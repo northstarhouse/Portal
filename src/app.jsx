@@ -2777,8 +2777,8 @@ const StrategyApp = () => {
         <div style="font-size:13px;color:#222;white-space:pre-wrap">${value}</div>
       </div>` : '';
 
-    const areaHtml = SECTION_PAGES.map(({ label: focusArea }) => {
-      const latest = getLatest(focusArea);
+    const renderSectionHtml = (sectionLabel) => {
+      const latest = getLatest(sectionLabel);
       const payload = latest?.payload || {};
       const review = payload.review || {};
 
@@ -2808,14 +2808,14 @@ const StrategyApp = () => {
       ].filter((item) => item.value);
 
       return `
-        <div style="margin-bottom:40px;page-break-inside:avoid">
-          <h2 style="font-size:16px;font-weight:bold;border-bottom:2px solid #c8a951;padding-bottom:6px;margin-bottom:16px;color:#2a2a2a">${focusArea}</h2>
+        <div style="margin-bottom:32px;page-break-inside:avoid">
+          <h3 style="font-size:15px;font-weight:bold;margin:0 0 14px;color:#2a2a2a">${sectionLabel}</h3>
 
-          <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:0 0 10px">Primary Focus &amp; Goals</h3>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:0 0 8px">Primary Focus &amp; Goals</div>
           ${field('Primary focus', primaryFocusValue || '—')}
-          ${goals.length ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#888;margin-bottom:6px">Goals</div>${goals.map((g, i) => `<div style="margin-bottom:5px;font-size:13px">${i + 1}. ${g.goal || '—'}</div>`).join('')}` : '<div style="font-size:13px;color:#999;margin-bottom:12px">No goals submitted.</div>'}
+          ${goals.length ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#888;margin-bottom:6px">Goals</div>${goals.map((g, i) => `<div style="margin-bottom:5px;font-size:13px">${i + 1}. ${g.goal || '—'}</div>`).join('')}` : '<div style="font-size:13px;color:#999;margin-bottom:10px">No goals submitted.</div>'}
 
-          <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:16px 0 10px">Quarterly Reflection</h3>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:14px 0 8px">Quarterly Reflection</div>
           ${field('What went well', payload.wins)}
           ${field('Challenges', challenges.details)}
           ${field('Challenges (checked)', challengesDisplay)}
@@ -2824,12 +2824,24 @@ const StrategyApp = () => {
           ${field('Next quarter focus', payload.nextQuarterFocus)}
           ${nextPriorities.length ? `<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#888;margin-bottom:6px">Next priorities</div>${nextPriorities.map((item, i) => `<div style="margin-bottom:5px;font-size:13px">${i + 1}. ${item}</div>`).join('')}` : ''}
           ${field('Other notes', payload.decisionsNeeded)}
-          ${!payload.wins && !challenges.details && !payload.supportNeeded ? '<div style="font-size:13px;color:#999;margin-bottom:12px">No reflection submitted.</div>' : ''}
+          ${!payload.wins && !challenges.details && !payload.supportNeeded ? '<div style="font-size:13px;color:#999;margin-bottom:10px">No reflection submitted.</div>' : ''}
 
-          <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:16px 0 10px">Co-Champion Notes</h3>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:14px 0 8px">Co-Champion Notes</div>
           ${reviewItems.length ? reviewItems.map((item) => field(item.label, item.value)).join('') : '<div style="font-size:13px;color:#999">No review submitted.</div>'}
         </div>`;
-    }).join('');
+    };
+
+    const groupedByFocusArea = FOCUS_AREAS.map((focusAreaName) => {
+      const sections = SECTION_PAGES.filter(({ label }) => sectionToFocusArea[label] === focusAreaName);
+      return { focusAreaName, sections };
+    });
+
+    const areaHtml = groupedByFocusArea.map(({ focusAreaName, sections }) => `
+      <div style="margin-bottom:48px;page-break-before:auto">
+        <h2 style="font-size:18px;font-weight:bold;border-bottom:3px solid #c8a951;padding-bottom:8px;margin-bottom:24px;color:#1b1f24">${focusAreaName}</h2>
+        ${sections.map(({ label }) => renderSectionHtml(label)).join('<hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>')}
+      </div>`
+    ).join('');
 
     const quarterRanges = { Q1: 'Jan 1 – Mar 31', Q2: 'Apr 1 – Jun 30', Q3: 'Jul 1 – Sep 30', Q4: 'Oct 1 – Dec 31' };
 
