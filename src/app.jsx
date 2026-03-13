@@ -2809,7 +2809,7 @@ const StrategyApp = () => {
 
       return `
         <div style="margin-bottom:32px;page-break-inside:avoid">
-          <h3 style="font-size:15px;font-weight:bold;margin:0 0 14px;color:#2a2a2a">${sectionLabel}</h3>
+          <h3 style="font-family:'Cardo',Georgia,serif;font-size:16px;font-weight:bold;margin:0 0 14px;color:#2a2a2a">${sectionLabel}</h3>
 
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:0 0 8px">Primary Focus &amp; Goals</div>
           ${field('Primary focus', primaryFocusValue || '—')}
@@ -2838,7 +2838,7 @@ const StrategyApp = () => {
 
     const areaHtml = groupedByFocusArea.map(({ focusAreaName, sections }, index) => `
       <div style="margin-bottom:48px;${index > 0 ? 'page-break-before:always;' : ''}">
-        <h2 style="font-size:18px;font-weight:bold;border-bottom:3px solid #c8a951;padding-bottom:8px;margin-bottom:24px;color:#1b1f24">${focusAreaName}</h2>
+        <h2 style="font-family:'Cardo',Georgia,serif;font-size:20px;font-weight:bold;border-bottom:3px solid #c8a951;padding-bottom:8px;margin-bottom:24px;color:#1b1f24">${focusAreaName}</h2>
         ${sections.map(({ label }) => renderSectionHtml(label)).join('<hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>')}
       </div>`
     ).join('');
@@ -2846,9 +2846,15 @@ const StrategyApp = () => {
     const quarterRanges = { Q1: 'Jan 1 – Mar 31', Q2: 'Apr 1 – Jun 30', Q3: 'Jul 1 – Sep 30', Q4: 'Oct 1 – Dec 31' };
 
     const html = `<!DOCTYPE html><html><head><title>North Star House — ${quarter} Report</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap" rel="stylesheet">
       <style>
-        body { font-family: Georgia, serif; max-width: 820px; margin: 40px auto; color: #222; padding: 0 24px; }
-        h1 { font-size: 24px; margin: 0 0 4px; }
+        body { font-family: Arial, sans-serif; max-width: 820px; margin: 40px auto; color: #222; padding: 0 24px; }
+        h1, h2, h3 { font-family: 'Cardo', Georgia, serif; }
+        h1 { font-size: 28px; margin: 0 0 4px; }
+        h2 { font-size: 20px; }
+        h3 { font-size: 16px; }
         .meta { font-size: 12px; color: #888; margin-bottom: 36px; }
         @media print { body { margin: 0; } }
       </style>
