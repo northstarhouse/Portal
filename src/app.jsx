@@ -2836,8 +2836,8 @@ const StrategyApp = () => {
       return { focusAreaName, sections };
     });
 
-    const areaHtml = groupedByFocusArea.map(({ focusAreaName, sections }) => `
-      <div style="margin-bottom:48px;page-break-before:auto">
+    const areaHtml = groupedByFocusArea.map(({ focusAreaName, sections }, index) => `
+      <div style="margin-bottom:48px;${index > 0 ? 'page-break-before:always;' : ''}">
         <h2 style="font-size:18px;font-weight:bold;border-bottom:3px solid #c8a951;padding-bottom:8px;margin-bottom:24px;color:#1b1f24">${focusAreaName}</h2>
         ${sections.map(({ label }) => renderSectionHtml(label)).join('<hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>')}
       </div>`

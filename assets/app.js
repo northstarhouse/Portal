@@ -24,10 +24,10 @@
 
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#888;margin:14px 0 8px">Co-Champion Notes</div>
           ${de.length?de.map(k=>x(k.label,k.value)).join(""):'<div style="font-size:13px;color:#999">No review submitted.</div>'}
-        </div>`},I=Te.map(U=>{const v=Ae.filter(({label:p})=>q[p]===U);return{focusAreaName:U,sections:v}}).map(({focusAreaName:U,sections:v})=>`
-      <div style="margin-bottom:48px;page-break-before:auto">
+        </div>`},I=Te.map(U=>{const v=Ae.filter(({label:p})=>q[p]===U);return{focusAreaName:U,sections:v}}).map(({focusAreaName:U,sections:v},p)=>`
+      <div style="margin-bottom:48px;${p>0?"page-break-before:always;":""}">
         <h2 style="font-size:18px;font-weight:bold;border-bottom:3px solid #c8a951;padding-bottom:8px;margin-bottom:24px;color:#1b1f24">${U}</h2>
-        ${v.map(({label:p})=>T(p)).join('<hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>')}
+        ${v.map(({label:d})=>T(d)).join('<hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>')}
       </div>`).join(""),te=`<!DOCTYPE html><html><head><title>North Star House \u2014 ${r} Report</title>
       <style>
         body { font-family: Georgia, serif; max-width: 820px; margin: 40px auto; color: #222; padding: 0 24px; }
