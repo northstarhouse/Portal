@@ -10,6 +10,7 @@ const SNAPSHOTS_CACHE_KEY = 'nsh-strategy-sections-cache-v1';
 const QUARTERLY_CACHE_KEY = 'nsh-strategy-quarterly-cache-v1';
 const VISION_CACHE_KEY = 'nsh-strategy-vision-cache-v1';
 const FOCUS_GOALS_CACHE_KEY = 'nsh-strategy-focus-goals-cache-v1';
+const PURCHASES_CACHE_KEY = 'nsh-strategy-purchases-cache-v1';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 const readCache = () => {
@@ -417,6 +418,39 @@ const SheetsAPI = {
       throw new Error('Google Sheets not configured');
     }
     const data = await SheetsAPI.postJson(GOOGLE_SCRIPT_URL, { action: 'deleteFocusAreaGoal', id });
+    if (!data.success) throw new Error(data.error || 'Delete failed');
+    return data.result;
+  },
+
+  fetchPurchases: async () => {
+    if (!SheetsAPI.isConfigured()) {
+      return [];
+    }
+    try {
+      const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getPurchases`);
+      if (!response.ok) throw new Error('Failed to fetch purchases');
+      const data = await response.json();
+      return data.purchases || [];
+    } catch (error) {
+      console.error('Error fetching purchases:', error);
+      return [];
+    }
+  },
+
+  savePurchase: async (purchase) => {
+    if (!SheetsAPI.isConfigured()) {
+      throw new Error('Google Sheets not configured');
+    }
+    const data = await SheetsAPI.postJson(GOOGLE_SCRIPT_URL, { action: 'savePurchase', purchase });
+    if (!data.success) throw new Error(data.error || 'Save failed');
+    return data.result;
+  },
+
+  deletePurchase: async (id) => {
+    if (!SheetsAPI.isConfigured()) {
+      throw new Error('Google Sheets not configured');
+    }
+    const data = await SheetsAPI.postJson(GOOGLE_SCRIPT_URL, { action: 'deletePurchase', id });
     if (!data.success) throw new Error(data.error || 'Delete failed');
     return data.result;
   },
@@ -1959,6 +1993,159 @@ const FocusGoalForm = ({ focusArea, initialGoal, presetCategory, onSave, onCance
   );
 };
 
+const PurchasePanel = ({ section, sectionLabel, purchases, budget, onSave, onDelete, isSaving, onClose }) => {
+  const emptyForm = { item: '', amountSpent: '', type: 'budget', notes: '' };
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState(null);
+
+  const totalSpent = purchases.reduce((sum, p) => sum + (parseFloat(p.amountSpent) || 0), 0);
+  const budgetNum = parseFloat(budget) || 0;
+
+  const handleEdit = (purchase) => {
+    setEditingId(purchase.id);
+    setForm({ item: purchase.item, amountSpent: purchase.amountSpent, type: purchase.type, notes: purchase.notes });
+  };
+
+  const handleCancel = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.item.trim()) return;
+    await onSave({
+      id: editingId || undefined,
+      section,
+      item: form.item.trim(),
+      amountSpent: parseFloat(form.amountSpent) || 0,
+      type: form.type,
+      notes: form.notes.trim()
+    });
+    setEditingId(null);
+    setForm(emptyForm);
+  };
+
+  return (
+    <div className="mt-6 bg-white rounded-3xl border border-stone-100 p-6 card-shadow">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <div className="font-display text-2xl text-ink">{sectionLabel} Purchases</div>
+          {budgetNum > 0 && (
+            <div className="text-sm text-steel mt-1">
+              {formatCurrency(totalSpent)} spent of {formatCurrency(budgetNum)} budget
+              {budgetNum > 0 && (
+                <span className={totalSpent > budgetNum ? ' text-red-500 font-medium' : ' text-green-600 font-medium'}>
+                  {totalSpent > budgetNum ? ` (${formatCurrency(totalSpent - budgetNum)} over)` : ` (${formatCurrency(budgetNum - totalSpent)} remaining)`}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <button type="button" onClick={onClose} className="px-3 py-2 border border-stone-200 rounded-lg text-sm">Close</button>
+      </div>
+
+      {purchases.length > 0 && (
+        <div className="mb-6 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-stone-100">
+                <th className="text-left py-2 pr-4 text-xs uppercase tracking-wide text-steel font-medium">Item</th>
+                <th className="text-right py-2 pr-4 text-xs uppercase tracking-wide text-steel font-medium">Amount</th>
+                <th className="text-left py-2 pr-4 text-xs uppercase tracking-wide text-steel font-medium">Type</th>
+                <th className="text-left py-2 pr-4 text-xs uppercase tracking-wide text-steel font-medium">Notes</th>
+                <th className="py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchases.map((p) => (
+                <tr key={p.id} className="border-b border-stone-50">
+                  <td className="py-2 pr-4 text-ink">{p.item}</td>
+                  <td className="py-2 pr-4 text-right text-ink">{formatCurrency(parseFloat(p.amountSpent) || 0)}</td>
+                  <td className="py-2 pr-4">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${p.type === 'in-kind' ? 'bg-blue-50 text-blue-700' : 'bg-stone-100 text-stone-600'}`}>
+                      {p.type === 'in-kind' ? 'In-Kind Donation' : 'Budget'}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-4 text-steel">{p.notes || '—'}</td>
+                  <td className="py-2 flex gap-2 justify-end">
+                    <button type="button" onClick={() => handleEdit(p)} className="text-xs text-blue-600 hover:underline">Edit</button>
+                    <button type="button" onClick={() => onDelete(p.id)} disabled={isSaving} className="text-xs text-red-500 hover:underline">Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="border-t border-stone-100 pt-4">
+        <div className="text-sm font-medium text-ink mb-3">{editingId ? 'Edit purchase' : 'Add a purchase'}</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="block text-xs text-steel mb-1">Item *</label>
+            <input
+              type="text"
+              value={form.item}
+              onChange={(e) => setForm((prev) => ({ ...prev, item: e.target.value }))}
+              placeholder="e.g. Paint supplies"
+              className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stone-400"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-steel mb-1">Amount Spent</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.amountSpent}
+              onChange={(e) => setForm((prev) => ({ ...prev, amountSpent: e.target.value }))}
+              placeholder="0.00"
+              className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stone-400"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-steel mb-1">Type</label>
+            <select
+              value={form.type}
+              onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
+              className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stone-400"
+            >
+              <option value="budget">Budget</option>
+              <option value="in-kind">In-Kind Donation</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-steel mb-1">Notes</label>
+            <input
+              type="text"
+              value={form.notes}
+              onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+              placeholder="Optional notes"
+              className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-stone-400"
+            />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={isSaving || !form.item.trim()}
+            className="px-4 py-2 bg-ink text-white rounded-lg text-sm disabled:opacity-50"
+          >
+            {isSaving ? 'Saving...' : editingId ? 'Update' : 'Add Purchase'}
+          </button>
+          {editingId && (
+            <button type="button" onClick={handleCancel} className="px-4 py-2 border border-stone-200 rounded-lg text-sm">
+              Cancel
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+};
+
 const FocusAreaCard = ({ focusArea, goals, vision, onSaveVision, isSavingVision, onSaveGoal, onDeleteGoal, isSaving, hideTitle }) => {
   const [editingGoal, setEditingGoal] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -2504,6 +2691,9 @@ const StrategyApp = () => {
   const [focusAreaGoals, setFocusAreaGoals] = useState([]);
   const [isSavingGoal, setIsSavingGoal] = useState(false);
   const [focusAreaFilter, setFocusAreaFilter] = useState(null);
+  const [purchases, setPurchases] = useState([]);
+  const [isSavingPurchase, setIsSavingPurchase] = useState(false);
+  const [purchaseModal, setPurchaseModal] = useState(null); // section key or null
   const [focusPanelOpen, setFocusPanelOpen] = useState(false);
   const [focusPanelArea, setFocusPanelArea] = useState(null);
   const sectionToFocusArea = {
@@ -2564,6 +2754,7 @@ const StrategyApp = () => {
     const cachedQuarterly = useCache ? readSimpleCache(QUARTERLY_CACHE_KEY) : null;
     const cachedVision = useCache ? readSimpleCache(VISION_CACHE_KEY) : null;
     const cachedFocusGoals = useCache ? readSimpleCache(FOCUS_GOALS_CACHE_KEY) : null;
+    const cachedPurchases = useCache ? readSimpleCache(PURCHASES_CACHE_KEY) : null;
 
     if (cachedInitiatives) {
       setInitiatives(cachedInitiatives);
@@ -2578,6 +2769,7 @@ const StrategyApp = () => {
     if (cachedQuarterly) setQuarterlyUpdates(cachedQuarterly);
     if (cachedVision) setVisionStatements(cachedVision);
     if (cachedFocusGoals) setFocusAreaGoals(cachedFocusGoals);
+    if (cachedPurchases) setPurchases(cachedPurchases);
 
     if (!USE_SHEETS) {
       setInitiatives((cachedInitiatives || SAMPLE_INITIATIVES.map(normalizeInitiative)));
@@ -2635,6 +2827,11 @@ const StrategyApp = () => {
     if (focusGoalsData.length) {
       setFocusAreaGoals(focusGoalsData);
       writeSimpleCache(FOCUS_GOALS_CACHE_KEY, focusGoalsData);
+    }
+    const purchasesData = await SheetsAPI.fetchPurchases();
+    if (purchasesData.length) {
+      setPurchases(purchasesData);
+      writeSimpleCache(PURCHASES_CACHE_KEY, purchasesData);
     }
   };
 
@@ -3037,6 +3234,41 @@ const StrategyApp = () => {
     setIsSavingGoal(false);
   };
 
+  const handleSavePurchase = async (purchase) => {
+    setIsSavingPurchase(true);
+    try {
+      const updated = await SheetsAPI.savePurchase(purchase);
+      setPurchases((prev) => {
+        const index = prev.findIndex((item) => item.id === updated.id);
+        const next = index >= 0
+          ? prev.map((item, idx) => (idx === index ? updated : item))
+          : [...prev, updated];
+        writeSimpleCache(PURCHASES_CACHE_KEY, next);
+        return next;
+      });
+    } catch (error) {
+      console.error('Failed to save purchase:', error);
+      alert('Failed to save purchase. Please try again.');
+    }
+    setIsSavingPurchase(false);
+  };
+
+  const handleDeletePurchase = async (id) => {
+    setIsSavingPurchase(true);
+    try {
+      await SheetsAPI.deletePurchase(id);
+      setPurchases((prev) => {
+        const next = prev.filter((item) => item.id !== id);
+        writeSimpleCache(PURCHASES_CACHE_KEY, next);
+        return next;
+      });
+    } catch (error) {
+      console.error('Failed to delete purchase:', error);
+      alert('Failed to delete purchase. Please try again.');
+    }
+    setIsSavingPurchase(false);
+  };
+
   const isDetailReady = view === 'detail' && selectedInitiative;
 
   return (
@@ -3161,12 +3393,25 @@ const StrategyApp = () => {
                             <div className="text-xs uppercase tracking-wide text-steel">Lead name</div>
                             <div className="text-lg text-ink mt-2">{snapshot?.lead || 'N/A'}</div>
                           </div>
-                          <div className="bg-stone-50 rounded-2xl p-4 border border-stone-100">
+                          <button
+                            type="button"
+                            onClick={() => setPurchaseModal(sectionDetails[view].key)}
+                            className="bg-stone-50 rounded-2xl p-4 border border-stone-100 text-left hover:bg-stone-100 hover:border-stone-300 transition-colors w-full"
+                          >
                             <div className="text-xs uppercase tracking-wide text-steel">Budget</div>
                             <div className="text-lg text-ink mt-2">
                               {snapshot?.budget ? formatCurrency(snapshot.budget) : 'N/A'}
                             </div>
-                          </div>
+                            {(() => {
+                              const sectionPurchases = purchases.filter((p) => p.section === sectionDetails[view].key);
+                              const spent = sectionPurchases.reduce((sum, p) => sum + (parseFloat(p.amountSpent) || 0), 0);
+                              return spent > 0 ? (
+                                <div className="text-xs text-steel mt-1">{formatCurrency(spent)} spent &middot; click to manage</div>
+                              ) : (
+                                <div className="text-xs text-steel mt-1">Click to track purchases</div>
+                              );
+                            })()}
+                          </button>
                           <div className="bg-stone-50 rounded-2xl p-4 border border-stone-100">
                             <div className="text-xs uppercase tracking-wide text-steel">Volunteers (2026)</div>
                             <div className="text-lg text-ink mt-2">{snapshot?.volunteers || 'N/A'}</div>
@@ -3176,6 +3421,18 @@ const StrategyApp = () => {
                     })()}
                   </div>
                 </div>
+                {purchaseModal === sectionDetails[view].key && (
+                  <PurchasePanel
+                    section={sectionDetails[view].key}
+                    sectionLabel={sectionDetails[view].label}
+                    purchases={purchases.filter((p) => p.section === sectionDetails[view].key)}
+                    budget={sectionSnapshots[sectionDetails[view].key]?.budget}
+                    onSave={handleSavePurchase}
+                    onDelete={handleDeletePurchase}
+                    isSaving={isSavingPurchase}
+                    onClose={() => setPurchaseModal(null)}
+                  />
+                )}
                 {focusPanelOpen && focusPanelArea === sectionToFocusArea[sectionDetails[view].label] && (
                   <div className="mt-6 bg-white rounded-3xl border border-stone-100 p-6 card-shadow">
                     <div className="flex items-center justify-between">

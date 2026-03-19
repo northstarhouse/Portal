@@ -61,6 +61,18 @@ const VISION_HEADERS = [
   'threeYearVision',
   'updatedAt'
 ];
+const PURCHASES_SHEET_NAME = 'Purchases';
+const PURCHASES_HEADERS = [
+  'id',
+  'section',
+  'item',
+  'amountSpent',
+  'type',
+  'notes',
+  'createdAt',
+  'updatedAt'
+];
+
 const FOCUS_GOALS_SHEET_NAME = 'Focus Areas';
 const FOCUS_GOALS_HEADERS = [
   'id',
@@ -347,6 +359,93 @@ function getFocusGoalsSheet() {
   return sheet;
 }
 
+function getPurchasesSheet() {
+  const ss = getStrategicSpreadsheet();
+  let sheet = ss.getSheetByName(PURCHASES_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(PURCHASES_SHEET_NAME);
+  }
+  const headerRange = sheet.getRange(1, 1, 1, PURCHASES_HEADERS.length);
+  const headerValues = headerRange.getValues()[0];
+  const needsHeaders = headerValues.every((value) => value === '');
+  if (needsHeaders) {
+    headerRange.setValues([PURCHASES_HEADERS]);
+    headerRange.setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getPurchases(section) {
+  const sheet = getPurchasesSheet();
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return [];
+  const headers = data[0];
+  const headerMap = headers.reduce((acc, value, idx) => {
+    if (value) acc[value] = idx;
+    return acc;
+  }, {});
+  const rows = data.slice(1).filter((row) => row[headerMap.id]);
+  const filtered = section ? rows.filter((row) => row[headerMap.section] === section) : rows;
+  return filtered.map((row) => ({
+    id: row[headerMap.id],
+    section: row[headerMap.section] || '',
+    item: row[headerMap.item] || '',
+    amountSpent: row[headerMap.amountSpent] || 0,
+    type: row[headerMap.type] || 'budget',
+    notes: row[headerMap.notes] || '',
+    createdAt: row[headerMap.createdAt] || '',
+    updatedAt: row[headerMap.updatedAt] || ''
+  }));
+}
+
+function savePurchase(purchase) {
+  if (!purchase) throw new Error('Missing purchase data');
+  const sheet = getPurchasesSheet();
+  const lastRow = sheet.getLastRow();
+  const ids = lastRow > 1
+    ? sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat()
+    : [];
+  const id = purchase.id || Utilities.getUuid();
+  const rowIndex = ids.indexOf(id);
+  const targetRow = rowIndex >= 0 ? rowIndex + 2 : lastRow + 1;
+  const now = new Date().toISOString();
+  const createdAt = rowIndex >= 0 ? (purchase.createdAt || now) : now;
+  const values = [
+    id,
+    purchase.section || '',
+    purchase.item || '',
+    purchase.amountSpent || 0,
+    purchase.type || 'budget',
+    purchase.notes || '',
+    createdAt,
+    now
+  ];
+  sheet.getRange(targetRow, 1, 1, PURCHASES_HEADERS.length).setValues([values]);
+  return {
+    id,
+    section: purchase.section || '',
+    item: purchase.item || '',
+    amountSpent: purchase.amountSpent || 0,
+    type: purchase.type || 'budget',
+    notes: purchase.notes || '',
+    createdAt,
+    updatedAt: now
+  };
+}
+
+function deletePurchase(id) {
+  if (!id) throw new Error('Missing id');
+  const sheet = getPurchasesSheet();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { deleted: false };
+  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat();
+  const rowIndex = ids.indexOf(id);
+  if (rowIndex < 0) return { deleted: false };
+  sheet.deleteRow(rowIndex + 2);
+  return { deleted: true };
+}
+
 function getFocusAreaGoals() {
   const sheet = getFocusGoalsSheet();
   const data = sheet.getDataRange().getValues();
@@ -620,6 +719,7 @@ function doGet(e) {
     ensureSectionTabs();
     ensureVisionRows();
     getFocusGoalsSheet();
+    getPurchasesSheet();
 
     if (action === 'getAll') {
       if (!USE_SHEETS) {
@@ -682,6 +782,13 @@ function doGet(e) {
       const goals = getFocusAreaGoals();
       return ContentService
         .createTextOutput(JSON.stringify({ success: true, goals: goals }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === 'getPurchases') {
+      const section = e.parameter.section || null;
+      const purchases = getPurchases(section);
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: true, purchases: purchases }))
         .setMimeType(ContentService.MimeType.JSON);
     }
     if (action === 'getQuarterlyUpdates') {
@@ -920,6 +1027,7 @@ function doPost(e) {
     ensureSectionTabs();
     ensureVisionRows();
     getFocusGoalsSheet();
+    getPurchasesSheet();
 
     let result;
 
@@ -953,6 +1061,12 @@ function doPost(e) {
         break;
       case 'deleteFocusAreaGoal':
         result = deleteFocusAreaGoal(data.id);
+        break;
+      case 'savePurchase':
+        result = savePurchase(data.purchase);
+        break;
+      case 'deletePurchase':
+        result = deletePurchase(data.id);
         break;
       default:
         return ContentService
