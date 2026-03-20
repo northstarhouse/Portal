@@ -306,6 +306,13 @@ function VolunteersView() {
   var inactive = volunteers.filter(function(v) { return v['Status'] === 'Inactive'; }).length;
   var teams = new Set(volunteers.map(function(v) { return (v['Team'] || '').split(',')[0].trim(); }).filter(Boolean)).size;
 
+  function fmtBirthday(val) {
+    if (!val) return '';
+    var d = new Date(val + 'T00:00:00');
+    if (isNaN(d)) return val;
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  }
+
   function initials(v) {
     return ((v['First Name'] || '')[0] || '').toUpperCase() + ((v['Last Name'] || '')[0] || '').toUpperCase();
   }
@@ -532,7 +539,7 @@ function VolunteersView() {
                 <div style={{ marginBottom: 4 }}>
                   <span style={secLabel}>Volunteer Info</span>
                   <InfoRow label="Anniversary" value={selected['Volunteer Anniversary']} />
-                  <InfoRow label="Birthday" value={selected['Birthday']} />
+                  <InfoRow label="Birthday" value={fmtBirthday(selected['Birthday'])} />
                 </div>
               )}
               {(selected['Overview Notes'] || selected['Background Notes'] || selected['Notes']) && (
