@@ -254,7 +254,7 @@ function VolunteersView() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    sbFetch("2025 Volunteers-1", ["First Name", "Last Name", "Role", "Team", "Status", "Email"])
+    sbFetch("2026 Volunteers", ["First Name", "Last Name", "Role", "Team", "Status", "Email"])
       .then(data => {
         if (Array.isArray(data)) setVolunteers(data);
         else setError(JSON.stringify(data));
