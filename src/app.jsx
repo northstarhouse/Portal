@@ -414,6 +414,7 @@ function VolunteersView() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filterTeam, setFilterTeam] = useState('All');
+  const [tab, setTab] = useState('active');
 
   var emptyForm = {
     'First Name': '', 'Last Name': '', 'Team': '', 'Status': 'Active',
@@ -437,8 +438,9 @@ function VolunteersView() {
 
   var active = volunteers.filter(function(v) { return v['Status'] === 'Active'; }).length;
   var inactive = volunteers.filter(function(v) { return v['Status'] === 'Inactive'; }).length;
+  var tabList = volunteers.filter(function(v) { return tab === 'active' ? v['Status'] !== 'Inactive' : v['Status'] === 'Inactive'; });
   var teamSet = ['All'].concat(TEAM_OPTIONS.filter(function(t) {
-    return volunteers.some(function(v) { return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(t) !== -1; });
+    return tabList.some(function(v) { return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(t) !== -1; });
   }));
   var teams = teamSet.length - 1;
   function teamSortKey(v) {
@@ -449,8 +451,8 @@ function VolunteersView() {
     return '3_' + t;
   }
   var filtered = filterTeam === 'All'
-    ? volunteers.slice().sort(function(a, b) { return teamSortKey(a).localeCompare(teamSortKey(b)); })
-    : volunteers.filter(function(v) {
+    ? tabList.slice().sort(function(a, b) { return teamSortKey(a).localeCompare(teamSortKey(b)); })
+    : tabList.filter(function(v) {
         return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(filterTeam) !== -1;
       });
 
@@ -567,7 +569,16 @@ function VolunteersView() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ fontSize: 13, color: '#888' }}>{loading ? 'Loading...' : volunteers.length + ' volunteer' + (volunteers.length !== 1 ? 's' : '')}</div>
+        <div style={{ display: 'flex', gap: 0, background: '#f0ebe3', borderRadius: 10, padding: 3 }}>
+          <button
+            onClick={function() { setTab('active'); setFilterTeam('All'); }}
+            style={{ border: 'none', borderRadius: 8, padding: '6px 18px', fontSize: 13, fontWeight: tab === 'active' ? 600 : 400, cursor: 'pointer', background: tab === 'active' ? '#fff' : 'transparent', color: tab === 'active' ? '#2a2a2a' : '#999', boxShadow: tab === 'active' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
+          >Active <span style={{ fontSize: 11, color: tab === 'active' ? gold : '#bbb', fontWeight: 500 }}>{active}</span></button>
+          <button
+            onClick={function() { setTab('inactive'); setFilterTeam('All'); }}
+            style={{ border: 'none', borderRadius: 8, padding: '6px 18px', fontSize: 13, fontWeight: tab === 'inactive' ? 600 : 400, cursor: 'pointer', background: tab === 'inactive' ? '#fff' : 'transparent', color: tab === 'inactive' ? '#2a2a2a' : '#999', boxShadow: tab === 'inactive' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
+          >Inactive <span style={{ fontSize: 11, color: tab === 'inactive' ? gold : '#bbb', fontWeight: 500 }}>{inactive}</span></button>
+        </div>
         <button onClick={function() { setForm(emptyForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ Add Volunteer</button>
       </div>
 
