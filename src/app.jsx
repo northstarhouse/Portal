@@ -254,7 +254,7 @@ function VolunteersView() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    sbFetch("2026 Volunteers", ["First Name", "Last Name", "Role", "Team", "Status", "Email"])
+    sbFetch("2026 Volunteers", ["First Name", "Last Name", "Team", "Status", "Email"])
       .then(data => {
         if (Array.isArray(data)) setVolunteers(data);
         else setError(JSON.stringify(data));
@@ -278,11 +278,10 @@ function VolunteersView() {
         <div style={{ padding: 24, textAlign: "center", color: "#aaa", fontSize: 13 }}>Loading volunteers...</div>
       ) : (
         <Table
-          cols={["Name", "Role", "Team", "Status", "Email"]}
+          cols={["Name", "Team", "Status", "Email"]}
           rows={volunteers}
           renderRow={r => (<>
             <Td>{r["First Name"]} {r["Last Name"]}</Td>
-            <Td muted>{r.Role}</Td>
             <Td muted>{r.Team}</Td>
             <Td><Badge status={r.Status} /></Td>
             <Td muted>{r.Email}</Td>
