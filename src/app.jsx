@@ -275,6 +275,71 @@ function sbUpdate(table, firstName, lastName, row) {
   }).then(r => r.json());
 }
 
+var TEAM_OPTIONS = ['Grounds','Construction','Events Team','Event Support','Interiors','Fundraising','Staff','Board Member','New','Docent'];
+
+function TeamPicker({ value, onChange }) {
+  const { useState: useS } = React;
+  const [open, setOpen] = useS(false);
+  var selected = value ? value.split(',').map(function(t) { return t.trim(); }).filter(Boolean) : [];
+
+  function toggle(opt) {
+    var next;
+    if (selected.indexOf(opt) !== -1) {
+      next = selected.filter(function(t) { return t !== opt; });
+    } else {
+      next = selected.concat([opt]);
+    }
+    onChange({ target: { name: 'Team', value: next.join(', ') } });
+  }
+
+  function remove(opt) {
+    var next = selected.filter(function(t) { return t !== opt; });
+    onChange({ target: { name: 'Team', value: next.join(', ') } });
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        onClick={function() { setOpen(function(o) { return !o; }); }}
+        style={{ minHeight: 38, border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', background: '#fff', display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}
+      >
+        {selected.length === 0 && <span style={{ fontSize: 13, color: '#bbb' }}>Select teams...</span>}
+        {selected.map(function(t) {
+          return (
+            <span key={t} style={{ background: '#f0e8dc', color: '#7a5c30', fontSize: 12, fontWeight: 500, padding: '3px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4 }}>
+              {t}
+              <span
+                onClick={function(e) { e.stopPropagation(); remove(t); }}
+                style={{ cursor: 'pointer', opacity: 0.6, fontSize: 13, lineHeight: 1, marginLeft: 1 }}
+              >×</span>
+            </span>
+          );
+        })}
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#bbb', flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 100, marginTop: 4, padding: '6px 0', maxHeight: 220, overflowY: 'auto' }}>
+          {TEAM_OPTIONS.map(function(opt) {
+            var isOn = selected.indexOf(opt) !== -1;
+            return (
+              <div
+                key={opt}
+                onClick={function() { toggle(opt); }}
+                style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: isOn ? '#faf5ee' : '#fff', color: isOn ? '#7a5c30' : '#2a2a2a' }}
+                onMouseEnter={function(e) { if (!isOn) e.currentTarget.style.background = '#faf8f4'; }}
+                onMouseLeave={function(e) { if (!isOn) e.currentTarget.style.background = '#fff'; }}
+              >
+                {opt}
+                {isOn && <span style={{ color: gold, fontSize: 14, fontWeight: 600 }}>✓</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 var volInputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
 var volLabelStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
 var volGrp = { marginBottom: 14 };
@@ -292,7 +357,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel }) {
             <div><label style={volLabelStyle}>Last Name *</label><input required name="Last Name" value={form['Last Name']} onChange={onChange} style={volInputStyle} /></div>
           </div>
           <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
-          <div style={volGrp}><label style={volLabelStyle}>Team</label><input name="Team" value={form['Team']} onChange={onChange} style={volInputStyle} placeholder="e.g. Garden, Events" /></div>
+          <div style={volGrp}><label style={volLabelStyle}>Team</label><div style={{ marginTop: 4 }}><TeamPicker value={form['Team']} onChange={onChange} /></div></div>
           <span style={volSecLabel}>Contact</span>
           <div style={volGrp}><label style={volLabelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={onChange} style={volInputStyle} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={onChange} style={volInputStyle} /></div>
