@@ -1,8 +1,15 @@
 const { useState, useEffect } = React;
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2endoaHd6ZWxhZWxmaGZrdmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMzI4OTksImV4cCI6MjA4OTYwODg5OX0.xw5n0MGm69u_FOiZHxbLNUCNQHehIJliO_s4YbTyfh8";
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2endoaHd6ZWxhZWxmaGZrdmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMzI4OTksImV4cCI6MjA4OTYwODg5OX0.xw5n0MGm69u_FOiZHxbLNUCNQHehIJliO_s4YbTyfh8";
+
+function sbFetch(table, columns) {
+  const cols = columns.map(c => encodeURIComponent(c)).join(",");
+  const url = SUPABASE_URL + "/rest/v1/" + encodeURIComponent(table) + "?select=" + cols;
+  return fetch(url, {
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+  }).then(r => r.json());
+}
 
 const gold = "#886c44";
 const cream = "#f8f4ec";
@@ -247,19 +254,13 @@ function VolunteersView() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (typeof supabase === "undefined") {
-      setError("Supabase library not loaded");
-      setLoading(false);
-      return;
-    }
-    db.from("2025 Volunteers-1")
-      .select("First Name, Last Name, Role, Team, Status, Email")
-      .order("Last Name")
-      .then(({ data, error: err }) => {
-        if (err) { setError(err.message); }
-        else if (data) setVolunteers(data);
+    sbFetch("2025 Volunteers-1", ["First Name", "Last Name", "Role", "Team", "Status", "Email"])
+      .then(data => {
+        if (Array.isArray(data)) setVolunteers(data);
+        else setError(JSON.stringify(data));
         setLoading(false);
-      });
+      })
+      .catch(err => { setError(err.message); setLoading(false); });
   }, []);
 
   const active = volunteers.filter(v => v.Status === "Active").length;
