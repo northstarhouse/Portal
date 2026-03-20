@@ -413,6 +413,7 @@ function VolunteersView() {
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [filterTeam, setFilterTeam] = useState('All');
 
   var emptyForm = {
     'First Name': '', 'Last Name': '', 'Team': '', 'Status': 'Active',
@@ -436,7 +437,13 @@ function VolunteersView() {
 
   var active = volunteers.filter(function(v) { return v['Status'] === 'Active'; }).length;
   var inactive = volunteers.filter(function(v) { return v['Status'] === 'Inactive'; }).length;
-  var teams = new Set(volunteers.map(function(v) { return (v['Team'] || '').split('|')[0].trim(); }).filter(Boolean)).size;
+  var teamSet = ['All'].concat(TEAM_OPTIONS.filter(function(t) {
+    return volunteers.some(function(v) { return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(t) !== -1; });
+  }));
+  var teams = teamSet.length - 1;
+  var filtered = filterTeam === 'All' ? volunteers : volunteers.filter(function(v) {
+    return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(filterTeam) !== -1;
+  });
 
   function fmtBirthday(val) {
     if (!val) return '';
@@ -555,13 +562,39 @@ function VolunteersView() {
         <button onClick={function() { setForm(emptyForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ Add Volunteer</button>
       </div>
 
+      {!loading && teamSet.length > 2 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+          {teamSet.map(function(t) {
+            var isActive = filterTeam === t;
+            var tc = TEAM_COLORS[t] || { bg: '#f3f3f3', color: '#555' };
+            return (
+              <button
+                key={t}
+                onClick={function() { setFilterTeam(t); }}
+                style={{
+                  border: isActive ? 'none' : '0.5px solid #e0d8cc',
+                  borderRadius: 20,
+                  padding: '5px 12px',
+                  fontSize: 12,
+                  fontWeight: isActive ? 600 : 400,
+                  cursor: 'pointer',
+                  background: isActive ? tc.bg : '#fff',
+                  color: isActive ? tc.color : '#888',
+                  transition: 'all 0.15s'
+                }}
+              >{t}</button>
+            );
+          })}
+        </div>
+      )}
+
       {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#c0392b' }}>Error: {error}</div>}
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading volunteers...</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 14 }}>
-          {volunteers.map(function(v, i) {
+          {filtered.map(function(v, i) {
             var imgUrl = v['Picture URL'] ? driveImg(v['Picture URL']) : null;
             return (
               <div key={i} onClick={function() { setSelected(v); }}
