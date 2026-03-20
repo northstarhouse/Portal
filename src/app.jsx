@@ -275,7 +275,19 @@ function sbUpdate(table, firstName, lastName, row) {
   }).then(r => r.json());
 }
 
-var TEAM_OPTIONS = ['Grounds','Construction','Events Team','Event Support','Interiors','Fundraising','Staff','Board Member','New','Docent'];
+var TEAM_COLORS = {
+  'Grounds':      { bg: '#e8f5e9', color: '#2e7d32' },
+  'Construction': { bg: '#fff3e0', color: '#e65100' },
+  'Events Team':  { bg: '#e3f2fd', color: '#1565c0' },
+  'Event Support':{ bg: '#e8eaf6', color: '#3949ab' },
+  'Interiors':    { bg: '#f3e5f5', color: '#6a1b9a' },
+  'Fundraising':  { bg: '#fff8e1', color: '#8a6200' },
+  'Staff':        { bg: '#f3f3f3', color: '#555' },
+  'Board Member': { bg: '#fce4ec', color: '#880e4f' },
+  'New':          { bg: '#e0f7fa', color: '#006064' },
+  'Docent':       { bg: '#fbe9e7', color: '#8d3d2b' },
+};
+var TEAM_OPTIONS = Object.keys(TEAM_COLORS);
 
 function TeamPicker({ value, onChange }) {
   const { useState: useS } = React;
@@ -306,11 +318,11 @@ function TeamPicker({ value, onChange }) {
         {selected.length === 0 && <span style={{ fontSize: 13, color: '#bbb' }}>Select teams...</span>}
         {selected.map(function(t) {
           return (
-            <span key={t} style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+            <span key={t} style={{ background: (TEAM_COLORS[t] || { bg: '#f3f3f3' }).bg, color: (TEAM_COLORS[t] || { color: '#555' }).color, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
               {t}
               <span
                 onClick={function(e) { e.stopPropagation(); remove(t); }}
-                style={{ cursor: 'pointer', opacity: 0.5, fontSize: 14, lineHeight: 1, marginLeft: 2, color: '#2e7d32' }}
+                style={{ cursor: 'pointer', opacity: 0.6, fontSize: 14, lineHeight: 1, marginLeft: 2 }}
               >×</span>
             </span>
           );
@@ -325,7 +337,7 @@ function TeamPicker({ value, onChange }) {
               <div
                 key={opt}
                 onClick={function() { toggle(opt); }}
-                style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: isOn ? '#e8f5e9' : '#fff', color: isOn ? '#2e7d32' : '#2a2a2a' }}
+                style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: isOn ? (TEAM_COLORS[opt] || { bg: '#f3f3f3' }).bg : '#fff', color: isOn ? (TEAM_COLORS[opt] || { color: '#555' }).color : '#2a2a2a' }}
                 onMouseEnter={function(e) { if (!isOn) e.currentTarget.style.background = '#faf8f4'; }}
                 onMouseLeave={function(e) { if (!isOn) e.currentTarget.style.background = '#fff'; }}
               >
