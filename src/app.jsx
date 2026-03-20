@@ -1,15 +1,4 @@
-const { useState, useEffect } = React;
-
-const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2endoaHd6ZWxhZWxmaGZrdmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMzI4OTksImV4cCI6MjA4OTYwODg5OX0.xw5n0MGm69u_FOiZHxbLNUCNQHehIJliO_s4YbTyfh8";
-
-function sbFetch(table, columns) {
-  const cols = columns.map(c => encodeURIComponent(c)).join(",");
-  const url = SUPABASE_URL + "/rest/v1/" + encodeURIComponent(table) + "?select=" + cols;
-  return fetch(url, {
-    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
-  }).then(r => r.json());
-}
+const { useState } = React;
 
 const gold = "#886c44";
 const cream = "#f8f4ec";
@@ -29,7 +18,7 @@ const modules = [
 const mockData = {
   events: [
     { name: "Spring Garden Tour", date: "Apr 12", status: "Confirmed", revenue: "$1,200", guests: 45 },
-    { name: "Founder’s Gala", date: "May 3", status: "Pending", revenue: "$4,800", guests: 120 },
+    { name: "Founder's Gala", date: "May 3", status: "Pending", revenue: "$4,800", guests: 120 },
     { name: "Julia Morgan Lecture", date: "May 18", status: "Confirmed", revenue: "$600", guests: 30 },
     { name: "Mid-Summer Festival", date: "Jul 11", status: "Planning", revenue: "—", guests: 200 },
     { name: "Board Retreat", date: "Aug 5", status: "Confirmed", revenue: "—", guests: 14 },
@@ -83,7 +72,9 @@ const mockData = {
     { pillar: "Volunteer Development", goal: "Grow volunteer base to 50 active", progress: 60, owner: "Haley", due: "Q4 2025" },
     { pillar: "Brand & Communications", goal: "Relaunch NSH website", progress: 55, owner: "Haley", due: "Q3 2025" },
   ],
-};const statusColors = {
+};
+
+const statusColors = {
   Confirmed: { bg: "#e8f5e9", color: "#2e7d32" },
   Pending: { bg: "#fff8e1", color: "#8a6200" },
   Planning: { bg: "#e8eaf6", color: "#3949ab" },
@@ -124,7 +115,7 @@ function StatCard({ label, value, sub }) {
 function ProgressBar({ pct, color }) {
   return (
     <div style={{ background: "#eee", borderRadius: 4, height: 6, width: "100%", overflow: "hidden" }}>
-      <div style={{ width: pct + "%", height: "100%", background: color || gold, borderRadius: 4, transition: "width 0.4s" }} />
+      <div style={{ width: `${pct}%`, height: "100%", background: color || gold, borderRadius: 4, transition: "width 0.4s" }} />
     </div>
   );
 }
@@ -169,15 +160,31 @@ const typeColors = {
   Volunteer: { bg: "#e8f5e9", color: "#2e7d32" },
   Board: { bg: "#e8eaf6", color: "#3949ab" },
   Event: { bg: "#fff8e1", color: "#8a6200" },
-};function HomeView() {
+};
+
+const sponsors = [
+  { name: "Teichert Foundation", level: "Gold", amount: "$10,000", status: "Confirmed" },
+  { name: "PG&E Community Giving", level: "Silver", amount: "$5,000", status: "In Review" },
+  { name: "Nevada County Arts", level: "Bronze", amount: "$1,500", status: "Confirmed" },
+  { name: "Grass Valley Chamber", level: "Bronze", amount: "$750", status: "Confirmed" },
+];
+
+const levelColors = {
+  Gold: { bg: "#fff8e1", color: "#8a6200" },
+  Silver: { bg: "#f3f3f3", color: "#555" },
+  Bronze: { bg: "#fbe9e7", color: "#8d3d2b" },
+};
+
+function HomeView() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Today — March 20, 2026</div>
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 500, color: "#2a2a2a" }}>Good morning, North Star House</h2>
-        <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Here’s your organization at a glance.</p>
+        <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Here's your organization at a glance.</p>
       </div>
 
+      {/* Quarterly update banner */}
       <div style={{ background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ fontSize: 16, color: gold }}>⏎</div>
         <div>
@@ -194,10 +201,14 @@ const typeColors = {
         <StatCard label="Active Sponsors" value="3" sub="+ 1 in review" />
       </div>
 
+      {/* This Week + Events side by side */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        {/* This Week */}
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>This Week at North Star House</div>
-          {thisWeek.map((e, i) => {
+          {thisWeek.length === 0 ? (
+            <div style={{ fontSize: 13, color: "#ccc", fontStyle: "italic" }}>No events this week.</div>
+          ) : thisWeek.map((e, i) => {
             const tc = typeColors[e.type] || { bg: "#f3f3f3", color: "#555" };
             return (
               <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
@@ -215,6 +226,7 @@ const typeColors = {
           </div>
         </div>
 
+        {/* 2026 Events */}
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>In-House Events</div>
           {mockData.events.map((e, i) => (
@@ -230,7 +242,9 @@ const typeColors = {
       </div>
     </div>
   );
-}function EventsView() {
+}
+
+function EventsView() {
   return (
     <div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
@@ -242,19 +256,42 @@ const typeColors = {
       <Table
         cols={["Event", "Date", "Status", "Est. Guests", "Revenue"]}
         rows={mockData.events}
-        renderRow={r => (<><Td>{r.name}</Td><Td muted>{r.date}</Td><Td><Badge status={r.status} /></Td><Td muted>{r.guests}</Td><Td>{r.revenue}</Td></>)}
+        renderRow={r => (<>
+          <Td>{r.name}</Td>
+          <Td muted>{r.date}</Td>
+          <Td><Badge status={r.status} /></Td>
+          <Td muted>{r.guests}</Td>
+          <Td>{r.revenue}</Td>
+        </>)}
       />
     </div>
   );
 }
 
-function driveImg(url) {
-  if (!url) return null;
-  var i = url.indexOf("/d/");
-  if (i === -1) return url;
-  var rest = url.substring(i + 3);
-  var id = rest.split("/")[0].split("?")[0];
-  return "https://drive.google.com/thumbnail?id=" + id + "&sz=w200";
+function sbInsert(table, row) {
+  return fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent(table), {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: "Bearer " + SUPABASE_KEY,
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(row)
+  }).then(r => r.json());
+}
+
+function sbInsert(table, row) {
+  return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table), {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation'
+    },
+    body: JSON.stringify(row)
+  }).then(r => r.json());
 }
 
 function VolunteersView() {
@@ -262,76 +299,201 @@ function VolunteersView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    sbFetch("2026 Volunteers", ["First Name", "Last Name", "Team", "Status", "Email", "Phone Number", "Picture URL", "Overview Notes"])
-      .then(data => {
+  var emptyForm = {
+    'First Name': '', 'Last Name': '', 'Team': '', 'Status': 'Active',
+    'Email': '', 'Phone Number': '', 'Address': '', 'Birthday': '',
+    'Volunteer Anniversary': '', 'CC': false, 'Nametag': false,
+    'Overview Notes': '', 'Background Notes': '', 'Notes': '',
+    'What they want to see at NSH': '', 'Picture URL': '',
+    'Emergency Contact': '', 'Month': '', 'Day': ''
+  };
+  const [form, setForm] = useState(emptyForm);
+
+  useEffect(function() {
+    sbFetch('2026 Volunteers', ['First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day'])
+      .then(function(data) {
         if (Array.isArray(data)) setVolunteers(data);
         else setError(JSON.stringify(data));
         setLoading(false);
       })
-      .catch(err => { setError(err.message); setLoading(false); });
+      .catch(function(err) { setError(err.message); setLoading(false); });
   }, []);
 
-  const active = volunteers.filter(v => v.Status === "Active").length;
+  var active = volunteers.filter(function(v) { return v['Status'] === 'Active'; }).length;
+  var inactive = volunteers.filter(function(v) { return v['Status'] === 'Inactive'; }).length;
+  var teams = new Set(volunteers.map(function(v) { return (v['Team'] || '').split(',')[0].trim(); }).filter(Boolean)).size;
 
   function initials(v) {
-    return ((v["First Name"] || "")[0] || "") + ((v["Last Name"] || "")[0] || "");
+    return ((v['First Name'] || '')[0] || '').toUpperCase() + ((v['Last Name'] || '')[0] || '').toUpperCase();
   }
+
+  function handleFormChange(e) {
+    var key = e.target.name;
+    var val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setForm(function(prev) { var n = Object.assign({}, prev); n[key] = val; return n; });
+  }
+
+  function handleAddSubmit(e) {
+    e.preventDefault();
+    setSaving(true);
+    var row = {};
+    Object.keys(form).forEach(function(k) {
+      if (form[k] !== '' && form[k] !== false) row[k] = form[k] === true ? 'TRUE' : form[k];
+    });
+    if (!form['CC']) row['CC'] = 'FALSE';
+    if (!form['Nametag']) row['Nametag'] = 'FALSE';
+    sbInsert('2026 Volunteers', row).then(function(res) {
+      setSaving(false);
+      var inserted = Array.isArray(res) ? res[0] : res;
+      if (inserted && inserted['First Name']) setVolunteers(function(p) { return p.concat([inserted]); });
+      setShowAdd(false);
+      setForm(emptyForm);
+    }).catch(function() { setSaving(false); });
+  }
+
+  var inputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
+  var labelStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
+  var grp = { marginBottom: 14 };
+  var secLabel = { fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', marginBottom: 8, marginTop: 18 };
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <StatCard label="Total Volunteers" value={loading ? "..." : volunteers.length} />
-        <StatCard label="Active" value={loading ? "..." : active} />
-        <StatCard label="Inactive" value={loading ? "..." : volunteers.length - active} />
-        <StatCard label="Teams" value={loading ? "..." : [...new Set(volunteers.flatMap(v => (v.Team || "").split(", ").map(t => t.trim()).filter(Boolean)))].length} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+        <StatCard label="Total Volunteers" value={loading ? '...' : volunteers.length} />
+        <StatCard label="Active" value={loading ? '...' : active} />
+        <StatCard label="Inactive" value={loading ? '...' : inactive} />
+        <StatCard label="Teams" value={loading ? '...' : teams} />
       </div>
-      {error && <div style={{ background: "#fce4e4", border: "0.5px solid #f5a0a0", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#c0392b" }}>Error: {error}</div>}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: '#888' }}>{loading ? 'Loading...' : volunteers.length + ' volunteer' + (volunteers.length !== 1 ? 's' : '')}</div>
+        <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ Add Volunteer</button>
+      </div>
+
+      {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#c0392b' }}>Error: {error}</div>}
+
       {loading ? (
-        <div style={{ padding: 24, textAlign: "center", color: "#aaa", fontSize: 13 }}>Loading volunteers...</div>
+        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading volunteers...</div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 14 }}>
-          {volunteers.map((v, i) => (
-            <button key={i} onClick={() => setSelected(v)} style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 12, padding: "18px 12px 14px", cursor: "pointer", textAlign: "center", transition: "box-shadow 0.15s", boxShadow: "none" }}
-              onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(136,108,68,0.12)"}
-              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
-              {v["Picture URL"] ? (
-                <img src={driveImg(v["Picture URL"])} alt={v["First Name"]} style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", marginBottom: 10, border: "2px solid #e0d8cc" }} />
-              ) : (
-                <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#f0e8dc", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 20, fontWeight: 600, color: gold, border: "2px solid #e0d8cc" }}>{initials(v)}</div>
-              )}
-              <div style={{ fontSize: 13, fontWeight: 500, color: "#2a2a2a", marginBottom: 4 }}>{v["First Name"]} {v["Last Name"]}</div>
-              <div style={{ fontSize: 11, color: "#aaa", marginBottom: 8, lineHeight: 1.3 }}>{(v.Team || "").split(", ")[0]}</div>
-              <Badge status={v.Status} />
-            </button>
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 14 }}>
+          {volunteers.map(function(v, i) {
+            var imgUrl = v['Picture URL'] ? driveImg(v['Picture URL']) : null;
+            return (
+              <div key={i} onClick={function() { setSelected(v); }}
+                onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 4px 16px rgba(136,108,68,0.15)'; }}
+                onMouseLeave={function(e) { e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+                style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '16px 12px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', transition: 'box-shadow 0.18s' }}>
+                {imgUrl ? (
+                  <img src={imgUrl} alt={v['First Name']} style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', marginBottom: 10, background: '#eee' }} />
+                ) : (
+                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: gold, color: '#fff', fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>{initials(v)}</div>
+                )}
+                <div style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a', marginBottom: 3, lineHeight: 1.3 }}>{v['First Name']} {v['Last Name']}</div>
+                {v['Team'] && <div style={{ fontSize: 11, color: '#aaa', marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v['Team'] || '').split(',')[0].trim()}</div>}
+                <Badge status={v['Status'] || 'Active'} />
+              </div>
+            );
+          })}
         </div>
       )}
 
       {selected && (
-        <div onClick={() => setSelected(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, padding: 28, maxWidth: 420, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
-              {selected["Picture URL"] ? (
-                <img src={driveImg(selected["Picture URL"])} alt={selected["First Name"]} style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "2px solid #e0d8cc", flexShrink: 0 }} />
+        <div onClick={function() { setSelected(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              {selected['Picture URL'] ? (
+                <img src={driveImg(selected['Picture URL'])} alt={selected['First Name']} style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', marginBottom: 12, background: '#eee' }} />
               ) : (
-                <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#f0e8dc", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 600, color: gold, border: "2px solid #e0d8cc", flexShrink: 0 }}>{initials(selected)}</div>
+                <div style={{ width: 80, height: 80, borderRadius: '50%', background: gold, color: '#fff', fontSize: 26, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>{initials(selected)}</div>
               )}
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 600, color: "#2a2a2a" }}>{selected["First Name"]} {selected["Last Name"]}</div>
-                <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>{selected.Team}</div>
-                <div style={{ marginTop: 6 }}><Badge status={selected.Status} /></div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected['First Name']} {selected['Last Name']}</div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Badge status={selected['Status'] || 'Active'} />
+                {selected['Team'] && <span style={{ fontSize: 12, color: '#888' }}>{selected['Team']}</span>}
               </div>
             </div>
-            {selected["Overview Notes"] && (
-              <div style={{ background: "#f9f5ef", borderRadius: 8, padding: "12px 14px", marginBottom: 14, fontSize: 13, color: "#555", lineHeight: 1.6 }}>{selected["Overview Notes"]}</div>
+            {(selected['Email'] || selected['Phone Number'] || selected['Address'] || selected['Emergency Contact']) && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={secLabel}>Contact</div>
+                {selected['Email'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Email</span><a href={'mailto:' + selected['Email']} style={{ color: gold, textDecoration: 'none' }}>{selected['Email']}</a></div>}
+                {selected['Phone Number'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Phone</span>{selected['Phone Number']}</div>}
+                {selected['Address'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Address</span>{selected['Address']}</div>}
+                {selected['Emergency Contact'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Emergency</span>{selected['Emergency Contact']}</div>}
+              </div>
             )}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {selected.Email && <div style={{ fontSize: 13 }}><span style={{ color: "#aaa", marginRight: 8 }}>Email</span><a href={"mailto:" + selected.Email} style={{ color: gold }}>{selected.Email}</a></div>}
-              {selected["Phone Number"] && <div style={{ fontSize: 13 }}><span style={{ color: "#aaa", marginRight: 8 }}>Phone</span><span style={{ color: "#2a2a2a" }}>{selected["Phone Number"]}</span></div>}
-            </div>
-            <button onClick={() => setSelected(null)} style={{ marginTop: 20, width: "100%", padding: "8px", background: "transparent", border: "0.5px solid #e0d8cc", borderRadius: 8, cursor: "pointer", fontSize: 13, color: "#aaa" }}>Close</button>
+            {(selected['Volunteer Anniversary'] || selected['Birthday'] || selected['CC'] || selected['Nametag']) && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={secLabel}>Volunteer Info</div>
+                {selected['Volunteer Anniversary'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Anniversary</span>{selected['Volunteer Anniversary']}</div>}
+                {selected['Birthday'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Birthday</span>{selected['Birthday']}</div>}
+                {selected['CC'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>CC</span>{String(selected['CC']).toUpperCase() === 'TRUE' ? 'Yes' : 'No'}</div>}
+                {selected['Nametag'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Nametag</span>{String(selected['Nametag']).toUpperCase() === 'TRUE' ? 'Yes' : 'No'}</div>}
+              </div>
+            )}
+            {(selected['Overview Notes'] || selected['Background Notes'] || selected['Notes']) && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={secLabel}>Notes</div>
+                {selected['Overview Notes'] && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, color: '#aaa', marginBottom: 4 }}>Overview</div><div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.5 }}>{selected['Overview Notes']}</div></div>}
+                {selected['Background Notes'] && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, color: '#aaa', marginBottom: 4 }}>Background</div><div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.5 }}>{selected['Background Notes']}</div></div>}
+                {selected['Notes'] && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, color: '#aaa', marginBottom: 4 }}>Additional</div><div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.5 }}>{selected['Notes']}</div></div>}
+              </div>
+            )}
+            {selected['What they want to see at NSH'] && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={secLabel}>Goals</div>
+                <div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.5 }}>{selected['What they want to see at NSH']}</div>
+              </div>
+            )}
+            <button onClick={function() { setSelected(null); }} style={{ width: '100%', padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {showAdd && (
+        <div onClick={function() { setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>Add Volunteer</div>
+            <form onSubmit={handleAddSubmit}>
+              <div style={secLabel}>Basic Info</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div><label style={labelStyle}>First Name *</label><input required name="First Name" value={form['First Name']} onChange={handleFormChange} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Last Name *</label><input required name="Last Name" value={form['Last Name']} onChange={handleFormChange} style={inputStyle} /></div>
+              </div>
+              <div style={grp}><label style={labelStyle}>Status</label><select name="Status" value={form['Status']} onChange={handleFormChange} style={inputStyle}><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+              <div style={grp}><label style={labelStyle}>Team</label><input name="Team" value={form['Team']} onChange={handleFormChange} style={inputStyle} placeholder="e.g. Garden, Events" /></div>
+              <div style={secLabel}>Contact</div>
+              <div style={grp}><label style={labelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={handleFormChange} style={inputStyle} /></div>
+              <div style={grp}><label style={labelStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={handleFormChange} style={inputStyle} /></div>
+              <div style={grp}><label style={labelStyle}>Address</label><input name="Address" value={form['Address']} onChange={handleFormChange} style={inputStyle} /></div>
+              <div style={grp}><label style={labelStyle}>Emergency Contact</label><input name="Emergency Contact" value={form['Emergency Contact']} onChange={handleFormChange} style={inputStyle} /></div>
+              <div style={secLabel}>Volunteer Info</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div><label style={labelStyle}>Birthday</label><input name="Birthday" type="date" value={form['Birthday']} onChange={handleFormChange} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Anniversary</label><input name="Volunteer Anniversary" type="date" value={form['Volunteer Anniversary']} onChange={handleFormChange} style={inputStyle} /></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div><label style={labelStyle}>Month</label><input name="Month" value={form['Month']} onChange={handleFormChange} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Day</label><input name="Day" value={form['Day']} onChange={handleFormChange} style={inputStyle} /></div>
+              </div>
+              <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="CC" checked={form['CC']} onChange={handleFormChange} /> CC</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Nametag" checked={form['Nametag']} onChange={handleFormChange} /> Nametag</label>
+              </div>
+              <div style={grp}><label style={labelStyle}>Picture URL (Google Drive)</label><input name="Picture URL" value={form['Picture URL']} onChange={handleFormChange} style={inputStyle} placeholder="https://drive.google.com/..." /></div>
+              <div style={secLabel}>Notes</div>
+              <div style={grp}><label style={labelStyle}>Overview Notes</label><textarea name="Overview Notes" value={form['Overview Notes']} onChange={handleFormChange} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} /></div>
+              <div style={grp}><label style={labelStyle}>Background Notes</label><textarea name="Background Notes" value={form['Background Notes']} onChange={handleFormChange} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} /></div>
+              <div style={grp}><label style={labelStyle}>Notes</label><textarea name="Notes" value={form['Notes']} onChange={handleFormChange} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} /></div>
+              <div style={secLabel}>Goals</div>
+              <div style={grp}><label style={labelStyle}>What they want to see at NSH</label><textarea name="What they want to see at NSH" value={form['What they want to see at NSH']} onChange={handleFormChange} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} /></div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : 'Save Volunteer'}</button>
+                <button type="button" onClick={function() { setShowAdd(false); }} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -351,7 +513,13 @@ function DonorsView() {
       <Table
         cols={["Donor", "Type", "Amount", "Year", "Status"]}
         rows={mockData.donors}
-        renderRow={r => (<><Td>{r.name}</Td><Td muted>{r.type}</Td><Td>{r.amount}</Td><Td muted>{r.year}</Td><Td><Badge status={r.status} /></Td></>)}
+        renderRow={r => (<>
+          <Td>{r.name}</Td>
+          <Td muted>{r.type}</Td>
+          <Td>{r.amount}</Td>
+          <Td muted>{r.year}</Td>
+          <Td><Badge status={r.status} /></Td>
+        </>)}
       />
     </div>
   );
@@ -369,11 +537,19 @@ function MarketingView() {
       <Table
         cols={["Platform", "Post", "Scheduled Date", "Lead", "Status"]}
         rows={mockData.marketing}
-        renderRow={r => (<><Td>{r.platform}</Td><Td>{r.post}</Td><Td muted>{r.date}</Td><Td muted>{r.lead}</Td><Td><Badge status={r.status} /></Td></>)}
+        renderRow={r => (<>
+          <Td>{r.platform}</Td>
+          <Td>{r.post}</Td>
+          <Td muted>{r.date}</Td>
+          <Td muted>{r.lead}</Td>
+          <Td><Badge status={r.status} /></Td>
+        </>)}
       />
     </div>
   );
-}function FinancialsView() {
+}
+
+function FinancialsView() {
   return (
     <div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
@@ -410,11 +586,19 @@ function ArchivalView() {
       <Table
         cols={["ID", "Name", "Type", "Condition", "Location"]}
         rows={mockData.archival}
-        renderRow={r => (<><Td muted>{r.id}</Td><Td>{r.name}</Td><Td muted>{r.type}</Td><Td><Badge status={r.condition} /></Td><Td muted>{r.location}</Td></>)}
+        renderRow={r => (<>
+          <Td muted>{r.id}</Td>
+          <Td>{r.name}</Td>
+          <Td muted>{r.type}</Td>
+          <Td><Badge status={r.condition} /></Td>
+          <Td muted>{r.location}</Td>
+        </>)}
       />
     </div>
   );
-}function BoardView() {
+}
+
+function BoardView() {
   return (
     <div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
@@ -426,7 +610,13 @@ function ArchivalView() {
       <Table
         cols={["Member", "Role", "Attendance", "Last Vote", "Status"]}
         rows={mockData.board}
-        renderRow={r => (<><Td>{r.member}</Td><Td muted>{r.role}</Td><Td>{r.attendance}</Td><Td muted>{r.lastVote}</Td><Td><Badge status={r.status} /></Td></>)}
+        renderRow={r => (<>
+          <Td>{r.member}</Td>
+          <Td muted>{r.role}</Td>
+          <Td>{r.attendance}</Td>
+          <Td muted>{r.lastVote}</Td>
+          <Td><Badge status={r.status} /></Td>
+        </>)}
       />
     </div>
   );
@@ -476,14 +666,17 @@ const views = {
   archival: ArchivalView,
   board: BoardView,
   strategy: StrategyView,
-};function Dashboard() {
+};
+
+function Dashboard() {
   const [active, setActive] = useState("home");
   const View = views[active];
   const mod = modules.find(m => m.id === active);
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" }}>
-      <style>{".nsh-sidebar::-webkit-scrollbar { display: none; }"}</style>
+      {/* Sidebar */}
+      <style>{`.nsh-sidebar::-webkit-scrollbar { display: none; }`}</style>
       <div className="nsh-sidebar" style={{ width: 220, background: "#2a2420", display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto", scrollbarWidth: "none" }}>
         <div style={{ padding: "24px 20px 16px" }}>
           <div style={{ fontSize: 11, color: gold, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>North Star House</div>
@@ -512,10 +705,11 @@ const views = {
         </div>
       </div>
 
+      {/* Main */}
       <div style={{ flex: 1, padding: "28px 32px", overflowY: "auto" }}>
         <div style={{ maxWidth: 900 }}>
           <div style={{ marginBottom: 22 }}>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: "#2a2a2a" }}>{mod && mod.label}</h1>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: "#2a2a2a" }}>{mod?.label}</h1>
             <div style={{ height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 6 }} />
           </div>
           <View />
@@ -525,5 +719,9 @@ const views = {
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(React.createElement(Dashboard));
+// ============================================================================
+// RENDER
+// ============================================================================
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<Dashboard />);
