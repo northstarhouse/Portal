@@ -265,8 +265,8 @@ function sbInsert(table, row) {
   }).then(r => r.json());
 }
 
-function sbUpdate(table, id, row) {
-  return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table) + '?id=eq.' + id, {
+function sbUpdate(table, firstName, lastName, row) {
+  return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table) + '?' + encodeURIComponent('First Name') + '=eq.' + encodeURIComponent(firstName) + '&' + encodeURIComponent('Last Name') + '=eq.' + encodeURIComponent(lastName), {
     method: 'PATCH',
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
     body: JSON.stringify(row)
@@ -293,7 +293,7 @@ function VolunteersView() {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(function() {
-    sbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day'])
+    sbFetch('2026 Volunteers', ['First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day'])
       .then(function(data) {
         if (Array.isArray(data)) setVolunteers(data);
         else setError(JSON.stringify(data));
@@ -361,17 +361,17 @@ function VolunteersView() {
 
   function handleEditSubmit(e) {
     e.preventDefault();
-    if (!selected || !selected['id']) { setSaving(false); return; }
+    if (!selected) { setSaving(false); return; }
     setSaving(true);
     var row = {};
     Object.keys(form).forEach(function(k) {
       row[k] = form[k] === true ? 'TRUE' : form[k] === false ? 'FALSE' : form[k];
     });
-    sbUpdate('2026 Volunteers', selected['id'], row).then(function(res) {
+    sbUpdate('2026 Volunteers', selected['First Name'], selected['Last Name'], row).then(function(res) {
       setSaving(false);
       var updated = Array.isArray(res) ? res[0] : res;
       var merged = Object.assign({}, selected, row, updated || {});
-      setVolunteers(function(prev) { return prev.map(function(v) { return v['id'] === selected['id'] ? merged : v; }); });
+      setVolunteers(function(prev) { return prev.map(function(v) { return v['First Name'] === selected['First Name'] && v['Last Name'] === selected['Last Name'] ? merged : v; }); });
       setSelected(merged);
       setEditing(false);
     }).catch(function() { setSaving(false); });
