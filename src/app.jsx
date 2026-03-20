@@ -120,6 +120,7 @@ function ProgressBar({ pct, color }) {
 
 function Table({ cols, rows, renderRow }) {
   return (
+    <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, overflow: "hidden" }}>
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
@@ -137,6 +138,7 @@ function Table({ cols, rows, renderRow }) {
           ))}
         </tbody>
       </table>
+    </div>
     </div>
   );
 }
@@ -355,9 +357,9 @@ function StrategyView() {
         <StatCard label="On Track" value="3" />
         <StatCard label="Needs Attention" value="2" />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
         {mockData.strategy.map((s, i) => (
-          <div key={i} style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
+          <div key={i} style={{ borderBottom: i < mockData.strategy.length - 1 ? "0.5px solid #f0ebe2" : "none", paddingBottom: i < mockData.strategy.length - 1 ? 14 : 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <div>
                 <div style={{ fontSize: 12, color: gold, fontWeight: 500, marginBottom: 2 }}>{s.pillar}</div>
