@@ -1,4 +1,15 @@
-const { useState } = React;
+const { useState, useEffect } = React;
+
+const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2endoaHd6ZWxhZWxmaGZrdmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMzI4OTksImV4cCI6MjA4OTYwODg5OX0.xw5n0MGm69u_FOiZHxbLNUCNQHehIJliO_s4YbTyfh8";
+
+function sbFetch(table, columns) {
+  const cols = columns.map(c => encodeURIComponent(c)).join(",");
+  const url = SUPABASE_URL + "/rest/v1/" + encodeURIComponent(table) + "?select=" + cols;
+  return fetch(url, {
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+  }).then(r => r.json());
+}
 
 const gold = "#886c44";
 const cream = "#f8f4ec";
@@ -18,7 +29,7 @@ const modules = [
 const mockData = {
   events: [
     { name: "Spring Garden Tour", date: "Apr 12", status: "Confirmed", revenue: "$1,200", guests: 45 },
-    { name: "Founder's Gala", date: "May 3", status: "Pending", revenue: "$4,800", guests: 120 },
+    { name: "Founder’s Gala", date: "May 3", status: "Pending", revenue: "$4,800", guests: 120 },
     { name: "Julia Morgan Lecture", date: "May 18", status: "Confirmed", revenue: "$600", guests: 30 },
     { name: "Mid-Summer Festival", date: "Jul 11", status: "Planning", revenue: "—", guests: 200 },
     { name: "Board Retreat", date: "Aug 5", status: "Confirmed", revenue: "—", guests: 14 },
@@ -72,9 +83,7 @@ const mockData = {
     { pillar: "Volunteer Development", goal: "Grow volunteer base to 50 active", progress: 60, owner: "Haley", due: "Q4 2025" },
     { pillar: "Brand & Communications", goal: "Relaunch NSH website", progress: 55, owner: "Haley", due: "Q3 2025" },
   ],
-};
-
-const statusColors = {
+};const statusColors = {
   Confirmed: { bg: "#e8f5e9", color: "#2e7d32" },
   Pending: { bg: "#fff8e1", color: "#8a6200" },
   Planning: { bg: "#e8eaf6", color: "#3949ab" },
@@ -115,7 +124,7 @@ function StatCard({ label, value, sub }) {
 function ProgressBar({ pct, color }) {
   return (
     <div style={{ background: "#eee", borderRadius: 4, height: 6, width: "100%", overflow: "hidden" }}>
-      <div style={{ width: `${pct}%`, height: "100%", background: color || gold, borderRadius: 4, transition: "width 0.4s" }} />
+      <div style={{ width: pct + "%", height: "100%", background: color || gold, borderRadius: 4, transition: "width 0.4s" }} />
     </div>
   );
 }
@@ -160,31 +169,15 @@ const typeColors = {
   Volunteer: { bg: "#e8f5e9", color: "#2e7d32" },
   Board: { bg: "#e8eaf6", color: "#3949ab" },
   Event: { bg: "#fff8e1", color: "#8a6200" },
-};
-
-const sponsors = [
-  { name: "Teichert Foundation", level: "Gold", amount: "$10,000", status: "Confirmed" },
-  { name: "PG&E Community Giving", level: "Silver", amount: "$5,000", status: "In Review" },
-  { name: "Nevada County Arts", level: "Bronze", amount: "$1,500", status: "Confirmed" },
-  { name: "Grass Valley Chamber", level: "Bronze", amount: "$750", status: "Confirmed" },
-];
-
-const levelColors = {
-  Gold: { bg: "#fff8e1", color: "#8a6200" },
-  Silver: { bg: "#f3f3f3", color: "#555" },
-  Bronze: { bg: "#fbe9e7", color: "#8d3d2b" },
-};
-
-function HomeView() {
+};function HomeView() {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Today — March 20, 2026</div>
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 500, color: "#2a2a2a" }}>Good morning, North Star House</h2>
-        <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Here's your organization at a glance.</p>
+        <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Here’s your organization at a glance.</p>
       </div>
 
-      {/* Quarterly update banner */}
       <div style={{ background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ fontSize: 16, color: gold }}>⏎</div>
         <div>
@@ -201,14 +194,10 @@ function HomeView() {
         <StatCard label="Active Sponsors" value="3" sub="+ 1 in review" />
       </div>
 
-      {/* This Week + Events side by side */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-        {/* This Week */}
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>This Week at North Star House</div>
-          {thisWeek.length === 0 ? (
-            <div style={{ fontSize: 13, color: "#ccc", fontStyle: "italic" }}>No events this week.</div>
-          ) : thisWeek.map((e, i) => {
+          {thisWeek.map((e, i) => {
             const tc = typeColors[e.type] || { bg: "#f3f3f3", color: "#555" };
             return (
               <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
@@ -226,7 +215,6 @@ function HomeView() {
           </div>
         </div>
 
-        {/* 2026 Events */}
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>In-House Events</div>
           {mockData.events.map((e, i) => (
@@ -242,9 +230,7 @@ function HomeView() {
       </div>
     </div>
   );
-}
-
-function EventsView() {
+}function EventsView() {
   return (
     <div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
@@ -256,29 +242,19 @@ function EventsView() {
       <Table
         cols={["Event", "Date", "Status", "Est. Guests", "Revenue"]}
         rows={mockData.events}
-        renderRow={r => (<>
-          <Td>{r.name}</Td>
-          <Td muted>{r.date}</Td>
-          <Td><Badge status={r.status} /></Td>
-          <Td muted>{r.guests}</Td>
-          <Td>{r.revenue}</Td>
-        </>)}
+        renderRow={r => (<><Td>{r.name}</Td><Td muted>{r.date}</Td><Td><Badge status={r.status} /></Td><Td muted>{r.guests}</Td><Td>{r.revenue}</Td></>)}
       />
     </div>
   );
 }
 
-function sbInsert(table, row) {
-  return fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent(table), {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: "Bearer " + SUPABASE_KEY,
-      "Content-Type": "application/json",
-      Prefer: "return=representation"
-    },
-    body: JSON.stringify(row)
-  }).then(r => r.json());
+function driveImg(url) {
+  if (!url) return null;
+  var i = url.indexOf("/d/");
+  if (i === -1) return url;
+  var rest = url.substring(i + 3);
+  var id = rest.split("/")[0].split("?")[0];
+  return "https://drive.google.com/thumbnail?id=" + id + "&sz=w200";
 }
 
 function sbInsert(table, row) {
@@ -513,13 +489,7 @@ function DonorsView() {
       <Table
         cols={["Donor", "Type", "Amount", "Year", "Status"]}
         rows={mockData.donors}
-        renderRow={r => (<>
-          <Td>{r.name}</Td>
-          <Td muted>{r.type}</Td>
-          <Td>{r.amount}</Td>
-          <Td muted>{r.year}</Td>
-          <Td><Badge status={r.status} /></Td>
-        </>)}
+        renderRow={r => (<><Td>{r.name}</Td><Td muted>{r.type}</Td><Td>{r.amount}</Td><Td muted>{r.year}</Td><Td><Badge status={r.status} /></Td></>)}
       />
     </div>
   );
@@ -537,19 +507,11 @@ function MarketingView() {
       <Table
         cols={["Platform", "Post", "Scheduled Date", "Lead", "Status"]}
         rows={mockData.marketing}
-        renderRow={r => (<>
-          <Td>{r.platform}</Td>
-          <Td>{r.post}</Td>
-          <Td muted>{r.date}</Td>
-          <Td muted>{r.lead}</Td>
-          <Td><Badge status={r.status} /></Td>
-        </>)}
+        renderRow={r => (<><Td>{r.platform}</Td><Td>{r.post}</Td><Td muted>{r.date}</Td><Td muted>{r.lead}</Td><Td><Badge status={r.status} /></Td></>)}
       />
     </div>
   );
-}
-
-function FinancialsView() {
+}function FinancialsView() {
   return (
     <div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
@@ -586,19 +548,11 @@ function ArchivalView() {
       <Table
         cols={["ID", "Name", "Type", "Condition", "Location"]}
         rows={mockData.archival}
-        renderRow={r => (<>
-          <Td muted>{r.id}</Td>
-          <Td>{r.name}</Td>
-          <Td muted>{r.type}</Td>
-          <Td><Badge status={r.condition} /></Td>
-          <Td muted>{r.location}</Td>
-        </>)}
+        renderRow={r => (<><Td muted>{r.id}</Td><Td>{r.name}</Td><Td muted>{r.type}</Td><Td><Badge status={r.condition} /></Td><Td muted>{r.location}</Td></>)}
       />
     </div>
   );
-}
-
-function BoardView() {
+}function BoardView() {
   return (
     <div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
@@ -610,13 +564,7 @@ function BoardView() {
       <Table
         cols={["Member", "Role", "Attendance", "Last Vote", "Status"]}
         rows={mockData.board}
-        renderRow={r => (<>
-          <Td>{r.member}</Td>
-          <Td muted>{r.role}</Td>
-          <Td>{r.attendance}</Td>
-          <Td muted>{r.lastVote}</Td>
-          <Td><Badge status={r.status} /></Td>
-        </>)}
+        renderRow={r => (<><Td>{r.member}</Td><Td muted>{r.role}</Td><Td>{r.attendance}</Td><Td muted>{r.lastVote}</Td><Td><Badge status={r.status} /></Td></>)}
       />
     </div>
   );
@@ -666,17 +614,14 @@ const views = {
   archival: ArchivalView,
   board: BoardView,
   strategy: StrategyView,
-};
-
-function Dashboard() {
+};function Dashboard() {
   const [active, setActive] = useState("home");
   const View = views[active];
   const mod = modules.find(m => m.id === active);
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" }}>
-      {/* Sidebar */}
-      <style>{`.nsh-sidebar::-webkit-scrollbar { display: none; }`}</style>
+      <style>{".nsh-sidebar::-webkit-scrollbar { display: none; }"}</style>
       <div className="nsh-sidebar" style={{ width: 220, background: "#2a2420", display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto", scrollbarWidth: "none" }}>
         <div style={{ padding: "24px 20px 16px" }}>
           <div style={{ fontSize: 11, color: gold, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>North Star House</div>
@@ -705,11 +650,10 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Main */}
       <div style={{ flex: 1, padding: "28px 32px", overflowY: "auto" }}>
         <div style={{ maxWidth: 900 }}>
           <div style={{ marginBottom: 22 }}>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: "#2a2a2a" }}>{mod?.label}</h1>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: "#2a2a2a" }}>{mod && mod.label}</h1>
             <div style={{ height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 6 }} />
           </div>
           <View />
@@ -719,9 +663,5 @@ function Dashboard() {
   );
 }
 
-// ============================================================================
-// RENDER
-// ============================================================================
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<Dashboard />);
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(Dashboard));
