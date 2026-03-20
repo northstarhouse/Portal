@@ -252,9 +252,10 @@ function VolunteersView() {
   const [volunteers, setVolunteers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    sbFetch("2026 Volunteers", ["First Name", "Last Name", "Team", "Status", "Email"])
+    sbFetch("2026 Volunteers", ["First Name", "Last Name", "Team", "Status", "Email", "Phone Number", "Picture URL", "Overview Notes"])
       .then(data => {
         if (Array.isArray(data)) setVolunteers(data);
         else setError(JSON.stringify(data));
@@ -264,6 +265,10 @@ function VolunteersView() {
   }, []);
 
   const active = volunteers.filter(v => v.Status === "Active").length;
+
+  function initials(v) {
+    return ((v["First Name"] || "")[0] || "") + ((v["Last Name"] || "")[0] || "");
+  }
 
   return (
     <div>
@@ -277,16 +282,49 @@ function VolunteersView() {
       {loading ? (
         <div style={{ padding: 24, textAlign: "center", color: "#aaa", fontSize: 13 }}>Loading volunteers...</div>
       ) : (
-        <Table
-          cols={["Name", "Team", "Status", "Email"]}
-          rows={volunteers}
-          renderRow={r => (<>
-            <Td>{r["First Name"]} {r["Last Name"]}</Td>
-            <Td muted>{r.Team}</Td>
-            <Td><Badge status={r.Status} /></Td>
-            <Td muted>{r.Email}</Td>
-          </>)}
-        />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 14 }}>
+          {volunteers.map((v, i) => (
+            <button key={i} onClick={() => setSelected(v)} style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 12, padding: "18px 12px 14px", cursor: "pointer", textAlign: "center", transition: "box-shadow 0.15s", boxShadow: "none" }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(136,108,68,0.12)"}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
+              {v["Picture URL"] ? (
+                <img src={v["Picture URL"]} alt={v["First Name"]} style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", marginBottom: 10, border: "2px solid #e0d8cc" }} />
+              ) : (
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#f0e8dc", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 20, fontWeight: 600, color: gold, border: "2px solid #e0d8cc" }}>{initials(v)}</div>
+              )}
+              <div style={{ fontSize: 13, fontWeight: 500, color: "#2a2a2a", marginBottom: 4 }}>{v["First Name"]} {v["Last Name"]}</div>
+              <div style={{ fontSize: 11, color: "#aaa", marginBottom: 8, lineHeight: 1.3 }}>{(v.Team || "").split(", ")[0]}</div>
+              <Badge status={v.Status} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {selected && (
+        <div onClick={() => setSelected(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, padding: 28, maxWidth: 420, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+              {selected["Picture URL"] ? (
+                <img src={selected["Picture URL"]} alt={selected["First Name"]} style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "2px solid #e0d8cc", flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#f0e8dc", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 600, color: gold, border: "2px solid #e0d8cc", flexShrink: 0 }}>{initials(selected)}</div>
+              )}
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: "#2a2a2a" }}>{selected["First Name"]} {selected["Last Name"]}</div>
+                <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>{selected.Team}</div>
+                <div style={{ marginTop: 6 }}><Badge status={selected.Status} /></div>
+              </div>
+            </div>
+            {selected["Overview Notes"] && (
+              <div style={{ background: "#f9f5ef", borderRadius: 8, padding: "12px 14px", marginBottom: 14, fontSize: 13, color: "#555", lineHeight: 1.6 }}>{selected["Overview Notes"]}</div>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {selected.Email && <div style={{ fontSize: 13 }}><span style={{ color: "#aaa", marginRight: 8 }}>Email</span><a href={"mailto:" + selected.Email} style={{ color: gold }}>{selected.Email}</a></div>}
+              {selected["Phone Number"] && <div style={{ fontSize: 13 }}><span style={{ color: "#aaa", marginRight: 8 }}>Phone</span><span style={{ color: "#2a2a2a" }}>{selected["Phone Number"]}</span></div>}
+            </div>
+            <button onClick={() => setSelected(null)} style={{ marginTop: 20, width: "100%", padding: "8px", background: "transparent", border: "0.5px solid #e0d8cc", borderRadius: 8, cursor: "pointer", fontSize: 13, color: "#aaa" }}>Close</button>
+          </div>
+        </div>
       )}
     </div>
   );
