@@ -156,7 +156,68 @@ const typeColors = {
   Volunteer: { bg: "#e8f5e9", color: "#2e7d32" },
   Board: { bg: "#e8eaf6", color: "#3949ab" },
   Event: { bg: "#fff8e1", color: "#8a6200" },
-};function EventsView() {
+};function HomeView() {
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Today — March 20, 2026</div>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 500, color: "#2a2a2a" }}>Good morning, North Star House</h2>
+        <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Here’s your organization at a glance.</p>
+      </div>
+
+      <div style={{ background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ fontSize: 16, color: gold }}>⏎</div>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 500, color: "#8a6200" }}>Quarterly Update Due — March 31, 2026</div>
+          <div style={{ fontSize: 12, color: "#b08040", marginTop: 2 }}>Donations · Volunteers · Sponsors · Events · Board Activity</div>
+        </div>
+        <div style={{ marginLeft: "auto", fontSize: 11, fontWeight: 500, color: "#c0392b", background: "#fce4e4", padding: "3px 10px", borderRadius: 20 }}>11 days away</div>
+      </div>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+        <StatCard label="YTD Donations" value="$18,000" sub="of $25K goal" />
+        <StatCard label="Active Volunteers" value="4" sub="of 5 total" />
+        <StatCard label="2026 Events" value="5" sub="on the books" />
+        <StatCard label="Active Sponsors" value="3" sub="+ 1 in review" />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>This Week at North Star House</div>
+          {thisWeek.map((e, i) => {
+            const tc = typeColors[e.type] || { bg: "#f3f3f3", color: "#555" };
+            return (
+              <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
+                <div style={{ minWidth: 6, height: 6, borderRadius: "50%", background: tc.color, marginTop: 5 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "#2a2a2a" }}>{e.title}</div>
+                  <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{e.day} · {e.time}</div>
+                </div>
+                <span style={{ fontSize: 11, background: tc.bg, color: tc.color, padding: "2px 7px", borderRadius: 20, whiteSpace: "nowrap", fontWeight: 500 }}>{e.type}</span>
+              </div>
+            );
+          })}
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "0.5px solid #f0ebe2", fontSize: 11, color: "#bbb" }}>
+            Synced from Google Calendar
+          </div>
+        </div>
+
+        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>In-House Events</div>
+          {mockData.events.map((e, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{e.name}</div>
+                <div style={{ fontSize: 11, color: "#aaa" }}>{e.date}</div>
+              </div>
+              <Badge status={e.status} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}function EventsView() {
   return (
     <div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
