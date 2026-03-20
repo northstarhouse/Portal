@@ -266,7 +266,9 @@ function sbInsert(table, row) {
 }
 
 function sbUpdate(table, firstName, lastName, row) {
-  return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table) + '?' + encodeURIComponent('First Name') + '=eq.' + encodeURIComponent(firstName) + '&' + encodeURIComponent('Last Name') + '=eq.' + encodeURIComponent(lastName), {
+  var fnKey = encodeURIComponent('"First Name"');
+  var lnKey = encodeURIComponent('"Last Name"');
+  return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table) + '?' + fnKey + '=eq.' + encodeURIComponent(firstName) + '&' + lnKey + '=eq.' + encodeURIComponent(lastName), {
     method: 'PATCH',
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
     body: JSON.stringify(row)
@@ -421,20 +423,23 @@ function VolunteersView() {
 
   function handleEditSubmit(e) {
     e.preventDefault();
-    if (!selected) { setSaving(false); return; }
+    if (!selected) return;
     setSaving(true);
     var row = {};
     Object.keys(form).forEach(function(k) {
-      row[k] = form[k] === true ? 'TRUE' : form[k] === false ? 'FALSE' : form[k];
+      if (form[k] !== '') row[k] = form[k] === true ? 'TRUE' : form[k] === false ? 'FALSE' : form[k];
     });
-    sbUpdate('2026 Volunteers', selected['First Name'], selected['Last Name'], row).then(function(res) {
-      setSaving(false);
-      var updated = Array.isArray(res) ? res[0] : res;
-      var merged = Object.assign({}, selected, row, updated || {});
-      setVolunteers(function(prev) { return prev.map(function(v) { return v['First Name'] === selected['First Name'] && v['Last Name'] === selected['Last Name'] ? merged : v; }); });
-      setSelected(merged);
-      setEditing(false);
-    }).catch(function() { setSaving(false); });
+    sbUpdate('2026 Volunteers', selected['First Name'], selected['Last Name'], row)
+      .then(function(res) {
+        setSaving(false);
+        if (res && res.code) { alert('Save failed: ' + (res.message || JSON.stringify(res))); return; }
+        var updated = Array.isArray(res) ? res[0] : res;
+        var merged = Object.assign({}, selected, row, updated || {});
+        setVolunteers(function(prev) { return prev.map(function(v) { return v['First Name'] === selected['First Name'] && v['Last Name'] === selected['Last Name'] ? merged : v; }); });
+        setSelected(merged);
+        setEditing(false);
+      })
+      .catch(function(err) { setSaving(false); alert('Save error: ' + err.message); });
   }
 
   function InfoRow({ label, value, link }) {
