@@ -438,7 +438,7 @@ function VolunteersView() {
 
   var active = volunteers.filter(function(v) { return v['Status'] === 'Active'; }).length;
   var inactive = volunteers.filter(function(v) { return v['Status'] === 'Inactive'; }).length;
-  var tabList = volunteers.filter(function(v) { return tab === 'active' ? v['Status'] !== 'Inactive' : v['Status'] === 'Inactive'; });
+  var tabList = volunteers.filter(function(v) { return tab === 'active' ? v['Status'] === 'Active' : v['Status'] === 'Inactive'; });
   var teamSet = ['All'].concat(TEAM_OPTIONS.filter(function(t) {
     return tabList.some(function(v) { return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(t) !== -1; });
   }));
@@ -564,7 +564,6 @@ function VolunteersView() {
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
         <StatCard label="Total Volunteers" value={loading ? '...' : volunteers.length} />
         <StatCard label="Active" value={loading ? '...' : active} />
-        <StatCard label="Inactive" value={loading ? '...' : inactive} />
         <StatCard label="Teams" value={loading ? '...' : teams} />
       </div>
 
