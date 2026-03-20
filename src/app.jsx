@@ -280,7 +280,7 @@ var TEAM_OPTIONS = ['Grounds','Construction','Events Team','Event Support','Inte
 function TeamPicker({ value, onChange }) {
   const { useState: useS } = React;
   const [open, setOpen] = useS(false);
-  var selected = value ? value.split(',').map(function(t) { return t.trim(); }).filter(Boolean) : [];
+  var selected = value ? value.split('|').map(function(t) { return t.trim(); }).filter(Boolean) : [];
 
   function toggle(opt) {
     var next;
@@ -289,12 +289,12 @@ function TeamPicker({ value, onChange }) {
     } else {
       next = selected.concat([opt]);
     }
-    onChange({ target: { name: 'Team', value: next.join(', ') } });
+    onChange({ target: { name: 'Team', value: next.join(' | ') } });
   }
 
   function remove(opt) {
     var next = selected.filter(function(t) { return t !== opt; });
-    onChange({ target: { name: 'Team', value: next.join(', ') } });
+    onChange({ target: { name: 'Team', value: next.join(' | ') } });
   }
 
   return (
@@ -306,11 +306,11 @@ function TeamPicker({ value, onChange }) {
         {selected.length === 0 && <span style={{ fontSize: 13, color: '#bbb' }}>Select teams...</span>}
         {selected.map(function(t) {
           return (
-            <span key={t} style={{ background: '#f0e8dc', color: '#7a5c30', fontSize: 12, fontWeight: 500, padding: '3px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span key={t} style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
               {t}
               <span
                 onClick={function(e) { e.stopPropagation(); remove(t); }}
-                style={{ cursor: 'pointer', opacity: 0.6, fontSize: 13, lineHeight: 1, marginLeft: 1 }}
+                style={{ cursor: 'pointer', opacity: 0.5, fontSize: 14, lineHeight: 1, marginLeft: 2, color: '#2e7d32' }}
               >×</span>
             </span>
           );
@@ -325,7 +325,7 @@ function TeamPicker({ value, onChange }) {
               <div
                 key={opt}
                 onClick={function() { toggle(opt); }}
-                style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: isOn ? '#faf5ee' : '#fff', color: isOn ? '#7a5c30' : '#2a2a2a' }}
+                style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: isOn ? '#e8f5e9' : '#fff', color: isOn ? '#2e7d32' : '#2a2a2a' }}
                 onMouseEnter={function(e) { if (!isOn) e.currentTarget.style.background = '#faf8f4'; }}
                 onMouseLeave={function(e) { if (!isOn) e.currentTarget.style.background = '#fff'; }}
               >
@@ -424,7 +424,7 @@ function VolunteersView() {
 
   var active = volunteers.filter(function(v) { return v['Status'] === 'Active'; }).length;
   var inactive = volunteers.filter(function(v) { return v['Status'] === 'Inactive'; }).length;
-  var teams = new Set(volunteers.map(function(v) { return (v['Team'] || '').split(',')[0].trim(); }).filter(Boolean)).size;
+  var teams = new Set(volunteers.map(function(v) { return (v['Team'] || '').split('|')[0].trim(); }).filter(Boolean)).size;
 
   function fmtBirthday(val) {
     if (!val) return '';
@@ -562,7 +562,7 @@ function VolunteersView() {
                   <div style={{ width: 56, height: 56, borderRadius: '50%', background: gold, color: '#fff', fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>{initials(v)}</div>
                 )}
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a', marginBottom: 3, lineHeight: 1.3 }}>{v['First Name']} {v['Last Name']}</div>
-                {v['Team'] && <div style={{ fontSize: 11, color: '#aaa', marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v['Team'] || '').split(',')[0].trim()}</div>}
+                {v['Team'] && <div style={{ fontSize: 11, color: '#aaa', marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v['Team'] || '').split('|')[0].trim()}</div>}
                 <Badge status={v['Status'] || 'Active'} />
               </div>
             );
