@@ -244,13 +244,20 @@ const typeColors = {
 function VolunteersView() {
   const [volunteers, setVolunteers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (typeof supabase === "undefined") {
+      setError("Supabase library not loaded");
+      setLoading(false);
+      return;
+    }
     db.from("2025 Volunteers-1")
       .select("First Name, Last Name, Role, Team, Status, Email")
       .order("Last Name")
-      .then(({ data, error }) => {
-        if (!error && data) setVolunteers(data);
+      .then(({ data, error: err }) => {
+        if (err) { setError(err.message); }
+        else if (data) setVolunteers(data);
         setLoading(false);
       });
   }, []);
@@ -265,6 +272,7 @@ function VolunteersView() {
         <StatCard label="Inactive" value={loading ? "..." : volunteers.length - active} />
         <StatCard label="Teams" value={loading ? "..." : [...new Set(volunteers.flatMap(v => (v.Team || "").split(", ").map(t => t.trim()).filter(Boolean)))].length} />
       </div>
+      {error && <div style={{ background: "#fce4e4", border: "0.5px solid #f5a0a0", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#c0392b" }}>Error: {error}</div>}
       {loading ? (
         <div style={{ padding: 24, textAlign: "center", color: "#aaa", fontSize: 13 }}>Loading volunteers...</div>
       ) : (
