@@ -442,10 +442,11 @@ function VolunteersView() {
   }));
   var teams = teamSet.length - 1;
   function teamSortKey(v) {
+    if (v['First Name'] === 'Ken' && v['Last Name'] === 'Underwood') return '0';
     var t = (v['Team'] || '').split('|')[0].trim();
-    if (t === 'Board Member') return '0';
-    if (t === 'Staff') return '1';
-    return '2_' + t;
+    if (t === 'Board Member') return '1';
+    if (t === 'Staff') return '2';
+    return '3_' + t;
   }
   var filtered = filterTeam === 'All'
     ? volunteers.slice().sort(function(a, b) { return teamSortKey(a).localeCompare(teamSortKey(b)); })
