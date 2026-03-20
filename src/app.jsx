@@ -260,12 +260,15 @@ function driveImg(url) {
 function sbInsert(table, row) {
   return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table), {
     method: 'POST',
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: 'Bearer ' + SUPABASE_KEY,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation'
-    },
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(row)
+  }).then(r => r.json());
+}
+
+function sbUpdate(table, id, row) {
+  return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table) + '?id=eq.' + id, {
+    method: 'PATCH',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
     body: JSON.stringify(row)
   }).then(r => r.json());
 }
@@ -276,6 +279,7 @@ function VolunteersView() {
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   var emptyForm = {
@@ -289,7 +293,7 @@ function VolunteersView() {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(function() {
-    sbFetch('2026 Volunteers', ['First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day'])
+    sbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day'])
       .then(function(data) {
         if (Array.isArray(data)) setVolunteers(data);
         else setError(JSON.stringify(data));
@@ -312,6 +316,31 @@ function VolunteersView() {
     setForm(function(prev) { var n = Object.assign({}, prev); n[key] = val; return n; });
   }
 
+  function openEdit(v) {
+    setForm({
+      'First Name': v['First Name'] || '',
+      'Last Name': v['Last Name'] || '',
+      'Team': v['Team'] || '',
+      'Status': v['Status'] || 'Active',
+      'Email': v['Email'] || '',
+      'Phone Number': v['Phone Number'] || '',
+      'Address': v['Address'] || '',
+      'Birthday': v['Birthday'] || '',
+      'Volunteer Anniversary': v['Volunteer Anniversary'] || '',
+      'CC': String(v['CC']).toUpperCase() === 'TRUE',
+      'Nametag': String(v['Nametag']).toUpperCase() === 'TRUE',
+      'Overview Notes': v['Overview Notes'] || '',
+      'Background Notes': v['Background Notes'] || '',
+      'Notes': v['Notes'] || '',
+      'What they want to see at NSH': v['What they want to see at NSH'] || '',
+      'Picture URL': v['Picture URL'] || '',
+      'Emergency Contact': v['Emergency Contact'] || '',
+      'Month': v['Month'] || '',
+      'Day': v['Day'] || ''
+    });
+    setEditing(true);
+  }
+
   function handleAddSubmit(e) {
     e.preventDefault();
     setSaving(true);
@@ -330,10 +359,98 @@ function VolunteersView() {
     }).catch(function() { setSaving(false); });
   }
 
-  var inputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
+  function handleEditSubmit(e) {
+    e.preventDefault();
+    if (!selected || !selected['id']) { setSaving(false); return; }
+    setSaving(true);
+    var row = {};
+    Object.keys(form).forEach(function(k) {
+      row[k] = form[k] === true ? 'TRUE' : form[k] === false ? 'FALSE' : form[k];
+    });
+    sbUpdate('2026 Volunteers', selected['id'], row).then(function(res) {
+      setSaving(false);
+      var updated = Array.isArray(res) ? res[0] : res;
+      var merged = Object.assign({}, selected, row, updated || {});
+      setVolunteers(function(prev) { return prev.map(function(v) { return v['id'] === selected['id'] ? merged : v; }); });
+      setSelected(merged);
+      setEditing(false);
+    }).catch(function() { setSaving(false); });
+  }
+
+  var inputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
   var labelStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
   var grp = { marginBottom: 14 };
-  var secLabel = { fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', marginBottom: 8, marginTop: 18 };
+  var secLabel = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
+
+  function InfoRow({ label, value, link }) {
+    if (!value) return null;
+    return (
+      <div style={{ display: 'flex', gap: 0, marginBottom: 10, alignItems: 'flex-start' }}>
+        <div style={{ width: 110, fontSize: 12, color: '#aaa', flexShrink: 0, paddingTop: 1 }}>{label}</div>
+        <div style={{ fontSize: 13, color: '#2a2a2a', flex: 1, lineHeight: 1.4 }}>
+          {link ? <a href={link} style={{ color: gold, textDecoration: 'none' }}>{value}</a> : value}
+        </div>
+      </div>
+    );
+  }
+
+  function NoteBlock({ label, value }) {
+    if (!value) return null;
+    return (
+      <div style={{ marginBottom: 10 }}>
+        {label && <div style={{ fontSize: 11, color: '#bbb', fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 5 }}>{label}</div>}
+        <div style={{ fontSize: 13, color: '#444', lineHeight: 1.65, background: '#faf8f4', borderRadius: 8, padding: '10px 14px' }}>{value}</div>
+      </div>
+    );
+  }
+
+  function VolForm({ onSubmit, title, onCancel }) {
+    return (
+      <div onClick={onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>{title}</div>
+          <form onSubmit={onSubmit}>
+            <div style={secLabel}>Basic Info</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+              <div><label style={labelStyle}>First Name *</label><input required name="First Name" value={form['First Name']} onChange={handleFormChange} style={inputStyle} /></div>
+              <div><label style={labelStyle}>Last Name *</label><input required name="Last Name" value={form['Last Name']} onChange={handleFormChange} style={inputStyle} /></div>
+            </div>
+            <div style={grp}><label style={labelStyle}>Status</label><select name="Status" value={form['Status']} onChange={handleFormChange} style={inputStyle}><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+            <div style={grp}><label style={labelStyle}>Team</label><input name="Team" value={form['Team']} onChange={handleFormChange} style={inputStyle} placeholder="e.g. Garden, Events" /></div>
+            <div style={secLabel}>Contact</div>
+            <div style={grp}><label style={labelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={handleFormChange} style={inputStyle} /></div>
+            <div style={grp}><label style={labelStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={handleFormChange} style={inputStyle} /></div>
+            <div style={grp}><label style={labelStyle}>Address</label><input name="Address" value={form['Address']} onChange={handleFormChange} style={inputStyle} /></div>
+            <div style={grp}><label style={labelStyle}>Emergency Contact</label><input name="Emergency Contact" value={form['Emergency Contact']} onChange={handleFormChange} style={inputStyle} /></div>
+            <div style={secLabel}>Volunteer Info</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Birthday</label><input name="Birthday" type="date" value={form['Birthday']} onChange={handleFormChange} style={inputStyle} /></div>
+              <div><label style={labelStyle}>Anniversary</label><input name="Volunteer Anniversary" type="date" value={form['Volunteer Anniversary']} onChange={handleFormChange} style={inputStyle} /></div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+              <div><label style={labelStyle}>Month</label><input name="Month" value={form['Month']} onChange={handleFormChange} style={inputStyle} /></div>
+              <div><label style={labelStyle}>Day</label><input name="Day" value={form['Day']} onChange={handleFormChange} style={inputStyle} /></div>
+            </div>
+            <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="CC" checked={form['CC']} onChange={handleFormChange} /> CC</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Nametag" checked={form['Nametag']} onChange={handleFormChange} /> Nametag</label>
+            </div>
+            <div style={grp}><label style={labelStyle}>Picture URL (Google Drive)</label><input name="Picture URL" value={form['Picture URL']} onChange={handleFormChange} style={inputStyle} placeholder="https://drive.google.com/..." /></div>
+            <div style={secLabel}>Notes</div>
+            <div style={grp}><label style={labelStyle}>Overview Notes</label><textarea name="Overview Notes" value={form['Overview Notes']} onChange={handleFormChange} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} /></div>
+            <div style={grp}><label style={labelStyle}>Background Notes</label><textarea name="Background Notes" value={form['Background Notes']} onChange={handleFormChange} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} /></div>
+            <div style={grp}><label style={labelStyle}>Notes</label><textarea name="Notes" value={form['Notes']} onChange={handleFormChange} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} /></div>
+            <div style={secLabel}>Goals</div>
+            <div style={grp}><label style={labelStyle}>What they want to see at NSH</label><textarea name="What they want to see at NSH" value={form['What they want to see at NSH']} onChange={handleFormChange} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} /></div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : 'Save'}</button>
+              <button type="button" onClick={onCancel} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -346,7 +463,7 @@ function VolunteersView() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ fontSize: 13, color: '#888' }}>{loading ? 'Loading...' : volunteers.length + ' volunteer' + (volunteers.length !== 1 ? 's' : '')}</div>
-        <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ Add Volunteer</button>
+        <button onClick={function() { setForm(emptyForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ Add Volunteer</button>
       </div>
 
       {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#c0392b' }}>Error: {error}</div>}
@@ -376,102 +493,79 @@ function VolunteersView() {
         </div>
       )}
 
-      {selected && (
+      {selected && !editing && (
         <div onClick={function() { setSelected(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ textAlign: 'center', marginBottom: 20 }}>
-              {selected['Picture URL'] ? (
-                <img src={driveImg(selected['Picture URL'])} alt={selected['First Name']} style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', marginBottom: 12, background: '#eee' }} />
-              ) : (
-                <div style={{ width: 80, height: 80, borderRadius: '50%', background: gold, color: '#fff', fontSize: 26, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>{initials(selected)}</div>
-              )}
-              <div style={{ fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected['First Name']} {selected['Last Name']}</div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <Badge status={selected['Status'] || 'Active'} />
-                {selected['Team'] && <span style={{ fontSize: 12, color: '#888' }}>{selected['Team']}</span>}
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto', overflow: 'hidden' }}>
+
+            {/* Header band */}
+            <div style={{ background: 'linear-gradient(135deg, #f8f4ec 0%, #f0e8dc 100%)', padding: '28px 28px 20px', borderBottom: '0.5px solid #e8dece', position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+                {selected['Picture URL'] ? (
+                  <img src={driveImg(selected['Picture URL'])} alt={selected['First Name']} style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '3px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', flexShrink: 0 }} />
+                ) : (
+                  <div style={{ width: 72, height: 72, borderRadius: '50%', background: gold, color: '#fff', fontSize: 24, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', flexShrink: 0 }}>{initials(selected)}</div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 3, lineHeight: 1.2 }}>{selected['First Name']} {selected['Last Name']}</div>
+                  {selected['Team'] && <div style={{ fontSize: 12, color: '#9a7f5a', marginBottom: 6, fontWeight: 500 }}>{selected['Team']}</div>}
+                  <Badge status={selected['Status'] || 'Active'} />
+                </div>
               </div>
+              <button onClick={function() { openEdit(selected); }} style={{ position: 'absolute', top: 16, right: 16, background: '#fff', border: '0.5px solid #ddd4c4', borderRadius: 7, padding: '5px 12px', fontSize: 12, color: '#7a6a55', cursor: 'pointer', fontWeight: 500 }}>Edit</button>
             </div>
-            {(selected['Email'] || selected['Phone Number'] || selected['Address'] || selected['Emergency Contact']) && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={secLabel}>Contact</div>
-                {selected['Email'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Email</span><a href={'mailto:' + selected['Email']} style={{ color: gold, textDecoration: 'none' }}>{selected['Email']}</a></div>}
-                {selected['Phone Number'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Phone</span>{selected['Phone Number']}</div>}
-                {selected['Address'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Address</span>{selected['Address']}</div>}
-                {selected['Emergency Contact'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Emergency</span>{selected['Emergency Contact']}</div>}
-              </div>
-            )}
-            {(selected['Volunteer Anniversary'] || selected['Birthday'] || selected['CC'] || selected['Nametag']) && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={secLabel}>Volunteer Info</div>
-                {selected['Volunteer Anniversary'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Anniversary</span>{selected['Volunteer Anniversary']}</div>}
-                {selected['Birthday'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Birthday</span>{selected['Birthday']}</div>}
-                {selected['CC'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>CC</span>{String(selected['CC']).toUpperCase() === 'TRUE' ? 'Yes' : 'No'}</div>}
-                {selected['Nametag'] && <div style={{ fontSize: 13, marginBottom: 5 }}><span style={{ color: '#aaa', marginRight: 6 }}>Nametag</span>{String(selected['Nametag']).toUpperCase() === 'TRUE' ? 'Yes' : 'No'}</div>}
-              </div>
-            )}
-            {(selected['Overview Notes'] || selected['Background Notes'] || selected['Notes']) && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={secLabel}>Notes</div>
-                {selected['Overview Notes'] && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, color: '#aaa', marginBottom: 4 }}>Overview</div><div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.5 }}>{selected['Overview Notes']}</div></div>}
-                {selected['Background Notes'] && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, color: '#aaa', marginBottom: 4 }}>Background</div><div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.5 }}>{selected['Background Notes']}</div></div>}
-                {selected['Notes'] && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, color: '#aaa', marginBottom: 4 }}>Additional</div><div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.5 }}>{selected['Notes']}</div></div>}
-              </div>
-            )}
-            {selected['What they want to see at NSH'] && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={secLabel}>Goals</div>
-                <div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.5 }}>{selected['What they want to see at NSH']}</div>
-              </div>
-            )}
-            <button onClick={function() { setSelected(null); }} style={{ width: '100%', padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Close</button>
+
+            {/* Body */}
+            <div style={{ padding: '20px 28px 24px', overflowY: 'auto' }}>
+              {(selected['Email'] || selected['Phone Number'] || selected['Address'] || selected['Emergency Contact']) && (
+                <div style={{ marginBottom: 4 }}>
+                  <span style={secLabel}>Contact</span>
+                  <InfoRow label="Email" value={selected['Email']} link={'mailto:' + selected['Email']} />
+                  <InfoRow label="Phone" value={selected['Phone Number']} />
+                  <InfoRow label="Address" value={selected['Address']} />
+                  <InfoRow label="Emergency" value={selected['Emergency Contact']} />
+                </div>
+              )}
+              {(selected['Volunteer Anniversary'] || selected['Birthday']) && (
+                <div style={{ marginBottom: 4 }}>
+                  <span style={secLabel}>Volunteer Info</span>
+                  <InfoRow label="Anniversary" value={selected['Volunteer Anniversary']} />
+                  <InfoRow label="Birthday" value={selected['Birthday']} />
+                </div>
+              )}
+              {(selected['Overview Notes'] || selected['Background Notes'] || selected['Notes']) && (
+                <div style={{ marginBottom: 4 }}>
+                  <span style={secLabel}>Notes</span>
+                  <NoteBlock label={selected['Background Notes'] || selected['Notes'] ? 'Overview' : null} value={selected['Overview Notes']} />
+                  <NoteBlock label="Background" value={selected['Background Notes']} />
+                  <NoteBlock label="Additional" value={selected['Notes']} />
+                </div>
+              )}
+              {selected['What they want to see at NSH'] && (
+                <div style={{ marginBottom: 4 }}>
+                  <span style={secLabel}>Goals</span>
+                  <NoteBlock value={selected['What they want to see at NSH']} />
+                </div>
+              )}
+              <button onClick={function() { setSelected(null); }} style={{ marginTop: 16, width: '100%', padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: '#999', fontWeight: 500 }}>Close</button>
+            </div>
           </div>
         </div>
       )}
 
+      {selected && editing && (
+        <VolForm
+          title={'Edit — ' + selected['First Name'] + ' ' + selected['Last Name']}
+          onSubmit={handleEditSubmit}
+          onCancel={function() { setEditing(false); }}
+        />
+      )}
+
       {showAdd && (
-        <div onClick={function() { setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>Add Volunteer</div>
-            <form onSubmit={handleAddSubmit}>
-              <div style={secLabel}>Basic Info</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                <div><label style={labelStyle}>First Name *</label><input required name="First Name" value={form['First Name']} onChange={handleFormChange} style={inputStyle} /></div>
-                <div><label style={labelStyle}>Last Name *</label><input required name="Last Name" value={form['Last Name']} onChange={handleFormChange} style={inputStyle} /></div>
-              </div>
-              <div style={grp}><label style={labelStyle}>Status</label><select name="Status" value={form['Status']} onChange={handleFormChange} style={inputStyle}><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
-              <div style={grp}><label style={labelStyle}>Team</label><input name="Team" value={form['Team']} onChange={handleFormChange} style={inputStyle} placeholder="e.g. Garden, Events" /></div>
-              <div style={secLabel}>Contact</div>
-              <div style={grp}><label style={labelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={handleFormChange} style={inputStyle} /></div>
-              <div style={grp}><label style={labelStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={handleFormChange} style={inputStyle} /></div>
-              <div style={grp}><label style={labelStyle}>Address</label><input name="Address" value={form['Address']} onChange={handleFormChange} style={inputStyle} /></div>
-              <div style={grp}><label style={labelStyle}>Emergency Contact</label><input name="Emergency Contact" value={form['Emergency Contact']} onChange={handleFormChange} style={inputStyle} /></div>
-              <div style={secLabel}>Volunteer Info</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                <div><label style={labelStyle}>Birthday</label><input name="Birthday" type="date" value={form['Birthday']} onChange={handleFormChange} style={inputStyle} /></div>
-                <div><label style={labelStyle}>Anniversary</label><input name="Volunteer Anniversary" type="date" value={form['Volunteer Anniversary']} onChange={handleFormChange} style={inputStyle} /></div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                <div><label style={labelStyle}>Month</label><input name="Month" value={form['Month']} onChange={handleFormChange} style={inputStyle} /></div>
-                <div><label style={labelStyle}>Day</label><input name="Day" value={form['Day']} onChange={handleFormChange} style={inputStyle} /></div>
-              </div>
-              <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="CC" checked={form['CC']} onChange={handleFormChange} /> CC</label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Nametag" checked={form['Nametag']} onChange={handleFormChange} /> Nametag</label>
-              </div>
-              <div style={grp}><label style={labelStyle}>Picture URL (Google Drive)</label><input name="Picture URL" value={form['Picture URL']} onChange={handleFormChange} style={inputStyle} placeholder="https://drive.google.com/..." /></div>
-              <div style={secLabel}>Notes</div>
-              <div style={grp}><label style={labelStyle}>Overview Notes</label><textarea name="Overview Notes" value={form['Overview Notes']} onChange={handleFormChange} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} /></div>
-              <div style={grp}><label style={labelStyle}>Background Notes</label><textarea name="Background Notes" value={form['Background Notes']} onChange={handleFormChange} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} /></div>
-              <div style={grp}><label style={labelStyle}>Notes</label><textarea name="Notes" value={form['Notes']} onChange={handleFormChange} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} /></div>
-              <div style={secLabel}>Goals</div>
-              <div style={grp}><label style={labelStyle}>What they want to see at NSH</label><textarea name="What they want to see at NSH" value={form['What they want to see at NSH']} onChange={handleFormChange} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} /></div>
-              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : 'Save Volunteer'}</button>
-                <button type="button" onClick={function() { setShowAdd(false); }} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <VolForm
+          title="Add Volunteer"
+          onSubmit={handleAddSubmit}
+          onCancel={function() { setShowAdd(false); }}
+        />
       )}
     </div>
   );
