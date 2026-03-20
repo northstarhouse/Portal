@@ -68,6 +68,17 @@ const SECTION_PAGES = [
   { key: 'venue', label: 'Venue', sheet: 'Venue' }
 ];
 
+// Maps volunteer Team tags (from 2026 Volunteers sheet) to section sheet keys
+const VOLUNTEER_TEAM_TO_SECTION = {
+  'Restoration': 'Construction',
+  'Landscaping': 'Grounds',
+  'Interiors': 'Interiors',
+  'Docents': 'Docents',
+  'Events Team': 'Events',
+  'Event Support': 'Events',
+  'Development': 'Fundraising'
+};
+
 const STATUSES = [
   'Not started',
   'On track',
@@ -3574,7 +3585,7 @@ const StrategyApp = () => {
                             <div className="text-xs uppercase tracking-wide text-steel">Volunteers (2026)</div>
                             <div className="text-lg text-ink mt-2">
                               {(() => {
-                                const count = volunteers.filter((v) => v.team === sectionDetails[view].key).length;
+                                const count = volunteers.filter((v) => VOLUNTEER_TEAM_TO_SECTION[v.team] === sectionDetails[view].key).length;
                                 return count > 0 ? count : (snapshot?.volunteers || 'N/A');
                               })()}
                             </div>
@@ -3600,7 +3611,7 @@ const StrategyApp = () => {
                 {volunteerModal === sectionDetails[view].key && (
                   <VolunteerPanel
                     sectionLabel={sectionDetails[view].label}
-                    volunteers={volunteers.filter((v) => v.team === sectionDetails[view].key)}
+                    volunteers={volunteers.filter((v) => VOLUNTEER_TEAM_TO_SECTION[v.team] === sectionDetails[view].key)}
                     onUpdateNotes={handleUpdateVolunteerNotes}
                     isSaving={isSavingVolunteer}
                     onClose={() => setVolunteerModal(null)}
