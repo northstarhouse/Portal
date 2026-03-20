@@ -246,8 +246,8 @@ function VolunteersView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    db.from("2026 Volunteers")
-      .select("First Name, Last Name, Team, Status, Email")
+    db.from("2025 Volunteers-1")
+      .select("First Name, Last Name, Role, Team, Status, Email")
       .order("Last Name")
       .then(({ data, error }) => {
         if (!error && data) setVolunteers(data);
@@ -269,10 +269,11 @@ function VolunteersView() {
         <div style={{ padding: 24, textAlign: "center", color: "#aaa", fontSize: 13 }}>Loading volunteers...</div>
       ) : (
         <Table
-          cols={["Name", "Team", "Status", "Email"]}
+          cols={["Name", "Role", "Team", "Status", "Email"]}
           rows={volunteers}
           renderRow={r => (<>
             <Td>{r["First Name"]} {r["Last Name"]}</Td>
+            <Td muted>{r.Role}</Td>
             <Td muted>{r.Team}</Td>
             <Td><Badge status={r.Status} /></Td>
             <Td muted>{r.Email}</Td>
