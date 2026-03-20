@@ -441,9 +441,17 @@ function VolunteersView() {
     return volunteers.some(function(v) { return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(t) !== -1; });
   }));
   var teams = teamSet.length - 1;
-  var filtered = filterTeam === 'All' ? volunteers : volunteers.filter(function(v) {
-    return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(filterTeam) !== -1;
-  });
+  function teamSortKey(v) {
+    var t = (v['Team'] || '').split('|')[0].trim();
+    if (t === 'Board Member') return '0';
+    if (t === 'Staff') return '1';
+    return '2_' + t;
+  }
+  var filtered = filterTeam === 'All'
+    ? volunteers.slice().sort(function(a, b) { return teamSortKey(a).localeCompare(teamSortKey(b)); })
+    : volunteers.filter(function(v) {
+        return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(filterTeam) !== -1;
+      });
 
   function fmtBirthday(val) {
     if (!val) return '';
