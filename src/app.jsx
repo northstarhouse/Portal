@@ -248,6 +248,15 @@ const typeColors = {
   );
 }
 
+function driveImg(url) {
+  if (!url) return null;
+  var i = url.indexOf("/d/");
+  if (i === -1) return url;
+  var rest = url.substring(i + 3);
+  var id = rest.split("/")[0].split("?")[0];
+  return "https://drive.google.com/thumbnail?id=" + id + "&sz=w200";
+}
+
 function VolunteersView() {
   const [volunteers, setVolunteers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -288,7 +297,7 @@ function VolunteersView() {
               onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(136,108,68,0.12)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
               {v["Picture URL"] ? (
-                <img src={v["Picture URL"]} alt={v["First Name"]} style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", marginBottom: 10, border: "2px solid #e0d8cc" }} />
+                <img src={driveImg(v["Picture URL"])} alt={v["First Name"]} style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", marginBottom: 10, border: "2px solid #e0d8cc" }} />
               ) : (
                 <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#f0e8dc", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: 20, fontWeight: 600, color: gold, border: "2px solid #e0d8cc" }}>{initials(v)}</div>
               )}
@@ -305,7 +314,7 @@ function VolunteersView() {
           <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, padding: 28, maxWidth: 420, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
               {selected["Picture URL"] ? (
-                <img src={selected["Picture URL"]} alt={selected["First Name"]} style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "2px solid #e0d8cc", flexShrink: 0 }} />
+                <img src={driveImg(selected["Picture URL"])} alt={selected["First Name"]} style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "2px solid #e0d8cc", flexShrink: 0 }} />
               ) : (
                 <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#f0e8dc", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 600, color: gold, border: "2px solid #e0d8cc", flexShrink: 0 }}>{initials(selected)}</div>
               )}
