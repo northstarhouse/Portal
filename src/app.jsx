@@ -1,4 +1,8 @@
-const { useState } = React;
+const { useState, useEffect } = React;
+
+const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2endoaHd6ZWxhZWxmaGZrdmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMzI4OTksImV4cCI6MjA4OTYwODg5OX0.xw5n0MGm69u_FOiZHxbLNUCNQHehIJliO_s4YbTyfh8";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const gold = "#886c44";
 const cream = "#f8f4ec";
@@ -238,19 +242,43 @@ const typeColors = {
 }
 
 function VolunteersView() {
+  const [volunteers, setVolunteers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    db.from("2026 Volunteers")
+      .select("First Name, Last Name, Team, Status, Email")
+      .order("Last Name")
+      .then(({ data, error }) => {
+        if (!error && data) setVolunteers(data);
+        setLoading(false);
+      });
+  }, []);
+
+  const active = volunteers.filter(v => v.Status === "Active").length;
+
   return (
     <div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <StatCard label="Total Volunteers" value="5" />
-        <StatCard label="Active" value="4" />
-        <StatCard label="Total Hours (YTD)" value="146" />
-        <StatCard label="Avg Hours / Volunteer" value="29" />
+        <StatCard label="Total Volunteers" value={loading ? "..." : volunteers.length} />
+        <StatCard label="Active" value={loading ? "..." : active} />
+        <StatCard label="Inactive" value={loading ? "..." : volunteers.length - active} />
+        <StatCard label="Teams" value={loading ? "..." : [...new Set(volunteers.flatMap(v => (v.Team || "").split(", ").map(t => t.trim()).filter(Boolean)))].length} />
       </div>
-      <Table
-        cols={["Name", "Role", "Hours YTD", "Last Shift", "Status"]}
-        rows={mockData.volunteers}
-        renderRow={r => (<><Td>{r.name}</Td><Td muted>{r.role}</Td><Td>{r.hours}</Td><Td muted>{r.lastShift}</Td><Td><Badge status={r.status} /></Td></>)}
-      />
+      {loading ? (
+        <div style={{ padding: 24, textAlign: "center", color: "#aaa", fontSize: 13 }}>Loading volunteers...</div>
+      ) : (
+        <Table
+          cols={["Name", "Team", "Status", "Email"]}
+          rows={volunteers}
+          renderRow={r => (<>
+            <Td>{r["First Name"]} {r["Last Name"]}</Td>
+            <Td muted>{r.Team}</Td>
+            <Td><Badge status={r.Status} /></Td>
+            <Td muted>{r.Email}</Td>
+          </>)}
+        />
+      )}
     </div>
   );
 }
