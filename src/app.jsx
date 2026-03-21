@@ -1678,50 +1678,82 @@ const views = {
   board: BoardView,
   strategy: StrategyView,
   operational: OperationalView,
-};function Dashboard() {
+};
+
+var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];function Dashboard() {
   const [active, setActive] = useState("home");
+  const [opOpen, setOpOpen] = useState(false);
+  const [opArea, setOpArea] = useState(null);
   const View = views[active];
   const mod = modules.find(m => m.id === active);
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" }}>
       <style>{".nsh-sidebar::-webkit-scrollbar { display: none; }"}</style>
-      <div className="nsh-sidebar" style={{ width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto", scrollbarWidth: "none" }}>
-        <div style={{ padding: "24px 20px 16px" }}>
-          <div style={{ fontSize: 12, color: gold, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>North Star House</div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>Command Center</div>
-        </div>
-        <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" }} />
-        <nav style={{ flex: 1, padding: "0 8px" }}>
-          {modules.filter(m => !m.hidden).map(m => (
-            <button key={m.id} onClick={() => setActive(m.id)} style={{
-              display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px",
-              background: active === m.id ? "rgba(136,108,68,0.18)" : "transparent",
-              border: "none", borderRadius: 7, cursor: "pointer", textAlign: "left",
-              color: active === m.id ? gold : "rgba(255,255,255,0.5)",
-              fontSize: 12, fontWeight: active === m.id ? 500 : 400,
-              marginBottom: 2, transition: "all 0.15s"
+      <div style={{ display: "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 }}>
+        <div className="nsh-sidebar" style={{ width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", scrollbarWidth: "none" }}>
+          <div style={{ padding: "24px 20px 16px" }}>
+            <div style={{ fontSize: 12, color: gold, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>North Star House</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>Command Center</div>
+          </div>
+          <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" }} />
+          <nav style={{ flex: 1, padding: "0 8px" }}>
+            {modules.filter(m => !m.hidden).map(m => (
+              <button key={m.id} onClick={() => { setActive(m.id); setOpOpen(false); }} style={{
+                display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px",
+                background: active === m.id ? "rgba(136,108,68,0.18)" : "transparent",
+                border: "none", borderRadius: 7, cursor: "pointer", textAlign: "left",
+                color: active === m.id ? gold : "rgba(255,255,255,0.5)",
+                fontSize: 12, fontWeight: active === m.id ? 500 : 400,
+                marginBottom: 2, transition: "all 0.15s"
+              }}>
+                <NavIcon id={m.id} active={active === m.id} />
+                {m.label}
+              </button>
+            ))}
+          </nav>
+          <div style={{ padding: "12px 8px 16px", borderTop: "0.5px solid rgba(255,255,255,0.08)", marginTop: 8 }}>
+            <button onClick={() => setOpOpen(o => !o)} style={{
+              width: "100%", padding: "10px 12px", borderRadius: 8, cursor: "pointer", textAlign: "left",
+              background: opOpen ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)",
+              border: "0.5px solid rgba(255,255,255,0.12)",
+              color: opOpen ? "#fff" : "rgba(255,255,255,0.5)",
+              fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s"
             }}>
-              <NavIcon id={m.id} active={active === m.id} />
-              {m.label}
+              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}>
+                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              Operational Areas
+              <span style={{ marginLeft: "auto", fontSize: 10, opacity: 0.6 }}>{opOpen ? "▲" : "▶"}</span>
             </button>
-          ))}
-        </nav>
-        <div style={{ padding: "12px 8px 16px", borderTop: "0.5px solid rgba(255,255,255,0.08)", marginTop: 8 }}>
-          <button onClick={() => setActive("operational")} style={{
-            width: "100%", padding: "10px 12px", borderRadius: 8, cursor: "pointer", textAlign: "left",
-            background: active === "operational" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)",
-            border: "0.5px solid rgba(255,255,255,0.12)",
-            color: active === "operational" ? "#fff" : "rgba(255,255,255,0.5)",
-            fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s"
-          }}>
-            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}>
-              <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-            </svg>
-            Operational Areas
-          </button>
+          </div>
+          <div style={{ padding: "0 20px 20px" }} />
         </div>
-        <div style={{ padding: "0 20px 20px" }} />
+
+        {/* Operational Areas flyout */}
+        <div style={{
+          width: opOpen ? 180 : 0, overflow: "hidden", transition: "width 0.25s ease",
+          background: "#222226", borderLeft: opOpen ? "0.5px solid rgba(255,255,255,0.06)" : "none",
+          display: "flex", flexDirection: "column", height: "100vh"
+        }}>
+          <div style={{ padding: "24px 0 16px 0", opacity: opOpen ? 1 : 0, transition: "opacity 0.2s ease 0.05s", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", fontWeight: 600, letterSpacing: 1.4, textTransform: "uppercase", padding: "0 16px", marginBottom: 10 }}>Areas</div>
+            {OPERATIONAL_AREAS.map(function(area) {
+              return (
+                <button key={area} onClick={function() { setOpArea(area); setActive("operational"); }}
+                  style={{
+                    display: "block", width: "100%", padding: "9px 16px", background: opArea === area && active === "operational" ? "rgba(255,255,255,0.08)" : "transparent",
+                    border: "none", cursor: "pointer", textAlign: "left",
+                    color: opArea === area && active === "operational" ? "#fff" : "rgba(255,255,255,0.45)",
+                    fontSize: 13, fontWeight: opArea === area && active === "operational" ? 500 : 400,
+                    transition: "all 0.15s"
+                  }}>
+                  {area}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div style={{ flex: 1, padding: "28px 32px", overflowY: "auto" }}>

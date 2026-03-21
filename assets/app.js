@@ -1344,11 +1344,17 @@
     strategy: StrategyView,
     operational: OperationalView
   };
+  var OPERATIONAL_AREAS = ["Construction", "Grounds", "Interiors", "Docents", "Fundraising", "Events", "Marketing", "Venue"];
   function Dashboard() {
     const [active, setActive] = useState("home");
+    const [opOpen, setOpOpen] = useState(false);
+    const [opArea, setOpArea] = useState(null);
     const View = views[active];
     const mod = modules.find((m) => m.id === active);
-    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, ".nsh-sidebar::-webkit-scrollbar { display: none; }"), /* @__PURE__ */ React.createElement("div", { className: "nsh-sidebar", style: { width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto", scrollbarWidth: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "24px 20px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: gold, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 } }, "North Star House"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.35)" } }, "Command Center")), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" } }), /* @__PURE__ */ React.createElement("nav", { style: { flex: 1, padding: "0 8px" } }, modules.filter((m) => !m.hidden).map((m) => /* @__PURE__ */ React.createElement("button", { key: m.id, onClick: () => setActive(m.id), style: {
+    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, ".nsh-sidebar::-webkit-scrollbar { display: none; }"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { className: "nsh-sidebar", style: { width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", scrollbarWidth: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "24px 20px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: gold, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 } }, "North Star House"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.35)" } }, "Command Center")), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" } }), /* @__PURE__ */ React.createElement("nav", { style: { flex: 1, padding: "0 8px" } }, modules.filter((m) => !m.hidden).map((m) => /* @__PURE__ */ React.createElement("button", { key: m.id, onClick: () => {
+      setActive(m.id);
+      setOpOpen(false);
+    }, style: {
       display: "flex",
       alignItems: "center",
       gap: 10,
@@ -1364,22 +1370,56 @@
       fontWeight: active === m.id ? 500 : 400,
       marginBottom: 2,
       transition: "all 0.15s"
-    } }, /* @__PURE__ */ React.createElement(NavIcon, { id: m.id, active: active === m.id }), m.label))), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 8px 16px", borderTop: "0.5px solid rgba(255,255,255,0.08)", marginTop: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setActive("operational"), style: {
+    } }, /* @__PURE__ */ React.createElement(NavIcon, { id: m.id, active: active === m.id }), m.label))), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 8px 16px", borderTop: "0.5px solid rgba(255,255,255,0.08)", marginTop: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setOpOpen((o) => !o), style: {
       width: "100%",
       padding: "10px 12px",
       borderRadius: 8,
       cursor: "pointer",
       textAlign: "left",
-      background: active === "operational" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)",
+      background: opOpen ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)",
       border: "0.5px solid rgba(255,255,255,0.12)",
-      color: active === "operational" ? "#fff" : "rgba(255,255,255,0.5)",
+      color: opOpen ? "#fff" : "rgba(255,255,255,0.5)",
       fontSize: 13,
       fontWeight: 500,
       display: "flex",
       alignItems: "center",
       gap: 8,
       transition: "all 0.15s"
-    } }, /* @__PURE__ */ React.createElement("svg", { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, opacity: 0.8 } }, /* @__PURE__ */ React.createElement("rect", { x: "2", y: "3", width: "20", height: "14", rx: "2" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "21", x2: "16", y2: "21" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "17", x2: "12", y2: "21" })), "Operational Areas")), /* @__PURE__ */ React.createElement("div", { style: { padding: "0 20px 20px" } })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: "28px 32px", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0, fontSize: 26, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, mod && mod.label), /* @__PURE__ */ React.createElement("div", { style: { height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 10, opacity: 0.65 } })), /* @__PURE__ */ React.createElement(View, { navigate: setActive }))));
+    } }, /* @__PURE__ */ React.createElement("svg", { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", style: { flexShrink: 0, opacity: 0.8 } }, /* @__PURE__ */ React.createElement("rect", { x: "2", y: "3", width: "20", height: "14", rx: "2" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "21", x2: "16", y2: "21" }), /* @__PURE__ */ React.createElement("line", { x1: "12", y1: "17", x2: "12", y2: "21" })), "Operational Areas", /* @__PURE__ */ React.createElement("span", { style: { marginLeft: "auto", fontSize: 10, opacity: 0.6 } }, opOpen ? "\u25B2" : "\u25B6"))), /* @__PURE__ */ React.createElement("div", { style: { padding: "0 20px 20px" } })), /* @__PURE__ */ React.createElement("div", { style: {
+      width: opOpen ? 180 : 0,
+      overflow: "hidden",
+      transition: "width 0.25s ease",
+      background: "#222226",
+      borderLeft: opOpen ? "0.5px solid rgba(255,255,255,0.06)" : "none",
+      display: "flex",
+      flexDirection: "column",
+      height: "100vh"
+    } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "24px 0 16px 0", opacity: opOpen ? 1 : 0, transition: "opacity 0.2s ease 0.05s", whiteSpace: "nowrap" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "rgba(255,255,255,0.3)", fontWeight: 600, letterSpacing: 1.4, textTransform: "uppercase", padding: "0 16px", marginBottom: 10 } }, "Areas"), OPERATIONAL_AREAS.map(function(area) {
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: area,
+          onClick: function() {
+            setOpArea(area);
+            setActive("operational");
+          },
+          style: {
+            display: "block",
+            width: "100%",
+            padding: "9px 16px",
+            background: opArea === area && active === "operational" ? "rgba(255,255,255,0.08)" : "transparent",
+            border: "none",
+            cursor: "pointer",
+            textAlign: "left",
+            color: opArea === area && active === "operational" ? "#fff" : "rgba(255,255,255,0.45)",
+            fontSize: 13,
+            fontWeight: opArea === area && active === "operational" ? 500 : 400,
+            transition: "all 0.15s"
+          }
+        },
+        area
+      );
+    })))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: "28px 32px", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0, fontSize: 26, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, mod && mod.label), /* @__PURE__ */ React.createElement("div", { style: { height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 10, opacity: 0.65 } })), /* @__PURE__ */ React.createElement(View, { navigate: setActive }))));
   }
   var root = ReactDOM.createRoot(document.getElementById("root"));
   root.render(React.createElement(Dashboard));
