@@ -169,6 +169,7 @@ const typeColors = {
   Event: { bg: "#fff8e1", color: "#8a6200" },
 };function HomeView() {
   const [donationTotal, setDonationTotal] = useState(null);
+  const [activeVols, setActiveVols] = useState(null);
   useEffect(function() {
     sbFetch('2026 Donations', ['Amount']).then(function(rows) {
       if (!Array.isArray(rows)) return;
@@ -176,6 +177,10 @@ const typeColors = {
         return s + parseFloat((r['Amount'] || '0').replace(/[^\d.]/g, '') || 0);
       }, 0);
       setDonationTotal(total);
+    });
+    sbFetch('Volunteers', ['Status']).then(function(rows) {
+      if (!Array.isArray(rows)) return;
+      setActiveVols(rows.filter(function(r) { return r['Status'] === 'Active'; }).length);
     });
   }, []);
   return (
@@ -197,7 +202,7 @@ const typeColors = {
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
         <StatCard label="YTD Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub="of $50K goal" />
-        <StatCard label="Active Volunteers" value="4" sub="of 5 total" />
+        <StatCard label="Active Volunteers" value={activeVols === null ? '...' : activeVols} />
         <StatCard label="2026 Events" value="5" sub="on the books" />
         <StatCard label="Active Sponsors" value="3" sub="+ 1 in review" />
       </div>
