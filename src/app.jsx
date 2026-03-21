@@ -168,6 +168,16 @@ const typeColors = {
   Board: { bg: "#e8eaf6", color: "#3949ab" },
   Event: { bg: "#fff8e1", color: "#8a6200" },
 };function HomeView() {
+  const [donationTotal, setDonationTotal] = useState(null);
+  useEffect(function() {
+    sbFetch('2026 Donations', ['Amount']).then(function(rows) {
+      if (!Array.isArray(rows)) return;
+      var total = rows.reduce(function(s, r) {
+        return s + parseFloat((r['Amount'] || '0').replace(/[^\d.]/g, '') || 0);
+      }, 0);
+      setDonationTotal(total);
+    });
+  }, []);
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
@@ -186,7 +196,7 @@ const typeColors = {
       </div>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-        <StatCard label="YTD Donations" value="$18,000" sub="of $25K goal" />
+        <StatCard label="YTD Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub="2026 YTD" />
         <StatCard label="Active Volunteers" value="4" sub="of 5 total" />
         <StatCard label="2026 Events" value="5" sub="on the books" />
         <StatCard label="Active Sponsors" value="3" sub="+ 1 in review" />
