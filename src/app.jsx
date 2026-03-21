@@ -1310,7 +1310,7 @@ function BoardView() {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 16, flexShrink: 0 }}>
                   <span style={{ fontSize: 12, color: '#aaa' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
                   {revealed
-                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Revealed</span>
+                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Closed – Decision Made</span>
                     : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Open</span>
                   }
                 </div>
