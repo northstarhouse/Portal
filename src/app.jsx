@@ -273,9 +273,9 @@ const typeColors = {
             var isCreative = /creative|class/.test(tl);
             var isEvent = /event|party/.test(tl);
             var isGoals = /goal/.test(tl);
-            var dotColor = isDocent ? '#2e7d32' : isEstate ? '#c2185b' : isWedding ? '#b71c1c' : isCommittee ? '#e65100' : isMeeting ? '#6a1b9a' : isCreative ? '#00838f' : isEvent ? '#1565c0' : isGoals ? '#f57c00' : gold;
+            var dotColor = isDocent ? '#2e7d32' : isEstate ? '#c2185b' : isWedding ? '#b71c1c' : isCommittee ? '#e65100' : isMeeting ? '#f9a825' : isCreative ? '#00838f' : isEvent ? '#1565c0' : isGoals ? '#f57c00' : gold;
             var label = isDocent ? 'Docent Tour' : isEstate ? 'Estate Tour' : isWedding ? 'Wedding' : isCommittee ? 'Committee' : isMeeting ? 'Meeting' : isCreative ? 'Creative' : isEvent ? 'Event' : isGoals ? 'Goals' : 'Other';
-            var labelBg = isDocent ? '#e8f5e9' : isEstate ? '#fce4ec' : isWedding ? '#ffebee' : isCommittee ? '#fff3e0' : isMeeting ? '#f3e5f5' : isCreative ? '#e0f7fa' : isEvent ? '#e3f2fd' : isGoals ? '#fff8e1' : '#f0ebe2';
+            var labelBg = isDocent ? '#e8f5e9' : isEstate ? '#fce4ec' : isWedding ? '#ffebee' : isCommittee ? '#fff3e0' : isMeeting ? '#fffde7' : isCreative ? '#e0f7fa' : isEvent ? '#e3f2fd' : isGoals ? '#fff8e1' : '#f0ebe2';
             return (
               <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
                 <div style={{ minWidth: 6, height: 6, borderRadius: "50%", background: dotColor, marginTop: 5, flexShrink: 0 }} />
