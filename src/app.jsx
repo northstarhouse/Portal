@@ -1668,7 +1668,7 @@ const views = {
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" }}>
       <style>{".nsh-sidebar::-webkit-scrollbar { display: none; }"}</style>
-      <div className="nsh-sidebar" style={{ width: 220, background: "#2a2420", display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto", scrollbarWidth: "none" }}>
+      <div className="nsh-sidebar" style={{ width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto", scrollbarWidth: "none" }}>
         <div style={{ padding: "24px 20px 16px" }}>
           <div style={{ fontSize: 11, color: gold, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>North Star House</div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>Command Center</div>
