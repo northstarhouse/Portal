@@ -1,1 +1,753 @@
-(()=>{const{useState:x,useEffect:ie}=React,ee="https://uvzwhhwzelaelfhfkvdb.supabase.co",j="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2endoaHd6ZWxhZWxmaGZrdmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMzI4OTksImV4cCI6MjA4OTYwODg5OX0.xw5n0MGm69u_FOiZHxbLNUCNQHehIJliO_s4YbTyfh8";function re(e,n){const l=n.map(d=>encodeURIComponent(d)).join(","),p=ee+"/rest/v1/"+encodeURIComponent(e)+"?select="+l;return fetch(p,{headers:{apikey:j,Authorization:"Bearer "+j}}).then(d=>d.json())}const g="#886c44",ce="#f8f4ec",oe=[{id:"home",label:"Overview",icon:"\u2302"},{id:"events",label:"Events & Bookings",icon:"\u25C8"},{id:"volunteers",label:"Volunteers",icon:"\u25CE"},{id:"donors",label:"Donors & Donations",icon:"\u25C7"},{id:"marketing",label:"Marketing / Content",icon:"\u25F0"},{id:"board",label:"Board Activity",icon:"\u25D1"},{id:"strategy",label:"Strategic Plan",icon:"\u25C8"}],L={events:[{name:"Spring Garden Tour",date:"Apr 12",status:"Confirmed",revenue:"$1,200",guests:45},{name:"Founder\u2019s Gala",date:"May 3",status:"Pending",revenue:"$4,800",guests:120},{name:"Julia Morgan Lecture",date:"May 18",status:"Confirmed",revenue:"$600",guests:30},{name:"Mid-Summer Festival",date:"Jul 11",status:"Planning",revenue:"\u2014",guests:200},{name:"Board Retreat",date:"Aug 5",status:"Confirmed",revenue:"\u2014",guests:14}],volunteers:[{name:"Margaret H.",role:"Garden Lead",hours:42,lastShift:"Mar 18",status:"Active"},{name:"David K.",role:"Events Support",hours:28,lastShift:"Mar 15",status:"Active"},{name:"Sara L.",role:"Archivist",hours:35,lastShift:"Mar 10",status:"Active"},{name:"James T.",role:"Docent",hours:19,lastShift:"Feb 28",status:"Inactive"},{name:"Priya M.",role:"Social Media",hours:22,lastShift:"Mar 19",status:"Active"}],donors:[{name:"Teichert Foundation",type:"Foundation",amount:"$10,000",year:2025,status:"Received"},{name:"Robert & Jean Foote",type:"Individual",amount:"$2,500",year:2025,status:"Pledged"},{name:"PG&E Community Giving",type:"Corporate",amount:"$5,000",year:2025,status:"In Review"},{name:"McConnell Foundation",type:"Foundation",amount:"$7,500",year:2024,status:"Received"},{name:"Anonymous",type:"Individual",amount:"$500",year:2025,status:"Received"}],marketing:[{platform:"Instagram",post:"Spring Hedgerow Walk",date:"Apr 5",status:"Scheduled",lead:"Haley"},{platform:"Facebook",post:"Volunteer Spotlight \u2014 Sara L.",date:"Apr 8",status:"Draft",lead:"Haley"},{platform:"Email",post:"April Newsletter",date:"Apr 1",status:"Sent",lead:"Haley"},{platform:"Instagram",post:"Mid-Summer Festival Announce",date:"Apr 15",status:"Draft",lead:"Haley"},{platform:"TikTok",post:"Julia Morgan Heritage Clip",date:"Apr 20",status:"Ideas",lead:"Haley"}],financials:[{category:"Event Revenue",budget:"$18,000",actual:"$9,600",pct:53},{category:"Donations",budget:"$25,000",actual:"$18,000",pct:72},{category:"Grants",budget:"$30,000",actual:"$17,500",pct:58},{category:"Operations",budget:"$22,000",actual:"$10,200",pct:46,expense:!0},{category:"Programming",budget:"$8,000",actual:"$3,100",pct:39,expense:!0}],archival:[{id:"NSH-001",name:"Foote Family Portrait, 1908",type:"Photograph",condition:"Good",location:"Storage A"},{id:"NSH-002",name:"Original Blueprint \u2014 Julia Morgan",type:"Document",condition:"Fragile",location:"Archive Box 3"},{id:"NSH-003",name:"Gold Rush Mining Equipment",type:"Artifact",condition:"Fair",location:"Display Case 1"},{id:"NSH-004",name:"North Star Mine Letter, 1902",type:"Document",condition:"Good",location:"Archive Box 1"},{id:"NSH-005",name:"Pelton Wheel Fragment",type:"Artifact",condition:"Fair",location:"Garden Shed"}],board:[{member:"Carol W.",role:"Chair",attendance:"100%",lastVote:"Mar 12",status:"Active"},{member:"Thomas A.",role:"Treasurer",attendance:"92%",lastVote:"Mar 12",status:"Active"},{member:"Diane P.",role:"Secretary",attendance:"85%",lastVote:"Mar 12",status:"Active"},{member:"Raj S.",role:"Member",attendance:"78%",lastVote:"Feb 8",status:"Active"},{member:"Nina F.",role:"Member",attendance:"60%",lastVote:"Jan 15",status:"Watch"}],strategy:[{pillar:"Historic Preservation",goal:"Complete 2nd floor feasibility study",progress:90,owner:"Haley",due:"Q2 2025"},{pillar:"Community Programs",goal:"Launch Hedgerow Garden Walk",progress:75,owner:"Haley",due:"Q2 2025"},{pillar:"Revenue Diversification",goal:"Secure 3 new grant sources",progress:40,owner:"Board",due:"Q3 2025"},{pillar:"Volunteer Development",goal:"Grow volunteer base to 50 active",progress:60,owner:"Haley",due:"Q4 2025"},{pillar:"Brand & Communications",goal:"Relaunch NSH website",progress:55,owner:"Haley",due:"Q3 2025"}]},ue={Confirmed:{bg:"#e8f5e9",color:"#2e7d32"},Pending:{bg:"#fff8e1",color:"#8a6200"},Planning:{bg:"#e8eaf6",color:"#3949ab"},Active:{bg:"#e8f5e9",color:"#2e7d32"},Inactive:{bg:"#f3f3f3",color:"#757575"},Received:{bg:"#e8f5e9",color:"#2e7d32"},Pledged:{bg:"#e8eaf6",color:"#3949ab"},"In Review":{bg:"#fff8e1",color:"#8a6200"},Scheduled:{bg:"#e3f2fd",color:"#1565c0"},Draft:{bg:"#f3f3f3",color:"#555"},Sent:{bg:"#e8f5e9",color:"#2e7d32"},Ideas:{bg:"#fce4ec",color:"#880e4f"},Watch:{bg:"#fff3e0",color:"#e65100"},Good:{bg:"#e8f5e9",color:"#2e7d32"},Fair:{bg:"#fff8e1",color:"#8a6200"},Fragile:{bg:"#fce4ec",color:"#880e4f"}};function G({status:e}){const n=ue[e]||{bg:"#f3f3f3",color:"#555"};return React.createElement("span",{style:{background:n.bg,color:n.color,fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:20,whiteSpace:"nowrap"}},e)}function c({label:e,value:n,sub:l}){return React.createElement("div",{style:{background:"#fff",border:"0.5px solid #e0d8cc",borderRadius:10,padding:"14px 18px",flex:1,minWidth:120}},React.createElement("div",{style:{fontSize:12,color:"#888",marginBottom:4}},e),React.createElement("div",{style:{fontSize:22,fontWeight:500,color:"#2a2a2a"}},n),l&&React.createElement("div",{style:{fontSize:11,color:"#aaa",marginTop:2}},l))}function pe({pct:e,color:n}){return React.createElement("div",{style:{background:"#eee",borderRadius:4,height:6,width:"100%",overflow:"hidden"}},React.createElement("div",{style:{width:e+"%",height:"100%",background:n||g,borderRadius:4,transition:"width 0.4s"}}))}function te({cols:e,rows:n,renderRow:l}){return React.createElement("div",{style:{background:"#fff",border:"0.5px solid #e0d8cc",borderRadius:10,overflow:"hidden"}},React.createElement("div",{style:{overflowX:"auto"}},React.createElement("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:13}},React.createElement("thead",null,React.createElement("tr",null,e.map(p=>React.createElement("th",{key:p,style:{textAlign:"left",padding:"8px 10px",color:"#999",fontWeight:500,borderBottom:"0.5px solid #e8e0d4",whiteSpace:"nowrap"}},p)))),React.createElement("tbody",null,n.map((p,d)=>React.createElement("tr",{key:d,style:{borderBottom:"0.5px solid #f0ebe2"}},l(p)))))))}function C({children:e,muted:n}){return React.createElement("td",{style:{padding:"9px 10px",color:n?"#aaa":"#2a2a2a",whiteSpace:"nowrap"}},e)}const fe=[{day:"Mon Mar 23",title:"Volunteer Garden Workday",time:"9:00 AM",type:"Volunteer"},{day:"Wed Mar 25",title:"Board Finance Committee",time:"3:00 PM",type:"Board"},{day:"Thu Mar 26",title:"Spring Tour Site Walk",time:"11:00 AM",type:"Event"},{day:"Sat Mar 28",title:"Community Open House",time:"1:00 PM",type:"Event"}],ge={Volunteer:{bg:"#e8f5e9",color:"#2e7d32"},Board:{bg:"#e8eaf6",color:"#3949ab"},Event:{bg:"#fff8e1",color:"#8a6200"}};function ve(){return React.createElement("div",null,React.createElement("div",{style:{marginBottom:24}},React.createElement("div",{style:{fontSize:12,color:g,fontWeight:500,letterSpacing:1,textTransform:"uppercase",marginBottom:6}},"Today \u2014 March 20, 2026"),React.createElement("h2",{style:{margin:0,fontSize:20,fontWeight:500,color:"#2a2a2a"}},"Good morning, North Star House"),React.createElement("p",{style:{fontSize:13,color:"#888",margin:"4px 0 0"}},"Here\u2019s your organization at a glance.")),React.createElement("div",{style:{background:"#fff4e5",border:"0.5px solid #e0c98a",borderRadius:10,padding:"12px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:12}},React.createElement("div",{style:{fontSize:16,color:g}},"\u23CE"),React.createElement("div",null,React.createElement("div",{style:{fontSize:12,fontWeight:500,color:"#8a6200"}},"Quarterly Update Due \u2014 March 31, 2026"),React.createElement("div",{style:{fontSize:12,color:"#b08040",marginTop:2}},"Donations \xB7 Volunteers \xB7 Sponsors \xB7 Events \xB7 Board Activity")),React.createElement("div",{style:{marginLeft:"auto",fontSize:11,fontWeight:500,color:"#c0392b",background:"#fce4e4",padding:"3px 10px",borderRadius:20}},"11 days away")),React.createElement("div",{style:{display:"flex",gap:12,flexWrap:"wrap",marginBottom:24}},React.createElement(c,{label:"YTD Donations",value:"$18,000",sub:"of $25K goal"}),React.createElement(c,{label:"Active Volunteers",value:"4",sub:"of 5 total"}),React.createElement(c,{label:"2026 Events",value:"5",sub:"on the books"}),React.createElement(c,{label:"Active Sponsors",value:"3",sub:"+ 1 in review"})),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}},React.createElement("div",{style:{background:"#fff",border:"0.5px solid #e0d8cc",borderRadius:10,padding:"16px 18px"}},React.createElement("div",{style:{fontSize:12,fontWeight:500,color:g,marginBottom:14,textTransform:"uppercase",letterSpacing:.8}},"This Week at North Star House"),fe.map((e,n)=>{const l=ge[e.type]||{bg:"#f3f3f3",color:"#555"};return React.createElement("div",{key:n,style:{display:"flex",gap:12,alignItems:"flex-start",marginBottom:12}},React.createElement("div",{style:{minWidth:6,height:6,borderRadius:"50%",background:l.color,marginTop:5}}),React.createElement("div",{style:{flex:1}},React.createElement("div",{style:{fontSize:13,fontWeight:500,color:"#2a2a2a"}},e.title),React.createElement("div",{style:{fontSize:11,color:"#aaa",marginTop:2}},e.day," \xB7 ",e.time)),React.createElement("span",{style:{fontSize:11,background:l.bg,color:l.color,padding:"2px 7px",borderRadius:20,whiteSpace:"nowrap",fontWeight:500}},e.type))}),React.createElement("div",{style:{marginTop:12,paddingTop:12,borderTop:"0.5px solid #f0ebe2",fontSize:11,color:"#bbb"}},"Synced from Google Calendar")),React.createElement("div",{style:{background:"#fff",border:"0.5px solid #e0d8cc",borderRadius:10,padding:"16px 18px"}},React.createElement("div",{style:{fontSize:12,fontWeight:500,color:g,marginBottom:14,textTransform:"uppercase",letterSpacing:.8}},"In-House Events"),L.events.map((e,n)=>React.createElement("div",{key:n,style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}},React.createElement("div",null,React.createElement("div",{style:{fontSize:13,fontWeight:500}},e.name),React.createElement("div",{style:{fontSize:11,color:"#aaa"}},e.date)),React.createElement(G,{status:e.status}))))))}function me(){return React.createElement("div",null,React.createElement("div",{style:{display:"flex",gap:12,flexWrap:"wrap",marginBottom:20}},React.createElement(c,{label:"Total Events",value:"5",sub:"next 90 days"}),React.createElement(c,{label:"Confirmed",value:"3"}),React.createElement(c,{label:"Est. Revenue",value:"$6,600",sub:"confirmed only"}),React.createElement(c,{label:"Est. Guests",value:"395",sub:"across all events"})),React.createElement(te,{cols:["Event","Date","Status","Est. Guests","Revenue"],rows:L.events,renderRow:e=>React.createElement(React.Fragment,null,React.createElement(C,null,e.name),React.createElement(C,{muted:!0},e.date),React.createElement(C,null,React.createElement(G,{status:e.status})),React.createElement(C,{muted:!0},e.guests),React.createElement(C,null,e.revenue))}))}function ae(e){if(!e)return null;var n=e.indexOf("/d/");if(n===-1)return e;var l=e.substring(n+3),p=l.split("/")[0].split("?")[0];return"https://drive.google.com/thumbnail?id="+p+"&sz=w200"}function le(e,n){return fetch(ee+"/rest/v1/"+encodeURIComponent(e),{method:"POST",headers:{apikey:j,Authorization:"Bearer "+j,"Content-Type":"application/json",Prefer:"return=representation"},body:JSON.stringify(n)}).then(l=>l.json())}function ye(e,n,l,p){var d=encodeURIComponent('"First Name"'),y=encodeURIComponent('"Last Name"');return fetch(ee+"/rest/v1/"+encodeURIComponent(e)+"?"+d+"=eq."+encodeURIComponent(n)+"&"+y+"=eq."+encodeURIComponent(l),{method:"PATCH",headers:{apikey:j,Authorization:"Bearer "+j,"Content-Type":"application/json",Prefer:"return=representation"},body:JSON.stringify(p)}).then(o=>o.json())}var V={Grounds:{bg:"#e8f5e9",color:"#2e7d32"},Construction:{bg:"#fff3e0",color:"#e65100"},"Events Team":{bg:"#e3f2fd",color:"#1565c0"},"Event Support":{bg:"#e8eaf6",color:"#3949ab"},Interiors:{bg:"#f3e5f5",color:"#6a1b9a"},Fundraising:{bg:"#fff8e1",color:"#8a6200"},Staff:{bg:"#f3f3f3",color:"#555"},"Board Member":{bg:"#fce4ec",color:"#880e4f"},New:{bg:"#e0f7fa",color:"#006064"},Docent:{bg:"#fbe9e7",color:"#8d3d2b"},"Volunteer Exchange":{bg:"#e8f4fd",color:"#0d6eab"},"Support List":{bg:"#f0f4f8",color:"#3a5068"}},se=Object.keys(V);function be({value:e,onChange:n}){const{useState:l}=React,[p,d]=l(!1);var y=e?e.split("|").map(function(u){return u.trim()}).filter(Boolean):[];function o(u){var f;y.indexOf(u)!==-1?f=y.filter(function(T){return T!==u}):f=y.concat([u]),n({target:{name:"Team",value:f.join(" | ")}})}function z(u){var f=y.filter(function(T){return T!==u});n({target:{name:"Team",value:f.join(" | ")}})}return React.createElement("div",{style:{position:"relative"}},React.createElement("div",{onClick:function(){d(function(u){return!u})},style:{minHeight:38,border:"0.5px solid #e0d8cc",borderRadius:8,padding:"5px 10px",cursor:"pointer",background:"#fff",display:"flex",flexWrap:"wrap",gap:5,alignItems:"center"}},y.length===0&&React.createElement("span",{style:{fontSize:13,color:"#bbb"}},"Select teams..."),y.map(function(u){return React.createElement("span",{key:u,style:{background:(V[u]||{bg:"#f3f3f3"}).bg,color:(V[u]||{color:"#555"}).color,fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:20,display:"flex",alignItems:"center",gap:4,whiteSpace:"nowrap"}},u,React.createElement("span",{onClick:function(f){f.stopPropagation(),z(u)},style:{cursor:"pointer",opacity:.6,fontSize:14,lineHeight:1,marginLeft:2}},"\xD7"))}),React.createElement("span",{style:{marginLeft:"auto",fontSize:11,color:"#bbb",flexShrink:0}},p?"\u25B2":"\u25BC")),p&&React.createElement("div",{style:{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"0.5px solid #e0d8cc",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",zIndex:100,marginTop:4,padding:"6px 0",maxHeight:220,overflowY:"auto"}},se.map(function(u){var f=y.indexOf(u)!==-1;return React.createElement("div",{key:u,onClick:function(){o(u)},style:{padding:"8px 14px",fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",background:f?(V[u]||{bg:"#f3f3f3"}).bg:"#fff",color:f?(V[u]||{color:"#555"}).color:"#2a2a2a"},onMouseEnter:function(T){f||(T.currentTarget.style.background="#faf8f4")},onMouseLeave:function(T){f||(T.currentTarget.style.background="#fff")}},u,f&&React.createElement("span",{style:{color:g,fontSize:14,fontWeight:600}},"\u2713"))})))}var w={width:"100%",padding:"8px 10px",border:"0.5px solid #e0d8cc",borderRadius:8,fontSize:13,marginTop:4,boxSizing:"border-box",fontFamily:"system-ui, sans-serif",background:"#fff"},N={fontSize:12,color:"#666",fontWeight:500},D={marginBottom:14},W={fontSize:10,textTransform:"uppercase",letterSpacing:1.2,color:"#bbb",fontWeight:600,marginBottom:10,marginTop:20,display:"block"};function ne({form:e,onChange:n,saving:l,onSubmit:p,title:d,onCancel:y}){return React.createElement("div",{onClick:y,style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.32)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1010,padding:20}},React.createElement("div",{onClick:function(o){o.stopPropagation()},style:{background:"#fff",borderRadius:16,padding:28,maxWidth:480,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,0.18)",maxHeight:"90vh",overflowY:"auto"}},React.createElement("div",{style:{fontSize:17,fontWeight:600,color:"#2a2a2a",marginBottom:20}},d),React.createElement("form",{onSubmit:p},React.createElement("span",{style:W},"Basic Info"),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}},React.createElement("div",null,React.createElement("label",{style:N},"First Name *"),React.createElement("input",{required:!0,name:"First Name",value:e["First Name"],onChange:n,style:w})),React.createElement("div",null,React.createElement("label",{style:N},"Last Name *"),React.createElement("input",{required:!0,name:"Last Name",value:e["Last Name"],onChange:n,style:w}))),React.createElement("div",{style:D},React.createElement("label",{style:N},"Status"),React.createElement("select",{name:"Status",value:e.Status,onChange:n,style:w},React.createElement("option",{value:"Active"},"Active"),React.createElement("option",{value:"Inactive"},"Inactive"))),React.createElement("div",{style:D},React.createElement("label",{style:N},"Team"),React.createElement("div",{style:{marginTop:4}},React.createElement(be,{value:e.Team,onChange:n}))),React.createElement("span",{style:W},"Contact"),React.createElement("div",{style:D},React.createElement("label",{style:N},"Email"),React.createElement("input",{name:"Email",type:"email",value:e.Email,onChange:n,style:w})),React.createElement("div",{style:D},React.createElement("label",{style:N},"Phone Number"),React.createElement("input",{name:"Phone Number",value:e["Phone Number"],onChange:n,style:w})),React.createElement("div",{style:D},React.createElement("label",{style:N},"Address"),React.createElement("input",{name:"Address",value:e.Address,onChange:n,style:w})),React.createElement("div",{style:D},React.createElement("label",{style:N},"Emergency Contact"),React.createElement("input",{name:"Emergency Contact",value:e["Emergency Contact"],onChange:n,style:w})),React.createElement("span",{style:W},"Volunteer Info"),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}},React.createElement("div",null,React.createElement("label",{style:N},"Birthday"),React.createElement("input",{name:"Birthday",type:"date",value:e.Birthday,onChange:n,style:w})),React.createElement("div",null,React.createElement("label",{style:N},"Anniversary"),React.createElement("input",{name:"Volunteer Anniversary",type:"date",value:e["Volunteer Anniversary"],onChange:n,style:w}))),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}},React.createElement("div",null,React.createElement("label",{style:N},"Month"),React.createElement("input",{name:"Month",value:e.Month,onChange:n,style:w})),React.createElement("div",null,React.createElement("label",{style:N},"Day"),React.createElement("input",{name:"Day",value:e.Day,onChange:n,style:w}))),React.createElement("div",{style:{display:"flex",gap:20,marginBottom:14}},React.createElement("label",{style:{display:"flex",alignItems:"center",gap:6,fontSize:13,color:"#444",cursor:"pointer"}},React.createElement("input",{type:"checkbox",name:"CC",checked:e.CC,onChange:n})," CC"),React.createElement("label",{style:{display:"flex",alignItems:"center",gap:6,fontSize:13,color:"#444",cursor:"pointer"}},React.createElement("input",{type:"checkbox",name:"Nametag",checked:e.Nametag,onChange:n})," Nametag")),React.createElement("div",{style:D},React.createElement("label",{style:N},"Picture URL (Google Drive)"),React.createElement("input",{name:"Picture URL",value:e["Picture URL"],onChange:n,style:w,placeholder:"https://drive.google.com/..."})),React.createElement("span",{style:W},"Notes"),React.createElement("div",{style:D},React.createElement("label",{style:N},"Overview Notes"),React.createElement("textarea",{name:"Overview Notes",value:e["Overview Notes"],onChange:n,rows:3,style:Object.assign({},w,{resize:"vertical"})})),React.createElement("div",{style:D},React.createElement("label",{style:N},"Background Notes"),React.createElement("textarea",{name:"Background Notes",value:e["Background Notes"],onChange:n,rows:3,style:Object.assign({},w,{resize:"vertical"})})),React.createElement("div",{style:D},React.createElement("label",{style:N},"Notes"),React.createElement("textarea",{name:"Notes",value:e.Notes,onChange:n,rows:3,style:Object.assign({},w,{resize:"vertical"})})),React.createElement("span",{style:W},"Goals"),React.createElement("div",{style:D},React.createElement("label",{style:N},"What they want to see at NSH"),React.createElement("textarea",{name:"What they want to see at NSH",value:e["What they want to see at NSH"],onChange:n,rows:3,style:Object.assign({},w,{resize:"vertical"})})),React.createElement("div",{style:{display:"flex",gap:10,marginTop:8}},React.createElement("button",{type:"submit",disabled:l,style:{flex:1,background:g,color:"#fff",border:"none",borderRadius:8,padding:"10px",fontSize:13,fontWeight:500,cursor:"pointer",opacity:l?.7:1}},l?"Saving...":"Save"),React.createElement("button",{type:"button",onClick:y,style:{flex:1,padding:10,background:"#f5f0ea",border:"none",borderRadius:8,fontSize:13,color:"#666",cursor:"pointer",fontWeight:500}},"Cancel")))))}function he(){const[e,n]=x([]),[l,p]=x(!0),[d,y]=x(null),[o,z]=x(null),[u,f]=x(!1),[T,E]=x(!1),[_,I]=x(!1),[$,P]=x("All"),[s,O]=x("active");var H={"First Name":"","Last Name":"",Team:"",Status:"Active",Email:"","Phone Number":"",Address:"",Birthday:"","Volunteer Anniversary":"",CC:!1,Nametag:!1,"Overview Notes":"","Background Notes":"",Notes:"","What they want to see at NSH":"","Picture URL":"","Emergency Contact":"",Month:"",Day:""};const[S,F]=x(H);ie(function(){re("2026 Volunteers",["First Name","Last Name","Team","Status","Email","Phone Number","Address","Birthday","Volunteer Anniversary","CC","Nametag","Overview Notes","Background Notes","Notes","What they want to see at NSH","Picture URL","Emergency Contact","Month","Day"]).then(function(t){Array.isArray(t)?n(t):y(JSON.stringify(t)),p(!1)}).catch(function(t){y(t.message),p(!1)})},[]);var Q=e.filter(function(t){return t.Status==="Active"}).length,U=e.filter(function(t){return t.Status==="Inactive"}).length,J=e.filter(function(t){return s==="active"?t.Status==="Active":t.Status==="Inactive"}),Y=["All"].concat(se.filter(function(t){return J.some(function(i){return(i.Team||"").split("|").map(function(r){return r.trim()}).indexOf(t)!==-1})})),q=Y.length-1;function m(t){if(t["First Name"]==="Ken"&&t["Last Name"]==="Underwood")return"0";var i=(t.Team||"").split("|")[0].trim();return i==="Board Member"?"1":i==="Staff"?"2":"3_"+i}var Z=$==="All"?J.slice().sort(function(t,i){return m(t).localeCompare(m(i))}):J.filter(function(t){return(t.Team||"").split("|").map(function(i){return i.trim()}).indexOf($)!==-1});function k(t){if(!t)return"";var i=new Date(t+"T00:00:00");return isNaN(i)?t:i.toLocaleDateString("en-US",{month:"long",day:"numeric"})}function b(t){return((t["First Name"]||"")[0]||"").toUpperCase()+((t["Last Name"]||"")[0]||"").toUpperCase()}function A(t){var i=t.target.name,r=t.target.type==="checkbox"?t.target.checked:t.target.value;F(function(R){var M=Object.assign({},R);return M[i]=r,M})}function B(t){F({"First Name":t["First Name"]||"","Last Name":t["Last Name"]||"",Team:t.Team||"",Status:t.Status||"Active",Email:t.Email||"","Phone Number":t["Phone Number"]||"",Address:t.Address||"",Birthday:t.Birthday||"","Volunteer Anniversary":t["Volunteer Anniversary"]||"",CC:String(t.CC).toUpperCase()==="TRUE",Nametag:String(t.Nametag).toUpperCase()==="TRUE","Overview Notes":t["Overview Notes"]||"","Background Notes":t["Background Notes"]||"",Notes:t.Notes||"","What they want to see at NSH":t["What they want to see at NSH"]||"","Picture URL":t["Picture URL"]||"","Emergency Contact":t["Emergency Contact"]||"",Month:t.Month||"",Day:t.Day||""}),E(!0)}function K(t){t.preventDefault(),I(!0);var i={};Object.keys(S).forEach(function(r){S[r]!==""&&S[r]!==!1&&(i[r]=S[r]===!0?"TRUE":S[r])}),S.CC||(i.CC="FALSE"),S.Nametag||(i.Nametag="FALSE"),le("2026 Volunteers",i).then(function(r){I(!1);var R=Array.isArray(r)?r[0]:r;R&&R["First Name"]&&n(function(M){return M.concat([R])}),f(!1),F(H)}).catch(function(){I(!1)})}function a(t){if(t.preventDefault(),!!o){I(!0);var i={};Object.keys(S).forEach(function(r){S[r]!==""&&(i[r]=S[r]===!0?"TRUE":S[r]===!1?"FALSE":S[r])}),ye("2026 Volunteers",o["First Name"],o["Last Name"],i).then(function(r){if(I(!1),r&&r.code){alert("Save failed: "+(r.message||JSON.stringify(r)));return}var R=Array.isArray(r)?r[0]:r,M=Object.assign({},o,i,R||{});n(function(de){return de.map(function(X){return X["First Name"]===o["First Name"]&&X["Last Name"]===o["Last Name"]?M:X})}),z(M),E(!1)}).catch(function(r){I(!1),alert("Save error: "+r.message)})}}function v({label:t,value:i,link:r}){return i?React.createElement("div",{style:{display:"flex",gap:0,marginBottom:10,alignItems:"flex-start"}},React.createElement("div",{style:{width:110,fontSize:12,color:"#aaa",flexShrink:0,paddingTop:1}},t),React.createElement("div",{style:{fontSize:13,color:"#2a2a2a",flex:1,lineHeight:1.4}},r?React.createElement("a",{href:r,style:{color:g,textDecoration:"none"}},i):i)):null}function h({label:t,value:i}){return i?React.createElement("div",{style:{marginBottom:10}},t&&React.createElement("div",{style:{fontSize:11,color:"#bbb",fontWeight:600,letterSpacing:.8,textTransform:"uppercase",marginBottom:5}},t),React.createElement("div",{style:{fontSize:13,color:"#444",lineHeight:1.65,background:"#faf8f4",borderRadius:8,padding:"10px 14px"}},i)):null}return React.createElement("div",null,React.createElement("div",{style:{display:"flex",gap:12,flexWrap:"wrap",marginBottom:20}},React.createElement(c,{label:"Total Volunteers",value:l?"...":e.length}),React.createElement(c,{label:"Active",value:l?"...":Q}),React.createElement(c,{label:"Teams",value:l?"...":q})),React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},React.createElement("div",{style:{display:"flex",gap:0,background:"#f0ebe3",borderRadius:10,padding:3}},React.createElement("button",{onClick:function(){O("active"),P("All")},style:{border:"none",borderRadius:8,padding:"6px 18px",fontSize:13,fontWeight:s==="active"?600:400,cursor:"pointer",background:s==="active"?"#fff":"transparent",color:s==="active"?"#2a2a2a":"#999",boxShadow:s==="active"?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all 0.15s"}},"Active ",React.createElement("span",{style:{fontSize:11,color:s==="active"?g:"#bbb",fontWeight:500}},Q)),React.createElement("button",{onClick:function(){O("inactive"),P("All")},style:{border:"none",borderRadius:8,padding:"6px 18px",fontSize:13,fontWeight:s==="inactive"?600:400,cursor:"pointer",background:s==="inactive"?"#fff":"transparent",color:s==="inactive"?"#2a2a2a":"#999",boxShadow:s==="inactive"?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all 0.15s"}},"Inactive ",React.createElement("span",{style:{fontSize:11,color:s==="inactive"?g:"#bbb",fontWeight:500}},U))),React.createElement("button",{onClick:function(){F(H),f(!0)},style:{background:g,color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:500,cursor:"pointer"}},"+ Add Volunteer")),!l&&Y.length>2&&React.createElement("div",{style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}},Y.map(function(t){var i=$===t,r=V[t]||{bg:"#f3f3f3",color:"#555"};return React.createElement("button",{key:t,onClick:function(){P(t)},style:{border:i?"none":"0.5px solid #e0d8cc",borderRadius:20,padding:"5px 12px",fontSize:12,fontWeight:i?600:400,cursor:"pointer",background:i?r.bg:"#fff",color:i?r.color:"#888",transition:"all 0.15s"}},t)})),d&&React.createElement("div",{style:{background:"#fce4e4",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#c0392b"}},"Error: ",d),l?React.createElement("div",{style:{textAlign:"center",padding:40,color:"#aaa",fontSize:13}},"Loading volunteers..."):React.createElement("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(140px, 1fr))",gap:14}},Z.map(function(t,i){var r=t["Picture URL"]?ae(t["Picture URL"]):null;return React.createElement("div",{key:i,onClick:function(){z(t)},onMouseEnter:function(R){R.currentTarget.style.boxShadow="0 4px 16px rgba(136,108,68,0.15)"},onMouseLeave:function(R){R.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.04)"},style:{background:"#fff",border:"0.5px solid #e0d8cc",borderRadius:12,padding:"16px 12px",textAlign:"center",cursor:"pointer",boxShadow:"0 1px 4px rgba(0,0,0,0.04)",transition:"box-shadow 0.18s"}},r?React.createElement("img",{src:r,alt:t["First Name"],style:{width:56,height:56,borderRadius:"50%",objectFit:"cover",marginBottom:10,background:"#eee"}}):React.createElement("div",{style:{width:56,height:56,borderRadius:"50%",background:g,color:"#fff",fontSize:18,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px"}},b(t)),React.createElement("div",{style:{fontSize:13,fontWeight:500,color:"#2a2a2a",marginBottom:3,lineHeight:1.3}},t["First Name"]," ",t["Last Name"]),t.Team&&React.createElement("div",{style:{fontSize:11,color:"#aaa",marginBottom:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},(t.Team||"").split("|")[0].trim()),React.createElement(G,{status:t.Status||"Active"}))})),o&&!T&&React.createElement("div",{onClick:function(){z(null)},style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.38)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1e3,padding:24}},React.createElement("div",{onClick:function(t){t.stopPropagation()},style:{background:"#fff",borderRadius:18,maxWidth:620,width:"100%",boxShadow:"0 12px 48px rgba(0,0,0,0.22)",maxHeight:"92vh",display:"flex",flexDirection:"column"}},React.createElement("div",{style:{background:"linear-gradient(135deg, #f8f4ec 0%, #f0e8dc 100%)",padding:"28px 28px 20px",borderBottom:"0.5px solid #e8dece",position:"relative"}},React.createElement("div",{style:{display:"flex",alignItems:"center",gap:18}},o["Picture URL"]?React.createElement("img",{src:ae(o["Picture URL"]),alt:o["First Name"],style:{width:72,height:72,borderRadius:"50%",objectFit:"cover",border:"3px solid #fff",boxShadow:"0 2px 8px rgba(0,0,0,0.12)",flexShrink:0}}):React.createElement("div",{style:{width:72,height:72,borderRadius:"50%",background:g,color:"#fff",fontSize:24,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",border:"3px solid #fff",boxShadow:"0 2px 8px rgba(0,0,0,0.12)",flexShrink:0}},b(o)),React.createElement("div",{style:{flex:1,minWidth:0}},React.createElement("div",{style:{fontSize:19,fontWeight:600,color:"#1e1a16",marginBottom:3,lineHeight:1.2}},o["First Name"]," ",o["Last Name"]),o.Team&&React.createElement("div",{style:{fontSize:12,color:"#9a7f5a",marginBottom:6,fontWeight:500}},o.Team),React.createElement(G,{status:o.Status||"Active"}),o["Overview Notes"]&&React.createElement("div",{style:{fontSize:12,color:"#7a6a55",marginTop:8,lineHeight:1.5,fontStyle:"italic"}},o["Overview Notes"]))),React.createElement("div",{style:{position:"absolute",top:14,right:14,display:"flex",gap:8}},React.createElement("button",{onClick:function(){B(o)},style:{background:"#fff",border:"0.5px solid #ddd4c4",borderRadius:7,padding:"5px 12px",fontSize:12,color:"#7a6a55",cursor:"pointer",fontWeight:500}},"Edit"),React.createElement("button",{onClick:function(){z(null)},style:{background:"rgba(0,0,0,0.06)",border:"none",borderRadius:"50%",width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16,color:"#666",lineHeight:1}},"\xD7"))),React.createElement("div",{style:{padding:"20px 28px 24px",overflowY:"auto"}},(o.Email||o["Phone Number"]||o.Address||o["Emergency Contact"])&&React.createElement("div",{style:{marginBottom:4}},React.createElement("span",{style:W},"Contact"),React.createElement(v,{label:"Email",value:o.Email,link:"mailto:"+o.Email}),React.createElement(v,{label:"Phone",value:o["Phone Number"]}),React.createElement(v,{label:"Address",value:o.Address}),React.createElement(v,{label:"Emergency",value:o["Emergency Contact"]})),(o["Volunteer Anniversary"]||o.Birthday)&&React.createElement("div",{style:{marginBottom:4}},React.createElement("span",{style:W},"Volunteer Info"),React.createElement(v,{label:"Anniversary",value:o["Volunteer Anniversary"]}),React.createElement(v,{label:"Birthday",value:k(o.Birthday)})),(o["Background Notes"]||o.Notes)&&React.createElement("div",{style:{marginBottom:4}},React.createElement("span",{style:W},"Notes"),React.createElement(h,{label:"Background",value:o["Background Notes"]}),React.createElement(h,{label:"Additional",value:o.Notes})),o["What they want to see at NSH"]&&React.createElement("div",{style:{marginBottom:4}},React.createElement("span",{style:W},"Goals"),React.createElement(h,{value:o["What they want to see at NSH"]})),React.createElement("button",{onClick:function(){z(null)},style:{marginTop:16,width:"100%",padding:"9px",background:"transparent",border:"0.5px solid #e0d8cc",borderRadius:8,cursor:"pointer",fontSize:13,color:"#999",fontWeight:500}},"Close")))),o&&T&&React.createElement(ne,{form:S,onChange:A,saving:_,title:"Edit \u2014 "+o["First Name"]+" "+o["Last Name"],onSubmit:a,onCancel:function(){E(!1)}}),u&&React.createElement(ne,{form:S,onChange:A,saving:_,title:"Add Volunteer",onSubmit:K,onCancel:function(){f(!1)}}))}function xe(){const[e,n]=x([]),[l,p]=x(!0),[d,y]=x(null),[o,z]=x(null),[u,f]=x(!1),[T,E]=x(!1);var _=["Donation","Membership","Restricted","Membership, Donation","Brick Purchase","Tribute"],I=["Website","Check","Cash","Credit Card","ACH","Other"],$=["Individual","Family","Household","Foundation","Corporate","Organization"],P={"Donor Name":"","Last Name":"","Informal Names":"",Amount:"","Close Date":"","Donation Type":"Donation","Payment Type":"Website","Account Type":"Individual",Acknowledged:!1,Salesforce:!1,Email:"","Phone Number":"",Address:"",Benefits:"","Donation Notes":"","Donor Notes":"",Notes:""};const[s,O]=x(P);ie(function(){re("2026 Donations",["Donor Name","Last Name","Informal Names","Amount","Close Date","Donation Type","Payment Type","Account Type","Acknowledged","Salesforce","Email","Phone Number","Address","Benefits","Donation Notes","Donor Notes","Notes"]).then(function(a){Array.isArray(a)?n(a):y(JSON.stringify(a)),p(!1)}).catch(function(a){y(a.message),p(!1)})},[]);function H(a){return parseFloat((a||"0").replace(/[^d.]/g,"")||0)}function S(a){var v=H(a);return"$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}function F(a){if(!a)return"";var v=new Date(a+"T00:00:00");return isNaN(v)?a:v.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}var Q=e.reduce(function(a,v){return a+H(v.Amount)},0),U=e.length,J=e.filter(function(a){return(a["Donation Type"]||"").includes("Membership")}).length,Y=e.filter(function(a){return a.Acknowledged===!0||String(a.Acknowledged).toUpperCase()==="TRUE"}).length,q=U-Y;function m(a){var v=a.target.name,h=a.target.type==="checkbox"?a.target.checked:a.target.value;O(function(t){var i=Object.assign({},t);return i[v]=h,i})}function Z(a){a.preventDefault(),E(!0);var v={};Object.keys(s).forEach(function(h){s[h]!==""&&(v[h]=s[h]===!0?"TRUE":s[h]===!1?"FALSE":s[h])}),le("2026 Donations",v).then(function(h){E(!1);var t=Array.isArray(h)?h[0]:h;t&&t["Donor Name"]&&n(function(i){return i.concat([t])}),f(!1),O(P)}).catch(function(){E(!1)})}var k={width:"100%",padding:"8px 10px",border:"0.5px solid #e0d8cc",borderRadius:8,fontSize:13,marginTop:4,boxSizing:"border-box",fontFamily:"system-ui, sans-serif",background:"#fff"},b={fontSize:12,color:"#666",fontWeight:500},A={marginBottom:14},B={fontSize:10,textTransform:"uppercase",letterSpacing:1.2,color:"#bbb",fontWeight:600,marginBottom:10,marginTop:20,display:"block"},K={Donation:{bg:"#e3f2fd",color:"#1565c0"},Membership:{bg:"#e8f5e9",color:"#2e7d32"},Restricted:{bg:"#fce4ec",color:"#880e4f"},"Membership, Donation":{bg:"#f3e5f5",color:"#6a1b9a"},"Brick Purchase":{bg:"#fbe9e7",color:"#8d3d2b"},Tribute:{bg:"#fff8e1",color:"#8a6200"}};return React.createElement("div",null,React.createElement("div",{style:{display:"flex",gap:12,flexWrap:"wrap",marginBottom:20}},React.createElement(c,{label:"Total Raised",value:l?"...":"$"+Q.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}),sub:"2026 YTD"}),React.createElement(c,{label:"Donations",value:l?"...":U}),React.createElement(c,{label:"Memberships",value:l?"...":J}),React.createElement(c,{label:"Need Thank You",value:l?"...":q,sub:q>0?"pending":"all clear"})),React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}},React.createElement("div",{style:{fontSize:13,color:"#888"}},l?"Loading...":U+" donation"+(U!==1?"s":"")),React.createElement("button",{onClick:function(){O(P),f(!0)},style:{background:g,color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:500,cursor:"pointer"}},"+ Add Donation")),d&&React.createElement("div",{style:{background:"#fce4e4",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#c0392b"}},"Error: ",d),l?React.createElement("div",{style:{textAlign:"center",padding:40,color:"#aaa",fontSize:13}},"Loading donations..."):React.createElement("div",{style:{background:"#fff",border:"0.5px solid #e0d8cc",borderRadius:10,overflow:"hidden"}},React.createElement("div",{style:{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:0,padding:"8px 16px",borderBottom:"0.5px solid #e8e0d4",background:"#faf8f4"}},["Donor","Type","Amount","Date"].map(function(a){return React.createElement("div",{key:a,style:{fontSize:11,color:"#aaa",fontWeight:600,textTransform:"uppercase",letterSpacing:.8}},a)})),e.map(function(a,v){var h=K[a["Donation Type"]]||{bg:"#f3f3f3",color:"#555"},t=a.Acknowledged===!0||String(a.Acknowledged).toUpperCase()==="TRUE";return React.createElement("div",{key:v,onClick:function(){z(a)},onMouseEnter:function(i){i.currentTarget.style.background="#faf8f4"},onMouseLeave:function(i){i.currentTarget.style.background="#fff"},style:{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:0,padding:"11px 16px",borderBottom:v<e.length-1?"0.5px solid #f0ebe2":"none",cursor:"pointer",background:"#fff",alignItems:"center",transition:"background 0.12s"}},React.createElement("div",null,React.createElement("div",{style:{fontSize:13,fontWeight:500,color:"#2a2a2a"}},a["Donor Name"]),React.createElement("div",{style:{fontSize:11,color:"#bbb",marginTop:1}},a["Account Type"])),React.createElement("div",null,React.createElement("span",{style:{background:h.bg,color:h.color,fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:20,whiteSpace:"nowrap"}},a["Donation Type"])),React.createElement("div",{style:{fontSize:13,fontWeight:600,color:"#2a2a2a"}},S(a.Amount)),React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},React.createElement("span",{style:{fontSize:12,color:"#888"}},F(a["Close Date"])),React.createElement("span",{style:{fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:20,background:t?"#e8f5e9":"#fff8e1",color:t?"#2e7d32":"#8a6200"}},t?"Thanked":"Pending")))})),o&&React.createElement("div",{onClick:function(){z(null)},style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.32)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1e3,padding:20}},React.createElement("div",{onClick:function(a){a.stopPropagation()},style:{background:"#fff",borderRadius:16,maxWidth:540,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,0.18)",maxHeight:"90vh",display:"flex",flexDirection:"column"}},React.createElement("div",{style:{background:"linear-gradient(135deg, #f8f4ec 0%, #f0e8dc 100%)",padding:"24px 28px 18px",borderBottom:"0.5px solid #e8dece",position:"relative",borderRadius:"16px 16px 0 0"}},React.createElement("div",{style:{fontSize:19,fontWeight:600,color:"#1e1a16",marginBottom:4}},o["Donor Name"]),React.createElement("div",{style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},(function(){var a=K[o["Donation Type"]]||{bg:"#f3f3f3",color:"#555"};return React.createElement("span",{style:{background:a.bg,color:a.color,fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:20}},o["Donation Type"])})(),React.createElement("span",{style:{fontSize:20,fontWeight:700,color:g}},S(o.Amount)),React.createElement("span",{style:{fontSize:12,color:"#aaa"}},F(o["Close Date"]))),React.createElement("button",{onClick:function(){z(null)},style:{position:"absolute",top:14,right:14,background:"rgba(0,0,0,0.06)",border:"none",borderRadius:"50%",width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16,color:"#666"}},"\xD7")),React.createElement("div",{style:{padding:"20px 28px 24px",overflowY:"auto",flex:1}},React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 32px"}},React.createElement("div",null,React.createElement("span",{style:B},"Donor Info"),o["Informal Names"]&&React.createElement("div",{style:{fontSize:13,marginBottom:8}},React.createElement("span",{style:{color:"#aaa",marginRight:8}},"Goes by"),o["Informal Names"]),o["Account Type"]&&React.createElement("div",{style:{fontSize:13,marginBottom:8}},React.createElement("span",{style:{color:"#aaa",marginRight:8}},"Type"),o["Account Type"]),o.Email&&React.createElement("div",{style:{fontSize:13,marginBottom:8}},React.createElement("span",{style:{color:"#aaa",marginRight:8}},"Email"),React.createElement("a",{href:"mailto:"+o.Email,style:{color:g,textDecoration:"none"}},o.Email)),o["Phone Number"]&&React.createElement("div",{style:{fontSize:13,marginBottom:8}},React.createElement("span",{style:{color:"#aaa",marginRight:8}},"Phone"),o["Phone Number"]),o.Address&&React.createElement("div",{style:{fontSize:13,marginBottom:8}},React.createElement("span",{style:{color:"#aaa",marginRight:8}},"Address"),React.createElement("span",{style:{whiteSpace:"pre-line"}},o.Address)),React.createElement("span",{style:B},"Payment"),o["Payment Type"]&&React.createElement("div",{style:{fontSize:13,marginBottom:8}},React.createElement("span",{style:{color:"#aaa",marginRight:8}},"Method"),o["Payment Type"]),o.Benefits&&React.createElement("div",{style:{fontSize:13,marginBottom:8}},React.createElement("span",{style:{color:"#aaa",marginRight:8}},"Benefits"),o.Benefits),React.createElement("div",{style:{fontSize:13,marginBottom:8}},React.createElement("span",{style:{color:"#aaa",marginRight:8}},"Acknowledged"),React.createElement("span",{style:{fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:20,background:o.Acknowledged===!0||String(o.Acknowledged).toUpperCase()==="TRUE"?"#e8f5e9":"#fff8e1",color:o.Acknowledged===!0||String(o.Acknowledged).toUpperCase()==="TRUE"?"#2e7d32":"#8a6200"}},o.Acknowledged===!0||String(o.Acknowledged).toUpperCase()==="TRUE"?"Thanked":"Pending"))),React.createElement("div",null,o["Donation Notes"]&&React.createElement("div",{style:{marginBottom:12}},React.createElement("span",{style:B},"Donation Notes"),React.createElement("div",{style:{fontSize:13,background:"#faf8f4",borderRadius:8,padding:"10px 14px",color:"#444",lineHeight:1.6}},o["Donation Notes"])),o["Donor Notes"]&&React.createElement("div",{style:{marginBottom:12}},React.createElement("span",{style:B},"Donor Notes"),React.createElement("div",{style:{fontSize:13,background:"#faf8f4",borderRadius:8,padding:"10px 14px",color:"#444",lineHeight:1.6}},o["Donor Notes"])),o.Notes&&React.createElement("div",{style:{marginBottom:12}},React.createElement("span",{style:B},"Notes"),React.createElement("div",{style:{fontSize:13,background:"#faf8f4",borderRadius:8,padding:"10px 14px",color:"#444",lineHeight:1.6}},o.Notes)))),React.createElement("button",{onClick:function(){z(null)},style:{marginTop:16,width:"100%",padding:"9px",background:"transparent",border:"0.5px solid #e0d8cc",borderRadius:8,cursor:"pointer",fontSize:13,color:"#999",fontWeight:500}},"Close")))),u&&React.createElement("div",{onClick:function(){f(!1)},style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.32)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1e3,padding:20}},React.createElement("div",{onClick:function(a){a.stopPropagation()},style:{background:"#fff",borderRadius:16,padding:28,maxWidth:480,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,0.18)",maxHeight:"90vh",overflowY:"auto"}},React.createElement("div",{style:{fontSize:17,fontWeight:600,color:"#2a2a2a",marginBottom:20}},"Add Donation"),React.createElement("form",{onSubmit:Z},React.createElement("span",{style:B},"Donor"),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}},React.createElement("div",null,React.createElement("label",{style:b},"First / Full Name *"),React.createElement("input",{required:!0,name:"Donor Name",value:s["Donor Name"],onChange:m,style:k})),React.createElement("div",null,React.createElement("label",{style:b},"Last Name"),React.createElement("input",{name:"Last Name",value:s["Last Name"],onChange:m,style:k}))),React.createElement("div",{style:A},React.createElement("label",{style:b},"Goes By (Informal)"),React.createElement("input",{name:"Informal Names",value:s["Informal Names"],onChange:m,style:k})),React.createElement("div",{style:A},React.createElement("label",{style:b},"Account Type"),React.createElement("select",{name:"Account Type",value:s["Account Type"],onChange:m,style:k},$.map(function(a){return React.createElement("option",{key:a,value:a},a)}))),React.createElement("span",{style:B},"Donation"),React.createElement("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}},React.createElement("div",null,React.createElement("label",{style:b},"Amount *"),React.createElement("input",{required:!0,name:"Amount",value:s.Amount,onChange:m,style:k,placeholder:"$0.00"})),React.createElement("div",null,React.createElement("label",{style:b},"Close Date"),React.createElement("input",{name:"Close Date",type:"date",value:s["Close Date"],onChange:m,style:k}))),React.createElement("div",{style:A},React.createElement("label",{style:b},"Donation Type"),React.createElement("select",{name:"Donation Type",value:s["Donation Type"],onChange:m,style:k},_.map(function(a){return React.createElement("option",{key:a,value:a},a)}))),React.createElement("div",{style:A},React.createElement("label",{style:b},"Payment Type"),React.createElement("select",{name:"Payment Type",value:s["Payment Type"],onChange:m,style:k},I.map(function(a){return React.createElement("option",{key:a,value:a},a)}))),React.createElement("div",{style:A},React.createElement("label",{style:b},"Benefits"),React.createElement("input",{name:"Benefits",value:s.Benefits,onChange:m,style:k})),React.createElement("div",{style:{display:"flex",gap:20,marginBottom:14}},React.createElement("label",{style:{display:"flex",alignItems:"center",gap:6,fontSize:13,color:"#444",cursor:"pointer"}},React.createElement("input",{type:"checkbox",name:"Acknowledged",checked:s.Acknowledged,onChange:m})," Acknowledged / Thanked"),React.createElement("label",{style:{display:"flex",alignItems:"center",gap:6,fontSize:13,color:"#444",cursor:"pointer"}},React.createElement("input",{type:"checkbox",name:"Salesforce",checked:s.Salesforce,onChange:m})," In Salesforce")),React.createElement("span",{style:B},"Contact"),React.createElement("div",{style:A},React.createElement("label",{style:b},"Email"),React.createElement("input",{name:"Email",type:"email",value:s.Email,onChange:m,style:k})),React.createElement("div",{style:A},React.createElement("label",{style:b},"Phone Number"),React.createElement("input",{name:"Phone Number",value:s["Phone Number"],onChange:m,style:k})),React.createElement("div",{style:A},React.createElement("label",{style:b},"Address"),React.createElement("textarea",{name:"Address",value:s.Address,onChange:m,rows:3,style:Object.assign({},k,{resize:"vertical"})})),React.createElement("span",{style:B},"Notes"),React.createElement("div",{style:A},React.createElement("label",{style:b},"Donation Notes"),React.createElement("textarea",{name:"Donation Notes",value:s["Donation Notes"],onChange:m,rows:2,style:Object.assign({},k,{resize:"vertical"})})),React.createElement("div",{style:A},React.createElement("label",{style:b},"Donor Notes"),React.createElement("textarea",{name:"Donor Notes",value:s["Donor Notes"],onChange:m,rows:2,style:Object.assign({},k,{resize:"vertical"})})),React.createElement("div",{style:A},React.createElement("label",{style:b},"Notes"),React.createElement("textarea",{name:"Notes",value:s.Notes,onChange:m,rows:2,style:Object.assign({},k,{resize:"vertical"})})),React.createElement("div",{style:{display:"flex",gap:10,marginTop:8}},React.createElement("button",{type:"submit",disabled:T,style:{flex:1,background:g,color:"#fff",border:"none",borderRadius:8,padding:"10px",fontSize:13,fontWeight:500,cursor:"pointer",opacity:T?.7:1}},T?"Saving...":"Save Donation"),React.createElement("button",{type:"button",onClick:function(){f(!1)},style:{flex:1,padding:10,background:"#f5f0ea",border:"none",borderRadius:8,fontSize:13,color:"#666",cursor:"pointer",fontWeight:500}},"Cancel"))))))}function Se(){return React.createElement("div",null,React.createElement("div",{style:{display:"flex",gap:12,flexWrap:"wrap",marginBottom:20}},React.createElement(c,{label:"Posts This Month",value:"5"}),React.createElement(c,{label:"Sent",value:"1"}),React.createElement(c,{label:"Scheduled",value:"1"}),React.createElement(c,{label:"In Draft/Ideas",value:"3"})),React.createElement(te,{cols:["Platform","Post","Scheduled Date","Lead","Status"],rows:L.marketing,renderRow:e=>React.createElement(React.Fragment,null,React.createElement(C,null,e.platform),React.createElement(C,null,e.post),React.createElement(C,{muted:!0},e.date),React.createElement(C,{muted:!0},e.lead),React.createElement(C,null,React.createElement(G,{status:e.status})))}))}function ke(){return React.createElement("div",null,React.createElement("div",{style:{display:"flex",gap:12,flexWrap:"wrap",marginBottom:20}},React.createElement(c,{label:"Board Members",value:"5"}),React.createElement(c,{label:"Active",value:"5"}),React.createElement(c,{label:"Avg Attendance",value:"83%"}),React.createElement(c,{label:"Next Meeting",value:"Apr 9"})),React.createElement(te,{cols:["Member","Role","Attendance","Last Vote","Status"],rows:L.board,renderRow:e=>React.createElement(React.Fragment,null,React.createElement(C,null,e.member),React.createElement(C,{muted:!0},e.role),React.createElement(C,null,e.attendance),React.createElement(C,{muted:!0},e.lastVote),React.createElement(C,null,React.createElement(G,{status:e.status})))}))}function Ne(){return React.createElement("div",null,React.createElement("div",{style:{display:"flex",gap:12,flexWrap:"wrap",marginBottom:20}},React.createElement(c,{label:"Strategic Goals",value:"5"}),React.createElement(c,{label:"Avg Progress",value:"64%"}),React.createElement(c,{label:"On Track",value:"3"}),React.createElement(c,{label:"Needs Attention",value:"2"})),React.createElement("div",{style:{background:"#fff",border:"0.5px solid #e0d8cc",borderRadius:10,padding:"16px 18px",display:"flex",flexDirection:"column",gap:14}},L.strategy.map((e,n)=>React.createElement("div",{key:n,style:{borderBottom:n<L.strategy.length-1?"0.5px solid #f0ebe2":"none",paddingBottom:n<L.strategy.length-1?14:0}},React.createElement("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:6}},React.createElement("div",null,React.createElement("div",{style:{fontSize:12,color:g,fontWeight:500,marginBottom:2}},e.pillar),React.createElement("div",{style:{fontSize:14,fontWeight:500}},e.goal)),React.createElement("div",{style:{textAlign:"right",minWidth:60}},React.createElement("div",{style:{fontSize:20,fontWeight:500,color:e.progress>=70?"#2e7d32":e.progress>=40?"#8a6200":"#c62828"}},e.progress,"%"),React.createElement("div",{style:{fontSize:11,color:"#aaa"}},"complete"))),React.createElement(pe,{pct:e.progress,color:e.progress>=70?"#4caf50":e.progress>=40?g:"#e57373"}),React.createElement("div",{style:{display:"flex",gap:16,marginTop:8}},React.createElement("div",{style:{fontSize:12,color:"#aaa"}},"Owner: ",React.createElement("span",{style:{color:"#555"}},e.owner)),React.createElement("div",{style:{fontSize:12,color:"#aaa"}},"Due: ",React.createElement("span",{style:{color:"#555"}},e.due)))))))}const we={home:ve,events:me,volunteers:he,donors:xe,marketing:Se,board:ke,strategy:Ne};function Ce(){const[e,n]=x("home"),l=we[e],p=oe.find(d=>d.id===e);return React.createElement("div",{style:{display:"flex",minHeight:"100vh",background:ce,fontFamily:"system-ui, sans-serif"}},React.createElement("style",null,".nsh-sidebar::-webkit-scrollbar { display: none; }"),React.createElement("div",{className:"nsh-sidebar",style:{width:220,background:"#2a2420",display:"flex",flexDirection:"column",flexShrink:0,position:"sticky",top:0,height:"100vh",overflowY:"auto",scrollbarWidth:"none"}},React.createElement("div",{style:{padding:"24px 20px 16px"}},React.createElement("div",{style:{fontSize:11,color:g,fontWeight:600,letterSpacing:1.5,textTransform:"uppercase",marginBottom:2}},"North Star House"),React.createElement("div",{style:{fontSize:12,color:"rgba(255,255,255,0.35)"}},"Command Center")),React.createElement("div",{style:{borderTop:"0.5px solid rgba(255,255,255,0.08)",margin:"0 0 8px"}}),React.createElement("nav",{style:{flex:1,padding:"0 8px"}},oe.map(d=>React.createElement("button",{key:d.id,onClick:()=>n(d.id),style:{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"9px 12px",background:e===d.id?"rgba(136,108,68,0.18)":"transparent",border:"none",borderRadius:7,cursor:"pointer",textAlign:"left",color:e===d.id?g:"rgba(255,255,255,0.5)",fontSize:13,fontWeight:e===d.id?500:400,marginBottom:2,transition:"all 0.15s"}},React.createElement("span",{style:{fontSize:14,opacity:.8}},d.icon),d.label))),React.createElement("div",{style:{padding:"12px 20px 20px",borderTop:"0.5px solid rgba(255,255,255,0.08)"}},React.createElement("div",{style:{fontSize:11,color:"rgba(255,255,255,0.25)"}},"Connected to Airtable"),React.createElement("div",{style:{width:8,height:8,borderRadius:"50%",background:"#4caf50",display:"inline-block",marginRight:5,marginTop:6}}),React.createElement("span",{style:{fontSize:11,color:"rgba(255,255,255,0.3)"}},"Live sync"))),React.createElement("div",{style:{flex:1,padding:"28px 32px",overflowY:"auto"}},React.createElement("div",{style:{maxWidth:900}},React.createElement("div",{style:{marginBottom:22}},React.createElement("h1",{style:{margin:0,fontSize:22,fontWeight:500,color:"#2a2a2a"}},p&&p.label),React.createElement("div",{style:{height:2,width:32,background:g,borderRadius:2,marginTop:6}})),React.createElement(l,null))))}const Te=ReactDOM.createRoot(document.getElementById("root"));Te.render(React.createElement(Ce));})();
+var App = (() => {
+  // src/app.jsx
+  var { useState, useEffect } = React;
+  var SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
+  var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2endoaHd6ZWxhZWxmaGZrdmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMzI4OTksImV4cCI6MjA4OTYwODg5OX0.xw5n0MGm69u_FOiZHxbLNUCNQHehIJliO_s4YbTyfh8";
+  function sbFetch(table, columns) {
+    const cols = columns.map((c) => encodeURIComponent(c)).join(",");
+    const url = SUPABASE_URL + "/rest/v1/" + encodeURIComponent(table) + "?select=" + cols;
+    return fetch(url, {
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+    }).then((r) => r.json());
+  }
+  var gold = "#886c44";
+  var cream = "#f8f4ec";
+  var modules = [
+    { id: "home", label: "Overview", icon: "\u2302" },
+    { id: "events", label: "Events & Bookings", icon: "\u25C8" },
+    { id: "volunteers", label: "Volunteers", icon: "\u25CE" },
+    { id: "donors", label: "Donors & Donations", icon: "\u25C7" },
+    { id: "marketing", label: "Marketing / Content", icon: "\u25F0" },
+    { id: "board", label: "Board Activity", icon: "\u25D1" },
+    { id: "strategy", label: "Strategic Plan", icon: "\u25C8" }
+  ];
+  var mockData = {
+    events: [
+      { name: "Spring Garden Tour", date: "Apr 12", status: "Confirmed", revenue: "$1,200", guests: 45 },
+      { name: "Founder\u2019s Gala", date: "May 3", status: "Pending", revenue: "$4,800", guests: 120 },
+      { name: "Julia Morgan Lecture", date: "May 18", status: "Confirmed", revenue: "$600", guests: 30 },
+      { name: "Mid-Summer Festival", date: "Jul 11", status: "Planning", revenue: "\u2014", guests: 200 },
+      { name: "Board Retreat", date: "Aug 5", status: "Confirmed", revenue: "\u2014", guests: 14 }
+    ],
+    volunteers: [
+      { name: "Margaret H.", role: "Garden Lead", hours: 42, lastShift: "Mar 18", status: "Active" },
+      { name: "David K.", role: "Events Support", hours: 28, lastShift: "Mar 15", status: "Active" },
+      { name: "Sara L.", role: "Archivist", hours: 35, lastShift: "Mar 10", status: "Active" },
+      { name: "James T.", role: "Docent", hours: 19, lastShift: "Feb 28", status: "Inactive" },
+      { name: "Priya M.", role: "Social Media", hours: 22, lastShift: "Mar 19", status: "Active" }
+    ],
+    donors: [
+      { name: "Teichert Foundation", type: "Foundation", amount: "$10,000", year: 2025, status: "Received" },
+      { name: "Robert & Jean Foote", type: "Individual", amount: "$2,500", year: 2025, status: "Pledged" },
+      { name: "PG&E Community Giving", type: "Corporate", amount: "$5,000", year: 2025, status: "In Review" },
+      { name: "McConnell Foundation", type: "Foundation", amount: "$7,500", year: 2024, status: "Received" },
+      { name: "Anonymous", type: "Individual", amount: "$500", year: 2025, status: "Received" }
+    ],
+    marketing: [
+      { platform: "Instagram", post: "Spring Hedgerow Walk", date: "Apr 5", status: "Scheduled", lead: "Haley" },
+      { platform: "Facebook", post: "Volunteer Spotlight \u2014 Sara L.", date: "Apr 8", status: "Draft", lead: "Haley" },
+      { platform: "Email", post: "April Newsletter", date: "Apr 1", status: "Sent", lead: "Haley" },
+      { platform: "Instagram", post: "Mid-Summer Festival Announce", date: "Apr 15", status: "Draft", lead: "Haley" },
+      { platform: "TikTok", post: "Julia Morgan Heritage Clip", date: "Apr 20", status: "Ideas", lead: "Haley" }
+    ],
+    financials: [
+      { category: "Event Revenue", budget: "$18,000", actual: "$9,600", pct: 53 },
+      { category: "Donations", budget: "$25,000", actual: "$18,000", pct: 72 },
+      { category: "Grants", budget: "$30,000", actual: "$17,500", pct: 58 },
+      { category: "Operations", budget: "$22,000", actual: "$10,200", pct: 46, expense: true },
+      { category: "Programming", budget: "$8,000", actual: "$3,100", pct: 39, expense: true }
+    ],
+    archival: [
+      { id: "NSH-001", name: "Foote Family Portrait, 1908", type: "Photograph", condition: "Good", location: "Storage A" },
+      { id: "NSH-002", name: "Original Blueprint \u2014 Julia Morgan", type: "Document", condition: "Fragile", location: "Archive Box 3" },
+      { id: "NSH-003", name: "Gold Rush Mining Equipment", type: "Artifact", condition: "Fair", location: "Display Case 1" },
+      { id: "NSH-004", name: "North Star Mine Letter, 1902", type: "Document", condition: "Good", location: "Archive Box 1" },
+      { id: "NSH-005", name: "Pelton Wheel Fragment", type: "Artifact", condition: "Fair", location: "Garden Shed" }
+    ],
+    board: [
+      { member: "Carol W.", role: "Chair", attendance: "100%", lastVote: "Mar 12", status: "Active" },
+      { member: "Thomas A.", role: "Treasurer", attendance: "92%", lastVote: "Mar 12", status: "Active" },
+      { member: "Diane P.", role: "Secretary", attendance: "85%", lastVote: "Mar 12", status: "Active" },
+      { member: "Raj S.", role: "Member", attendance: "78%", lastVote: "Feb 8", status: "Active" },
+      { member: "Nina F.", role: "Member", attendance: "60%", lastVote: "Jan 15", status: "Watch" }
+    ],
+    strategy: [
+      { pillar: "Historic Preservation", goal: "Complete 2nd floor feasibility study", progress: 90, owner: "Haley", due: "Q2 2025" },
+      { pillar: "Community Programs", goal: "Launch Hedgerow Garden Walk", progress: 75, owner: "Haley", due: "Q2 2025" },
+      { pillar: "Revenue Diversification", goal: "Secure 3 new grant sources", progress: 40, owner: "Board", due: "Q3 2025" },
+      { pillar: "Volunteer Development", goal: "Grow volunteer base to 50 active", progress: 60, owner: "Haley", due: "Q4 2025" },
+      { pillar: "Brand & Communications", goal: "Relaunch NSH website", progress: 55, owner: "Haley", due: "Q3 2025" }
+    ]
+  };
+  var statusColors = {
+    Confirmed: { bg: "#e8f5e9", color: "#2e7d32" },
+    Pending: { bg: "#fff8e1", color: "#8a6200" },
+    Planning: { bg: "#e8eaf6", color: "#3949ab" },
+    Active: { bg: "#e8f5e9", color: "#2e7d32" },
+    Inactive: { bg: "#f3f3f3", color: "#757575" },
+    Received: { bg: "#e8f5e9", color: "#2e7d32" },
+    Pledged: { bg: "#e8eaf6", color: "#3949ab" },
+    "In Review": { bg: "#fff8e1", color: "#8a6200" },
+    Scheduled: { bg: "#e3f2fd", color: "#1565c0" },
+    Draft: { bg: "#f3f3f3", color: "#555" },
+    Sent: { bg: "#e8f5e9", color: "#2e7d32" },
+    Ideas: { bg: "#fce4ec", color: "#880e4f" },
+    Watch: { bg: "#fff3e0", color: "#e65100" },
+    Good: { bg: "#e8f5e9", color: "#2e7d32" },
+    Fair: { bg: "#fff8e1", color: "#8a6200" },
+    Fragile: { bg: "#fce4ec", color: "#880e4f" }
+  };
+  function Badge({ status }) {
+    const style = statusColors[status] || { bg: "#f3f3f3", color: "#555" };
+    return /* @__PURE__ */ React.createElement("span", { style: { background: style.bg, color: style.color, fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap" } }, status);
+  }
+  function StatCard({ label, value, sub }) {
+    return /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px", flex: 1, minWidth: 120 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#888", marginBottom: 4 } }, label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 500, color: "#2a2a2a" } }, value), sub && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 2 } }, sub));
+  }
+  function ProgressBar({ pct, color }) {
+    return /* @__PURE__ */ React.createElement("div", { style: { background: "#eee", borderRadius: 4, height: 6, width: "100%", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { width: pct + "%", height: "100%", background: color || gold, borderRadius: 4, transition: "width 0.4s" } }));
+  }
+  function Table({ cols, rows, renderRow }) {
+    return /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { overflowX: "auto" } }, /* @__PURE__ */ React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 13 } }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, cols.map((c) => /* @__PURE__ */ React.createElement("th", { key: c, style: { textAlign: "left", padding: "8px 10px", color: "#999", fontWeight: 500, borderBottom: "0.5px solid #e8e0d4", whiteSpace: "nowrap" } }, c)))), /* @__PURE__ */ React.createElement("tbody", null, rows.map((row, i) => /* @__PURE__ */ React.createElement("tr", { key: i, style: { borderBottom: "0.5px solid #f0ebe2" } }, renderRow(row)))))));
+  }
+  function Td({ children, muted }) {
+    return /* @__PURE__ */ React.createElement("td", { style: { padding: "9px 10px", color: muted ? "#aaa" : "#2a2a2a", whiteSpace: "nowrap" } }, children);
+  }
+  var thisWeek = [
+    { day: "Mon Mar 23", title: "Volunteer Garden Workday", time: "9:00 AM", type: "Volunteer" },
+    { day: "Wed Mar 25", title: "Board Finance Committee", time: "3:00 PM", type: "Board" },
+    { day: "Thu Mar 26", title: "Spring Tour Site Walk", time: "11:00 AM", type: "Event" },
+    { day: "Sat Mar 28", title: "Community Open House", time: "1:00 PM", type: "Event" }
+  ];
+  var typeColors = {
+    Volunteer: { bg: "#e8f5e9", color: "#2e7d32" },
+    Board: { bg: "#e8eaf6", color: "#3949ab" },
+    Event: { bg: "#fff8e1", color: "#8a6200" }
+  };
+  function HomeView() {
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 } }, "Today \u2014 March 20, 2026"), /* @__PURE__ */ React.createElement("h2", { style: { margin: 0, fontSize: 20, fontWeight: 500, color: "#2a2a2a" } }, "Good morning, North Star House"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#888", margin: "4px 0 0" } }, "Here\u2019s your organization at a glance.")), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: gold } }, "\u23CE"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: "#8a6200" } }, "Quarterly Update Due \u2014 March 31, 2026"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#b08040", marginTop: 2 } }, "Donations \xB7 Volunteers \xB7 Sponsors \xB7 Events \xB7 Board Activity")), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", fontSize: 11, fontWeight: 500, color: "#c0392b", background: "#fce4e4", padding: "3px 10px", borderRadius: 20 } }, "11 days away")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "YTD Donations", value: "$18,000", sub: "of $25K goal" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Active Volunteers", value: "4", sub: "of 5 total" }), /* @__PURE__ */ React.createElement(StatCard, { label: "2026 Events", value: "5", sub: "on the books" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Active Sponsors", value: "3", sub: "+ 1 in review" })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 } }, "This Week at North Star House"), thisWeek.map((e, i) => {
+      const tc = typeColors[e.type] || { bg: "#f3f3f3", color: "#555" };
+      return /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 6, height: 6, borderRadius: "50%", background: tc.color, marginTop: 5 } }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: "#2a2a2a" } }, e.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 2 } }, e.day, " \xB7 ", e.time)), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, background: tc.bg, color: tc.color, padding: "2px 7px", borderRadius: 20, whiteSpace: "nowrap", fontWeight: 500 } }, e.type));
+    }), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: "0.5px solid #f0ebe2", fontSize: 11, color: "#bbb" } }, "Synced from Google Calendar")), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 } }, "In-House Events"), mockData.events.map((e, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 500 } }, e.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa" } }, e.date)), /* @__PURE__ */ React.createElement(Badge, { status: e.status }))))));
+  }
+  function EventsView() {
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Total Events", value: "5", sub: "next 90 days" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Confirmed", value: "3" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Est. Revenue", value: "$6,600", sub: "confirmed only" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Est. Guests", value: "395", sub: "across all events" })), /* @__PURE__ */ React.createElement(
+      Table,
+      {
+        cols: ["Event", "Date", "Status", "Est. Guests", "Revenue"],
+        rows: mockData.events,
+        renderRow: (r) => /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Td, null, r.name), /* @__PURE__ */ React.createElement(Td, { muted: true }, r.date), /* @__PURE__ */ React.createElement(Td, null, /* @__PURE__ */ React.createElement(Badge, { status: r.status })), /* @__PURE__ */ React.createElement(Td, { muted: true }, r.guests), /* @__PURE__ */ React.createElement(Td, null, r.revenue))
+      }
+    ));
+  }
+  function driveImg(url) {
+    if (!url) return null;
+    var i = url.indexOf("/d/");
+    if (i === -1) return url;
+    var rest = url.substring(i + 3);
+    var id = rest.split("/")[0].split("?")[0];
+    return "https://drive.google.com/thumbnail?id=" + id + "&sz=w200";
+  }
+  function sbInsert(table, row) {
+    return fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent(table), {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify(row)
+    }).then((r) => r.json());
+  }
+  function sbUpdate(table, firstName, lastName, row) {
+    var fnKey = encodeURIComponent('"First Name"');
+    var lnKey = encodeURIComponent('"Last Name"');
+    return fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent(table) + "?" + fnKey + "=eq." + encodeURIComponent(firstName) + "&" + lnKey + "=eq." + encodeURIComponent(lastName), {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify(row)
+    }).then((r) => r.json());
+  }
+  var TEAM_COLORS = {
+    "Grounds": { bg: "#e8f5e9", color: "#2e7d32" },
+    "Construction": { bg: "#fff3e0", color: "#e65100" },
+    "Events Team": { bg: "#e3f2fd", color: "#1565c0" },
+    "Event Support": { bg: "#e8eaf6", color: "#3949ab" },
+    "Interiors": { bg: "#f3e5f5", color: "#6a1b9a" },
+    "Fundraising": { bg: "#fff8e1", color: "#8a6200" },
+    "Staff": { bg: "#f3f3f3", color: "#555" },
+    "Board Member": { bg: "#fce4ec", color: "#880e4f" },
+    "New": { bg: "#e0f7fa", color: "#006064" },
+    "Docent": { bg: "#fbe9e7", color: "#8d3d2b" },
+    "Volunteer Exchange": { bg: "#e8f4fd", color: "#0d6eab" },
+    "Support List": { bg: "#f0f4f8", color: "#3a5068" }
+  };
+  var TEAM_OPTIONS = Object.keys(TEAM_COLORS);
+  function TeamPicker({ value, onChange }) {
+    const { useState: useS } = React;
+    const [open, setOpen] = useS(false);
+    var selected = value ? value.split("|").map(function(t) {
+      return t.trim();
+    }).filter(Boolean) : [];
+    function toggle(opt) {
+      var next;
+      if (selected.indexOf(opt) !== -1) {
+        next = selected.filter(function(t) {
+          return t !== opt;
+        });
+      } else {
+        next = selected.concat([opt]);
+      }
+      onChange({ target: { name: "Team", value: next.join(" | ") } });
+    }
+    function remove(opt) {
+      var next = selected.filter(function(t) {
+        return t !== opt;
+      });
+      onChange({ target: { name: "Team", value: next.join(" | ") } });
+    }
+    return /* @__PURE__ */ React.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: function() {
+          setOpen(function(o) {
+            return !o;
+          });
+        },
+        style: { minHeight: 38, border: "0.5px solid #e0d8cc", borderRadius: 8, padding: "5px 10px", cursor: "pointer", background: "#fff", display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center" }
+      },
+      selected.length === 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#bbb" } }, "Select teams..."),
+      selected.map(function(t) {
+        return /* @__PURE__ */ React.createElement("span", { key: t, style: { background: (TEAM_COLORS[t] || { bg: "#f3f3f3" }).bg, color: (TEAM_COLORS[t] || { color: "#555" }).color, fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 20, display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" } }, t, /* @__PURE__ */ React.createElement(
+          "span",
+          {
+            onClick: function(e) {
+              e.stopPropagation();
+              remove(t);
+            },
+            style: { cursor: "pointer", opacity: 0.6, fontSize: 14, lineHeight: 1, marginLeft: 2 }
+          },
+          "\xD7"
+        ));
+      }),
+      /* @__PURE__ */ React.createElement("span", { style: { marginLeft: "auto", fontSize: 11, color: "#bbb", flexShrink: 0 } }, open ? "\u25B2" : "\u25BC")
+    ), open && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 100, marginTop: 4, padding: "6px 0", maxHeight: 220, overflowY: "auto" } }, TEAM_OPTIONS.map(function(opt) {
+      var isOn = selected.indexOf(opt) !== -1;
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: opt,
+          onClick: function() {
+            toggle(opt);
+          },
+          style: { padding: "8px 14px", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", background: isOn ? (TEAM_COLORS[opt] || { bg: "#f3f3f3" }).bg : "#fff", color: isOn ? (TEAM_COLORS[opt] || { color: "#555" }).color : "#2a2a2a" },
+          onMouseEnter: function(e) {
+            if (!isOn) e.currentTarget.style.background = "#faf8f4";
+          },
+          onMouseLeave: function(e) {
+            if (!isOn) e.currentTarget.style.background = "#fff";
+          }
+        },
+        opt,
+        isOn && /* @__PURE__ */ React.createElement("span", { style: { color: gold, fontSize: 14, fontWeight: 600 } }, "\u2713")
+      );
+    })));
+  }
+  var volInputStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 13, marginTop: 4, boxSizing: "border-box", fontFamily: "system-ui, sans-serif", background: "#fff" };
+  var volLabelStyle = { fontSize: 12, color: "#666", fontWeight: 500 };
+  var volGrp = { marginBottom: 14 };
+  var volSecLabel = { fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 10, marginTop: 20, display: "block" };
+  function VolForm({ form, onChange, saving, onSubmit, title, onCancel }) {
+    return /* @__PURE__ */ React.createElement("div", { onClick: onCancel, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1010, padding: 20 } }, /* @__PURE__ */ React.createElement("div", { onClick: function(e) {
+      e.stopPropagation();
+    }, style: { background: "#fff", borderRadius: 16, padding: 28, maxWidth: 480, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", maxHeight: "90vh", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: "#2a2a2a", marginBottom: 20 } }, title), /* @__PURE__ */ React.createElement("form", { onSubmit }, /* @__PURE__ */ React.createElement("span", { style: volSecLabel }, "Basic Info"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "First Name *"), /* @__PURE__ */ React.createElement("input", { required: true, name: "First Name", value: form["First Name"], onChange, style: volInputStyle })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Last Name *"), /* @__PURE__ */ React.createElement("input", { required: true, name: "Last Name", value: form["Last Name"], onChange, style: volInputStyle }))), /* @__PURE__ */ React.createElement("div", { style: volGrp }, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Status"), /* @__PURE__ */ React.createElement("select", { name: "Status", value: form["Status"], onChange, style: volInputStyle }, /* @__PURE__ */ React.createElement("option", { value: "Active" }, "Active"), /* @__PURE__ */ React.createElement("option", { value: "Inactive" }, "Inactive"))), /* @__PURE__ */ React.createElement("div", { style: volGrp }, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Team"), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 4 } }, /* @__PURE__ */ React.createElement(TeamPicker, { value: form["Team"], onChange }))), /* @__PURE__ */ React.createElement("span", { style: volSecLabel }, "Contact"), /* @__PURE__ */ React.createElement("div", { style: volGrp }, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Email"), /* @__PURE__ */ React.createElement("input", { name: "Email", type: "email", value: form["Email"], onChange, style: volInputStyle })), /* @__PURE__ */ React.createElement("div", { style: volGrp }, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Phone Number"), /* @__PURE__ */ React.createElement("input", { name: "Phone Number", value: form["Phone Number"], onChange, style: volInputStyle })), /* @__PURE__ */ React.createElement("div", { style: volGrp }, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Address"), /* @__PURE__ */ React.createElement("input", { name: "Address", value: form["Address"], onChange, style: volInputStyle })), /* @__PURE__ */ React.createElement("div", { style: volGrp }, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Emergency Contact"), /* @__PURE__ */ React.createElement("input", { name: "Emergency Contact", value: form["Emergency Contact"], onChange, style: volInputStyle })), /* @__PURE__ */ React.createElement("span", { style: volSecLabel }, "Volunteer Info"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Birthday"), /* @__PURE__ */ React.createElement("input", { name: "Birthday", type: "date", value: form["Birthday"], onChange, style: volInputStyle })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Anniversary"), /* @__PURE__ */ React.createElement("input", { name: "Volunteer Anniversary", type: "date", value: form["Volunteer Anniversary"], onChange, style: volInputStyle }))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Month"), /* @__PURE__ */ React.createElement("input", { name: "Month", value: form["Month"], onChange, style: volInputStyle })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Day"), /* @__PURE__ */ React.createElement("input", { name: "Day", value: form["Day"], onChange, style: volInputStyle }))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 20, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#444", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", name: "CC", checked: form["CC"], onChange }), " CC"), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#444", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", name: "Nametag", checked: form["Nametag"], onChange }), " Nametag")), /* @__PURE__ */ React.createElement("div", { style: volGrp }, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Picture URL (Google Drive)"), /* @__PURE__ */ React.createElement("input", { name: "Picture URL", value: form["Picture URL"], onChange, style: volInputStyle, placeholder: "https://drive.google.com/..." })), /* @__PURE__ */ React.createElement("span", { style: volSecLabel }, "Notes"), /* @__PURE__ */ React.createElement("div", { style: volGrp }, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Overview Notes"), /* @__PURE__ */ React.createElement("textarea", { name: "Overview Notes", value: form["Overview Notes"], onChange, rows: 3, style: Object.assign({}, volInputStyle, { resize: "vertical" }) })), /* @__PURE__ */ React.createElement("div", { style: volGrp }, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Background Notes"), /* @__PURE__ */ React.createElement("textarea", { name: "Background Notes", value: form["Background Notes"], onChange, rows: 3, style: Object.assign({}, volInputStyle, { resize: "vertical" }) })), /* @__PURE__ */ React.createElement("div", { style: volGrp }, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "Notes"), /* @__PURE__ */ React.createElement("textarea", { name: "Notes", value: form["Notes"], onChange, rows: 3, style: Object.assign({}, volInputStyle, { resize: "vertical" }) })), /* @__PURE__ */ React.createElement("span", { style: volSecLabel }, "Goals"), /* @__PURE__ */ React.createElement("div", { style: volGrp }, /* @__PURE__ */ React.createElement("label", { style: volLabelStyle }, "What they want to see at NSH"), /* @__PURE__ */ React.createElement("textarea", { name: "What they want to see at NSH", value: form["What they want to see at NSH"], onChange, rows: 3, style: Object.assign({}, volInputStyle, { resize: "vertical" }) })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 8 } }, /* @__PURE__ */ React.createElement("button", { type: "submit", disabled: saving, style: { flex: 1, background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving ? 0.7 : 1 } }, saving ? "Saving..." : "Save"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: onCancel, style: { flex: 1, padding: 10, background: "#f5f0ea", border: "none", borderRadius: 8, fontSize: 13, color: "#666", cursor: "pointer", fontWeight: 500 } }, "Cancel")))));
+  }
+  function VolunteersView() {
+    const [volunteers, setVolunteers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [selected, setSelected] = useState(null);
+    const [showAdd, setShowAdd] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [filterTeam, setFilterTeam] = useState("All");
+    const [tab, setTab] = useState("active");
+    var emptyForm = {
+      "First Name": "",
+      "Last Name": "",
+      "Team": "",
+      "Status": "Active",
+      "Email": "",
+      "Phone Number": "",
+      "Address": "",
+      "Birthday": "",
+      "Volunteer Anniversary": "",
+      "CC": false,
+      "Nametag": false,
+      "Overview Notes": "",
+      "Background Notes": "",
+      "Notes": "",
+      "What they want to see at NSH": "",
+      "Picture URL": "",
+      "Emergency Contact": "",
+      "Month": "",
+      "Day": ""
+    };
+    const [form, setForm] = useState(emptyForm);
+    useEffect(function() {
+      sbFetch("2026 Volunteers", ["First Name", "Last Name", "Team", "Status", "Email", "Phone Number", "Address", "Birthday", "Volunteer Anniversary", "CC", "Nametag", "Overview Notes", "Background Notes", "Notes", "What they want to see at NSH", "Picture URL", "Emergency Contact", "Month", "Day"]).then(function(data) {
+        if (Array.isArray(data)) setVolunteers(data);
+        else setError(JSON.stringify(data));
+        setLoading(false);
+      }).catch(function(err) {
+        setError(err.message);
+        setLoading(false);
+      });
+    }, []);
+    var active = volunteers.filter(function(v) {
+      return v["Status"] === "Active";
+    }).length;
+    var inactive = volunteers.filter(function(v) {
+      return v["Status"] === "Inactive";
+    }).length;
+    var tabList = volunteers.filter(function(v) {
+      return tab === "active" ? v["Status"] === "Active" : v["Status"] === "Inactive";
+    });
+    var teamSet = ["All"].concat(TEAM_OPTIONS.filter(function(t) {
+      return tabList.some(function(v) {
+        return (v["Team"] || "").split("|").map(function(x) {
+          return x.trim();
+        }).indexOf(t) !== -1;
+      });
+    }));
+    var teams = teamSet.length - 1;
+    function teamSortKey(v) {
+      if (v["First Name"] === "Ken" && v["Last Name"] === "Underwood") return "0";
+      var t = (v["Team"] || "").split("|")[0].trim();
+      if (t === "Board Member") return "1";
+      if (t === "Staff") return "2";
+      return "3_" + t;
+    }
+    var filtered = filterTeam === "All" ? tabList.slice().sort(function(a, b) {
+      return teamSortKey(a).localeCompare(teamSortKey(b));
+    }) : tabList.filter(function(v) {
+      return (v["Team"] || "").split("|").map(function(x) {
+        return x.trim();
+      }).indexOf(filterTeam) !== -1;
+    });
+    function fmtBirthday(val) {
+      if (!val) return "";
+      var d = /* @__PURE__ */ new Date(val + "T00:00:00");
+      if (isNaN(d)) return val;
+      return d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+    }
+    function initials(v) {
+      return ((v["First Name"] || "")[0] || "").toUpperCase() + ((v["Last Name"] || "")[0] || "").toUpperCase();
+    }
+    function handleFormChange(e) {
+      var key = e.target.name;
+      var val = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+      setForm(function(prev) {
+        var n = Object.assign({}, prev);
+        n[key] = val;
+        return n;
+      });
+    }
+    function openEdit(v) {
+      setForm({
+        "First Name": v["First Name"] || "",
+        "Last Name": v["Last Name"] || "",
+        "Team": v["Team"] || "",
+        "Status": v["Status"] || "Active",
+        "Email": v["Email"] || "",
+        "Phone Number": v["Phone Number"] || "",
+        "Address": v["Address"] || "",
+        "Birthday": v["Birthday"] || "",
+        "Volunteer Anniversary": v["Volunteer Anniversary"] || "",
+        "CC": String(v["CC"]).toUpperCase() === "TRUE",
+        "Nametag": String(v["Nametag"]).toUpperCase() === "TRUE",
+        "Overview Notes": v["Overview Notes"] || "",
+        "Background Notes": v["Background Notes"] || "",
+        "Notes": v["Notes"] || "",
+        "What they want to see at NSH": v["What they want to see at NSH"] || "",
+        "Picture URL": v["Picture URL"] || "",
+        "Emergency Contact": v["Emergency Contact"] || "",
+        "Month": v["Month"] || "",
+        "Day": v["Day"] || ""
+      });
+      setEditing(true);
+    }
+    function handleAddSubmit(e) {
+      e.preventDefault();
+      setSaving(true);
+      var row = {};
+      Object.keys(form).forEach(function(k) {
+        if (form[k] !== "" && form[k] !== false) row[k] = form[k] === true ? "TRUE" : form[k];
+      });
+      if (!form["CC"]) row["CC"] = "FALSE";
+      if (!form["Nametag"]) row["Nametag"] = "FALSE";
+      sbInsert("2026 Volunteers", row).then(function(res) {
+        setSaving(false);
+        var inserted = Array.isArray(res) ? res[0] : res;
+        if (inserted && inserted["First Name"]) setVolunteers(function(p) {
+          return p.concat([inserted]);
+        });
+        setShowAdd(false);
+        setForm(emptyForm);
+      }).catch(function() {
+        setSaving(false);
+      });
+    }
+    function handleEditSubmit(e) {
+      e.preventDefault();
+      if (!selected) return;
+      setSaving(true);
+      var row = {};
+      Object.keys(form).forEach(function(k) {
+        if (form[k] !== "") row[k] = form[k] === true ? "TRUE" : form[k] === false ? "FALSE" : form[k];
+      });
+      sbUpdate("2026 Volunteers", selected["First Name"], selected["Last Name"], row).then(function(res) {
+        setSaving(false);
+        if (res && res.code) {
+          alert("Save failed: " + (res.message || JSON.stringify(res)));
+          return;
+        }
+        var updated = Array.isArray(res) ? res[0] : res;
+        var merged = Object.assign({}, selected, row, updated || {});
+        setVolunteers(function(prev) {
+          return prev.map(function(v) {
+            return v["First Name"] === selected["First Name"] && v["Last Name"] === selected["Last Name"] ? merged : v;
+          });
+        });
+        setSelected(merged);
+        setEditing(false);
+      }).catch(function(err) {
+        setSaving(false);
+        alert("Save error: " + err.message);
+      });
+    }
+    function InfoRow({ label, value, link }) {
+      if (!value) return null;
+      return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 0, marginBottom: 10, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 110, fontSize: 12, color: "#aaa", flexShrink: 0, paddingTop: 1 } }, label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#2a2a2a", flex: 1, lineHeight: 1.4 } }, link ? /* @__PURE__ */ React.createElement("a", { href: link, style: { color: gold, textDecoration: "none" } }, value) : value));
+    }
+    function NoteBlock({ label, value }) {
+      if (!value) return null;
+      return /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, label && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#bbb", fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 5 } }, label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#444", lineHeight: 1.65, background: "#faf8f4", borderRadius: 8, padding: "10px 14px" } }, value));
+    }
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Total Volunteers", value: loading ? "..." : volunteers.length }), /* @__PURE__ */ React.createElement(StatCard, { label: "Active", value: loading ? "..." : active }), /* @__PURE__ */ React.createElement(StatCard, { label: "Teams", value: loading ? "..." : teams })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 0, background: "#f0ebe3", borderRadius: 10, padding: 3 } }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: function() {
+          setTab("active");
+          setFilterTeam("All");
+        },
+        style: { border: "none", borderRadius: 8, padding: "6px 18px", fontSize: 13, fontWeight: tab === "active" ? 600 : 400, cursor: "pointer", background: tab === "active" ? "#fff" : "transparent", color: tab === "active" ? "#2a2a2a" : "#999", boxShadow: tab === "active" ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: "all 0.15s" }
+      },
+      "Active ",
+      /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: tab === "active" ? gold : "#bbb", fontWeight: 500 } }, active)
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: function() {
+          setTab("inactive");
+          setFilterTeam("All");
+        },
+        style: { border: "none", borderRadius: 8, padding: "6px 18px", fontSize: 13, fontWeight: tab === "inactive" ? 600 : 400, cursor: "pointer", background: tab === "inactive" ? "#fff" : "transparent", color: tab === "inactive" ? "#2a2a2a" : "#999", boxShadow: tab === "inactive" ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: "all 0.15s" }
+      },
+      "Inactive ",
+      /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: tab === "inactive" ? gold : "#bbb", fontWeight: 500 } }, inactive)
+    )), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setForm(emptyForm);
+      setShowAdd(true);
+    }, style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer" } }, "+ Add Volunteer")), !loading && teamSet.length > 2 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 } }, teamSet.map(function(t) {
+      var isActive = filterTeam === t;
+      var tc = TEAM_COLORS[t] || { bg: "#f3f3f3", color: "#555" };
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: t,
+          onClick: function() {
+            setFilterTeam(t);
+          },
+          style: {
+            border: isActive ? "none" : "0.5px solid #e0d8cc",
+            borderRadius: 20,
+            padding: "5px 12px",
+            fontSize: 12,
+            fontWeight: isActive ? 600 : 400,
+            cursor: "pointer",
+            background: isActive ? tc.bg : "#fff",
+            color: isActive ? tc.color : "#888",
+            transition: "all 0.15s"
+          }
+        },
+        t
+      );
+    })), error && /* @__PURE__ */ React.createElement("div", { style: { background: "#fce4e4", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#c0392b" } }, "Error: ", error), loading ? /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 40, color: "#aaa", fontSize: 13 } }, "Loading volunteers...") : /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 14 } }, filtered.map(function(v, i) {
+      var imgUrl = v["Picture URL"] ? driveImg(v["Picture URL"]) : null;
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: i,
+          onClick: function() {
+            setSelected(v);
+          },
+          onMouseEnter: function(e) {
+            e.currentTarget.style.boxShadow = "0 4px 16px rgba(136,108,68,0.15)";
+          },
+          onMouseLeave: function(e) {
+            e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)";
+          },
+          style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 12, padding: "16px 12px", textAlign: "center", cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.04)", transition: "box-shadow 0.18s" }
+        },
+        imgUrl ? /* @__PURE__ */ React.createElement("img", { src: imgUrl, alt: v["First Name"], style: { width: 56, height: 56, borderRadius: "50%", objectFit: "cover", marginBottom: 10, background: "#eee" } }) : /* @__PURE__ */ React.createElement("div", { style: { width: 56, height: 56, borderRadius: "50%", background: gold, color: "#fff", fontSize: 18, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" } }, initials(v)),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: "#2a2a2a", marginBottom: 3, lineHeight: 1.3 } }, v["First Name"], " ", v["Last Name"]),
+        v["Team"] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginBottom: 7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, (v["Team"] || "").split("|")[0].trim()),
+        /* @__PURE__ */ React.createElement(Badge, { status: v["Status"] || "Active" })
+      );
+    })), selected && !editing && /* @__PURE__ */ React.createElement("div", { onClick: function() {
+      setSelected(null);
+    }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.38)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1e3, padding: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: function(e) {
+      e.stopPropagation();
+    }, style: { background: "#fff", borderRadius: 18, maxWidth: 620, width: "100%", boxShadow: "0 12px 48px rgba(0,0,0,0.22)", maxHeight: "92vh", display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "linear-gradient(135deg, #f8f4ec 0%, #f0e8dc 100%)", padding: "28px 28px 20px", borderBottom: "0.5px solid #e8dece", position: "relative" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 18 } }, selected["Picture URL"] ? /* @__PURE__ */ React.createElement("img", { src: driveImg(selected["Picture URL"]), alt: selected["First Name"], style: { width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "3px solid #fff", boxShadow: "0 2px 8px rgba(0,0,0,0.12)", flexShrink: 0 } }) : /* @__PURE__ */ React.createElement("div", { style: { width: 72, height: 72, borderRadius: "50%", background: gold, color: "#fff", fontSize: 24, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", border: "3px solid #fff", boxShadow: "0 2px 8px rgba(0,0,0,0.12)", flexShrink: 0 } }, initials(selected)), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 19, fontWeight: 600, color: "#1e1a16", marginBottom: 3, lineHeight: 1.2 } }, selected["First Name"], " ", selected["Last Name"]), selected["Team"] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#9a7f5a", marginBottom: 6, fontWeight: 500 } }, selected["Team"]), /* @__PURE__ */ React.createElement(Badge, { status: selected["Status"] || "Active" }), selected["Overview Notes"] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#7a6a55", marginTop: 8, lineHeight: 1.5, fontStyle: "italic" } }, selected["Overview Notes"]))), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 14, right: 14, display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      openEdit(selected);
+    }, style: { background: "#fff", border: "0.5px solid #ddd4c4", borderRadius: 7, padding: "5px 12px", fontSize: 12, color: "#7a6a55", cursor: "pointer", fontWeight: 500 } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setSelected(null);
+    }, style: { background: "rgba(0,0,0,0.06)", border: "none", borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16, color: "#666", lineHeight: 1 } }, "\xD7"))), /* @__PURE__ */ React.createElement("div", { style: { padding: "20px 28px 24px", overflowY: "auto" } }, (selected["Email"] || selected["Phone Number"] || selected["Address"] || selected["Emergency Contact"]) && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 4 } }, /* @__PURE__ */ React.createElement("span", { style: volSecLabel }, "Contact"), /* @__PURE__ */ React.createElement(InfoRow, { label: "Email", value: selected["Email"], link: "mailto:" + selected["Email"] }), /* @__PURE__ */ React.createElement(InfoRow, { label: "Phone", value: selected["Phone Number"] }), /* @__PURE__ */ React.createElement(InfoRow, { label: "Address", value: selected["Address"] }), /* @__PURE__ */ React.createElement(InfoRow, { label: "Emergency", value: selected["Emergency Contact"] })), (selected["Volunteer Anniversary"] || selected["Birthday"]) && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 4 } }, /* @__PURE__ */ React.createElement("span", { style: volSecLabel }, "Volunteer Info"), /* @__PURE__ */ React.createElement(InfoRow, { label: "Anniversary", value: selected["Volunteer Anniversary"] }), /* @__PURE__ */ React.createElement(InfoRow, { label: "Birthday", value: fmtBirthday(selected["Birthday"]) })), (selected["Background Notes"] || selected["Notes"]) && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 4 } }, /* @__PURE__ */ React.createElement("span", { style: volSecLabel }, "Notes"), /* @__PURE__ */ React.createElement(NoteBlock, { label: "Background", value: selected["Background Notes"] }), /* @__PURE__ */ React.createElement(NoteBlock, { label: "Additional", value: selected["Notes"] })), selected["What they want to see at NSH"] && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 4 } }, /* @__PURE__ */ React.createElement("span", { style: volSecLabel }, "Goals"), /* @__PURE__ */ React.createElement(NoteBlock, { value: selected["What they want to see at NSH"] })), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setSelected(null);
+    }, style: { marginTop: 16, width: "100%", padding: "9px", background: "transparent", border: "0.5px solid #e0d8cc", borderRadius: 8, cursor: "pointer", fontSize: 13, color: "#999", fontWeight: 500 } }, "Close")))), selected && editing && /* @__PURE__ */ React.createElement(
+      VolForm,
+      {
+        form,
+        onChange: handleFormChange,
+        saving,
+        title: "Edit \u2014 " + selected["First Name"] + " " + selected["Last Name"],
+        onSubmit: handleEditSubmit,
+        onCancel: function() {
+          setEditing(false);
+        }
+      }
+    ), showAdd && /* @__PURE__ */ React.createElement(
+      VolForm,
+      {
+        form,
+        onChange: handleFormChange,
+        saving,
+        title: "Add Volunteer",
+        onSubmit: handleAddSubmit,
+        onCancel: function() {
+          setShowAdd(false);
+        }
+      }
+    ));
+  }
+  function DonorsView() {
+    const [donations, setDonations] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [selected, setSelected] = useState(null);
+    const [showAdd, setShowAdd] = useState(false);
+    const [saving, setSaving] = useState(false);
+    var DONATION_TYPES = ["Donation", "Membership", "Restricted", "Membership, Donation", "Brick Purchase", "Tribute"];
+    var PAYMENT_TYPES = ["Website", "Check", "Cash", "Credit Card", "ACH", "Other"];
+    var ACCOUNT_TYPES = ["Individual", "Family", "Household", "Foundation", "Corporate", "Organization"];
+    var emptyDonForm = {
+      "Donor Name": "",
+      "Last Name": "",
+      "Informal Names": "",
+      "Amount": "",
+      "Close Date": "",
+      "Donation Type": "Donation",
+      "Payment Type": "Website",
+      "Account Type": "Individual",
+      "Acknowledged": false,
+      "Salesforce": false,
+      "Email": "",
+      "Phone Number": "",
+      "Address": "",
+      "Benefits": "",
+      "Donation Notes": "",
+      "Donor Notes": "",
+      "Notes": ""
+    };
+    const [form, setForm] = useState(emptyDonForm);
+    useEffect(function() {
+      sbFetch("2026 Donations", ["Donor Name", "Last Name", "Informal Names", "Amount", "Close Date", "Donation Type", "Payment Type", "Account Type", "Acknowledged", "Salesforce", "Email", "Phone Number", "Address", "Benefits", "Donation Notes", "Donor Notes", "Notes"]).then(function(data) {
+        if (Array.isArray(data)) setDonations(data);
+        else setError(JSON.stringify(data));
+        setLoading(false);
+      }).catch(function(err) {
+        setError(err.message);
+        setLoading(false);
+      });
+    }, []);
+    function parseAmount(val) {
+      return parseFloat((val || "0").replace(/[^d.]/g, "") || 0);
+    }
+    function fmtAmount(val) {
+      var n = parseAmount(val);
+      return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function fmtDate(val) {
+      if (!val) return "";
+      var d = /* @__PURE__ */ new Date(val + "T00:00:00");
+      if (isNaN(d)) return val;
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+    var totalRaised = donations.reduce(function(s, r) {
+      return s + parseAmount(r["Amount"]);
+    }, 0);
+    var totalDonors = donations.length;
+    var memberships = donations.filter(function(r) {
+      return (r["Donation Type"] || "").includes("Membership");
+    }).length;
+    var acknowledged = donations.filter(function(r) {
+      return r["Acknowledged"] === true || String(r["Acknowledged"]).toUpperCase() === "TRUE";
+    }).length;
+    var unacknowledged = totalDonors - acknowledged;
+    function handleDonFormChange(e) {
+      var key = e.target.name;
+      var val = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+      setForm(function(prev) {
+        var n = Object.assign({}, prev);
+        n[key] = val;
+        return n;
+      });
+    }
+    function handleDonSubmit(e) {
+      e.preventDefault();
+      setSaving(true);
+      var row = {};
+      Object.keys(form).forEach(function(k) {
+        if (form[k] !== "") row[k] = form[k] === true ? "TRUE" : form[k] === false ? "FALSE" : form[k];
+      });
+      sbInsert("2026 Donations", row).then(function(res) {
+        setSaving(false);
+        var inserted = Array.isArray(res) ? res[0] : res;
+        if (inserted && inserted["Donor Name"]) setDonations(function(p) {
+          return p.concat([inserted]);
+        });
+        setShowAdd(false);
+        setForm(emptyDonForm);
+      }).catch(function() {
+        setSaving(false);
+      });
+    }
+    var iStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 13, marginTop: 4, boxSizing: "border-box", fontFamily: "system-ui, sans-serif", background: "#fff" };
+    var lStyle = { fontSize: 12, color: "#666", fontWeight: 500 };
+    var grp = { marginBottom: 14 };
+    var sec = { fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 10, marginTop: 20, display: "block" };
+    var typeColors2 = {
+      "Donation": { bg: "#e3f2fd", color: "#1565c0" },
+      "Membership": { bg: "#e8f5e9", color: "#2e7d32" },
+      "Restricted": { bg: "#fce4ec", color: "#880e4f" },
+      "Membership, Donation": { bg: "#f3e5f5", color: "#6a1b9a" },
+      "Brick Purchase": { bg: "#fbe9e7", color: "#8d3d2b" },
+      "Tribute": { bg: "#fff8e1", color: "#8a6200" }
+    };
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Total Raised", value: loading ? "..." : "$" + totalRaised.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), sub: "2026 YTD" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Donations", value: loading ? "..." : totalDonors }), /* @__PURE__ */ React.createElement(StatCard, { label: "Memberships", value: loading ? "..." : memberships }), /* @__PURE__ */ React.createElement(StatCard, { label: "Need Thank You", value: loading ? "..." : unacknowledged, sub: unacknowledged > 0 ? "pending" : "all clear" })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#888" } }, loading ? "Loading..." : totalDonors + " donation" + (totalDonors !== 1 ? "s" : "")), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setForm(emptyDonForm);
+      setShowAdd(true);
+    }, style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer" } }, "+ Add Donation")), error && /* @__PURE__ */ React.createElement("div", { style: { background: "#fce4e4", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#c0392b" } }, "Error: ", error), loading ? /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 40, color: "#aaa", fontSize: 13 } }, "Loading donations...") : /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 0, padding: "8px 16px", borderBottom: "0.5px solid #e8e0d4", background: "#faf8f4" } }, ["Donor", "Type", "Amount", "Date"].map(function(h) {
+      return /* @__PURE__ */ React.createElement("div", { key: h, style: { fontSize: 11, color: "#aaa", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.8 } }, h);
+    })), donations.map(function(d, i) {
+      var tc = typeColors2[d["Donation Type"]] || { bg: "#f3f3f3", color: "#555" };
+      var acked = d["Acknowledged"] === true || String(d["Acknowledged"]).toUpperCase() === "TRUE";
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: i,
+          onClick: function() {
+            setSelected(d);
+          },
+          onMouseEnter: function(e) {
+            e.currentTarget.style.background = "#faf8f4";
+          },
+          onMouseLeave: function(e) {
+            e.currentTarget.style.background = "#fff";
+          },
+          style: { display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 0, padding: "11px 16px", borderBottom: i < donations.length - 1 ? "0.5px solid #f0ebe2" : "none", cursor: "pointer", background: "#fff", alignItems: "center", transition: "background 0.12s" }
+        },
+        /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: "#2a2a2a" } }, d["Donor Name"]), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#bbb", marginTop: 1 } }, d["Account Type"])),
+        /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap" } }, d["Donation Type"])),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a" } }, fmtAmount(d["Amount"])),
+        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#888" } }, fmtDate(d["Close Date"])), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 20, background: acked ? "#e8f5e9" : "#fff8e1", color: acked ? "#2e7d32" : "#8a6200" } }, acked ? "Thanked" : "Pending"))
+      );
+    })), selected && /* @__PURE__ */ React.createElement("div", { onClick: function() {
+      setSelected(null);
+    }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1e3, padding: 20 } }, /* @__PURE__ */ React.createElement("div", { onClick: function(e) {
+      e.stopPropagation();
+    }, style: { background: "#fff", borderRadius: 16, maxWidth: 540, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", maxHeight: "90vh", display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "linear-gradient(135deg, #f8f4ec 0%, #f0e8dc 100%)", padding: "24px 28px 18px", borderBottom: "0.5px solid #e8dece", position: "relative", borderRadius: "16px 16px 0 0" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 19, fontWeight: 600, color: "#1e1a16", marginBottom: 4 } }, selected["Donor Name"]), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } }, (function() {
+      var tc = typeColors2[selected["Donation Type"]] || { bg: "#f3f3f3", color: "#555" };
+      return /* @__PURE__ */ React.createElement("span", { style: { background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 20 } }, selected["Donation Type"]);
+    })(), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: gold } }, fmtAmount(selected["Amount"])), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#aaa" } }, fmtDate(selected["Close Date"]))), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setSelected(null);
+    }, style: { position: "absolute", top: 14, right: 14, background: "rgba(0,0,0,0.06)", border: "none", borderRadius: "50%", width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16, color: "#666" } }, "\xD7")), /* @__PURE__ */ React.createElement("div", { style: { padding: "20px 28px 24px", overflowY: "auto", flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 32px" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: sec }, "Donor Info"), selected["Informal Names"] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa", marginRight: 8 } }, "Goes by"), selected["Informal Names"]), selected["Account Type"] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa", marginRight: 8 } }, "Type"), selected["Account Type"]), selected["Email"] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa", marginRight: 8 } }, "Email"), /* @__PURE__ */ React.createElement("a", { href: "mailto:" + selected["Email"], style: { color: gold, textDecoration: "none" } }, selected["Email"])), selected["Phone Number"] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa", marginRight: 8 } }, "Phone"), selected["Phone Number"]), selected["Address"] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa", marginRight: 8 } }, "Address"), /* @__PURE__ */ React.createElement("span", { style: { whiteSpace: "pre-line" } }, selected["Address"])), /* @__PURE__ */ React.createElement("span", { style: sec }, "Payment"), selected["Payment Type"] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa", marginRight: 8 } }, "Method"), selected["Payment Type"]), selected["Benefits"] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa", marginRight: 8 } }, "Benefits"), selected["Benefits"]), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa", marginRight: 8 } }, "Acknowledged"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 20, background: selected["Acknowledged"] === true || String(selected["Acknowledged"]).toUpperCase() === "TRUE" ? "#e8f5e9" : "#fff8e1", color: selected["Acknowledged"] === true || String(selected["Acknowledged"]).toUpperCase() === "TRUE" ? "#2e7d32" : "#8a6200" } }, selected["Acknowledged"] === true || String(selected["Acknowledged"]).toUpperCase() === "TRUE" ? "Thanked" : "Pending"))), /* @__PURE__ */ React.createElement("div", null, selected["Donation Notes"] && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: sec }, "Donation Notes"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, background: "#faf8f4", borderRadius: 8, padding: "10px 14px", color: "#444", lineHeight: 1.6 } }, selected["Donation Notes"])), selected["Donor Notes"] && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: sec }, "Donor Notes"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, background: "#faf8f4", borderRadius: 8, padding: "10px 14px", color: "#444", lineHeight: 1.6 } }, selected["Donor Notes"])), selected["Notes"] && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: sec }, "Notes"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, background: "#faf8f4", borderRadius: 8, padding: "10px 14px", color: "#444", lineHeight: 1.6 } }, selected["Notes"])))), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setSelected(null);
+    }, style: { marginTop: 16, width: "100%", padding: "9px", background: "transparent", border: "0.5px solid #e0d8cc", borderRadius: 8, cursor: "pointer", fontSize: 13, color: "#999", fontWeight: 500 } }, "Close")))), showAdd && /* @__PURE__ */ React.createElement("div", { onClick: function() {
+      setShowAdd(false);
+    }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1e3, padding: 20 } }, /* @__PURE__ */ React.createElement("div", { onClick: function(e) {
+      e.stopPropagation();
+    }, style: { background: "#fff", borderRadius: 16, padding: 28, maxWidth: 480, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", maxHeight: "90vh", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: "#2a2a2a", marginBottom: 20 } }, "Add Donation"), /* @__PURE__ */ React.createElement("form", { onSubmit: handleDonSubmit }, /* @__PURE__ */ React.createElement("span", { style: sec }, "Donor"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "First / Full Name *"), /* @__PURE__ */ React.createElement("input", { required: true, name: "Donor Name", value: form["Donor Name"], onChange: handleDonFormChange, style: iStyle })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Last Name"), /* @__PURE__ */ React.createElement("input", { name: "Last Name", value: form["Last Name"], onChange: handleDonFormChange, style: iStyle }))), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Goes By (Informal)"), /* @__PURE__ */ React.createElement("input", { name: "Informal Names", value: form["Informal Names"], onChange: handleDonFormChange, style: iStyle })), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Account Type"), /* @__PURE__ */ React.createElement("select", { name: "Account Type", value: form["Account Type"], onChange: handleDonFormChange, style: iStyle }, ACCOUNT_TYPES.map(function(t) {
+      return /* @__PURE__ */ React.createElement("option", { key: t, value: t }, t);
+    }))), /* @__PURE__ */ React.createElement("span", { style: sec }, "Donation"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Amount *"), /* @__PURE__ */ React.createElement("input", { required: true, name: "Amount", value: form["Amount"], onChange: handleDonFormChange, style: iStyle, placeholder: "$0.00" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Close Date"), /* @__PURE__ */ React.createElement("input", { name: "Close Date", type: "date", value: form["Close Date"], onChange: handleDonFormChange, style: iStyle }))), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Donation Type"), /* @__PURE__ */ React.createElement("select", { name: "Donation Type", value: form["Donation Type"], onChange: handleDonFormChange, style: iStyle }, DONATION_TYPES.map(function(t) {
+      return /* @__PURE__ */ React.createElement("option", { key: t, value: t }, t);
+    }))), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Payment Type"), /* @__PURE__ */ React.createElement("select", { name: "Payment Type", value: form["Payment Type"], onChange: handleDonFormChange, style: iStyle }, PAYMENT_TYPES.map(function(t) {
+      return /* @__PURE__ */ React.createElement("option", { key: t, value: t }, t);
+    }))), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Benefits"), /* @__PURE__ */ React.createElement("input", { name: "Benefits", value: form["Benefits"], onChange: handleDonFormChange, style: iStyle })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 20, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#444", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", name: "Acknowledged", checked: form["Acknowledged"], onChange: handleDonFormChange }), " Acknowledged / Thanked"), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#444", cursor: "pointer" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", name: "Salesforce", checked: form["Salesforce"], onChange: handleDonFormChange }), " In Salesforce")), /* @__PURE__ */ React.createElement("span", { style: sec }, "Contact"), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Email"), /* @__PURE__ */ React.createElement("input", { name: "Email", type: "email", value: form["Email"], onChange: handleDonFormChange, style: iStyle })), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Phone Number"), /* @__PURE__ */ React.createElement("input", { name: "Phone Number", value: form["Phone Number"], onChange: handleDonFormChange, style: iStyle })), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Address"), /* @__PURE__ */ React.createElement("textarea", { name: "Address", value: form["Address"], onChange: handleDonFormChange, rows: 3, style: Object.assign({}, iStyle, { resize: "vertical" }) })), /* @__PURE__ */ React.createElement("span", { style: sec }, "Notes"), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Donation Notes"), /* @__PURE__ */ React.createElement("textarea", { name: "Donation Notes", value: form["Donation Notes"], onChange: handleDonFormChange, rows: 2, style: Object.assign({}, iStyle, { resize: "vertical" }) })), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Donor Notes"), /* @__PURE__ */ React.createElement("textarea", { name: "Donor Notes", value: form["Donor Notes"], onChange: handleDonFormChange, rows: 2, style: Object.assign({}, iStyle, { resize: "vertical" }) })), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lStyle }, "Notes"), /* @__PURE__ */ React.createElement("textarea", { name: "Notes", value: form["Notes"], onChange: handleDonFormChange, rows: 2, style: Object.assign({}, iStyle, { resize: "vertical" }) })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 8 } }, /* @__PURE__ */ React.createElement("button", { type: "submit", disabled: saving, style: { flex: 1, background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: saving ? 0.7 : 1 } }, saving ? "Saving..." : "Save Donation"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: function() {
+      setShowAdd(false);
+    }, style: { flex: 1, padding: 10, background: "#f5f0ea", border: "none", borderRadius: 8, fontSize: 13, color: "#666", cursor: "pointer", fontWeight: 500 } }, "Cancel"))))));
+  }
+  function MarketingView() {
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Posts This Month", value: "5" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Sent", value: "1" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Scheduled", value: "1" }), /* @__PURE__ */ React.createElement(StatCard, { label: "In Draft/Ideas", value: "3" })), /* @__PURE__ */ React.createElement(
+      Table,
+      {
+        cols: ["Platform", "Post", "Scheduled Date", "Lead", "Status"],
+        rows: mockData.marketing,
+        renderRow: (r) => /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Td, null, r.platform), /* @__PURE__ */ React.createElement(Td, null, r.post), /* @__PURE__ */ React.createElement(Td, { muted: true }, r.date), /* @__PURE__ */ React.createElement(Td, { muted: true }, r.lead), /* @__PURE__ */ React.createElement(Td, null, /* @__PURE__ */ React.createElement(Badge, { status: r.status })))
+      }
+    ));
+  }
+  function BoardView() {
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Board Members", value: "5" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Active", value: "5" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Avg Attendance", value: "83%" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Next Meeting", value: "Apr 9" })), /* @__PURE__ */ React.createElement(
+      Table,
+      {
+        cols: ["Member", "Role", "Attendance", "Last Vote", "Status"],
+        rows: mockData.board,
+        renderRow: (r) => /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Td, null, r.member), /* @__PURE__ */ React.createElement(Td, { muted: true }, r.role), /* @__PURE__ */ React.createElement(Td, null, r.attendance), /* @__PURE__ */ React.createElement(Td, { muted: true }, r.lastVote), /* @__PURE__ */ React.createElement(Td, null, /* @__PURE__ */ React.createElement(Badge, { status: r.status })))
+      }
+    ));
+  }
+  function StrategyView() {
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Strategic Goals", value: "5" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Avg Progress", value: "64%" }), /* @__PURE__ */ React.createElement(StatCard, { label: "On Track", value: "3" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Needs Attention", value: "2" })), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 } }, mockData.strategy.map((s, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { borderBottom: i < mockData.strategy.length - 1 ? "0.5px solid #f0ebe2" : "none", paddingBottom: i < mockData.strategy.length - 1 ? 14 : 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: gold, fontWeight: 500, marginBottom: 2 } }, s.pillar), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 500 } }, s.goal)), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", minWidth: 60 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 500, color: s.progress >= 70 ? "#2e7d32" : s.progress >= 40 ? "#8a6200" : "#c62828" } }, s.progress, "%"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa" } }, "complete"))), /* @__PURE__ */ React.createElement(ProgressBar, { pct: s.progress, color: s.progress >= 70 ? "#4caf50" : s.progress >= 40 ? gold : "#e57373" }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, marginTop: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#aaa" } }, "Owner: ", /* @__PURE__ */ React.createElement("span", { style: { color: "#555" } }, s.owner)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#aaa" } }, "Due: ", /* @__PURE__ */ React.createElement("span", { style: { color: "#555" } }, s.due)))))));
+  }
+  var views = {
+    home: HomeView,
+    events: EventsView,
+    volunteers: VolunteersView,
+    donors: DonorsView,
+    marketing: MarketingView,
+    board: BoardView,
+    strategy: StrategyView
+  };
+  function Dashboard() {
+    const [active, setActive] = useState("home");
+    const View = views[active];
+    const mod = modules.find((m) => m.id === active);
+    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, ".nsh-sidebar::-webkit-scrollbar { display: none; }"), /* @__PURE__ */ React.createElement("div", { className: "nsh-sidebar", style: { width: 220, background: "#2a2420", display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto", scrollbarWidth: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "24px 20px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: gold, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 } }, "North Star House"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.35)" } }, "Command Center")), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" } }), /* @__PURE__ */ React.createElement("nav", { style: { flex: 1, padding: "0 8px" } }, modules.map((m) => /* @__PURE__ */ React.createElement("button", { key: m.id, onClick: () => setActive(m.id), style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      width: "100%",
+      padding: "9px 12px",
+      background: active === m.id ? "rgba(136,108,68,0.18)" : "transparent",
+      border: "none",
+      borderRadius: 7,
+      cursor: "pointer",
+      textAlign: "left",
+      color: active === m.id ? gold : "rgba(255,255,255,0.5)",
+      fontSize: 13,
+      fontWeight: active === m.id ? 500 : 400,
+      marginBottom: 2,
+      transition: "all 0.15s"
+    } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, opacity: 0.8 } }, m.icon), m.label))), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 20px 20px", borderTop: "0.5px solid rgba(255,255,255,0.08)" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.25)" } }, "Connected to Airtable"), /* @__PURE__ */ React.createElement("div", { style: { width: 8, height: 8, borderRadius: "50%", background: "#4caf50", display: "inline-block", marginRight: 5, marginTop: 6 } }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "rgba(255,255,255,0.3)" } }, "Live sync"))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: "28px 32px", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0, fontSize: 22, fontWeight: 500, color: "#2a2a2a" } }, mod && mod.label), /* @__PURE__ */ React.createElement("div", { style: { height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 6 } })), /* @__PURE__ */ React.createElement(View, null))));
+  }
+  var root = ReactDOM.createRoot(document.getElementById("root"));
+  root.render(React.createElement(Dashboard));
+})();
