@@ -1565,7 +1565,9 @@
       }).then(function(rows) {
         if (Array.isArray(rows)) setBudget(rows);
       });
-      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("2026 Volunteers") + "?select=" + encodeURIComponent("id,First Name,Last Name,Team,Notes,Overview Notes,Status"), {
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("2026 Volunteers") + "?select=" + ["id", "First Name", "Last Name", "Team", "Notes", "Overview Notes", "Status"].map(function(c) {
+        return encodeURIComponent(c);
+      }).join(","), {
         headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
       }).then(function(r) {
         return r.json();
