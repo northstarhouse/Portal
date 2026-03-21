@@ -987,7 +987,7 @@ function DonorsView() {
               <button onClick={function() { setSelected(null); }} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: '#666' }}>×</button>
             </div>
             <div style={{ padding: '20px 28px 24px', overflowY: 'auto', flex: 1 }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: gold, marginBottom: 20 }}>{fmtAmount(selected['Amount'])}</div>
+              <div style={{ marginBottom: 20 }}><span style={{ fontSize: 13, color: '#aaa', marginRight: 8 }}>Amount</span><span style={{ fontSize: 16, fontWeight: 600, color: gold }}>{fmtAmount(selected['Amount'])}</span></div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
                 <div>
                   <span style={sec}>Donor Info</span>
