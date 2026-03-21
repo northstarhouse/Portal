@@ -280,6 +280,8 @@ const typeColors = {
             var start = parseIcalDate(ev['DTSTART']);
             var isAllDay = ev['DTSTART'] && ev['DTSTART'].replace(/[^0-9TZ]/g,'').length === 8;
             var dayStr = start ? start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+            var todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            var isToday = start && dayStr === todayStr;
             var end = ev['DTEND'] ? parseIcalDate(ev['DTEND']) : null;
             if (!end && ev['DURATION']) {
               var dur = ev['DURATION'];
@@ -308,10 +310,13 @@ const typeColors = {
             var label = isDocent ? 'Docent Tour' : isEstate ? 'Estate Tour' : isWedding ? 'Wedding' : isCommittee ? 'Committee' : isMeeting ? 'Meeting' : isCreative ? 'Creative' : isEvent ? 'Event' : isGoals ? 'Goals' : 'Other';
             var labelBg = isDocent ? '#e8f5e9' : isEstate ? '#fce4ec' : isWedding ? '#ffebee' : isCommittee ? '#fff3e0' : isMeeting ? '#fff9c4' : isCreative ? '#e0f7fa' : isEvent ? '#e3f2fd' : isGoals ? '#fff8e1' : '#f0ebe2';
             return (
-              <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
+              <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 10, background: isToday ? '#fffbf0' : 'transparent', border: isToday ? '0.5px solid #e8d9b0' : 'none', borderRadius: isToday ? 8 : 0, padding: isToday ? '8px 10px' : '2px 0' }}>
                 <div style={{ minWidth: 6, height: 6, borderRadius: "50%", background: dotColor, marginTop: 5, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: "#2a2a2a" }}>{title}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: isToday ? 700 : 500, color: "#2a2a2a" }}>{title}</span>
+                    {isToday && <span style={{ fontSize: 10, fontWeight: 600, color: gold, textTransform: 'uppercase', letterSpacing: 0.8 }}>Today</span>}
+                  </div>
                   <div style={{ fontSize: 12, color: "#777", marginTop: 2 }}>{dayStr}{timeStr !== 'All day' ? ' · ' + timeStr : ''}</div>
                 </div>
                 {label && <span style={{ fontSize: 12, background: labelBg, color: dotColor, borderRadius: 20, fontWeight: 500, flexShrink: 0, width: 90, textAlign: 'center', display: 'inline-block', padding: '2px 0' }}>{label}</span>}
