@@ -264,13 +264,33 @@ const typeColors = {
               ? start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
               : 'All day';
             var title = (ev['SUMMARY'] || 'Untitled').replace(/\\,/g, ',').replace(/\\n/g, ' ');
+            var tl = title.toLowerCase();
+            var dotColor = /tour/.test(tl) ? '#2e7d32'
+              : /wedding/.test(tl) ? '#c2185b'
+              : /committee/.test(tl) ? '#e65100'
+              : /meeting/.test(tl) ? '#6a1b9a'
+              : /event/.test(tl) ? '#1565c0'
+              : gold;
+            var label = /tour/.test(tl) ? 'Tour'
+              : /wedding/.test(tl) ? 'Wedding'
+              : /committee/.test(tl) ? 'Committee'
+              : /meeting/.test(tl) ? 'Meeting'
+              : /event/.test(tl) ? 'Event'
+              : null;
+            var labelBg = /tour/.test(tl) ? '#e8f5e9'
+              : /wedding/.test(tl) ? '#fce4ec'
+              : /committee/.test(tl) ? '#fff3e0'
+              : /meeting/.test(tl) ? '#f3e5f5'
+              : /event/.test(tl) ? '#e3f2fd'
+              : '#f5f5f5';
             return (
               <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
-                <div style={{ minWidth: 6, height: 6, borderRadius: "50%", background: gold, marginTop: 5, flexShrink: 0 }} />
+                <div style={{ minWidth: 6, height: 6, borderRadius: "50%", background: dotColor, marginTop: 5, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "#2a2a2a" }}>{title}</div>
                   <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{dayStr}{timeStr !== 'All day' ? ' · ' + timeStr : ''}</div>
                 </div>
+                {label && <span style={{ fontSize: 11, background: labelBg, color: dotColor, padding: "2px 7px", borderRadius: 20, whiteSpace: "nowrap", fontWeight: 500, flexShrink: 0 }}>{label}</span>}
               </div>
             );
           })}
