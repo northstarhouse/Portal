@@ -1918,9 +1918,8 @@ var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundrai
       <style>{".nsh-sidebar::-webkit-scrollbar { display: none; }"}</style>
       <div style={{ display: "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 }}>
         <div className="nsh-sidebar" style={{ width: 220, background: "#b5a185", display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", scrollbarWidth: "none" }}>
-          <div style={{ padding: "24px 20px 16px" }}>
-            <div style={{ fontSize: 12, color: "#fff", fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>North Star House</div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>Command Center</div>
+          <div style={{ padding: "20px 20px 14px" }}>
+            <img src="assets/logo.png" alt="North Star House" style={{ width: 140, display: "block" }} />
           </div>
           <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.2)", margin: "0 0 8px" }} />
           <nav style={{ flex: 1, padding: "0 8px" }}>
