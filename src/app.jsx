@@ -270,7 +270,7 @@ const typeColors = {
         <StatCard label="Active Sponsors" value="3" sub="+ 1 in review" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <div style={{ marginBottom: 16 }}>
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>Upcoming — NSH Calendar</div>
           {calEvents === null && <div style={{ fontSize: 13, color: "#aaa" }}>Loading…</div>}
@@ -322,18 +322,6 @@ const typeColors = {
           </div>
         </div>
 
-        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>In-House Events</div>
-          {mockData.events.map((e, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{e.name}</div>
-                <div style={{ fontSize: 11, color: "#aaa" }}>{e.date}</div>
-              </div>
-              <Badge status={e.status} />
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
