@@ -273,7 +273,7 @@ const typeColors = {
 
       <div style={{ marginBottom: 16 }}>
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>Upcoming — NSH Calendar</div>
+          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>Happening Soon at North Star House</div>
           {calEvents === null && <div style={{ fontSize: 12, color: "#777" }}>Loading…</div>}
           {calEvents !== null && calEvents.length === 0 && <div style={{ fontSize: 12, color: "#777" }}>No upcoming events in the next 2 weeks.</div>}
           {calEvents !== null && calEvents.map(function(ev, i) {
