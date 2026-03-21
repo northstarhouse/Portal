@@ -1975,7 +1975,7 @@ function OperationalView({ opArea }) {
       if (!Array.isArray(rows)) return;
       setVols(rows.filter(function(v) {
         if (!v.Team) return false;
-        return v.Team.split(',').map(function(t) { return t.trim(); }).indexOf(area) !== -1;
+        return v.Team.split(',').map(function(t) { return t.trim().toLowerCase(); }).indexOf(area.toLowerCase()) !== -1;
       }));
     });
   }, [area]);
