@@ -1017,32 +1017,42 @@ var App = (() => {
     if (loadError) return /* @__PURE__ */ React.createElement("div", { style: { color: "#c62828", fontSize: 13, padding: 20, background: "#ffebee", borderRadius: 8, border: "0.5px solid #ffcdd2" } }, /* @__PURE__ */ React.createElement("strong", null, "Supabase error:"), " ", loadError, /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), "Make sure you've run the SQL setup in Supabase and that RLS is disabled on both tables.");
     return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#888" } }, items.length, " topic", items.length !== 1 ? "s" : ""), /* @__PURE__ */ React.createElement("button", { onClick: function() {
       setShowAdd(true);
-    }, style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 500, cursor: "pointer" } }, "+ Add Topic")), items.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { color: "#aaa", fontSize: 14, textAlign: "center", padding: 40 } }, "No voting items yet."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, items.map(function(item) {
-      var iv = itemVotes(item);
-      var revealed = isRevealed(item);
-      var t = tally(item);
-      return /* @__PURE__ */ React.createElement(
-        "div",
-        {
-          key: item.id,
-          onClick: function() {
-            setSelected(item);
-            setVoteForm({ voter: "", choice: "", note: "" });
+    }, style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 500, cursor: "pointer" } }, "+ Add Topic")), items.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { color: "#aaa", fontSize: 14, textAlign: "center", padding: 40 } }, "No voting items yet."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, (function() {
+      var openItems = items.filter(function(i) {
+        return !isRevealed(i);
+      });
+      var closedItems = items.filter(function(i) {
+        return isRevealed(i);
+      });
+      var allItems = openItems.concat(closedItems);
+      return allItems.map(function(item, idx) {
+        var iv = itemVotes(item);
+        var revealed = isRevealed(item);
+        var t = tally(item);
+        var showDivider = idx === openItems.length && closedItems.length > 0 && openItems.length > 0;
+        return /* @__PURE__ */ React.createElement(React.Fragment, { key: item.id }, showDivider && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, margin: "6px 0" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: "0.5px", background: "#e0d8cc" } }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#bbb", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 } }, "Closed"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: "0.5px", background: "#e0d8cc" } })), /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            key: item.id,
+            onClick: function() {
+              setSelected(item);
+              setVoteForm({ voter: "", choice: "", note: "" });
+            },
+            style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 12, padding: "16px 20px", cursor: "pointer", transition: "box-shadow 0.15s" },
+            onMouseEnter: function(e) {
+              e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.07)";
+            },
+            onMouseLeave: function(e) {
+              e.currentTarget.style.boxShadow = "none";
+            }
           },
-          style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 12, padding: "16px 20px", cursor: "pointer", transition: "box-shadow 0.15s" },
-          onMouseEnter: function(e) {
-            e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.07)";
-          },
-          onMouseLeave: function(e) {
-            e.currentTarget.style.boxShadow = "none";
-          }
-        },
-        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 500, color: "#2a2a2a", marginBottom: 4 } }, item.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#aaa" } }, item.submitted_by ? /* @__PURE__ */ React.createElement("span", null, "Submitted by ", item.submitted_by, item.due_date ? " \xB7 " : "") : null, item.due_date ? /* @__PURE__ */ React.createElement("span", null, "Due ", fmtDate(item.due_date)) : null, item.meeting_date ? /* @__PURE__ */ React.createElement("span", null, " \xB7 Meeting ", fmtDate(item.meeting_date)) : null)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", marginLeft: 16, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#aaa" } }, iv.length, "/", BOARD_MEMBERS.length, " voted"), revealed ? /* @__PURE__ */ React.createElement("span", { style: { background: "#e8f5e9", color: "#2e7d32", fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20 } }, "Revealed") : /* @__PURE__ */ React.createElement("span", { style: { background: "#fff3e0", color: "#e65100", fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20 } }, "Open"))),
-        revealed && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 14, marginTop: 10 } }, [["Yes", t.yes, "#2e7d32"], ["No", t.no, "#c62828"], ["Abstain", t.abstain, "#e65100"]].map(function(entry) {
-          return /* @__PURE__ */ React.createElement("div", { key: entry[0], style: { fontSize: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: entry[2], fontWeight: 600 } }, entry[1]), /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa" } }, " ", entry[0]));
-        }))
-      );
-    })), selected && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: cream, zIndex: 1010, overflowY: "auto", padding: "32px" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 680, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("button", { onClick: function() {
+          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 500, color: "#2a2a2a", marginBottom: 4 } }, item.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#aaa" } }, item.submitted_by ? /* @__PURE__ */ React.createElement("span", null, "Submitted by ", item.submitted_by, item.due_date ? " \xB7 " : "") : null, item.due_date ? /* @__PURE__ */ React.createElement("span", null, "Due ", fmtDate(item.due_date)) : null, item.meeting_date ? /* @__PURE__ */ React.createElement("span", null, " \xB7 Meeting ", fmtDate(item.meeting_date)) : null)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", marginLeft: 16, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#aaa" } }, iv.length, "/", BOARD_MEMBERS.length, " voted"), revealed ? /* @__PURE__ */ React.createElement("span", { style: { background: "#e8f5e9", color: "#2e7d32", fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20 } }, "Revealed") : /* @__PURE__ */ React.createElement("span", { style: { background: "#fff3e0", color: "#e65100", fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20 } }, "Open"))),
+          revealed && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 14, marginTop: 10 } }, [["Yes", t.yes, "#2e7d32"], ["No", t.no, "#c62828"], ["Abstain", t.abstain, "#e65100"]].map(function(entry) {
+            return /* @__PURE__ */ React.createElement("div", { key: entry[0], style: { fontSize: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { color: entry[2], fontWeight: 600 } }, entry[1]), /* @__PURE__ */ React.createElement("span", { style: { color: "#aaa" } }, " ", entry[0]));
+          }))
+        ));
+      });
+    })()), selected && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: cream, zIndex: 1010, overflowY: "auto", padding: "32px" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 680, margin: "0 auto" } }, /* @__PURE__ */ React.createElement("button", { onClick: function() {
       setSelected(null);
     }, style: { display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#888", fontSize: 13, cursor: "pointer", marginBottom: 24, padding: 0 } }, "\u2190 Back to topics"), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 16, padding: 36, boxShadow: "0 2px 20px rgba(0,0,0,0.06)" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 600, color: "#2a2a2a", marginBottom: 6 } }, selected.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#aaa" } }, selected.submitted_by ? /* @__PURE__ */ React.createElement("span", null, "Submitted by ", selected.submitted_by) : null, selected.due_date ? /* @__PURE__ */ React.createElement("span", null, " \xB7 Due ", fmtDate(selected.due_date)) : null, selected.meeting_date ? /* @__PURE__ */ React.createElement("span", null, " \xB7 Meeting ", fmtDate(selected.meeting_date)) : null)), selected.description && /* @__PURE__ */ React.createElement("div", { dangerouslySetInnerHTML: { __html: selected.description }, style: { fontSize: 13, color: "#555", lineHeight: 1.6, marginBottom: 16, padding: "12px 14px", background: "#faf8f4", borderRadius: 8, borderLeft: "3px solid " + gold } }), selected.attachment_url && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("a", { href: selected.attachment_url, target: "_blank", rel: "noopener noreferrer", style: { fontSize: 13, color: gold, textDecoration: "none" } }, "\u{1F4CE} View Attachment")), isRevealed(selected) ? /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 12 } }, "Results"), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, (function() {
       var t = tally(selected);

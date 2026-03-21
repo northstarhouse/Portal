@@ -1271,11 +1271,24 @@ function BoardView() {
       {items.length === 0 && <div style={{ color: '#aaa', fontSize: 14, textAlign: 'center', padding: 40 }}>No voting items yet.</div>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {items.map(function(item) {
+        {(function() {
+          var openItems = items.filter(function(i) { return !isRevealed(i); });
+          var closedItems = items.filter(function(i) { return isRevealed(i); });
+          var allItems = openItems.concat(closedItems);
+          return allItems.map(function(item, idx) {
           var iv = itemVotes(item);
           var revealed = isRevealed(item);
           var t = tally(item);
+          var showDivider = idx === openItems.length && closedItems.length > 0 && openItems.length > 0;
           return (
+            <React.Fragment key={item.id}>
+              {showDivider && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '6px 0' }}>
+                  <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
+                  <span style={{ fontSize: 11, color: '#bbb', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Closed</span>
+                  <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
+                </div>
+              )}
             <div
               key={item.id}
               onClick={function() { setSelected(item); setVoteForm({ voter: '', choice: '', note: '' }); }}
@@ -1308,8 +1321,10 @@ function BoardView() {
                 </div>
               )}
             </div>
+            </React.Fragment>
           );
-        })}
+          });
+        })()}
       </div>
 
       {selected && (
