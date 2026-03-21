@@ -44,7 +44,7 @@ function parseIcalDate(val) {
   return new Date(y + "-" + mo + "-" + d + "T" + h + ":" + mi + ":" + s + (val.endsWith("Z") ? "Z" : ""));
 }
 
-const gold = "#9a7b2f";
+const gold = "#886c44";
 const cream = "#f8f4ec";
 
 const modules = [
@@ -59,7 +59,7 @@ const modules = [
 const mockData = {
   events: [
     { name: "Spring Garden Tour", date: "Apr 12", status: "Confirmed", revenue: "$1,200", guests: 45 },
-    { name: "Founder’s Gala", date: "May 3", status: "Pending", revenue: "$4,800", guests: 120 },
+    { name: "Founder's Gala", date: "May 3", status: "Pending", revenue: "$4,800", guests: 120 },
     { name: "Julia Morgan Lecture", date: "May 18", status: "Confirmed", revenue: "$600", guests: 30 },
     { name: "Mid-Summer Festival", date: "Jul 11", status: "Planning", revenue: "—", guests: 200 },
     { name: "Board Retreat", date: "Aug 5", status: "Confirmed", revenue: "—", guests: 14 },
@@ -230,10 +230,10 @@ const typeColors = {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ display: ‘flex’, alignItems: ‘center’, gap: 8, flexWrap: ‘wrap’ }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase" }}>Today — March 20, 2026</span>
-          <span style={{ color: ‘#ccc’, fontSize: 12 }}>—</span>
-          <span style={{ fontSize: 13, color: "#888" }}>Here’s your organization at a glance.</span>
+          <span style={{ color: '#ccc', fontSize: 12 }}>—</span>
+          <span style={{ fontSize: 13, color: "#888" }}>Here's your organization at a glance.</span>
         </div>
       </div>
 

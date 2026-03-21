@@ -44,7 +44,7 @@
     var y = val.slice(0, 4), mo = val.slice(4, 6), d = val.slice(6, 8), h = val.slice(9, 11), mi = val.slice(11, 13), s = val.slice(13, 15) || "00";
     return /* @__PURE__ */ new Date(y + "-" + mo + "-" + d + "T" + h + ":" + mi + ":" + s + (val.endsWith("Z") ? "Z" : ""));
   }
-  var gold = "#b8960c";
+  var gold = "#886c44";
   var cream = "#f8f4ec";
   var modules = [
     { id: "home", label: "Overview", icon: "\u2302" },
@@ -57,7 +57,7 @@
   var mockData = {
     events: [
       { name: "Spring Garden Tour", date: "Apr 12", status: "Confirmed", revenue: "$1,200", guests: 45 },
-      { name: "Founder\u2019s Gala", date: "May 3", status: "Pending", revenue: "$4,800", guests: 120 },
+      { name: "Founder's Gala", date: "May 3", status: "Pending", revenue: "$4,800", guests: 120 },
       { name: "Julia Morgan Lecture", date: "May 18", status: "Confirmed", revenue: "$600", guests: 30 },
       { name: "Mid-Summer Festival", date: "Jul 11", status: "Planning", revenue: "\u2014", guests: 200 },
       { name: "Board Retreat", date: "Aug 5", status: "Confirmed", revenue: "\u2014", guests: 14 }
@@ -175,7 +175,7 @@
         setCalEvents([]);
       });
     }, []);
-    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 } }, "Today \u2014 March 20, 2026"), /* @__PURE__ */ React.createElement("h2", { style: { margin: 0, fontSize: 20, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, "Good morning, North Star House"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#888", margin: "4px 0 0" } }, "Here\u2019s your organization at a glance.")), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: gold } }, "\u23CE"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: "#8a6200" } }, "Quarterly Update Due \u2014 March 31, 2026")), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", fontSize: 11, fontWeight: 500, color: "#c0392b", background: "#fce4e4", padding: "3px 10px", borderRadius: 20 } }, "11 days away")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: function() {
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase" } }, "Today \u2014 March 20, 2026"), /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc", fontSize: 12 } }, "\u2014"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#888" } }, "Here's your organization at a glance."))), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: gold } }, "\u23CE"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: "#8a6200" } }, "Quarterly Update Due \u2014 March 31, 2026")), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", fontSize: 11, fontWeight: 500, color: "#c0392b", background: "#fce4e4", padding: "3px 10px", borderRadius: 20 } }, "11 days away")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: function() {
       navigate("donors");
     }, style: { cursor: "pointer" } }, /* @__PURE__ */ React.createElement(StatCard, { label: "YTD Donations", value: donationTotal === null ? "..." : "$" + donationTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), sub: "of $50K goal" })), /* @__PURE__ */ React.createElement("div", { onClick: function() {
       navigate("volunteers");
