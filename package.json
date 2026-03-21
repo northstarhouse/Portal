@@ -16,6 +16,7 @@
   "author": "North Star House",
   "license": "ISC",
   "devDependencies": {
-    "esbuild": "^0.27.2"
+    "esbuild": "^0.27.2",
+    "jimp": "^1.6.0"
   }
 }
