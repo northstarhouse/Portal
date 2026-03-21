@@ -196,7 +196,7 @@ const typeColors = {
       </div>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-        <StatCard label="YTD Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub="2026 YTD" />
+        <StatCard label="YTD Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub="of $50K goal" />
         <StatCard label="Active Volunteers" value="4" sub="of 5 total" />
         <StatCard label="2026 Events" value="5" sub="on the books" />
         <StatCard label="Active Sponsors" value="3" sub="+ 1 in review" />
