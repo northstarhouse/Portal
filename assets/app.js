@@ -1552,7 +1552,7 @@
     const [opArea, setOpArea] = useState(null);
     const View = views[active];
     const mod = modules.find((m) => m.id === active);
-    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, ".nsh-sidebar::-webkit-scrollbar { display: none; }"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { className: "nsh-sidebar", style: { width: 220, background: "#b5a185", display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", scrollbarWidth: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "20px 20px 14px" } }, /* @__PURE__ */ React.createElement("img", { src: "assets/logo.png", alt: "North Star House", style: { width: 140, display: "block" } })), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid rgba(255,255,255,0.2)", margin: "0 0 8px" } }), /* @__PURE__ */ React.createElement("nav", { style: { flex: 1, padding: "0 8px" } }, modules.filter((m) => !m.hidden).map((m) => /* @__PURE__ */ React.createElement("button", { key: m.id, onClick: () => {
+    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, ".nsh-sidebar::-webkit-scrollbar { display: none; }"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { className: "nsh-sidebar", style: { width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", scrollbarWidth: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "20px 20px 14px" } }, /* @__PURE__ */ React.createElement("img", { src: "assets/logo.png", alt: "North Star House", style: { width: 140, display: "block" } })), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" } }), /* @__PURE__ */ React.createElement("nav", { style: { flex: 1, padding: "0 8px" } }, modules.filter((m) => !m.hidden).map((m) => /* @__PURE__ */ React.createElement("button", { key: m.id, onClick: () => {
       setActive(m.id);
       setOpOpen(false);
     }, style: {
@@ -1561,25 +1561,25 @@
       gap: 10,
       width: "100%",
       padding: "9px 12px",
-      background: active === m.id ? "rgba(255,255,255,0.2)" : "transparent",
+      background: active === m.id ? "rgba(181,161,133,0.15)" : "transparent",
       border: "none",
       borderRadius: 7,
       cursor: "pointer",
       textAlign: "left",
-      color: "#fff",
+      color: active === m.id ? "#b5a185" : "rgba(255,255,255,0.5)",
       fontSize: 12,
       fontWeight: active === m.id ? 600 : 400,
       marginBottom: 2,
       transition: "all 0.15s"
-    } }, /* @__PURE__ */ React.createElement(NavIcon, { id: m.id, active: active === m.id }), m.label))), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 8px 16px", borderTop: "0.5px solid rgba(255,255,255,0.2)", marginTop: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setOpOpen((o) => !o), style: {
+    } }, /* @__PURE__ */ React.createElement(NavIcon, { id: m.id, active: active === m.id }), m.label))), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 8px 16px", borderTop: "0.5px solid rgba(255,255,255,0.08)", marginTop: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setOpOpen((o) => !o), style: {
       width: "100%",
       padding: "10px 12px",
       borderRadius: 8,
       cursor: "pointer",
       textAlign: "left",
-      background: opOpen ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)",
-      border: "0.5px solid rgba(255,255,255,0.25)",
-      color: "#fff",
+      background: opOpen ? "rgba(181,161,133,0.15)" : "rgba(255,255,255,0.05)",
+      border: "0.5px solid rgba(255,255,255,0.12)",
+      color: opOpen ? "#b5a185" : "rgba(255,255,255,0.5)",
       fontSize: 13,
       fontWeight: 500,
       display: "flex",
@@ -1590,8 +1590,8 @@
       width: opOpen ? 180 : 0,
       overflow: "hidden",
       transition: "width 0.25s ease",
-      background: "#a8956e",
-      borderLeft: opOpen ? "0.5px solid rgba(255,255,255,0.12)" : "none",
+      background: "#222226",
+      borderLeft: opOpen ? "0.5px solid rgba(255,255,255,0.06)" : "none",
       display: "flex",
       flexDirection: "column",
       height: "100vh"
@@ -1608,11 +1608,11 @@
             display: "block",
             width: "100%",
             padding: "9px 16px",
-            background: opArea === area && active === "operational" ? "rgba(255,255,255,0.2)" : "transparent",
+            background: opArea === area && active === "operational" ? "rgba(181,161,133,0.15)" : "transparent",
             border: "none",
             cursor: "pointer",
             textAlign: "left",
-            color: "#fff",
+            color: opArea === area && active === "operational" ? "#b5a185" : "rgba(255,255,255,0.45)",
             fontSize: 13,
             fontWeight: opArea === area && active === "operational" ? 600 : 400,
             transition: "all 0.15s"
