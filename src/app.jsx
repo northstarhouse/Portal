@@ -1208,7 +1208,7 @@ function BoardView() {
   }
 
   function handleVoteSubmit(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!voteForm.voter || !voteForm.choice) return;
     setVoteSaving(true);
     var existing = votes.find(function(v) { return v.topicId === selected.id && v.voter === voteForm.voter; });
@@ -1386,61 +1386,61 @@ function BoardView() {
                 </div>
               </div>
             ) : (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 8 }}>
-                  Results locked · {itemVotes(selected).length}/{BOARD_MEMBERS.length} voted
+              <div>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 12 }}>
+                  Votes · {itemVotes(selected).length}/{BOARD_MEMBERS.length} submitted
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {BOARD_MEMBERS.map(function(m) {
-                    var voted = itemVotes(selected).some(function(v) { return v.voter === m; });
+                    var mv = itemVotes(selected).find(function(v) { return v.voter === m; });
+                    var isEditing = voteForm.voter === m;
+                    var vc = mv ? (VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' }) : null;
                     return (
-                      <span key={m} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: voted ? '#e8f5e9' : '#f5f5f5', color: voted ? '#2e7d32' : '#aaa', fontWeight: 500 }}>
-                        {voted ? '✓ ' : ''}{m}
-                      </span>
+                      <div key={m} style={{ background: '#fafafa', borderRadius: 10, padding: '10px 14px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isEditing ? 10 : 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{m}</span>
+                            {mv && mv.changed_in_meeting && <span style={{ fontSize: 11, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {mv
+                              ? <span style={{ background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span>
+                              : <span style={{ fontSize: 12, color: '#ccc' }}>No vote yet</span>
+                            }
+                            <button type="button" onClick={function() { setVoteForm(isEditing ? { voter: '', choice: mv ? mv.choice : '', note: mv ? (mv.note || '') : '' } : { voter: m, choice: mv ? mv.choice : '', note: mv ? (mv.note || '') : '' }); }}
+                              style={{ fontSize: 11, color: isEditing ? '#aaa' : gold, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}>
+                              {isEditing ? 'Cancel' : mv ? 'Edit' : 'Vote'}
+                            </button>
+                          </div>
+                        </div>
+                        {isEditing && (
+                          <div>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                              {['Yes', 'No', 'Abstain', 'Not in attendance'].map(function(opt) {
+                                var vc2 = VOTE_COLORS[opt];
+                                var active = voteForm.choice === opt;
+                                return (
+                                  <button key={opt} type="button" onClick={function() { setVoteForm(function(f) { return Object.assign({}, f, { choice: opt }); }); }}
+                                    style={{ padding: '6px 12px', borderRadius: 20, border: '1.5px solid ' + (active ? vc2.color : '#e0d8cc'), background: active ? vc2.bg : '#fff', color: active ? vc2.color : '#888', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer' }}>
+                                    {opt}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={2} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 8 })} placeholder="Note (optional)…" />
+                            <button onClick={handleVoteSubmit} disabled={voteSaving || !voteForm.choice}
+                              style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: (voteSaving || !voteForm.choice) ? 0.6 : 1 }}>
+                              {voteSaving ? 'Saving…' : 'Save Vote'}
+                            </button>
+                          </div>
+                        )}
+                        {mv && mv.note && !isEditing && <div style={{ fontSize: 12, color: '#777', marginTop: 4, fontStyle: 'italic' }}>{mv.note}</div>}
+                      </div>
                     );
                   })}
                 </div>
               </div>
             )}
-
-            <div style={{ borderTop: '0.5px solid #f0ebe2', paddingTop: 16, marginTop: 8 }}>
-              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 12 }}>Cast / Update Vote</div>
-              <form onSubmit={handleVoteSubmit}>
-                <div style={bGrp}>
-                  <label style={bLbl}>Board Member</label>
-                  <select value={voteForm.voter} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { voter: e.target.value }); }); }} style={bInp}>
-                    <option value="">Select name…</option>
-                    {BOARD_MEMBERS.map(function(m) {
-                      var hasVoted = itemVotes(selected).some(function(v) { return v.voter === m; });
-                      return <option key={m} value={m} style={{ color: hasVoted ? '#bbb' : '#2a2a2a' }}>{m}{hasVoted ? ' (already voted)' : ''}</option>;
-                    })}
-                  </select>
-                </div>
-                <div style={bGrp}>
-                  <label style={bLbl}>Vote</label>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                    {['Yes', 'No', 'Abstain', 'Not in attendance'].map(function(opt) {
-                      var vc = VOTE_COLORS[opt];
-                      var active = voteForm.choice === opt;
-                      return (
-                        <button key={opt} type="button" onClick={function() { setVoteForm(function(f) { return Object.assign({}, f, { choice: opt }); }); }}
-                          style={{ padding: '7px 14px', borderRadius: 20, border: '1.5px solid ' + (active ? vc.color : '#e0d8cc'), background: active ? vc.bg : '#fff', color: active ? vc.color : '#888', fontSize: 13, fontWeight: active ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}>
-                          {opt}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div style={bGrp}>
-                  <label style={bLbl}>Note (optional)</label>
-                  <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={2} style={Object.assign({}, bInp, { resize: 'vertical' })} placeholder="Reason or comment…" />
-                </div>
-                <button type="submit" disabled={voteSaving || !voteForm.voter || !voteForm.choice}
-                  style={{ width: '100%', background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: (voteSaving || !voteForm.voter || !voteForm.choice) ? 0.6 : 1 }}>
-                  {voteSaving ? 'Saving…' : 'Submit Vote'}
-                </button>
-              </form>
-            </div>
             </div>
           </div>
         </div>
