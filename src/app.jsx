@@ -1328,7 +1328,7 @@ function BoardView() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a', marginBottom: 4 }}>{item.title}</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>{item.title}</div>
                   <div style={{ fontSize: 12, color: '#777' }}>
                     {item.submitted_by ? <span>Submitted by {item.submitted_by}{item.due_date ? ' · ' : ''}</span> : null}
                     {item.due_date ? <span>Due {fmtDate(item.due_date)}</span> : null}
