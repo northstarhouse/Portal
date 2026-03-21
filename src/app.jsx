@@ -230,7 +230,7 @@ const typeColors = {
     <div>
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Today — March 20, 2026</div>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 500, color: "#2a2a2a" }}>Good morning, North Star House</h2>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" }}>Good morning, North Star House</h2>
         <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Here’s your organization at a glance.</p>
       </div>
 
@@ -1689,7 +1689,7 @@ const views = {
       <div style={{ flex: 1, padding: "28px 32px", overflowY: "auto" }}>
         <div style={{ maxWidth: 900 }}>
           <div style={{ marginBottom: 22 }}>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: "#2a2a2a" }}>{mod && mod.label}</h1>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" }}>{mod && mod.label}</h1>
             <div style={{ height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 6 }} />
           </div>
           <View navigate={setActive} />
