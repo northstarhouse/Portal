@@ -1640,7 +1640,7 @@
         },
         area
       );
-    })))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: "28px 32px", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0, fontSize: 26, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, mod && mod.label), /* @__PURE__ */ React.createElement("div", { style: { height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 10, opacity: 0.65 } })), /* @__PURE__ */ React.createElement(View, { navigate: setActive, opArea }))));
+    })))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: "28px 32px", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif" } }, mod && mod.label), /* @__PURE__ */ React.createElement("div", { style: { height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 10, opacity: 0.65 } })), /* @__PURE__ */ React.createElement(View, { navigate: setActive, opArea }))));
   }
   var root = ReactDOM.createRoot(document.getElementById("root"));
   root.render(React.createElement(Dashboard));
