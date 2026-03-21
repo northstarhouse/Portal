@@ -1607,16 +1607,16 @@ function StrategyView() {
                   <span style={{ fontSize: 12, color: '#888' }}>{done}/{catGoals.length} complete</span>
                 </div>
                 <div style={{ height: 8, background: '#f0ece6', borderRadius: 99, overflow: 'hidden', display: 'flex' }}>
-                  <div style={{ width: pct + '%', background: gold, borderRadius: 99, transition: 'width 0.4s' }} />
-                  <div style={{ width: inprogPct + '%', background: '#e8d5b0', transition: 'width 0.4s' }} />
+                  <div style={{ width: pct + '%', background: '#4caf50', borderRadius: 99, transition: 'width 0.4s' }} />
+                  <div style={{ width: inprogPct + '%', background: '#f5a623', transition: 'width 0.4s' }} />
                 </div>
               </div>
             );
           })}
         </div>
         <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#888' }}><div style={{ width: 10, height: 10, borderRadius: 3, background: gold }} />Complete</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#888' }}><div style={{ width: 10, height: 10, borderRadius: 3, background: '#e8d5b0' }} />In Progress</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#888' }}><div style={{ width: 10, height: 10, borderRadius: 3, background: '#4caf50' }} />Complete</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#888' }}><div style={{ width: 10, height: 10, borderRadius: 3, background: '#f5a623' }} />In Progress</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#888' }}><div style={{ width: 10, height: 10, borderRadius: 3, background: '#f0ece6' }} />Not Started</div>
         </div>
       </div>
