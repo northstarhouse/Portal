@@ -1698,11 +1698,7 @@ const views = {
             <span style={{ fontSize: 13 }}>◉</span> Quarterly Update
           </button>
         </div>
-        <div style={{ padding: "12px 20px 20px", borderTop: "0.5px solid rgba(255,255,255,0.08)" }}>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>Connected to Airtable</div>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4caf50", display: "inline-block", marginRight: 5, marginTop: 6 }} />
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Live sync</span>
-        </div>
+        <div style={{ padding: "8px 20px 20px" }} />
       </div>
 
       <div style={{ flex: 1, padding: "28px 32px", overflowY: "auto" }}>
