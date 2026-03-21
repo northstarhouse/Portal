@@ -1704,7 +1704,7 @@ const views = {
         <div style={{ maxWidth: 900 }}>
           <div style={{ marginBottom: 22 }}>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" }}>{mod && mod.label}</h1>
-            <div style={{ height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 6, opacity: 0.65 }} />
+            <div style={{ height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 10, opacity: 0.65 }} />
           </div>
           <View navigate={setActive} />
         </div>
