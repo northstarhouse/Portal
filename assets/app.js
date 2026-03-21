@@ -10,6 +10,40 @@ var App = (() => {
       headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
     }).then((r) => r.json());
   }
+  var CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthstarhouse%40gmail.com/private-06287b2ca0d9ee6acd4f49f9d4d0d2da/basic.ics";
+  function fetchCalendarEvents() {
+    var proxy = "https://corsproxy.io/?" + encodeURIComponent(CALENDAR_ICAL_URL);
+    return fetch(proxy).then(function(r) {
+      return r.text();
+    }).then(function(text) {
+      text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n[ \t]/g, "");
+      var events = [], current = null;
+      text.split("\n").forEach(function(line) {
+        if (line === "BEGIN:VEVENT") {
+          current = {};
+        } else if (line === "END:VEVENT") {
+          if (current) events.push(current);
+          current = null;
+        } else if (current) {
+          var ci = line.indexOf(":");
+          if (ci !== -1) {
+            var rawKey = line.slice(0, ci);
+            var val = line.slice(ci + 1);
+            var baseKey = rawKey.split(";")[0];
+            current[baseKey] = val;
+          }
+        }
+      });
+      return events;
+    });
+  }
+  function parseIcalDate(val) {
+    if (!val) return null;
+    val = val.replace(/[^0-9TZ]/g, "");
+    if (val.length === 8) return /* @__PURE__ */ new Date(val.slice(0, 4) + "-" + val.slice(4, 6) + "-" + val.slice(6, 8) + "T00:00:00");
+    var y = val.slice(0, 4), mo = val.slice(4, 6), d = val.slice(6, 8), h = val.slice(9, 11), mi = val.slice(11, 13), s = val.slice(13, 15) || "00";
+    return /* @__PURE__ */ new Date(y + "-" + mo + "-" + d + "T" + h + ":" + mi + ":" + s + (val.endsWith("Z") ? "Z" : ""));
+  }
   var gold = "#886c44";
   var cream = "#f8f4ec";
   var modules = [
@@ -113,20 +147,10 @@ var App = (() => {
   function Td({ children, muted }) {
     return /* @__PURE__ */ React.createElement("td", { style: { padding: "9px 10px", color: muted ? "#aaa" : "#2a2a2a", whiteSpace: "nowrap" } }, children);
   }
-  var thisWeek = [
-    { day: "Mon Mar 23", title: "Volunteer Garden Workday", time: "9:00 AM", type: "Volunteer" },
-    { day: "Wed Mar 25", title: "Board Finance Committee", time: "3:00 PM", type: "Board" },
-    { day: "Thu Mar 26", title: "Spring Tour Site Walk", time: "11:00 AM", type: "Event" },
-    { day: "Sat Mar 28", title: "Community Open House", time: "1:00 PM", type: "Event" }
-  ];
-  var typeColors = {
-    Volunteer: { bg: "#e8f5e9", color: "#2e7d32" },
-    Board: { bg: "#e8eaf6", color: "#3949ab" },
-    Event: { bg: "#fff8e1", color: "#8a6200" }
-  };
   function HomeView() {
     const [donationTotal, setDonationTotal] = useState(null);
     const [activeVols, setActiveVols] = useState(null);
+    const [calEvents, setCalEvents] = useState(null);
     useEffect(function() {
       sbFetch("2026 Donations", ["Amount"]).then(function(rows) {
         if (!Array.isArray(rows)) return;
@@ -141,10 +165,26 @@ var App = (() => {
           return r["Status"] === "Active";
         }).length);
       });
+      fetchCalendarEvents().then(function(events) {
+        var now = /* @__PURE__ */ new Date();
+        var windowEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1e3);
+        var filtered = events.filter(function(ev) {
+          var start = parseIcalDate(ev["DTSTART"]);
+          return start && start >= now && start <= windowEnd;
+        }).sort(function(a, b) {
+          return parseIcalDate(a["DTSTART"]) - parseIcalDate(b["DTSTART"]);
+        }).slice(0, 8);
+        setCalEvents(filtered);
+      }).catch(function() {
+        setCalEvents([]);
+      });
     }, []);
-    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 } }, "Today \u2014 March 20, 2026"), /* @__PURE__ */ React.createElement("h2", { style: { margin: 0, fontSize: 20, fontWeight: 500, color: "#2a2a2a" } }, "Good morning, North Star House"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#888", margin: "4px 0 0" } }, "Here\u2019s your organization at a glance.")), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: gold } }, "\u23CE"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: "#8a6200" } }, "Quarterly Update Due \u2014 March 31, 2026"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#b08040", marginTop: 2 } }, "Donations \xB7 Volunteers \xB7 Sponsors \xB7 Events \xB7 Board Activity")), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", fontSize: 11, fontWeight: 500, color: "#c0392b", background: "#fce4e4", padding: "3px 10px", borderRadius: 20 } }, "11 days away")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "YTD Donations", value: donationTotal === null ? "..." : "$" + donationTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), sub: "of $50K goal" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Active Volunteers", value: activeVols === null ? "..." : activeVols }), /* @__PURE__ */ React.createElement(StatCard, { label: "2026 Events", value: "5", sub: "on the books" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Active Sponsors", value: "3", sub: "+ 1 in review" })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 } }, "This Week at North Star House"), thisWeek.map((e, i) => {
-      const tc = typeColors[e.type] || { bg: "#f3f3f3", color: "#555" };
-      return /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 6, height: 6, borderRadius: "50%", background: tc.color, marginTop: 5 } }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: "#2a2a2a" } }, e.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 2 } }, e.day, " \xB7 ", e.time)), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, background: tc.bg, color: tc.color, padding: "2px 7px", borderRadius: 20, whiteSpace: "nowrap", fontWeight: 500 } }, e.type));
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 } }, "Today \u2014 March 20, 2026"), /* @__PURE__ */ React.createElement("h2", { style: { margin: 0, fontSize: 20, fontWeight: 500, color: "#2a2a2a" } }, "Good morning, North Star House"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: "#888", margin: "4px 0 0" } }, "Here\u2019s your organization at a glance.")), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: gold } }, "\u23CE"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: "#8a6200" } }, "Quarterly Update Due \u2014 March 31, 2026"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#b08040", marginTop: 2 } }, "Donations \xB7 Volunteers \xB7 Sponsors \xB7 Events \xB7 Board Activity")), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", fontSize: 11, fontWeight: 500, color: "#c0392b", background: "#fce4e4", padding: "3px 10px", borderRadius: 20 } }, "11 days away")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "YTD Donations", value: donationTotal === null ? "..." : "$" + donationTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), sub: "of $50K goal" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Active Volunteers", value: activeVols === null ? "..." : activeVols }), /* @__PURE__ */ React.createElement(StatCard, { label: "2026 Events", value: "5", sub: "on the books" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Active Sponsors", value: "3", sub: "+ 1 in review" })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 } }, "Upcoming \u2014 NSH Calendar"), calEvents === null && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#aaa" } }, "Loading\u2026"), calEvents !== null && calEvents.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#aaa" } }, "No upcoming events in the next 2 weeks."), calEvents !== null && calEvents.map(function(ev, i) {
+      var start = parseIcalDate(ev["DTSTART"]);
+      var dayStr = start ? start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "";
+      var timeStr = ev["DTSTART"] && ev["DTSTART"].length > 8 ? start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "All day";
+      var title = (ev["SUMMARY"] || "Untitled").replace(/\\,/g, ",").replace(/\\n/g, " ");
+      return /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 6, height: 6, borderRadius: "50%", background: gold, marginTop: 5, flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: "#2a2a2a" } }, title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 2 } }, dayStr, timeStr !== "All day" ? " \xB7 " + timeStr : "")));
     }), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: "0.5px solid #f0ebe2", fontSize: 11, color: "#bbb" } }, "Synced from Google Calendar")), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 } }, "In-House Events"), mockData.events.map((e, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 500 } }, e.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa" } }, e.date)), /* @__PURE__ */ React.createElement(Badge, { status: e.status }))))));
   }
   function EventsView() {
@@ -657,7 +697,7 @@ var App = (() => {
     var lStyle = { fontSize: 12, color: "#666", fontWeight: 500 };
     var grp = { marginBottom: 14 };
     var sec = { fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 10, marginTop: 20, display: "block" };
-    var typeColors2 = {
+    var typeColors = {
       "Donation": { bg: "#e3f2fd", color: "#1565c0" },
       "Membership": { bg: "#e8f5e9", color: "#2e7d32" },
       "Restricted": { bg: "#fce4ec", color: "#880e4f" },
@@ -671,7 +711,7 @@ var App = (() => {
     }, style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer" } }, "+ Add Donation")), error && /* @__PURE__ */ React.createElement("div", { style: { background: "#fce4e4", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#c0392b" } }, "Error: ", error), loading ? /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: 40, color: "#aaa", fontSize: 13 } }, "Loading donations...") : /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 0, padding: "8px 16px", borderBottom: "0.5px solid #e8e0d4", background: "#faf8f4" } }, ["Donor", "Type", "Amount", "Date"].map(function(h) {
       return /* @__PURE__ */ React.createElement("div", { key: h, style: { fontSize: 11, color: "#aaa", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.8 } }, h);
     })), donations.map(function(d, i) {
-      var tc = typeColors2[d["Donation Type"]] || { bg: "#f3f3f3", color: "#555" };
+      var tc = typeColors[d["Donation Type"]] || { bg: "#f3f3f3", color: "#555" };
       var acked = d["Acknowledged"] === true || String(d["Acknowledged"]).toUpperCase() === "TRUE";
       return /* @__PURE__ */ React.createElement(
         "div",
@@ -698,7 +738,7 @@ var App = (() => {
     }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1e3, padding: 20 } }, /* @__PURE__ */ React.createElement("div", { onClick: function(e) {
       e.stopPropagation();
     }, style: { background: "#fff", borderRadius: 16, maxWidth: 540, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", maxHeight: "90vh", display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "linear-gradient(135deg, #f8f4ec 0%, #f0e8dc 100%)", padding: "24px 28px 18px", borderBottom: "0.5px solid #e8dece", position: "relative", borderRadius: "16px 16px 0 0" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 19, fontWeight: 600, color: "#1e1a16", marginBottom: 4 } }, selected["Donor Name"]), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } }, (function() {
-      var tc = typeColors2[selected["Donation Type"]] || { bg: "#f3f3f3", color: "#555" };
+      var tc = typeColors[selected["Donation Type"]] || { bg: "#f3f3f3", color: "#555" };
       return /* @__PURE__ */ React.createElement("span", { style: { background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 20 } }, selected["Donation Type"]);
     })(), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: gold } }, fmtAmount(selected["Amount"])), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#aaa" } }, fmtDate(selected["Close Date"]))), /* @__PURE__ */ React.createElement("button", { onClick: function() {
       setSelected(null);

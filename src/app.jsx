@@ -11,6 +11,39 @@ function sbFetch(table, columns) {
   }).then(r => r.json());
 }
 
+const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthstarhouse%40gmail.com/private-06287b2ca0d9ee6acd4f49f9d4d0d2da/basic.ics";
+
+function fetchCalendarEvents() {
+  var proxy = "https://corsproxy.io/?" + encodeURIComponent(CALENDAR_ICAL_URL);
+  return fetch(proxy).then(function(r) { return r.text(); }).then(function(text) {
+    // Unfold continuation lines
+    text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n[ \t]/g, "");
+    var events = [], current = null;
+    text.split("\n").forEach(function(line) {
+      if (line === "BEGIN:VEVENT") { current = {}; }
+      else if (line === "END:VEVENT") { if (current) events.push(current); current = null; }
+      else if (current) {
+        var ci = line.indexOf(":");
+        if (ci !== -1) {
+          var rawKey = line.slice(0, ci);
+          var val = line.slice(ci + 1);
+          var baseKey = rawKey.split(";")[0];
+          current[baseKey] = val;
+        }
+      }
+    });
+    return events;
+  });
+}
+
+function parseIcalDate(val) {
+  if (!val) return null;
+  val = val.replace(/[^0-9TZ]/g, "");
+  if (val.length === 8) return new Date(val.slice(0,4) + "-" + val.slice(4,6) + "-" + val.slice(6,8) + "T00:00:00");
+  var y = val.slice(0,4), mo = val.slice(4,6), d = val.slice(6,8), h = val.slice(9,11), mi = val.slice(11,13), s = val.slice(13,15) || "00";
+  return new Date(y + "-" + mo + "-" + d + "T" + h + ":" + mi + ":" + s + (val.endsWith("Z") ? "Z" : ""));
+}
+
 const gold = "#886c44";
 const cream = "#f8f4ec";
 
@@ -170,6 +203,7 @@ const typeColors = {
 };function HomeView() {
   const [donationTotal, setDonationTotal] = useState(null);
   const [activeVols, setActiveVols] = useState(null);
+  const [calEvents, setCalEvents] = useState(null);
   useEffect(function() {
     sbFetch('2026 Donations', ['Amount']).then(function(rows) {
       if (!Array.isArray(rows)) return;
@@ -182,6 +216,17 @@ const typeColors = {
       if (!Array.isArray(rows)) return;
       setActiveVols(rows.filter(function(r) { return r['Status'] === 'Active'; }).length);
     });
+    fetchCalendarEvents().then(function(events) {
+      var now = new Date();
+      var windowEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      var filtered = events.filter(function(ev) {
+        var start = parseIcalDate(ev['DTSTART']);
+        return start && start >= now && start <= windowEnd;
+      }).sort(function(a, b) {
+        return parseIcalDate(a['DTSTART']) - parseIcalDate(b['DTSTART']);
+      }).slice(0, 8);
+      setCalEvents(filtered);
+    }).catch(function() { setCalEvents([]); });
   }, []);
   return (
     <div>
@@ -209,17 +254,23 @@ const typeColors = {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>This Week at North Star House</div>
-          {thisWeek.map((e, i) => {
-            const tc = typeColors[e.type] || { bg: "#f3f3f3", color: "#555" };
+          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>Upcoming — NSH Calendar</div>
+          {calEvents === null && <div style={{ fontSize: 13, color: "#aaa" }}>Loading…</div>}
+          {calEvents !== null && calEvents.length === 0 && <div style={{ fontSize: 13, color: "#aaa" }}>No upcoming events in the next 2 weeks.</div>}
+          {calEvents !== null && calEvents.map(function(ev, i) {
+            var start = parseIcalDate(ev['DTSTART']);
+            var dayStr = start ? start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+            var timeStr = ev['DTSTART'] && ev['DTSTART'].length > 8
+              ? start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+              : 'All day';
+            var title = (ev['SUMMARY'] || 'Untitled').replace(/\\,/g, ',').replace(/\\n/g, ' ');
             return (
               <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
-                <div style={{ minWidth: 6, height: 6, borderRadius: "50%", background: tc.color, marginTop: 5 }} />
+                <div style={{ minWidth: 6, height: 6, borderRadius: "50%", background: gold, marginTop: 5, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#2a2a2a" }}>{e.title}</div>
-                  <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{e.day} · {e.time}</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "#2a2a2a" }}>{title}</div>
+                  <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{dayStr}{timeStr !== 'All day' ? ' · ' + timeStr : ''}</div>
                 </div>
-                <span style={{ fontSize: 11, background: tc.bg, color: tc.color, padding: "2px 7px", borderRadius: 20, whiteSpace: "nowrap", fontWeight: 500 }}>{e.type}</span>
               </div>
             );
           })}
