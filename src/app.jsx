@@ -265,27 +265,17 @@ const typeColors = {
               : 'All day';
             var title = (ev['SUMMARY'] || 'Untitled').replace(/\\,/g, ',').replace(/\\n/g, ' ');
             var tl = title.toLowerCase();
-            var dotColor = /tour/.test(tl) ? '#c2185b'
-              : /wedding/.test(tl) ? '#b71c1c'
-              : /committee/.test(tl) ? '#e65100'
-              : /meeting/.test(tl) ? '#6a1b9a'
-              : /creative|class/.test(tl) ? '#00838f'
-              : /event|party/.test(tl) ? '#1565c0'
-              : gold;
-            var label = /tour/.test(tl) ? 'Tour'
-              : /wedding/.test(tl) ? 'Wedding'
-              : /committee/.test(tl) ? 'Committee'
-              : /meeting/.test(tl) ? 'Meeting'
-              : /creative|class/.test(tl) ? 'Creative'
-              : /event|party/.test(tl) ? 'Event'
-              : null;
-            var labelBg = /tour/.test(tl) ? '#fce4ec'
-              : /wedding/.test(tl) ? '#ffebee'
-              : /committee/.test(tl) ? '#fff3e0'
-              : /meeting/.test(tl) ? '#f3e5f5'
-              : /creative|class/.test(tl) ? '#e0f7fa'
-              : /event|party/.test(tl) ? '#e3f2fd'
-              : '#f5f5f5';
+            var isDocent = /docent/.test(tl);
+            var isEstate = !isDocent && /estate|walk.?thr|sierra|\(j\)|tour/.test(tl);
+            var isWedding = /wedding/.test(tl);
+            var isCommittee = /committee/.test(tl);
+            var isMeeting = /meeting/.test(tl);
+            var isCreative = /creative|class/.test(tl);
+            var isEvent = /event|party/.test(tl);
+            var isGoals = /goal/.test(tl);
+            var dotColor = isDocent ? '#2e7d32' : isEstate ? '#c2185b' : isWedding ? '#b71c1c' : isCommittee ? '#e65100' : isMeeting ? '#6a1b9a' : isCreative ? '#00838f' : isEvent ? '#1565c0' : isGoals ? '#f57c00' : gold;
+            var label = isDocent ? 'Docent Tour' : isEstate ? 'Estate Tour' : isWedding ? 'Wedding' : isCommittee ? 'Committee' : isMeeting ? 'Meeting' : isCreative ? 'Creative' : isEvent ? 'Event' : isGoals ? 'Goals' : null;
+            var labelBg = isDocent ? '#e8f5e9' : isEstate ? '#fce4ec' : isWedding ? '#ffebee' : isCommittee ? '#fff3e0' : isMeeting ? '#f3e5f5' : isCreative ? '#e0f7fa' : isEvent ? '#e3f2fd' : isGoals ? '#fff8e1' : '#f5f5f5';
             return (
               <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
                 <div style={{ minWidth: 6, height: 6, borderRadius: "50%", background: dotColor, marginTop: 5, flexShrink: 0 }} />
@@ -293,7 +283,7 @@ const typeColors = {
                   <div style={{ fontSize: 13, fontWeight: 500, color: "#2a2a2a" }}>{title}</div>
                   <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{dayStr}{timeStr !== 'All day' ? ' · ' + timeStr : ''}</div>
                 </div>
-                {label && <span style={{ fontSize: 11, background: labelBg, color: dotColor, padding: "2px 7px", borderRadius: 20, whiteSpace: "nowrap", fontWeight: 500, flexShrink: 0 }}>{label}</span>}
+                {label && <span style={{ fontSize: 11, background: labelBg, color: dotColor, borderRadius: 20, fontWeight: 500, flexShrink: 0, width: 90, textAlign: 'center', display: 'inline-block', padding: '2px 0' }}>{label}</span>}
               </div>
             );
           })}
