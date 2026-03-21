@@ -724,6 +724,30 @@ var App = (() => {
     const [voteForm, setVoteForm] = React.useState({ member: "", vote: "", note: "" });
     const [voteSaving, setVoteSaving] = React.useState(false);
     const [topicSaving, setTopicSaving] = React.useState(false);
+    const [attachUploading, setAttachUploading] = React.useState(false);
+    const [attachFileName, setAttachFileName] = React.useState("");
+    function handleAttachUpload(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      setAttachFileName(file.name);
+      setAttachUploading(true);
+      var path = Date.now() + "_" + file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      fetch(SUPABASE_URL + "/storage/v1/object/board-attachments/" + encodeURIComponent(path), {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": file.type || "application/octet-stream" },
+        body: file
+      }).then(function(r) {
+        return r.json();
+      }).then(function(res) {
+        setAttachUploading(false);
+        var url = SUPABASE_URL + "/storage/v1/object/public/board-attachments/" + encodeURIComponent(path);
+        setTopicForm(function(f) {
+          return Object.assign({}, f, { attachment_url: url });
+        });
+      }).catch(function() {
+        setAttachUploading(false);
+      });
+    }
     function sbFetchAll(table) {
       var url = SUPABASE_URL + "/rest/v1/" + encodeURIComponent(table) + "?select=*";
       return fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } }).then(function(r) {
@@ -828,6 +852,8 @@ var App = (() => {
         setTopicSaving(false);
         setShowAdd(false);
         setTopicForm({ title: "", description: "", attachment_url: "", submitted_by: "", due_date: "", meeting_date: "" });
+        setAttachFileName("");
+        setAttachUploading(false);
         load();
       });
     }
@@ -939,11 +965,7 @@ var App = (() => {
       setTopicForm(function(f) {
         return Object.assign({}, f, { description: e.target.value });
       });
-    }, rows: 3, style: Object.assign({}, bInp, { resize: "vertical" }), placeholder: "Background, details, context\u2026" })), /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Attachment URL"), /* @__PURE__ */ React.createElement("input", { value: topicForm.attachment_url, onChange: function(e) {
-      setTopicForm(function(f) {
-        return Object.assign({}, f, { attachment_url: e.target.value });
-      });
-    }, style: bInp, placeholder: "https://\u2026" })), /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Submitted By"), /* @__PURE__ */ React.createElement("input", { value: topicForm.submitted_by, onChange: function(e) {
+    }, rows: 3, style: Object.assign({}, bInp, { resize: "vertical" }), placeholder: "Background, details, context\u2026" })), /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Attachment"), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 10, marginTop: 6, padding: "8px 12px", border: "0.5px solid #e0d8cc", borderRadius: 8, cursor: "pointer", background: "#fff", fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { background: gold, color: "#fff", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 500, flexShrink: 0 } }, attachUploading ? "Uploading\u2026" : "Choose file"), /* @__PURE__ */ React.createElement("span", { style: { color: attachFileName ? "#2a2a2a" : "#bbb", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, attachFileName || "No file chosen"), /* @__PURE__ */ React.createElement("input", { type: "file", onChange: handleAttachUpload, style: { display: "none" } })), topicForm.attachment_url && !attachUploading && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#2e7d32", marginTop: 4 } }, "\u2713 Uploaded")), /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Submitted By"), /* @__PURE__ */ React.createElement("input", { value: topicForm.submitted_by, onChange: function(e) {
       setTopicForm(function(f) {
         return Object.assign({}, f, { submitted_by: e.target.value });
       });

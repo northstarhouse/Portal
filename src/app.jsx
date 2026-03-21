@@ -1004,6 +1004,25 @@ function BoardView() {
   const [voteForm, setVoteForm] = React.useState({ member: '', vote: '', note: '' });
   const [voteSaving, setVoteSaving] = React.useState(false);
   const [topicSaving, setTopicSaving] = React.useState(false);
+  const [attachUploading, setAttachUploading] = React.useState(false);
+  const [attachFileName, setAttachFileName] = React.useState('');
+
+  function handleAttachUpload(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    setAttachFileName(file.name);
+    setAttachUploading(true);
+    var path = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    fetch(SUPABASE_URL + '/storage/v1/object/board-attachments/' + encodeURIComponent(path), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream' },
+      body: file
+    }).then(function(r) { return r.json(); }).then(function(res) {
+      setAttachUploading(false);
+      var url = SUPABASE_URL + '/storage/v1/object/public/board-attachments/' + encodeURIComponent(path);
+      setTopicForm(function(f) { return Object.assign({}, f, { attachment_url: url }); });
+    }).catch(function() { setAttachUploading(false); });
+  }
 
   function sbFetchAll(table) {
     var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table) + '?select=*';
@@ -1091,6 +1110,7 @@ function BoardView() {
       setTopicSaving(false);
       setShowAdd(false);
       setTopicForm({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
+      setAttachFileName(''); setAttachUploading(false);
       load();
     });
   }
@@ -1298,7 +1318,15 @@ function BoardView() {
             <form onSubmit={handleTopicSubmit}>
               <div style={bGrp}><label style={bLbl}>Title *</label><input required value={topicForm.title} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { title: e.target.value }); }); }} style={bInp} placeholder="Topic title…" /></div>
               <div style={bGrp}><label style={bLbl}>Description</label><textarea value={topicForm.description} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} rows={3} style={Object.assign({}, bInp, { resize: 'vertical' })} placeholder="Background, details, context…" /></div>
-              <div style={bGrp}><label style={bLbl}>Attachment URL</label><input value={topicForm.attachment_url} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { attachment_url: e.target.value }); }); }} style={bInp} placeholder="https://…" /></div>
+              <div style={bGrp}>
+                <label style={bLbl}>Attachment</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, padding: '8px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', background: '#fff', fontSize: 13 }}>
+                  <span style={{ background: gold, color: '#fff', borderRadius: 6, padding: '4px 12px', fontSize: 12, fontWeight: 500, flexShrink: 0 }}>{attachUploading ? 'Uploading…' : 'Choose file'}</span>
+                  <span style={{ color: attachFileName ? '#2a2a2a' : '#bbb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachFileName || 'No file chosen'}</span>
+                  <input type="file" onChange={handleAttachUpload} style={{ display: 'none' }} />
+                </label>
+                {topicForm.attachment_url && !attachUploading && <div style={{ fontSize: 11, color: '#2e7d32', marginTop: 4 }}>✓ Uploaded</div>}
+              </div>
               <div style={bGrp}><label style={bLbl}>Submitted By</label><input value={topicForm.submitted_by} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { submitted_by: e.target.value }); }); }} style={bInp} placeholder="Name…" /></div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
                 <div><label style={bLbl}>Due Date</label><input type="date" value={topicForm.due_date} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { due_date: e.target.value }); }); }} style={bInp} /></div>
