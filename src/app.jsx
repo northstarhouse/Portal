@@ -1948,7 +1948,7 @@ var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundrai
                 display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px",
                 background: active === m.id ? "rgba(181,161,133,0.15)" : "transparent",
                 border: "none", borderRadius: 7, cursor: "pointer", textAlign: "left",
-                color: active === m.id ? "#fff" : "rgba(255,255,255,0.5)",
+                color: active === m.id ? "#f0ebe3" : "rgba(255,255,255,0.5)",
                 fontSize: 12, fontWeight: active === m.id ? 600 : 400,
                 marginBottom: 2, transition: "all 0.15s"
               }}>
@@ -1962,7 +1962,7 @@ var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundrai
               width: "100%", padding: "10px 12px", borderRadius: 8, cursor: "pointer", textAlign: "left",
               background: opOpen ? "rgba(181,161,133,0.15)" : "rgba(255,255,255,0.05)",
               border: "0.5px solid rgba(255,255,255,0.12)",
-              color: opOpen ? "#fff" : "rgba(255,255,255,0.5)",
+              color: opOpen ? "#f0ebe3" : "rgba(255,255,255,0.5)",
               fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s"
             }}>
               <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}>
