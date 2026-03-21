@@ -19,9 +19,7 @@ const modules = [
   { id: "events", label: "Events & Bookings", icon: "◈" },
   { id: "volunteers", label: "Volunteers", icon: "◎" },
   { id: "donors", label: "Donors & Donations", icon: "◇" },
-  { id: "marketing", label: "Marketing / Content", icon: "◰" },
-  { id: "financials", label: "Financials", icon: "◻" },
-  { id: "archival", label: "Archival / Objects", icon: "◫" },
+  { id: "marketing", label: "Marketing / Content", icon: "◰" },
   { id: "board", label: "Board Activity", icon: "◑" },
   { id: "strategy", label: "Strategic Plan", icon: "◈" },
 ];
@@ -983,47 +981,6 @@ function MarketingView() {
       />
     </div>
   );
-}function FinancialsView() {
-  return (
-    <div>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <StatCard label="Total Revenue Budget" value="$73,000" />
-        <StatCard label="Actual Revenue YTD" value="$45,100" sub="62% of goal" />
-        <StatCard label="Total Expense Budget" value="$30,000" />
-        <StatCard label="Actual Expenses YTD" value="$13,300" sub="44% spent" />
-      </div>
-      <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, overflow: "hidden" }}>
-        {mockData.financials.map((f, i) => (
-          <div key={i} style={{ padding: "14px 18px", borderBottom: i < mockData.financials.length - 1 ? "0.5px solid #f0ebe2" : "none" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: f.expense ? "#c0392b" : "#2a7a4b" }}>{f.category}</div>
-              <div style={{ fontSize: 12, color: "#888" }}>{f.actual} <span style={{ color: "#ccc" }}>/ {f.budget}</span></div>
-            </div>
-            <ProgressBar pct={f.pct} color={f.expense ? "#e57373" : gold} />
-            <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>{f.pct}% of budget</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ArchivalView() {
-  return (
-    <div>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <StatCard label="Total Objects" value="5" />
-        <StatCard label="Photographs" value="1" />
-        <StatCard label="Documents" value="2" />
-        <StatCard label="Artifacts" value="2" />
-      </div>
-      <Table
-        cols={["ID", "Name", "Type", "Condition", "Location"]}
-        rows={mockData.archival}
-        renderRow={r => (<><Td muted>{r.id}</Td><Td>{r.name}</Td><Td muted>{r.type}</Td><Td><Badge status={r.condition} /></Td><Td muted>{r.location}</Td></>)}
-      />
-    </div>
-  );
 }function BoardView() {
   return (
     <div>
@@ -1081,9 +1038,7 @@ const views = {
   events: EventsView,
   volunteers: VolunteersView,
   donors: DonorsView,
-  marketing: MarketingView,
-  financials: FinancialsView,
-  archival: ArchivalView,
+  marketing: MarketingView,
   board: BoardView,
   strategy: StrategyView,
 };function Dashboard() {
