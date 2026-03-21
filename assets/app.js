@@ -199,7 +199,7 @@
       });
     }, []);
     return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#5c3d1e", fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.8 } }, "Today \u2014 ", (/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })), /* @__PURE__ */ React.createElement("span", { style: { color: "#777", fontSize: 13 } }, "\u2014"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#888" } }, "Here's your organization at a glance."))), (function() {
-      var due = /* @__PURE__ */ new Date("2026-03-31");
+      var due = quarterDueDate(currentQuarterStr(), (/* @__PURE__ */ new Date()).getFullYear());
       var now = /* @__PURE__ */ new Date();
       now.setHours(0, 0, 0, 0);
       var days = Math.round((due - now) / 864e5);
@@ -1342,8 +1342,166 @@
       })));
     }));
   }
+  var CHALLENGE_OPTIONS = ["Capacity or volunteer limitations", "Budget or funding constraints", "Scheduling or timing issues", "Cross-area coordination gaps", "External factors", "Other"];
+  var SUPPORT_OPTIONS = ["Staff or volunteer help", "Marketing or communications", "Board guidance or decision", "Funding or fundraising support", "Facilities or logistics", "Other"];
+  function currentQuarterStr() {
+    var m = (/* @__PURE__ */ new Date()).getMonth();
+    return m <= 2 ? "Q1" : m <= 5 ? "Q2" : m <= 8 ? "Q3" : "Q4";
+  }
+  function quarterDueDate(q, yr) {
+    if (q === "Q1") return new Date(yr, 2, 31);
+    if (q === "Q2") return new Date(yr, 5, 30);
+    if (q === "Q3") return new Date(yr, 8, 30);
+    return new Date(yr, 11, 31);
+  }
+  function nextQ(q, yr) {
+    return q === "Q1" ? { q: "Q2", yr } : q === "Q2" ? { q: "Q3", yr } : q === "Q3" ? { q: "Q4", yr } : { q: "Q1", yr: yr + 1 };
+  }
   function QuarterlyView() {
-    return /* @__PURE__ */ React.createElement("div", { style: { color: "#777", fontSize: 12, padding: "40px 0" } }, "Quarterly update coming soon.");
+    var { useState: useState2, useEffect: useEffect2 } = React;
+    var cq = currentQuarterStr();
+    var cy = (/* @__PURE__ */ new Date()).getFullYear();
+    var [area, setArea] = useState2("");
+    var [quarter, setQuarter] = useState2(cq);
+    var [year, setYear] = useState2(cy);
+    var [currentGoals, setCurrentGoals] = useState2(null);
+    var emptyForm = { what_went_well: "", goal_1_status: "On Track", goal_1_summary: "", goal_2_status: "On Track", goal_2_summary: "", goal_3_status: "On Track", goal_3_summary: "", challenges: [], challenges_details: "", support_needed: [], support_details: "", other_notes: "", next_focus: "", goal_1: "", goal_2: "", goal_3: "" };
+    var [form, setForm] = useState2(emptyForm);
+    var [saving, setSaving] = useState2(false);
+    var [saved, setSaved] = useState2(false);
+    useEffect2(function() {
+      if (!area) return;
+      setCurrentGoals(null);
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Quarter Goals") + "?area=eq." + encodeURIComponent(area) + "&quarter=eq." + encodeURIComponent(quarter) + "&year=eq." + year + "&select=*", {
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+      }).then(function(r) {
+        return r.json();
+      }).then(function(rows) {
+        if (rows && rows[0]) setCurrentGoals(rows[0]);
+      });
+    }, [area, quarter, year]);
+    function toggleCheck(field, val) {
+      setForm(function(f) {
+        var arr = f[field];
+        var next = arr.indexOf(val) !== -1 ? arr.filter(function(x) {
+          return x !== val;
+        }) : arr.concat([val]);
+        var patch = {};
+        patch[field] = next;
+        return Object.assign({}, f, patch);
+      });
+    }
+    function handleSubmit(e) {
+      e.preventDefault();
+      setSaving(true);
+      var nq = nextQ(quarter, year);
+      var payload = { area, quarter, year, date_submitted: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10), successes: form.what_went_well, goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary, challenges: form.challenges, challenges_details: form.challenges_details, support_needed: form.support_needed, support_details: form.support_details, other_notes: form.other_notes, next_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3 };
+      var currentGoalsUpdate = currentGoals ? fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Quarter Goals") + "?id=eq." + currentGoals.id, {
+        method: "PATCH",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary })
+      }) : Promise.resolve();
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Quarterly Updates"), {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify(payload)
+      }).then(function(r) {
+        return r.json();
+      }).then(function() {
+        var goalsPayload = { area, quarter: nq.q, year: nq.yr, primary_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3 };
+        return Promise.all([
+          fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Quarter Goals"), {
+            method: "POST",
+            headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" },
+            body: JSON.stringify(goalsPayload)
+          }),
+          currentGoalsUpdate
+        ]);
+      }).then(function() {
+        setSaving(false);
+        setSaved(true);
+        setForm(emptyForm);
+        setTimeout(function() {
+          setSaved(false);
+        }, 4e3);
+      });
+    }
+    var secStyle = { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 10, marginTop: 4, display: "block" };
+    var inpStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: "border-box", fontFamily: "system-ui, sans-serif", background: "#fff" };
+    var grp = { marginBottom: 14 };
+    var card = { background: "#fff", border: "0.5px solid #e8e0d5", borderRadius: 10, padding: "20px 24px", marginBottom: 16 };
+    var lbl = { fontSize: 12, color: "#666", fontWeight: 500 };
+    var nqLabel = nextQ(quarter, year).q + " " + nextQ(quarter, year).yr;
+    return /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 680 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#faf8f5", border: "0.5px solid #e8e0d5", borderRadius: 10, padding: "14px 20px", marginBottom: 20, fontSize: 13, color: "#777", lineHeight: 1.6 } }, "Share quarterly progress, challenges, and support needs for each focus area."), /* @__PURE__ */ React.createElement("form", { onSubmit: handleSubmit }, /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Area & Period"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Organizational Area *"), /* @__PURE__ */ React.createElement("select", { required: true, value: area, onChange: function(e) {
+      setArea(e.target.value);
+    }, style: inpStyle }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select area..."), OPERATIONAL_AREAS.map(function(a) {
+      return /* @__PURE__ */ React.createElement("option", { key: a }, a);
+    }))), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Quarter *"), /* @__PURE__ */ React.createElement("select", { required: true, value: quarter, onChange: function(e) {
+      setQuarter(e.target.value);
+    }, style: inpStyle }, /* @__PURE__ */ React.createElement("option", null, "Q1"), /* @__PURE__ */ React.createElement("option", null, "Q2"), /* @__PURE__ */ React.createElement("option", null, "Q3"), /* @__PURE__ */ React.createElement("option", null, "Q4"))), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Year"), /* @__PURE__ */ React.createElement("input", { type: "number", value: year, onChange: function(e) {
+      setYear(parseInt(e.target.value) || cy);
+    }, style: inpStyle }))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Date Submitted"), /* @__PURE__ */ React.createElement("input", { readOnly: true, value: (/* @__PURE__ */ new Date()).toLocaleDateString("en-US"), style: Object.assign({}, inpStyle, { background: "#f9f7f4", color: "#999" }) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Due Date"), /* @__PURE__ */ React.createElement("input", { readOnly: true, value: quarterDueDate(quarter, year).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }), style: Object.assign({}, inpStyle, { background: "#f9f7f4", color: "#999" }) }))), currentGoals && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 14, padding: "12px 14px", background: "#faf8f5", borderRadius: 6, borderLeft: "3px solid " + gold } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: gold, fontWeight: 600, marginBottom: 4 } }, "Current ", quarter, " Goals"), currentGoals.primary_focus && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", marginTop: 4 } }, currentGoals.primary_focus))), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Goal Progress"), currentGoals ? [["goal_1", "goal_1_status", "goal_1_summary"], ["goal_2", "goal_2_status", "goal_2_summary"], ["goal_3", "goal_3_status", "goal_3_summary"]].map(function(keys, i) {
+      var goalText = currentGoals[keys[0]];
+      if (!goalText) return null;
+      var statusKey = keys[1];
+      var summaryKey = keys[2];
+      var statusColors2 = { "On Track": { bg: "#eaf3ea", color: "#3a7d3a" }, "Behind": { bg: "#fff3e0", color: "#c07040" }, "Complete": { bg: "#e8f5e9", color: "#2e7d32" }, "At Risk": { bg: "#fdecea", color: "#c62828" } };
+      var sc = statusColors2[form[statusKey]] || statusColors2["On Track"];
+      return /* @__PURE__ */ React.createElement("div", { key: keys[0], style: { borderBottom: i < 2 ? "0.5px solid #f0ece6" : "none", paddingBottom: 14, marginBottom: i < 2 ? 14 : 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#2a2a2a", fontWeight: 500, marginBottom: 8 } }, i + 1, ". ", goalText), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "160px 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Status"), /* @__PURE__ */ React.createElement("select", { value: form[statusKey], onChange: function(e) {
+        var v = e.target.value;
+        setForm(function(f) {
+          var p = {};
+          p[statusKey] = v;
+          return Object.assign({}, f, p);
+        });
+      }, style: Object.assign({}, inpStyle, { background: sc.bg, color: sc.color, fontWeight: 600 }) }, /* @__PURE__ */ React.createElement("option", null, "On Track"), /* @__PURE__ */ React.createElement("option", null, "Behind"), /* @__PURE__ */ React.createElement("option", null, "At Risk"), /* @__PURE__ */ React.createElement("option", null, "Complete"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Progress Summary"), /* @__PURE__ */ React.createElement("input", { value: form[summaryKey], onChange: function(e) {
+        var v = e.target.value;
+        setForm(function(f) {
+          var p = {};
+          p[summaryKey] = v;
+          return Object.assign({}, f, p);
+        });
+      }, style: inpStyle, placeholder: "Brief update on this goal..." }))));
+    }) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#bbb", fontStyle: "italic" } }, "Select an area and quarter to update goal statuses.")), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "What Went Well"), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Successes & Forward Movement"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginBottom: 2 } }, "Goals achieved and measurable progress this quarter."), /* @__PURE__ */ React.createElement("textarea", { value: form.what_went_well, onChange: function(e) {
+      setForm(function(f) {
+        return Object.assign({}, f, { what_went_well: e.target.value });
+      });
+    }, rows: 4, style: Object.assign({}, inpStyle, { resize: "vertical" }) }))), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Challenges Encountered"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 } }, CHALLENGE_OPTIONS.map(function(opt) {
+      var on = form.challenges.indexOf(opt) !== -1;
+      return /* @__PURE__ */ React.createElement("label", { key: opt, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, cursor: "pointer", padding: "5px 10px", borderRadius: 5, border: "0.5px solid " + (on ? gold : "#e0d8cc"), background: on ? "#faf5ee" : "#fff", color: on ? "#7a5c30" : "#555", userSelect: "none" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: on, onChange: function() {
+        toggleCheck("challenges", opt);
+      }, style: { display: "none" } }), on && /* @__PURE__ */ React.createElement("span", { style: { color: gold } }, "\u2713 "), opt);
+    })), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Details"), /* @__PURE__ */ React.createElement("textarea", { value: form.challenges_details, onChange: function(e) {
+      setForm(function(f) {
+        return Object.assign({}, f, { challenges_details: e.target.value });
+      });
+    }, rows: 3, style: Object.assign({}, inpStyle, { resize: "vertical" }) }))), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Support Needed to Stay on Track"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 } }, SUPPORT_OPTIONS.map(function(opt) {
+      var on = form.support_needed.indexOf(opt) !== -1;
+      return /* @__PURE__ */ React.createElement("label", { key: opt, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, cursor: "pointer", padding: "5px 10px", borderRadius: 5, border: "0.5px solid " + (on ? gold : "#e0d8cc"), background: on ? "#faf5ee" : "#fff", color: on ? "#7a5c30" : "#555", userSelect: "none" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: on, onChange: function() {
+        toggleCheck("support_needed", opt);
+      }, style: { display: "none" } }), on && /* @__PURE__ */ React.createElement("span", { style: { color: gold } }, "\u2713 "), opt);
+    })), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Details"), /* @__PURE__ */ React.createElement("textarea", { value: form.support_details, onChange: function(e) {
+      setForm(function(f) {
+        return Object.assign({}, f, { support_details: e.target.value });
+      });
+    }, rows: 3, style: Object.assign({}, inpStyle, { resize: "vertical" }) }))), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Other Notes"), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Decisions or approvals needed"), /* @__PURE__ */ React.createElement("textarea", { value: form.other_notes, onChange: function(e) {
+      setForm(function(f) {
+        return Object.assign({}, f, { other_notes: e.target.value });
+      });
+    }, rows: 3, style: Object.assign({}, inpStyle, { resize: "vertical" }) }))), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Next Quarter Focus & Goals"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginBottom: 12 } }, "These will auto-populate as ", nqLabel, " goals for ", area || "this area", "."), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Primary Focus for Next Quarter"), /* @__PURE__ */ React.createElement("input", { value: form.next_focus, onChange: function(e) {
+      setForm(function(f) {
+        return Object.assign({}, f, { next_focus: e.target.value });
+      });
+    }, style: inpStyle, placeholder: "Primary focus..." })), ["goal_1", "goal_2", "goal_3"].map(function(key, i) {
+      return /* @__PURE__ */ React.createElement("div", { key, style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, i + 1, "."), /* @__PURE__ */ React.createElement("input", { value: form[key], onChange: function(e) {
+        var v = e.target.value;
+        setForm(function(f) {
+          var p = {};
+          p[key] = v;
+          return Object.assign({}, f, p);
+        });
+      }, style: inpStyle, placeholder: "Goal " + (i + 1) + "..." }));
+    })), /* @__PURE__ */ React.createElement("button", { type: "submit", disabled: saving || !area, style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "12px 32px", fontSize: 14, fontWeight: 600, cursor: saving || !area ? "not-allowed" : "pointer", opacity: saving || !area ? 0.6 : 1, width: "100%", marginBottom: 8 } }, saving ? "Submitting..." : "Submit Quarterly Update"), saved && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#2e7d32", fontSize: 13, fontWeight: 600, padding: 8 } }, "Submitted! Next quarter goals saved.")));
   }
   function OperationalView({ opArea }) {
     var { useState: useState2, useEffect: useEffect2 } = React;
@@ -1361,11 +1519,21 @@
     var [noteEdit, setNoteEdit] = useState2(null);
     var [noteVal, setNoteVal] = useState2("");
     var [noteSaving, setNoteSaving] = useState2(null);
+    var [quarterGoals, setQuarterGoals] = useState2(null);
+    var cq = currentQuarterStr();
     useEffect2(function() {
       setAreaInfo(null);
       setBudget([]);
       setVols([]);
+      setQuarterGoals(null);
       setEditLead(false);
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Quarter Goals") + "?area=eq." + encodeURIComponent(area) + "&quarter=eq." + encodeURIComponent(cq) + "&year=eq." + (/* @__PURE__ */ new Date()).getFullYear() + "&select=*", {
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+      }).then(function(r) {
+        return r.json();
+      }).then(function(rows) {
+        if (rows && rows[0]) setQuarterGoals(rows[0]);
+      });
       fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Operational Areas") + "?area=eq." + encodeURIComponent(area) + "&select=*", {
         headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
       }).then(function(r) {
@@ -1501,7 +1669,15 @@
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: "#2a2a2a" } }, vols.length),
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 4 } }, "assigned to ", area),
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 } }, "View / Add notes \u2192")
-    ))), showBudget && /* @__PURE__ */ React.createElement("div", { onClick: function() {
+    ))), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 12, padding: "18px 24px", border: "0.5px solid #e8e0d5", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 } }, cq, " ", (/* @__PURE__ */ new Date()).getFullYear(), " Goals"), quarterGoals ? /* @__PURE__ */ React.createElement("div", null, quarterGoals.primary_focus && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "#2a2a2a", marginBottom: 12 } }, quarterGoals.primary_focus), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, [["goal_1", "goal_1_status", "goal_1_summary"], ["goal_2", "goal_2_status", "goal_2_summary"], ["goal_3", "goal_3_status", "goal_3_summary"]].map(function(keys, i) {
+      var g = quarterGoals[keys[0]];
+      if (!g) return null;
+      var st = quarterGoals[keys[1]];
+      var sm = quarterGoals[keys[2]];
+      var stColors = { "On Track": { bg: "#eaf3ea", color: "#3a7d3a" }, "Behind": { bg: "#fff3e0", color: "#c07040" }, "Complete": { bg: "#e8f5e9", color: "#2e7d32" }, "At Risk": { bg: "#fdecea", color: "#c62828" } };
+      var sc = st && stColors[st] ? stColors[st] : null;
+      return /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { color: gold, fontWeight: 600, flexShrink: 0, marginTop: 1 } }, i + 1, "."), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { color: "#2a2a2a", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", null, g), sc && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: sc.bg, color: sc.color, flexShrink: 0 } }, st)), sm && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777", marginTop: 2 } }, sm)));
+    }))) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ccc", fontStyle: "italic" } }, "No goals set for ", cq, " yet. Submit a quarterly update to populate.")), showBudget && /* @__PURE__ */ React.createElement("div", { onClick: function() {
       setShowBudget(false);
     }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1010, padding: 20 } }, /* @__PURE__ */ React.createElement("div", { onClick: function(e) {
       e.stopPropagation();

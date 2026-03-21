@@ -257,7 +257,7 @@ const typeColors = {
       </div>
 
       {(function() {
-        var due = new Date('2026-03-31');
+        var due = quarterDueDate(currentQuarterStr(), new Date().getFullYear());
         var now = new Date(); now.setHours(0,0,0,0);
         var days = Math.round((due - now) / 86400000);
         var dueStr = due.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -1673,10 +1673,235 @@ function StrategyView() {
   );
 }
 
+var CHALLENGE_OPTIONS = ['Capacity or volunteer limitations','Budget or funding constraints','Scheduling or timing issues','Cross-area coordination gaps','External factors','Other'];
+var SUPPORT_OPTIONS = ['Staff or volunteer help','Marketing or communications','Board guidance or decision','Funding or fundraising support','Facilities or logistics','Other'];
+
+function currentQuarterStr() { var m = new Date().getMonth(); return m <= 2 ? 'Q1' : m <= 5 ? 'Q2' : m <= 8 ? 'Q3' : 'Q4'; }
+function quarterDueDate(q, yr) {
+  if (q === 'Q1') return new Date(yr, 2, 31);
+  if (q === 'Q2') return new Date(yr, 5, 30);
+  if (q === 'Q3') return new Date(yr, 8, 30);
+  return new Date(yr, 11, 31);
+}
+function nextQ(q, yr) { return q === 'Q1' ? {q:'Q2',yr:yr} : q === 'Q2' ? {q:'Q3',yr:yr} : q === 'Q3' ? {q:'Q4',yr:yr} : {q:'Q1',yr:yr+1}; }
+
 function QuarterlyView() {
+  var { useState, useEffect } = React;
+  var cq = currentQuarterStr();
+  var cy = new Date().getFullYear();
+  var [area, setArea] = useState('');
+  var [quarter, setQuarter] = useState(cq);
+  var [year, setYear] = useState(cy);
+  var [currentGoals, setCurrentGoals] = useState(null);
+  var emptyForm = { what_went_well: '', goal_1_status: 'On Track', goal_1_summary: '', goal_2_status: 'On Track', goal_2_summary: '', goal_3_status: 'On Track', goal_3_summary: '', challenges: [], challenges_details: '', support_needed: [], support_details: '', other_notes: '', next_focus: '', goal_1: '', goal_2: '', goal_3: '' };
+  var [form, setForm] = useState(emptyForm);
+  var [saving, setSaving] = useState(false);
+  var [saved, setSaved] = useState(false);
+
+  useEffect(function() {
+    if (!area) return;
+    setCurrentGoals(null);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(quarter) + '&year=eq.' + year + '&select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (rows && rows[0]) setCurrentGoals(rows[0]);
+    });
+  }, [area, quarter, year]);
+
+  function toggleCheck(field, val) {
+    setForm(function(f) {
+      var arr = f[field];
+      var next = arr.indexOf(val) !== -1 ? arr.filter(function(x) { return x !== val; }) : arr.concat([val]);
+      var patch = {}; patch[field] = next;
+      return Object.assign({}, f, patch);
+    });
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    setSaving(true);
+    var nq = nextQ(quarter, year);
+    var payload = { area: area, quarter: quarter, year: year, date_submitted: new Date().toISOString().slice(0,10), successes: form.what_went_well, goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary, challenges: form.challenges, challenges_details: form.challenges_details, support_needed: form.support_needed, support_details: form.support_details, other_notes: form.other_notes, next_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3 };
+    var currentGoalsUpdate = currentGoals ? fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?id=eq.' + currentGoals.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary })
+    }) : Promise.resolve();
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function() {
+      var goalsPayload = { area: area, quarter: nq.q, year: nq.yr, primary_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3 };
+      return Promise.all([
+        fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals'), {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
+          body: JSON.stringify(goalsPayload)
+        }),
+        currentGoalsUpdate
+      ]);
+    }).then(function() {
+      setSaving(false); setSaved(true); setForm(emptyForm);
+      setTimeout(function() { setSaved(false); }, 4000);
+    });
+  }
+
+  var secStyle = { fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 10, marginTop: 4, display: 'block' };
+  var inpStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+  var grp = { marginBottom: 14 };
+  var card = { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '20px 24px', marginBottom: 16 };
+  var lbl = { fontSize: 12, color: '#666', fontWeight: 500 };
+  var nqLabel = nextQ(quarter, year).q + ' ' + nextQ(quarter, year).yr;
+
   return (
-    <div style={{ color: '#777', fontSize: 12, padding: '40px 0' }}>
-      Quarterly update coming soon.
+    <div style={{ maxWidth: 680 }}>
+      <div style={{ background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 20px', marginBottom: 20, fontSize: 13, color: '#777', lineHeight: 1.6 }}>
+        Share quarterly progress, challenges, and support needs for each focus area.
+      </div>
+      <form onSubmit={handleSubmit}>
+        <div style={card}>
+          <span style={secStyle}>Area & Period</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div style={grp}>
+              <label style={lbl}>Organizational Area *</label>
+              <select required value={area} onChange={function(e) { setArea(e.target.value); }} style={inpStyle}>
+                <option value="">Select area...</option>
+                {OPERATIONAL_AREAS.map(function(a) { return <option key={a}>{a}</option>; })}
+              </select>
+            </div>
+            <div style={grp}>
+              <label style={lbl}>Quarter *</label>
+              <select required value={quarter} onChange={function(e) { setQuarter(e.target.value); }} style={inpStyle}>
+                <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+              </select>
+            </div>
+            <div style={grp}>
+              <label style={lbl}>Year</label>
+              <input type="number" value={year} onChange={function(e) { setYear(parseInt(e.target.value) || cy); }} style={inpStyle} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div><label style={lbl}>Date Submitted</label><input readOnly value={new Date().toLocaleDateString('en-US')} style={Object.assign({}, inpStyle, { background: '#f9f7f4', color: '#999' })} /></div>
+            <div><label style={lbl}>Due Date</label><input readOnly value={quarterDueDate(quarter, year).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} style={Object.assign({}, inpStyle, { background: '#f9f7f4', color: '#999' })} /></div>
+          </div>
+          {currentGoals && (
+            <div style={{ marginTop: 14, padding: '12px 14px', background: '#faf8f5', borderRadius: 6, borderLeft: '3px solid ' + gold }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: gold, fontWeight: 600, marginBottom: 4 }}>Current {quarter} Goals</div>
+              {currentGoals.primary_focus && <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginTop: 4 }}>{currentGoals.primary_focus}</div>}
+            </div>
+          )}
+        </div>
+
+        <div style={card}>
+          <span style={secStyle}>Goal Progress</span>
+          {currentGoals ? (
+            [['goal_1','goal_1_status','goal_1_summary'], ['goal_2','goal_2_status','goal_2_summary'], ['goal_3','goal_3_status','goal_3_summary']].map(function(keys, i) {
+              var goalText = currentGoals[keys[0]];
+              if (!goalText) return null;
+              var statusKey = keys[1]; var summaryKey = keys[2];
+              var statusColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
+              var sc = statusColors[form[statusKey]] || statusColors['On Track'];
+              return (
+                <div key={keys[0]} style={{ borderBottom: i < 2 ? '0.5px solid #f0ece6' : 'none', paddingBottom: 14, marginBottom: i < 2 ? 14 : 0 }}>
+                  <div style={{ fontSize: 13, color: '#2a2a2a', fontWeight: 500, marginBottom: 8 }}>{i+1}. {goalText}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 10 }}>
+                    <div>
+                      <label style={lbl}>Status</label>
+                      <select value={form[statusKey]} onChange={function(e) { var v = e.target.value; setForm(function(f) { var p = {}; p[statusKey] = v; return Object.assign({}, f, p); }); }} style={Object.assign({}, inpStyle, { background: sc.bg, color: sc.color, fontWeight: 600 })}>
+                        <option>On Track</option><option>Behind</option><option>At Risk</option><option>Complete</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={lbl}>Progress Summary</label>
+                      <input value={form[summaryKey]} onChange={function(e) { var v = e.target.value; setForm(function(f) { var p = {}; p[summaryKey] = v; return Object.assign({}, f, p); }); }} style={inpStyle} placeholder="Brief update on this goal..." />
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div style={{ fontSize: 13, color: '#bbb', fontStyle: 'italic' }}>Select an area and quarter to update goal statuses.</div>
+          )}
+        </div>
+
+        <div style={card}>
+          <span style={secStyle}>What Went Well</span>
+          <div style={grp}>
+            <label style={lbl}>Successes & Forward Movement</label>
+            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>Goals achieved and measurable progress this quarter.</div>
+            <textarea value={form.what_went_well} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { what_went_well: e.target.value }); }); }} rows={4} style={Object.assign({}, inpStyle, { resize: 'vertical' })} />
+          </div>
+        </div>
+
+        <div style={card}>
+          <span style={secStyle}>Challenges Encountered</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            {CHALLENGE_OPTIONS.map(function(opt) {
+              var on = form.challenges.indexOf(opt) !== -1;
+              return (
+                <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', padding: '5px 10px', borderRadius: 5, border: '0.5px solid ' + (on ? gold : '#e0d8cc'), background: on ? '#faf5ee' : '#fff', color: on ? '#7a5c30' : '#555', userSelect: 'none' }}>
+                  <input type="checkbox" checked={on} onChange={function() { toggleCheck('challenges', opt); }} style={{ display: 'none' }} />
+                  {on && <span style={{ color: gold }}>✓ </span>}{opt}
+                </label>
+              );
+            })}
+          </div>
+          <div style={grp}>
+            <label style={lbl}>Details</label>
+            <textarea value={form.challenges_details} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { challenges_details: e.target.value }); }); }} rows={3} style={Object.assign({}, inpStyle, { resize: 'vertical' })} />
+          </div>
+        </div>
+
+        <div style={card}>
+          <span style={secStyle}>Support Needed to Stay on Track</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            {SUPPORT_OPTIONS.map(function(opt) {
+              var on = form.support_needed.indexOf(opt) !== -1;
+              return (
+                <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', padding: '5px 10px', borderRadius: 5, border: '0.5px solid ' + (on ? gold : '#e0d8cc'), background: on ? '#faf5ee' : '#fff', color: on ? '#7a5c30' : '#555', userSelect: 'none' }}>
+                  <input type="checkbox" checked={on} onChange={function() { toggleCheck('support_needed', opt); }} style={{ display: 'none' }} />
+                  {on && <span style={{ color: gold }}>✓ </span>}{opt}
+                </label>
+              );
+            })}
+          </div>
+          <div style={grp}>
+            <label style={lbl}>Details</label>
+            <textarea value={form.support_details} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { support_details: e.target.value }); }); }} rows={3} style={Object.assign({}, inpStyle, { resize: 'vertical' })} />
+          </div>
+        </div>
+
+        <div style={card}>
+          <span style={secStyle}>Other Notes</span>
+          <div style={grp}>
+            <label style={lbl}>Decisions or approvals needed</label>
+            <textarea value={form.other_notes} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { other_notes: e.target.value }); }); }} rows={3} style={Object.assign({}, inpStyle, { resize: 'vertical' })} />
+          </div>
+        </div>
+
+        <div style={card}>
+          <span style={secStyle}>Next Quarter Focus & Goals</span>
+          <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>These will auto-populate as {nqLabel} goals for {area || 'this area'}.</div>
+          <div style={grp}>
+            <label style={lbl}>Primary Focus for Next Quarter</label>
+            <input value={form.next_focus} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { next_focus: e.target.value }); }); }} style={inpStyle} placeholder="Primary focus..." />
+          </div>
+          {['goal_1','goal_2','goal_3'].map(function(key, i) {
+            return (
+              <div key={key} style={grp}>
+                <label style={lbl}>{i+1}.</label>
+                <input value={form[key]} onChange={function(e) { var v = e.target.value; setForm(function(f) { var p = {}; p[key] = v; return Object.assign({}, f, p); }); }} style={inpStyle} placeholder={'Goal ' + (i+1) + '...'} />
+              </div>
+            );
+          })}
+        </div>
+
+        <button type="submit" disabled={saving || !area} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '12px 32px', fontSize: 14, fontWeight: 600, cursor: saving || !area ? 'not-allowed' : 'pointer', opacity: (saving || !area) ? 0.6 : 1, width: '100%', marginBottom: 8 }}>
+          {saving ? 'Submitting...' : 'Submit Quarterly Update'}
+        </button>
+        {saved && <div style={{ textAlign: 'center', color: '#2e7d32', fontSize: 13, fontWeight: 600, padding: 8 }}>Submitted! Next quarter goals saved.</div>}
+      </form>
     </div>
   );
 }
@@ -1697,12 +1922,20 @@ function OperationalView({ opArea }) {
   var [noteEdit, setNoteEdit] = useState(null);
   var [noteVal, setNoteVal] = useState('');
   var [noteSaving, setNoteSaving] = useState(null);
+  var [quarterGoals, setQuarterGoals] = useState(null);
+  var cq = currentQuarterStr();
 
   useEffect(function() {
     setAreaInfo(null);
     setBudget([]);
     setVols([]);
+    setQuarterGoals(null);
     setEditLead(false);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(cq) + '&year=eq.' + new Date().getFullYear() + '&select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (rows && rows[0]) setQuarterGoals(rows[0]);
+    });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Operational Areas') + '?area=eq.' + encodeURIComponent(area) + '&select=*', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
@@ -1811,6 +2044,37 @@ function OperationalView({ opArea }) {
             <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add notes →</div>
           </div>
         </div>
+      </div>
+      <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5', marginBottom: 20 }}>
+        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 }}>{cq} {new Date().getFullYear()} Goals</div>
+        {quarterGoals ? (
+          <div>
+            {quarterGoals.primary_focus && <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 12 }}>{quarterGoals.primary_focus}</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[['goal_1','goal_1_status','goal_1_summary'],['goal_2','goal_2_status','goal_2_summary'],['goal_3','goal_3_status','goal_3_summary']].map(function(keys, i) {
+                var g = quarterGoals[keys[0]]; if (!g) return null;
+                var st = quarterGoals[keys[1]];
+                var sm = quarterGoals[keys[2]];
+                var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
+                var sc = st && stColors[st] ? stColors[st] : null;
+                return (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13 }}>
+                    <span style={{ color: gold, fontWeight: 600, flexShrink: 0, marginTop: 1 }}>{i+1}.</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: '#2a2a2a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span>{g}</span>
+                        {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: sc.bg, color: sc.color, flexShrink: 0 }}>{st}</span>}
+                      </div>
+                      {sm && <div style={{ fontSize: 12, color: '#777', marginTop: 2 }}>{sm}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No goals set for {cq} yet. Submit a quarterly update to populate.</div>
+        )}
       </div>
 
       {showBudget && (
