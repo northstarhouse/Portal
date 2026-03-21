@@ -721,7 +721,7 @@ var App = (() => {
     const [loading, setLoading] = React.useState(true);
     const [loadError, setLoadError] = React.useState(null);
     const [topicForm, setTopicForm] = React.useState({ title: "", description: "", attachment_url: "", submitted_by: "", due_date: "", meeting_date: "" });
-    const [voteForm, setVoteForm] = React.useState({ member: "", vote: "", note: "" });
+    const [voteForm, setVoteForm] = React.useState({ voter: "", choice: "", note: "" });
     const [voteSaving, setVoteSaving] = React.useState(false);
     const [topicSaving, setTopicSaving] = React.useState(false);
     const [attachUploading, setAttachUploading] = React.useState(false);
@@ -791,14 +791,14 @@ var App = (() => {
     }, []);
     function itemVotes(item) {
       return votes.filter(function(v) {
-        return v.topic_id === item.id;
+        return v.topicId === item.id;
       });
     }
     function isRevealed(item) {
       var iv = itemVotes(item);
       var allVoted = BOARD_MEMBERS.every(function(m) {
         return iv.some(function(v) {
-          return v.member === m;
+          return v.voter === m;
         });
       });
       var pastDue = item.due_date && new Date(item.due_date) < /* @__PURE__ */ new Date();
@@ -808,29 +808,29 @@ var App = (() => {
       var iv = itemVotes(item);
       return {
         yes: iv.filter(function(v) {
-          return v.vote === "Yes";
+          return v.choice === "Yes";
         }).length,
         no: iv.filter(function(v) {
-          return v.vote === "No";
+          return v.choice === "No";
         }).length,
         abstain: iv.filter(function(v) {
-          return v.vote === "Abstain";
+          return v.choice === "Abstain";
         }).length,
         absent: iv.filter(function(v) {
-          return v.vote === "Not in attendance";
+          return v.choice === "Not in attendance";
         }).length
       };
     }
     function handleVoteSubmit(e) {
       e.preventDefault();
-      if (!voteForm.member || !voteForm.vote) return;
+      if (!voteForm.voter || !voteForm.choice) return;
       setVoteSaving(true);
       var existing = votes.find(function(v) {
-        return v.topic_id === selected.id && v.member === voteForm.member;
+        return v.topicId === selected.id && v.voter === voteForm.voter;
       });
       var today = (/* @__PURE__ */ new Date()).toDateString();
       var isInMeeting = selected.meeting_date && (/* @__PURE__ */ new Date(selected.meeting_date + "T12:00:00")).toDateString() === today;
-      var payload = { topic_id: selected.id, member: voteForm.member, vote: voteForm.vote, note: voteForm.note || null };
+      var payload = { topicId: selected.id, voter: voteForm.voter, choice: voteForm.choice, note: voteForm.note || null };
       var prom;
       if (existing) {
         prom = sbPatchById("Board-Votes", existing.id, Object.assign({}, payload, { changed_in_meeting: isInMeeting ? true : existing.changed_in_meeting || false }));
@@ -839,7 +839,7 @@ var App = (() => {
       }
       prom.then(function() {
         setVoteSaving(false);
-        setVoteForm({ member: "", vote: "", note: "" });
+        setVoteForm({ voter: "", choice: "", note: "" });
         load();
       });
     }
@@ -885,7 +885,7 @@ var App = (() => {
           key: item.id,
           onClick: function() {
             setSelected(item);
-            setVoteForm({ member: "", vote: "", note: "" });
+            setVoteForm({ voter: "", choice: "", note: "" });
           },
           style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 12, padding: "16px 20px", cursor: "pointer", transition: "box-shadow 0.15s" },
           onMouseEnter: function(e) {
@@ -915,25 +915,25 @@ var App = (() => {
       });
     })()), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 10 } }, "Individual Votes"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 } }, BOARD_MEMBERS.map(function(m) {
       var mv = itemVotes(selected).find(function(v) {
-        return v.member === m;
+        return v.voter === m;
       });
       if (!mv) return /* @__PURE__ */ React.createElement("div", { key: m, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#fafafa", borderRadius: 8, fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#2a2a2a", fontWeight: 500 } }, m), /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc", fontSize: 12 } }, "No vote"));
-      var vc = VOTE_COLORS[mv.vote] || { bg: "#f5f5f5", color: "#888" };
-      return /* @__PURE__ */ React.createElement("div", { key: m, style: { padding: "8px 12px", background: "#fafafa", borderRadius: 8, fontSize: 13 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#2a2a2a", fontWeight: 500 } }, m), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, mv.changed_in_meeting && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#e65100", fontStyle: "italic" } }, "Changed in meeting"), /* @__PURE__ */ React.createElement("span", { style: { background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 20 } }, mv.vote))), mv.note && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777", marginTop: 4, fontStyle: "italic" } }, mv.note));
+      var vc = VOTE_COLORS[mv.choice] || { bg: "#f5f5f5", color: "#888" };
+      return /* @__PURE__ */ React.createElement("div", { key: m, style: { padding: "8px 12px", background: "#fafafa", borderRadius: 8, fontSize: 13 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#2a2a2a", fontWeight: 500 } }, m), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, mv.changed_in_meeting && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#e65100", fontStyle: "italic" } }, "Changed in meeting"), /* @__PURE__ */ React.createElement("span", { style: { background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 20 } }, mv.choice))), mv.note && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777", marginTop: 4, fontStyle: "italic" } }, mv.note));
     }))) : /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 8 } }, "Results locked \xB7 ", itemVotes(selected).length, "/", BOARD_MEMBERS.length, " voted"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, BOARD_MEMBERS.map(function(m) {
       var voted = itemVotes(selected).some(function(v) {
-        return v.member === m;
+        return v.voter === m;
       });
       return /* @__PURE__ */ React.createElement("span", { key: m, style: { fontSize: 12, padding: "3px 10px", borderRadius: 20, background: voted ? "#e8f5e9" : "#f5f5f5", color: voted ? "#2e7d32" : "#aaa", fontWeight: 500 } }, voted ? "\u2713 " : "", m);
-    }))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid #f0ebe2", paddingTop: 16, marginTop: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 12 } }, "Cast / Update Vote"), /* @__PURE__ */ React.createElement("form", { onSubmit: handleVoteSubmit }, /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Board Member"), /* @__PURE__ */ React.createElement("select", { value: voteForm.member, onChange: function(e) {
+    }))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid #f0ebe2", paddingTop: 16, marginTop: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 12 } }, "Cast / Update Vote"), /* @__PURE__ */ React.createElement("form", { onSubmit: handleVoteSubmit }, /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Board Member"), /* @__PURE__ */ React.createElement("select", { value: voteForm.voter, onChange: function(e) {
       setVoteForm(function(f) {
-        return Object.assign({}, f, { member: e.target.value });
+        return Object.assign({}, f, { voter: e.target.value });
       });
     }, style: bInp }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select name\u2026"), BOARD_MEMBERS.map(function(m) {
       return /* @__PURE__ */ React.createElement("option", { key: m, value: m }, m);
     }))), /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Vote"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" } }, ["Yes", "No", "Abstain", "Not in attendance"].map(function(opt) {
       var vc = VOTE_COLORS[opt];
-      var active = voteForm.vote === opt;
+      var active = voteForm.choice === opt;
       return /* @__PURE__ */ React.createElement(
         "button",
         {
@@ -941,7 +941,7 @@ var App = (() => {
           type: "button",
           onClick: function() {
             setVoteForm(function(f) {
-              return Object.assign({}, f, { vote: opt });
+              return Object.assign({}, f, { choice: opt });
             });
           },
           style: { padding: "7px 14px", borderRadius: 20, border: "1.5px solid " + (active ? vc.color : "#e0d8cc"), background: active ? vc.bg : "#fff", color: active ? vc.color : "#888", fontSize: 13, fontWeight: active ? 600 : 400, cursor: "pointer", transition: "all 0.15s" }
@@ -956,8 +956,8 @@ var App = (() => {
       "button",
       {
         type: "submit",
-        disabled: voteSaving || !voteForm.member || !voteForm.vote,
-        style: { width: "100%", background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: voteSaving || !voteForm.member || !voteForm.vote ? 0.6 : 1 }
+        disabled: voteSaving || !voteForm.voter || !voteForm.choice,
+        style: { width: "100%", background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: voteSaving || !voteForm.voter || !voteForm.choice ? 0.6 : 1 }
       },
       voteSaving ? "Saving\u2026" : "Submit Vote"
     ))))), showAdd && /* @__PURE__ */ React.createElement("div", { onClick: function() {
