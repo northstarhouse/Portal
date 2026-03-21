@@ -48,12 +48,12 @@ const gold = "#886c44";
 const cream = "#f8f4ec";
 
 const modules = [
-  { id: "home", label: "Overview", icon: "⌂" },
-  { id: "quarterly", label: "Quarterly Update", icon: "◉" },
-  { id: "volunteers", label: "Volunteers", icon: "◎" },
-  { id: "donors", label: "Donors & Donations", icon: "◇" },
-  { id: "board", label: "Board Voting", icon: "◑" },
-  { id: "strategy", label: "Strategic Goal Progress", icon: "◈" },
+  { id: "home", label: "Overview", icon: "🏡" },
+  { id: "quarterly", label: "Quarterly Update", icon: "📋" },
+  { id: "volunteers", label: "Volunteers", icon: "👥" },
+  { id: "donors", label: "Donors & Donations", icon: "🤝" },
+  { id: "board", label: "Board Voting", icon: "🗳️" },
+  { id: "strategy", label: "Strategic Goal Progress", icon: "🎯" },
 ];
 
 const mockData = {

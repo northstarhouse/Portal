@@ -47,12 +47,12 @@
   var gold = "#886c44";
   var cream = "#f8f4ec";
   var modules = [
-    { id: "home", label: "Overview", icon: "\u2302" },
-    { id: "quarterly", label: "Quarterly Update", icon: "\u25C9" },
-    { id: "volunteers", label: "Volunteers", icon: "\u25CE" },
-    { id: "donors", label: "Donors & Donations", icon: "\u25C7" },
-    { id: "board", label: "Board Voting", icon: "\u25D1" },
-    { id: "strategy", label: "Strategic Goal Progress", icon: "\u25C8" }
+    { id: "home", label: "Overview", icon: "\u{1F3E1}" },
+    { id: "quarterly", label: "Quarterly Update", icon: "\u{1F4CB}" },
+    { id: "volunteers", label: "Volunteers", icon: "\u{1F465}" },
+    { id: "donors", label: "Donors & Donations", icon: "\u{1F91D}" },
+    { id: "board", label: "Board Voting", icon: "\u{1F5F3}\uFE0F" },
+    { id: "strategy", label: "Strategic Goal Progress", icon: "\u{1F3AF}" }
   ];
   var mockData = {
     events: [
