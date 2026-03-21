@@ -1330,8 +1330,209 @@
   function QuarterlyView() {
     return /* @__PURE__ */ React.createElement("div", { style: { color: "#777", fontSize: 12, padding: "40px 0" } }, "Quarterly update coming soon.");
   }
-  function OperationalView() {
-    return /* @__PURE__ */ React.createElement("div", { style: { color: "#777", fontSize: 12, padding: "40px 0" } }, "Operational areas coming soon.");
+  function OperationalView({ opArea }) {
+    var { useState: useState2, useEffect: useEffect2 } = React;
+    var area = opArea || OPERATIONAL_AREAS[0];
+    var [areaInfo, setAreaInfo] = useState2(null);
+    var [budget, setBudget] = useState2([]);
+    var [vols, setVols] = useState2([]);
+    var [showBudget, setShowBudget] = useState2(false);
+    var [showVols, setShowVols] = useState2(false);
+    var [editLead, setEditLead] = useState2(false);
+    var [leadInput, setLeadInput] = useState2("");
+    var today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    var [budgetForm, setBudgetForm] = useState2({ type: "Purchase", description: "", amount: "", date: today });
+    var [budgetSaving, setBudgetSaving] = useState2(false);
+    var [noteEdit, setNoteEdit] = useState2(null);
+    var [noteVal, setNoteVal] = useState2("");
+    var [noteSaving, setNoteSaving] = useState2(null);
+    useEffect2(function() {
+      setAreaInfo(null);
+      setBudget([]);
+      setVols([]);
+      setEditLead(false);
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Operational Areas") + "?area=eq." + encodeURIComponent(area) + "&select=*", {
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+      }).then(function(r) {
+        return r.json();
+      }).then(function(rows) {
+        if (rows && rows[0]) {
+          setAreaInfo(rows[0]);
+          setLeadInput(rows[0].lead || "");
+        }
+      });
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Budget") + "?area=eq." + encodeURIComponent(area) + "&select=*&order=date.desc,id.desc", {
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+      }).then(function(r) {
+        return r.json();
+      }).then(function(rows) {
+        if (Array.isArray(rows)) setBudget(rows);
+      });
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("2026 Volunteers") + "?select=" + encodeURIComponent("id,First Name,Last Name,Team,Notes,Status"), {
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+      }).then(function(r) {
+        return r.json();
+      }).then(function(rows) {
+        if (!Array.isArray(rows)) return;
+        setVols(rows.filter(function(v) {
+          if (!v.Team) return false;
+          return v.Team.split(",").map(function(t) {
+            return t.trim();
+          }).indexOf(area) !== -1;
+        }));
+      });
+    }, [area]);
+    function saveLead() {
+      if (!areaInfo) return;
+      sbPatchById("Operational Areas", areaInfo.id, { lead: leadInput }).then(function() {
+        setAreaInfo(Object.assign({}, areaInfo, { lead: leadInput }));
+        setEditLead(false);
+      });
+    }
+    function addBudgetItem(e) {
+      e.preventDefault();
+      setBudgetSaving(true);
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Budget"), {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify({ area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null })
+      }).then(function(r) {
+        return r.json();
+      }).then(function(rows) {
+        setBudgetSaving(false);
+        if (rows && rows[0]) setBudget(function(prev) {
+          return [rows[0]].concat(prev);
+        });
+        setBudgetForm({ type: "Purchase", description: "", amount: "", date: today });
+      });
+    }
+    function deleteBudgetItem(id) {
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Budget") + "?id=eq." + id, {
+        method: "DELETE",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+      }).then(function() {
+        setBudget(function(prev) {
+          return prev.filter(function(b) {
+            return b.id !== id;
+          });
+        });
+      });
+    }
+    function saveNote(v) {
+      setNoteSaving(v.id);
+      sbUpdate("2026 Volunteers", v["First Name"], v["Last Name"], { Notes: noteVal }).then(function() {
+        setVols(function(prev) {
+          return prev.map(function(x) {
+            return x.id === v.id ? Object.assign({}, x, { Notes: noteVal }) : x;
+          });
+        });
+        setNoteEdit(null);
+        setNoteSaving(null);
+      });
+    }
+    var totalPurchases = budget.filter(function(b) {
+      return b.type === "Purchase";
+    }).reduce(function(s, b) {
+      return s + (parseFloat(b.amount) || 0);
+    }, 0);
+    var totalInKind = budget.filter(function(b) {
+      return b.type === "In-Kind";
+    }).reduce(function(s, b) {
+      return s + (parseFloat(b.amount) || 0);
+    }, 0);
+    function fmt(n) {
+      return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+    var cardHover = { cursor: "pointer", background: "#faf8f5", border: "0.5px solid #e8e0d5", borderRadius: 10, padding: "16px 20px", flex: 1, minWidth: 150 };
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 12, padding: "22px 26px", border: "0.5px solid #e8e0d5", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 6 } }, "Operational Area"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, area)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 6 } }, "Lead"), editLead ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center" } }, /* @__PURE__ */ React.createElement("input", { value: leadInput, onChange: function(e) {
+      setLeadInput(e.target.value);
+    }, autoFocus: true, style: { fontSize: 14, padding: "5px 8px", border: "0.5px solid #e0d8cc", borderRadius: 6, width: 150 } }), /* @__PURE__ */ React.createElement("button", { onClick: saveLead, style: { background: gold, color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px", fontSize: 12, cursor: "pointer" } }, "Save"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setEditLead(false);
+    }, style: { background: "#f0ece6", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer", color: "#666" } }, "Cancel")) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, color: "#2a2a2a", fontWeight: 500 } }, areaInfo && areaInfo.lead ? areaInfo.lead : /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc", fontStyle: "italic" } }, "Not set")), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setEditLead(true);
+    }, style: { background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#bbb", padding: "2px 6px", borderRadius: 4 } }, "Edit")))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: function() {
+          setShowBudget(true);
+        },
+        style: cardHover,
+        onMouseEnter: function(e) {
+          e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)";
+        },
+        onMouseLeave: function(e) {
+          e.currentTarget.style.boxShadow = "none";
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#bbb", fontWeight: 600, marginBottom: 8 } }, "Budget"),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: gold } }, fmt(totalPurchases + totalInKind)),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 4 } }, fmt(totalPurchases), " purchases \xB7 ", fmt(totalInKind), " in-kind"),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 } }, "View / Add entries \u2192")
+    ), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: function() {
+          setShowVols(true);
+        },
+        style: cardHover,
+        onMouseEnter: function(e) {
+          e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)";
+        },
+        onMouseLeave: function(e) {
+          e.currentTarget.style.boxShadow = "none";
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#bbb", fontWeight: 600, marginBottom: 8 } }, "Volunteers"),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: "#2a2a2a" } }, vols.length),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 4 } }, "assigned to ", area),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 } }, "View / Add notes \u2192")
+    ))), showBudget && /* @__PURE__ */ React.createElement("div", { onClick: function() {
+      setShowBudget(false);
+    }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1010, padding: 20 } }, /* @__PURE__ */ React.createElement("div", { onClick: function(e) {
+      e.stopPropagation();
+    }, style: { background: "#fff", borderRadius: 16, padding: 28, maxWidth: 520, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", maxHeight: "85vh", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: "#2a2a2a" } }, area, " \u2014 Budget"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setShowBudget(false);
+    }, style: { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#bbb" } }, "x")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 22 } }, [{ label: "Purchases", val: totalPurchases, color: "#c07040" }, { label: "In-Kind", val: totalInKind, color: "#5a8a5a" }, { label: "Total", val: totalPurchases + totalInKind, color: gold }].map(function(s) {
+      return /* @__PURE__ */ React.createElement("div", { key: s.label, style: { background: "#faf8f5", borderRadius: 8, padding: "10px 14px", textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#bbb", fontWeight: 600 } }, s.label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: s.color, marginTop: 4 } }, fmt(s.val)));
+    })), /* @__PURE__ */ React.createElement("div", { style: { background: "#faf8f5", borderRadius: 10, padding: "14px 16px", marginBottom: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#bbb", fontWeight: 600, marginBottom: 12 } }, "Add Entry"), /* @__PURE__ */ React.createElement("form", { onSubmit: addBudgetItem }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#888", marginBottom: 4 } }, "Type"), /* @__PURE__ */ React.createElement("select", { value: budgetForm.type, onChange: function(e) {
+      setBudgetForm(function(f) {
+        return Object.assign({}, f, { type: e.target.value });
+      });
+    }, style: { width: "100%", padding: "7px 10px", border: "0.5px solid #e0d8cc", borderRadius: 7, fontSize: 13, background: "#fff" } }, /* @__PURE__ */ React.createElement("option", null, "Purchase"), /* @__PURE__ */ React.createElement("option", null, "In-Kind"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#888", marginBottom: 4 } }, "Amount ($)"), /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.01", min: "0", value: budgetForm.amount, onChange: function(e) {
+      setBudgetForm(function(f) {
+        return Object.assign({}, f, { amount: e.target.value });
+      });
+    }, style: { width: "100%", padding: "7px 10px", border: "0.5px solid #e0d8cc", borderRadius: 7, fontSize: 13 }, placeholder: "0.00" }))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#888", marginBottom: 4 } }, "Description"), /* @__PURE__ */ React.createElement("input", { value: budgetForm.description, onChange: function(e) {
+      setBudgetForm(function(f) {
+        return Object.assign({}, f, { description: e.target.value });
+      });
+    }, style: { width: "100%", padding: "7px 10px", border: "0.5px solid #e0d8cc", borderRadius: 7, fontSize: 13 }, placeholder: "What was purchased or donated..." })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "flex-end" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#888", marginBottom: 4 } }, "Date"), /* @__PURE__ */ React.createElement("input", { type: "date", value: budgetForm.date, onChange: function(e) {
+      setBudgetForm(function(f) {
+        return Object.assign({}, f, { date: e.target.value });
+      });
+    }, style: { width: "100%", padding: "7px 10px", border: "0.5px solid #e0d8cc", borderRadius: 7, fontSize: 13 } })), /* @__PURE__ */ React.createElement("button", { type: "submit", disabled: budgetSaving, style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: budgetSaving ? 0.7 : 1 } }, "Add")))), budget.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#bbb", fontSize: 13, textAlign: "center", padding: "20px 0" } }, "No entries yet.") : budget.map(function(b) {
+      return /* @__PURE__ */ React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "0.5px solid #f0ece6" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, padding: "3px 8px", borderRadius: 20, fontWeight: 500, background: b.type === "Purchase" ? "#fef0e6" : "#eaf3ea", color: b.type === "Purchase" ? "#c07040" : "#5a8a5a", flexShrink: 0 } }, b.type), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 13, color: "#2a2a2a" } }, b.description || "\u2014"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", flexShrink: 0 } }, fmt(parseFloat(b.amount) || 0)), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#bbb", flexShrink: 0 } }, b.date), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+        deleteBudgetItem(b.id);
+      }, style: { background: "none", border: "none", cursor: "pointer", color: "#ddd", fontSize: 14, padding: "2px 4px", flexShrink: 0 } }, "x"));
+    }))), showVols && /* @__PURE__ */ React.createElement("div", { onClick: function() {
+      setShowVols(false);
+    }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1010, padding: 20 } }, /* @__PURE__ */ React.createElement("div", { onClick: function(e) {
+      e.stopPropagation();
+    }, style: { background: "#fff", borderRadius: 16, padding: 28, maxWidth: 500, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", maxHeight: "85vh", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: "#2a2a2a" } }, area, " Volunteers (", vols.length, ")"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setShowVols(false);
+    }, style: { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#bbb" } }, "x")), vols.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#bbb", fontSize: 13, textAlign: "center", padding: "30px 0" } }, "No volunteers assigned to ", area, ".") : vols.map(function(v) {
+      var isEditing = noteEdit === v.id;
+      return /* @__PURE__ */ React.createElement("div", { key: v.id, style: { borderBottom: "0.5px solid #f0ece6", paddingBottom: 14, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: "#2a2a2a" } }, v["First Name"], " ", v["Last Name"]), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#aaa", background: "#f5f5f5", padding: "2px 8px", borderRadius: 20 } }, v.Status), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+        setNoteEdit(v.id);
+        setNoteVal(v.Notes || "");
+      }, style: { marginLeft: "auto", fontSize: 11, color: gold, background: "none", border: "none", cursor: "pointer", fontWeight: 500 } }, "Edit note")), isEditing ? /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("textarea", { value: noteVal, onChange: function(e) {
+        setNoteVal(e.target.value);
+      }, rows: 3, autoFocus: true, style: { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 13, fontFamily: "system-ui, sans-serif", resize: "vertical", boxSizing: "border-box" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement("button", { onClick: function() {
+        saveNote(v);
+      }, disabled: noteSaving === v.id, style: { background: gold, color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 500, cursor: "pointer", opacity: noteSaving === v.id ? 0.7 : 1 } }, noteSaving === v.id ? "Saving..." : "Save"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+        setNoteEdit(null);
+      }, style: { background: "#f0ece6", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, cursor: "pointer", color: "#666" } }, "Cancel"))) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: v.Notes ? "#555" : "#ccc", fontStyle: v.Notes ? "normal" : "italic", lineHeight: 1.5 } }, v.Notes || "No notes"));
+    }))));
   }
   var views = {
     home: HomeView,
@@ -1419,7 +1620,7 @@
         },
         area
       );
-    })))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: "28px 32px", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0, fontSize: 26, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, mod && mod.label), /* @__PURE__ */ React.createElement("div", { style: { height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 10, opacity: 0.65 } })), /* @__PURE__ */ React.createElement(View, { navigate: setActive }))));
+    })))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: "28px 32px", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0, fontSize: 26, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, mod && mod.label), /* @__PURE__ */ React.createElement("div", { style: { height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 10, opacity: 0.65 } })), /* @__PURE__ */ React.createElement(View, { navigate: setActive, opArea }))));
   }
   var root = ReactDOM.createRoot(document.getElementById("root"));
   root.render(React.createElement(Dashboard));

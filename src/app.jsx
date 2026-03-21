@@ -1660,10 +1660,236 @@ function QuarterlyView() {
   );
 }
 
-function OperationalView() {
+function OperationalView({ opArea }) {
+  var { useState, useEffect } = React;
+  var area = opArea || OPERATIONAL_AREAS[0];
+  var [areaInfo, setAreaInfo] = useState(null);
+  var [budget, setBudget] = useState([]);
+  var [vols, setVols] = useState([]);
+  var [showBudget, setShowBudget] = useState(false);
+  var [showVols, setShowVols] = useState(false);
+  var [editLead, setEditLead] = useState(false);
+  var [leadInput, setLeadInput] = useState('');
+  var today = new Date().toISOString().slice(0, 10);
+  var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today });
+  var [budgetSaving, setBudgetSaving] = useState(false);
+  var [noteEdit, setNoteEdit] = useState(null);
+  var [noteVal, setNoteVal] = useState('');
+  var [noteSaving, setNoteSaving] = useState(null);
+
+  useEffect(function() {
+    setAreaInfo(null);
+    setBudget([]);
+    setVols([]);
+    setEditLead(false);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Operational Areas') + '?area=eq.' + encodeURIComponent(area) + '&select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (rows && rows[0]) { setAreaInfo(rows[0]); setLeadInput(rows[0].lead || ''); }
+    });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?area=eq.' + encodeURIComponent(area) + '&select=*&order=date.desc,id.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setBudget(rows);
+    });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?select=' + encodeURIComponent('id,First Name,Last Name,Team,Notes,Status'), {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (!Array.isArray(rows)) return;
+      setVols(rows.filter(function(v) {
+        if (!v.Team) return false;
+        return v.Team.split(',').map(function(t) { return t.trim(); }).indexOf(area) !== -1;
+      }));
+    });
+  }, [area]);
+
+  function saveLead() {
+    if (!areaInfo) return;
+    sbPatchById('Operational Areas', areaInfo.id, { lead: leadInput }).then(function() {
+      setAreaInfo(Object.assign({}, areaInfo, { lead: leadInput }));
+      setEditLead(false);
+    });
+  }
+
+  function addBudgetItem(e) {
+    e.preventDefault();
+    setBudgetSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ area: area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setBudgetSaving(false);
+      if (rows && rows[0]) setBudget(function(prev) { return [rows[0]].concat(prev); });
+      setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today });
+    });
+  }
+
+  function deleteBudgetItem(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      setBudget(function(prev) { return prev.filter(function(b) { return b.id !== id; }); });
+    });
+  }
+
+  function saveNote(v) {
+    setNoteSaving(v.id);
+    sbUpdate('2026 Volunteers', v['First Name'], v['Last Name'], { Notes: noteVal }).then(function() {
+      setVols(function(prev) { return prev.map(function(x) { return x.id === v.id ? Object.assign({}, x, { Notes: noteVal }) : x; }); });
+      setNoteEdit(null);
+      setNoteSaving(null);
+    });
+  }
+
+  var totalPurchases = budget.filter(function(b) { return b.type === 'Purchase'; }).reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+  var totalInKind = budget.filter(function(b) { return b.type === 'In-Kind'; }).reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+  function fmt(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+  var cardHover = { cursor: 'pointer', background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '16px 20px', flex: 1, minWidth: 150 };
+
   return (
-    <div style={{ color: '#777', fontSize: 12, padding: '40px 0' }}>
-      Operational areas coming soon.
+    <div>
+      <div style={{ background: '#fff', borderRadius: 12, padding: '22px 26px', border: '0.5px solid #e8e0d5', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 6 }}>Operational Area</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{area}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 6 }}>Lead</div>
+            {editLead ? (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input value={leadInput} onChange={function(e) { setLeadInput(e.target.value); }} autoFocus style={{ fontSize: 14, padding: '5px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, width: 150 }} />
+                <button onClick={saveLead} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>Save</button>
+                <button onClick={function() { setEditLead(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: '#666' }}>Cancel</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 15, color: '#2a2a2a', fontWeight: 500 }}>{areaInfo && areaInfo.lead ? areaInfo.lead : <span style={{ color: '#ccc', fontStyle: 'italic' }}>Not set</span>}</span>
+                <button onClick={function() { setEditLead(true); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#bbb', padding: '2px 6px', borderRadius: 4 }}>Edit</button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          <div onClick={function() { setShowBudget(true); }} style={cardHover}
+            onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'; }}
+            onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600, marginBottom: 8 }}>Budget</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{fmt(totalPurchases + totalInKind)}</div>
+            <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>{fmt(totalPurchases)} purchases · {fmt(totalInKind)} in-kind</div>
+            <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add entries →</div>
+          </div>
+          <div onClick={function() { setShowVols(true); }} style={cardHover}
+            onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'; }}
+            onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600, marginBottom: 8 }}>Volunteers</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a' }}>{vols.length}</div>
+            <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>assigned to {area}</div>
+            <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add notes →</div>
+          </div>
+        </div>
+      </div>
+
+      {showBudget && (
+        <div onClick={function() { setShowBudget(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>{area} — Budget</div>
+              <button onClick={function() { setShowBudget(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>x</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 22 }}>
+              {[{ label: 'Purchases', val: totalPurchases, color: '#c07040' }, { label: 'In-Kind', val: totalInKind, color: '#5a8a5a' }, { label: 'Total', val: totalPurchases + totalInKind, color: gold }].map(function(s) {
+                return (
+                  <div key={s.label} style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600 }}>{s.label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: s.color, marginTop: 4 }}>{fmt(s.val)}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 18 }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600, marginBottom: 12 }}>Add Entry</div>
+              <form onSubmit={addBudgetItem}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Type</div>
+                    <select value={budgetForm.type} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { type: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff' }}>
+                      <option>Purchase</option>
+                      <option>In-Kind</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Amount ($)</div>
+                    <input type="number" step="0.01" min="0" value={budgetForm.amount} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="0.00" />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Description</div>
+                  <input value={budgetForm.description} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="What was purchased or donated..." />
+                </div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Date</div>
+                    <input type="date" value={budgetForm.date} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
+                  </div>
+                  <button type="submit" disabled={budgetSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: budgetSaving ? 0.7 : 1 }}>Add</button>
+                </div>
+              </form>
+            </div>
+            {budget.length === 0 ? (
+              <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No entries yet.</div>
+            ) : budget.map(function(b) {
+              return (
+                <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                  <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, fontWeight: 500, background: b.type === 'Purchase' ? '#fef0e6' : '#eaf3ea', color: b.type === 'Purchase' ? '#c07040' : '#5a8a5a', flexShrink: 0 }}>{b.type}</span>
+                  <span style={{ flex: 1, fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</span>
+                  <span style={{ fontSize: 11, color: '#bbb', flexShrink: 0 }}>{b.date}</span>
+                  <button onClick={function() { deleteBudgetItem(b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>x</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {showVols && (
+        <div onClick={function() { setShowVols(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 500, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>{area} Volunteers ({vols.length})</div>
+              <button onClick={function() { setShowVols(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>x</button>
+            </div>
+            {vols.length === 0 ? (
+              <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No volunteers assigned to {area}.</div>
+            ) : vols.map(function(v) {
+              var isEditing = noteEdit === v.id;
+              return (
+                <div key={v.id} style={{ borderBottom: '0.5px solid #f0ece6', paddingBottom: 14, marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</span>
+                    <span style={{ fontSize: 11, color: '#aaa', background: '#f5f5f5', padding: '2px 8px', borderRadius: 20 }}>{v.Status}</span>
+                    <button onClick={function() { setNoteEdit(v.id); setNoteVal(v.Notes || ''); }} style={{ marginLeft: 'auto', fontSize: 11, color: gold, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Edit note</button>
+                  </div>
+                  {isEditing ? (
+                    <div>
+                      <textarea value={noteVal} onChange={function(e) { setNoteVal(e.target.value); }} rows={3} autoFocus style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'system-ui, sans-serif', resize: 'vertical', boxSizing: 'border-box' }} />
+                      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                        <button onClick={function() { saveNote(v); }} disabled={noteSaving === v.id} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: noteSaving === v.id ? 0.7 : 1 }}>{noteSaving === v.id ? 'Saving...' : 'Save'}</button>
+                        <button onClick={function() { setNoteEdit(null); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer', color: '#666' }}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: v.Notes ? '#555' : '#ccc', fontStyle: v.Notes ? 'normal' : 'italic', lineHeight: 1.5 }}>{v.Notes || 'No notes'}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1762,7 +1988,7 @@ var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundrai
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" }}>{mod && mod.label}</h1>
             <div style={{ height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 10, opacity: 0.65 }} />
           </div>
-          <View navigate={setActive} />
+          <View navigate={setActive} opArea={opArea} />
         </div>
       </div>
     </div>
