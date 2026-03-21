@@ -1368,7 +1368,7 @@
       }).then(function(rows) {
         if (Array.isArray(rows)) setBudget(rows);
       });
-      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("2026 Volunteers") + "?select=" + encodeURIComponent("id,First Name,Last Name,Team,Notes,Status"), {
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("2026 Volunteers") + "?select=" + encodeURIComponent("id,First Name,Last Name,Team,Notes,Overview Notes,Status"), {
         headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
       }).then(function(r) {
         return r.json();
@@ -1522,16 +1522,33 @@
       setShowVols(false);
     }, style: { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#bbb" } }, "x")), vols.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#bbb", fontSize: 13, textAlign: "center", padding: "30px 0" } }, "No volunteers assigned to ", area, ".") : vols.map(function(v) {
       var isEditing = noteEdit === v.id;
-      return /* @__PURE__ */ React.createElement("div", { key: v.id, style: { borderBottom: "0.5px solid #f0ece6", paddingBottom: 14, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: "#2a2a2a" } }, v["First Name"], " ", v["Last Name"]), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#aaa", background: "#f5f5f5", padding: "2px 8px", borderRadius: 20 } }, v.Status), /* @__PURE__ */ React.createElement("button", { onClick: function() {
-        setNoteEdit(v.id);
-        setNoteVal(v.Notes || "");
-      }, style: { marginLeft: "auto", fontSize: 11, color: gold, background: "none", border: "none", cursor: "pointer", fontWeight: 500 } }, "Edit note")), isEditing ? /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("textarea", { value: noteVal, onChange: function(e) {
+      return /* @__PURE__ */ React.createElement("div", { key: v.id, style: { borderBottom: "0.5px solid #f0ece6", paddingBottom: 14, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: "#2a2a2a" } }, v["First Name"], " ", v["Last Name"]), v["Overview Notes"] && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc" } }, "\u2014"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#777" } }, v["Overview Notes"])), /* @__PURE__ */ React.createElement(
+        "select",
+        {
+          value: v.Status || "Active",
+          onChange: function(e) {
+            var newStatus = e.target.value;
+            sbUpdate("2026 Volunteers", v["First Name"], v["Last Name"], { Status: newStatus });
+            setVols(function(prev) {
+              return prev.map(function(x) {
+                return x.id === v.id ? Object.assign({}, x, { Status: newStatus }) : x;
+              });
+            });
+          },
+          style: { marginLeft: "auto", fontSize: 11, padding: "2px 6px", border: "0.5px solid #e0d8cc", borderRadius: 5, color: v.Status === "Active" ? "#5a8a5a" : "#aaa", background: "#fff", cursor: "pointer" }
+        },
+        /* @__PURE__ */ React.createElement("option", null, "Active"),
+        /* @__PURE__ */ React.createElement("option", null, "Inactive")
+      )), isEditing ? /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("textarea", { value: noteVal, onChange: function(e) {
         setNoteVal(e.target.value);
       }, rows: 3, autoFocus: true, style: { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 13, fontFamily: "system-ui, sans-serif", resize: "vertical", boxSizing: "border-box" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement("button", { onClick: function() {
         saveNote(v);
       }, disabled: noteSaving === v.id, style: { background: gold, color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 500, cursor: "pointer", opacity: noteSaving === v.id ? 0.7 : 1 } }, noteSaving === v.id ? "Saving..." : "Save"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
         setNoteEdit(null);
-      }, style: { background: "#f0ece6", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, cursor: "pointer", color: "#666" } }, "Cancel"))) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: v.Notes ? "#555" : "#ccc", fontStyle: v.Notes ? "normal" : "italic", lineHeight: 1.5 } }, v.Notes || "No notes"));
+      }, style: { background: "#f0ece6", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, cursor: "pointer", color: "#666" } }, "Cancel"))) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: v.Notes ? "#555" : "#ccc", fontStyle: v.Notes ? "normal" : "italic", lineHeight: 1.5 } }, v.Notes || "No notes"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+        setNoteEdit(v.id);
+        setNoteVal(v.Notes || "");
+      }, style: { flexShrink: 0, fontSize: 11, color: gold, background: "none", border: "none", cursor: "pointer", fontWeight: 500 } }, "Edit note")));
     }))));
   }
   var views = {

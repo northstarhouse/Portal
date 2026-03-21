@@ -1692,7 +1692,7 @@ function OperationalView({ opArea }) {
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (Array.isArray(rows)) setBudget(rows);
     });
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?select=' + encodeURIComponent('id,First Name,Last Name,Team,Notes,Status'), {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?select=' + encodeURIComponent('id,First Name,Last Name,Team,Notes,Overview Notes,Status'), {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (!Array.isArray(rows)) return;
@@ -1868,10 +1868,21 @@ function OperationalView({ opArea }) {
               var isEditing = noteEdit === v.id;
               return (
                 <div key={v.id} style={{ borderBottom: '0.5px solid #f0ece6', paddingBottom: 14, marginBottom: 14 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</span>
-                    <span style={{ fontSize: 11, color: '#aaa', background: '#f5f5f5', padding: '2px 8px', borderRadius: 20 }}>{v.Status}</span>
-                    <button onClick={function() { setNoteEdit(v.id); setNoteVal(v.Notes || ''); }} style={{ marginLeft: 'auto', fontSize: 11, color: gold, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Edit note</button>
+                    {v['Overview Notes'] && <><span style={{ color: '#ccc' }}>—</span><span style={{ fontSize: 13, color: '#777' }}>{v['Overview Notes']}</span></>}
+                    <select
+                      value={v.Status || 'Active'}
+                      onChange={function(e) {
+                        var newStatus = e.target.value;
+                        sbUpdate('2026 Volunteers', v['First Name'], v['Last Name'], { Status: newStatus });
+                        setVols(function(prev) { return prev.map(function(x) { return x.id === v.id ? Object.assign({}, x, { Status: newStatus }) : x; }); });
+                      }}
+                      style={{ marginLeft: 'auto', fontSize: 11, padding: '2px 6px', border: '0.5px solid #e0d8cc', borderRadius: 5, color: v.Status === 'Active' ? '#5a8a5a' : '#aaa', background: '#fff', cursor: 'pointer' }}
+                    >
+                      <option>Active</option>
+                      <option>Inactive</option>
+                    </select>
                   </div>
                   {isEditing ? (
                     <div>
@@ -1882,7 +1893,10 @@ function OperationalView({ opArea }) {
                       </div>
                     </div>
                   ) : (
-                    <div style={{ fontSize: 13, color: v.Notes ? '#555' : '#ccc', fontStyle: v.Notes ? 'normal' : 'italic', lineHeight: 1.5 }}>{v.Notes || 'No notes'}</div>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ fontSize: 13, color: v.Notes ? '#555' : '#ccc', fontStyle: v.Notes ? 'normal' : 'italic', lineHeight: 1.5 }}>{v.Notes || 'No notes'}</div>
+                      <button onClick={function() { setNoteEdit(v.id); setNoteVal(v.Notes || ''); }} style={{ flexShrink: 0, fontSize: 11, color: gold, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>Edit note</button>
+                    </div>
                   )}
                 </div>
               );
