@@ -585,7 +585,7 @@ var App = (() => {
       });
     }, []);
     function parseAmount(val) {
-      return parseFloat((val || "0").replace(/[^d.]/g, "") || 0);
+      return parseFloat((val || "0").replace(/[^\d.]/g, "") || 0);
     }
     function fmtAmount(val) {
       var n = parseAmount(val);
