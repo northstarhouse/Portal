@@ -1249,11 +1249,11 @@ function BoardView() {
                     return (
                       <div key={m} style={{ padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 13 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ color: '#2a2a2a', fontWeight: 500 }}>{m}</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {mv.changed_in_meeting && <span style={{ fontSize: 11, color: '#e65100', fontStyle: 'italic' }}>Changed in meeting</span>}
-                            <span style={{ background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span>
+                            <span style={{ color: '#2a2a2a', fontWeight: 500 }}>{m}</span>
+                            {mv.changed_in_meeting && <span style={{ fontSize: 11, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
                           </div>
+                          <span style={{ background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span>
                         </div>
                         {mv.note && <div style={{ fontSize: 12, color: '#777', marginTop: 4, fontStyle: 'italic' }}>{mv.note}</div>}
                       </div>
