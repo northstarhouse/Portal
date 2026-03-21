@@ -1592,7 +1592,7 @@ function StrategyView() {
     <div>
       <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '18px 22px', marginBottom: 20 }}>
         <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 14 }}>Progress by Focus Area</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {CATEGORY_ORDER.map(function(cat) {
             var catGoals = goals.filter(function(g) { return g.category === cat && g.goal_type !== 'three_year_vision'; });
             if (catGoals.length === 0) return null;
@@ -1601,15 +1601,13 @@ function StrategyView() {
             var pct = Math.round((done / catGoals.length) * 100);
             var inprogPct = Math.round((inprog / catGoals.length) * 100);
             return (
-              <div key={cat}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{cat}</span>
-                  <span style={{ fontSize: 12, color: '#888' }}>{done}/{catGoals.length} complete</span>
-                </div>
-                <div style={{ height: 8, background: '#f0ece6', borderRadius: 99, overflow: 'hidden', display: 'flex' }}>
-                  <div style={{ width: pct + '%', background: '#4caf50', borderRadius: 99, transition: 'width 0.4s' }} />
+              <div key={cat} style={{ background: '#faf8f5', borderRadius: 8, padding: '14px 16px' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 10, lineHeight: 1.3 }}>{cat}</div>
+                <div style={{ height: 8, background: '#ede8e0', borderRadius: 99, overflow: 'hidden', display: 'flex', marginBottom: 8 }}>
+                  <div style={{ width: pct + '%', background: '#4caf50', transition: 'width 0.4s' }} />
                   <div style={{ width: inprogPct + '%', background: '#f5a623', transition: 'width 0.4s' }} />
                 </div>
+                <div style={{ fontSize: 12, color: '#888' }}>{done}/{catGoals.length} complete</div>
               </div>
             );
           })}
