@@ -650,6 +650,7 @@ function VolunteersView() {
                   <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 3, lineHeight: 1.2 }}>{selected['First Name']} {selected['Last Name']}</div>
                   {selected['Team'] && <div style={{ fontSize: 12, color: '#9a7f5a', marginBottom: 6, fontWeight: 500 }}>{selected['Team']}</div>}
                   <Badge status={selected['Status'] || 'Active'} />
+                  {selected['Overview Notes'] && <div style={{ fontSize: 12, color: '#7a6a55', marginTop: 8, lineHeight: 1.5, fontStyle: 'italic' }}>{selected['Overview Notes']}</div>}
                 </div>
               </div>
               <div style={{ position: 'absolute', top: 14, right: 14, display: 'flex', gap: 8 }}>
@@ -676,10 +677,9 @@ function VolunteersView() {
                   <InfoRow label="Birthday" value={fmtBirthday(selected['Birthday'])} />
                 </div>
               )}
-              {(selected['Overview Notes'] || selected['Background Notes'] || selected['Notes']) && (
+              {(selected['Background Notes'] || selected['Notes']) && (
                 <div style={{ marginBottom: 4 }}>
                   <span style={volSecLabel}>Notes</span>
-                  <NoteBlock label={selected['Background Notes'] || selected['Notes'] ? 'Overview' : null} value={selected['Overview Notes']} />
                   <NoteBlock label="Background" value={selected['Background Notes']} />
                   <NoteBlock label="Additional" value={selected['Notes']} />
                 </div>
