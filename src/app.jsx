@@ -990,6 +990,32 @@ function MarketingView() {
     </div>
   );
 }
+function RichEditor({ value, onChange, placeholder }) {
+  var ref = React.useRef(null);
+  var initialized = React.useRef(false);
+  React.useEffect(function() {
+    if (ref.current && !initialized.current) {
+      ref.current.innerHTML = value || '';
+      initialized.current = true;
+    }
+  }, []);
+  function exec(cmd) { ref.current.focus(); document.execCommand(cmd, false, null); }
+  return (
+    <div style={{ border: '0.5px solid #e0d8cc', borderRadius: 8, overflow: 'hidden', marginTop: 4 }}>
+      <style>{'.rich-editor:empty:before{content:attr(data-placeholder);color:#bbb;pointer-events:none}'}</style>
+      <div style={{ display: 'flex', gap: 4, padding: '5px 8px', borderBottom: '0.5px solid #f0ebe2', background: '#faf8f4' }}>
+        <button type="button" onMouseDown={function(e) { e.preventDefault(); exec('bold'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 5, padding: '1px 8px', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#444', lineHeight: 1.6 }}>B</button>
+        <button type="button" onMouseDown={function(e) { e.preventDefault(); exec('italic'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 5, padding: '1px 8px', fontSize: 13, fontStyle: 'italic', cursor: 'pointer', color: '#444', lineHeight: 1.6 }}>I</button>
+      </div>
+      <div ref={ref} className="rich-editor" contentEditable={true} suppressContentEditableWarning={true}
+        onInput={function() { onChange(ref.current.innerHTML); }}
+        data-placeholder={placeholder || 'Write something…'}
+        style={{ minHeight: 72, padding: '8px 10px', fontSize: 13, outline: 'none', fontFamily: 'system-ui, sans-serif', lineHeight: 1.6, background: '#fff' }}
+      />
+    </div>
+  );
+}
+
 var BOARD_MEMBERS = ['Ken', 'Rick', 'Wyn', 'Paula', 'Jeff', 'Rich'];
 var VOTE_COLORS = { 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#fff3e0', color: '#e65100' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' } };
 
@@ -1201,9 +1227,7 @@ function BoardView() {
             </div>
 
             {selected.description && (
-              <div style={{ fontSize: 13, color: '#555', lineHeight: 1.6, marginBottom: 16, padding: '12px 14px', background: '#faf8f4', borderRadius: 8, borderLeft: '3px solid ' + gold }}>
-                {selected.description}
-              </div>
+              <div dangerouslySetInnerHTML={{ __html: selected.description }} style={{ fontSize: 13, color: '#555', lineHeight: 1.6, marginBottom: 16, padding: '12px 14px', background: '#faf8f4', borderRadius: 8, borderLeft: '3px solid ' + gold }} />
             )}
 
             {selected.attachment_url && (
@@ -1324,7 +1348,7 @@ function BoardView() {
             <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>New Voting Topic</div>
             <form onSubmit={handleTopicSubmit}>
               <div style={bGrp}><label style={bLbl}>Title *</label><input required value={topicForm.title} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { title: e.target.value }); }); }} style={bInp} placeholder="Topic title…" /></div>
-              <div style={bGrp}><label style={bLbl}>Description</label><textarea value={topicForm.description} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} rows={3} style={Object.assign({}, bInp, { resize: 'vertical' })} placeholder="Background, details, context…" /></div>
+              <div style={bGrp}><label style={bLbl}>Description</label><RichEditor value={topicForm.description} onChange={function(html) { setTopicForm(function(f) { return Object.assign({}, f, { description: html }); }); }} placeholder="Background, details, context…" /></div>
               <div style={bGrp}>
                 <label style={bLbl}>Attachment</label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, padding: '8px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', background: '#fff', fontSize: 13 }}>

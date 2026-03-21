@@ -711,6 +711,40 @@ var App = (() => {
       }
     ));
   }
+  function RichEditor({ value, onChange, placeholder }) {
+    var ref = React.useRef(null);
+    var initialized = React.useRef(false);
+    React.useEffect(function() {
+      if (ref.current && !initialized.current) {
+        ref.current.innerHTML = value || "";
+        initialized.current = true;
+      }
+    }, []);
+    function exec(cmd) {
+      ref.current.focus();
+      document.execCommand(cmd, false, null);
+    }
+    return /* @__PURE__ */ React.createElement("div", { style: { border: "0.5px solid #e0d8cc", borderRadius: 8, overflow: "hidden", marginTop: 4 } }, /* @__PURE__ */ React.createElement("style", null, ".rich-editor:empty:before{content:attr(data-placeholder);color:#bbb;pointer-events:none}"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, padding: "5px 8px", borderBottom: "0.5px solid #f0ebe2", background: "#faf8f4" } }, /* @__PURE__ */ React.createElement("button", { type: "button", onMouseDown: function(e) {
+      e.preventDefault();
+      exec("bold");
+    }, style: { background: "none", border: "0.5px solid #e0d8cc", borderRadius: 5, padding: "1px 8px", fontSize: 13, fontWeight: 700, cursor: "pointer", color: "#444", lineHeight: 1.6 } }, "B"), /* @__PURE__ */ React.createElement("button", { type: "button", onMouseDown: function(e) {
+      e.preventDefault();
+      exec("italic");
+    }, style: { background: "none", border: "0.5px solid #e0d8cc", borderRadius: 5, padding: "1px 8px", fontSize: 13, fontStyle: "italic", cursor: "pointer", color: "#444", lineHeight: 1.6 } }, "I")), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        ref,
+        className: "rich-editor",
+        contentEditable: true,
+        suppressContentEditableWarning: true,
+        onInput: function() {
+          onChange(ref.current.innerHTML);
+        },
+        "data-placeholder": placeholder || "Write something\u2026",
+        style: { minHeight: 72, padding: "8px 10px", fontSize: 13, outline: "none", fontFamily: "system-ui, sans-serif", lineHeight: 1.6, background: "#fff" }
+      }
+    ));
+  }
   var BOARD_MEMBERS = ["Ken", "Rick", "Wyn", "Paula", "Jeff", "Rich"];
   var VOTE_COLORS = { "Yes": { bg: "#e8f5e9", color: "#2e7d32" }, "No": { bg: "#ffebee", color: "#c62828" }, "Abstain": { bg: "#fff3e0", color: "#e65100" }, "Not in attendance": { bg: "#f5f5f5", color: "#888" } };
   function BoardView() {
@@ -906,7 +940,7 @@ var App = (() => {
       e.stopPropagation();
     }, style: { background: "#fff", borderRadius: 16, padding: 28, maxWidth: 540, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", maxHeight: "90vh", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, paddingRight: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 600, color: "#2a2a2a" } }, selected.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#aaa", marginTop: 3 } }, selected.submitted_by ? /* @__PURE__ */ React.createElement("span", null, "Submitted by ", selected.submitted_by) : null, selected.due_date ? /* @__PURE__ */ React.createElement("span", null, " \xB7 Due ", fmtDate(selected.due_date)) : null, selected.meeting_date ? /* @__PURE__ */ React.createElement("span", null, " \xB7 Meeting ", fmtDate(selected.meeting_date)) : null)), /* @__PURE__ */ React.createElement("button", { onClick: function() {
       setSelected(null);
-    }, style: { background: "none", border: "none", fontSize: 22, color: "#aaa", cursor: "pointer", lineHeight: 1, padding: 4, flexShrink: 0 } }, "\xD7")), selected.description && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#555", lineHeight: 1.6, marginBottom: 16, padding: "12px 14px", background: "#faf8f4", borderRadius: 8, borderLeft: "3px solid " + gold } }, selected.description), selected.attachment_url && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("a", { href: selected.attachment_url, target: "_blank", rel: "noopener noreferrer", style: { fontSize: 13, color: gold, textDecoration: "none" } }, "\u{1F4CE} View Attachment")), isRevealed(selected) ? /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 12 } }, "Results"), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, (function() {
+    }, style: { background: "none", border: "none", fontSize: 22, color: "#aaa", cursor: "pointer", lineHeight: 1, padding: 4, flexShrink: 0 } }, "\xD7")), selected.description && /* @__PURE__ */ React.createElement("div", { dangerouslySetInnerHTML: { __html: selected.description }, style: { fontSize: 13, color: "#555", lineHeight: 1.6, marginBottom: 16, padding: "12px 14px", background: "#faf8f4", borderRadius: 8, borderLeft: "3px solid " + gold } }), selected.attachment_url && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("a", { href: selected.attachment_url, target: "_blank", rel: "noopener noreferrer", style: { fontSize: 13, color: gold, textDecoration: "none" } }, "\u{1F4CE} View Attachment")), isRevealed(selected) ? /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, color: "#bbb", fontWeight: 600, marginBottom: 12 } }, "Results"), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, (function() {
       var t = tally(selected);
       var total = BOARD_MEMBERS.length;
       return [["Yes", t.yes, "#4caf50"], ["No", t.no, "#ef5350"], ["Abstain", t.abstain, gold]].map(function(entry) {
@@ -968,11 +1002,11 @@ var App = (() => {
       setTopicForm(function(f) {
         return Object.assign({}, f, { title: e.target.value });
       });
-    }, style: bInp, placeholder: "Topic title\u2026" })), /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Description"), /* @__PURE__ */ React.createElement("textarea", { value: topicForm.description, onChange: function(e) {
+    }, style: bInp, placeholder: "Topic title\u2026" })), /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Description"), /* @__PURE__ */ React.createElement(RichEditor, { value: topicForm.description, onChange: function(html) {
       setTopicForm(function(f) {
-        return Object.assign({}, f, { description: e.target.value });
+        return Object.assign({}, f, { description: html });
       });
-    }, rows: 3, style: Object.assign({}, bInp, { resize: "vertical" }), placeholder: "Background, details, context\u2026" })), /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Attachment"), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 10, marginTop: 6, padding: "8px 12px", border: "0.5px solid #e0d8cc", borderRadius: 8, cursor: "pointer", background: "#fff", fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { background: gold, color: "#fff", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 500, flexShrink: 0 } }, attachUploading ? "Uploading\u2026" : "Choose file"), /* @__PURE__ */ React.createElement("span", { style: { color: attachFileName ? "#2a2a2a" : "#bbb", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, attachFileName || "No file chosen"), /* @__PURE__ */ React.createElement("input", { type: "file", onChange: handleAttachUpload, style: { display: "none" } })), topicForm.attachment_url && !attachUploading && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#2e7d32", marginTop: 4 } }, "\u2713 Uploaded")), /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Submitted By"), /* @__PURE__ */ React.createElement("input", { value: topicForm.submitted_by, onChange: function(e) {
+    }, placeholder: "Background, details, context\u2026" })), /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Attachment"), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 10, marginTop: 6, padding: "8px 12px", border: "0.5px solid #e0d8cc", borderRadius: 8, cursor: "pointer", background: "#fff", fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { background: gold, color: "#fff", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 500, flexShrink: 0 } }, attachUploading ? "Uploading\u2026" : "Choose file"), /* @__PURE__ */ React.createElement("span", { style: { color: attachFileName ? "#2a2a2a" : "#bbb", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, attachFileName || "No file chosen"), /* @__PURE__ */ React.createElement("input", { type: "file", onChange: handleAttachUpload, style: { display: "none" } })), topicForm.attachment_url && !attachUploading && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#2e7d32", marginTop: 4 } }, "\u2713 Uploaded")), /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Submitted By"), /* @__PURE__ */ React.createElement("input", { value: topicForm.submitted_by, onChange: function(e) {
       setTopicForm(function(f) {
         return Object.assign({}, f, { submitted_by: e.target.value });
       });
