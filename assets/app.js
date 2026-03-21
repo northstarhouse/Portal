@@ -18,7 +18,7 @@ var App = (() => {
     { id: "volunteers", label: "Volunteers", icon: "\u25CE" },
     { id: "donors", label: "Donors & Donations", icon: "\u25C7" },
     { id: "marketing", label: "Marketing / Content", icon: "\u25F0" },
-    { id: "board", label: "Board Activity", icon: "\u25D1" },
+    { id: "board", label: "Board Voting", icon: "\u25D1" },
     { id: "strategy", label: "Strategic Plan", icon: "\u25C8" }
   ];
   var mockData = {

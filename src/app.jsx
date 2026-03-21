@@ -19,8 +19,8 @@ const modules = [
   { id: "events", label: "Events & Bookings", icon: "◈" },
   { id: "volunteers", label: "Volunteers", icon: "◎" },
   { id: "donors", label: "Donors & Donations", icon: "◇" },
-  { id: "marketing", label: "Marketing / Content", icon: "◰" },
-  { id: "board", label: "Board Activity", icon: "◑" },
+  { id: "marketing", label: "Marketing / Content", icon: "◰" },
+  { id: "board", label: "Board Voting", icon: "◑" },
   { id: "strategy", label: "Strategic Plan", icon: "◈" },
 ];
 
@@ -1341,7 +1341,7 @@ const views = {
   events: EventsView,
   volunteers: VolunteersView,
   donors: DonorsView,
-  marketing: MarketingView,
+  marketing: MarketingView,
   board: BoardView,
   strategy: StrategyView,
 };function Dashboard() {
