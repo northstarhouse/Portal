@@ -164,7 +164,7 @@ function StatCard({ label, value, sub }) {
     <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px", minHeight: 90, display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 120 }}>
       <div style={{ fontSize: 13, color: "#888", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 500, color: "#2a2a2a" }}>{value}</div>
-      <div style={{ fontSize: 12, color: "#aaa", marginTop: 2, minHeight: 16 }}>{sub || ''}</div>
+      <div style={{ fontSize: 12, color: "#777", marginTop: 2, minHeight: 16 }}>{sub || ''}</div>
     </div>
   );
 }
@@ -250,7 +250,7 @@ const typeColors = {
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase" }}>Today — March 20, 2026</span>
-          <span style={{ color: '#ccc', fontSize: 13 }}>—</span>
+          <span style={{ color: '#777', fontSize: 13 }}>—</span>
           <span style={{ fontSize: 14, color: "#888" }}>Here's your organization at a glance.</span>
         </div>
       </div>
@@ -273,8 +273,8 @@ const typeColors = {
       <div style={{ marginBottom: 16 }}>
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
           <div style={{ fontSize: 13, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>Upcoming — NSH Calendar</div>
-          {calEvents === null && <div style={{ fontSize: 14, color: "#aaa" }}>Loading…</div>}
-          {calEvents !== null && calEvents.length === 0 && <div style={{ fontSize: 14, color: "#aaa" }}>No upcoming events in the next 2 weeks.</div>}
+          {calEvents === null && <div style={{ fontSize: 14, color: "#777" }}>Loading…</div>}
+          {calEvents !== null && calEvents.length === 0 && <div style={{ fontSize: 14, color: "#777" }}>No upcoming events in the next 2 weeks.</div>}
           {calEvents !== null && calEvents.map(function(ev, i) {
             var start = parseIcalDate(ev['DTSTART']);
             var isAllDay = ev['DTSTART'] && ev['DTSTART'].replace(/[^0-9TZ]/g,'').length === 8;
@@ -311,13 +311,13 @@ const typeColors = {
                 <div style={{ minWidth: 6, height: 6, borderRadius: "50%", background: dotColor, marginTop: 5, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "#2a2a2a" }}>{title}</div>
-                  <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>{dayStr}{timeStr !== 'All day' ? ' · ' + timeStr : ''}</div>
+                  <div style={{ fontSize: 12, color: "#777", marginTop: 2 }}>{dayStr}{timeStr !== 'All day' ? ' · ' + timeStr : ''}</div>
                 </div>
                 {label && <span style={{ fontSize: 12, background: labelBg, color: dotColor, borderRadius: 20, fontWeight: 500, flexShrink: 0, width: 90, textAlign: 'center', display: 'inline-block', padding: '2px 0' }}>{label}</span>}
               </div>
             );
           })}
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "0.5px solid #f0ebe2", fontSize: 12, color: "#bbb" }}>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "0.5px solid #f0ebe2", fontSize: 12, color: "#999" }}>
             Synced from Google Calendar
           </div>
         </div>
@@ -420,7 +420,7 @@ function TeamPicker({ value, onChange }) {
         onClick={function() { setOpen(function(o) { return !o; }); }}
         style={{ minHeight: 38, border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', background: '#fff', display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}
       >
-        {selected.length === 0 && <span style={{ fontSize: 14, color: '#bbb' }}>Select teams...</span>}
+        {selected.length === 0 && <span style={{ fontSize: 14, color: '#999' }}>Select teams...</span>}
         {selected.map(function(t) {
           return (
             <span key={t} style={{ background: (TEAM_COLORS[t] || { bg: '#f3f3f3' }).bg, color: (TEAM_COLORS[t] || { color: '#555' }).color, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
@@ -432,7 +432,7 @@ function TeamPicker({ value, onChange }) {
             </span>
           );
         })}
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#bbb', flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#999', flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
       </div>
       {open && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 100, marginTop: 4, padding: '6px 0', maxHeight: 220, overflowY: 'auto' }}>
@@ -460,7 +460,7 @@ function TeamPicker({ value, onChange }) {
 var volInputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 14, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
 var volLabelStyle = { fontSize: 13, color: '#666', fontWeight: 500 };
 var volGrp = { marginBottom: 14 };
-var volSecLabel = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
+var volSecLabel = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#999', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
 
 function VolForm({ form, onChange, saving, onSubmit, title, onCancel }) {
   return (
@@ -646,7 +646,7 @@ function VolunteersView() {
     if (!value) return null;
     return (
       <div style={{ display: 'flex', gap: 0, marginBottom: 10, alignItems: 'flex-start' }}>
-        <div style={{ width: 110, fontSize: 13, color: '#aaa', flexShrink: 0, paddingTop: 1 }}>{label}</div>
+        <div style={{ width: 110, fontSize: 13, color: '#777', flexShrink: 0, paddingTop: 1 }}>{label}</div>
         <div style={{ fontSize: 14, color: '#2a2a2a', flex: 1, lineHeight: 1.4 }}>
           {link ? <a href={link} style={{ color: gold, textDecoration: 'none' }}>{value}</a> : value}
         </div>
@@ -658,7 +658,7 @@ function VolunteersView() {
     if (!value) return null;
     return (
       <div style={{ marginBottom: 10 }}>
-        {label && <div style={{ fontSize: 12, color: '#bbb', fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 5 }}>{label}</div>}
+        {label && <div style={{ fontSize: 12, color: '#999', fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 5 }}>{label}</div>}
         <div style={{ fontSize: 14, color: '#444', lineHeight: 1.65, background: '#faf8f4', borderRadius: 8, padding: '10px 14px' }}>{value}</div>
       </div>
     );
@@ -715,7 +715,7 @@ function VolunteersView() {
       {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 14, color: '#c0392b' }}>Error: {error}</div>}
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 14 }}>Loading volunteers...</div>
+        <div style={{ textAlign: 'center', padding: 40, color: '#777', fontSize: 14 }}>Loading volunteers...</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 14 }}>
           {filtered.map(function(v, i) {
@@ -731,7 +731,7 @@ function VolunteersView() {
                   <div style={{ width: 56, height: 56, borderRadius: '50%', background: gold, color: '#fff', fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>{initials(v)}</div>
                 )}
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#2a2a2a', marginBottom: 3, lineHeight: 1.3 }}>{v['First Name']} {v['Last Name']}</div>
-                {v['Team'] && <div style={{ fontSize: 12, color: '#aaa', marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v['Team'] || '').split('|')[0].trim()}</div>}
+                {v['Team'] && <div style={{ fontSize: 12, color: '#777', marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v['Team'] || '').split('|')[0].trim()}</div>}
                 <Badge status={v['Status'] || 'Active'} />
               </div>
             );
@@ -906,7 +906,7 @@ function DonorsView() {
   var iStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 14, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
   var lStyle = { fontSize: 13, color: '#666', fontWeight: 500 };
   var grp = { marginBottom: 14 };
-  var sec = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
+  var sec = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#999', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
 
   var typeColors = {
     'Donation':            { bg: '#e3f2fd', color: '#1565c0' },
@@ -947,12 +947,12 @@ function DonorsView() {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 14 }}>Loading donations...</div>
+        <div style={{ textAlign: 'center', padding: 40, color: '#777', fontSize: 14 }}>Loading donations...</div>
       ) : (
         <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 0, padding: '8px 16px', borderBottom: '0.5px solid #e8e0d4', background: '#faf8f4' }}>
             {['Donor', 'Type', 'Amount', 'Date'].map(function(h) {
-              return <div key={h} style={{ fontSize: 12, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>{h}</div>;
+              return <div key={h} style={{ fontSize: 12, color: '#777', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>{h}</div>;
             })}
           </div>
           {donations.filter(function(d) { return filterType === 'All' || d['Donation Type'] === filterType; }).map(function(d, i) {
@@ -968,7 +968,7 @@ function DonorsView() {
               >
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: '#2a2a2a' }}>{d['Donor Name']}</div>
-                  <div style={{ fontSize: 12, color: '#bbb', marginTop: 1 }}>{d['Account Type']}</div>
+                  <div style={{ fontSize: 12, color: '#999', marginTop: 1 }}>{d['Account Type']}</div>
                 </div>
                 <div>
                   <span style={{ background: tc.bg, color: tc.color, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>{d['Donation Type']}</span>
@@ -991,25 +991,25 @@ function DonorsView() {
               <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 4 }}>{selected['Donor Name']}</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {(function() { var tc = typeColors[selected['Donation Type']] || { bg: '#f3f3f3', color: '#555' }; return <span style={{ background: tc.bg, color: tc.color, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20 }}>{selected['Donation Type']}</span>; })()}
-                <span style={{ fontSize: 13, color: '#aaa' }}>{fmtDate(selected['Close Date'])}</span>
+                <span style={{ fontSize: 13, color: '#777' }}>{fmtDate(selected['Close Date'])}</span>
               </div>
               <button onClick={function() { setSelected(null); }} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: '#666' }}>×</button>
             </div>
             <div style={{ padding: '20px 28px 24px', overflowY: 'auto', flex: 1 }}>
-              <div style={{ marginBottom: 20 }}><span style={{ fontSize: 14, color: '#aaa', marginRight: 8 }}>Amount</span><span style={{ fontSize: 16, fontWeight: 600, color: gold }}>{fmtAmount(selected['Amount'])}</span></div>
+              <div style={{ marginBottom: 20 }}><span style={{ fontSize: 14, color: '#777', marginRight: 8 }}>Amount</span><span style={{ fontSize: 16, fontWeight: 600, color: gold }}>{fmtAmount(selected['Amount'])}</span></div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
                 <div>
                   <span style={sec}>Donor Info</span>
-                  {selected['Informal Names'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Goes by</span>{selected['Informal Names']}</div>}
-                  {selected['Account Type'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Type</span>{selected['Account Type']}</div>}
-                  {selected['Email'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Email</span><a href={'mailto:' + selected['Email']} style={{ color: gold, textDecoration: 'none' }}>{selected['Email']}</a></div>}
-                  {selected['Phone Number'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Phone</span>{selected['Phone Number']}</div>}
-                  {selected['Address'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Address</span><span style={{ whiteSpace: 'pre-line' }}>{selected['Address']}</span></div>}
+                  {selected['Informal Names'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Goes by</span>{selected['Informal Names']}</div>}
+                  {selected['Account Type'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Type</span>{selected['Account Type']}</div>}
+                  {selected['Email'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Email</span><a href={'mailto:' + selected['Email']} style={{ color: gold, textDecoration: 'none' }}>{selected['Email']}</a></div>}
+                  {selected['Phone Number'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Phone</span>{selected['Phone Number']}</div>}
+                  {selected['Address'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Address</span><span style={{ whiteSpace: 'pre-line' }}>{selected['Address']}</span></div>}
                   <span style={sec}>Payment</span>
-                  {selected['Payment Type'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Method</span>{selected['Payment Type']}</div>}
-                  {selected['Benefits'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Benefits</span>{selected['Benefits']}</div>}
+                  {selected['Payment Type'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Method</span>{selected['Payment Type']}</div>}
+                  {selected['Benefits'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Benefits</span>{selected['Benefits']}</div>}
                   <div style={{ fontSize: 14, marginBottom: 8 }}>
-                    <span style={{ color: '#aaa', marginRight: 8 }}>Acknowledged</span>
+                    <span style={{ color: '#777', marginRight: 8 }}>Acknowledged</span>
                     <span style={{ fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: (selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? '#e8f5e9' : '#fff8e1', color: (selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? '#2e7d32' : '#8a6200' }}>
                       {(selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? 'Thanked' : 'Pending'}
                     </span>
@@ -1269,7 +1269,7 @@ function BoardView() {
   var bLbl = { fontSize: 13, color: '#666', fontWeight: 500 };
   var bGrp = { marginBottom: 14 };
 
-  if (loading) return <div style={{ color: '#aaa', fontSize: 14, padding: 40, textAlign: 'center' }}>Loading…</div>;
+  if (loading) return <div style={{ color: '#777', fontSize: 14, padding: 40, textAlign: 'center' }}>Loading…</div>;
   if (loadError) return <div style={{ color: '#c62828', fontSize: 14, padding: 20, background: '#ffebee', borderRadius: 8, border: '0.5px solid #ffcdd2' }}><strong>Supabase error:</strong> {loadError}<br/><br/>Make sure you've run the SQL setup in Supabase and that RLS is disabled on both tables.</div>;
 
   return (
@@ -1279,7 +1279,7 @@ function BoardView() {
         <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>+ Add Topic</button>
       </div>
 
-      {items.length === 0 && <div style={{ color: '#aaa', fontSize: 14, textAlign: 'center', padding: 40 }}>No voting items yet.</div>}
+      {items.length === 0 && <div style={{ color: '#777', fontSize: 14, textAlign: 'center', padding: 40 }}>No voting items yet.</div>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {(function() {
@@ -1296,7 +1296,7 @@ function BoardView() {
               {showDivider && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '6px 0' }}>
                   <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
-                  <span style={{ fontSize: 12, color: '#bbb', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Closed</span>
+                  <span style={{ fontSize: 12, color: '#999', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Closed</span>
                   <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
                 </div>
               )}
@@ -1310,14 +1310,14 @@ function BoardView() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 15, fontWeight: 500, color: '#2a2a2a', marginBottom: 4 }}>{item.title}</div>
-                  <div style={{ fontSize: 13, color: '#aaa' }}>
+                  <div style={{ fontSize: 13, color: '#777' }}>
                     {item.submitted_by ? <span>Submitted by {item.submitted_by}{item.due_date ? ' · ' : ''}</span> : null}
                     {item.due_date ? <span>Due {fmtDate(item.due_date)}</span> : null}
                     {item.meeting_date ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 16, flexShrink: 0 }}>
-                  <span style={{ fontSize: 13, color: '#aaa' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                  <span style={{ fontSize: 13, color: '#777' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
                   {revealed
                     ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Closed – Decision Made</span>
                     : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Open</span>
@@ -1327,7 +1327,7 @@ function BoardView() {
               {revealed && (
                 <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
                   {[['Yes', t.yes, '#2e7d32'], ['No', t.no, '#c62828'], ['Abstain', t.abstain, '#e65100']].map(function(entry) {
-                    return <div key={entry[0]} style={{ fontSize: 13 }}><span style={{ color: entry[2], fontWeight: 600 }}>{entry[1]}</span><span style={{ color: '#aaa' }}> {entry[0]}</span></div>;
+                    return <div key={entry[0]} style={{ fontSize: 13 }}><span style={{ color: entry[2], fontWeight: 600 }}>{entry[1]}</span><span style={{ color: '#777' }}> {entry[0]}</span></div>;
                   })}
                 </div>
               )}
@@ -1345,7 +1345,7 @@ function BoardView() {
             <div style={{ background: '#fff', borderRadius: 16, padding: 36, boxShadow: '0 2px 20px rgba(0,0,0,0.06)' }}>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 22, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
-                <div style={{ fontSize: 14, color: '#aaa' }}>
+                <div style={{ fontSize: 14, color: '#777' }}>
                   {selected.submitted_by ? <span>Submitted by {selected.submitted_by}</span> : null}
                   {selected.due_date ? <span> · Due {fmtDate(selected.due_date)}</span> : null}
                   {selected.meeting_date ? <span> · Meeting {fmtDate(selected.meeting_date)}</span> : null}
@@ -1364,7 +1364,7 @@ function BoardView() {
 
             {isRevealed(selected) ? (
               <div>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 12 }}>Results</div>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#999', fontWeight: 600, marginBottom: 12 }}>Results</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
                   {(function() {
                     var t = tally(selected);
@@ -1382,15 +1382,15 @@ function BoardView() {
                     });
                   })()}
                 </div>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 10 }}>Individual Votes</div>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#999', fontWeight: 600, marginBottom: 10 }}>Individual Votes</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
                   {BOARD_MEMBERS.map(function(m) {
                     var mv = itemVotes(selected).find(function(v) { return v.voter === m; });
                     if (!mv) return (
                       <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 14 }}>
                         <span style={{ fontWeight: 500, color: '#2a2a2a' }}>{m}</span>
-                        <span style={{ color: '#bbb' }}>—</span>
-                        <span style={{ color: '#ccc', fontSize: 13 }}>No vote</span>
+                        <span style={{ color: '#999' }}>—</span>
+                        <span style={{ color: '#777', fontSize: 13 }}>No vote</span>
                       </div>
                     );
                     var vc = VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' };
@@ -1398,7 +1398,7 @@ function BoardView() {
                       <div key={m} style={{ padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 14 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontWeight: 500, color: '#2a2a2a' }}>{m}</span>
-                          <span style={{ color: '#bbb' }}>—</span>
+                          <span style={{ color: '#999' }}>—</span>
                           <span style={{ background: vc.bg, color: vc.color, fontSize: 13, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span>
                           {mv.changed_in_meeting && <span style={{ fontSize: 12, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
                         </div>
@@ -1410,7 +1410,7 @@ function BoardView() {
               </div>
             ) : (
               <div>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 12 }}>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#999', fontWeight: 600, marginBottom: 12 }}>
                   Votes · {itemVotes(selected).length}/{BOARD_MEMBERS.length} submitted
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1421,9 +1421,9 @@ function BoardView() {
                       <div key={m} style={{ background: '#fafafa', borderRadius: 10, padding: '10px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 14, fontWeight: 500, color: mv ? '#aaa' : '#2a2a2a' }}>{m}</span>
-                          {mv && <><span style={{ color: '#bbb' }}>—</span><span style={{ background: vc.bg, color: vc.color, fontSize: 13, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span></>}
+                          {mv && <><span style={{ color: '#999' }}>—</span><span style={{ background: vc.bg, color: vc.color, fontSize: 13, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span></>}
                           {mv && mv.changed_in_meeting && <span style={{ fontSize: 12, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
-                          {!mv && <span style={{ fontSize: 13, color: '#ccc' }}>No vote yet</span>}
+                          {!mv && <span style={{ fontSize: 13, color: '#777' }}>No vote yet</span>}
                         </div>
                         {mv && mv.note && <div style={{ fontSize: 13, color: '#777', marginTop: 4, fontStyle: 'italic' }}>{mv.note}</div>}
                       </div>
@@ -1564,7 +1564,7 @@ function StrategyView() {
       background: tab === t ? gold : '#f0ebe2', color: tab === t ? '#fff' : '#666' };
   };
 
-  if (loading) return <div style={{ padding: 40, color: '#aaa', fontSize: 14 }}>Loading…</div>;
+  if (loading) return <div style={{ padding: 40, color: '#777', fontSize: 14 }}>Loading…</div>;
 
   return (
     <div>
@@ -1609,8 +1609,8 @@ function StrategyView() {
                     </div>
                     {tab !== 'three_year_vision' && !isEdit && (g.lead || g.due_date) && (
                       <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-                        {g.lead && <div style={{ fontSize: 13, color: '#aaa' }}>Lead: <span style={{ color: '#555' }}>{g.lead}</span></div>}
-                        {g.due_date && <div style={{ fontSize: 13, color: '#aaa' }}>Due: <span style={{ color: '#555' }}>{g.due_date}</span></div>}
+                        {g.lead && <div style={{ fontSize: 13, color: '#777' }}>Lead: <span style={{ color: '#555' }}>{g.lead}</span></div>}
+                        {g.due_date && <div style={{ fontSize: 13, color: '#777' }}>Due: <span style={{ color: '#555' }}>{g.due_date}</span></div>}
                       </div>
                     )}
                     {isEdit && (
@@ -1653,7 +1653,7 @@ function StrategyView() {
 
 function QuarterlyView() {
   return (
-    <div style={{ color: '#aaa', fontSize: 14, padding: '40px 0' }}>
+    <div style={{ color: '#777', fontSize: 14, padding: '40px 0' }}>
       Quarterly update coming soon.
     </div>
   );
