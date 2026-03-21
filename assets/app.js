@@ -1219,11 +1219,14 @@
     var annualGoals = goals.filter(function(g) {
       return g.goal_type === "annual";
     });
-    var onTrack = annualGoals.filter(function(g) {
-      return g.status === "On track" || g.status === "Complete";
+    var countNotStarted = goals.filter(function(g) {
+      return g.goal_type !== "three_year_vision" && (!g.status || g.status === "Not started");
     }).length;
-    var notStarted = annualGoals.filter(function(g) {
-      return g.status === "Not started" || !g.status;
+    var countInProgress = goals.filter(function(g) {
+      return g.goal_type !== "three_year_vision" && (g.status === "In progress" || g.status === "On track");
+    }).length;
+    var countComplete = goals.filter(function(g) {
+      return g.goal_type !== "three_year_vision" && g.status === "Complete";
     }).length;
     function openEdit(g) {
       setEditing(g.id);
@@ -1250,7 +1253,7 @@
       };
     };
     if (loading) return /* @__PURE__ */ React.createElement("div", { style: { padding: 40, color: "#aaa", fontSize: 13 } }, "Loading\u2026");
-    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Annual Goals", value: annualGoals.length }), /* @__PURE__ */ React.createElement(StatCard, { label: "On Track / Complete", value: onTrack }), /* @__PURE__ */ React.createElement(StatCard, { label: "Not Started", value: notStarted }), /* @__PURE__ */ React.createElement(StatCard, { label: "Focus Areas", value: CATEGORY_ORDER.length })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, ["annual", "future", "three_year_vision"].map(function(t) {
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Not Started", value: countNotStarted }), /* @__PURE__ */ React.createElement(StatCard, { label: "In Progress", value: countInProgress }), /* @__PURE__ */ React.createElement(StatCard, { label: "Completed", value: countComplete })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, ["annual", "future", "three_year_vision"].map(function(t) {
       return /* @__PURE__ */ React.createElement("button", { key: t, onClick: function() {
         setTab(t);
       }, style: tabStyle(t) }, GOAL_TYPE_LABELS[t]);
