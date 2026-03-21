@@ -49,11 +49,11 @@ const cream = "#f8f4ec";
 
 const modules = [
   { id: "home", label: "Overview", icon: "⌂" },
-  { id: "operational", label: "Operational Areas", icon: "◫" },
   { id: "volunteers", label: "Volunteers", icon: "◎" },
   { id: "donors", label: "Donors & Donations", icon: "◇" },
   { id: "board", label: "Board Voting", icon: "◑" },
   { id: "strategy", label: "Strategic Goal Progress", icon: "◈" },
+  { id: "quarterly", label: "Quarterly Update", icon: "◉", hidden: true },
 ];
 
 const mockData = {
@@ -1643,10 +1643,10 @@ function StrategyView() {
   );
 }
 
-function OperationalView() {
+function QuarterlyView() {
   return (
     <div style={{ color: '#aaa', fontSize: 13, padding: '40px 0' }}>
-      Coming soon — build out this section with operational content.
+      Quarterly update coming soon.
     </div>
   );
 }
@@ -1654,7 +1654,7 @@ function OperationalView() {
 const views = {
   home: HomeView,
   events: EventsView,
-  operational: OperationalView,
+  quarterly: QuarterlyView,
   volunteers: VolunteersView,
   donors: DonorsView,
   marketing: MarketingView,
@@ -1675,7 +1675,7 @@ const views = {
         </div>
         <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" }} />
         <nav style={{ flex: 1, padding: "0 8px" }}>
-          {modules.map(m => (
+          {modules.filter(m => !m.hidden).map(m => (
             <button key={m.id} onClick={() => setActive(m.id)} style={{
               display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px",
               background: active === m.id ? "rgba(136,108,68,0.18)" : "transparent",
@@ -1689,6 +1689,15 @@ const views = {
             </button>
           ))}
         </nav>
+        <div style={{ padding: "12px 8px 8px" }}>
+          <button onClick={() => setActive("quarterly")} style={{
+            width: "100%", padding: "10px 12px", background: active === "quarterly" ? "rgba(136,108,68,0.25)" : "rgba(136,108,68,0.12)",
+            border: "0.5px solid rgba(136,108,68,0.35)", borderRadius: 8, cursor: "pointer", textAlign: "left",
+            color: gold, fontSize: 12, fontWeight: 600, letterSpacing: 0.3, display: "flex", alignItems: "center", gap: 8
+          }}>
+            <span style={{ fontSize: 13 }}>◉</span> Quarterly Update
+          </button>
+        </div>
         <div style={{ padding: "12px 20px 20px", borderTop: "0.5px solid rgba(255,255,255,0.08)" }}>
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>Connected to Airtable</div>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4caf50", display: "inline-block", marginRight: 5, marginTop: 6 }} />
