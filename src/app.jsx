@@ -72,6 +72,7 @@ const modules = [
   { id: "donors", label: "Donors & Donations" },
   { id: "board", label: "Board Voting" },
   { id: "strategy", label: "Strategic Goal Progress" },
+  { id: "operational", label: "Operational Areas", hidden: true },
 ];
 
 const mockData = {
@@ -1659,6 +1660,14 @@ function QuarterlyView() {
   );
 }
 
+function OperationalView() {
+  return (
+    <div style={{ color: '#777', fontSize: 12, padding: '40px 0' }}>
+      Operational areas coming soon.
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
   events: EventsView,
@@ -1668,6 +1677,7 @@ const views = {
   marketing: MarketingView,
   board: BoardView,
   strategy: StrategyView,
+  operational: OperationalView,
 };function Dashboard() {
   const [active, setActive] = useState("home");
   const View = views[active];
@@ -1683,7 +1693,7 @@ const views = {
         </div>
         <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" }} />
         <nav style={{ flex: 1, padding: "0 8px" }}>
-          {modules.map(m => (
+          {modules.filter(m => !m.hidden).map(m => (
             <button key={m.id} onClick={() => setActive(m.id)} style={{
               display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px",
               background: active === m.id ? "rgba(136,108,68,0.18)" : "transparent",
@@ -1697,7 +1707,21 @@ const views = {
             </button>
           ))}
         </nav>
-        <div style={{ padding: "8px 20px 20px" }} />
+        <div style={{ padding: "12px 8px 16px", borderTop: "0.5px solid rgba(255,255,255,0.08)", marginTop: 8 }}>
+          <button onClick={() => setActive("operational")} style={{
+            width: "100%", padding: "10px 12px", borderRadius: 8, cursor: "pointer", textAlign: "left",
+            background: active === "operational" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)",
+            border: "0.5px solid rgba(255,255,255,0.12)",
+            color: active === "operational" ? "#fff" : "rgba(255,255,255,0.5)",
+            fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s"
+          }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.8 }}>
+              <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            Operational Areas
+          </button>
+        </div>
+        <div style={{ padding: "0 20px 20px" }} />
       </div>
 
       <div style={{ flex: 1, padding: "28px 32px", overflowY: "auto" }}>
