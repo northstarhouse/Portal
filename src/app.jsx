@@ -250,9 +250,9 @@ const typeColors = {
     <div>
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, color: "#5c3d1e", fontWeight: 500, letterSpacing: 1, textTransform: "uppercase" }}>Today — {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-          <span style={{ color: '#777', fontSize: 12 }}>—</span>
-          <span style={{ fontSize: 12, color: "#888" }}>Here's your organization at a glance.</span>
+          <span style={{ fontSize: 13, color: "#5c3d1e", fontWeight: 500 }}>Today — {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+          <span style={{ color: '#777', fontSize: 13 }}>—</span>
+          <span style={{ fontSize: 13, color: "#888" }}>Here's your organization at a glance.</span>
         </div>
       </div>
 
