@@ -773,6 +773,8 @@ var App = (() => {
           setLoading(false);
           return;
         }
+        console.log("Board Voting Items:", itemsData);
+        console.log("Board-Votes:", votesData);
         var sorted = itemsData.sort(function(a, b) {
           return new Date(b.created_at) - new Date(a.created_at);
         });
