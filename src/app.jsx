@@ -724,19 +724,245 @@ function VolunteersView() {
 }
 
 function DonorsView() {
+  const [donations, setDonations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
+  var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
+  var ACCOUNT_TYPES = ['Individual','Family','Household','Foundation','Corporate','Organization'];
+
+  var emptyDonForm = {
+    'Donor Name': '', 'Last Name': '', 'Informal Names': '',
+    'Amount': '', 'Close Date': '', 'Donation Type': 'Donation',
+    'Payment Type': 'Website', 'Account Type': 'Individual',
+    'Acknowledged': false, 'Salesforce': false,
+    'Email': '', 'Phone Number': '', 'Address': '',
+    'Benefits': '', 'Donation Notes': '', 'Donor Notes': '', 'Notes': ''
+  };
+  const [form, setForm] = useState(emptyDonForm);
+
+  useEffect(function() {
+    sbFetch('2026 Donations', ['Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes'])
+      .then(function(data) {
+        if (Array.isArray(data)) setDonations(data);
+        else setError(JSON.stringify(data));
+        setLoading(false);
+      })
+      .catch(function(err) { setError(err.message); setLoading(false); });
+  }, []);
+
+  function parseAmount(val) {
+    return parseFloat((val || '0').replace(/[^d.]/g, '') || 0);
+  }
+
+  function fmtAmount(val) {
+    var n = parseAmount(val);
+    return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function fmtDate(val) {
+    if (!val) return '';
+    var d = new Date(val + 'T00:00:00');
+    if (isNaN(d)) return val;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  var totalRaised = donations.reduce(function(s, r) { return s + parseAmount(r['Amount']); }, 0);
+  var totalDonors = donations.length;
+  var memberships = donations.filter(function(r) { return (r['Donation Type'] || '').includes('Membership'); }).length;
+  var acknowledged = donations.filter(function(r) { return r['Acknowledged'] === true || String(r['Acknowledged']).toUpperCase() === 'TRUE'; }).length;
+  var unacknowledged = totalDonors - acknowledged;
+
+  function handleDonFormChange(e) {
+    var key = e.target.name;
+    var val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setForm(function(prev) { var n = Object.assign({}, prev); n[key] = val; return n; });
+  }
+
+  function handleDonSubmit(e) {
+    e.preventDefault();
+    setSaving(true);
+    var row = {};
+    Object.keys(form).forEach(function(k) {
+      if (form[k] !== '') row[k] = form[k] === true ? 'TRUE' : form[k] === false ? 'FALSE' : form[k];
+    });
+    sbInsert('2026 Donations', row).then(function(res) {
+      setSaving(false);
+      var inserted = Array.isArray(res) ? res[0] : res;
+      if (inserted && inserted['Donor Name']) setDonations(function(p) { return p.concat([inserted]); });
+      setShowAdd(false);
+      setForm(emptyDonForm);
+    }).catch(function() { setSaving(false); });
+  }
+
+  var iStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+  var lStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
+  var grp = { marginBottom: 14 };
+  var sec = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
+
+  var typeColors = {
+    'Donation':            { bg: '#e3f2fd', color: '#1565c0' },
+    'Membership':          { bg: '#e8f5e9', color: '#2e7d32' },
+    'Restricted':          { bg: '#fce4ec', color: '#880e4f' },
+    'Membership, Donation':{ bg: '#f3e5f5', color: '#6a1b9a' },
+    'Brick Purchase':      { bg: '#fbe9e7', color: '#8d3d2b' },
+    'Tribute':             { bg: '#fff8e1', color: '#8a6200' },
+  };
+
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <StatCard label="Total Donors" value="5" />
-        <StatCard label="YTD Received" value="$18,000" />
-        <StatCard label="Pledged / Pending" value="$7,500" />
-        <StatCard label="Largest Gift" value="$10,000" sub="Teichert Foundation" />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+        <StatCard label="Total Raised" value={loading ? '...' : '$' + totalRaised.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub="2026 YTD" />
+        <StatCard label="Donations" value={loading ? '...' : totalDonors} />
+        <StatCard label="Memberships" value={loading ? '...' : memberships} />
+        <StatCard label="Need Thank You" value={loading ? '...' : unacknowledged} sub={unacknowledged > 0 ? 'pending' : 'all clear'} />
       </div>
-      <Table
-        cols={["Donor", "Type", "Amount", "Year", "Status"]}
-        rows={mockData.donors}
-        renderRow={r => (<><Td>{r.name}</Td><Td muted>{r.type}</Td><Td>{r.amount}</Td><Td muted>{r.year}</Td><Td><Badge status={r.status} /></Td></>)}
-      />
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ fontSize: 13, color: '#888' }}>{loading ? 'Loading...' : totalDonors + ' donation' + (totalDonors !== 1 ? 's' : '')}</div>
+        <button onClick={function() { setForm(emptyDonForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ Add Donation</button>
+      </div>
+
+      {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#c0392b' }}>Error: {error}</div>}
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading donations...</div>
+      ) : (
+        <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, overflow: 'hidden' }}>
+          {/* Header */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 0, padding: '8px 16px', borderBottom: '0.5px solid #e8e0d4', background: '#faf8f4' }}>
+            {['Donor', 'Type', 'Amount', 'Date'].map(function(h) {
+              return <div key={h} style={{ fontSize: 11, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>{h}</div>;
+            })}
+          </div>
+          {donations.map(function(d, i) {
+            var tc = typeColors[d['Donation Type']] || { bg: '#f3f3f3', color: '#555' };
+            var acked = d['Acknowledged'] === true || String(d['Acknowledged']).toUpperCase() === 'TRUE';
+            return (
+              <div
+                key={i}
+                onClick={function() { setSelected(d); }}
+                onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
+                onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}
+                style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 0, padding: '11px 16px', borderBottom: i < donations.length - 1 ? '0.5px solid #f0ebe2' : 'none', cursor: 'pointer', background: '#fff', alignItems: 'center', transition: 'background 0.12s' }}
+              >
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{d['Donor Name']}</div>
+                  <div style={{ fontSize: 11, color: '#bbb', marginTop: 1 }}>{d['Account Type']}</div>
+                </div>
+                <div>
+                  <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>{d['Donation Type']}</span>
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{fmtAmount(d['Amount'])}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 12, color: '#888' }}>{fmtDate(d['Close Date'])}</span>
+                  <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: acked ? '#e8f5e9' : '#fff8e1', color: acked ? '#2e7d32' : '#8a6200' }}>{acked ? 'Thanked' : 'Pending'}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {selected && (
+        <div onClick={function() { setSelected(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 540, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: 'linear-gradient(135deg, #f8f4ec 0%, #f0e8dc 100%)', padding: '24px 28px 18px', borderBottom: '0.5px solid #e8dece', position: 'relative', borderRadius: '16px 16px 0 0' }}>
+              <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 4 }}>{selected['Donor Name']}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {(function() { var tc = typeColors[selected['Donation Type']] || { bg: '#f3f3f3', color: '#555' }; return <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20 }}>{selected['Donation Type']}</span>; })()}
+                <span style={{ fontSize: 20, fontWeight: 700, color: gold }}>{fmtAmount(selected['Amount'])}</span>
+                <span style={{ fontSize: 12, color: '#aaa' }}>{fmtDate(selected['Close Date'])}</span>
+              </div>
+              <button onClick={function() { setSelected(null); }} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: '#666' }}>×</button>
+            </div>
+            <div style={{ padding: '20px 28px 24px', overflowY: 'auto', flex: 1 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
+                <div>
+                  <span style={sec}>Donor Info</span>
+                  {selected['Informal Names'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Goes by</span>{selected['Informal Names']}</div>}
+                  {selected['Account Type'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Type</span>{selected['Account Type']}</div>}
+                  {selected['Email'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Email</span><a href={'mailto:' + selected['Email']} style={{ color: gold, textDecoration: 'none' }}>{selected['Email']}</a></div>}
+                  {selected['Phone Number'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Phone</span>{selected['Phone Number']}</div>}
+                  {selected['Address'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Address</span><span style={{ whiteSpace: 'pre-line' }}>{selected['Address']}</span></div>}
+                  <span style={sec}>Payment</span>
+                  {selected['Payment Type'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Method</span>{selected['Payment Type']}</div>}
+                  {selected['Benefits'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Benefits</span>{selected['Benefits']}</div>}
+                  <div style={{ fontSize: 13, marginBottom: 8 }}>
+                    <span style={{ color: '#aaa', marginRight: 8 }}>Acknowledged</span>
+                    <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: (selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? '#e8f5e9' : '#fff8e1', color: (selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? '#2e7d32' : '#8a6200' }}>
+                      {(selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? 'Thanked' : 'Pending'}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  {selected['Donation Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Donation Notes</span><div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Donation Notes']}</div></div>}
+                  {selected['Donor Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Donor Notes</span><div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Donor Notes']}</div></div>}
+                  {selected['Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Notes</span><div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Notes']}</div></div>}
+                </div>
+              </div>
+              <button onClick={function() { setSelected(null); }} style={{ marginTop: 16, width: '100%', padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: '#999', fontWeight: 500 }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAdd && (
+        <div onClick={function() { setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>Add Donation</div>
+            <form onSubmit={handleDonSubmit}>
+              <span style={sec}>Donor</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div><label style={lStyle}>First / Full Name *</label><input required name="Donor Name" value={form['Donor Name']} onChange={handleDonFormChange} style={iStyle} /></div>
+                <div><label style={lStyle}>Last Name</label><input name="Last Name" value={form['Last Name']} onChange={handleDonFormChange} style={iStyle} /></div>
+              </div>
+              <div style={grp}><label style={lStyle}>Goes By (Informal)</label><input name="Informal Names" value={form['Informal Names']} onChange={handleDonFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Account Type</label>
+                <select name="Account Type" value={form['Account Type']} onChange={handleDonFormChange} style={iStyle}>
+                  {ACCOUNT_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+                </select>
+              </div>
+              <span style={sec}>Donation</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div><label style={lStyle}>Amount *</label><input required name="Amount" value={form['Amount']} onChange={handleDonFormChange} style={iStyle} placeholder="$0.00" /></div>
+                <div><label style={lStyle}>Close Date</label><input name="Close Date" type="date" value={form['Close Date']} onChange={handleDonFormChange} style={iStyle} /></div>
+              </div>
+              <div style={grp}><label style={lStyle}>Donation Type</label>
+                <select name="Donation Type" value={form['Donation Type']} onChange={handleDonFormChange} style={iStyle}>
+                  {DONATION_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+                </select>
+              </div>
+              <div style={grp}><label style={lStyle}>Payment Type</label>
+                <select name="Payment Type" value={form['Payment Type']} onChange={handleDonFormChange} style={iStyle}>
+                  {PAYMENT_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+                </select>
+              </div>
+              <div style={grp}><label style={lStyle}>Benefits</label><input name="Benefits" value={form['Benefits']} onChange={handleDonFormChange} style={iStyle} /></div>
+              <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Acknowledged" checked={form['Acknowledged']} onChange={handleDonFormChange} /> Acknowledged / Thanked</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Salesforce" checked={form['Salesforce']} onChange={handleDonFormChange} /> In Salesforce</label>
+              </div>
+              <span style={sec}>Contact</span>
+              <div style={grp}><label style={lStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={handleDonFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={handleDonFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Address</label><textarea name="Address" value={form['Address']} onChange={handleDonFormChange} rows={3} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <span style={sec}>Notes</span>
+              <div style={grp}><label style={lStyle}>Donation Notes</label><textarea name="Donation Notes" value={form['Donation Notes']} onChange={handleDonFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <div style={grp}><label style={lStyle}>Donor Notes</label><textarea name="Donor Notes" value={form['Donor Notes']} onChange={handleDonFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <div style={grp}><label style={lStyle}>Notes</label><textarea name="Notes" value={form['Notes']} onChange={handleDonFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : 'Save Donation'}</button>
+                <button type="button" onClick={function() { setShowAdd(false); }} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
