@@ -969,12 +969,12 @@ function DonorsView() {
               <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 4 }}>{selected['Donor Name']}</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {(function() { var tc = typeColors[selected['Donation Type']] || { bg: '#f3f3f3', color: '#555' }; return <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20 }}>{selected['Donation Type']}</span>; })()}
-                <span style={{ fontSize: 20, fontWeight: 700, color: gold }}>{fmtAmount(selected['Amount'])}</span>
                 <span style={{ fontSize: 12, color: '#aaa' }}>{fmtDate(selected['Close Date'])}</span>
               </div>
               <button onClick={function() { setSelected(null); }} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: '#666' }}>×</button>
             </div>
             <div style={{ padding: '20px 28px 24px', overflowY: 'auto', flex: 1 }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: gold, marginBottom: 20 }}>{fmtAmount(selected['Amount'])}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
                 <div>
                   <span style={sec}>Donor Info</span>
