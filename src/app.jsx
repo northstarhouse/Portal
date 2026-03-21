@@ -19,7 +19,7 @@ const modules = [
   { id: "events", label: "Events & Bookings", icon: "◈" },
   { id: "volunteers", label: "Volunteers", icon: "◎" },
   { id: "donors", label: "Donors & Donations", icon: "◇" },
-  { id: "marketing", label: "Marketing / Content", icon: "◰" },
+  { id: "marketing", label: "Marketing / Content", icon: "◰" },
   { id: "board", label: "Board Voting", icon: "◑" },
   { id: "strategy", label: "Strategic Plan", icon: "◈" },
 ];
@@ -999,24 +999,36 @@ function BoardView() {
   const [selected, setSelected] = React.useState(null);
   const [showAdd, setShowAdd] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState(null);
   const [topicForm, setTopicForm] = React.useState({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
   const [voteForm, setVoteForm] = React.useState({ member: '', vote: '', note: '' });
   const [voteSaving, setVoteSaving] = React.useState(false);
   const [topicSaving, setTopicSaving] = React.useState(false);
 
+  function sbFetchAll(table) {
+    var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table) + '?select=*';
+    return fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); });
+  }
+
   function load() {
     setLoading(true);
+    setLoadError(null);
     Promise.all([
-      sbFetch('Board Voting Items', ['id', 'title', 'description', 'attachment_url', 'submitted_by', 'due_date', 'meeting_date', 'status', 'created_at']),
-      sbFetch('Board-Votes', ['id', 'topic_id', 'member', 'vote', 'note', 'changed_in_meeting', 'created_at'])
+      sbFetchAll('Board Voting Items'),
+      sbFetchAll('Board-Votes')
     ]).then(function(results) {
       var itemsData = results[0];
       var votesData = results[1];
-      var sorted = Array.isArray(itemsData) ? itemsData.sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); }) : [];
+      if (!Array.isArray(itemsData)) {
+        setLoadError((itemsData && itemsData.message) ? itemsData.message : JSON.stringify(itemsData));
+        setLoading(false);
+        return;
+      }
+      var sorted = itemsData.sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
       setItems(sorted);
       setVotes(Array.isArray(votesData) ? votesData : []);
       setLoading(false);
-    });
+    }).catch(function(err) { setLoadError(err.message); setLoading(false); });
   }
 
   React.useEffect(function() { load(); }, []);
@@ -1093,6 +1105,7 @@ function BoardView() {
   var bGrp = { marginBottom: 14 };
 
   if (loading) return <div style={{ color: '#aaa', fontSize: 14, padding: 40, textAlign: 'center' }}>Loading…</div>;
+  if (loadError) return <div style={{ color: '#c62828', fontSize: 13, padding: 20, background: '#ffebee', borderRadius: 8, border: '0.5px solid #ffcdd2' }}><strong>Supabase error:</strong> {loadError}<br/><br/>Make sure you've run the SQL setup in Supabase and that RLS is disabled on both tables.</div>;
 
   return (
     <div>
@@ -1341,7 +1354,7 @@ const views = {
   events: EventsView,
   volunteers: VolunteersView,
   donors: DonorsView,
-  marketing: MarketingView,
+  marketing: MarketingView,
   board: BoardView,
   strategy: StrategyView,
 };function Dashboard() {
