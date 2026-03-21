@@ -1523,10 +1523,10 @@ function StrategyView() {
   const [saving, setSaving] = useS(false);
 
   function load() {
-    sbFetch('Strategic Goals', 'order=category,id').then(function(d) {
-      setGoals(Array.isArray(d) ? d : []);
-      setLoading(false);
-    });
+    var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Strategic Goals') + '?select=*&order=category,id';
+    fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(d) { setGoals(Array.isArray(d) ? d : []); setLoading(false); });
   }
   useE(function() { load(); }, []);
 
