@@ -392,6 +392,7 @@ var TEAM_COLORS = {
   'Docent':           { bg: '#fbe9e7', color: '#8d3d2b' },
   'Volunteer Exchange': { bg: '#e8f4fd', color: '#0d6eab' },
   'Support List':      { bg: '#f0f4f8', color: '#3a5068' },
+  'Venue':             { bg: '#ede7f6', color: '#4527a0' },
 };
 var TEAM_OPTIONS = Object.keys(TEAM_COLORS);
 
