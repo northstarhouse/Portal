@@ -185,8 +185,26 @@ var App = (() => {
       navigate("volunteers");
     }, style: { cursor: "pointer" } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Active Volunteers", value: activeVols === null ? "..." : activeVols })), /* @__PURE__ */ React.createElement(StatCard, { label: "2026 Events", value: "5", sub: "on the books" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Active Sponsors", value: "3", sub: "+ 1 in review" })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 } }, "Upcoming \u2014 NSH Calendar"), calEvents === null && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#aaa" } }, "Loading\u2026"), calEvents !== null && calEvents.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#aaa" } }, "No upcoming events in the next 2 weeks."), calEvents !== null && calEvents.map(function(ev, i) {
       var start = parseIcalDate(ev["DTSTART"]);
+      var isAllDay = ev["DTSTART"] && ev["DTSTART"].replace(/[^0-9TZ]/g, "").length === 8;
       var dayStr = start ? start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "";
-      var timeStr = ev["DTSTART"] && ev["DTSTART"].length > 8 ? start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "All day";
+      var end = ev["DTEND"] ? parseIcalDate(ev["DTEND"]) : null;
+      if (!end && ev["DURATION"]) {
+        var dur = ev["DURATION"];
+        var durMs = 0;
+        var wk = dur.match(/(\d+)W/);
+        if (wk) durMs += parseInt(wk[1]) * 7 * 864e5;
+        var dy = dur.match(/(\d+)D/);
+        if (dy) durMs += parseInt(dy[1]) * 864e5;
+        var hr = dur.match(/(\d+)H/);
+        if (hr) durMs += parseInt(hr[1]) * 36e5;
+        var mn = dur.match(/(\d+)M/);
+        if (mn) durMs += parseInt(mn[1]) * 6e4;
+        if (durMs > 0 && start) end = new Date(start.getTime() + durMs);
+      }
+      var fmt = function(d) {
+        return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      };
+      var timeStr = isAllDay ? "All day" : end && end > start ? fmt(start) + " \u2013 " + fmt(end) : fmt(start);
       var title = (ev["SUMMARY"] || "Untitled").replace(/\\,/g, ",").replace(/\\n/g, " ");
       var tl = title.toLowerCase();
       var isDocent = /docent/.test(tl);

@@ -259,10 +259,22 @@ const typeColors = {
           {calEvents !== null && calEvents.length === 0 && <div style={{ fontSize: 13, color: "#aaa" }}>No upcoming events in the next 2 weeks.</div>}
           {calEvents !== null && calEvents.map(function(ev, i) {
             var start = parseIcalDate(ev['DTSTART']);
+            var isAllDay = ev['DTSTART'] && ev['DTSTART'].replace(/[^0-9TZ]/g,'').length === 8;
             var dayStr = start ? start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
-            var timeStr = ev['DTSTART'] && ev['DTSTART'].length > 8
-              ? start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-              : 'All day';
+            var end = ev['DTEND'] ? parseIcalDate(ev['DTEND']) : null;
+            if (!end && ev['DURATION']) {
+              var dur = ev['DURATION'];
+              var durMs = 0;
+              var wk = dur.match(/(\d+)W/); if (wk) durMs += parseInt(wk[1]) * 7 * 86400000;
+              var dy = dur.match(/(\d+)D/); if (dy) durMs += parseInt(dy[1]) * 86400000;
+              var hr = dur.match(/(\d+)H/); if (hr) durMs += parseInt(hr[1]) * 3600000;
+              var mn = dur.match(/(\d+)M/); if (mn) durMs += parseInt(mn[1]) * 60000;
+              if (durMs > 0 && start) end = new Date(start.getTime() + durMs);
+            }
+            var fmt = function(d) { return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+            var timeStr = isAllDay ? 'All day'
+              : end && end > start ? fmt(start) + ' – ' + fmt(end)
+              : fmt(start);
             var title = (ev['SUMMARY'] || 'Untitled').replace(/\\,/g, ',').replace(/\\n/g, ' ');
             var tl = title.toLowerCase();
             var isDocent = /docent/.test(tl);
