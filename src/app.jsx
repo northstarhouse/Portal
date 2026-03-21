@@ -282,7 +282,10 @@ const typeColors = {
 
       <div style={{ marginBottom: 16 }}>
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14 }}>Happening Soon at North Star House</div>
+          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Happening Soon at North Star House
+          </div>
           {calEvents === null && <div style={{ fontSize: 12, color: "#777" }}>Loading…</div>}
           {calEvents !== null && calEvents.length === 0 && <div style={{ fontSize: 12, color: "#777" }}>No upcoming events in the next 2 weeks.</div>}
           {calEvents !== null && calEvents.map(function(ev, i) {
