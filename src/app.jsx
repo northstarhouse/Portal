@@ -1129,6 +1129,7 @@ function BoardView() {
   const [loadError, setLoadError] = React.useState(null);
   const [topicForm, setTopicForm] = React.useState({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
   const [voteForm, setVoteForm] = React.useState({ voter: '', choice: '', note: '' });
+  const [showPostMeeting, setShowPostMeeting] = React.useState(false);
   const [voteSaving, setVoteSaving] = React.useState(false);
   const [topicSaving, setTopicSaving] = React.useState(false);
   const [attachUploading, setAttachUploading] = React.useState(false);
@@ -1224,6 +1225,7 @@ function BoardView() {
     prom.then(function() {
       setVoteSaving(false);
       setVoteForm({ voter: '', choice: '', note: '' });
+      setShowPostMeeting(false);
       load();
     });
   }
@@ -1354,21 +1356,18 @@ function BoardView() {
             {isRevealed(selected) ? (
               <div>
                 <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 12 }}>Results</div>
-                <div style={{ marginBottom: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
                   {(function() {
                     var t = tally(selected);
-                    var total = BOARD_MEMBERS.length;
-                    return [['Yes', t.yes, '#4caf50'], ['No', t.no, '#ef5350'], ['Abstain', t.abstain, gold]].map(function(entry) {
-                      var pct = total > 0 ? Math.round(entry[1] / total * 100) : 0;
+                    return [
+                      { label: 'Yes', count: t.yes, bg: '#e8f5e9', border: '#a5d6a7', color: '#2e7d32' },
+                      { label: 'No', count: t.no, bg: '#ffebee', border: '#ef9a9a', color: '#c62828' },
+                      { label: 'Abstain / Not in Attendance', count: t.abstain + t.absent, bg: '#f5f5f5', border: '#e0e0e0', color: '#888' },
+                    ].map(function(entry) {
                       return (
-                        <div key={entry[0]} style={{ marginBottom: 10 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                            <span style={{ color: entry[2], fontWeight: 500 }}>{entry[0]}</span>
-                            <span style={{ color: '#888' }}>{entry[1]} / {total}</span>
-                          </div>
-                          <div style={{ background: '#f0ebe2', borderRadius: 4, height: 8, overflow: 'hidden' }}>
-                            <div style={{ width: pct + '%', height: '100%', background: entry[2], borderRadius: 4 }} />
-                          </div>
+                        <div key={entry.label} style={{ background: entry.bg, border: '1px solid ' + entry.border, borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 28, fontWeight: 700, color: entry.color, lineHeight: 1 }}>{entry.count}</div>
+                          <div style={{ fontSize: 11, color: entry.color, fontWeight: 600, marginTop: 4, opacity: 0.8 }}>{entry.label}</div>
                         </div>
                       );
                     });
@@ -1379,20 +1378,20 @@ function BoardView() {
                   {BOARD_MEMBERS.map(function(m) {
                     var mv = itemVotes(selected).find(function(v) { return v.voter === m; });
                     if (!mv) return (
-                      <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 13 }}>
-                        <span style={{ color: '#2a2a2a', fontWeight: 500 }}>{m}</span>
+                      <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 13 }}>
+                        <span style={{ fontWeight: 500, color: '#2a2a2a' }}>{m}</span>
+                        <span style={{ color: '#bbb' }}>—</span>
                         <span style={{ color: '#ccc', fontSize: 12 }}>No vote</span>
                       </div>
                     );
                     var vc = VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' };
                     return (
                       <div key={m} style={{ padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 13 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ color: '#2a2a2a', fontWeight: 500 }}>{m}</span>
-                            {mv.changed_in_meeting && <span style={{ fontSize: 11, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
-                          </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontWeight: 500, color: '#2a2a2a' }}>{m}</span>
+                          <span style={{ color: '#bbb' }}>—</span>
                           <span style={{ background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span>
+                          {mv.changed_in_meeting && <span style={{ fontSize: 11, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
                         </div>
                         {mv.note && <div style={{ fontSize: 12, color: '#777', marginTop: 4, fontStyle: 'italic' }}>{mv.note}</div>}
                       </div>
@@ -1408,51 +1407,61 @@ function BoardView() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {BOARD_MEMBERS.map(function(m) {
                     var mv = itemVotes(selected).find(function(v) { return v.voter === m; });
-                    var isEditing = voteForm.voter === m;
                     var vc = mv ? (VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' }) : null;
                     return (
                       <div key={m} style={{ background: '#fafafa', borderRadius: 10, padding: '10px 14px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isEditing ? 10 : 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{m}</span>
-                            {mv && mv.changed_in_meeting && <span style={{ fontSize: 11, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {mv
-                              ? <span style={{ background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span>
-                              : <span style={{ fontSize: 12, color: '#ccc' }}>No vote yet</span>
-                            }
-                            <button type="button" onClick={function() { setVoteForm(isEditing ? { voter: '', choice: mv ? mv.choice : '', note: mv ? (mv.note || '') : '' } : { voter: m, choice: mv ? mv.choice : '', note: mv ? (mv.note || '') : '' }); }}
-                              style={{ fontSize: 11, color: isEditing ? '#aaa' : gold, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 500 }}>
-                              {isEditing ? 'Cancel' : mv ? 'Edit' : 'Vote'}
-                            </button>
-                          </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: mv ? '#aaa' : '#2a2a2a' }}>{m}</span>
+                          {mv && <><span style={{ color: '#bbb' }}>—</span><span style={{ background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span></>}
+                          {mv && mv.changed_in_meeting && <span style={{ fontSize: 11, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
+                          {!mv && <span style={{ fontSize: 12, color: '#ccc' }}>No vote yet</span>}
                         </div>
-                        {isEditing && (
-                          <div>
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                              {['Yes', 'No', 'Abstain', 'Not in attendance'].map(function(opt) {
-                                var vc2 = VOTE_COLORS[opt];
-                                var active = voteForm.choice === opt;
-                                return (
-                                  <button key={opt} type="button" onClick={function() { setVoteForm(function(f) { return Object.assign({}, f, { choice: opt }); }); }}
-                                    style={{ padding: '6px 12px', borderRadius: 20, border: '1.5px solid ' + (active ? vc2.color : '#e0d8cc'), background: active ? vc2.bg : '#fff', color: active ? vc2.color : '#888', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer' }}>
-                                    {opt}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={2} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 8 })} placeholder="Note (optional)…" />
-                            <button onClick={handleVoteSubmit} disabled={voteSaving || !voteForm.choice}
-                              style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: (voteSaving || !voteForm.choice) ? 0.6 : 1 }}>
-                              {voteSaving ? 'Saving…' : 'Save Vote'}
-                            </button>
-                          </div>
-                        )}
-                        {mv && mv.note && !isEditing && <div style={{ fontSize: 12, color: '#777', marginTop: 4, fontStyle: 'italic' }}>{mv.note}</div>}
+                        {mv && mv.note && <div style={{ fontSize: 12, color: '#777', marginTop: 4, fontStyle: 'italic' }}>{mv.note}</div>}
                       </div>
                     );
                   })}
+                </div>
+                <div style={{ marginTop: 20 }}>
+                  {!showPostMeeting ? (
+                    <button type="button" onClick={function() { setShowPostMeeting(true); setVoteForm({ voter: '', choice: '', note: '' }); }}
+                      style={{ fontSize: 12, color: gold, background: 'none', border: '1px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 500 }}>
+                      + Add Post-Meeting Votes
+                    </button>
+                  ) : (
+                    <div style={{ background: '#fafafa', borderRadius: 12, padding: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 12 }}>Add Post-Meeting Vote</div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={bLbl}>Board Member</label>
+                        <select value={voteForm.voter} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { voter: e.target.value, choice: '', note: '' }); }); }} style={Object.assign({}, bInp, { marginTop: 4 })}>
+                          <option value="">Select member…</option>
+                          {BOARD_MEMBERS.map(function(m) { return <option key={m} value={m}>{m}</option>; })}
+                        </select>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                        {['Yes', 'No', 'Abstain', 'Not in attendance'].map(function(opt) {
+                          var vc2 = VOTE_COLORS[opt];
+                          var active = voteForm.choice === opt;
+                          return (
+                            <button key={opt} type="button" onClick={function() { setVoteForm(function(f) { return Object.assign({}, f, { choice: opt }); }); }}
+                              style={{ padding: '6px 12px', borderRadius: 20, border: '1.5px solid ' + (active ? vc2.color : '#e0d8cc'), background: active ? vc2.bg : '#fff', color: active ? vc2.color : '#888', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer' }}>
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={2} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 10 })} placeholder="Note (optional)…" />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={handleVoteSubmit} disabled={voteSaving || !voteForm.choice || !voteForm.voter}
+                          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: (voteSaving || !voteForm.choice || !voteForm.voter) ? 0.6 : 1 }}>
+                          {voteSaving ? 'Saving…' : 'Save Vote'}
+                        </button>
+                        <button type="button" onClick={function() { setShowPostMeeting(false); setVoteForm({ voter: '', choice: '', note: '' }); }}
+                          style={{ padding: '8px 16px', background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 }}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1493,36 +1502,142 @@ function BoardView() {
     </div>
   );
 }
+var GOAL_STATUS_OPTS = ['Not started', 'In progress', 'On track', 'Complete', 'Blocked'];
+var GOAL_STATUS_COLORS = {
+  'On track': { bg: '#e8f5e9', color: '#2e7d32' },
+  'In progress': { bg: '#fff3e0', color: '#e65100' },
+  'Complete': { bg: '#e3f2fd', color: '#1565c0' },
+  'Blocked': { bg: '#ffebee', color: '#c62828' },
+  'Not started': { bg: '#f5f5f5', color: '#888' },
+};
+var GOAL_TYPE_LABELS = { annual: 'This Year', future: 'Future Goals', three_year_vision: '3-Year Vision' };
+var CATEGORY_ORDER = ['Fund Development', 'House and Grounds Development', 'Programs and Events', 'Organizational Development'];
+
 function StrategyView() {
+  const { useState: useS, useEffect: useE } = React;
+  const [goals, setGoals] = useS([]);
+  const [loading, setLoading] = useS(true);
+  const [tab, setTab] = useS('annual');
+  const [editing, setEditing] = useS(null);
+  const [editForm, setEditForm] = useS({});
+  const [saving, setSaving] = useS(false);
+
+  function load() {
+    sbFetch('Strategic Goals', 'order=category,id').then(function(d) {
+      setGoals(Array.isArray(d) ? d : []);
+      setLoading(false);
+    });
+  }
+  useE(function() { load(); }, []);
+
+  var filtered = goals.filter(function(g) { return g.goal_type === tab; });
+  var annualGoals = goals.filter(function(g) { return g.goal_type === 'annual'; });
+  var onTrack = annualGoals.filter(function(g) { return g.status === 'On track' || g.status === 'Complete'; }).length;
+  var notStarted = annualGoals.filter(function(g) { return g.status === 'Not started' || !g.status; }).length;
+
+  function openEdit(g) {
+    setEditing(g.id);
+    setEditForm({ status: g.status || 'Not started', lead: g.lead || '', due_date: g.due_date || '' });
+  }
+
+  function handleSave(g) {
+    setSaving(true);
+    sbPatchById('Strategic Goals', g.id, editForm).then(function() {
+      setSaving(false);
+      setEditing(null);
+      load();
+    });
+  }
+
+  var tabStyle = function(t) {
+    return { padding: '6px 14px', fontSize: 12, fontWeight: 500, border: 'none', borderRadius: 20, cursor: 'pointer',
+      background: tab === t ? gold : '#f0ebe2', color: tab === t ? '#fff' : '#666' };
+  };
+
+  if (loading) return <div style={{ padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>;
+
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <StatCard label="Strategic Goals" value="5" />
-        <StatCard label="Avg Progress" value="64%" />
-        <StatCard label="On Track" value="3" />
-        <StatCard label="Needs Attention" value="2" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
+        <StatCard label="Annual Goals" value={annualGoals.length} />
+        <StatCard label="On Track / Complete" value={onTrack} />
+        <StatCard label="Not Started" value={notStarted} />
+        <StatCard label="Focus Areas" value={CATEGORY_ORDER.length} />
       </div>
-      <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
-        {mockData.strategy.map((s, i) => (
-          <div key={i} style={{ borderBottom: i < mockData.strategy.length - 1 ? "0.5px solid #f0ebe2" : "none", paddingBottom: i < mockData.strategy.length - 1 ? 14 : 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <div>
-                <div style={{ fontSize: 12, color: gold, fontWeight: 500, marginBottom: 2 }}>{s.pillar}</div>
-                <div style={{ fontSize: 14, fontWeight: 500 }}>{s.goal}</div>
-              </div>
-              <div style={{ textAlign: "right", minWidth: 60 }}>
-                <div style={{ fontSize: 20, fontWeight: 500, color: s.progress >= 70 ? "#2e7d32" : s.progress >= 40 ? "#8a6200" : "#c62828" }}>{s.progress}%</div>
-                <div style={{ fontSize: 11, color: "#aaa" }}>complete</div>
-              </div>
-            </div>
-            <ProgressBar pct={s.progress} color={s.progress >= 70 ? "#4caf50" : s.progress >= 40 ? gold : "#e57373"} />
-            <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
-              <div style={{ fontSize: 12, color: "#aaa" }}>Owner: <span style={{ color: "#555" }}>{s.owner}</span></div>
-              <div style={{ fontSize: 12, color: "#aaa" }}>Due: <span style={{ color: "#555" }}>{s.due}</span></div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {['annual', 'future', 'three_year_vision'].map(function(t) {
+          return <button key={t} onClick={function() { setTab(t); }} style={tabStyle(t)}>{GOAL_TYPE_LABELS[t]}</button>;
+        })}
+      </div>
+
+      {CATEGORY_ORDER.map(function(cat) {
+        var catGoals = filtered.filter(function(g) { return g.category === cat; });
+        if (catGoals.length === 0) return null;
+        return (
+          <div key={cat} style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.4, color: gold, fontWeight: 700, marginBottom: 10 }}>{cat}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {catGoals.map(function(g) {
+                var sc = GOAL_STATUS_COLORS[g.status] || GOAL_STATUS_COLORS['Not started'];
+                var isEdit = editing === g.id;
+                return (
+                  <div key={g.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>{g.title}</div>
+                        {g.description && <div style={{ fontSize: 12, color: '#777', lineHeight: 1.5 }}>{g.description}</div>}
+                      </div>
+                      {tab !== 'three_year_vision' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                          {g.status && <span style={{ background: sc.bg, color: sc.color, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{g.status}</span>}
+                          <button onClick={function() { isEdit ? setEditing(null) : openEdit(g); }}
+                            style={{ fontSize: 11, color: isEdit ? '#aaa' : gold, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: 0 }}>
+                            {isEdit ? 'Cancel' : 'Edit'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {tab !== 'three_year_vision' && !isEdit && (g.lead || g.due_date) && (
+                      <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+                        {g.lead && <div style={{ fontSize: 12, color: '#aaa' }}>Lead: <span style={{ color: '#555' }}>{g.lead}</span></div>}
+                        {g.due_date && <div style={{ fontSize: 12, color: '#aaa' }}>Due: <span style={{ color: '#555' }}>{g.due_date}</span></div>}
+                      </div>
+                    )}
+                    {isEdit && (
+                      <div style={{ marginTop: 14, paddingTop: 14, borderTop: '0.5px solid #f0ebe2' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                          <div>
+                            <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Status</label>
+                            <select value={editForm.status} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { status: e.target.value }); }); }}
+                              style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff' }}>
+                              {GOAL_STATUS_OPTS.map(function(s) { return <option key={s} value={s}>{s}</option>; })}
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Lead</label>
+                            <input value={editForm.lead} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { lead: e.target.value }); }); }}
+                              style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }} placeholder="Name…" />
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: 10 }}>
+                          <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Due Date</label>
+                          <input type="date" value={editForm.due_date} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { due_date: e.target.value }); }); }}
+                            style={{ padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13 }} />
+                        </div>
+                        <button onClick={function() { handleSave(g); }} disabled={saving}
+                          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+                          {saving ? 'Saving…' : 'Save'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
