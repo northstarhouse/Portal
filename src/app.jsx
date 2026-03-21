@@ -479,7 +479,7 @@ function TeamPicker({ value, onChange }) {
 var volInputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
 var volLabelStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
 var volGrp = { marginBottom: 14 };
-var volSecLabel = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#999', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
+var volSecLabel = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
 
 function VolForm({ form, onChange, saving, onSubmit, title, onCancel }) {
   return (
@@ -677,7 +677,7 @@ function VolunteersView() {
     if (!value) return null;
     return (
       <div style={{ marginBottom: 10 }}>
-        {label && <div style={{ fontSize: 12, color: '#999', fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 5 }}>{label}</div>}
+        {label && <div style={{ fontSize: 12, color: '#888', fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 5 }}>{label}</div>}
         <div style={{ fontSize: 12, color: '#444', lineHeight: 1.65, background: '#faf8f4', borderRadius: 8, padding: '10px 14px' }}>{value}</div>
       </div>
     );
@@ -925,7 +925,7 @@ function DonorsView() {
   var iStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
   var lStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
   var grp = { marginBottom: 14 };
-  var sec = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#999', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
+  var sec = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
 
   var typeColors = {
     'Donation':            { bg: '#e3f2fd', color: '#1565c0' },
@@ -1315,7 +1315,7 @@ function BoardView() {
               {showDivider && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '6px 0' }}>
                   <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
-                  <span style={{ fontSize: 12, color: '#999', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Closed</span>
+                  <span style={{ fontSize: 12, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Closed</span>
                   <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
                 </div>
               )}
@@ -1386,7 +1386,7 @@ function BoardView() {
 
             {isRevealed(selected) ? (
               <div>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#999', fontWeight: 600, marginBottom: 12 }}>Results</div>
+                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 12 }}>Results</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
                   {(function() {
                     var t = tally(selected);
@@ -1404,7 +1404,7 @@ function BoardView() {
                     });
                   })()}
                 </div>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#999', fontWeight: 600, marginBottom: 10 }}>Individual Votes</div>
+                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10 }}>Individual Votes</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
                   {BOARD_MEMBERS.map(function(m) {
                     var mv = itemVotes(selected).find(function(v) { return v.voter === m; });
@@ -1432,7 +1432,7 @@ function BoardView() {
               </div>
             ) : (
               <div>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#999', fontWeight: 600, marginBottom: 12 }}>
+                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 12 }}>
                   Votes · {itemVotes(selected).length}/{BOARD_MEMBERS.length} submitted
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1747,7 +1747,7 @@ function QuarterlyView() {
     });
   }
 
-  var secStyle = { fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 10, marginTop: 4, display: 'block' };
+  var secStyle = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10, marginTop: 4, display: 'block' };
   var inpStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
   var grp = { marginBottom: 14 };
   var card = { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '20px 24px', marginBottom: 16 };
@@ -2007,11 +2007,11 @@ function OperationalView({ opArea }) {
       <div style={{ background: '#fff', borderRadius: 12, padding: '22px 26px', border: '0.5px solid #e8e0d5', marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
           <div>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 6 }}>Operational Area</div>
+            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 6 }}>Operational Area</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{area}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 6 }}>Lead</div>
+            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 6 }}>Lead</div>
             {editLead ? (
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <input value={leadInput} onChange={function(e) { setLeadInput(e.target.value); }} autoFocus style={{ fontSize: 14, padding: '5px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, width: 150 }} />
@@ -2030,7 +2030,7 @@ function OperationalView({ opArea }) {
           <div onClick={function() { setShowBudget(true); }} style={cardHover}
             onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'; }}
             onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600, marginBottom: 8 }}>Budget</div>
+            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 8 }}>Budget</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{fmt(totalPurchases + totalInKind)}</div>
             <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>{fmt(totalPurchases)} purchases · {fmt(totalInKind)} in-kind</div>
             <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add entries →</div>
@@ -2038,7 +2038,7 @@ function OperationalView({ opArea }) {
           <div onClick={function() { setShowVols(true); }} style={cardHover}
             onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'; }}
             onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}>
-            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600, marginBottom: 8 }}>Volunteers</div>
+            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 8 }}>Volunteers</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a' }}>{vols.length}</div>
             <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>assigned to {area}</div>
             <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add notes →</div>
@@ -2088,14 +2088,14 @@ function OperationalView({ opArea }) {
               {[{ label: 'Purchases', val: totalPurchases, color: '#c07040' }, { label: 'In-Kind', val: totalInKind, color: '#5a8a5a' }, { label: 'Total', val: totalPurchases + totalInKind, color: gold }].map(function(s) {
                 return (
                   <div key={s.label} style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600 }}>{s.label}</div>
+                    <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>{s.label}</div>
                     <div style={{ fontSize: 18, fontWeight: 700, color: s.color, marginTop: 4 }}>{fmt(s.val)}</div>
                   </div>
                 );
               })}
             </div>
             <div style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 18 }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600, marginBottom: 12 }}>Add Entry</div>
+              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 12 }}>Add Entry</div>
               <form onSubmit={addBudgetItem}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                   <div>
