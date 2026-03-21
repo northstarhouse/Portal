@@ -144,10 +144,10 @@ function Badge({ status }) {
 
 function StatCard({ label, value, sub }) {
   return (
-    <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px", flex: 1, minWidth: 120 }}>
+    <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px", flex: 1, minWidth: 120, minHeight: 90, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 500, color: "#2a2a2a" }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{sub}</div>}
+      <div style={{ fontSize: 11, color: "#aaa", marginTop: 2, minHeight: 16 }}>{sub || ''}</div>
     </div>
   );
 }
