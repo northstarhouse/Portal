@@ -49,7 +49,7 @@ const cream = "#f8f4ec";
 
 const modules = [
   { id: "home", label: "Overview", icon: "⌂" },
-  { id: "operational", label: "Operational", icon: "◫" },
+  { id: "operational", label: "Operational Areas", icon: "◫" },
   { id: "volunteers", label: "Volunteers", icon: "◎" },
   { id: "donors", label: "Donors & Donations", icon: "◇" },
   { id: "board", label: "Board Voting", icon: "◑" },

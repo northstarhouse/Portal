@@ -48,7 +48,7 @@
   var cream = "#f8f4ec";
   var modules = [
     { id: "home", label: "Overview", icon: "\u2302" },
-    { id: "operational", label: "Operational", icon: "\u25EB" },
+    { id: "operational", label: "Operational Areas", icon: "\u25EB" },
     { id: "volunteers", label: "Volunteers", icon: "\u25CE" },
     { id: "donors", label: "Donors & Donations", icon: "\u25C7" },
     { id: "board", label: "Board Voting", icon: "\u25D1" },
