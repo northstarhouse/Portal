@@ -262,8 +262,8 @@ const typeColors = {
         var days = Math.round((due - now) / 86400000);
         var dueStr = due.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
         var label = days === 0 ? 'Due today' : days < 0 ? Math.abs(days) + ' days overdue' : days + ' days away';
-        var labelColor = days <= 0 ? '#c0392b' : days <= 7 ? '#c0392b' : '#8a6200';
-        var labelBg = days <= 0 ? '#fce4e4' : days <= 7 ? '#fce4e4' : '#fff4e5';
+        var labelColor = '#c0392b';
+        var labelBg = '#fce4e4';
         return (
           <div style={{ background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ fontSize: 16, color: gold }}>⏎</div>

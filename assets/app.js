@@ -205,8 +205,8 @@
       var days = Math.round((due - now) / 864e5);
       var dueStr = due.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
       var label = days === 0 ? "Due today" : days < 0 ? Math.abs(days) + " days overdue" : days + " days away";
-      var labelColor = days <= 0 ? "#c0392b" : days <= 7 ? "#c0392b" : "#8a6200";
-      var labelBg = days <= 0 ? "#fce4e4" : days <= 7 ? "#fce4e4" : "#fff4e5";
+      var labelColor = "#c0392b";
+      var labelBg = "#fce4e4";
       return /* @__PURE__ */ React.createElement("div", { style: { background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, color: gold } }, "\u23CE"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: "#8a6200" } }, "Quarterly Update Due \u2014 ", dueStr), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", fontSize: 12, fontWeight: 500, color: labelColor, background: labelBg, padding: "3px 10px", borderRadius: 20, flexShrink: 0 } }, label));
     })(), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: function() {
       navigate("donors");
