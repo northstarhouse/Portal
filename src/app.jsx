@@ -265,22 +265,25 @@ const typeColors = {
               : 'All day';
             var title = (ev['SUMMARY'] || 'Untitled').replace(/\\,/g, ',').replace(/\\n/g, ' ');
             var tl = title.toLowerCase();
-            var dotColor = /tour/.test(tl) ? '#2e7d32'
-              : /wedding/.test(tl) ? '#c2185b'
+            var dotColor = /tour/.test(tl) ? '#c2185b'
+              : /wedding/.test(tl) ? '#b71c1c'
               : /committee/.test(tl) ? '#e65100'
               : /meeting/.test(tl) ? '#6a1b9a'
+              : /creative/.test(tl) ? '#00838f'
               : /event/.test(tl) ? '#1565c0'
               : gold;
             var label = /tour/.test(tl) ? 'Tour'
               : /wedding/.test(tl) ? 'Wedding'
               : /committee/.test(tl) ? 'Committee'
               : /meeting/.test(tl) ? 'Meeting'
+              : /creative/.test(tl) ? 'Creative'
               : /event/.test(tl) ? 'Event'
               : null;
-            var labelBg = /tour/.test(tl) ? '#e8f5e9'
-              : /wedding/.test(tl) ? '#fce4ec'
+            var labelBg = /tour/.test(tl) ? '#fce4ec'
+              : /wedding/.test(tl) ? '#ffebee'
               : /committee/.test(tl) ? '#fff3e0'
               : /meeting/.test(tl) ? '#f3e5f5'
+              : /creative/.test(tl) ? '#e0f7fa'
               : /event/.test(tl) ? '#e3f2fd'
               : '#f5f5f5';
             return (
