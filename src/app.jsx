@@ -230,9 +230,11 @@ const typeColors = {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Today — March 20, 2026</div>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" }}>Good morning, North Star House</h2>
-        <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Here’s your organization at a glance.</p>
+        <div style={{ display: ‘flex’, alignItems: ‘center’, gap: 8, flexWrap: ‘wrap’ }}>
+          <span style={{ fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase" }}>Today — March 20, 2026</span>
+          <span style={{ color: ‘#ccc’, fontSize: 12 }}>—</span>
+          <span style={{ fontSize: 13, color: "#888" }}>Here’s your organization at a glance.</span>
+        </div>
       </div>
 
       <div style={{ background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
