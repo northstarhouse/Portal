@@ -153,7 +153,7 @@ const mockData = {
 function Badge({ status }) {
   const style = statusColors[status] || { bg: "#f3f3f3", color: "#555" };
   return (
-    <span style={{ background: style.bg, color: style.color, fontSize: 11, fontWeight: 500, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap" }}>
+    <span style={{ background: style.bg, color: style.color, fontSize: 12, fontWeight: 500, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap" }}>
       {status}
     </span>
   );
@@ -162,9 +162,9 @@ function Badge({ status }) {
 function StatCard({ label, value, sub }) {
   return (
     <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px", minHeight: 90, display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 120 }}>
-      <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 13, color: "#888", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 500, color: "#2a2a2a" }}>{value}</div>
-      <div style={{ fontSize: 11, color: "#aaa", marginTop: 2, minHeight: 16 }}>{sub || ''}</div>
+      <div style={{ fontSize: 12, color: "#aaa", marginTop: 2, minHeight: 16 }}>{sub || ''}</div>
     </div>
   );
 }
@@ -181,7 +181,7 @@ function Table({ cols, rows, renderRow }) {
   return (
     <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, overflow: "hidden" }}>
     <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
         <thead>
           <tr>
             {cols.map(c => (
@@ -249,18 +249,18 @@ const typeColors = {
     <div>
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase" }}>Today — March 20, 2026</span>
-          <span style={{ color: '#ccc', fontSize: 12 }}>—</span>
-          <span style={{ fontSize: 13, color: "#888" }}>Here's your organization at a glance.</span>
+          <span style={{ fontSize: 13, color: gold, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase" }}>Today — March 20, 2026</span>
+          <span style={{ color: '#ccc', fontSize: 13 }}>—</span>
+          <span style={{ fontSize: 14, color: "#888" }}>Here's your organization at a glance.</span>
         </div>
       </div>
 
       <div style={{ background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ fontSize: 16, color: gold }}>⏎</div>
         <div>
-          <div style={{ fontSize: 12, fontWeight: 500, color: "#8a6200" }}>Quarterly Update Due — March 31, 2026</div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: "#8a6200" }}>Quarterly Update Due — March 31, 2026</div>
         </div>
-        <div style={{ marginLeft: "auto", fontSize: 11, fontWeight: 500, color: "#c0392b", background: "#fce4e4", padding: "3px 10px", borderRadius: 20 }}>11 days away</div>
+        <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 500, color: "#c0392b", background: "#fce4e4", padding: "3px 10px", borderRadius: 20 }}>11 days away</div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
@@ -272,9 +272,9 @@ const typeColors = {
 
       <div style={{ marginBottom: 16 }}>
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>Upcoming — NSH Calendar</div>
-          {calEvents === null && <div style={{ fontSize: 13, color: "#aaa" }}>Loading…</div>}
-          {calEvents !== null && calEvents.length === 0 && <div style={{ fontSize: 13, color: "#aaa" }}>No upcoming events in the next 2 weeks.</div>}
+          <div style={{ fontSize: 13, fontWeight: 500, color: gold, marginBottom: 14, textTransform: "uppercase", letterSpacing: 0.8 }}>Upcoming — NSH Calendar</div>
+          {calEvents === null && <div style={{ fontSize: 14, color: "#aaa" }}>Loading…</div>}
+          {calEvents !== null && calEvents.length === 0 && <div style={{ fontSize: 14, color: "#aaa" }}>No upcoming events in the next 2 weeks.</div>}
           {calEvents !== null && calEvents.map(function(ev, i) {
             var start = parseIcalDate(ev['DTSTART']);
             var isAllDay = ev['DTSTART'] && ev['DTSTART'].replace(/[^0-9TZ]/g,'').length === 8;
@@ -310,14 +310,14 @@ const typeColors = {
               <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
                 <div style={{ minWidth: 6, height: 6, borderRadius: "50%", background: dotColor, marginTop: 5, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#2a2a2a" }}>{title}</div>
-                  <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{dayStr}{timeStr !== 'All day' ? ' · ' + timeStr : ''}</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "#2a2a2a" }}>{title}</div>
+                  <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>{dayStr}{timeStr !== 'All day' ? ' · ' + timeStr : ''}</div>
                 </div>
-                {label && <span style={{ fontSize: 11, background: labelBg, color: dotColor, borderRadius: 20, fontWeight: 500, flexShrink: 0, width: 90, textAlign: 'center', display: 'inline-block', padding: '2px 0' }}>{label}</span>}
+                {label && <span style={{ fontSize: 12, background: labelBg, color: dotColor, borderRadius: 20, fontWeight: 500, flexShrink: 0, width: 90, textAlign: 'center', display: 'inline-block', padding: '2px 0' }}>{label}</span>}
               </div>
             );
           })}
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "0.5px solid #f0ebe2", fontSize: 11, color: "#bbb" }}>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "0.5px solid #f0ebe2", fontSize: 12, color: "#bbb" }}>
             Synced from Google Calendar
           </div>
         </div>
@@ -420,10 +420,10 @@ function TeamPicker({ value, onChange }) {
         onClick={function() { setOpen(function(o) { return !o; }); }}
         style={{ minHeight: 38, border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', background: '#fff', display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}
       >
-        {selected.length === 0 && <span style={{ fontSize: 13, color: '#bbb' }}>Select teams...</span>}
+        {selected.length === 0 && <span style={{ fontSize: 14, color: '#bbb' }}>Select teams...</span>}
         {selected.map(function(t) {
           return (
-            <span key={t} style={{ background: (TEAM_COLORS[t] || { bg: '#f3f3f3' }).bg, color: (TEAM_COLORS[t] || { color: '#555' }).color, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+            <span key={t} style={{ background: (TEAM_COLORS[t] || { bg: '#f3f3f3' }).bg, color: (TEAM_COLORS[t] || { color: '#555' }).color, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
               {t}
               <span
                 onClick={function(e) { e.stopPropagation(); remove(t); }}
@@ -432,7 +432,7 @@ function TeamPicker({ value, onChange }) {
             </span>
           );
         })}
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#bbb', flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#bbb', flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
       </div>
       {open && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 100, marginTop: 4, padding: '6px 0', maxHeight: 220, overflowY: 'auto' }}>
@@ -442,7 +442,7 @@ function TeamPicker({ value, onChange }) {
               <div
                 key={opt}
                 onClick={function() { toggle(opt); }}
-                style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: isOn ? (TEAM_COLORS[opt] || { bg: '#f3f3f3' }).bg : '#fff', color: isOn ? (TEAM_COLORS[opt] || { color: '#555' }).color : '#2a2a2a' }}
+                style={{ padding: '8px 14px', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: isOn ? (TEAM_COLORS[opt] || { bg: '#f3f3f3' }).bg : '#fff', color: isOn ? (TEAM_COLORS[opt] || { color: '#555' }).color : '#2a2a2a' }}
                 onMouseEnter={function(e) { if (!isOn) e.currentTarget.style.background = '#faf8f4'; }}
                 onMouseLeave={function(e) { if (!isOn) e.currentTarget.style.background = '#fff'; }}
               >
@@ -457,8 +457,8 @@ function TeamPicker({ value, onChange }) {
   );
 }
 
-var volInputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
-var volLabelStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
+var volInputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 14, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+var volLabelStyle = { fontSize: 13, color: '#666', fontWeight: 500 };
 var volGrp = { marginBottom: 14 };
 var volSecLabel = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
 
@@ -490,8 +490,8 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel }) {
             <div><label style={volLabelStyle}>Day</label><input name="Day" value={form['Day']} onChange={onChange} style={volInputStyle} /></div>
           </div>
           <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="CC" checked={form['CC']} onChange={onChange} /> CC</label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Nametag" checked={form['Nametag']} onChange={onChange} /> Nametag</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="CC" checked={form['CC']} onChange={onChange} /> CC</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Nametag" checked={form['Nametag']} onChange={onChange} /> Nametag</label>
           </div>
           <div style={volGrp}><label style={volLabelStyle}>Picture URL (Google Drive)</label><input name="Picture URL" value={form['Picture URL']} onChange={onChange} style={volInputStyle} placeholder="https://drive.google.com/..." /></div>
           <span style={volSecLabel}>Notes</span>
@@ -501,8 +501,8 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel }) {
           <span style={volSecLabel}>Goals</span>
           <div style={volGrp}><label style={volLabelStyle}>What they want to see at NSH</label><textarea name="What they want to see at NSH" value={form['What they want to see at NSH']} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-            <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : 'Save'}</button>
-            <button type="button" onClick={onCancel} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
+            <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : 'Save'}</button>
+            <button type="button" onClick={onCancel} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 14, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
           </div>
         </form>
       </div>
@@ -646,8 +646,8 @@ function VolunteersView() {
     if (!value) return null;
     return (
       <div style={{ display: 'flex', gap: 0, marginBottom: 10, alignItems: 'flex-start' }}>
-        <div style={{ width: 110, fontSize: 12, color: '#aaa', flexShrink: 0, paddingTop: 1 }}>{label}</div>
-        <div style={{ fontSize: 13, color: '#2a2a2a', flex: 1, lineHeight: 1.4 }}>
+        <div style={{ width: 110, fontSize: 13, color: '#aaa', flexShrink: 0, paddingTop: 1 }}>{label}</div>
+        <div style={{ fontSize: 14, color: '#2a2a2a', flex: 1, lineHeight: 1.4 }}>
           {link ? <a href={link} style={{ color: gold, textDecoration: 'none' }}>{value}</a> : value}
         </div>
       </div>
@@ -658,8 +658,8 @@ function VolunteersView() {
     if (!value) return null;
     return (
       <div style={{ marginBottom: 10 }}>
-        {label && <div style={{ fontSize: 11, color: '#bbb', fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 5 }}>{label}</div>}
-        <div style={{ fontSize: 13, color: '#444', lineHeight: 1.65, background: '#faf8f4', borderRadius: 8, padding: '10px 14px' }}>{value}</div>
+        {label && <div style={{ fontSize: 12, color: '#bbb', fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 5 }}>{label}</div>}
+        <div style={{ fontSize: 14, color: '#444', lineHeight: 1.65, background: '#faf8f4', borderRadius: 8, padding: '10px 14px' }}>{value}</div>
       </div>
     );
   }
@@ -676,14 +676,14 @@ function VolunteersView() {
         <div style={{ display: 'flex', gap: 0, background: '#f0ebe3', borderRadius: 10, padding: 3 }}>
           <button
             onClick={function() { setTab('active'); setFilterTeam('All'); }}
-            style={{ border: 'none', borderRadius: 8, padding: '6px 18px', fontSize: 13, fontWeight: tab === 'active' ? 600 : 400, cursor: 'pointer', background: tab === 'active' ? '#fff' : 'transparent', color: tab === 'active' ? '#2a2a2a' : '#999', boxShadow: tab === 'active' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
-          >Active <span style={{ fontSize: 11, color: tab === 'active' ? gold : '#bbb', fontWeight: 500 }}>{active}</span></button>
+            style={{ border: 'none', borderRadius: 8, padding: '6px 18px', fontSize: 14, fontWeight: tab === 'active' ? 600 : 400, cursor: 'pointer', background: tab === 'active' ? '#fff' : 'transparent', color: tab === 'active' ? '#2a2a2a' : '#999', boxShadow: tab === 'active' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
+          >Active <span style={{ fontSize: 12, color: tab === 'active' ? gold : '#bbb', fontWeight: 500 }}>{active}</span></button>
           <button
             onClick={function() { setTab('inactive'); setFilterTeam('All'); }}
-            style={{ border: 'none', borderRadius: 8, padding: '6px 18px', fontSize: 13, fontWeight: tab === 'inactive' ? 600 : 400, cursor: 'pointer', background: tab === 'inactive' ? '#fff' : 'transparent', color: tab === 'inactive' ? '#2a2a2a' : '#999', boxShadow: tab === 'inactive' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
-          >Inactive <span style={{ fontSize: 11, color: tab === 'inactive' ? gold : '#bbb', fontWeight: 500 }}>{inactive}</span></button>
+            style={{ border: 'none', borderRadius: 8, padding: '6px 18px', fontSize: 14, fontWeight: tab === 'inactive' ? 600 : 400, cursor: 'pointer', background: tab === 'inactive' ? '#fff' : 'transparent', color: tab === 'inactive' ? '#2a2a2a' : '#999', boxShadow: tab === 'inactive' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
+          >Inactive <span style={{ fontSize: 12, color: tab === 'inactive' ? gold : '#bbb', fontWeight: 500 }}>{inactive}</span></button>
         </div>
-        <button onClick={function() { setForm(emptyForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ Add Volunteer</button>
+        <button onClick={function() { setForm(emptyForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>+ Add Volunteer</button>
       </div>
 
       {!loading && teamSet.length > 2 && (
@@ -699,7 +699,7 @@ function VolunteersView() {
                   border: isActive ? 'none' : '0.5px solid #e0d8cc',
                   borderRadius: 20,
                   padding: '5px 12px',
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: isActive ? 600 : 400,
                   cursor: 'pointer',
                   background: isActive ? tc.bg : '#fff',
@@ -712,10 +712,10 @@ function VolunteersView() {
         </div>
       )}
 
-      {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#c0392b' }}>Error: {error}</div>}
+      {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 14, color: '#c0392b' }}>Error: {error}</div>}
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading volunteers...</div>
+        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 14 }}>Loading volunteers...</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 14 }}>
           {filtered.map(function(v, i) {
@@ -730,8 +730,8 @@ function VolunteersView() {
                 ) : (
                   <div style={{ width: 56, height: 56, borderRadius: '50%', background: gold, color: '#fff', fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>{initials(v)}</div>
                 )}
-                <div style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a', marginBottom: 3, lineHeight: 1.3 }}>{v['First Name']} {v['Last Name']}</div>
-                {v['Team'] && <div style={{ fontSize: 11, color: '#aaa', marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v['Team'] || '').split('|')[0].trim()}</div>}
+                <div style={{ fontSize: 14, fontWeight: 500, color: '#2a2a2a', marginBottom: 3, lineHeight: 1.3 }}>{v['First Name']} {v['Last Name']}</div>
+                {v['Team'] && <div style={{ fontSize: 12, color: '#aaa', marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v['Team'] || '').split('|')[0].trim()}</div>}
                 <Badge status={v['Status'] || 'Active'} />
               </div>
             );
@@ -753,13 +753,13 @@ function VolunteersView() {
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 3, lineHeight: 1.2 }}>{selected['First Name']} {selected['Last Name']}</div>
-                  {selected['Team'] && <div style={{ fontSize: 12, color: '#9a7f5a', marginBottom: 6, fontWeight: 500 }}>{selected['Team']}</div>}
+                  {selected['Team'] && <div style={{ fontSize: 13, color: '#9a7f5a', marginBottom: 6, fontWeight: 500 }}>{selected['Team']}</div>}
                   <Badge status={selected['Status'] || 'Active'} />
-                  {selected['Overview Notes'] && <div style={{ fontSize: 12, color: '#7a6a55', marginTop: 8, lineHeight: 1.5, fontStyle: 'italic' }}>{selected['Overview Notes']}</div>}
+                  {selected['Overview Notes'] && <div style={{ fontSize: 13, color: '#7a6a55', marginTop: 8, lineHeight: 1.5, fontStyle: 'italic' }}>{selected['Overview Notes']}</div>}
                 </div>
               </div>
               <div style={{ position: 'absolute', top: 14, right: 14, display: 'flex', gap: 8 }}>
-                <button onClick={function() { openEdit(selected); }} style={{ background: '#fff', border: '0.5px solid #ddd4c4', borderRadius: 7, padding: '5px 12px', fontSize: 12, color: '#7a6a55', cursor: 'pointer', fontWeight: 500 }}>Edit</button>
+                <button onClick={function() { openEdit(selected); }} style={{ background: '#fff', border: '0.5px solid #ddd4c4', borderRadius: 7, padding: '5px 12px', fontSize: 13, color: '#7a6a55', cursor: 'pointer', fontWeight: 500 }}>Edit</button>
                 <button onClick={function() { setSelected(null); }} style={{ background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: '#666', lineHeight: 1 }}>×</button>
               </div>
             </div>
@@ -795,7 +795,7 @@ function VolunteersView() {
                   <NoteBlock value={selected['What they want to see at NSH']} />
                 </div>
               )}
-              <button onClick={function() { setSelected(null); }} style={{ marginTop: 16, width: '100%', padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: '#999', fontWeight: 500 }}>Close</button>
+              <button onClick={function() { setSelected(null); }} style={{ marginTop: 16, width: '100%', padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 14, color: '#999', fontWeight: 500 }}>Close</button>
             </div>
           </div>
         </div>
@@ -903,8 +903,8 @@ function DonorsView() {
     }).catch(function() { setSaving(false); });
   }
 
-  var iStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
-  var lStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
+  var iStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 14, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+  var lStyle = { fontSize: 13, color: '#666', fontWeight: 500 };
   var grp = { marginBottom: 14 };
   var sec = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
 
@@ -927,11 +927,11 @@ function DonorsView() {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <div style={{ fontSize: 13, color: '#888' }}>{loading ? 'Loading...' : totalDonors + ' donation' + (totalDonors !== 1 ? 's' : '')}</div>
-        <button onClick={function() { setForm(emptyDonForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ Add Donation</button>
+        <div style={{ fontSize: 14, color: '#888' }}>{loading ? 'Loading...' : totalDonors + ' donation' + (totalDonors !== 1 ? 's' : '')}</div>
+        <button onClick={function() { setForm(emptyDonForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>+ Add Donation</button>
       </div>
 
-      {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#c0392b' }}>Error: {error}</div>}
+      {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 14, color: '#c0392b' }}>Error: {error}</div>}
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
         {['All'].concat(DONATION_TYPES).map(function(t) {
@@ -939,7 +939,7 @@ function DonorsView() {
           var tc = typeColors[t] || { bg: '#f5f0ea', color: '#888' };
           return (
             <button key={t} onClick={function() { setFilterType(t); }}
-              style={{ padding: '5px 14px', borderRadius: 20, border: '1.5px solid ' + (active ? tc.color : '#e0d8cc'), background: active ? tc.bg : '#fff', color: active ? tc.color : '#888', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}>
+              style={{ padding: '5px 14px', borderRadius: 20, border: '1.5px solid ' + (active ? tc.color : '#e0d8cc'), background: active ? tc.bg : '#fff', color: active ? tc.color : '#888', fontSize: 13, fontWeight: active ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}>
               {t}
             </button>
           );
@@ -947,12 +947,12 @@ function DonorsView() {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading donations...</div>
+        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 14 }}>Loading donations...</div>
       ) : (
         <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, overflow: 'hidden' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 0, padding: '8px 16px', borderBottom: '0.5px solid #e8e0d4', background: '#faf8f4' }}>
             {['Donor', 'Type', 'Amount', 'Date'].map(function(h) {
-              return <div key={h} style={{ fontSize: 11, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>{h}</div>;
+              return <div key={h} style={{ fontSize: 12, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>{h}</div>;
             })}
           </div>
           {donations.filter(function(d) { return filterType === 'All' || d['Donation Type'] === filterType; }).map(function(d, i) {
@@ -967,16 +967,16 @@ function DonorsView() {
                 style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 0, padding: '11px 16px', borderBottom: '0.5px solid #f0ebe2', cursor: 'pointer', background: '#fff', alignItems: 'center', transition: 'background 0.12s' }}
               >
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{d['Donor Name']}</div>
-                  <div style={{ fontSize: 11, color: '#bbb', marginTop: 1 }}>{d['Account Type']}</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: '#2a2a2a' }}>{d['Donor Name']}</div>
+                  <div style={{ fontSize: 12, color: '#bbb', marginTop: 1 }}>{d['Account Type']}</div>
                 </div>
                 <div>
-                  <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>{d['Donation Type']}</span>
+                  <span style={{ background: tc.bg, color: tc.color, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>{d['Donation Type']}</span>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{fmtAmount(d['Amount'])}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{fmtAmount(d['Amount'])}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 12, color: '#888' }}>{fmtDate(d['Close Date'])}</span>
-                  <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: acked ? '#e8f5e9' : '#fff8e1', color: acked ? '#2e7d32' : '#8a6200' }}>{acked ? 'Thanked' : 'Pending'}</span>
+                  <span style={{ fontSize: 13, color: '#888' }}>{fmtDate(d['Close Date'])}</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: acked ? '#e8f5e9' : '#fff8e1', color: acked ? '#2e7d32' : '#8a6200' }}>{acked ? 'Thanked' : 'Pending'}</span>
                 </div>
               </div>
             );
@@ -990,38 +990,38 @@ function DonorsView() {
             <div style={{ background: 'linear-gradient(135deg, #f8f4ec 0%, #f0e8dc 100%)', padding: '24px 28px 18px', borderBottom: '0.5px solid #e8dece', position: 'relative', borderRadius: '16px 16px 0 0' }}>
               <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 4 }}>{selected['Donor Name']}</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                {(function() { var tc = typeColors[selected['Donation Type']] || { bg: '#f3f3f3', color: '#555' }; return <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20 }}>{selected['Donation Type']}</span>; })()}
-                <span style={{ fontSize: 12, color: '#aaa' }}>{fmtDate(selected['Close Date'])}</span>
+                {(function() { var tc = typeColors[selected['Donation Type']] || { bg: '#f3f3f3', color: '#555' }; return <span style={{ background: tc.bg, color: tc.color, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20 }}>{selected['Donation Type']}</span>; })()}
+                <span style={{ fontSize: 13, color: '#aaa' }}>{fmtDate(selected['Close Date'])}</span>
               </div>
               <button onClick={function() { setSelected(null); }} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: '#666' }}>×</button>
             </div>
             <div style={{ padding: '20px 28px 24px', overflowY: 'auto', flex: 1 }}>
-              <div style={{ marginBottom: 20 }}><span style={{ fontSize: 13, color: '#aaa', marginRight: 8 }}>Amount</span><span style={{ fontSize: 16, fontWeight: 600, color: gold }}>{fmtAmount(selected['Amount'])}</span></div>
+              <div style={{ marginBottom: 20 }}><span style={{ fontSize: 14, color: '#aaa', marginRight: 8 }}>Amount</span><span style={{ fontSize: 16, fontWeight: 600, color: gold }}>{fmtAmount(selected['Amount'])}</span></div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
                 <div>
                   <span style={sec}>Donor Info</span>
-                  {selected['Informal Names'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Goes by</span>{selected['Informal Names']}</div>}
-                  {selected['Account Type'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Type</span>{selected['Account Type']}</div>}
-                  {selected['Email'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Email</span><a href={'mailto:' + selected['Email']} style={{ color: gold, textDecoration: 'none' }}>{selected['Email']}</a></div>}
-                  {selected['Phone Number'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Phone</span>{selected['Phone Number']}</div>}
-                  {selected['Address'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Address</span><span style={{ whiteSpace: 'pre-line' }}>{selected['Address']}</span></div>}
+                  {selected['Informal Names'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Goes by</span>{selected['Informal Names']}</div>}
+                  {selected['Account Type'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Type</span>{selected['Account Type']}</div>}
+                  {selected['Email'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Email</span><a href={'mailto:' + selected['Email']} style={{ color: gold, textDecoration: 'none' }}>{selected['Email']}</a></div>}
+                  {selected['Phone Number'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Phone</span>{selected['Phone Number']}</div>}
+                  {selected['Address'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Address</span><span style={{ whiteSpace: 'pre-line' }}>{selected['Address']}</span></div>}
                   <span style={sec}>Payment</span>
-                  {selected['Payment Type'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Method</span>{selected['Payment Type']}</div>}
-                  {selected['Benefits'] && <div style={{ fontSize: 13, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Benefits</span>{selected['Benefits']}</div>}
-                  <div style={{ fontSize: 13, marginBottom: 8 }}>
+                  {selected['Payment Type'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Method</span>{selected['Payment Type']}</div>}
+                  {selected['Benefits'] && <div style={{ fontSize: 14, marginBottom: 8 }}><span style={{ color: '#aaa', marginRight: 8 }}>Benefits</span>{selected['Benefits']}</div>}
+                  <div style={{ fontSize: 14, marginBottom: 8 }}>
                     <span style={{ color: '#aaa', marginRight: 8 }}>Acknowledged</span>
-                    <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: (selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? '#e8f5e9' : '#fff8e1', color: (selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? '#2e7d32' : '#8a6200' }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: (selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? '#e8f5e9' : '#fff8e1', color: (selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? '#2e7d32' : '#8a6200' }}>
                       {(selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? 'Thanked' : 'Pending'}
                     </span>
                   </div>
                 </div>
                 <div>
-                  {selected['Donation Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Donation Notes</span><div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Donation Notes']}</div></div>}
-                  {selected['Donor Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Donor Notes</span><div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Donor Notes']}</div></div>}
-                  {selected['Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Notes</span><div style={{ fontSize: 13, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Notes']}</div></div>}
+                  {selected['Donation Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Donation Notes</span><div style={{ fontSize: 14, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Donation Notes']}</div></div>}
+                  {selected['Donor Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Donor Notes</span><div style={{ fontSize: 14, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Donor Notes']}</div></div>}
+                  {selected['Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Notes</span><div style={{ fontSize: 14, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Notes']}</div></div>}
                 </div>
               </div>
-              <button onClick={function() { setSelected(null); }} style={{ marginTop: 16, width: '100%', padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: '#999', fontWeight: 500 }}>Close</button>
+              <button onClick={function() { setSelected(null); }} style={{ marginTop: 16, width: '100%', padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 14, color: '#999', fontWeight: 500 }}>Close</button>
             </div>
           </div>
         </div>
@@ -1060,8 +1060,8 @@ function DonorsView() {
               </div>
               <div style={grp}><label style={lStyle}>Benefits</label><input name="Benefits" value={form['Benefits']} onChange={handleDonFormChange} style={iStyle} /></div>
               <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Acknowledged" checked={form['Acknowledged']} onChange={handleDonFormChange} /> Acknowledged / Thanked</label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Salesforce" checked={form['Salesforce']} onChange={handleDonFormChange} /> In Salesforce</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Acknowledged" checked={form['Acknowledged']} onChange={handleDonFormChange} /> Acknowledged / Thanked</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Salesforce" checked={form['Salesforce']} onChange={handleDonFormChange} /> In Salesforce</label>
               </div>
               <span style={sec}>Contact</span>
               <div style={grp}><label style={lStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={handleDonFormChange} style={iStyle} /></div>
@@ -1072,8 +1072,8 @@ function DonorsView() {
               <div style={grp}><label style={lStyle}>Donor Notes</label><textarea name="Donor Notes" value={form['Donor Notes']} onChange={handleDonFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
               <div style={grp}><label style={lStyle}>Notes</label><textarea name="Notes" value={form['Notes']} onChange={handleDonFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : 'Save Donation'}</button>
-                <button type="button" onClick={function() { setShowAdd(false); }} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
+                <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : 'Save Donation'}</button>
+                <button type="button" onClick={function() { setShowAdd(false); }} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 14, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
               </div>
             </form>
           </div>
@@ -1114,13 +1114,13 @@ function RichEditor({ value, onChange, placeholder }) {
     <div style={{ border: '0.5px solid #e0d8cc', borderRadius: 8, overflow: 'hidden', marginTop: 4 }}>
       <style>{'.rich-editor:empty:before{content:attr(data-placeholder);color:#bbb;pointer-events:none}'}</style>
       <div style={{ display: 'flex', gap: 4, padding: '5px 8px', borderBottom: '0.5px solid #f0ebe2', background: '#faf8f4' }}>
-        <button type="button" onMouseDown={function(e) { e.preventDefault(); exec('bold'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 5, padding: '1px 8px', fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#444', lineHeight: 1.6 }}>B</button>
-        <button type="button" onMouseDown={function(e) { e.preventDefault(); exec('italic'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 5, padding: '1px 8px', fontSize: 13, fontStyle: 'italic', cursor: 'pointer', color: '#444', lineHeight: 1.6 }}>I</button>
+        <button type="button" onMouseDown={function(e) { e.preventDefault(); exec('bold'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 5, padding: '1px 8px', fontSize: 14, fontWeight: 700, cursor: 'pointer', color: '#444', lineHeight: 1.6 }}>B</button>
+        <button type="button" onMouseDown={function(e) { e.preventDefault(); exec('italic'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 5, padding: '1px 8px', fontSize: 14, fontStyle: 'italic', cursor: 'pointer', color: '#444', lineHeight: 1.6 }}>I</button>
       </div>
       <div ref={ref} className="rich-editor" contentEditable={true} suppressContentEditableWarning={true}
         onInput={function() { onChange(ref.current.innerHTML); }}
         data-placeholder={placeholder || 'Write something…'}
-        style={{ minHeight: 72, padding: '8px 10px', fontSize: 13, outline: 'none', fontFamily: 'system-ui, sans-serif', lineHeight: 1.6, background: '#fff' }}
+        style={{ minHeight: 72, padding: '8px 10px', fontSize: 14, outline: 'none', fontFamily: 'system-ui, sans-serif', lineHeight: 1.6, background: '#fff' }}
       />
     </div>
   );
@@ -1265,18 +1265,18 @@ function BoardView() {
     return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  var bInp = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
-  var bLbl = { fontSize: 12, color: '#666', fontWeight: 500 };
+  var bInp = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 14, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+  var bLbl = { fontSize: 13, color: '#666', fontWeight: 500 };
   var bGrp = { marginBottom: 14 };
 
   if (loading) return <div style={{ color: '#aaa', fontSize: 14, padding: 40, textAlign: 'center' }}>Loading…</div>;
-  if (loadError) return <div style={{ color: '#c62828', fontSize: 13, padding: 20, background: '#ffebee', borderRadius: 8, border: '0.5px solid #ffcdd2' }}><strong>Supabase error:</strong> {loadError}<br/><br/>Make sure you've run the SQL setup in Supabase and that RLS is disabled on both tables.</div>;
+  if (loadError) return <div style={{ color: '#c62828', fontSize: 14, padding: 20, background: '#ffebee', borderRadius: 8, border: '0.5px solid #ffcdd2' }}><strong>Supabase error:</strong> {loadError}<br/><br/>Make sure you've run the SQL setup in Supabase and that RLS is disabled on both tables.</div>;
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div style={{ fontSize: 13, color: '#888' }}>{items.length} topic{items.length !== 1 ? 's' : ''}</div>
-        <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ Add Topic</button>
+        <div style={{ fontSize: 14, color: '#888' }}>{items.length} topic{items.length !== 1 ? 's' : ''}</div>
+        <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>+ Add Topic</button>
       </div>
 
       {items.length === 0 && <div style={{ color: '#aaa', fontSize: 14, textAlign: 'center', padding: 40 }}>No voting items yet.</div>}
@@ -1296,7 +1296,7 @@ function BoardView() {
               {showDivider && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '6px 0' }}>
                   <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
-                  <span style={{ fontSize: 11, color: '#bbb', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Closed</span>
+                  <span style={{ fontSize: 12, color: '#bbb', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Closed</span>
                   <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
                 </div>
               )}
@@ -1310,24 +1310,24 @@ function BoardView() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 15, fontWeight: 500, color: '#2a2a2a', marginBottom: 4 }}>{item.title}</div>
-                  <div style={{ fontSize: 12, color: '#aaa' }}>
+                  <div style={{ fontSize: 13, color: '#aaa' }}>
                     {item.submitted_by ? <span>Submitted by {item.submitted_by}{item.due_date ? ' · ' : ''}</span> : null}
                     {item.due_date ? <span>Due {fmtDate(item.due_date)}</span> : null}
                     {item.meeting_date ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 16, flexShrink: 0 }}>
-                  <span style={{ fontSize: 12, color: '#aaa' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                  <span style={{ fontSize: 13, color: '#aaa' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
                   {revealed
-                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Closed – Decision Made</span>
-                    : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Open</span>
+                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Closed – Decision Made</span>
+                    : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Open</span>
                   }
                 </div>
               </div>
               {revealed && (
                 <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
                   {[['Yes', t.yes, '#2e7d32'], ['No', t.no, '#c62828'], ['Abstain', t.abstain, '#e65100']].map(function(entry) {
-                    return <div key={entry[0]} style={{ fontSize: 12 }}><span style={{ color: entry[2], fontWeight: 600 }}>{entry[1]}</span><span style={{ color: '#aaa' }}> {entry[0]}</span></div>;
+                    return <div key={entry[0]} style={{ fontSize: 13 }}><span style={{ color: entry[2], fontWeight: 600 }}>{entry[1]}</span><span style={{ color: '#aaa' }}> {entry[0]}</span></div>;
                   })}
                 </div>
               )}
@@ -1341,11 +1341,11 @@ function BoardView() {
       {selected && (
         <div style={{ position: 'fixed', inset: 0, background: cream, zIndex: 1010, overflowY: 'auto', padding: '32px' }}>
           <div style={{ maxWidth: 680, margin: '0 auto' }}>
-            <button onClick={function() { setSelected(null); }} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#888', fontSize: 13, cursor: 'pointer', marginBottom: 24, padding: 0 }}>← Back to topics</button>
+            <button onClick={function() { setSelected(null); }} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#888', fontSize: 14, cursor: 'pointer', marginBottom: 24, padding: 0 }}>← Back to topics</button>
             <div style={{ background: '#fff', borderRadius: 16, padding: 36, boxShadow: '0 2px 20px rgba(0,0,0,0.06)' }}>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 22, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
-                <div style={{ fontSize: 13, color: '#aaa' }}>
+                <div style={{ fontSize: 14, color: '#aaa' }}>
                   {selected.submitted_by ? <span>Submitted by {selected.submitted_by}</span> : null}
                   {selected.due_date ? <span> · Due {fmtDate(selected.due_date)}</span> : null}
                   {selected.meeting_date ? <span> · Meeting {fmtDate(selected.meeting_date)}</span> : null}
@@ -1353,12 +1353,12 @@ function BoardView() {
             </div>
 
             {selected.description && (
-              <div dangerouslySetInnerHTML={{ __html: selected.description }} style={{ fontSize: 13, color: '#555', lineHeight: 1.6, marginBottom: 16, padding: '12px 14px', background: '#faf8f4', borderRadius: 8, borderLeft: '3px solid ' + gold }} />
+              <div dangerouslySetInnerHTML={{ __html: selected.description }} style={{ fontSize: 14, color: '#555', lineHeight: 1.6, marginBottom: 16, padding: '12px 14px', background: '#faf8f4', borderRadius: 8, borderLeft: '3px solid ' + gold }} />
             )}
 
             {selected.attachment_url && (
               <div style={{ marginBottom: 16 }}>
-                <a href={selected.attachment_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: gold, textDecoration: 'none' }}>📎 View Attachment</a>
+                <a href={selected.attachment_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 14, color: gold, textDecoration: 'none' }}>📎 View Attachment</a>
               </div>
             )}
 
@@ -1376,7 +1376,7 @@ function BoardView() {
                       return (
                         <div key={entry.label} style={{ background: entry.bg, border: '1px solid ' + entry.border, borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
                           <div style={{ fontSize: 28, fontWeight: 700, color: entry.color, lineHeight: 1 }}>{entry.count}</div>
-                          <div style={{ fontSize: 11, color: entry.color, fontWeight: 600, marginTop: 4, opacity: 0.8 }}>{entry.label}</div>
+                          <div style={{ fontSize: 12, color: entry.color, fontWeight: 600, marginTop: 4, opacity: 0.8 }}>{entry.label}</div>
                         </div>
                       );
                     });
@@ -1387,22 +1387,22 @@ function BoardView() {
                   {BOARD_MEMBERS.map(function(m) {
                     var mv = itemVotes(selected).find(function(v) { return v.voter === m; });
                     if (!mv) return (
-                      <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 13 }}>
+                      <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 14 }}>
                         <span style={{ fontWeight: 500, color: '#2a2a2a' }}>{m}</span>
                         <span style={{ color: '#bbb' }}>—</span>
-                        <span style={{ color: '#ccc', fontSize: 12 }}>No vote</span>
+                        <span style={{ color: '#ccc', fontSize: 13 }}>No vote</span>
                       </div>
                     );
                     var vc = VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' };
                     return (
-                      <div key={m} style={{ padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 13 }}>
+                      <div key={m} style={{ padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 14 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontWeight: 500, color: '#2a2a2a' }}>{m}</span>
                           <span style={{ color: '#bbb' }}>—</span>
-                          <span style={{ background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span>
-                          {mv.changed_in_meeting && <span style={{ fontSize: 11, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
+                          <span style={{ background: vc.bg, color: vc.color, fontSize: 13, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span>
+                          {mv.changed_in_meeting && <span style={{ fontSize: 12, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
                         </div>
-                        {mv.note && <div style={{ fontSize: 12, color: '#777', marginTop: 4, fontStyle: 'italic' }}>{mv.note}</div>}
+                        {mv.note && <div style={{ fontSize: 13, color: '#777', marginTop: 4, fontStyle: 'italic' }}>{mv.note}</div>}
                       </div>
                     );
                   })}
@@ -1420,12 +1420,12 @@ function BoardView() {
                     return (
                       <div key={m} style={{ background: '#fafafa', borderRadius: 10, padding: '10px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 13, fontWeight: 500, color: mv ? '#aaa' : '#2a2a2a' }}>{m}</span>
-                          {mv && <><span style={{ color: '#bbb' }}>—</span><span style={{ background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span></>}
-                          {mv && mv.changed_in_meeting && <span style={{ fontSize: 11, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
-                          {!mv && <span style={{ fontSize: 12, color: '#ccc' }}>No vote yet</span>}
+                          <span style={{ fontSize: 14, fontWeight: 500, color: mv ? '#aaa' : '#2a2a2a' }}>{m}</span>
+                          {mv && <><span style={{ color: '#bbb' }}>—</span><span style={{ background: vc.bg, color: vc.color, fontSize: 13, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span></>}
+                          {mv && mv.changed_in_meeting && <span style={{ fontSize: 12, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
+                          {!mv && <span style={{ fontSize: 13, color: '#ccc' }}>No vote yet</span>}
                         </div>
-                        {mv && mv.note && <div style={{ fontSize: 12, color: '#777', marginTop: 4, fontStyle: 'italic' }}>{mv.note}</div>}
+                        {mv && mv.note && <div style={{ fontSize: 13, color: '#777', marginTop: 4, fontStyle: 'italic' }}>{mv.note}</div>}
                       </div>
                     );
                   })}
@@ -1433,12 +1433,12 @@ function BoardView() {
                 <div style={{ marginTop: 20 }}>
                   {!showPostMeeting ? (
                     <button type="button" onClick={function() { setShowPostMeeting(true); setVoteForm({ voter: '', choice: '', note: '' }); }}
-                      style={{ fontSize: 12, color: gold, background: 'none', border: '1px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 500 }}>
+                      style={{ fontSize: 13, color: gold, background: 'none', border: '1px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 500 }}>
                       + Add Post-Meeting Votes
                     </button>
                   ) : (
                     <div style={{ background: '#fafafa', borderRadius: 12, padding: 16 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 12 }}>Add Post-Meeting Vote</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginBottom: 12 }}>Add Post-Meeting Vote</div>
                       <div style={{ marginBottom: 10 }}>
                         <label style={bLbl}>Board Member</label>
                         <select value={voteForm.voter} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { voter: e.target.value, choice: '', note: '' }); }); }} style={Object.assign({}, bInp, { marginTop: 4 })}>
@@ -1452,7 +1452,7 @@ function BoardView() {
                           var active = voteForm.choice === opt;
                           return (
                             <button key={opt} type="button" onClick={function() { setVoteForm(function(f) { return Object.assign({}, f, { choice: opt }); }); }}
-                              style={{ padding: '6px 12px', borderRadius: 20, border: '1.5px solid ' + (active ? vc2.color : '#e0d8cc'), background: active ? vc2.bg : '#fff', color: active ? vc2.color : '#888', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer' }}>
+                              style={{ padding: '6px 12px', borderRadius: 20, border: '1.5px solid ' + (active ? vc2.color : '#e0d8cc'), background: active ? vc2.bg : '#fff', color: active ? vc2.color : '#888', fontSize: 13, fontWeight: active ? 600 : 400, cursor: 'pointer' }}>
                               {opt}
                             </button>
                           );
@@ -1461,11 +1461,11 @@ function BoardView() {
                       <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={2} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 10 })} placeholder="Note (optional)…" />
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={handleVoteSubmit} disabled={voteSaving || !voteForm.choice || !voteForm.voter}
-                          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: (voteSaving || !voteForm.choice || !voteForm.voter) ? 0.6 : 1 }}>
+                          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: (voteSaving || !voteForm.choice || !voteForm.voter) ? 0.6 : 1 }}>
                           {voteSaving ? 'Saving…' : 'Save Vote'}
                         </button>
                         <button type="button" onClick={function() { setShowPostMeeting(false); setVoteForm({ voter: '', choice: '', note: '' }); }}
-                          style={{ padding: '8px 16px', background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 }}>
+                          style={{ padding: '8px 16px', background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 14, color: '#666', cursor: 'pointer', fontWeight: 500 }}>
                           Cancel
                         </button>
                       </div>
@@ -1488,12 +1488,12 @@ function BoardView() {
               <div style={bGrp}><label style={bLbl}>Description</label><RichEditor value={topicForm.description} onChange={function(html) { setTopicForm(function(f) { return Object.assign({}, f, { description: html }); }); }} placeholder="Background, details, context…" /></div>
               <div style={bGrp}>
                 <label style={bLbl}>Attachment</label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, padding: '8px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', background: '#fff', fontSize: 13 }}>
-                  <span style={{ background: gold, color: '#fff', borderRadius: 6, padding: '4px 12px', fontSize: 12, fontWeight: 500, flexShrink: 0 }}>{attachUploading ? 'Uploading…' : 'Choose file'}</span>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, padding: '8px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', background: '#fff', fontSize: 14 }}>
+                  <span style={{ background: gold, color: '#fff', borderRadius: 6, padding: '4px 12px', fontSize: 13, fontWeight: 500, flexShrink: 0 }}>{attachUploading ? 'Uploading…' : 'Choose file'}</span>
                   <span style={{ color: attachFileName ? '#2a2a2a' : '#bbb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachFileName || 'No file chosen'}</span>
                   <input type="file" onChange={handleAttachUpload} style={{ display: 'none' }} />
                 </label>
-                {topicForm.attachment_url && !attachUploading && <div style={{ fontSize: 11, color: '#2e7d32', marginTop: 4 }}>✓ Uploaded</div>}
+                {topicForm.attachment_url && !attachUploading && <div style={{ fontSize: 12, color: '#2e7d32', marginTop: 4 }}>✓ Uploaded</div>}
               </div>
               <div style={bGrp}><label style={bLbl}>Submitted By</label><input value={topicForm.submitted_by} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { submitted_by: e.target.value }); }); }} style={bInp} placeholder="Name…" /></div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
@@ -1501,8 +1501,8 @@ function BoardView() {
                 <div><label style={bLbl}>Meeting Date</label><input type="date" value={topicForm.meeting_date} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { meeting_date: e.target.value }); }); }} style={bInp} /></div>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <button type="submit" disabled={topicSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: topicSaving ? 0.7 : 1 }}>{topicSaving ? 'Saving…' : 'Add Topic'}</button>
-                <button type="button" onClick={function() { setShowAdd(false); }} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
+                <button type="submit" disabled={topicSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: topicSaving ? 0.7 : 1 }}>{topicSaving ? 'Saving…' : 'Add Topic'}</button>
+                <button type="button" onClick={function() { setShowAdd(false); }} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 14, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
               </div>
             </form>
           </div>
@@ -1560,11 +1560,11 @@ function StrategyView() {
   }
 
   var tabStyle = function(t) {
-    return { padding: '6px 14px', fontSize: 12, fontWeight: 500, border: 'none', borderRadius: 20, cursor: 'pointer',
+    return { padding: '6px 14px', fontSize: 13, fontWeight: 500, border: 'none', borderRadius: 20, cursor: 'pointer',
       background: tab === t ? gold : '#f0ebe2', color: tab === t ? '#fff' : '#666' };
   };
 
-  if (loading) return <div style={{ padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>;
+  if (loading) return <div style={{ padding: 40, color: '#aaa', fontSize: 14 }}>Loading…</div>;
 
   return (
     <div>
@@ -1595,13 +1595,13 @@ function StrategyView() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>{g.title}</div>
-                        {g.description && <div style={{ fontSize: 12, color: '#777', lineHeight: 1.5 }}>{g.description}</div>}
+                        {g.description && <div style={{ fontSize: 13, color: '#777', lineHeight: 1.5 }}>{g.description}</div>}
                       </div>
                       {tab !== 'three_year_vision' && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                          {g.status && <span style={{ background: sc.bg, color: sc.color, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{g.status}</span>}
+                          {g.status && <span style={{ background: sc.bg, color: sc.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{g.status}</span>}
                           <button onClick={function() { isEdit ? setEditing(null) : openEdit(g); }}
-                            style={{ fontSize: 11, color: isEdit ? '#aaa' : gold, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: 0 }}>
+                            style={{ fontSize: 12, color: isEdit ? '#aaa' : gold, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: 0 }}>
                             {isEdit ? 'Cancel' : 'Edit'}
                           </button>
                         </div>
@@ -1609,33 +1609,33 @@ function StrategyView() {
                     </div>
                     {tab !== 'three_year_vision' && !isEdit && (g.lead || g.due_date) && (
                       <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-                        {g.lead && <div style={{ fontSize: 12, color: '#aaa' }}>Lead: <span style={{ color: '#555' }}>{g.lead}</span></div>}
-                        {g.due_date && <div style={{ fontSize: 12, color: '#aaa' }}>Due: <span style={{ color: '#555' }}>{g.due_date}</span></div>}
+                        {g.lead && <div style={{ fontSize: 13, color: '#aaa' }}>Lead: <span style={{ color: '#555' }}>{g.lead}</span></div>}
+                        {g.due_date && <div style={{ fontSize: 13, color: '#aaa' }}>Due: <span style={{ color: '#555' }}>{g.due_date}</span></div>}
                       </div>
                     )}
                     {isEdit && (
                       <div style={{ marginTop: 14, paddingTop: 14, borderTop: '0.5px solid #f0ebe2' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                           <div>
-                            <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Status</label>
+                            <label style={{ fontSize: 12, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Status</label>
                             <select value={editForm.status} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { status: e.target.value }); }); }}
-                              style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff' }}>
+                              style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 14, background: '#fff' }}>
                               {GOAL_STATUS_OPTS.map(function(s) { return <option key={s} value={s}>{s}</option>; })}
                             </select>
                           </div>
                           <div>
-                            <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Lead</label>
+                            <label style={{ fontSize: 12, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Lead</label>
                             <input value={editForm.lead} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { lead: e.target.value }); }); }}
-                              style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }} placeholder="Name…" />
+                              style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} placeholder="Name…" />
                           </div>
                         </div>
                         <div style={{ marginBottom: 10 }}>
-                          <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Due Date</label>
+                          <label style={{ fontSize: 12, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Due Date</label>
                           <input type="date" value={editForm.due_date} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { due_date: e.target.value }); }); }}
-                            style={{ padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13 }} />
+                            style={{ padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 14 }} />
                         </div>
                         <button onClick={function() { handleSave(g); }} disabled={saving}
-                          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+                          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
                           {saving ? 'Saving…' : 'Save'}
                         </button>
                       </div>
@@ -1653,7 +1653,7 @@ function StrategyView() {
 
 function QuarterlyView() {
   return (
-    <div style={{ color: '#aaa', fontSize: 13, padding: '40px 0' }}>
+    <div style={{ color: '#aaa', fontSize: 14, padding: '40px 0' }}>
       Quarterly update coming soon.
     </div>
   );
@@ -1678,8 +1678,8 @@ const views = {
       <style>{".nsh-sidebar::-webkit-scrollbar { display: none; }"}</style>
       <div className="nsh-sidebar" style={{ width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto", scrollbarWidth: "none" }}>
         <div style={{ padding: "24px 20px 16px" }}>
-          <div style={{ fontSize: 11, color: gold, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>North Star House</div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>Command Center</div>
+          <div style={{ fontSize: 12, color: gold, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>North Star House</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)" }}>Command Center</div>
         </div>
         <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" }} />
         <nav style={{ flex: 1, padding: "0 8px" }}>
@@ -1689,7 +1689,7 @@ const views = {
               background: active === m.id ? "rgba(136,108,68,0.18)" : "transparent",
               border: "none", borderRadius: 7, cursor: "pointer", textAlign: "left",
               color: active === m.id ? gold : "rgba(255,255,255,0.5)",
-              fontSize: 13, fontWeight: active === m.id ? 500 : 400,
+              fontSize: 14, fontWeight: active === m.id ? 500 : 400,
               marginBottom: 2, transition: "all 0.15s"
             }}>
               <NavIcon id={m.id} active={active === m.id} />
