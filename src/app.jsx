@@ -47,13 +47,31 @@ function parseIcalDate(val) {
 const gold = "#886c44";
 const cream = "#f8f4ec";
 
+var NAV_ICONS = {
+  home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+  quarterly: '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/>',
+  volunteers: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  donors: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  board: '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  strategy: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+};
+
+function NavIcon({ id, active }) {
+  return React.createElement('svg', {
+    width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round',
+    style: { flexShrink: 0, opacity: active ? 1 : 0.7 },
+    dangerouslySetInnerHTML: { __html: NAV_ICONS[id] || '' }
+  });
+}
+
 const modules = [
-  { id: "home", label: "Overview", icon: "🏡" },
-  { id: "quarterly", label: "Quarterly Update", icon: "📋" },
-  { id: "volunteers", label: "Volunteers", icon: "👥" },
-  { id: "donors", label: "Donors & Donations", icon: "🤝" },
-  { id: "board", label: "Board Voting", icon: "🗳️" },
-  { id: "strategy", label: "Strategic Goal Progress", icon: "🎯" },
+  { id: "home", label: "Overview" },
+  { id: "quarterly", label: "Quarterly Update" },
+  { id: "volunteers", label: "Volunteers" },
+  { id: "donors", label: "Donors & Donations" },
+  { id: "board", label: "Board Voting" },
+  { id: "strategy", label: "Strategic Goal Progress" },
 ];
 
 const mockData = {
@@ -1686,7 +1704,7 @@ const views = {
               fontSize: 13, fontWeight: active === m.id ? 500 : 400,
               marginBottom: 2, transition: "all 0.15s"
             }}>
-              <span style={{ fontSize: 14, opacity: 0.8 }}>{m.icon}</span>
+              <NavIcon id={m.id} active={active === m.id} />
               {m.label}
             </button>
           ))}
