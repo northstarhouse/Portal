@@ -49,12 +49,10 @@ const cream = "#f8f4ec";
 
 const modules = [
   { id: "home", label: "Overview", icon: "⌂" },
-  { id: "events", label: "Events & Bookings", icon: "◈" },
   { id: "volunteers", label: "Volunteers", icon: "◎" },
   { id: "donors", label: "Donors & Donations", icon: "◇" },
-  { id: "marketing", label: "Marketing / Content", icon: "◰" },
   { id: "board", label: "Board Voting", icon: "◑" },
-  { id: "strategy", label: "Strategic Plan", icon: "◈" },
+  { id: "strategy", label: "Strategic Goal Progress", icon: "◈" },
 ];
 
 const mockData = {

@@ -48,12 +48,10 @@ var App = (() => {
   var cream = "#f8f4ec";
   var modules = [
     { id: "home", label: "Overview", icon: "\u2302" },
-    { id: "events", label: "Events & Bookings", icon: "\u25C8" },
     { id: "volunteers", label: "Volunteers", icon: "\u25CE" },
     { id: "donors", label: "Donors & Donations", icon: "\u25C7" },
-    { id: "marketing", label: "Marketing / Content", icon: "\u25F0" },
     { id: "board", label: "Board Voting", icon: "\u25D1" },
-    { id: "strategy", label: "Strategic Plan", icon: "\u25C8" }
+    { id: "strategy", label: "Strategic Goal Progress", icon: "\u25C8" }
   ];
   var mockData = {
     events: [
