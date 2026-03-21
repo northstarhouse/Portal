@@ -1302,18 +1302,17 @@ function BoardView() {
       </div>
 
       {selected && (
-        <div onClick={function() { setSelected(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 540, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <div style={{ flex: 1, paddingRight: 16 }}>
-                <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a' }}>{selected.title}</div>
-                <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>
+        <div style={{ position: 'fixed', inset: 0, background: cream, zIndex: 1010, overflowY: 'auto', padding: '32px' }}>
+          <div style={{ maxWidth: 680, margin: '0 auto' }}>
+            <button onClick={function() { setSelected(null); }} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#888', fontSize: 13, cursor: 'pointer', marginBottom: 24, padding: 0 }}>← Back to topics</button>
+            <div style={{ background: '#fff', borderRadius: 16, padding: 36, boxShadow: '0 2px 20px rgba(0,0,0,0.06)' }}>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 22, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
+                <div style={{ fontSize: 13, color: '#aaa' }}>
                   {selected.submitted_by ? <span>Submitted by {selected.submitted_by}</span> : null}
                   {selected.due_date ? <span> · Due {fmtDate(selected.due_date)}</span> : null}
                   {selected.meeting_date ? <span> · Meeting {fmtDate(selected.meeting_date)}</span> : null}
                 </div>
-              </div>
-              <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', fontSize: 22, color: '#aaa', cursor: 'pointer', lineHeight: 1, padding: 4, flexShrink: 0 }}>×</button>
             </div>
 
             {selected.description && (
@@ -1427,6 +1426,7 @@ function BoardView() {
                   {voteSaving ? 'Saving…' : 'Submit Vote'}
                 </button>
               </form>
+            </div>
             </div>
           </div>
         </div>
