@@ -162,7 +162,7 @@ function Badge({ status }) {
 
 function StatCard({ label, value, sub }) {
   return (
-    <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 5, padding: "14px 18px", minHeight: 90, display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 120 }}>
+    <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px", minHeight: 90, display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 120 }}>
       <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 500, color: "#2a2a2a" }}>{value}</div>
       <div style={{ fontSize: 12, color: "#777", marginTop: 2, minHeight: 16 }}>{sub || ''}</div>
@@ -698,7 +698,7 @@ function VolunteersView() {
                 onClick={function() { setFilterTeam(t); }}
                 style={{
                   border: isActive ? 'none' : '0.5px solid #e0d8cc',
-                  borderRadius: 20,
+                  borderRadius: 5,
                   padding: '5px 12px',
                   fontSize: 12,
                   fontWeight: isActive ? 600 : 400,
@@ -1919,7 +1919,7 @@ var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundrai
       <div style={{ display: "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 }}>
         <div className="nsh-sidebar" style={{ width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", scrollbarWidth: "none" }}>
           <div style={{ padding: "20px 20px 14px", display: "flex", justifyContent: "center" }}>
-            <img src="assets/logo.png" alt="North Star House" style={{ width: 170, display: "block" }} />
+            <img src="assets/logo.png" alt="North Star House" style={{ width: 195, display: "block" }} />
           </div>
           <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" }} />
           <nav style={{ flex: 1, padding: "0 8px" }}>
