@@ -256,13 +256,22 @@ const typeColors = {
         </div>
       </div>
 
-      <div style={{ background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ fontSize: 16, color: gold }}>⏎</div>
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 500, color: "#8a6200" }}>Quarterly Update Due — March 31, 2026</div>
-        </div>
-        <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 500, color: "#c0392b", background: "#fce4e4", padding: "3px 10px", borderRadius: 20 }}>11 days away</div>
-      </div>
+      {(function() {
+        var due = new Date('2026-03-31');
+        var now = new Date(); now.setHours(0,0,0,0);
+        var days = Math.round((due - now) / 86400000);
+        var dueStr = due.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        var label = days === 0 ? 'Due today' : days < 0 ? Math.abs(days) + ' days overdue' : days + ' days away';
+        var labelColor = days <= 0 ? '#c0392b' : days <= 7 ? '#c0392b' : '#8a6200';
+        var labelBg = days <= 0 ? '#fce4e4' : days <= 7 ? '#fce4e4' : '#fff4e5';
+        return (
+          <div style={{ background: "#fff4e5", border: "0.5px solid #e0c98a", borderRadius: 10, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ fontSize: 16, color: gold }}>⏎</div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: "#8a6200" }}>Quarterly Update Due — {dueStr}</div>
+            <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 500, color: labelColor, background: labelBg, padding: "3px 10px", borderRadius: 20, flexShrink: 0 }}>{label}</div>
+          </div>
+        );
+      })()}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         <div onClick={function() { navigate('donors'); }} style={{ cursor: 'pointer' }}><StatCard label="Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /></div>
