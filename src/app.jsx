@@ -2013,7 +2013,7 @@ var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundrai
       <div style={{ flex: 1, padding: "28px 32px", overflowY: "auto" }}>
         <div style={{ maxWidth: 900 }}>
           <div style={{ marginBottom: 22 }}>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "0 1px 4px rgba(136,108,68,0.18)" }}>{mod && mod.label}</h1>
+            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "2px 3px 0px rgba(136,108,68,0.2)" }}>{mod && mod.label}</h1>
             <div style={{ height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 10, opacity: 0.65 }} />
           </div>
           <View navigate={setActive} opArea={opArea} />
