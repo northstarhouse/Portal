@@ -240,7 +240,6 @@ const typeColors = {
         <div style={{ fontSize: 16, color: gold }}>⏎</div>
         <div>
           <div style={{ fontSize: 12, fontWeight: 500, color: "#8a6200" }}>Quarterly Update Due — March 31, 2026</div>
-          <div style={{ fontSize: 12, color: "#b08040", marginTop: 2 }}>Donations · Volunteers · Sponsors · Events · Board Activity</div>
         </div>
         <div style={{ marginLeft: "auto", fontSize: 11, fontWeight: 500, color: "#c0392b", background: "#fce4e4", padding: "3px 10px", borderRadius: 20 }}>11 days away</div>
       </div>
