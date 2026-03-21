@@ -44,7 +44,7 @@ function parseIcalDate(val) {
   return new Date(y + "-" + mo + "-" + d + "T" + h + ":" + mi + ":" + s + (val.endsWith("Z") ? "Z" : ""));
 }
 
-const gold = "#b8960c";
+const gold = "#9a7b2f";
 const cream = "#f8f4ec";
 
 const modules = [
