@@ -764,7 +764,12 @@ var App = (() => {
         var itemsData = results[0];
         var votesData = results[1];
         if (!Array.isArray(itemsData)) {
-          setLoadError(itemsData && itemsData.message ? itemsData.message : JSON.stringify(itemsData));
+          setLoadError("Board Voting Items: " + (itemsData && itemsData.message ? itemsData.message : JSON.stringify(itemsData)));
+          setLoading(false);
+          return;
+        }
+        if (!Array.isArray(votesData)) {
+          setLoadError("Board-Votes: " + (votesData && votesData.message ? votesData.message : JSON.stringify(votesData)));
           setLoading(false);
           return;
         }
@@ -772,7 +777,7 @@ var App = (() => {
           return new Date(b.created_at) - new Date(a.created_at);
         });
         setItems(sorted);
-        setVotes(Array.isArray(votesData) ? votesData : []);
+        setVotes(votesData);
         setLoading(false);
       }).catch(function(err) {
         setLoadError(err.message);
