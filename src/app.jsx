@@ -144,7 +144,7 @@ function Badge({ status }) {
 
 function StatCard({ label, value, sub }) {
   return (
-    <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px", flex: 1, minWidth: 120, minHeight: 90, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+    <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px", minHeight: 90, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
       <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 500, color: "#2a2a2a" }}>{value}</div>
       <div style={{ fontSize: 11, color: "#aaa", marginTop: 2, minHeight: 16 }}>{sub || ''}</div>
@@ -244,7 +244,7 @@ const typeColors = {
         <div style={{ marginLeft: "auto", fontSize: 11, fontWeight: 500, color: "#c0392b", background: "#fce4e4", padding: "3px 10px", borderRadius: 20 }}>11 days away</div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         <div onClick={function() { navigate('donors'); }} style={{ cursor: 'pointer' }}><StatCard label="YTD Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub="of $50K goal" /></div>
         <div onClick={function() { navigate('volunteers'); }} style={{ cursor: 'pointer' }}><StatCard label="Active Volunteers" value={activeVols === null ? '...' : activeVols} /></div>
         <StatCard label="2026 Events" value="5" sub="on the books" />
