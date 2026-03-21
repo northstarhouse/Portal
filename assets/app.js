@@ -1,4 +1,4 @@
-var App = (() => {
+(() => {
   // src/app.jsx
   var { useState, useEffect } = React;
   var SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
