@@ -144,7 +144,7 @@ function Badge({ status }) {
 
 function StatCard({ label, value, sub }) {
   return (
-    <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px", minHeight: 90, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+    <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px", minHeight: 90, display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 120 }}>
       <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 500, color: "#2a2a2a" }}>{value}</div>
       <div style={{ fontSize: 11, color: "#aaa", marginTop: 2, minHeight: 16 }}>{sub || ''}</div>
@@ -321,7 +321,7 @@ const typeColors = {
 }function EventsView() {
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
         <StatCard label="Total Events" value="5" sub="next 90 days" />
         <StatCard label="Confirmed" value="3" />
         <StatCard label="Est. Revenue" value="$6,600" sub="confirmed only" />
@@ -659,7 +659,7 @@ function VolunteersView() {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
         <StatCard label="Total Volunteers" value={loading ? '...' : volunteers.length} />
         <StatCard label="Active" value={loading ? '...' : active} />
         <StatCard label="Teams" value={loading ? '...' : teams} />
@@ -911,7 +911,7 @@ function DonorsView() {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
         <StatCard label="Total Raised" value={loading ? '...' : '$' + totalRaised.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub="2026 YTD" />
         <StatCard label="Donations" value={loading ? '...' : totalDonors} />
         <StatCard label="Memberships" value={loading ? '...' : memberships} />
@@ -1066,7 +1066,7 @@ function DonorsView() {
 function MarketingView() {
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
         <StatCard label="Posts This Month" value="5" />
         <StatCard label="Sent" value="1" />
         <StatCard label="Scheduled" value="1" />
@@ -1467,7 +1467,7 @@ function BoardView() {
 function StrategyView() {
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
         <StatCard label="Strategic Goals" value="5" />
         <StatCard label="Avg Progress" value="64%" />
         <StatCard label="On Track" value="3" />
