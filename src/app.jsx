@@ -1975,7 +1975,9 @@ function OperationalView({ opArea }) {
       if (!Array.isArray(rows)) return;
       setVols(rows.filter(function(v) {
         if (!v.Team) return false;
-        return v.Team.split(',').map(function(t) { return t.trim().toLowerCase(); }).indexOf(area.toLowerCase()) !== -1;
+        var areaAliases = { 'Events': ['events team', 'event support', 'events'], 'Docents': ['docent', 'docents'] };
+        var matches = areaAliases[area] || [area.toLowerCase()];
+        return v.Team.split(',').some(function(t) { return matches.indexOf(t.trim().toLowerCase()) !== -1; });
       }));
     });
   }, [area]);
