@@ -265,7 +265,7 @@ const typeColors = {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
-        <div onClick={function() { navigate('donors'); }} style={{ cursor: 'pointer' }}><StatCard label="YTD Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub="of $50K goal" /></div>
+        <div onClick={function() { navigate('donors'); }} style={{ cursor: 'pointer' }}><StatCard label="Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /></div>
         <div onClick={function() { navigate('volunteers'); }} style={{ cursor: 'pointer' }}><StatCard label="Active Volunteers" value={activeVols === null ? '...' : activeVols} /></div>
         <StatCard label="2026 Events" value="5" sub="on the books" />
         <StatCard label="Active Sponsors" value="3" sub="+ 1 in review" />
