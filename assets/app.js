@@ -44,7 +44,7 @@
     var y = val.slice(0, 4), mo = val.slice(4, 6), d = val.slice(6, 8), h = val.slice(9, 11), mi = val.slice(11, 13), s = val.slice(13, 15) || "00";
     return /* @__PURE__ */ new Date(y + "-" + mo + "-" + d + "T" + h + ":" + mi + ":" + s + (val.endsWith("Z") ? "Z" : ""));
   }
-  var gold = "#886c44";
+  var gold = "#b8960c";
   var cream = "#f8f4ec";
   var modules = [
     { id: "home", label: "Overview", icon: "\u2302" },
