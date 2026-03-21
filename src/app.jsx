@@ -49,11 +49,11 @@ const cream = "#f8f4ec";
 
 const modules = [
   { id: "home", label: "Overview", icon: "⌂" },
+  { id: "quarterly", label: "Quarterly Update", icon: "◉" },
   { id: "volunteers", label: "Volunteers", icon: "◎" },
   { id: "donors", label: "Donors & Donations", icon: "◇" },
   { id: "board", label: "Board Voting", icon: "◑" },
   { id: "strategy", label: "Strategic Goal Progress", icon: "◈" },
-  { id: "quarterly", label: "Quarterly Update", icon: "◉", hidden: true },
 ];
 
 const mockData = {
@@ -1677,7 +1677,7 @@ const views = {
         </div>
         <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" }} />
         <nav style={{ flex: 1, padding: "0 8px" }}>
-          {modules.filter(m => !m.hidden).map(m => (
+          {modules.map(m => (
             <button key={m.id} onClick={() => setActive(m.id)} style={{
               display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px",
               background: active === m.id ? "rgba(136,108,68,0.18)" : "transparent",
@@ -1691,15 +1691,6 @@ const views = {
             </button>
           ))}
         </nav>
-        <div style={{ padding: "12px 8px 8px" }}>
-          <button onClick={() => setActive("quarterly")} style={{
-            width: "100%", padding: "10px 12px", background: active === "quarterly" ? "rgba(136,108,68,0.25)" : "rgba(136,108,68,0.12)",
-            border: "0.5px solid rgba(136,108,68,0.35)", borderRadius: 8, cursor: "pointer", textAlign: "left",
-            color: gold, fontSize: 12, fontWeight: 600, letterSpacing: 0.3, display: "flex", alignItems: "center", gap: 8
-          }}>
-            <span style={{ fontSize: 13 }}>◉</span> Quarterly Update
-          </button>
-        </div>
         <div style={{ padding: "8px 20px 20px" }} />
       </div>
 

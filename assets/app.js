@@ -48,11 +48,11 @@
   var cream = "#f8f4ec";
   var modules = [
     { id: "home", label: "Overview", icon: "\u2302" },
+    { id: "quarterly", label: "Quarterly Update", icon: "\u25C9" },
     { id: "volunteers", label: "Volunteers", icon: "\u25CE" },
     { id: "donors", label: "Donors & Donations", icon: "\u25C7" },
     { id: "board", label: "Board Voting", icon: "\u25D1" },
-    { id: "strategy", label: "Strategic Goal Progress", icon: "\u25C8" },
-    { id: "quarterly", label: "Quarterly Update", icon: "\u25C9", hidden: true }
+    { id: "strategy", label: "Strategic Goal Progress", icon: "\u25C8" }
   ];
   var mockData = {
     events: [
@@ -1318,7 +1318,7 @@
     const [active, setActive] = useState("home");
     const View = views[active];
     const mod = modules.find((m) => m.id === active);
-    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, ".nsh-sidebar::-webkit-scrollbar { display: none; }"), /* @__PURE__ */ React.createElement("div", { className: "nsh-sidebar", style: { width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto", scrollbarWidth: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "24px 20px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: gold, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 } }, "North Star House"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.35)" } }, "Command Center")), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" } }), /* @__PURE__ */ React.createElement("nav", { style: { flex: 1, padding: "0 8px" } }, modules.filter((m) => !m.hidden).map((m) => /* @__PURE__ */ React.createElement("button", { key: m.id, onClick: () => setActive(m.id), style: {
+    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, ".nsh-sidebar::-webkit-scrollbar { display: none; }"), /* @__PURE__ */ React.createElement("div", { className: "nsh-sidebar", style: { width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto", scrollbarWidth: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "24px 20px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: gold, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 } }, "North Star House"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.35)" } }, "Command Center")), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" } }), /* @__PURE__ */ React.createElement("nav", { style: { flex: 1, padding: "0 8px" } }, modules.map((m) => /* @__PURE__ */ React.createElement("button", { key: m.id, onClick: () => setActive(m.id), style: {
       display: "flex",
       alignItems: "center",
       gap: 10,
@@ -1334,22 +1334,7 @@
       fontWeight: active === m.id ? 500 : 400,
       marginBottom: 2,
       transition: "all 0.15s"
-    } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, opacity: 0.8 } }, m.icon), m.label))), /* @__PURE__ */ React.createElement("div", { style: { padding: "12px 8px 8px" } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setActive("quarterly"), style: {
-      width: "100%",
-      padding: "10px 12px",
-      background: active === "quarterly" ? "rgba(136,108,68,0.25)" : "rgba(136,108,68,0.12)",
-      border: "0.5px solid rgba(136,108,68,0.35)",
-      borderRadius: 8,
-      cursor: "pointer",
-      textAlign: "left",
-      color: gold,
-      fontSize: 12,
-      fontWeight: 600,
-      letterSpacing: 0.3,
-      display: "flex",
-      alignItems: "center",
-      gap: 8
-    } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13 } }, "\u25C9"), " Quarterly Update")), /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 20px 20px" } })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: "28px 32px", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0, fontSize: 26, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, mod && mod.label), /* @__PURE__ */ React.createElement("div", { style: { height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 6, opacity: 0.65 } })), /* @__PURE__ */ React.createElement(View, { navigate: setActive }))));
+    } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, opacity: 0.8 } }, m.icon), m.label))), /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 20px 20px" } })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: "28px 32px", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900 } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ React.createElement("h1", { style: { margin: 0, fontSize: 26, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, mod && mod.label), /* @__PURE__ */ React.createElement("div", { style: { height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 6, opacity: 0.65 } })), /* @__PURE__ */ React.createElement(View, { navigate: setActive }))));
   }
   var root = ReactDOM.createRoot(document.getElementById("root"));
   root.render(React.createElement(Dashboard));
