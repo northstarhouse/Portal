@@ -1358,10 +1358,13 @@ function BoardView() {
       </div>
 
       {selected && (
-        <div style={{ position: 'fixed', inset: 0, background: cream, zIndex: 1010, overflowY: 'auto', padding: '32px' }}>
-          <div style={{ maxWidth: 680, margin: '0 auto' }}>
-            <button onClick={function() { setSelected(null); }} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#888', fontSize: 12, cursor: 'pointer', marginBottom: 24, padding: 0 }}>← Back to topics</button>
-            <div style={{ background: '#fff', borderRadius: 16, padding: 36, boxShadow: '0 2px 20px rgba(0,0,0,0.06)' }}>
+        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 520, background: '#fff', zIndex: 1011, boxShadow: '-4px 0 32px rgba(0,0,0,0.12)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '20px 24px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', color: '#888', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}>← Back</button>
+            <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ padding: '24px 28px', flex: 1 }}>
+            <div style={{ background: '#fff', borderRadius: 0 }}>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 22, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
                 <div style={{ fontSize: 12, color: '#777' }}>
