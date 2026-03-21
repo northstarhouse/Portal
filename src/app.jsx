@@ -273,6 +273,14 @@ function sbUpdate(table, firstName, lastName, row) {
   }).then(r => r.json());
 }
 
+function sbPatchById(table, id, row) {
+  return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table) + '?id=eq.' + encodeURIComponent(id), {
+    method: 'PATCH',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(row)
+  }).then(r => r.json());
+}
+
 var TEAM_COLORS = {
   'Grounds':      { bg: '#e8f5e9', color: '#2e7d32' },
   'Construction': { bg: '#fff3e0', color: '#e65100' },
@@ -981,24 +989,319 @@ function MarketingView() {
       />
     </div>
   );
-}function BoardView() {
+}
+var BOARD_MEMBERS = ['Ken', 'Rick', 'Wyn', 'Paula', 'Jeff', 'Rich'];
+var VOTE_COLORS = { 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#fff3e0', color: '#e65100' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' } };
+
+function BoardView() {
+  const [items, setItems] = React.useState([]);
+  const [votes, setVotes] = React.useState([]);
+  const [selected, setSelected] = React.useState(null);
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
+  const [topicForm, setTopicForm] = React.useState({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
+  const [voteForm, setVoteForm] = React.useState({ member: '', vote: '', note: '' });
+  const [voteSaving, setVoteSaving] = React.useState(false);
+  const [topicSaving, setTopicSaving] = React.useState(false);
+
+  function load() {
+    setLoading(true);
+    Promise.all([
+      sbFetch('Board Voting Items', ['id', 'title', 'description', 'attachment_url', 'submitted_by', 'due_date', 'meeting_date', 'status', 'created_at']),
+      sbFetch('Board-Votes', ['id', 'topic_id', 'member', 'vote', 'note', 'changed_in_meeting', 'created_at'])
+    ]).then(function(results) {
+      var itemsData = results[0];
+      var votesData = results[1];
+      var sorted = Array.isArray(itemsData) ? itemsData.sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); }) : [];
+      setItems(sorted);
+      setVotes(Array.isArray(votesData) ? votesData : []);
+      setLoading(false);
+    });
+  }
+
+  React.useEffect(function() { load(); }, []);
+
+  function itemVotes(item) {
+    return votes.filter(function(v) { return v.topic_id === item.id; });
+  }
+
+  function isRevealed(item) {
+    var iv = itemVotes(item);
+    var allVoted = BOARD_MEMBERS.every(function(m) { return iv.some(function(v) { return v.member === m; }); });
+    var pastDue = item.due_date && new Date(item.due_date) < new Date();
+    return allVoted || pastDue;
+  }
+
+  function tally(item) {
+    var iv = itemVotes(item);
+    return {
+      yes: iv.filter(function(v) { return v.vote === 'Yes'; }).length,
+      no: iv.filter(function(v) { return v.vote === 'No'; }).length,
+      abstain: iv.filter(function(v) { return v.vote === 'Abstain'; }).length,
+      absent: iv.filter(function(v) { return v.vote === 'Not in attendance'; }).length
+    };
+  }
+
+  function handleVoteSubmit(e) {
+    e.preventDefault();
+    if (!voteForm.member || !voteForm.vote) return;
+    setVoteSaving(true);
+    var existing = votes.find(function(v) { return v.topic_id === selected.id && v.member === voteForm.member; });
+    var today = new Date().toDateString();
+    var isInMeeting = selected.meeting_date && new Date(selected.meeting_date + 'T12:00:00').toDateString() === today;
+    var payload = { topic_id: selected.id, member: voteForm.member, vote: voteForm.vote, note: voteForm.note || null };
+    var prom;
+    if (existing) {
+      prom = sbPatchById('Board-Votes', existing.id, Object.assign({}, payload, { changed_in_meeting: isInMeeting ? true : (existing.changed_in_meeting || false) }));
+    } else {
+      prom = sbInsert('Board-Votes', Object.assign({}, payload, { changed_in_meeting: false }));
+    }
+    prom.then(function() {
+      setVoteSaving(false);
+      setVoteForm({ member: '', vote: '', note: '' });
+      load();
+    });
+  }
+
+  function handleTopicSubmit(e) {
+    e.preventDefault();
+    if (!topicForm.title) return;
+    setTopicSaving(true);
+    sbInsert('Board Voting Items', {
+      title: topicForm.title,
+      description: topicForm.description || null,
+      attachment_url: topicForm.attachment_url || null,
+      submitted_by: topicForm.submitted_by || null,
+      due_date: topicForm.due_date || null,
+      meeting_date: topicForm.meeting_date || null,
+      status: 'Open'
+    }).then(function() {
+      setTopicSaving(false);
+      setShowAdd(false);
+      setTopicForm({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
+      load();
+    });
+  }
+
+  function fmtDate(d) {
+    if (!d) return '—';
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  var bInp = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+  var bLbl = { fontSize: 12, color: '#666', fontWeight: 500 };
+  var bGrp = { marginBottom: 14 };
+
+  if (loading) return <div style={{ color: '#aaa', fontSize: 14, padding: 40, textAlign: 'center' }}>Loading…</div>;
+
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <StatCard label="Board Members" value="5" />
-        <StatCard label="Active" value="5" />
-        <StatCard label="Avg Attendance" value="83%" />
-        <StatCard label="Next Meeting" value="Apr 9" />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ fontSize: 13, color: '#888' }}>{items.length} topic{items.length !== 1 ? 's' : ''}</div>
+        <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ Add Topic</button>
       </div>
-      <Table
-        cols={["Member", "Role", "Attendance", "Last Vote", "Status"]}
-        rows={mockData.board}
-        renderRow={r => (<><Td>{r.member}</Td><Td muted>{r.role}</Td><Td>{r.attendance}</Td><Td muted>{r.lastVote}</Td><Td><Badge status={r.status} /></Td></>)}
-      />
+
+      {items.length === 0 && <div style={{ color: '#aaa', fontSize: 14, textAlign: 'center', padding: 40 }}>No voting items yet.</div>}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {items.map(function(item) {
+          var iv = itemVotes(item);
+          var revealed = isRevealed(item);
+          var t = tally(item);
+          return (
+            <div
+              key={item.id}
+              onClick={function() { setSelected(item); setVoteForm({ member: '', vote: '', note: '' }); }}
+              style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '16px 20px', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
+              onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.07)'; }}
+              onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 500, color: '#2a2a2a', marginBottom: 4 }}>{item.title}</div>
+                  <div style={{ fontSize: 12, color: '#aaa' }}>
+                    {item.submitted_by ? <span>Submitted by {item.submitted_by}{item.due_date ? ' · ' : ''}</span> : null}
+                    {item.due_date ? <span>Due {fmtDate(item.due_date)}</span> : null}
+                    {item.meeting_date ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 16, flexShrink: 0 }}>
+                  <span style={{ fontSize: 12, color: '#aaa' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                  {revealed
+                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Revealed</span>
+                    : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Open</span>
+                  }
+                </div>
+              </div>
+              {revealed && (
+                <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
+                  {[['Yes', t.yes, '#2e7d32'], ['No', t.no, '#c62828'], ['Abstain', t.abstain, '#e65100']].map(function(entry) {
+                    return <div key={entry[0]} style={{ fontSize: 12 }}><span style={{ color: entry[2], fontWeight: 600 }}>{entry[1]}</span><span style={{ color: '#aaa' }}> {entry[0]}</span></div>;
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {selected && (
+        <div onClick={function() { setSelected(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 540, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div style={{ flex: 1, paddingRight: 16 }}>
+                <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a' }}>{selected.title}</div>
+                <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>
+                  {selected.submitted_by ? <span>Submitted by {selected.submitted_by}</span> : null}
+                  {selected.due_date ? <span> · Due {fmtDate(selected.due_date)}</span> : null}
+                  {selected.meeting_date ? <span> · Meeting {fmtDate(selected.meeting_date)}</span> : null}
+                </div>
+              </div>
+              <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', fontSize: 22, color: '#aaa', cursor: 'pointer', lineHeight: 1, padding: 4, flexShrink: 0 }}>×</button>
+            </div>
+
+            {selected.description && (
+              <div style={{ fontSize: 13, color: '#555', lineHeight: 1.6, marginBottom: 16, padding: '12px 14px', background: '#faf8f4', borderRadius: 8, borderLeft: '3px solid ' + gold }}>
+                {selected.description}
+              </div>
+            )}
+
+            {selected.attachment_url && (
+              <div style={{ marginBottom: 16 }}>
+                <a href={selected.attachment_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: gold, textDecoration: 'none' }}>📎 View Attachment</a>
+              </div>
+            )}
+
+            {isRevealed(selected) ? (
+              <div>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 12 }}>Results</div>
+                <div style={{ marginBottom: 20 }}>
+                  {(function() {
+                    var t = tally(selected);
+                    var total = BOARD_MEMBERS.length;
+                    return [['Yes', t.yes, '#4caf50'], ['No', t.no, '#ef5350'], ['Abstain', t.abstain, gold]].map(function(entry) {
+                      var pct = total > 0 ? Math.round(entry[1] / total * 100) : 0;
+                      return (
+                        <div key={entry[0]} style={{ marginBottom: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                            <span style={{ color: entry[2], fontWeight: 500 }}>{entry[0]}</span>
+                            <span style={{ color: '#888' }}>{entry[1]} / {total}</span>
+                          </div>
+                          <div style={{ background: '#f0ebe2', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                            <div style={{ width: pct + '%', height: '100%', background: entry[2], borderRadius: 4 }} />
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 10 }}>Individual Votes</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
+                  {BOARD_MEMBERS.map(function(m) {
+                    var mv = itemVotes(selected).find(function(v) { return v.member === m; });
+                    if (!mv) return (
+                      <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 13 }}>
+                        <span style={{ color: '#2a2a2a', fontWeight: 500 }}>{m}</span>
+                        <span style={{ color: '#ccc', fontSize: 12 }}>No vote</span>
+                      </div>
+                    );
+                    var vc = VOTE_COLORS[mv.vote] || { bg: '#f5f5f5', color: '#888' };
+                    return (
+                      <div key={m} style={{ padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 13 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: '#2a2a2a', fontWeight: 500 }}>{m}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {mv.changed_in_meeting && <span style={{ fontSize: 11, color: '#e65100', fontStyle: 'italic' }}>Changed in meeting</span>}
+                            <span style={{ background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.vote}</span>
+                          </div>
+                        </div>
+                        {mv.note && <div style={{ fontSize: 12, color: '#777', marginTop: 4, fontStyle: 'italic' }}>{mv.note}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 8 }}>
+                  Results locked · {itemVotes(selected).length}/{BOARD_MEMBERS.length} voted
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {BOARD_MEMBERS.map(function(m) {
+                    var voted = itemVotes(selected).some(function(v) { return v.member === m; });
+                    return (
+                      <span key={m} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, background: voted ? '#e8f5e9' : '#f5f5f5', color: voted ? '#2e7d32' : '#aaa', fontWeight: 500 }}>
+                        {voted ? '✓ ' : ''}{m}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div style={{ borderTop: '0.5px solid #f0ebe2', paddingTop: 16, marginTop: 8 }}>
+              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#bbb', fontWeight: 600, marginBottom: 12 }}>Cast / Update Vote</div>
+              <form onSubmit={handleVoteSubmit}>
+                <div style={bGrp}>
+                  <label style={bLbl}>Board Member</label>
+                  <select value={voteForm.member} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { member: e.target.value }); }); }} style={bInp}>
+                    <option value="">Select name…</option>
+                    {BOARD_MEMBERS.map(function(m) { return <option key={m} value={m}>{m}</option>; })}
+                  </select>
+                </div>
+                <div style={bGrp}>
+                  <label style={bLbl}>Vote</label>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                    {['Yes', 'No', 'Abstain', 'Not in attendance'].map(function(opt) {
+                      var vc = VOTE_COLORS[opt];
+                      var active = voteForm.vote === opt;
+                      return (
+                        <button key={opt} type="button" onClick={function() { setVoteForm(function(f) { return Object.assign({}, f, { vote: opt }); }); }}
+                          style={{ padding: '7px 14px', borderRadius: 20, border: '1.5px solid ' + (active ? vc.color : '#e0d8cc'), background: active ? vc.bg : '#fff', color: active ? vc.color : '#888', fontSize: 13, fontWeight: active ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}>
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div style={bGrp}>
+                  <label style={bLbl}>Note (optional)</label>
+                  <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={2} style={Object.assign({}, bInp, { resize: 'vertical' })} placeholder="Reason or comment…" />
+                </div>
+                <button type="submit" disabled={voteSaving || !voteForm.member || !voteForm.vote}
+                  style={{ width: '100%', background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: (voteSaving || !voteForm.member || !voteForm.vote) ? 0.6 : 1 }}>
+                  {voteSaving ? 'Saving…' : 'Submit Vote'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAdd && (
+        <div onClick={function() { setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>New Voting Topic</div>
+            <form onSubmit={handleTopicSubmit}>
+              <div style={bGrp}><label style={bLbl}>Title *</label><input required value={topicForm.title} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { title: e.target.value }); }); }} style={bInp} placeholder="Topic title…" /></div>
+              <div style={bGrp}><label style={bLbl}>Description</label><textarea value={topicForm.description} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} rows={3} style={Object.assign({}, bInp, { resize: 'vertical' })} placeholder="Background, details, context…" /></div>
+              <div style={bGrp}><label style={bLbl}>Attachment URL</label><input value={topicForm.attachment_url} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { attachment_url: e.target.value }); }); }} style={bInp} placeholder="https://…" /></div>
+              <div style={bGrp}><label style={bLbl}>Submitted By</label><input value={topicForm.submitted_by} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { submitted_by: e.target.value }); }); }} style={bInp} placeholder="Name…" /></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div><label style={bLbl}>Due Date</label><input type="date" value={topicForm.due_date} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { due_date: e.target.value }); }); }} style={bInp} /></div>
+                <div><label style={bLbl}>Meeting Date</label><input type="date" value={topicForm.meeting_date} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { meeting_date: e.target.value }); }); }} style={bInp} /></div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <button type="submit" disabled={topicSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: topicSaving ? 0.7 : 1 }}>{topicSaving ? 'Saving…' : 'Add Topic'}</button>
+                <button type="button" onClick={function() { setShowAdd(false); }} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
 function StrategyView() {
   return (
     <div>
