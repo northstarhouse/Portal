@@ -1284,7 +1284,7 @@ function BoardView() {
     return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  var bInp = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+  var bInp = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 3, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
   var bLbl = { fontSize: 12, color: '#666', fontWeight: 500 };
   var bGrp = { marginBottom: 14 };
 
@@ -1322,7 +1322,7 @@ function BoardView() {
             <div
               key={item.id}
               onClick={function() { setSelected(item); setVoteForm({ voter: '', choice: '', note: '' }); }}
-              style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '16px 20px', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
+              style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 4, padding: '16px 20px', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
               onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.07)'; }}
               onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
             >
@@ -1338,8 +1338,8 @@ function BoardView() {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 16, flexShrink: 0 }}>
                   <span style={{ fontSize: 12, color: '#777' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
                   {revealed
-                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Closed – Decision Made</span>
-                    : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 20 }}>Open</span>
+                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Closed – Decision Made</span>
+                    : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Open</span>
                   }
                 </div>
               </div>
@@ -1375,7 +1375,7 @@ function BoardView() {
             </div>
 
             {selected.description && (
-              <div dangerouslySetInnerHTML={{ __html: selected.description }} style={{ fontSize: 12, color: '#555', lineHeight: 1.6, marginBottom: 16, padding: '12px 14px', background: '#faf8f4', borderRadius: 8, borderLeft: '3px solid ' + gold }} />
+              <div dangerouslySetInnerHTML={{ __html: selected.description }} style={{ fontSize: 12, color: '#555', lineHeight: 1.6, marginBottom: 16, padding: '12px 14px', background: '#faf8f4', borderRadius: 0, borderLeft: '3px solid ' + gold }} />
             )}
 
             {selected.attachment_url && (
@@ -1396,7 +1396,7 @@ function BoardView() {
                       { label: 'Abstain / Not in Attendance', count: t.abstain + t.absent, bg: '#f5f5f5', border: '#e0e0e0', color: '#888' },
                     ].map(function(entry) {
                       return (
-                        <div key={entry.label} style={{ background: entry.bg, border: '1px solid ' + entry.border, borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
+                        <div key={entry.label} style={{ background: entry.bg, border: '1px solid ' + entry.border, borderRadius: 4, padding: '14px 16px', textAlign: 'center' }}>
                           <div style={{ fontSize: 28, fontWeight: 700, color: entry.color, lineHeight: 1 }}>{entry.count}</div>
                           <div style={{ fontSize: 12, color: entry.color, fontWeight: 600, marginTop: 4, opacity: 0.8 }}>{entry.label}</div>
                         </div>
@@ -1409,7 +1409,7 @@ function BoardView() {
                   {BOARD_MEMBERS.map(function(m) {
                     var mv = itemVotes(selected).find(function(v) { return v.voter === m; });
                     if (!mv) return (
-                      <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 12 }}>
+                      <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fafafa', borderRadius: 2, fontSize: 12 }}>
                         <span style={{ fontWeight: 500, color: '#2a2a2a' }}>{m}</span>
                         <span style={{ color: '#999' }}>—</span>
                         <span style={{ color: '#777', fontSize: 12 }}>No vote</span>
@@ -1417,7 +1417,7 @@ function BoardView() {
                     );
                     var vc = VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' };
                     return (
-                      <div key={m} style={{ padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 12 }}>
+                      <div key={m} style={{ padding: '8px 12px', background: '#fafafa', borderRadius: 2, fontSize: 12 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontWeight: 500, color: '#2a2a2a' }}>{m}</span>
                           <span style={{ color: '#999' }}>—</span>
@@ -1440,7 +1440,7 @@ function BoardView() {
                     var mv = itemVotes(selected).find(function(v) { return v.voter === m; });
                     var vc = mv ? (VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' }) : null;
                     return (
-                      <div key={m} style={{ background: '#fafafa', borderRadius: 10, padding: '10px 14px' }}>
+                      <div key={m} style={{ background: '#fafafa', borderRadius: 2, padding: '10px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 12, fontWeight: 500, color: mv ? '#aaa' : '#2a2a2a' }}>{m}</span>
                           {mv && <><span style={{ color: '#999' }}>—</span><span style={{ background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span></>}
@@ -1459,7 +1459,7 @@ function BoardView() {
                       + Add Post-Meeting Votes
                     </button>
                   ) : (
-                    <div style={{ background: '#fafafa', borderRadius: 12, padding: 16 }}>
+                    <div style={{ background: '#fafafa', borderRadius: 2, padding: 16 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 12 }}>Add Post-Meeting Vote</div>
                       <div style={{ marginBottom: 10 }}>
                         <label style={bLbl}>Board Member</label>
@@ -1503,7 +1503,7 @@ function BoardView() {
 
       {showAdd && (
         <div onClick={function() { setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 4, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>New Voting Topic</div>
             <form onSubmit={handleTopicSubmit}>
               <div style={bGrp}><label style={bLbl}>Title *</label><input required value={topicForm.title} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { title: e.target.value }); }); }} style={bInp} placeholder="Topic title…" /></div>
