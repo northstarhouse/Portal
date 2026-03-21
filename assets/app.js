@@ -48,6 +48,7 @@
   var cream = "#f8f4ec";
   var modules = [
     { id: "home", label: "Overview", icon: "\u2302" },
+    { id: "operational", label: "Operational", icon: "\u25EB" },
     { id: "volunteers", label: "Volunteers", icon: "\u25CE" },
     { id: "donors", label: "Donors & Donations", icon: "\u25C7" },
     { id: "board", label: "Board Voting", icon: "\u25D1" },
@@ -1300,9 +1301,13 @@
       })));
     }));
   }
+  function OperationalView() {
+    return /* @__PURE__ */ React.createElement("div", { style: { color: "#aaa", fontSize: 13, padding: "40px 0" } }, "Coming soon \u2014 build out this section with operational content.");
+  }
   var views = {
     home: HomeView,
     events: EventsView,
+    operational: OperationalView,
     volunteers: VolunteersView,
     donors: DonorsView,
     marketing: MarketingView,

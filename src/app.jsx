@@ -49,6 +49,7 @@ const cream = "#f8f4ec";
 
 const modules = [
   { id: "home", label: "Overview", icon: "⌂" },
+  { id: "operational", label: "Operational", icon: "◫" },
   { id: "volunteers", label: "Volunteers", icon: "◎" },
   { id: "donors", label: "Donors & Donations", icon: "◇" },
   { id: "board", label: "Board Voting", icon: "◑" },
@@ -1642,9 +1643,18 @@ function StrategyView() {
   );
 }
 
+function OperationalView() {
+  return (
+    <div style={{ color: '#aaa', fontSize: 13, padding: '40px 0' }}>
+      Coming soon — build out this section with operational content.
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
   events: EventsView,
+  operational: OperationalView,
   volunteers: VolunteersView,
   donors: DonorsView,
   marketing: MarketingView,
