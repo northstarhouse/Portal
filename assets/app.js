@@ -1068,7 +1068,10 @@ var App = (() => {
         return Object.assign({}, f, { voter: e.target.value });
       });
     }, style: bInp }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select name\u2026"), BOARD_MEMBERS.map(function(m) {
-      return /* @__PURE__ */ React.createElement("option", { key: m, value: m }, m);
+      var hasVoted = itemVotes(selected).some(function(v) {
+        return v.voter === m;
+      });
+      return /* @__PURE__ */ React.createElement("option", { key: m, value: m, style: { color: hasVoted ? "#bbb" : "#2a2a2a" } }, m, hasVoted ? " (already voted)" : "");
     }))), /* @__PURE__ */ React.createElement("div", { style: bGrp }, /* @__PURE__ */ React.createElement("label", { style: bLbl }, "Vote"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" } }, ["Yes", "No", "Abstain", "Not in attendance"].map(function(opt) {
       var vc = VOTE_COLORS[opt];
       var active = voteForm.choice === opt;

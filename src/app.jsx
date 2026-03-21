@@ -1410,7 +1410,10 @@ function BoardView() {
                   <label style={bLbl}>Board Member</label>
                   <select value={voteForm.voter} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { voter: e.target.value }); }); }} style={bInp}>
                     <option value="">Select name…</option>
-                    {BOARD_MEMBERS.map(function(m) { return <option key={m} value={m}>{m}</option>; })}
+                    {BOARD_MEMBERS.map(function(m) {
+                      var hasVoted = itemVotes(selected).some(function(v) { return v.voter === m; });
+                      return <option key={m} value={m} style={{ color: hasVoted ? '#bbb' : '#2a2a2a' }}>{m}{hasVoted ? ' (already voted)' : ''}</option>;
+                    })}
                   </select>
                 </div>
                 <div style={bGrp}>
