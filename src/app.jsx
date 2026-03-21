@@ -824,6 +824,7 @@ function DonorsView() {
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [filterType, setFilterType] = useState('All');
 
   var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
   var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
@@ -842,7 +843,7 @@ function DonorsView() {
   useEffect(function() {
     sbFetch('2026 Donations', ['Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes'])
       .then(function(data) {
-        if (Array.isArray(data)) setDonations(data);
+        if (Array.isArray(data)) setDonations(data.sort(function(a, b) { return new Date(b['Close Date']) - new Date(a['Close Date']); }));
         else setError(JSON.stringify(data));
         setLoading(false);
       })
@@ -923,17 +924,29 @@ function DonorsView() {
 
       {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#c0392b' }}>Error: {error}</div>}
 
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+        {['All'].concat(DONATION_TYPES).map(function(t) {
+          var active = filterType === t;
+          var tc = typeColors[t] || { bg: '#f5f0ea', color: '#888' };
+          return (
+            <button key={t} onClick={function() { setFilterType(t); }}
+              style={{ padding: '5px 14px', borderRadius: 20, border: '1.5px solid ' + (active ? tc.color : '#e0d8cc'), background: active ? tc.bg : '#fff', color: active ? tc.color : '#888', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}>
+              {t}
+            </button>
+          );
+        })}
+      </div>
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading donations...</div>
       ) : (
         <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, overflow: 'hidden' }}>
-          {/* Header */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 0, padding: '8px 16px', borderBottom: '0.5px solid #e8e0d4', background: '#faf8f4' }}>
             {['Donor', 'Type', 'Amount', 'Date'].map(function(h) {
               return <div key={h} style={{ fontSize: 11, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>{h}</div>;
             })}
           </div>
-          {donations.map(function(d, i) {
+          {donations.filter(function(d) { return filterType === 'All' || d['Donation Type'] === filterType; }).map(function(d, i) {
             var tc = typeColors[d['Donation Type']] || { bg: '#f3f3f3', color: '#555' };
             var acked = d['Acknowledged'] === true || String(d['Acknowledged']).toUpperCase() === 'TRUE';
             return (
@@ -942,7 +955,7 @@ function DonorsView() {
                 onClick={function() { setSelected(d); }}
                 onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
                 onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}
-                style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 0, padding: '11px 16px', borderBottom: i < donations.length - 1 ? '0.5px solid #f0ebe2' : 'none', cursor: 'pointer', background: '#fff', alignItems: 'center', transition: 'background 0.12s' }}
+                style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 0, padding: '11px 16px', borderBottom: '0.5px solid #f0ebe2', cursor: 'pointer', background: '#fff', alignItems: 'center', transition: 'background 0.12s' }}
               >
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{d['Donor Name']}</div>
