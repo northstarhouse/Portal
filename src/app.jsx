@@ -1590,10 +1590,35 @@ function StrategyView() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
-        <StatCard label="Not Started" value={countNotStarted} />
-        <StatCard label="In Progress" value={countInProgress} />
-        <StatCard label="Completed" value={countComplete} />
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '18px 22px', marginBottom: 20 }}>
+        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 14 }}>Progress by Focus Area</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {CATEGORY_ORDER.map(function(cat) {
+            var catGoals = goals.filter(function(g) { return g.category === cat && g.goal_type !== 'three_year_vision'; });
+            if (catGoals.length === 0) return null;
+            var done = catGoals.filter(function(g) { return g.status === 'Complete'; }).length;
+            var inprog = catGoals.filter(function(g) { return g.status === 'In progress' || g.status === 'On track'; }).length;
+            var pct = Math.round((done / catGoals.length) * 100);
+            var inprogPct = Math.round((inprog / catGoals.length) * 100);
+            return (
+              <div key={cat}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{cat}</span>
+                  <span style={{ fontSize: 12, color: '#888' }}>{done}/{catGoals.length} complete</span>
+                </div>
+                <div style={{ height: 8, background: '#f0ece6', borderRadius: 99, overflow: 'hidden', display: 'flex' }}>
+                  <div style={{ width: pct + '%', background: gold, borderRadius: 99, transition: 'width 0.4s' }} />
+                  <div style={{ width: inprogPct + '%', background: '#e8d5b0', transition: 'width 0.4s' }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#888' }}><div style={{ width: 10, height: 10, borderRadius: 3, background: gold }} />Complete</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#888' }}><div style={{ width: 10, height: 10, borderRadius: 3, background: '#e8d5b0' }} />In Progress</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#888' }}><div style={{ width: 10, height: 10, borderRadius: 3, background: '#f0ece6' }} />Not Started</div>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>

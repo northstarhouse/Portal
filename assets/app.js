@@ -1269,7 +1269,21 @@
       };
     };
     if (loading) return /* @__PURE__ */ React.createElement("div", { style: { padding: 40, color: "#777", fontSize: 12 } }, "Loading\u2026");
-    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Not Started", value: countNotStarted }), /* @__PURE__ */ React.createElement(StatCard, { label: "In Progress", value: countInProgress }), /* @__PURE__ */ React.createElement(StatCard, { label: "Completed", value: countComplete })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, ["annual", "future", "three_year_vision"].map(function(t) {
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e8e0d5", borderRadius: 12, padding: "18px 22px", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 14 } }, "Progress by Focus Area"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, CATEGORY_ORDER.map(function(cat) {
+      var catGoals = goals.filter(function(g) {
+        return g.category === cat && g.goal_type !== "three_year_vision";
+      });
+      if (catGoals.length === 0) return null;
+      var done = catGoals.filter(function(g) {
+        return g.status === "Complete";
+      }).length;
+      var inprog = catGoals.filter(function(g) {
+        return g.status === "In progress" || g.status === "On track";
+      }).length;
+      var pct = Math.round(done / catGoals.length * 100);
+      var inprogPct = Math.round(inprog / catGoals.length * 100);
+      return /* @__PURE__ */ React.createElement("div", { key: cat }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: "#2a2a2a" } }, cat), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#888" } }, done, "/", catGoals.length, " complete")), /* @__PURE__ */ React.createElement("div", { style: { height: 8, background: "#f0ece6", borderRadius: 99, overflow: "hidden", display: "flex" } }, /* @__PURE__ */ React.createElement("div", { style: { width: pct + "%", background: gold, borderRadius: 99, transition: "width 0.4s" } }), /* @__PURE__ */ React.createElement("div", { style: { width: inprogPct + "%", background: "#e8d5b0", transition: "width 0.4s" } })));
+    })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, marginTop: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#888" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 10, height: 10, borderRadius: 3, background: gold } }), "Complete"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#888" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 10, height: 10, borderRadius: 3, background: "#e8d5b0" } }), "In Progress"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#888" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 10, height: 10, borderRadius: 3, background: "#f0ece6" } }), "Not Started"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, ["annual", "future", "three_year_vision"].map(function(t) {
       return /* @__PURE__ */ React.createElement("button", { key: t, onClick: function() {
         setTab(t);
       }, style: tabStyle(t) }, GOAL_TYPE_LABELS[t]);
