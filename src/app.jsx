@@ -200,7 +200,7 @@ const typeColors = {
   Volunteer: { bg: "#e8f5e9", color: "#2e7d32" },
   Board: { bg: "#e8eaf6", color: "#3949ab" },
   Event: { bg: "#fff8e1", color: "#8a6200" },
-};function HomeView() {
+};function HomeView({ navigate }) {
   const [donationTotal, setDonationTotal] = useState(null);
   const [activeVols, setActiveVols] = useState(null);
   const [calEvents, setCalEvents] = useState(null);
@@ -246,8 +246,8 @@ const typeColors = {
       </div>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-        <StatCard label="YTD Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub="of $50K goal" />
-        <StatCard label="Active Volunteers" value={activeVols === null ? '...' : activeVols} />
+        <div onClick={function() { navigate('donors'); }} style={{ cursor: 'pointer' }}><StatCard label="YTD Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub="of $50K goal" /></div>
+        <div onClick={function() { navigate('volunteers'); }} style={{ cursor: 'pointer' }}><StatCard label="Active Volunteers" value={activeVols === null ? '...' : activeVols} /></div>
         <StatCard label="2026 Events" value="5" sub="on the books" />
         <StatCard label="Active Sponsors" value="3" sub="+ 1 in review" />
       </div>
@@ -1537,7 +1537,7 @@ const views = {
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: "#2a2a2a" }}>{mod && mod.label}</h1>
             <div style={{ height: 2, width: 32, background: gold, borderRadius: 2, marginTop: 6 }} />
           </div>
-          <View />
+          <View navigate={setActive} />
         </div>
       </div>
     </div>
