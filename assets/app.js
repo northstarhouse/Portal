@@ -159,7 +159,7 @@ var App = (() => {
         }, 0);
         setDonationTotal(total);
       });
-      sbFetch("Volunteers", ["Status"]).then(function(rows) {
+      sbFetch("2026 Volunteers", ["Status"]).then(function(rows) {
         if (!Array.isArray(rows)) return;
         setActiveVols(rows.filter(function(r) {
           return r["Status"] === "Active";
