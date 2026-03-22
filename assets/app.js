@@ -1526,20 +1526,20 @@
       setForm(function(f) {
         return Object.assign({}, f, { what_went_well: e.target.value });
       });
-    }, rows: 4, style: Object.assign({}, inpStyle, { resize: "vertical" }) }))), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Challenges Encountered"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 } }, CHALLENGE_OPTIONS.map(function(opt) {
+    }, rows: 4, style: Object.assign({}, inpStyle, { resize: "vertical" }) }))), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Challenges Encountered"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 } }, CHALLENGE_OPTIONS.map(function(opt) {
       var on = form.challenges.indexOf(opt) !== -1;
-      return /* @__PURE__ */ React.createElement("label", { key: opt, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, cursor: "pointer", padding: "5px 10px", borderRadius: 5, border: "0.5px solid " + (on ? gold : "#e0d8cc"), background: on ? "#faf5ee" : "#fff", color: on ? "#7a5c30" : "#555", userSelect: "none" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: on, onChange: function() {
+      return /* @__PURE__ */ React.createElement("label", { key: opt, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 14, cursor: "pointer", color: on ? "#2a2a2a" : "#555", userSelect: "none" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: on, onChange: function() {
         toggleCheck("challenges", opt);
-      }, style: { display: "none" } }), on && /* @__PURE__ */ React.createElement("span", { style: { color: gold } }, "\u2713 "), opt);
+      }, style: { width: 16, height: 16, accentColor: gold, cursor: "pointer", flexShrink: 0 } }), opt);
     })), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Details"), /* @__PURE__ */ React.createElement("textarea", { value: form.challenges_details, onChange: function(e) {
       setForm(function(f) {
         return Object.assign({}, f, { challenges_details: e.target.value });
       });
-    }, rows: 3, style: Object.assign({}, inpStyle, { resize: "vertical" }) }))), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Support Needed to Stay on Track"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 } }, SUPPORT_OPTIONS.map(function(opt) {
+    }, rows: 3, style: Object.assign({}, inpStyle, { resize: "vertical" }) }))), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Support Needed to Stay on Track"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 } }, SUPPORT_OPTIONS.map(function(opt) {
       var on = form.support_needed.indexOf(opt) !== -1;
-      return /* @__PURE__ */ React.createElement("label", { key: opt, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 12, cursor: "pointer", padding: "5px 10px", borderRadius: 5, border: "0.5px solid " + (on ? gold : "#e0d8cc"), background: on ? "#faf5ee" : "#fff", color: on ? "#7a5c30" : "#555", userSelect: "none" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: on, onChange: function() {
+      return /* @__PURE__ */ React.createElement("label", { key: opt, style: { display: "flex", alignItems: "center", gap: 10, fontSize: 14, cursor: "pointer", color: on ? "#2a2a2a" : "#555", userSelect: "none" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: on, onChange: function() {
         toggleCheck("support_needed", opt);
-      }, style: { display: "none" } }), on && /* @__PURE__ */ React.createElement("span", { style: { color: gold } }, "\u2713 "), opt);
+      }, style: { width: 16, height: 16, accentColor: gold, cursor: "pointer", flexShrink: 0 } }), opt);
     })), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Details"), /* @__PURE__ */ React.createElement("textarea", { value: form.support_details, onChange: function(e) {
       setForm(function(f) {
         return Object.assign({}, f, { support_details: e.target.value });

@@ -1877,13 +1877,13 @@ function QuarterlyView() {
 
         <div style={card}>
           <span style={secStyle}>Challenges Encountered</span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
             {CHALLENGE_OPTIONS.map(function(opt) {
               var on = form.challenges.indexOf(opt) !== -1;
               return (
-                <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', padding: '5px 10px', borderRadius: 5, border: '0.5px solid ' + (on ? gold : '#e0d8cc'), background: on ? '#faf5ee' : '#fff', color: on ? '#7a5c30' : '#555', userSelect: 'none' }}>
-                  <input type="checkbox" checked={on} onChange={function() { toggleCheck('challenges', opt); }} style={{ display: 'none' }} />
-                  {on && <span style={{ color: gold }}>✓ </span>}{opt}
+                <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, cursor: 'pointer', color: on ? '#2a2a2a' : '#555', userSelect: 'none' }}>
+                  <input type="checkbox" checked={on} onChange={function() { toggleCheck('challenges', opt); }} style={{ width: 16, height: 16, accentColor: gold, cursor: 'pointer', flexShrink: 0 }} />
+                  {opt}
                 </label>
               );
             })}
@@ -1896,13 +1896,13 @@ function QuarterlyView() {
 
         <div style={card}>
           <span style={secStyle}>Support Needed to Stay on Track</span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
             {SUPPORT_OPTIONS.map(function(opt) {
               var on = form.support_needed.indexOf(opt) !== -1;
               return (
-                <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', padding: '5px 10px', borderRadius: 5, border: '0.5px solid ' + (on ? gold : '#e0d8cc'), background: on ? '#faf5ee' : '#fff', color: on ? '#7a5c30' : '#555', userSelect: 'none' }}>
-                  <input type="checkbox" checked={on} onChange={function() { toggleCheck('support_needed', opt); }} style={{ display: 'none' }} />
-                  {on && <span style={{ color: gold }}>✓ </span>}{opt}
+                <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, cursor: 'pointer', color: on ? '#2a2a2a' : '#555', userSelect: 'none' }}>
+                  <input type="checkbox" checked={on} onChange={function() { toggleCheck('support_needed', opt); }} style={{ width: 16, height: 16, accentColor: gold, cursor: 'pointer', flexShrink: 0 }} />
+                  {opt}
                 </label>
               );
             })}
