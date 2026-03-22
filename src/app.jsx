@@ -2408,13 +2408,13 @@ function OperationalView({ opArea }) {
                     )}
                     <div>
                       <span style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</span>
+                      {v['Overview Notes'] && <span style={{ fontSize: 13, color: '#999', fontStyle: 'italic', marginLeft: 6 }}>{v['Overview Notes']}</span>}
                       {(v['Phone Number'] || v['Email']) ? (
                         <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>
                           {[v['Phone Number'], v['Email']].filter(function(x) { return x && x.trim(); }).join(' | ')}
                         </div>
                       ) : null}
                     </div>
-                    {v['Overview Notes'] && <><span style={{ color: '#ccc' }}>—</span><span style={{ fontSize: 13, color: '#777' }}>{v['Overview Notes']}</span></>}
                     <select
                       value={v.Status || 'Active'}
                       onChange={function(e) {
