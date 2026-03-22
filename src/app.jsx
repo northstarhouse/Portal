@@ -2280,11 +2280,13 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
           <div>
             <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 6 }}>Operational Area</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{area}</div>
-              {navigateToQuarterly && <button onClick={function() { navigateToQuarterly(area); }} style={{ fontSize: 12, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 7, padding: '5px 14px', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap' }}>Submit Quarterly Update</button>}
-            </div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{area}</div>
           </div>
+          {navigateToQuarterly && (
+            <button onClick={function() { navigateToQuarterly(area); }} style={{ marginLeft: 'auto', alignSelf: 'center', background: gold, color: '#fff', border: 'none', borderRadius: 9, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(136,108,68,0.18)' }}>
+              Submit Quarterly Update
+            </button>
+          )}
           <div style={{ width: 200, flexShrink: 0 }}>
             {(function() {
               if (area === 'Venue') {
