@@ -2425,7 +2425,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
           var goalRows = [['goal_1','goal_1_status','goal_1_summary'],['goal_2','goal_2_status','goal_2_summary'],['goal_3','goal_3_status','goal_3_summary']];
           var frontCard = (
-            <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
+            <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>{selectedQ} {new Date().getFullYear()} Goals</div>
                 <div style={{ display: 'flex', gap: 4 }}>
@@ -2469,7 +2469,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
             </div>
           );
           var backCard = (
-            <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5', position: 'absolute', top: 0, left: 0, right: 0 }}>
+            <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                 <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>{selectedQ} {new Date().getFullYear()} Reflection</div>
                 <button onClick={function(e) { e.stopPropagation(); setCardFlipped(false); }} style={{ fontSize: 11, color: '#888', background: 'none', border: '0.5px solid #ccc', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 500 }}>← Goals</button>
@@ -2531,14 +2531,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
               )}
             </div>
           );
-          return (
-            <div style={{ perspective: '1200px' }}>
-              <div style={{ position: 'relative', transformStyle: 'preserve-3d', transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)', transform: cardFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
-                {frontCard}
-                {backCard}
-              </div>
-            </div>
-          );
+          return cardFlipped ? backCard : frontCard;
         })()}
 
         <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
