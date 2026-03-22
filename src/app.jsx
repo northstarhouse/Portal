@@ -1562,6 +1562,7 @@ function StrategyView() {
   const [goals, setGoals] = useS([]);
   const [loading, setLoading] = useS(true);
   const [tab, setTab] = useS('annual');
+  const [activeCat, setActiveCat] = useS(CATEGORY_ORDER[0]);
   const [editing, setEditing] = useS(null);
   const [editForm, setEditForm] = useS({});
   const [saving, setSaving] = useS(false);
@@ -1573,12 +1574,6 @@ function StrategyView() {
       .then(function(d) { setGoals(Array.isArray(d) ? d : []); setLoading(false); });
   }
   useE(function() { load(); }, []);
-
-  var filtered = goals.filter(function(g) { return g.goal_type === tab; });
-  var annualGoals = goals.filter(function(g) { return g.goal_type === 'annual'; });
-  var countNotStarted = goals.filter(function(g) { return g.goal_type !== 'three_year_vision' && (!g.status || g.status === 'Not started'); }).length;
-  var countInProgress = goals.filter(function(g) { return g.goal_type !== 'three_year_vision' && (g.status === 'In progress' || g.status === 'On track'); }).length;
-  var countComplete = goals.filter(function(g) { return g.goal_type !== 'three_year_vision' && g.status === 'Complete'; }).length;
 
   function openEdit(g) {
     setEditing(g.id);
@@ -1601,58 +1596,52 @@ function StrategyView() {
 
   if (loading) return <div style={{ padding: 40, color: '#777', fontSize: 12 }}>Loading…</div>;
 
+  var filtered = goals.filter(function(g) { return g.goal_type === tab && g.category === activeCat; });
+
   return (
     <div>
-      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '18px 22px', marginBottom: 20 }}>
-        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 14 }}>Progress by Focus Area</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          {CATEGORY_ORDER.map(function(cat) {
-            var catGoals = goals.filter(function(g) { return g.category === cat && g.goal_type !== 'three_year_vision'; });
-            if (catGoals.length === 0) return null;
-            var done = catGoals.filter(function(g) { return g.status === 'Complete'; }).length;
-            var inprog = catGoals.filter(function(g) { return g.status === 'In progress' || g.status === 'On track'; }).length;
-            var pct = Math.round((done / catGoals.length) * 100);
-            var inprogPct = Math.round((inprog / catGoals.length) * 100);
-            return (
-              <div key={cat} style={{ background: '#faf8f5', borderRadius: 8, padding: '14px 16px' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 10, lineHeight: 1.3 }}>{cat}</div>
-                <div style={{ height: 8, background: '#ede8e0', borderRadius: 99, overflow: 'hidden', display: 'flex', marginBottom: 8 }}>
-                  <div style={{ width: pct + '%', background: '#4caf50', transition: 'width 0.4s' }} />
-                  <div style={{ width: inprogPct + '%', background: '#f5a623', transition: 'width 0.4s' }} />
-                </div>
-                <div style={{ fontSize: 12, color: '#888' }}>{done}/{catGoals.length} complete</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+        {CATEGORY_ORDER.map(function(cat) {
+          var catGoals = goals.filter(function(g) { return g.category === cat && g.goal_type !== 'three_year_vision'; });
+          if (catGoals.length === 0) return null;
+          var done = catGoals.filter(function(g) { return g.status === 'Complete'; }).length;
+          var inprog = catGoals.filter(function(g) { return g.status === 'In progress' || g.status === 'On track'; }).length;
+          var pct = Math.round((done / catGoals.length) * 100);
+          var inprogPct = Math.round((inprog / catGoals.length) * 100);
+          var isActive = activeCat === cat;
+          return (
+            <div key={cat} onClick={function() { setActiveCat(cat); setEditing(null); }}
+              style={{ background: isActive ? '#fdf8f0' : '#fff', border: '0.5px solid ' + (isActive ? gold : '#e8e0d5'), borderRadius: 10, padding: '18px 20px', cursor: 'pointer', transition: 'all 0.15s' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginBottom: 12, lineHeight: 1.3 }}>{cat}</div>
+              <div style={{ height: 10, background: '#ede8e0', borderRadius: 99, overflow: 'hidden', display: 'flex', marginBottom: 10 }}>
+                <div style={{ width: pct + '%', background: '#4caf50', transition: 'width 0.4s' }} />
+                <div style={{ width: inprogPct + '%', background: '#f5a623', transition: 'width 0.4s' }} />
               </div>
-            );
-          })}
-        </div>
-        <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#888' }}><div style={{ width: 10, height: 10, borderRadius: 3, background: '#4caf50' }} />Complete</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#888' }}><div style={{ width: 10, height: 10, borderRadius: 3, background: '#f5a623' }} />In Progress</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#888' }}><div style={{ width: 10, height: 10, borderRadius: 3, background: '#f0ece6' }} />Not Started</div>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {['annual', 'future', 'three_year_vision'].map(function(t) {
-          return <button key={t} onClick={function() { setTab(t); }} style={tabStyle(t)}>{GOAL_TYPE_LABELS[t]}</button>;
+              <div style={{ display: 'flex', gap: 12, fontSize: 12, color: '#888' }}>
+                <span style={{ color: '#4caf50', fontWeight: 600 }}>{done} complete</span>
+                <span>{inprog} in progress</span>
+                <span>{catGoals.length - done - inprog} not started</span>
+              </div>
+            </div>
+          );
         })}
       </div>
 
-      {CATEGORY_ORDER.map(function(cat) {
-        var catGoals = filtered.filter(function(g) { return g.category === cat; });
-        if (catGoals.length === 0) return null;
-        return (
-          <div key={cat} style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.4, color: gold, fontWeight: 700, marginBottom: 10 }}>{cat}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {catGoals.map(function(g) {
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '20px 24px' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 16 }}>{activeCat}</div>
+
+        {filtered.length === 0 ? (
+          <div style={{ color: '#bbb', fontSize: 13, fontStyle: 'italic', padding: '10px 0' }}>No goals for this area.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+        {filtered.map(function(g) {
                 var sc = GOAL_STATUS_COLORS[g.status] || GOAL_STATUS_COLORS['Not started'];
                 var isEdit = editing === g.id;
                 return (
-                  <div key={g.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '14px 16px' }}>
+                  <div key={g.id} style={{ background: '#faf8f5', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '14px 16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>{g.title}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>{g.title}</div>
                         {g.description && <div style={{ fontSize: 12, color: '#777', lineHeight: 1.5 }}>{g.description}</div>}
                       </div>
                       {tab !== 'three_year_vision' && (
@@ -1701,10 +1690,15 @@ function StrategyView() {
                   </div>
                 );
               })}
-            </div>
           </div>
-        );
-      })}
+        )}
+
+        <div style={{ borderTop: '0.5px solid #f0ece6', paddingTop: 14, marginTop: 4, display: 'flex', gap: 8 }}>
+          {['annual', 'future', 'three_year_vision'].map(function(t) {
+            return <button key={t} onClick={function() { setTab(t); setEditing(null); }} style={tabStyle(t)}>{GOAL_TYPE_LABELS[t]}</button>;
+          })}
+        </div>
+      </div>
     </div>
   );
 }

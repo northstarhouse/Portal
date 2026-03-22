@@ -1231,6 +1231,7 @@
     const [goals, setGoals] = useS([]);
     const [loading, setLoading] = useS(true);
     const [tab, setTab] = useS("annual");
+    const [activeCat, setActiveCat] = useS(CATEGORY_ORDER[0]);
     const [editing, setEditing] = useS(null);
     const [editForm, setEditForm] = useS({});
     const [saving, setSaving] = useS(false);
@@ -1246,21 +1247,6 @@
     useE(function() {
       load();
     }, []);
-    var filtered = goals.filter(function(g) {
-      return g.goal_type === tab;
-    });
-    var annualGoals = goals.filter(function(g) {
-      return g.goal_type === "annual";
-    });
-    var countNotStarted = goals.filter(function(g) {
-      return g.goal_type !== "three_year_vision" && (!g.status || g.status === "Not started");
-    }).length;
-    var countInProgress = goals.filter(function(g) {
-      return g.goal_type !== "three_year_vision" && (g.status === "In progress" || g.status === "On track");
-    }).length;
-    var countComplete = goals.filter(function(g) {
-      return g.goal_type !== "three_year_vision" && g.status === "Complete";
-    }).length;
     function openEdit(g) {
       setEditing(g.id);
       setEditForm({ status: g.status || "Not started", lead: g.lead || "", due_date: g.due_date || "" });
@@ -1286,7 +1272,10 @@
       };
     };
     if (loading) return /* @__PURE__ */ React.createElement("div", { style: { padding: 40, color: "#777", fontSize: 12 } }, "Loading\u2026");
-    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e8e0d5", borderRadius: 12, padding: "18px 22px", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 14 } }, "Progress by Focus Area"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 } }, CATEGORY_ORDER.map(function(cat) {
+    var filtered = goals.filter(function(g) {
+      return g.goal_type === tab && g.category === activeCat;
+    });
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 } }, CATEGORY_ORDER.map(function(cat) {
       var catGoals = goals.filter(function(g) {
         return g.category === cat && g.goal_type !== "three_year_vision";
       });
@@ -1299,79 +1288,88 @@
       }).length;
       var pct = Math.round(done / catGoals.length * 100);
       var inprogPct = Math.round(inprog / catGoals.length * 100);
-      return /* @__PURE__ */ React.createElement("div", { key: cat, style: { background: "#faf8f5", borderRadius: 8, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#2a2a2a", marginBottom: 10, lineHeight: 1.3 } }, cat), /* @__PURE__ */ React.createElement("div", { style: { height: 8, background: "#ede8e0", borderRadius: 99, overflow: "hidden", display: "flex", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { width: pct + "%", background: "#4caf50", transition: "width 0.4s" } }), /* @__PURE__ */ React.createElement("div", { style: { width: inprogPct + "%", background: "#f5a623", transition: "width 0.4s" } })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#888" } }, done, "/", catGoals.length, " complete"));
-    })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, marginTop: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#888" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 10, height: 10, borderRadius: 3, background: "#4caf50" } }), "Complete"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#888" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 10, height: 10, borderRadius: 3, background: "#f5a623" } }), "In Progress"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#888" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 10, height: 10, borderRadius: 3, background: "#f0ece6" } }), "Not Started"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, ["annual", "future", "three_year_vision"].map(function(t) {
+      var isActive = activeCat === cat;
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: cat,
+          onClick: function() {
+            setActiveCat(cat);
+            setEditing(null);
+          },
+          style: { background: isActive ? "#fdf8f0" : "#fff", border: "0.5px solid " + (isActive ? gold : "#e8e0d5"), borderRadius: 10, padding: "18px 20px", cursor: "pointer", transition: "all 0.15s" }
+        },
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", marginBottom: 12, lineHeight: 1.3 } }, cat),
+        /* @__PURE__ */ React.createElement("div", { style: { height: 10, background: "#ede8e0", borderRadius: 99, overflow: "hidden", display: "flex", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { width: pct + "%", background: "#4caf50", transition: "width 0.4s" } }), /* @__PURE__ */ React.createElement("div", { style: { width: inprogPct + "%", background: "#f5a623", transition: "width 0.4s" } })),
+        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, fontSize: 12, color: "#888" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#4caf50", fontWeight: 600 } }, done, " complete"), /* @__PURE__ */ React.createElement("span", null, inprog, " in progress"), /* @__PURE__ */ React.createElement("span", null, catGoals.length - done - inprog, " not started"))
+      );
+    })), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e8e0d5", borderRadius: 12, padding: "20px 24px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif", marginBottom: 16 } }, activeCat), filtered.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#bbb", fontSize: 13, fontStyle: "italic", padding: "10px 0" } }, "No goals for this area.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 } }, filtered.map(function(g) {
+      var sc = GOAL_STATUS_COLORS[g.status] || GOAL_STATUS_COLORS["Not started"];
+      var isEdit = editing === g.id;
+      return /* @__PURE__ */ React.createElement("div", { key: g.id, style: { background: "#faf8f5", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", marginBottom: 4 } }, g.title), g.description && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777", lineHeight: 1.5 } }, g.description)), tab !== "three_year_vision" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, g.status && /* @__PURE__ */ React.createElement("span", { style: { background: sc.bg, color: sc.color, fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 20 } }, g.status), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: function() {
+            isEdit ? setEditing(null) : openEdit(g);
+          },
+          style: { fontSize: 12, color: isEdit ? "#aaa" : gold, background: "none", border: "none", cursor: "pointer", fontWeight: 500, padding: 0 }
+        },
+        isEdit ? "Cancel" : "Edit"
+      ))), tab !== "three_year_vision" && !isEdit && (g.lead || g.due_date) && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, marginTop: 8 } }, g.lead && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777" } }, "Lead: ", /* @__PURE__ */ React.createElement("span", { style: { color: "#555" } }, g.lead)), g.due_date && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777" } }, "Due: ", /* @__PURE__ */ React.createElement("span", { style: { color: "#555" } }, g.due_date))), isEdit && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 14, paddingTop: 14, borderTop: "0.5px solid #f0ebe2" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#888", fontWeight: 500, display: "block", marginBottom: 4 } }, "Status"), /* @__PURE__ */ React.createElement(
+        "select",
+        {
+          value: editForm.status,
+          onChange: function(e) {
+            setEditForm(function(f) {
+              return Object.assign({}, f, { status: e.target.value });
+            });
+          },
+          style: { width: "100%", padding: "7px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 12, background: "#fff" }
+        },
+        GOAL_STATUS_OPTS.map(function(s) {
+          return /* @__PURE__ */ React.createElement("option", { key: s, value: s }, s);
+        })
+      )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#888", fontWeight: 500, display: "block", marginBottom: 4 } }, "Lead"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          value: editForm.lead,
+          onChange: function(e) {
+            setEditForm(function(f) {
+              return Object.assign({}, f, { lead: e.target.value });
+            });
+          },
+          style: { width: "100%", padding: "7px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 12, boxSizing: "border-box" },
+          placeholder: "Name\u2026"
+        }
+      ))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#888", fontWeight: 500, display: "block", marginBottom: 4 } }, "Due Date"), /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "date",
+          value: editForm.due_date,
+          onChange: function(e) {
+            setEditForm(function(f) {
+              return Object.assign({}, f, { due_date: e.target.value });
+            });
+          },
+          style: { padding: "7px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 12 }
+        }
+      )), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: function() {
+            handleSave(g);
+          },
+          disabled: saving,
+          style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 12, fontWeight: 500, cursor: "pointer", opacity: saving ? 0.7 : 1 }
+        },
+        saving ? "Saving\u2026" : "Save"
+      )));
+    })), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid #f0ece6", paddingTop: 14, marginTop: 4, display: "flex", gap: 8 } }, ["annual", "future", "three_year_vision"].map(function(t) {
       return /* @__PURE__ */ React.createElement("button", { key: t, onClick: function() {
         setTab(t);
+        setEditing(null);
       }, style: tabStyle(t) }, GOAL_TYPE_LABELS[t]);
-    })), CATEGORY_ORDER.map(function(cat) {
-      var catGoals = filtered.filter(function(g) {
-        return g.category === cat;
-      });
-      if (catGoals.length === 0) return null;
-      return /* @__PURE__ */ React.createElement("div", { key: cat, style: { marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1.4, color: gold, fontWeight: 700, marginBottom: 10 } }, cat), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, catGoals.map(function(g) {
-        var sc = GOAL_STATUS_COLORS[g.status] || GOAL_STATUS_COLORS["Not started"];
-        var isEdit = editing === g.id;
-        return /* @__PURE__ */ React.createElement("div", { key: g.id, style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#2a2a2a", marginBottom: 4 } }, g.title), g.description && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777", lineHeight: 1.5 } }, g.description)), tab !== "three_year_vision" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, g.status && /* @__PURE__ */ React.createElement("span", { style: { background: sc.bg, color: sc.color, fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 20 } }, g.status), /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            onClick: function() {
-              isEdit ? setEditing(null) : openEdit(g);
-            },
-            style: { fontSize: 12, color: isEdit ? "#aaa" : gold, background: "none", border: "none", cursor: "pointer", fontWeight: 500, padding: 0 }
-          },
-          isEdit ? "Cancel" : "Edit"
-        ))), tab !== "three_year_vision" && !isEdit && (g.lead || g.due_date) && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, marginTop: 8 } }, g.lead && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777" } }, "Lead: ", /* @__PURE__ */ React.createElement("span", { style: { color: "#555" } }, g.lead)), g.due_date && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777" } }, "Due: ", /* @__PURE__ */ React.createElement("span", { style: { color: "#555" } }, g.due_date))), isEdit && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 14, paddingTop: 14, borderTop: "0.5px solid #f0ebe2" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#888", fontWeight: 500, display: "block", marginBottom: 4 } }, "Status"), /* @__PURE__ */ React.createElement(
-          "select",
-          {
-            value: editForm.status,
-            onChange: function(e) {
-              setEditForm(function(f) {
-                return Object.assign({}, f, { status: e.target.value });
-              });
-            },
-            style: { width: "100%", padding: "7px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 12, background: "#fff" }
-          },
-          GOAL_STATUS_OPTS.map(function(s) {
-            return /* @__PURE__ */ React.createElement("option", { key: s, value: s }, s);
-          })
-        )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#888", fontWeight: 500, display: "block", marginBottom: 4 } }, "Lead"), /* @__PURE__ */ React.createElement(
-          "input",
-          {
-            value: editForm.lead,
-            onChange: function(e) {
-              setEditForm(function(f) {
-                return Object.assign({}, f, { lead: e.target.value });
-              });
-            },
-            style: { width: "100%", padding: "7px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 12, boxSizing: "border-box" },
-            placeholder: "Name\u2026"
-          }
-        ))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("label", { style: { fontSize: 12, color: "#888", fontWeight: 500, display: "block", marginBottom: 4 } }, "Due Date"), /* @__PURE__ */ React.createElement(
-          "input",
-          {
-            type: "date",
-            value: editForm.due_date,
-            onChange: function(e) {
-              setEditForm(function(f) {
-                return Object.assign({}, f, { due_date: e.target.value });
-              });
-            },
-            style: { padding: "7px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 12 }
-          }
-        )), /* @__PURE__ */ React.createElement(
-          "button",
-          {
-            onClick: function() {
-              handleSave(g);
-            },
-            disabled: saving,
-            style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 12, fontWeight: 500, cursor: "pointer", opacity: saving ? 0.7 : 1 }
-          },
-          saving ? "Saving\u2026" : "Save"
-        )));
-      })));
-    }));
+    }))));
   }
   var CHALLENGE_OPTIONS = ["Capacity or volunteer limitations", "Budget or funding constraints", "Scheduling or timing issues", "Cross-area coordination gaps", "External factors", "Other"];
   var SUPPORT_OPTIONS = ["Staff or volunteer help", "Marketing or communications", "Board guidance or decision", "Funding or fundraising support", "Facilities or logistics", "Other"];
