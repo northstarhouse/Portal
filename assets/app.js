@@ -1435,7 +1435,19 @@
       }).then(function(r) {
         return r.json();
       }).then(function(rows) {
-        if (rows && rows[0]) setCurrentGoals(rows[0]);
+        if (rows && rows[0]) {
+          setCurrentGoals(rows[0]);
+          setForm(function(f) {
+            return Object.assign({}, f, {
+              goal_1_status: rows[0].goal_1_status || "On Track",
+              goal_1_summary: rows[0].goal_1_summary || "",
+              goal_2_status: rows[0].goal_2_status || "On Track",
+              goal_2_summary: rows[0].goal_2_summary || "",
+              goal_3_status: rows[0].goal_3_status || "On Track",
+              goal_3_summary: rows[0].goal_3_summary || ""
+            });
+          });
+        }
       });
     }, [area, quarter, year]);
     function toggleCheck(field, val) {
