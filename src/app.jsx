@@ -2273,11 +2273,8 @@ function OperationalView({ opArea }) {
           var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
           var goalRows = [['goal_1','goal_1_status','goal_1_summary'],['goal_2','goal_2_status','goal_2_summary'],['goal_3','goal_3_status','goal_3_summary']];
           var frontCard = (
-            <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5', position: 'absolute', inset: 0, overflowY: 'auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>{cq} {new Date().getFullYear()} Goals</div>
-                {quarterUpdate && <button onClick={function(e) { e.stopPropagation(); setCardFlipped(true); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 500 }}>↩ Reflection</button>}
-              </div>
+            <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 }}>{cq} {new Date().getFullYear()} Goals</div>
               {quarterGoals ? (
                 <div>
                   {quarterGoals.primary_focus && <div style={{ marginBottom: 12 }}><span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Primary Focus</span><div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginTop: 3, lineHeight: 1.5 }}>{quarterGoals.primary_focus}</div></div>}
@@ -2299,6 +2296,9 @@ function OperationalView({ opArea }) {
                       );
                     })}
                   </div>
+                  <div style={{ textAlign: 'right', marginTop: 14 }}>
+                    <button onClick={function(e) { e.stopPropagation(); setCardFlipped(true); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontWeight: 500 }}>View Full Reflection →</button>
+                  </div>
                 </div>
               ) : (
                 <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No goals set for {cq} yet.</div>
@@ -2306,7 +2306,7 @@ function OperationalView({ opArea }) {
             </div>
           );
           var backCard = (
-            <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5', position: 'absolute', inset: 0, overflowY: 'auto' }}>
+            <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5', position: 'absolute', top: 0, left: 0, right: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                 <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>{cq} {new Date().getFullYear()} Reflection</div>
                 <button onClick={function(e) { e.stopPropagation(); setCardFlipped(false); }} style={{ fontSize: 11, color: '#888', background: 'none', border: '0.5px solid #ccc', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 500 }}>← Goals</button>
@@ -2344,10 +2344,9 @@ function OperationalView({ opArea }) {
               )}
             </div>
           );
-          // measure front height dynamically isn't possible inline, so use a min-height that works
           return (
-            <div style={{ perspective: '1200px', minHeight: 240 }}>
-              <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 240, transformStyle: 'preserve-3d', transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)', transform: cardFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
+            <div style={{ perspective: '1200px' }}>
+              <div style={{ position: 'relative', transformStyle: 'preserve-3d', transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)', transform: cardFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
                 {frontCard}
                 {backCard}
               </div>
