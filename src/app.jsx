@@ -2187,6 +2187,9 @@ function OperationalView({ opArea }) {
           <div>
             <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 6 }}>Lead</div>
             {(function() {
+              if (area === 'Venue') {
+                return <span style={{ fontSize: 15, color: '#2a2a2a', fontWeight: 500 }}>Staff</span>;
+              }
               var leadName = areaInfo && areaInfo.lead ? areaInfo.lead : defaultLead;
               var leadVol = vols.find(function(v) { return (v['First Name'] + ' ' + v['Last Name']) === leadName; });
               if (editLead) {
