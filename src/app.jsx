@@ -85,8 +85,8 @@ const modules = [
   { id: "quarterly", label: "Quarterly Update" },
   { id: "volunteers", label: "Volunteers" },
   { id: "donors", label: "Donors & Donations" },
-  { id: "board", label: "Board Voting" },
   { id: "sponsors", label: "Sponsors" },
+  { id: "board", label: "Board Voting" },
   { id: "strategy", label: "Strategic Goal Progress" },
   { id: "operational", label: "Operational Areas", hidden: true },
 ];
