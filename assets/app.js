@@ -819,6 +819,11 @@
         });
         setShowAdd(false);
         setForm(emptyDonForm);
+        fetch("https://script.google.com/macros/s/AKfycbxknvigF90NbBe86zrXT6JvRlaDQmvsuYuRYCfOOLISwtzDO3X7hH5TIDH7ALemwCWy/exec", {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ sheet: "2026 Donations", row })
+        });
       }).catch(function() {
         setSaving(false);
       });
