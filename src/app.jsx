@@ -2270,6 +2270,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [quarterGoals, setQuarterGoals] = useState(null);
   var [quarterUpdate, setQuarterUpdate] = useState(null);
   var [cardFlipped, setCardFlipped] = useState(false);
+  var [resources, setResources] = useState([]);
   var cq = currentQuarterStr();
   var [selectedQ, setSelectedQ] = useState(cq);
 
@@ -2294,6 +2295,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     setAreaInfo(null);
     setBudget([]);
     setVols([]);
+    setResources([]);
     setEditLead(false);
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Operational Areas') + '?area=eq.' + encodeURIComponent(area) + '&select=*', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -2313,6 +2315,11 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         var matches = areaAliases[area] || [area.toLowerCase()];
         return v.Team.split(/[,|]/).some(function(t) { return matches.indexOf(t.trim().toLowerCase()) !== -1; });
       }));
+    });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?area=eq.' + encodeURIComponent(area) + '&select=*&order=created_at.asc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setResources(rows);
     });
   }, [area]);
 
@@ -2586,8 +2593,21 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         })()}
 
         <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 }}>Area Resources</div>
-          <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No resources added yet.</div>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 12 }}>Area Resources</div>
+          {resources.length === 0
+            ? <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No resources added yet.</div>
+            : resources.map(function(r) {
+                return (
+                  <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 6, background: '#faf8f5', borderRadius: 8, border: '0.5px solid #e8e0d5', textDecoration: 'none', color: '#2a2a2a' }}
+                    onMouseEnter={function(e) { e.currentTarget.style.background = '#f5f0e8'; }}
+                    onMouseLeave={function(e) { e.currentTarget.style.background = '#faf8f5'; }}>
+                    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: gold, flex: 1 }}>{r.title}</span>
+                    {r.description && <span style={{ fontSize: 11, color: '#aaa' }}>{r.description}</span>}
+                  </a>
+                );
+              })
+          }
         </div>
       </div>
 
