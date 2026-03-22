@@ -2439,7 +2439,7 @@ var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundrai
 var AREA_DEFAULTS = {
   'Construction':  { lead: 'Rick Panos',       budget: 12000 },
   'Grounds':       { lead: 'Paula Campbell',    budget: 14000 },
-  'Interiors':     { lead: 'Rebeka Freeman',    budget: 2500  },
+  'Interiors':     { lead: 'Rebekah Freeman',   budget: 2500  },
   'Docents':       { lead: 'Rich Hill',         budget: 1000  },
   'Fundraising':   { lead: 'Kaelen Jennings',   budget: null  },
   'Events':        { lead: 'Barb Kusha',        budget: 7500  },
