@@ -489,7 +489,7 @@ function TeamPicker({ value, onChange }) {
   );
 }
 
-var volInputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+var volInputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: "'Calibri', 'Segoe UI', sans-serif", background: '#fff' };
 var volLabelStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
 var volGrp = { marginBottom: 14 };
 var volSecLabel = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
@@ -935,7 +935,7 @@ function DonorsView() {
     }).catch(function() { setSaving(false); });
   }
 
-  var iStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+  var iStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: "'Calibri', 'Segoe UI', sans-serif", background: '#fff' };
   var lStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
   var grp = { marginBottom: 14 };
   var sec = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
@@ -1152,7 +1152,7 @@ function RichEditor({ value, onChange, placeholder }) {
       <div ref={ref} className="rich-editor" contentEditable={true} suppressContentEditableWarning={true}
         onInput={function() { onChange(ref.current.innerHTML); }}
         data-placeholder={placeholder || 'Write something…'}
-        style={{ minHeight: 72, padding: '8px 10px', fontSize: 12, outline: 'none', fontFamily: 'system-ui, sans-serif', lineHeight: 1.6, background: '#fff' }}
+        style={{ minHeight: 72, padding: '8px 10px', fontSize: 12, outline: 'none', fontFamily: "'Calibri', 'Segoe UI', sans-serif", lineHeight: 1.6, background: '#fff' }}
       />
     </div>
   );
@@ -1297,7 +1297,7 @@ function BoardView() {
     return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  var bInp = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 3, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+  var bInp = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 3, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: "'Calibri', 'Segoe UI', sans-serif", background: '#fff' };
   var bLbl = { fontSize: 12, color: '#666', fontWeight: 500 };
   var bGrp = { marginBottom: 14 };
 
@@ -1785,7 +1785,7 @@ function QuarterlyView() {
   }
 
   var secStyle = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10, marginTop: 4, display: 'block' };
-  var inpStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+  var inpStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: "'Calibri', 'Segoe UI', sans-serif", background: '#fff' };
   var grp = { marginBottom: 14 };
   var card = { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '20px 24px', marginBottom: 16 };
   var lbl = { fontSize: 12, color: '#666', fontWeight: 500 };
@@ -2217,7 +2217,7 @@ function OperationalView({ opArea }) {
                   </div>
                   {isEditing ? (
                     <div>
-                      <textarea value={noteVal} onChange={function(e) { setNoteVal(e.target.value); }} rows={3} autoFocus style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'system-ui, sans-serif', resize: 'vertical', boxSizing: 'border-box' }} />
+                      <textarea value={noteVal} onChange={function(e) { setNoteVal(e.target.value); }} rows={3} autoFocus style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: "'Calibri', 'Segoe UI', sans-serif", resize: 'vertical', boxSizing: 'border-box' }} />
                       <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                         <button onClick={function() { saveNote(v); }} disabled={noteSaving === v.id} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: noteSaving === v.id ? 0.7 : 1 }}>{noteSaving === v.id ? 'Saving...' : 'Save'}</button>
                         <button onClick={function() { setNoteEdit(null); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, cursor: 'pointer', color: '#666' }}>Cancel</button>
@@ -2259,7 +2259,7 @@ var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundrai
   const mod = modules.find(m => m.id === active);
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: cream, fontFamily: "'Calibri', 'Segoe UI', sans-serif" }}>
       <style>{".nsh-sidebar::-webkit-scrollbar { display: none; }"}</style>
       <div style={{ display: "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 }}>
         <div className="nsh-sidebar" style={{ width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", scrollbarWidth: "none" }}>

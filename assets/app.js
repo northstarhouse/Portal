@@ -396,7 +396,7 @@
       );
     }))));
   }
-  var volInputStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: "border-box", fontFamily: "system-ui, sans-serif", background: "#fff" };
+  var volInputStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: "border-box", fontFamily: "'Calibri', 'Segoe UI', sans-serif", background: "#fff" };
   var volLabelStyle = { fontSize: 12, color: "#666", fontWeight: 500 };
   var volGrp = { marginBottom: 14 };
   var volSecLabel = { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 10, marginTop: 20, display: "block" };
@@ -779,7 +779,7 @@
         setSaving(false);
       });
     }
-    var iStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: "border-box", fontFamily: "system-ui, sans-serif", background: "#fff" };
+    var iStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: "border-box", fontFamily: "'Calibri', 'Segoe UI', sans-serif", background: "#fff" };
     var lStyle = { fontSize: 12, color: "#666", fontWeight: 500 };
     var grp = { marginBottom: 14 };
     var sec = { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 10, marginTop: 20, display: "block" };
@@ -900,7 +900,7 @@
           onChange(ref.current.innerHTML);
         },
         "data-placeholder": placeholder || "Write something\u2026",
-        style: { minHeight: 72, padding: "8px 10px", fontSize: 12, outline: "none", fontFamily: "system-ui, sans-serif", lineHeight: 1.6, background: "#fff" }
+        style: { minHeight: 72, padding: "8px 10px", fontSize: 12, outline: "none", fontFamily: "'Calibri', 'Segoe UI', sans-serif", lineHeight: 1.6, background: "#fff" }
       }
     ));
   }
@@ -1063,7 +1063,7 @@
       if (!d) return "\u2014";
       return (/* @__PURE__ */ new Date(d + "T12:00:00")).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     }
-    var bInp = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 3, fontSize: 12, marginTop: 4, boxSizing: "border-box", fontFamily: "system-ui, sans-serif", background: "#fff" };
+    var bInp = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 3, fontSize: 12, marginTop: 4, boxSizing: "border-box", fontFamily: "'Calibri', 'Segoe UI', sans-serif", background: "#fff" };
     var bLbl = { fontSize: 12, color: "#666", fontWeight: 500 };
     var bGrp = { marginBottom: 14 };
     if (loading) return /* @__PURE__ */ React.createElement("div", { style: { color: "#777", fontSize: 12, padding: 40, textAlign: "center" } }, "Loading\u2026");
@@ -1468,7 +1468,7 @@
       });
     }
     var secStyle = { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 10, marginTop: 4, display: "block" };
-    var inpStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: "border-box", fontFamily: "system-ui, sans-serif", background: "#fff" };
+    var inpStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: "border-box", fontFamily: "'Calibri', 'Segoe UI', sans-serif", background: "#fff" };
     var grp = { marginBottom: 14 };
     var card = { background: "#fff", border: "0.5px solid #e8e0d5", borderRadius: 10, padding: "20px 24px", marginBottom: 16 };
     var lbl = { fontSize: 12, color: "#666", fontWeight: 500 };
@@ -1777,7 +1777,7 @@
         /* @__PURE__ */ React.createElement("option", null, "Inactive")
       )), isEditing ? /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("textarea", { value: noteVal, onChange: function(e) {
         setNoteVal(e.target.value);
-      }, rows: 3, autoFocus: true, style: { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 13, fontFamily: "system-ui, sans-serif", resize: "vertical", boxSizing: "border-box" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      }, rows: 3, autoFocus: true, style: { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 13, fontFamily: "'Calibri', 'Segoe UI', sans-serif", resize: "vertical", boxSizing: "border-box" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement("button", { onClick: function() {
         saveNote(v);
       }, disabled: noteSaving === v.id, style: { background: gold, color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 500, cursor: "pointer", opacity: noteSaving === v.id ? 0.7 : 1 } }, noteSaving === v.id ? "Saving..." : "Save"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
         setNoteEdit(null);
@@ -1805,7 +1805,7 @@
     const [opArea, setOpArea] = useState(null);
     const View = views[active];
     const mod = modules.find((m) => m.id === active);
-    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, ".nsh-sidebar::-webkit-scrollbar { display: none; }"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { className: "nsh-sidebar", style: { width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", scrollbarWidth: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "20px 20px 14px", display: "flex", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("img", { src: "assets/logo.png", alt: "North Star House", style: { width: 195, display: "block" } })), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" } }), /* @__PURE__ */ React.createElement("nav", { style: { flex: 1, padding: "0 8px" } }, modules.filter((m) => !m.hidden).map((m) => /* @__PURE__ */ React.createElement("button", { key: m.id, onClick: () => {
+    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "100vh", background: cream, fontFamily: "'Calibri', 'Segoe UI', sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, ".nsh-sidebar::-webkit-scrollbar { display: none; }"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { className: "nsh-sidebar", style: { width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", scrollbarWidth: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "20px 20px 14px", display: "flex", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("img", { src: "assets/logo.png", alt: "North Star House", style: { width: 195, display: "block" } })), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" } }), /* @__PURE__ */ React.createElement("nav", { style: { flex: 1, padding: "0 8px" } }, modules.filter((m) => !m.hidden).map((m) => /* @__PURE__ */ React.createElement("button", { key: m.id, onClick: () => {
       setActive(m.id);
       setOpOpen(false);
     }, style: {
