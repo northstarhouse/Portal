@@ -2424,7 +2424,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                     return (
                       <div>
                         <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Challenges Encountered</span>
-                        <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 4, lineHeight: 1.6 }}>{checked.join(', ')}</div>
+                        <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 4, lineHeight: 1.6, fontWeight: 600 }}>{checked.join(' | ')}</div>
                         {quarterUpdate.challenges_details && <div style={{ fontSize: 12, color: '#555', marginTop: 6, lineHeight: 1.5 }}>{quarterUpdate.challenges_details}</div>}
                       </div>
                     );
@@ -2435,7 +2435,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                     return (
                       <div>
                         <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Support Needed</span>
-                        <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 4, lineHeight: 1.6 }}>{checked.join(', ')}</div>
+                        <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 4, lineHeight: 1.6, fontWeight: 600 }}>{checked.join(' | ')}</div>
                         {quarterUpdate.support_details && <div style={{ fontSize: 12, color: '#555', marginTop: 6, lineHeight: 1.5 }}>{quarterUpdate.support_details}</div>}
                       </div>
                     );
