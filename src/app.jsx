@@ -1792,7 +1792,7 @@ function QuarterlyView() {
   var nqLabel = nextQ(quarter, year).q + ' ' + nextQ(quarter, year).yr;
 
   return (
-    <div style={{ maxWidth: 680 }}>
+    <div style={{ maxWidth: "100%" }}>
       <div style={{ background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 20px', marginBottom: 20, fontSize: 13, color: '#777', lineHeight: 1.6 }}>
         Share quarterly progress, challenges, and support needs for each focus area.
       </div>
