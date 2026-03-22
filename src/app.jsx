@@ -11,6 +11,19 @@ function sbFetch(table, columns) {
   }).then(r => r.json());
 }
 
+var _cache = {};
+function cachedSbFetch(table, columns) {
+  var key = table + ':' + columns.slice().sort().join(',');
+  if (_cache[key]) return Promise.resolve(_cache[key]);
+  return sbFetch(table, columns).then(function(data) {
+    if (Array.isArray(data)) _cache[key] = data;
+    return data;
+  });
+}
+function clearCache(table) {
+  Object.keys(_cache).forEach(function(k) { if (k.indexOf(table + ':') === 0) delete _cache[k]; });
+}
+
 const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthstarhouse%40gmail.com/private-06287b2ca0d9ee6acd4f49f9d4d0d2da/basic.ics";
 
 function fetchCalendarEvents() {
@@ -225,14 +238,14 @@ const typeColors = {
   const [calEvents, setCalEvents] = useState(null);
   const [birthdays, setBirthdays] = useState(null);
   useEffect(function() {
-    sbFetch('2026 Donations', ['Amount']).then(function(rows) {
+    cachedSbFetch('2026 Donations', ['Amount']).then(function(rows) {
       if (!Array.isArray(rows)) return;
       var total = rows.reduce(function(s, r) {
         return s + parseFloat((r['Amount'] || '0').replace(/[^\d.]/g, '') || 0);
       }, 0);
       setDonationTotal(total);
     });
-    sbFetch('2026 Volunteers', ['Status', 'First Name', 'Last Name', 'Birthday', 'Picture URL']).then(function(rows) {
+    cachedSbFetch('2026 Volunteers', ['Status', 'First Name', 'Last Name', 'Birthday', 'Picture URL']).then(function(rows) {
       if (!Array.isArray(rows)) return;
       setActiveVols(rows.filter(function(r) { return r['Status'] === 'Active'; }).length);
       var today = new Date(); today.setHours(0,0,0,0);
@@ -617,7 +630,7 @@ function VolunteersView() {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(function() {
-    sbFetch('2026 Volunteers', ['First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day'])
+    cachedSbFetch('2026 Volunteers', ['First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day'])
       .then(function(data) {
         if (Array.isArray(data)) setVolunteers(data);
         else setError(JSON.stringify(data));
@@ -699,6 +712,7 @@ function VolunteersView() {
     if (!form['Nametag']) row['Nametag'] = 'FALSE';
     sbInsert('2026 Volunteers', row).then(function(res) {
       setSaving(false);
+      clearCache('2026 Volunteers');
       var inserted = Array.isArray(res) ? res[0] : res;
       if (inserted && inserted['First Name']) setVolunteers(function(p) { return p.concat([inserted]); });
       setShowAdd(false);
@@ -713,6 +727,7 @@ function VolunteersView() {
       method: 'DELETE',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function() {
+      clearCache('2026 Volunteers');
       setVolunteers(function(prev) { return prev.filter(function(v) { return v.id !== selected.id; }); });
       setSelected(null);
       setEditing(false);
@@ -731,6 +746,7 @@ function VolunteersView() {
       .then(function(res) {
         setSaving(false);
         if (res && res.code) { alert('Save failed: ' + (res.message || JSON.stringify(res))); return; }
+        clearCache('2026 Volunteers');
         var updated = Array.isArray(res) ? res[0] : res;
         var merged = Object.assign({}, selected, row, updated || {});
         setVolunteers(function(prev) { return prev.map(function(v) { return v['First Name'] === selected['First Name'] && v['Last Name'] === selected['Last Name'] ? merged : v; }); });
@@ -952,7 +968,7 @@ function DonorsView() {
   const [form, setForm] = useState(emptyDonForm);
 
   useEffect(function() {
-    sbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes'])
+    cachedSbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes'])
       .then(function(data) {
         if (Array.isArray(data)) setDonations(data.sort(function(a, b) { return new Date(b['Close Date']) - new Date(a['Close Date']); }));
         else setError(JSON.stringify(data));
@@ -989,6 +1005,7 @@ function DonorsView() {
       method: 'DELETE',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function() {
+      clearCache('2026 Donations');
       setDonations(function(prev) { return prev.filter(function(x) { return x.id !== d.id; }); });
       setSelected(null);
     });
@@ -1015,6 +1032,7 @@ function DonorsView() {
       body: JSON.stringify(patch)
     }).then(function(r) { return r.json(); }).then(function(rows) {
       setEditSaving(false);
+      clearCache('2026 Donations');
       var updated = rows && rows[0] ? rows[0] : Object.assign({}, editDon, patch);
       setDonations(function(prev) { return prev.map(function(x) { return x.id === editDon.id ? updated : x; }); });
       setEditDon(null);
@@ -1037,6 +1055,7 @@ function DonorsView() {
     });
     sbInsert('2026 Donations', row).then(function(res) {
       setSaving(false);
+      clearCache('2026 Donations');
       var inserted = Array.isArray(res) ? res[0] : res;
       if (inserted && inserted['Donor Name']) setDonations(function(p) { return p.concat([inserted]); });
       setShowAdd(false);
