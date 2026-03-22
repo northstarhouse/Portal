@@ -1893,11 +1893,11 @@ function quarterDueDate(q, yr) {
 }
 function nextQ(q, yr) { return q === 'Q1' ? {q:'Q2',yr:yr} : q === 'Q2' ? {q:'Q3',yr:yr} : q === 'Q3' ? {q:'Q4',yr:yr} : {q:'Q1',yr:yr+1}; }
 
-function QuarterlyView({ navigateOp }) {
+function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
   var { useState, useEffect } = React;
   var cq = currentQuarterStr();
   var cy = new Date().getFullYear();
-  var [area, setArea] = useState('');
+  var [area, setArea] = useState(quarterlyArea || '');
   var [quarter, setQuarter] = useState(cq);
   var [year, setYear] = useState(cy);
   var [currentGoals, setCurrentGoals] = useState(null);
@@ -2128,7 +2128,7 @@ function QuarterlyView({ navigateOp }) {
   );
 }
 
-function OperationalView({ opArea }) {
+function OperationalView({ opArea, navigateToQuarterly }) {
   var { useState, useEffect } = React;
   var area = opArea || OPERATIONAL_AREAS[0];
   var [areaInfo, setAreaInfo] = useState(null);
@@ -2280,7 +2280,10 @@ function OperationalView({ opArea }) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
           <div>
             <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 6 }}>Operational Area</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{area}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{area}</div>
+              {navigateToQuarterly && <button onClick={function() { navigateToQuarterly(area); }} style={{ fontSize: 12, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 7, padding: '5px 14px', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap' }}>Submit Quarterly Update</button>}
+            </div>
           </div>
           <div style={{ width: 200, flexShrink: 0 }}>
             {(function() {
@@ -2624,6 +2627,7 @@ var AREA_DEFAULTS = {
   const [active, setActive] = useState("home");
   const [opOpen, setOpOpen] = useState(false);
   const [opArea, setOpArea] = useState(null);
+  const [quarterlyArea, setQuarterlyArea] = useState(null);
   const View = views[active];
   const mod = modules.find(m => m.id === active);
 
@@ -2706,7 +2710,7 @@ var AREA_DEFAULTS = {
         </div>
         <div style={{ flex: 1, padding: "28px 32px" }}>
           <div style={{ maxWidth: 900 }}>
-            <View navigate={setActive} opArea={opArea} navigateOp={function(a) { setOpArea(a); setActive('operational'); }} />
+            <View navigate={setActive} opArea={opArea} navigateOp={function(a) { setOpArea(a); setActive('operational'); }} quarterlyArea={quarterlyArea} navigateToQuarterly={function(a) { setQuarterlyArea(a); setActive('quarterly'); }} />
           </div>
         </div>
       </div>

@@ -1534,11 +1534,11 @@
   function nextQ(q, yr) {
     return q === "Q1" ? { q: "Q2", yr } : q === "Q2" ? { q: "Q3", yr } : q === "Q3" ? { q: "Q4", yr } : { q: "Q1", yr: yr + 1 };
   }
-  function QuarterlyView({ navigateOp }) {
+  function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
     var { useState: useState2, useEffect: useEffect2 } = React;
     var cq = currentQuarterStr();
     var cy = (/* @__PURE__ */ new Date()).getFullYear();
-    var [area, setArea] = useState2("");
+    var [area, setArea] = useState2(quarterlyArea || "");
     var [quarter, setQuarter] = useState2(cq);
     var [year, setYear] = useState2(cy);
     var [currentGoals, setCurrentGoals] = useState2(null);
@@ -1697,7 +1697,7 @@
       }, style: inpStyle, placeholder: "Goal " + (i + 1) + "..." }));
     })), /* @__PURE__ */ React.createElement("button", { type: "submit", disabled: saving || !area, style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "12px 32px", fontSize: 14, fontWeight: 600, cursor: saving || !area ? "not-allowed" : "pointer", opacity: saving || !area ? 0.6 : 1, width: "100%", marginBottom: 8 } }, saving ? "Submitting..." : "Submit Quarterly Update"), saved && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#2e7d32", fontSize: 13, fontWeight: 600, padding: 8 } }, "Submitted! Next quarter goals saved.")));
   }
-  function OperationalView({ opArea }) {
+  function OperationalView({ opArea, navigateToQuarterly }) {
     var { useState: useState2, useEffect: useEffect2 } = React;
     var area = opArea || OPERATIONAL_AREAS[0];
     var [areaInfo, setAreaInfo] = useState2(null);
@@ -1879,7 +1879,9 @@
       return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
     var cardHover = { cursor: "pointer", background: "#faf8f5", border: "0.5px solid #e8e0d5", borderRadius: 10, padding: "16px 20px", flex: 1, minWidth: 150 };
-    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 12, padding: "14px 20px", border: "0.5px solid #e8e0d5", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 6 } }, "Operational Area"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, area)), /* @__PURE__ */ React.createElement("div", { style: { width: 200, flexShrink: 0 } }, (function() {
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 12, padding: "14px 20px", border: "0.5px solid #e8e0d5", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 6 } }, "Operational Area"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, area), navigateToQuarterly && /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      navigateToQuarterly(area);
+    }, style: { fontSize: 12, color: gold, background: "none", border: "0.5px solid " + gold, borderRadius: 7, padding: "5px 14px", cursor: "pointer", fontWeight: 500, whiteSpace: "nowrap" } }, "Submit Quarterly Update"))), /* @__PURE__ */ React.createElement("div", { style: { width: 200, flexShrink: 0 } }, (function() {
       if (area === "Venue") {
         return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 2 } }, "Lead"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, color: "#2a2a2a", fontWeight: 500 } }, "Staff"));
       }
@@ -2068,6 +2070,7 @@
     const [active, setActive] = useState("home");
     const [opOpen, setOpOpen] = useState(false);
     const [opArea, setOpArea] = useState(null);
+    const [quarterlyArea, setQuarterlyArea] = useState(null);
     const View = views[active];
     const mod = modules.find((m) => m.id === active);
     return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "100vh", background: cream, fontFamily: "system-ui, sans-serif" } }, /* @__PURE__ */ React.createElement("style", null, ".nsh-sidebar::-webkit-scrollbar { display: none; }"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { className: "nsh-sidebar", style: { width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", scrollbarWidth: "none" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "20px 20px 14px", display: "flex", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("img", { src: "assets/logo.png", alt: "North Star House", style: { width: 195, display: "block" } })), /* @__PURE__ */ React.createElement("div", { style: { borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" } }), /* @__PURE__ */ React.createElement("nav", { style: { flex: 1, padding: "0 8px" } }, modules.filter((m) => !m.hidden).map((m) => /* @__PURE__ */ React.createElement("button", { key: m.id, onClick: () => {
@@ -2141,6 +2144,9 @@
     })))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#fdfcfb", padding: "24px 32px 18px", borderBottom: "3px solid rgba(136,108,68,0.35)", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(NavIcon, { id: active, active: true })), /* @__PURE__ */ React.createElement("h1", { style: { margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" } }, mod && mod.label))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: "28px 32px" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900 } }, /* @__PURE__ */ React.createElement(View, { navigate: setActive, opArea, navigateOp: function(a) {
       setOpArea(a);
       setActive("operational");
+    }, quarterlyArea, navigateToQuarterly: function(a) {
+      setQuarterlyArea(a);
+      setActive("quarterly");
     } })))));
   }
   var root = ReactDOM.createRoot(document.getElementById("root"));
