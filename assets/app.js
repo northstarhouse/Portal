@@ -1912,9 +1912,7 @@
         return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 2 } }, "Lead"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, color: "#2a2a2a", fontWeight: 500 } }, "Staff"));
       }
       var leadName = areaInfo && areaInfo.lead ? areaInfo.lead : defaultLead;
-      var leadVol = vols.find(function(v) {
-        return v["First Name"] + " " + v["Last Name"] === leadName;
-      });
+      var leadPic = areaDefaults.pic || "";
       if (editLead) {
         return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center" } }, /* @__PURE__ */ React.createElement("select", { autoFocus: true, value: leadInput, onChange: function(e) {
           setLeadInput(e.target.value);
@@ -1928,7 +1926,7 @@
       return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }, onClick: function() {
         setEditLead(true);
         setLeadInput(leadName || "");
-      } }, leadVol && leadVol["Picture URL"] ? /* @__PURE__ */ React.createElement("img", { src: driveImg(leadVol["Picture URL"]), alt: leadName, style: { width: 48, height: 48, borderRadius: "50%", objectFit: "cover", flexShrink: 0 } }) : /* @__PURE__ */ React.createElement("div", { style: { width: 48, height: 48, borderRadius: "50%", background: "#f0ece6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, color: "#999", flexShrink: 0 } }, leadName ? leadName[0] : "?"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 2 } }, "Lead"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, color: "#2a2a2a", fontWeight: 500 } }, leadName || /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc", fontStyle: "italic" } }, "Not set"))));
+      } }, leadPic ? /* @__PURE__ */ React.createElement("img", { src: driveImg(leadPic), alt: leadName, style: { width: 48, height: 48, borderRadius: "50%", objectFit: "cover", flexShrink: 0 } }) : /* @__PURE__ */ React.createElement("div", { style: { width: 48, height: 48, borderRadius: "50%", background: "#f0ece6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 600, color: "#999", flexShrink: 0 } }, leadName ? leadName[0] : "?"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 2 } }, "Lead"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, color: "#2a2a2a", fontWeight: 500 } }, leadName || /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc", fontStyle: "italic" } }, "Not set"))));
     })())), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement(
       "div",
       {
@@ -2089,14 +2087,14 @@
   };
   var OPERATIONAL_AREAS = ["Construction", "Grounds", "Interiors", "Docents", "Fundraising", "Events", "Marketing", "Venue"];
   var AREA_DEFAULTS = {
-    "Construction": { lead: "Rick Panos", budget: 12e3 },
-    "Grounds": { lead: "Paula Campbell", budget: 14e3 },
-    "Interiors": { lead: "Bec Freeman", budget: 2500 },
-    "Docents": { lead: "Rich Hill", budget: 1e3 },
-    "Fundraising": { lead: "Kaelen Jennings", budget: null },
-    "Events": { lead: "Barb Kusha", budget: 7500 },
-    "Marketing": { lead: "Haley Wright", budget: 1e3 },
-    "Venue": { lead: "Staff", budget: null }
+    "Construction": { lead: "Rick Panos", budget: 12e3, pic: "https://drive.google.com/file/d/1hbFJxUUQEsuhoWnTDeARg6peSHCpiBFH/view?usp=drive_link" },
+    "Grounds": { lead: "Paula Campbell", budget: 14e3, pic: "https://drive.google.com/file/d/17J0cF_okHkAs_HCRjuYm0TnpM0v8Ek5-/view?usp=sharing" },
+    "Interiors": { lead: "Bec Freeman", budget: 2500, pic: "https://drive.google.com/file/d/1PsjDfGQLqDF9BVc5wuBd-Qx9D5E0Hvf4/view?usp=drive_link" },
+    "Docents": { lead: "Rich Hill", budget: 1e3, pic: "https://drive.google.com/file/d/1gBzqnzekKkTLn8mnn2mxt-PqAeeMZSJs/view?usp=drive_link" },
+    "Fundraising": { lead: "Kaelen Jennings", budget: null, pic: "" },
+    "Events": { lead: "Barb Kusha", budget: 7500, pic: "" },
+    "Marketing": { lead: "Haley Wright", budget: 1e3, pic: "https://drive.google.com/file/d/17Tse_3jiKZwmkVTTKMtt64zDghfZ8WrV/view?usp=drive_link" },
+    "Venue": { lead: "Staff", budget: null, pic: "" }
   };
   function Dashboard() {
     const [active, setActive] = useState("home");

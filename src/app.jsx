@@ -2342,7 +2342,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 );
               }
               var leadName = areaInfo && areaInfo.lead ? areaInfo.lead : defaultLead;
-              var leadVol = vols.find(function(v) { return (v['First Name'] + ' ' + v['Last Name']) === leadName; });
+              var leadPic = areaDefaults.pic || '';
               if (editLead) {
                 return (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -2357,8 +2357,8 @@ function OperationalView({ opArea, navigateToQuarterly }) {
               }
               return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} onClick={function() { setEditLead(true); setLeadInput(leadName || ''); }}>
-                  {leadVol && leadVol['Picture URL'] ? (
-                    <img src={driveImg(leadVol['Picture URL'])} alt={leadName} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                  {leadPic ? (
+                    <img src={driveImg(leadPic)} alt={leadName} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                   ) : (
                     <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 600, color: '#999', flexShrink: 0 }}>
                       {leadName ? leadName[0] : '?'}
@@ -2672,14 +2672,14 @@ const views = {
 
 var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];
 var AREA_DEFAULTS = {
-  'Construction':  { lead: 'Rick Panos',       budget: 12000 },
-  'Grounds':       { lead: 'Paula Campbell',    budget: 14000 },
-  'Interiors':     { lead: 'Bec Freeman',        budget: 2500  },
-  'Docents':       { lead: 'Rich Hill',         budget: 1000  },
-  'Fundraising':   { lead: 'Kaelen Jennings',   budget: null  },
-  'Events':        { lead: 'Barb Kusha',        budget: 7500  },
-  'Marketing':     { lead: 'Haley Wright',      budget: 1000  },
-  'Venue':         { lead: 'Staff',             budget: null  },
+  'Construction':  { lead: 'Rick Panos',       budget: 12000, pic: 'https://drive.google.com/file/d/1hbFJxUUQEsuhoWnTDeARg6peSHCpiBFH/view?usp=drive_link' },
+  'Grounds':       { lead: 'Paula Campbell',   budget: 14000, pic: 'https://drive.google.com/file/d/17J0cF_okHkAs_HCRjuYm0TnpM0v8Ek5-/view?usp=sharing' },
+  'Interiors':     { lead: 'Bec Freeman',      budget: 2500,  pic: 'https://drive.google.com/file/d/1PsjDfGQLqDF9BVc5wuBd-Qx9D5E0Hvf4/view?usp=drive_link' },
+  'Docents':       { lead: 'Rich Hill',        budget: 1000,  pic: 'https://drive.google.com/file/d/1gBzqnzekKkTLn8mnn2mxt-PqAeeMZSJs/view?usp=drive_link' },
+  'Fundraising':   { lead: 'Kaelen Jennings',  budget: null,  pic: '' },
+  'Events':        { lead: 'Barb Kusha',       budget: 7500,  pic: '' },
+  'Marketing':     { lead: 'Haley Wright',     budget: 1000,  pic: 'https://drive.google.com/file/d/17Tse_3jiKZwmkVTTKMtt64zDghfZ8WrV/view?usp=drive_link' },
+  'Venue':         { lead: 'Staff',            budget: null,  pic: '' },
 };function Dashboard() {
   const [active, setActive] = useState("home");
   const [opOpen, setOpOpen] = useState(false);
