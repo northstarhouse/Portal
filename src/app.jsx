@@ -2234,6 +2234,11 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [quarterUpdate, setQuarterUpdate] = useState(null);
   var [cardFlipped, setCardFlipped] = useState(false);
   var [resources, setResources] = useState([]);
+  var [showSponsorForm, setShowSponsorForm] = useState(false);
+  var emptySponsorForm = { 'Business Name': '', 'Main Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Donation': '', 'Fair Market Value': '', 'Area Supported': area, 'Date Recieved': '', 'NSH Contact': '' };
+  var [sponsorForm, setSponsorForm] = useState(emptySponsorForm);
+  var [sponsorSaving, setSponsorSaving] = useState(false);
+  var [sponsorSaved, setSponsorSaved] = useState(false);
   var cq = currentQuarterStr();
   var [selectedQ, setSelectedQ] = useState(cq);
 
@@ -2558,7 +2563,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 12 }}>Area Resources</div>
           {resources.length === 0
-            ? <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No resources added yet.</div>
+            ? <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic', marginBottom: 12 }}>No resources added yet.</div>
             : resources.map(function(r) {
                 return (
                   <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 6, background: '#faf8f5', borderRadius: 8, border: '0.5px solid #e8e0d5', textDecoration: 'none', color: '#2a2a2a' }}
@@ -2571,8 +2576,72 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 );
               })
           }
+          <button onClick={function() { setSponsorForm(Object.assign({}, emptySponsorForm, { 'Area Supported': area })); setSponsorSaved(false); setShowSponsorForm(true); }} style={{ width: '100%', marginTop: 4, padding: '9px 12px', background: '#faf8f5', border: '0.5px dashed ' + gold, borderRadius: 8, fontSize: 12, color: gold, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+            + In-Kind Sponsorship Form
+          </button>
         </div>
       </div>
+
+      {showSponsorForm && (function() {
+        var areaOptions = ['Restoration','Grounds','Events','Interiors','Construction','Docents','Fundraising','Marketing','Venue','General'];
+        var fi = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+        var lb = { fontSize: 12, color: '#666', fontWeight: 500, display: 'block', marginBottom: 4 };
+        var grp = { marginBottom: 14 };
+        function fc(e) { var k = e.target.name, v = e.target.value; setSponsorForm(function(f) { return Object.assign({}, f, { [k]: v }); }); }
+        function handleSubmit(e) {
+          e.preventDefault();
+          setSponsorSaving(true);
+          var row = {};
+          Object.keys(sponsorForm).forEach(function(k) { if (sponsorForm[k]) row[k] = sponsorForm[k]; });
+          fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors'), {
+            method: 'POST',
+            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+            body: JSON.stringify(row)
+          }).then(function(r) { return r.json(); }).then(function() {
+            setSponsorSaving(false);
+            setSponsorSaved(true);
+            setSponsorForm(Object.assign({}, emptySponsorForm, { 'Area Supported': area }));
+          }).catch(function() { setSponsorSaving(false); });
+        }
+        return (
+          <div onClick={function() { setShowSponsorForm(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+            <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>In-Kind Sponsorship</div>
+                  <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>Documentation Form</div>
+                </div>
+                <button onClick={function() { setShowSponsorForm(false); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb' }}>×</button>
+              </div>
+              {sponsorSaved && <div style={{ background: '#e8f5e9', color: '#2e7d32', borderRadius: 8, padding: '10px 14px', fontSize: 13, fontWeight: 500, marginBottom: 16 }}>Submitted successfully — sponsor added to the list.</div>}
+              <form onSubmit={handleSubmit}>
+                <div style={grp}><label style={lb}>Sponsor Name *</label><input required name="Business Name" value={sponsorForm['Business Name']} onChange={fc} style={fi} /></div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                  <div><label style={lb}>Main Contact</label><input name="Main Contact" value={sponsorForm['Main Contact']} onChange={fc} style={fi} /></div>
+                  <div><label style={lb}>Phone Number</label><input name="Phone Number" value={sponsorForm['Phone Number']} onChange={fc} style={fi} /></div>
+                </div>
+                <div style={grp}><label style={lb}>Email Address</label><input name="Email Address" type="email" value={sponsorForm['Email Address']} onChange={fc} style={fi} /></div>
+                <div style={grp}><label style={lb}>Mailing Address</label><input name="Mailing Address" value={sponsorForm['Mailing Address']} onChange={fc} style={fi} /></div>
+                <div style={{ borderTop: '0.5px solid #f0ece6', margin: '16px 0' }} />
+                <div style={grp}><label style={lb}>In-Kind Donation Description</label><textarea name="Donation" value={sponsorForm['Donation']} onChange={fc} rows={3} style={Object.assign({}, fi, { resize: 'vertical' })} /></div>
+                <div style={grp}><label style={lb}>Estimated Fair Market Value</label><input name="Fair Market Value" value={sponsorForm['Fair Market Value']} onChange={fc} style={fi} placeholder="e.g. $500" /></div>
+                <div style={grp}>
+                  <label style={lb}>Area Supported</label>
+                  <select name="Area Supported" value={sponsorForm['Area Supported']} onChange={fc} style={fi}>
+                    <option value="">Select area…</option>
+                    {areaOptions.map(function(a) { return <option key={a} value={a}>{a}</option>; })}
+                  </select>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                  <div><label style={lb}>Date Received</label><input name="Date Recieved" type="date" value={sponsorForm['Date Recieved']} onChange={fc} style={fi} /></div>
+                  <div><label style={lb}>NSH Contact</label><input name="NSH Contact" value={sponsorForm['NSH Contact']} onChange={fc} style={fi} /></div>
+                </div>
+                <button type="submit" disabled={sponsorSaving} style={{ width: '100%', background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '11px', fontSize: 13, fontWeight: 600, cursor: sponsorSaving ? 'not-allowed' : 'pointer', opacity: sponsorSaving ? 0.7 : 1 }}>{sponsorSaving ? 'Submitting…' : 'Submit Sponsorship'}</button>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
 
       {showBudget && (
         <div onClick={function() { setShowBudget(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
