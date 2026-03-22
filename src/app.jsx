@@ -2696,8 +2696,8 @@ var AREA_DEFAULTS = {
         </div>
       </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}>
-        <div style={{ background: "#fdfcfb", padding: "24px 32px 18px", borderBottom: "3px solid rgba(136,108,68,0.35)", flexShrink: 0 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        <div style={{ background: "#fdfcfb", padding: "24px 32px 18px", borderBottom: "3px solid rgba(136,108,68,0.35)", position: "sticky", top: 0, zIndex: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
