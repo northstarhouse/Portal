@@ -1688,9 +1688,9 @@
         if (!Array.isArray(rows)) return;
         setVols(rows.filter(function(v) {
           if (!v.Team) return false;
-          var areaAliases = { "Events": ["events team", "event support", "events"], "Docents": ["docent", "docents"] };
+          var areaAliases = { "Events": ["events team", "event support", "events"], "Docents": ["docent", "docents"], "Venue": ["venue", "staff"] };
           var matches = areaAliases[area] || [area.toLowerCase()];
-          return v.Team.split(",").some(function(t) {
+          return v.Team.split(/[,|]/).some(function(t) {
             return matches.indexOf(t.trim().toLowerCase()) !== -1;
           });
         }));
