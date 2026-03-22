@@ -2508,7 +2508,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                         <div key={i} style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 12px', border: '0.5px solid #e8e0d5' }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                             <div>
-                              <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600 }}>Goal {i+1}</span>
+                              <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Goal {i+1}</span>
                               <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 2, lineHeight: 1.5 }}>{g}</div>
                             </div>
                             {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: sc.bg, color: sc.color, flexShrink: 0 }}>{st}</span>}
