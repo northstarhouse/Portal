@@ -2206,12 +2206,9 @@ function OperationalView({ opArea }) {
             {(function() {
               if (area === 'Venue') {
                 return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 600, color: '#999', flexShrink: 0 }}>S</div>
-                    <div>
-                      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 2 }}>Lead</div>
-                      <span style={{ fontSize: 15, color: '#2a2a2a', fontWeight: 500 }}>Staff</span>
-                    </div>
+                  <div>
+                    <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 2 }}>Lead</div>
+                    <span style={{ fontSize: 15, color: '#2a2a2a', fontWeight: 500 }}>Staff</span>
                   </div>
                 );
               }
