@@ -1699,6 +1699,10 @@
     }).reduce(function(s, b) {
       return s + (parseFloat(b.amount) || 0);
     }, 0);
+    var totalSpent = totalPurchases + totalInKind;
+    var areaDefaults = AREA_DEFAULTS[area] || {};
+    var allocation = areaDefaults.budget;
+    var defaultLead = areaDefaults.lead || "";
     function fmt(n) {
       return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
@@ -1707,7 +1711,7 @@
       setLeadInput(e.target.value);
     }, autoFocus: true, style: { fontSize: 14, padding: "5px 8px", border: "0.5px solid #e0d8cc", borderRadius: 6, width: 150 } }), /* @__PURE__ */ React.createElement("button", { onClick: saveLead, style: { background: gold, color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px", fontSize: 12, cursor: "pointer" } }, "Save"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
       setEditLead(false);
-    }, style: { background: "#f0ece6", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer", color: "#666" } }, "Cancel")) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, color: "#2a2a2a", fontWeight: 500 } }, areaInfo && areaInfo.lead ? areaInfo.lead : /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc", fontStyle: "italic" } }, "Not set")), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+    }, style: { background: "#f0ece6", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer", color: "#666" } }, "Cancel")) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, color: "#2a2a2a", fontWeight: 500 } }, areaInfo && areaInfo.lead ? areaInfo.lead : defaultLead ? defaultLead : /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc", fontStyle: "italic" } }, "Not set")), /* @__PURE__ */ React.createElement("button", { onClick: function() {
       setEditLead(true);
     }, style: { background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#bbb", padding: "2px 6px", borderRadius: 4 } }, "Edit")))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement(
       "div",
@@ -1724,8 +1728,10 @@
         }
       },
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#888", fontWeight: 600, marginBottom: 8 } }, "Budget"),
-      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: gold } }, fmt(totalPurchases + totalInKind)),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: gold } }, fmt(totalSpent), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#aaa", fontWeight: 400 } }, allocation ? " / " + fmt(allocation) : "")),
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 4 } }, fmt(totalPurchases), " purchases \xB7 ", fmt(totalInKind), " in-kind"),
+      allocation != null && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, marginTop: 4, color: totalSpent > allocation ? "#c62828" : "#3a7d3a", fontWeight: 500 } }, totalSpent > allocation ? fmt(totalSpent - allocation) + " over budget" : fmt(allocation - totalSpent) + " remaining"),
+      allocation == null && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 4, fontStyle: "italic" } }, "No budget established"),
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 } }, "View / Add entries \u2192")
     ), /* @__PURE__ */ React.createElement(
       "div",
@@ -1830,6 +1836,16 @@
     operational: OperationalView
   };
   var OPERATIONAL_AREAS = ["Construction", "Grounds", "Interiors", "Docents", "Fundraising", "Events", "Marketing", "Venue"];
+  var AREA_DEFAULTS = {
+    "Construction": { lead: "Rick Panos", budget: 12e3 },
+    "Grounds": { lead: "Paula Campbell", budget: 14e3 },
+    "Interiors": { lead: "Rebeka Freeman", budget: 2500 },
+    "Docents": { lead: "Rich Hill", budget: 1e3 },
+    "Fundraising": { lead: "Kaelen Jennings", budget: null },
+    "Events": { lead: "Barb Kusha", budget: 7500 },
+    "Marketing": { lead: "Haley Wright", budget: 1e3 },
+    "Venue": { lead: "Staff", budget: null }
+  };
   function Dashboard() {
     const [active, setActive] = useState("home");
     const [opOpen, setOpOpen] = useState(false);
