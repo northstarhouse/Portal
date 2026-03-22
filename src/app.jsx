@@ -2342,10 +2342,9 @@ function OperationalView({ opArea }) {
                       <div>
                         <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Challenges Encountered</span>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                          {CHALLENGE_OPTIONS.map(function(opt) {
-                            var on = checked.indexOf(opt) !== -1;
+                          {checked.map(function(opt) {
                             return (
-                              <span key={opt} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, fontWeight: on ? 600 : 400, background: on ? '#fff3e0' : '#f5f5f5', color: on ? '#c07040' : '#bbb', border: '0.5px solid ' + (on ? '#f0c090' : '#eee') }}>{on ? '✓ ' : ''}{opt}</span>
+                              <span key={opt} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, fontWeight: 600, background: '#fff3e0', color: '#c07040', border: '0.5px solid #f0c090' }}>{opt}</span>
                             );
                           })}
                         </div>
@@ -2360,10 +2359,9 @@ function OperationalView({ opArea }) {
                       <div>
                         <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Support Needed</span>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                          {SUPPORT_OPTIONS.map(function(opt) {
-                            var on = checked.indexOf(opt) !== -1;
+                          {checked.map(function(opt) {
                             return (
-                              <span key={opt} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, fontWeight: on ? 600 : 400, background: on ? '#eaf3ea' : '#f5f5f5', color: on ? '#3a7d3a' : '#bbb', border: '0.5px solid ' + (on ? '#a0d0a0' : '#eee') }}>{on ? '✓ ' : ''}{opt}</span>
+                              <span key={opt} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, fontWeight: 600, background: '#eaf3ea', color: '#3a7d3a', border: '0.5px solid #a0d0a0' }}>{opt}</span>
                             );
                           })}
                         </div>
