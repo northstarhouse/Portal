@@ -2067,7 +2067,8 @@ function OperationalView({ opArea }) {
   var [noteVal, setNoteVal] = useState('');
   var [noteSaving, setNoteSaving] = useState(null);
   var [quarterGoals, setQuarterGoals] = useState(null);
-  var [flippedGoals, setFlippedGoals] = useState({});
+  var [quarterUpdate, setQuarterUpdate] = useState(null);
+  var [cardFlipped, setCardFlipped] = useState(false);
   var cq = currentQuarterStr();
 
   useEffect(function() {
@@ -2075,12 +2076,18 @@ function OperationalView({ opArea }) {
     setBudget([]);
     setVols([]);
     setQuarterGoals(null);
-    setFlippedGoals({});
+    setQuarterUpdate(null);
+    setCardFlipped(false);
     setEditLead(false);
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(cq) + '&year=eq.' + new Date().getFullYear() + '&select=*', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (rows && rows[0]) setQuarterGoals(rows[0]);
+    });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(cq) + '&year=eq.' + new Date().getFullYear() + '&select=*&order=date_submitted.desc&limit=1', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (rows && rows[0]) setQuarterUpdate(rows[0]);
     });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Operational Areas') + '?area=eq.' + encodeURIComponent(area) + '&select=*', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -2104,11 +2111,22 @@ function OperationalView({ opArea }) {
   }, [area]);
 
   function saveLead() {
-    if (!areaInfo) return;
-    sbPatchById('Operational Areas', areaInfo.id, { lead: leadInput }).then(function() {
-      setAreaInfo(Object.assign({}, areaInfo, { lead: leadInput }));
-      setEditLead(false);
-    });
+    if (!leadInput) return;
+    if (areaInfo) {
+      sbPatchById('Operational Areas', areaInfo.id, { lead: leadInput }).then(function() {
+        setAreaInfo(Object.assign({}, areaInfo, { lead: leadInput }));
+        setEditLead(false);
+      });
+    } else {
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Operational Areas'), {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ area: area, lead: leadInput })
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        if (rows && rows[0]) setAreaInfo(rows[0]);
+        setEditLead(false);
+      });
+    }
   }
 
   function addBudgetItem(e) {
@@ -2184,7 +2202,7 @@ function OperationalView({ opArea }) {
             <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 6 }}>Operational Area</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{area}</div>
           </div>
-          <div>
+          <div style={{ width: 200, flexShrink: 0 }}>
             {(function() {
               if (area === 'Venue') {
                 return (
@@ -2250,64 +2268,92 @@ function OperationalView({ opArea }) {
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, marginBottom: 20 }}>
-        <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 }}>{cq} {new Date().getFullYear()} Goals</div>
-          {quarterGoals ? (
-            <div>
-              {quarterGoals.primary_focus && <div style={{ marginBottom: 14 }}><span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Primary Focus</span><div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginTop: 3, lineHeight: 1.5 }}>{quarterGoals.primary_focus}</div></div>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[['goal_1','goal_1_status','goal_1_summary'],['goal_2','goal_2_status','goal_2_summary'],['goal_3','goal_3_status','goal_3_summary']].map(function(keys, i) {
-                  var g = quarterGoals[keys[0]]; if (!g) return null;
-                  var st = quarterGoals[keys[1]];
-                  var sm = quarterGoals[keys[2]];
-                  var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
-                  var sc = st && stColors[st] ? stColors[st] : null;
-                  var hasReflection = !!(st || sm);
-                  var isFlipped = !!flippedGoals[i];
-                  return (
-                    <div key={i} style={{ perspective: '900px' }}>
-                      <div style={{
-                        position: 'relative', width: '100%',
-                        transformStyle: 'preserve-3d',
-                        transition: 'transform 0.45s cubic-bezier(0.4,0,0.2,1)',
-                        transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                        minHeight: 64
-                      }}>
-                        {/* Front */}
-                        <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', background: '#faf8f5', borderRadius: 8, padding: '10px 12px', border: '0.5px solid #e8e0d5' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        {/* Goals card — full card flip */}
+        {(function() {
+          var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
+          var goalRows = [['goal_1','goal_1_status','goal_1_summary'],['goal_2','goal_2_status','goal_2_summary'],['goal_3','goal_3_status','goal_3_summary']];
+          var frontCard = (
+            <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5', position: 'absolute', inset: 0, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>{cq} {new Date().getFullYear()} Goals</div>
+                {quarterUpdate && <button onClick={function(e) { e.stopPropagation(); setCardFlipped(true); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 500 }}>↩ Reflection</button>}
+              </div>
+              {quarterGoals ? (
+                <div>
+                  {quarterGoals.primary_focus && <div style={{ marginBottom: 12 }}><span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Primary Focus</span><div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginTop: 3, lineHeight: 1.5 }}>{quarterGoals.primary_focus}</div></div>}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {goalRows.map(function(keys, i) {
+                      var g = quarterGoals[keys[0]]; if (!g) return null;
+                      var st = quarterGoals[keys[1]];
+                      var sc = st && stColors[st] ? stColors[st] : null;
+                      return (
+                        <div key={i} style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 12px', border: '0.5px solid #e8e0d5' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                             <div>
                               <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600 }}>Goal {i+1}</span>
                               <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 2, lineHeight: 1.5 }}>{g}</div>
                             </div>
-                            {hasReflection && (
-                              <button onClick={function() { setFlippedGoals(function(f) { var n = Object.assign({}, f); n[i] = true; return n; }); }} style={{ flexShrink: 0, fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontWeight: 500, marginTop: 1, whiteSpace: 'nowrap' }}>↩ Reflection</button>
-                            )}
+                            {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: sc.bg, color: sc.color, flexShrink: 0 }}>{st}</span>}
                           </div>
                         </div>
-                        {/* Back */}
-                        <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', position: 'absolute', top: 0, left: 0, width: '100%', minHeight: '100%', background: sc ? sc.bg : '#f5f0ea', borderRadius: 8, padding: '10px 12px', border: '0.5px solid ' + (sc ? sc.color + '44' : '#e8e0d5'), boxSizing: 'border-box' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600 }}>Goal {i+1} — Reflection</span>
-                                {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: '#fff', color: sc.color }}>{st}</span>}
-                              </div>
-                              <div style={{ fontSize: 13, color: sc ? sc.color : '#555', lineHeight: 1.5 }}>{sm || <span style={{ fontStyle: 'italic', color: '#aaa' }}>No notes submitted.</span>}</div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No goals set for {cq} yet.</div>
+              )}
+            </div>
+          );
+          var backCard = (
+            <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5', position: 'absolute', inset: 0, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>{cq} {new Date().getFullYear()} Reflection</div>
+                <button onClick={function(e) { e.stopPropagation(); setCardFlipped(false); }} style={{ fontSize: 11, color: '#888', background: 'none', border: '0.5px solid #ccc', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 500 }}>← Goals</button>
+              </div>
+              {quarterUpdate ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {quarterUpdate.successes && <div><span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>What Went Well</span><div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 3, lineHeight: 1.6 }}>{quarterUpdate.successes}</div></div>}
+                  <div>
+                    <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Goal Progress</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                      {goalRows.map(function(keys, i) {
+                        var g = quarterGoals && quarterGoals[keys[0]]; if (!g) return null;
+                        var st = quarterUpdate[keys[1]];
+                        var sm = quarterUpdate[keys[2]];
+                        var sc = st && stColors[st] ? stColors[st] : null;
+                        return (
+                          <div key={i} style={{ background: sc ? sc.bg : '#faf8f5', borderRadius: 8, padding: '8px 12px', border: '0.5px solid ' + (sc ? sc.color + '33' : '#e8e0d5') }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: sm ? 4 : 0 }}>
+                              <span style={{ fontSize: 11, color: '#999' }}>Goal {i+1}</span>
+                              {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: '#fff', color: sc.color }}>{st}</span>}
                             </div>
-                            <button onClick={function() { setFlippedGoals(function(f) { var n = Object.assign({}, f); n[i] = false; return n; }); }} style={{ flexShrink: 0, fontSize: 11, color: '#888', background: 'none', border: '0.5px solid #ccc', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontWeight: 500, marginTop: 1, whiteSpace: 'nowrap' }}>← Goal</button>
+                            {sm && <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{sm}</div>}
                           </div>
-                        </div>
-                      </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  </div>
+                  {(quarterUpdate.challenges && quarterUpdate.challenges.length > 0) && <div><span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Challenges</span><div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 3, lineHeight: 1.6 }}>{[].concat(quarterUpdate.challenges).join(', ')}{quarterUpdate.challenges_details ? ' — ' + quarterUpdate.challenges_details : ''}</div></div>}
+                  {(quarterUpdate.support_needed && quarterUpdate.support_needed.length > 0) && <div><span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Support Needed</span><div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 3, lineHeight: 1.6 }}>{[].concat(quarterUpdate.support_needed).join(', ')}{quarterUpdate.support_details ? ' — ' + quarterUpdate.support_details : ''}</div></div>}
+                  {quarterUpdate.other_notes && <div><span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Other Notes</span><div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 3, lineHeight: 1.6 }}>{quarterUpdate.other_notes}</div></div>}
+                  {quarterUpdate.date_submitted && <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>Submitted {quarterUpdate.date_submitted}</div>}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No reflection submitted yet.</div>
+              )}
+            </div>
+          );
+          // measure front height dynamically isn't possible inline, so use a min-height that works
+          return (
+            <div style={{ perspective: '1200px', minHeight: 240 }}>
+              <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 240, transformStyle: 'preserve-3d', transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)', transform: cardFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
+                {frontCard}
+                {backCard}
               </div>
             </div>
-          ) : (
-            <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No goals set for {cq} yet. Submit a quarterly update to populate.</div>
-          )}
-        </div>
+          );
+        })()}
 
         <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 }}>Area Resources</div>
@@ -2468,7 +2514,7 @@ var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundrai
 var AREA_DEFAULTS = {
   'Construction':  { lead: 'Rick Panos',       budget: 12000 },
   'Grounds':       { lead: 'Paula Campbell',    budget: 14000 },
-  'Interiors':     { lead: 'Rebekah Freeman',   budget: 2500  },
+  'Interiors':     { lead: 'Bec Freeman',        budget: 2500  },
   'Docents':       { lead: 'Rich Hill',         budget: 1000  },
   'Fundraising':   { lead: 'Kaelen Jennings',   budget: null  },
   'Events':        { lead: 'Barb Kusha',        budget: 7500  },
