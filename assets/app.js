@@ -1875,7 +1875,7 @@
   var AREA_DEFAULTS = {
     "Construction": { lead: "Rick Panos", budget: 12e3, icon: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>' },
     "Grounds": { lead: "Paula Campbell", budget: 14e3, icon: '<path d="M12 22V12"/><path d="M5 3a7 7 0 0 0 7 7"/><path d="M19 3a7 7 0 0 1-7 7"/>' },
-    "Interiors": { lead: "Rebeka Freeman", budget: 2500, icon: '<path d="M20 9V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v2"/><path d="M2 11v5a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1H6v-1a2 2 0 0 0-4 0z"/><path d="M6 19v2"/><path d="M18 19v2"/>' },
+    "Interiors": { lead: "Rebeka Freeman", budget: 2500, icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>' },
     "Docents": { lead: "Rich Hill", budget: 1e3, icon: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>' },
     "Fundraising": { lead: "Kaelen Jennings", budget: null, icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>' },
     "Events": { lead: "Barb Kusha", budget: 7500, icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>' },
