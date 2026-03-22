@@ -1589,6 +1589,8 @@
     var today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     var [budgetForm, setBudgetForm] = useState2({ type: "Purchase", description: "", amount: "", date: today });
     var [budgetSaving, setBudgetSaving] = useState2(false);
+    var [uploadingId, setUploadingId] = useState2(null);
+    var fileInputRef = React.useRef(null);
     var [noteEdit, setNoteEdit] = useState2(null);
     var [noteVal, setNoteVal] = useState2("");
     var [noteSaving, setNoteSaving] = useState2(null);
@@ -1675,6 +1677,36 @@
           return prev.filter(function(b) {
             return b.id !== id;
           });
+        });
+      });
+    }
+    function handleReceiptSelect(e) {
+      var file = e.target.files[0];
+      if (!file || !uploadingId) {
+        e.target.value = "";
+        return;
+      }
+      var id = uploadingId;
+      var ext = file.name.split(".").pop();
+      var filename = area.toLowerCase().replace(/\s+/g, "-") + "-" + id + "-" + Date.now() + "." + ext;
+      fetch(SUPABASE_URL + "/storage/v1/object/receipts/" + filename, {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": file.type },
+        body: file
+      }).then(function() {
+        var url = SUPABASE_URL + "/storage/v1/object/public/receipts/" + filename;
+        return fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Budget") + "?id=eq." + id, {
+          method: "PATCH",
+          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ receipt_url: url })
+        }).then(function() {
+          setBudget(function(prev) {
+            return prev.map(function(b) {
+              return b.id === id ? Object.assign({}, b, { receipt_url: url }) : b;
+            });
+          });
+          setUploadingId(null);
+          e.target.value = "";
         });
       });
     }
@@ -1784,10 +1816,14 @@
         return Object.assign({}, f, { date: e.target.value });
       });
     }, style: { width: "100%", padding: "7px 10px", border: "0.5px solid #e0d8cc", borderRadius: 7, fontSize: 13 } })), /* @__PURE__ */ React.createElement("button", { type: "submit", disabled: budgetSaving, style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: budgetSaving ? 0.7 : 1 } }, "Add")))), budget.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#bbb", fontSize: 13, textAlign: "center", padding: "20px 0" } }, "No entries yet.") : budget.map(function(b) {
-      return /* @__PURE__ */ React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "0.5px solid #f0ece6" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, padding: "3px 8px", borderRadius: 20, fontWeight: 500, background: b.type === "Purchase" ? "#fef0e6" : "#eaf3ea", color: b.type === "Purchase" ? "#c07040" : "#5a8a5a", flexShrink: 0 } }, b.type), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 13, color: "#2a2a2a" } }, b.description || "\u2014"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", flexShrink: 0 } }, fmt(parseFloat(b.amount) || 0)), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#bbb", flexShrink: 0 } }, b.date), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      var isUploading = uploadingId === b.id;
+      return /* @__PURE__ */ React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "0.5px solid #f0ece6" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, padding: "3px 8px", borderRadius: 20, fontWeight: 500, background: b.type === "Purchase" ? "#fef0e6" : "#eaf3ea", color: b.type === "Purchase" ? "#c07040" : "#5a8a5a", flexShrink: 0 } }, b.type), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: 13, color: "#2a2a2a" } }, b.description || "\u2014"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", flexShrink: 0 } }, fmt(parseFloat(b.amount) || 0)), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#bbb", flexShrink: 0 } }, b.date), b.receipt_url ? /* @__PURE__ */ React.createElement("a", { href: b.receipt_url, target: "_blank", title: "View receipt", style: { fontSize: 14, color: gold, textDecoration: "none", flexShrink: 0 } }, "\u{1F4CE}") : /* @__PURE__ */ React.createElement("button", { onClick: function() {
+        setUploadingId(b.id);
+        fileInputRef.current.click();
+      }, disabled: isUploading, title: "Attach receipt", style: { background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 13, padding: "2px 4px", flexShrink: 0, opacity: isUploading ? 0.5 : 1 } }, isUploading ? "\u2026" : "\u{1F4CE}"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
         deleteBudgetItem(b.id);
-      }, style: { background: "none", border: "none", cursor: "pointer", color: "#ddd", fontSize: 14, padding: "2px 4px", flexShrink: 0 } }, "x"));
-    }))), showVols && /* @__PURE__ */ React.createElement("div", { onClick: function() {
+      }, style: { background: "none", border: "none", cursor: "pointer", color: "#ddd", fontSize: 14, padding: "2px 4px", flexShrink: 0 } }, "\xD7"));
+    }), /* @__PURE__ */ React.createElement("input", { ref: fileInputRef, type: "file", accept: "image/*,.pdf", style: { display: "none" }, onChange: handleReceiptSelect }))), showVols && /* @__PURE__ */ React.createElement("div", { onClick: function() {
       setShowVols(false);
     }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1010, padding: 20 } }, /* @__PURE__ */ React.createElement("div", { onClick: function(e) {
       e.stopPropagation();
