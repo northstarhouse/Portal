@@ -694,7 +694,11 @@ function VolunteersView() {
     if (v['First Name'] === 'Ken' && v['Last Name'] === 'Underwood') return '0';
     var t = (v['Team'] || '').split('|')[0].trim();
     if (t === 'Board Member') return '1';
-    if (t === 'Staff') return '2';
+    if (t === 'Staff') {
+      if (v['First Name'] === 'Haley' && v['Last Name'] === 'Wright') return '20';
+      if (v['First Name'] === 'Jen') return '21';
+      return '22_' + (v['Last Name'] || '');
+    }
     return '3_' + t;
   }
   var filtered = filterTeam === 'All'
