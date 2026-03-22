@@ -932,6 +932,9 @@ function DonorsView() {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filterType, setFilterType] = useState('All');
+  const [editDon, setEditDon] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
 
   var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
   var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
@@ -992,6 +995,29 @@ function DonorsView() {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ action: 'delete', sheet: '2026 Donations', 'Donor Name': d['Donor Name'], 'Close Date': d['Close Date'] })
+    });
+  }
+
+  function handleEditFormChange(e) {
+    var { name, value, type, checked } = e.target;
+    setEditForm(function(f) { return Object.assign({}, f, { [name]: type === 'checkbox' ? checked : value }); });
+  }
+
+  function saveEditDonation(e) {
+    e.preventDefault();
+    setEditSaving(true);
+    var patch = Object.assign({}, editForm);
+    delete patch.id;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Donations') + '?id=eq.' + editDon.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(patch)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setEditSaving(false);
+      var updated = rows && rows[0] ? rows[0] : Object.assign({}, editDon, patch);
+      setDonations(function(prev) { return prev.map(function(x) { return x.id === editDon.id ? updated : x; }); });
+      setEditDon(null);
+      setSelected(null);
     });
   }
 
@@ -1143,9 +1169,63 @@ function DonorsView() {
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                 <button onClick={function() { setSelected(null); }} style={{ flex: 1, padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#999', fontWeight: 500 }}>Close</button>
-                <button onClick={function() { deleteDonation(selected); }} style={{ padding: '9px 16px', background: 'transparent', border: '0.5px solid #e8a0a0', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#c0392b', fontWeight: 500 }}>Delete</button>
+                <button onClick={function() { setEditDon(selected); setEditForm(Object.assign({}, selected)); }} style={{ padding: '9px 20px', background: gold, border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#fff', fontWeight: 500 }}>Edit</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {editDon && (
+        <div onClick={function() { setEditDon(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>Edit Donation</div>
+            <form onSubmit={saveEditDonation}>
+              <span style={sec}>Donor</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div><label style={lStyle}>First / Full Name *</label><input required name="Donor Name" value={editForm['Donor Name'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
+                <div><label style={lStyle}>Last Name</label><input name="Last Name" value={editForm['Last Name'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
+              </div>
+              <div style={grp}><label style={lStyle}>Goes By (Informal)</label><input name="Informal Names" value={editForm['Informal Names'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Account Type</label>
+                <select name="Account Type" value={editForm['Account Type'] || ''} onChange={handleEditFormChange} style={iStyle}>
+                  {ACCOUNT_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+                </select>
+              </div>
+              <span style={sec}>Donation</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div><label style={lStyle}>Amount *</label><input required name="Amount" value={editForm['Amount'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
+                <div><label style={lStyle}>Close Date</label><input name="Close Date" type="date" value={editForm['Close Date'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
+              </div>
+              <div style={grp}><label style={lStyle}>Donation Type</label>
+                <select name="Donation Type" value={editForm['Donation Type'] || ''} onChange={handleEditFormChange} style={iStyle}>
+                  {DONATION_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+                </select>
+              </div>
+              <div style={grp}><label style={lStyle}>Payment Type</label>
+                <select name="Payment Type" value={editForm['Payment Type'] || ''} onChange={handleEditFormChange} style={iStyle}>
+                  {PAYMENT_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+                </select>
+              </div>
+              <div style={grp}><label style={lStyle}>Benefits</label><input name="Benefits" value={editForm['Benefits'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
+              <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Acknowledged" checked={!!editForm['Acknowledged']} onChange={handleEditFormChange} /> Acknowledged / Thanked</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Salesforce" checked={!!editForm['Salesforce']} onChange={handleEditFormChange} /> In Salesforce</label>
+              </div>
+              <span style={sec}>Contact</span>
+              <div style={grp}><label style={lStyle}>Email</label><input name="Email" type="email" value={editForm['Email'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Phone Number</label><input name="Phone Number" value={editForm['Phone Number'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Address</label><textarea name="Address" value={editForm['Address'] || ''} onChange={handleEditFormChange} rows={3} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <span style={sec}>Notes</span>
+              <div style={grp}><label style={lStyle}>Donation Notes</label><textarea name="Donation Notes" value={editForm['Donation Notes'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <div style={grp}><label style={lStyle}>Donor Notes</label><textarea name="Donor Notes" value={editForm['Donor Notes'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <div style={grp}><label style={lStyle}>Notes</label><textarea name="Notes" value={editForm['Notes'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <button type="submit" disabled={editSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: editSaving ? 0.7 : 1 }}>{editSaving ? 'Saving...' : 'Save Changes'}</button>
+                <button type="button" onClick={function() { setEditDon(null); }} style={{ padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
+                <button type="button" onClick={function() { deleteDonation(editDon); setEditDon(null); }} style={{ padding: '10px 16px', background: 'transparent', border: '0.5px solid #e8a0a0', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#c0392b', fontWeight: 500 }}>Delete</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
