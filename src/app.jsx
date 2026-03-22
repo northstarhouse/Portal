@@ -2234,6 +2234,12 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [quarterUpdate, setQuarterUpdate] = useState(null);
   var [cardFlipped, setCardFlipped] = useState(false);
   var [resources, setResources] = useState([]);
+  var [showAddResource, setShowAddResource] = useState(false);
+  var [resourceType, setResourceType] = useState('link');
+  var [resourceTitle, setResourceTitle] = useState('');
+  var [resourceUrl, setResourceUrl] = useState('');
+  var [resourceSaving, setResourceSaving] = useState(false);
+  var resourceFileRef = React.useRef(null);
   var [showSponsorForm, setShowSponsorForm] = useState(false);
   var emptySponsorForm = { 'Business Name': '', 'Main Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Donation': '', 'Fair Market Value': '', 'Area Supported': area, 'Date Recieved': '', 'NSH Contact': '' };
   var [sponsorForm, setSponsorForm] = useState(emptySponsorForm);
@@ -2576,7 +2582,70 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 );
               })
           }
-          <button onClick={function() { setSponsorForm(Object.assign({}, emptySponsorForm, { 'Area Supported': area })); setSponsorSaved(false); setShowSponsorForm(true); }} style={{ width: '100%', marginTop: 4, padding: '9px 12px', background: '#faf8f5', border: '0.5px dashed ' + gold, borderRadius: 8, fontSize: 12, color: gold, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+
+          {showAddResource ? (
+            <div style={{ background: '#faf8f5', borderRadius: 8, padding: '12px 14px', marginBottom: 6, border: '0.5px solid #e8e0d5' }}>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                {['link','file'].map(function(t) {
+                  return <button key={t} onClick={function() { setResourceType(t); }} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 5, border: '0.5px solid ' + (resourceType === t ? gold : '#e0d8cc'), background: resourceType === t ? gold : '#fff', color: resourceType === t ? '#fff' : '#888', cursor: 'pointer', fontWeight: resourceType === t ? 600 : 400 }}>{t === 'link' ? 'Link' : 'Upload File'}</button>;
+                })}
+              </div>
+              <input value={resourceTitle} onChange={function(e) { setResourceTitle(e.target.value); }} placeholder="Title" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} />
+              {resourceType === 'link'
+                ? <input value={resourceUrl} onChange={function(e) { setResourceUrl(e.target.value); }} placeholder="https://…" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} />
+                : <div style={{ marginBottom: 8 }}>
+                    <button onClick={function() { resourceFileRef.current.click(); }} style={{ fontSize: 12, color: gold, background: '#fff', border: '0.5px dashed ' + gold, borderRadius: 7, padding: '7px 14px', cursor: 'pointer', width: '100%' }}>
+                      {resourceUrl ? '✓ ' + resourceUrl.split('/').pop().slice(0,30) : 'Choose file…'}
+                    </button>
+                    <input ref={resourceFileRef} type="file" style={{ display: 'none' }} onChange={function(e) {
+                      var file = e.target.files[0];
+                      if (!file) return;
+                      if (!resourceTitle) setResourceTitle(file.name.replace(/\.[^.]+$/, ''));
+                      setResourceUrl('__file__:' + file.name);
+                    }} />
+                  </div>
+              }
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button disabled={resourceSaving} onClick={function() {
+                  if (!resourceTitle) return;
+                  setResourceSaving(true);
+                  function saveRecord(url) {
+                    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources'), {
+                      method: 'POST',
+                      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+                      body: JSON.stringify({ area: area, title: resourceTitle, url: url })
+                    }).then(function(r) { return r.json(); }).then(function(rows) {
+                      setResourceSaving(false);
+                      if (rows && rows[0]) setResources(function(prev) { return prev.concat([rows[0]]); });
+                      setResourceTitle(''); setResourceUrl(''); setShowAddResource(false);
+                    });
+                  }
+                  if (resourceType === 'link') {
+                    saveRecord(resourceUrl);
+                  } else {
+                    var file = resourceFileRef.current && resourceFileRef.current.files[0];
+                    if (!file) { setResourceSaving(false); return; }
+                    var ext = file.name.split('.').pop();
+                    var filename = area.replace(/\s+/g,'-').toLowerCase() + '-' + Date.now() + '.' + ext;
+                    fetch(SUPABASE_URL + '/storage/v1/object/area-resources/' + filename, {
+                      method: 'POST',
+                      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
+                      body: file
+                    }).then(function() {
+                      saveRecord(SUPABASE_URL + '/storage/v1/object/public/area-resources/' + filename);
+                    }).catch(function() { setResourceSaving(false); });
+                  }
+                }} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: resourceSaving ? 0.7 : 1 }}>{resourceSaving ? 'Saving…' : 'Add'}</button>
+                <button onClick={function() { setShowAddResource(false); setResourceTitle(''); setResourceUrl(''); }} style={{ padding: '7px 12px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={function() { setShowAddResource(true); setResourceType('link'); }} style={{ width: '100%', marginTop: 4, padding: '8px 12px', background: '#faf8f5', border: '0.5px dashed #d0c8bc', borderRadius: 8, fontSize: 12, color: '#aaa', cursor: 'pointer', textAlign: 'left' }}>
+              + Add Resource
+            </button>
+          )}
+
+          <button onClick={function() { setSponsorForm(Object.assign({}, emptySponsorForm, { 'Area Supported': area })); setSponsorSaved(false); setShowSponsorForm(true); }} style={{ width: '100%', marginTop: 6, padding: '9px 12px', background: '#faf8f5', border: '0.5px dashed ' + gold, borderRadius: 8, fontSize: 12, color: gold, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
             + In-Kind Sponsorship Form
           </button>
         </div>
