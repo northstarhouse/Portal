@@ -2186,18 +2186,34 @@ function OperationalView({ opArea }) {
           </div>
           <div>
             <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 6 }}>Lead</div>
-            {editLead ? (
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input value={leadInput} onChange={function(e) { setLeadInput(e.target.value); }} autoFocus style={{ fontSize: 14, padding: '5px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, width: 150 }} />
-                <button onClick={saveLead} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>Save</button>
-                <button onClick={function() { setEditLead(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: '#666' }}>Cancel</button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 15, color: '#2a2a2a', fontWeight: 500 }}>{areaInfo && areaInfo.lead ? areaInfo.lead : defaultLead ? defaultLead : <span style={{ color: '#ccc', fontStyle: 'italic' }}>Not set</span>}</span>
-                <button onClick={function() { setEditLead(true); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#bbb', padding: '2px 6px', borderRadius: 4 }}>Edit</button>
-              </div>
-            )}
+            {(function() {
+              var leadName = areaInfo && areaInfo.lead ? areaInfo.lead : defaultLead;
+              var leadVol = vols.find(function(v) { return (v['First Name'] + ' ' + v['Last Name']) === leadName; });
+              if (editLead) {
+                return (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <select autoFocus value={leadInput} onChange={function(e) { setLeadInput(e.target.value); }} style={{ fontSize: 13, padding: '5px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, background: '#fff', minWidth: 160 }}>
+                      <option value="">— Select lead —</option>
+                      {vols.map(function(v) { var n = v['First Name'] + ' ' + v['Last Name']; return <option key={v.id} value={n}>{n}</option>; })}
+                    </select>
+                    <button onClick={saveLead} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>Save</button>
+                    <button onClick={function() { setEditLead(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: '#666' }}>Cancel</button>
+                  </div>
+                );
+              }
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={function() { setEditLead(true); setLeadInput(leadName || ''); }}>
+                  {leadVol && leadVol['Picture URL'] ? (
+                    <img src={driveImg(leadVol['Picture URL'])} alt={leadName} style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                  ) : (
+                    <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 600, color: '#999', flexShrink: 0 }}>
+                      {leadName ? leadName[0] : '?'}
+                    </div>
+                  )}
+                  <span style={{ fontSize: 15, color: '#2a2a2a', fontWeight: 500 }}>{leadName || <span style={{ color: '#ccc', fontStyle: 'italic' }}>Not set</span>}</span>
+                </div>
+              );
+            })()}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>

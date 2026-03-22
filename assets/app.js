@@ -1809,13 +1809,26 @@
       return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
     var cardHover = { cursor: "pointer", background: "#faf8f5", border: "0.5px solid #e8e0d5", borderRadius: 10, padding: "16px 20px", flex: 1, minWidth: 150 };
-    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 12, padding: "14px 20px", border: "0.5px solid #e8e0d5", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 6 } }, "Operational Area"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, area)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 6 } }, "Lead"), editLead ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center" } }, /* @__PURE__ */ React.createElement("input", { value: leadInput, onChange: function(e) {
-      setLeadInput(e.target.value);
-    }, autoFocus: true, style: { fontSize: 14, padding: "5px 8px", border: "0.5px solid #e0d8cc", borderRadius: 6, width: 150 } }), /* @__PURE__ */ React.createElement("button", { onClick: saveLead, style: { background: gold, color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px", fontSize: 12, cursor: "pointer" } }, "Save"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
-      setEditLead(false);
-    }, style: { background: "#f0ece6", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer", color: "#666" } }, "Cancel")) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, color: "#2a2a2a", fontWeight: 500 } }, areaInfo && areaInfo.lead ? areaInfo.lead : defaultLead ? defaultLead : /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc", fontStyle: "italic" } }, "Not set")), /* @__PURE__ */ React.createElement("button", { onClick: function() {
-      setEditLead(true);
-    }, style: { background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#bbb", padding: "2px 6px", borderRadius: 4 } }, "Edit")))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 12, padding: "14px 20px", border: "0.5px solid #e8e0d5", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 6 } }, "Operational Area"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, area)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 6 } }, "Lead"), (function() {
+      var leadName = areaInfo && areaInfo.lead ? areaInfo.lead : defaultLead;
+      var leadVol = vols.find(function(v) {
+        return v["First Name"] + " " + v["Last Name"] === leadName;
+      });
+      if (editLead) {
+        return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center" } }, /* @__PURE__ */ React.createElement("select", { autoFocus: true, value: leadInput, onChange: function(e) {
+          setLeadInput(e.target.value);
+        }, style: { fontSize: 13, padding: "5px 8px", border: "0.5px solid #e0d8cc", borderRadius: 6, background: "#fff", minWidth: 160 } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 Select lead \u2014"), vols.map(function(v) {
+          var n = v["First Name"] + " " + v["Last Name"];
+          return /* @__PURE__ */ React.createElement("option", { key: v.id, value: n }, n);
+        })), /* @__PURE__ */ React.createElement("button", { onClick: saveLead, style: { background: gold, color: "#fff", border: "none", borderRadius: 6, padding: "5px 12px", fontSize: 12, cursor: "pointer" } }, "Save"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+          setEditLead(false);
+        }, style: { background: "#f0ece6", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer", color: "#666" } }, "Cancel"));
+      }
+      return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }, onClick: function() {
+        setEditLead(true);
+        setLeadInput(leadName || "");
+      } }, leadVol && leadVol["Picture URL"] ? /* @__PURE__ */ React.createElement("img", { src: driveImg(leadVol["Picture URL"]), alt: leadName, style: { width: 38, height: 38, borderRadius: "50%", objectFit: "cover", flexShrink: 0 } }) : /* @__PURE__ */ React.createElement("div", { style: { width: 38, height: 38, borderRadius: "50%", background: "#f0ece6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 600, color: "#999", flexShrink: 0 } }, leadName ? leadName[0] : "?"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 15, color: "#2a2a2a", fontWeight: 500 } }, leadName || /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc", fontStyle: "italic" } }, "Not set")));
+    })())), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement(
       "div",
       {
         onClick: function() {
