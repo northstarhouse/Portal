@@ -1231,7 +1231,7 @@
     const [goals, setGoals] = useS([]);
     const [loading, setLoading] = useS(true);
     const [tab, setTab] = useS("annual");
-    const [activeCat, setActiveCat] = useS(CATEGORY_ORDER[0]);
+    const [activeCat, setActiveCat] = useS(null);
     const [editing, setEditing] = useS(null);
     const [editForm, setEditForm] = useS({});
     const [saving, setSaving] = useS(false);
@@ -1272,23 +1272,21 @@
       };
     };
     if (loading) return /* @__PURE__ */ React.createElement("div", { style: { padding: 40, color: "#777", fontSize: 12 } }, "Loading\u2026");
-    var filtered = goals.filter(function(g) {
+    var filtered = activeCat ? goals.filter(function(g) {
       return g.goal_type === tab && g.category === activeCat;
-    });
-    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 } }, CATEGORY_ORDER.map(function(cat) {
+    }) : [];
+    function CatBox(cat) {
       var catGoals = goals.filter(function(g) {
         return g.category === cat && g.goal_type !== "three_year_vision";
       });
-      if (catGoals.length === 0) return null;
       var done = catGoals.filter(function(g) {
         return g.status === "Complete";
       }).length;
       var inprog = catGoals.filter(function(g) {
         return g.status === "In progress" || g.status === "On track";
       }).length;
-      var pct = Math.round(done / catGoals.length * 100);
-      var inprogPct = Math.round(inprog / catGoals.length * 100);
-      var isActive = activeCat === cat;
+      var pct = catGoals.length ? Math.round(done / catGoals.length * 100) : 0;
+      var inprogPct = catGoals.length ? Math.round(inprog / catGoals.length * 100) : 0;
       return /* @__PURE__ */ React.createElement(
         "div",
         {
@@ -1297,13 +1295,27 @@
             setActiveCat(cat);
             setEditing(null);
           },
-          style: { background: isActive ? "#fdf8f0" : "#fff", border: "0.5px solid " + (isActive ? gold : "#e8e0d5"), borderRadius: 10, padding: "18px 20px", cursor: "pointer", transition: "all 0.15s" }
+          style: { background: "#fff", border: "0.5px solid #e8e0d5", borderRadius: 10, padding: "18px 20px", cursor: "pointer", transition: "all 0.15s" },
+          onMouseEnter: function(e) {
+            e.currentTarget.style.borderColor = gold;
+            e.currentTarget.style.background = "#fdf8f0";
+          },
+          onMouseLeave: function(e) {
+            e.currentTarget.style.borderColor = "#e8e0d5";
+            e.currentTarget.style.background = "#fff";
+          }
         },
         /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", marginBottom: 12, lineHeight: 1.3 } }, cat),
         /* @__PURE__ */ React.createElement("div", { style: { height: 10, background: "#ede8e0", borderRadius: 99, overflow: "hidden", display: "flex", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { width: pct + "%", background: "#4caf50", transition: "width 0.4s" } }), /* @__PURE__ */ React.createElement("div", { style: { width: inprogPct + "%", background: "#f5a623", transition: "width 0.4s" } })),
         /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, fontSize: 12, color: "#888" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#4caf50", fontWeight: 600 } }, done, " complete"), /* @__PURE__ */ React.createElement("span", null, inprog, " in progress"), /* @__PURE__ */ React.createElement("span", null, catGoals.length - done - inprog, " not started"))
       );
-    })), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e8e0d5", borderRadius: 12, padding: "20px 24px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif", marginBottom: 16 } }, activeCat), filtered.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#bbb", fontSize: 13, fontStyle: "italic", padding: "10px 0" } }, "No goals for this area.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 } }, filtered.map(function(g) {
+    }
+    return /* @__PURE__ */ React.createElement("div", null, !activeCat ? /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 } }, CATEGORY_ORDER.map(function(cat) {
+      return CatBox(cat);
+    })) : /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e8e0d5", borderRadius: 12, padding: "20px 24px", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, activeCat), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setActiveCat(null);
+      setEditing(null);
+    }, style: { background: "none", border: "none", fontSize: 12, color: "#aaa", cursor: "pointer", padding: "4px 8px" } }, "\u2190 All areas")), filtered.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#bbb", fontSize: 13, fontStyle: "italic", padding: "10px 0" } }, "No goals for this area.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 } }, filtered.map(function(g) {
       var sc = GOAL_STATUS_COLORS[g.status] || GOAL_STATUS_COLORS["Not started"];
       var isEdit = editing === g.id;
       return /* @__PURE__ */ React.createElement("div", { key: g.id, style: { background: "#faf8f5", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", marginBottom: 4 } }, g.title), g.description && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777", lineHeight: 1.5 } }, g.description)), tab !== "three_year_vision" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, g.status && /* @__PURE__ */ React.createElement("span", { style: { background: sc.bg, color: sc.color, fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 20 } }, g.status), /* @__PURE__ */ React.createElement(
