@@ -237,7 +237,12 @@ const typeColors = {
   const [activeVols, setActiveVols] = useState(null);
   const [calEvents, setCalEvents] = useState(null);
   const [birthdays, setBirthdays] = useState(null);
+  const [sponsors, setSponsors] = useState(null);
+  const [showSponsors, setShowSponsors] = useState(false);
   useEffect(function() {
+    cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes']).then(function(rows) {
+      if (Array.isArray(rows)) setSponsors(rows);
+    });
     cachedSbFetch('2026 Donations', ['Amount']).then(function(rows) {
       if (!Array.isArray(rows)) return;
       var total = rows.reduce(function(s, r) {
@@ -312,8 +317,8 @@ const typeColors = {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         <div onClick={function() { navigate('donors'); }} style={{ cursor: 'pointer' }}><StatCard label="Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /></div>
         <div onClick={function() { navigate('volunteers'); }} style={{ cursor: 'pointer' }}><StatCard label="Active Volunteers" value={activeVols === null ? '...' : activeVols} /></div>
-        <StatCard label="2026 Events" value="5" sub="on the books" />
-        <StatCard label="Active Sponsors" value="3" sub="+ 1 in review" />
+        <StatCard label="2026 Events" value="5" />
+        <div onClick={function() { setShowSponsors(true); }} style={{ cursor: 'pointer' }}><StatCard label="Sponsors" value={sponsors === null ? '...' : sponsors.length} /></div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, marginBottom: 16 }}>
@@ -405,6 +410,45 @@ const typeColors = {
         </div>
 
       </div>
+
+      {showSponsors && (
+        <div onClick={function() { setShowSponsors(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 580, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Sponsors</div>
+                <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{sponsors ? sponsors.length : 0} total</div>
+              </div>
+              <button onClick={function() { setShowSponsors(false); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
+            </div>
+            {(!sponsors || sponsors.length === 0) && <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>No sponsors yet.</div>}
+            {sponsors && sponsors.map(function(s) {
+              return (
+                <div key={s.id} style={{ padding: '14px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 3 }}>{s['Business Name']}</div>
+                      {s['Main Contact'] && <div style={{ fontSize: 12, color: '#666' }}>Contact: {s['Main Contact']}</div>}
+                      {s['Donation'] && <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Donation: {s['Donation']}</div>}
+                      {s['Area Supported'] && <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>Area: {s['Area Supported']}</div>}
+                      {s['NSH Contact'] && <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>NSH Contact: {s['NSH Contact']}</div>}
+                      {s['Notes'] && <div style={{ fontSize: 12, color: '#888', marginTop: 4, fontStyle: 'italic' }}>{s['Notes']}</div>}
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      {s['Fair Market Value'] && <div style={{ fontSize: 13, fontWeight: 600, color: gold }}>{s['Fair Market Value']}</div>}
+                      <div style={{ marginTop: 4 }}>
+                        {s['Acknowledged']
+                          ? <span style={{ fontSize: 10, background: '#e8f5e9', color: '#2e7d32', borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>Acknowledged</span>
+                          : <span style={{ fontSize: 10, background: '#fff8e1', color: '#b8860b', borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>Pending</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }function EventsView() {
@@ -472,7 +516,7 @@ var TEAM_COLORS = {
   'New':          { bg: '#e0f7fa', color: '#006064' },
   'Docent':           { bg: '#fbe9e7', color: '#8d3d2b' },
   'Volunteer Exchange': { bg: '#e8f4fd', color: '#0d6eab' },
-  'Support List':      { bg: '#f0f4f8', color: '#3a5068' },
+  'Support':           { bg: '#f0f4f8', color: '#3a5068' },
   'Venue':             { bg: '#ede7f6', color: '#4527a0' },
   'Marketing':         { bg: '#fce4ec', color: '#c2185b' },
 };
