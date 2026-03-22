@@ -1361,7 +1361,7 @@ function RichEditor({ value, onChange, placeholder }) {
 }
 
 var BOARD_MEMBERS = ['Ken', 'Rick', 'Wyn', 'Paula', 'Jeff', 'Rich'];
-var VOTE_COLORS = { 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#fff3e0', color: '#e65100' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' } };
+var VOTE_COLORS = { 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#f3f0ff', color: '#7c3aed' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' } };
 
 function BoardView() {
   const [items, setItems] = React.useState([]);
@@ -1510,7 +1510,7 @@ function BoardView() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Voting Topics</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Voting Topics</div>
           <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{items.length} topic{items.length !== 1 ? 's' : ''}</div>
         </div>
         <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Topic</button>
@@ -1540,7 +1540,7 @@ function BoardView() {
             <div
               key={item.id}
               onClick={function() { setSelected(item); setVoteForm({ voter: '', choice: '', note: '' }); }}
-              style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 4, padding: '16px 20px', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
+              style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '16px 20px', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
               onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.07)'; }}
               onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
             >
@@ -1563,8 +1563,8 @@ function BoardView() {
               </div>
               {revealed && (
                 <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
-                  {[['Yes', t.yes, '#2e7d32'], ['No', t.no, '#c62828'], ['Abstain', t.abstain, '#e65100']].map(function(entry) {
-                    return <div key={entry[0]} style={{ fontSize: 12 }}><span style={{ color: entry[2], fontWeight: 600 }}>{entry[1]}</span><span style={{ color: '#777' }}> {entry[0]}</span></div>;
+                  {[['Yes', t.yes, '#2e7d32'], ['No', t.no, '#c62828'], ['Abstain', t.abstain, '#7c3aed']].map(function(entry) {
+                    return <div key={entry[0]} style={{ fontSize: 12, color: entry[2], fontWeight: 600 }}>{entry[1]} {entry[0]}</div>;
                   })}
                 </div>
               )}
@@ -1611,7 +1611,7 @@ function BoardView() {
                     return [
                       { label: 'Yes', count: t.yes, bg: '#e8f5e9', border: '#a5d6a7', color: '#2e7d32' },
                       { label: 'No', count: t.no, bg: '#ffebee', border: '#ef9a9a', color: '#c62828' },
-                      { label: 'Abstain / Not in Attendance', count: t.abstain + t.absent, bg: '#f5f5f5', border: '#e0e0e0', color: '#888' },
+                      { label: 'Abstain / Not in Attendance', count: t.abstain + t.absent, bg: '#f3f0ff', border: '#c4b5fd', color: '#7c3aed' },
                     ].map(function(entry) {
                       return (
                         <div key={entry.label} style={{ background: entry.bg, border: '1px solid ' + entry.border, borderRadius: 4, padding: '14px 16px', textAlign: 'center' }}>
