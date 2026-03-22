@@ -2335,8 +2335,42 @@ function OperationalView({ opArea }) {
                       </div>
                     </div>
                   )}
-                  {quarterUpdate && (quarterUpdate.challenges && quarterUpdate.challenges.length > 0) && <div><span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Challenges</span><div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 3, lineHeight: 1.6 }}>{[].concat(quarterUpdate.challenges).join(', ')}{quarterUpdate.challenges_details ? ' — ' + quarterUpdate.challenges_details : ''}</div></div>}
-                  {quarterUpdate && (quarterUpdate.support_needed && quarterUpdate.support_needed.length > 0) && <div><span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Support Needed</span><div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 3, lineHeight: 1.6 }}>{[].concat(quarterUpdate.support_needed).join(', ')}{quarterUpdate.support_details ? ' — ' + quarterUpdate.support_details : ''}</div></div>}
+                  {quarterUpdate && (function() {
+                    var checked = [].concat(quarterUpdate.challenges || []);
+                    if (!checked.length) return null;
+                    return (
+                      <div>
+                        <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Challenges Encountered</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                          {CHALLENGE_OPTIONS.map(function(opt) {
+                            var on = checked.indexOf(opt) !== -1;
+                            return (
+                              <span key={opt} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, fontWeight: on ? 600 : 400, background: on ? '#fff3e0' : '#f5f5f5', color: on ? '#c07040' : '#bbb', border: '0.5px solid ' + (on ? '#f0c090' : '#eee') }}>{on ? '✓ ' : ''}{opt}</span>
+                            );
+                          })}
+                        </div>
+                        {quarterUpdate.challenges_details && <div style={{ fontSize: 12, color: '#555', marginTop: 6, lineHeight: 1.5 }}>{quarterUpdate.challenges_details}</div>}
+                      </div>
+                    );
+                  })()}
+                  {quarterUpdate && (function() {
+                    var checked = [].concat(quarterUpdate.support_needed || []);
+                    if (!checked.length) return null;
+                    return (
+                      <div>
+                        <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Support Needed</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                          {SUPPORT_OPTIONS.map(function(opt) {
+                            var on = checked.indexOf(opt) !== -1;
+                            return (
+                              <span key={opt} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, fontWeight: on ? 600 : 400, background: on ? '#eaf3ea' : '#f5f5f5', color: on ? '#3a7d3a' : '#bbb', border: '0.5px solid ' + (on ? '#a0d0a0' : '#eee') }}>{on ? '✓ ' : ''}{opt}</span>
+                            );
+                          })}
+                        </div>
+                        {quarterUpdate.support_details && <div style={{ fontSize: 12, color: '#555', marginTop: 6, lineHeight: 1.5 }}>{quarterUpdate.support_details}</div>}
+                      </div>
+                    );
+                  })()}
                   {quarterUpdate && quarterUpdate.other_notes && <div><span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Other Notes</span><div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 3, lineHeight: 1.6 }}>{quarterUpdate.other_notes}</div></div>}
                   {quarterUpdate && quarterUpdate.date_submitted && <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>Submitted {quarterUpdate.date_submitted}</div>}
                 </div>
