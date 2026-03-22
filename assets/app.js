@@ -1484,13 +1484,15 @@
         }, 4e3);
       });
     }
-    var secStyle = { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 10, marginTop: 4, display: "block" };
-    var inpStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: "border-box", fontFamily: "system-ui, sans-serif", background: "#fff" };
-    var grp = { marginBottom: 14 };
-    var card = { background: "#fff", border: "0.5px solid #e8e0d5", borderRadius: 10, padding: "20px 24px", marginBottom: 16 };
-    var lbl = { fontSize: 12, color: "#666", fontWeight: 500 };
+    var secStyle = { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 12, marginTop: 4, display: "block" };
+    var inpStyle = { width: "100%", padding: "9px 12px", border: "0.5px solid #e0d8cc", borderRadius: 6, fontSize: 14, marginTop: 4, boxSizing: "border-box", fontFamily: "system-ui, sans-serif", background: "#fff", color: "#2a2a2a" };
+    var grp = { marginBottom: 16 };
+    var card = { background: "#fff", border: "0.5px solid #e8e0d5", borderTop: "none", padding: "22px 28px" };
+    var cardFirst = { background: "#fff", border: "0.5px solid #e8e0d5", borderRadius: "10px 10px 0 0", padding: "22px 28px" };
+    var cardLast = { background: "#fff", border: "0.5px solid #e8e0d5", borderTop: "none", borderRadius: "0 0 10px 10px", padding: "22px 28px", marginBottom: 20 };
+    var lbl = { fontSize: 13, color: "#444", fontWeight: 500 };
     var nqLabel = nextQ(quarter, year).q + " " + nextQ(quarter, year).yr;
-    return /* @__PURE__ */ React.createElement("div", { style: { maxWidth: "100%" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#faf8f5", border: "0.5px solid #e8e0d5", borderRadius: 10, padding: "14px 20px", marginBottom: 20, fontSize: 13, color: "#777", lineHeight: 1.6 } }, "Share quarterly progress, challenges, and support needs for each focus area."), /* @__PURE__ */ React.createElement("form", { onSubmit: handleSubmit }, /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Area & Period"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Organizational Area *"), /* @__PURE__ */ React.createElement("select", { required: true, value: area, onChange: function(e) {
+    return /* @__PURE__ */ React.createElement("div", { style: { maxWidth: "100%" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#faf8f5", border: "0.5px solid #e8e0d5", borderRadius: 10, padding: "14px 20px", marginBottom: 20, fontSize: 13, color: "#777", lineHeight: 1.6 } }, "Share quarterly progress, challenges, and support needs for each focus area."), /* @__PURE__ */ React.createElement("form", { onSubmit: handleSubmit }, /* @__PURE__ */ React.createElement("div", { style: cardFirst }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Area & Period"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Organizational Area *"), /* @__PURE__ */ React.createElement("select", { required: true, value: area, onChange: function(e) {
       setArea(e.target.value);
     }, style: inpStyle }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select area..."), OPERATIONAL_AREAS.map(function(a) {
       return /* @__PURE__ */ React.createElement("option", { key: a }, a);
@@ -1505,7 +1507,7 @@
       var summaryKey = keys[2];
       var statusColors2 = { "On Track": { bg: "#eaf3ea", color: "#3a7d3a" }, "Behind": { bg: "#fff3e0", color: "#c07040" }, "Complete": { bg: "#e8f5e9", color: "#2e7d32" }, "At Risk": { bg: "#fdecea", color: "#c62828" } };
       var sc = statusColors2[form[statusKey]] || statusColors2["On Track"];
-      return /* @__PURE__ */ React.createElement("div", { key: keys[0], style: { borderBottom: i < 2 ? "0.5px solid #f0ece6" : "none", paddingBottom: 14, marginBottom: i < 2 ? 14 : 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#2a2a2a", fontWeight: 500, marginBottom: 8 } }, i + 1, ". ", goalText), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "160px 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Status"), /* @__PURE__ */ React.createElement("select", { value: form[statusKey], onChange: function(e) {
+      return /* @__PURE__ */ React.createElement("div", { key: keys[0], style: { borderBottom: i < 2 ? "0.5px solid #f0ece6" : "none", paddingBottom: 14, marginBottom: i < 2 ? 14 : 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#2a2a2a", fontWeight: 500, marginBottom: 8 } }, i + 1, ". ", goalText), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "160px 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Status"), /* @__PURE__ */ React.createElement("select", { value: form[statusKey], onChange: function(e) {
         var v = e.target.value;
         setForm(function(f) {
           var p = {};
@@ -1520,7 +1522,7 @@
           return Object.assign({}, f, p);
         });
       }, style: inpStyle, placeholder: "Brief update on this goal..." }))));
-    }) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#bbb", fontStyle: "italic" } }, "Select an area and quarter to update goal statuses.")), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "What Went Well"), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Successes & Forward Movement"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginBottom: 2 } }, "Goals achieved and measurable progress this quarter."), /* @__PURE__ */ React.createElement("textarea", { value: form.what_went_well, onChange: function(e) {
+    }) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#bbb", fontStyle: "italic" } }, "Select an area and quarter to update goal statuses.")), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "What Went Well"), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Successes & Forward Movement"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#888", marginBottom: 4 } }, "Goals achieved and measurable progress this quarter."), /* @__PURE__ */ React.createElement("textarea", { value: form.what_went_well, onChange: function(e) {
       setForm(function(f) {
         return Object.assign({}, f, { what_went_well: e.target.value });
       });
@@ -1546,7 +1548,7 @@
       setForm(function(f) {
         return Object.assign({}, f, { other_notes: e.target.value });
       });
-    }, rows: 3, style: Object.assign({}, inpStyle, { resize: "vertical" }) }))), /* @__PURE__ */ React.createElement("div", { style: card }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Next Quarter Focus & Goals"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginBottom: 12 } }, "These will auto-populate as ", nqLabel, " goals for ", area || "this area", "."), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Primary Focus for Next Quarter"), /* @__PURE__ */ React.createElement("input", { value: form.next_focus, onChange: function(e) {
+    }, rows: 3, style: Object.assign({}, inpStyle, { resize: "vertical" }) }))), /* @__PURE__ */ React.createElement("div", { style: cardLast }, /* @__PURE__ */ React.createElement("span", { style: secStyle }, "Next Quarter Focus & Goals"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginBottom: 12 } }, "These will auto-populate as ", nqLabel, " goals for ", area || "this area", "."), /* @__PURE__ */ React.createElement("div", { style: grp }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Primary Focus for Next Quarter"), /* @__PURE__ */ React.createElement("input", { value: form.next_focus, onChange: function(e) {
       setForm(function(f) {
         return Object.assign({}, f, { next_focus: e.target.value });
       });

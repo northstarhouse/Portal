@@ -1786,11 +1786,13 @@ function QuarterlyView() {
     });
   }
 
-  var secStyle = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10, marginTop: 4, display: 'block' };
-  var inpStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
-  var grp = { marginBottom: 14 };
-  var card = { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '20px 24px', marginBottom: 16 };
-  var lbl = { fontSize: 12, color: '#666', fontWeight: 500 };
+  var secStyle = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 12, marginTop: 4, display: 'block' };
+  var inpStyle = { width: '100%', padding: '9px 12px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 14, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff', color: '#2a2a2a' };
+  var grp = { marginBottom: 16 };
+  var card = { background: '#fff', border: '0.5px solid #e8e0d5', borderTop: 'none', padding: '22px 28px' };
+  var cardFirst = { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: '10px 10px 0 0', padding: '22px 28px' };
+  var cardLast = { background: '#fff', border: '0.5px solid #e8e0d5', borderTop: 'none', borderRadius: '0 0 10px 10px', padding: '22px 28px', marginBottom: 20 };
+  var lbl = { fontSize: 13, color: '#444', fontWeight: 500 };
   var nqLabel = nextQ(quarter, year).q + ' ' + nextQ(quarter, year).yr;
 
   return (
@@ -1799,7 +1801,7 @@ function QuarterlyView() {
         Share quarterly progress, challenges, and support needs for each focus area.
       </div>
       <form onSubmit={handleSubmit}>
-        <div style={card}>
+        <div style={cardFirst}>
           <span style={secStyle}>Area & Period</span>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={grp}>
@@ -1843,7 +1845,7 @@ function QuarterlyView() {
               var sc = statusColors[form[statusKey]] || statusColors['On Track'];
               return (
                 <div key={keys[0]} style={{ borderBottom: i < 2 ? '0.5px solid #f0ece6' : 'none', paddingBottom: 14, marginBottom: i < 2 ? 14 : 0 }}>
-                  <div style={{ fontSize: 13, color: '#2a2a2a', fontWeight: 500, marginBottom: 8 }}>{i+1}. {goalText}</div>
+                  <div style={{ fontSize: 14, color: '#2a2a2a', fontWeight: 500, marginBottom: 8 }}>{i+1}. {goalText}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 10 }}>
                     <div>
                       <label style={lbl}>Status</label>
@@ -1868,7 +1870,7 @@ function QuarterlyView() {
           <span style={secStyle}>What Went Well</span>
           <div style={grp}>
             <label style={lbl}>Successes & Forward Movement</label>
-            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>Goals achieved and measurable progress this quarter.</div>
+            <div style={{ fontSize: 13, color: '#888', marginBottom: 4 }}>Goals achieved and measurable progress this quarter.</div>
             <textarea value={form.what_went_well} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { what_went_well: e.target.value }); }); }} rows={4} style={Object.assign({}, inpStyle, { resize: 'vertical' })} />
           </div>
         </div>
@@ -1919,7 +1921,7 @@ function QuarterlyView() {
           </div>
         </div>
 
-        <div style={card}>
+        <div style={cardLast}>
           <span style={secStyle}>Next Quarter Focus & Goals</span>
           <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>These will auto-populate as {nqLabel} goals for {area || 'this area'}.</div>
           <div style={grp}>
