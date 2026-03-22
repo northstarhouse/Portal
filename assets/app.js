@@ -222,12 +222,13 @@
       });
     }, []);
     return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#5c3d1e", fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.8 } }, "Today \u2014 ", (/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })), /* @__PURE__ */ React.createElement("span", { style: { color: "#777", fontSize: 13 } }, "\u2014"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#888" } }, "Here's your organization at a glance."))), (function() {
-      var due = quarterDueDate(currentQuarterStr(), (/* @__PURE__ */ new Date()).getFullYear());
+      var next = nextUpcomingDue();
+      var due = next.date;
       var now = /* @__PURE__ */ new Date();
       now.setHours(0, 0, 0, 0);
       var days = Math.round((due - now) / 864e5);
-      var dueStr = due.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-      var label = days === 0 ? "Due today" : days < 0 ? Math.abs(days) + " days overdue" : days + " days away";
+      var dueStr = next.q + " \u2014 " + due.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+      var label = days === 0 ? "Due today" : days + " days away";
       var labelColor = "#c0392b";
       var labelBg = "#fce4e4";
       return /* @__PURE__ */ React.createElement(
@@ -1529,7 +1530,20 @@
     if (q === "Q1") return new Date(yr, 2, 31);
     if (q === "Q2") return new Date(yr, 5, 30);
     if (q === "Q3") return new Date(yr, 8, 30);
-    return new Date(yr, 11, 31);
+    return new Date(yr, 11, 10);
+  }
+  function nextUpcomingDue() {
+    var now = /* @__PURE__ */ new Date();
+    now.setHours(0, 0, 0, 0);
+    var yr = now.getFullYear();
+    var candidates = ["Q1", "Q2", "Q3", "Q4"].map(function(q) {
+      return { q, yr, date: quarterDueDate(q, yr) };
+    }).concat(["Q1", "Q2", "Q3", "Q4"].map(function(q) {
+      return { q, yr: yr + 1, date: quarterDueDate(q, yr + 1) };
+    }));
+    return candidates.find(function(c) {
+      return c.date >= now;
+    }) || candidates[0];
   }
   function nextQ(q, yr) {
     return q === "Q1" ? { q: "Q2", yr } : q === "Q2" ? { q: "Q3", yr } : q === "Q3" ? { q: "Q4", yr } : { q: "Q1", yr: yr + 1 };
@@ -1729,28 +1743,32 @@
     var [quarterUpdate, setQuarterUpdate] = useState2(null);
     var [cardFlipped, setCardFlipped] = useState2(false);
     var cq = currentQuarterStr();
+    var [selectedQ, setSelectedQ] = useState2(cq);
     useEffect2(function() {
-      setAreaInfo(null);
-      setBudget([]);
-      setVols([]);
       setQuarterGoals(null);
       setQuarterUpdate(null);
       setCardFlipped(false);
-      setEditLead(false);
-      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Quarter Goals") + "?area=eq." + encodeURIComponent(area) + "&quarter=eq." + encodeURIComponent(cq) + "&year=eq." + (/* @__PURE__ */ new Date()).getFullYear() + "&select=*", {
+      var yr = (/* @__PURE__ */ new Date()).getFullYear();
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Quarter Goals") + "?area=eq." + encodeURIComponent(area) + "&quarter=eq." + encodeURIComponent(selectedQ) + "&year=eq." + yr + "&select=*", {
         headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
       }).then(function(r) {
         return r.json();
       }).then(function(rows) {
         if (rows && rows[0]) setQuarterGoals(rows[0]);
       });
-      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Quarterly Updates") + "?area=eq." + encodeURIComponent(area) + "&quarter=eq." + encodeURIComponent(cq) + "&year=eq." + (/* @__PURE__ */ new Date()).getFullYear() + "&select=*&order=date_submitted.desc&limit=1", {
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Quarterly Updates") + "?area=eq." + encodeURIComponent(area) + "&quarter=eq." + encodeURIComponent(selectedQ) + "&year=eq." + yr + "&select=*&order=date_submitted.desc&limit=1", {
         headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
       }).then(function(r) {
         return r.json();
       }).then(function(rows) {
         if (rows && rows[0]) setQuarterUpdate(rows[0]);
       });
+    }, [area, selectedQ]);
+    useEffect2(function() {
+      setAreaInfo(null);
+      setBudget([]);
+      setVols([]);
+      setEditLead(false);
       fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Operational Areas") + "?area=eq." + encodeURIComponent(area) + "&select=*", {
         headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
       }).then(function(r) {
@@ -1951,7 +1969,13 @@
     ))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 280px", gap: 16, marginBottom: 20 } }, (function() {
       var stColors = { "On Track": { bg: "#eaf3ea", color: "#3a7d3a" }, "Behind": { bg: "#fff3e0", color: "#c07040" }, "Complete": { bg: "#e8f5e9", color: "#2e7d32" }, "At Risk": { bg: "#fdecea", color: "#c62828" } };
       var goalRows = [["goal_1", "goal_1_status", "goal_1_summary"], ["goal_2", "goal_2_status", "goal_2_summary"], ["goal_3", "goal_3_status", "goal_3_summary"]];
-      var frontCard = /* @__PURE__ */ React.createElement("div", { style: { backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", background: "#fff", borderRadius: 12, padding: "18px 24px", border: "0.5px solid #e8e0d5" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 } }, cq, " ", (/* @__PURE__ */ new Date()).getFullYear(), " Goals"), quarterGoals ? /* @__PURE__ */ React.createElement("div", null, quarterGoals.primary_focus && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#aaa", fontWeight: 600 } }, "Primary Focus"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", marginTop: 3, lineHeight: 1.5 } }, quarterGoals.primary_focus)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, goalRows.map(function(keys, i) {
+      var frontCard = /* @__PURE__ */ React.createElement("div", { style: { backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", background: "#fff", borderRadius: 12, padding: "18px 24px", border: "0.5px solid #e8e0d5" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: gold, fontWeight: 600 } }, selectedQ, " ", (/* @__PURE__ */ new Date()).getFullYear(), " Goals"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, ["Q1", "Q2", "Q3", "Q4"].map(function(q) {
+        var isActive = q === selectedQ;
+        var isCurrent = q === cq;
+        return /* @__PURE__ */ React.createElement("button", { key: q, onClick: function() {
+          setSelectedQ(q);
+        }, style: { fontSize: 11, fontWeight: isActive ? 700 : 400, padding: "2px 9px", borderRadius: 5, border: "0.5px solid " + (isActive ? gold : "#e0d8cc"), background: isActive ? gold : "#fff", color: isActive ? "#fff" : isCurrent ? gold : "#aaa", cursor: "pointer" } }, q);
+      }))), quarterGoals ? /* @__PURE__ */ React.createElement("div", null, quarterGoals.primary_focus && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#aaa", fontWeight: 600 } }, "Primary Focus"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", marginTop: 3, lineHeight: 1.5 } }, quarterGoals.primary_focus)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, goalRows.map(function(keys, i) {
         var g = quarterGoals[keys[0]];
         if (!g) return null;
         var st = quarterGoals[keys[1]];
@@ -1961,7 +1985,7 @@
         e.stopPropagation();
         setCardFlipped(true);
       }, style: { fontSize: 11, color: gold, background: "none", border: "0.5px solid " + gold, borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontWeight: 500 } }, "View Full Reflection \u2192"))) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ccc", fontStyle: "italic" } }, "No goals set for ", cq, " yet."));
-      var backCard = /* @__PURE__ */ React.createElement("div", { style: { backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", background: "#fff", borderRadius: 12, padding: "18px 24px", border: "0.5px solid #e8e0d5", position: "absolute", top: 0, left: 0, right: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: gold, fontWeight: 600 } }, cq, " ", (/* @__PURE__ */ new Date()).getFullYear(), " Reflection"), /* @__PURE__ */ React.createElement("button", { onClick: function(e) {
+      var backCard = /* @__PURE__ */ React.createElement("div", { style: { backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", background: "#fff", borderRadius: 12, padding: "18px 24px", border: "0.5px solid #e8e0d5", position: "absolute", top: 0, left: 0, right: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: gold, fontWeight: 600 } }, selectedQ, " ", (/* @__PURE__ */ new Date()).getFullYear(), " Reflection"), /* @__PURE__ */ React.createElement("button", { onClick: function(e) {
         e.stopPropagation();
         setCardFlipped(false);
       }, style: { fontSize: 11, color: "#888", background: "none", border: "0.5px solid #ccc", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontWeight: 500 } }, "\u2190 Goals")), quarterGoals || quarterUpdate ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, quarterUpdate && quarterUpdate.successes && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#aaa", fontWeight: 600 } }, "What Went Well"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#2a2a2a", marginTop: 3, lineHeight: 1.6 } }, quarterUpdate.successes)), quarterGoals && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#aaa", fontWeight: 600 } }, "Goal Progress"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 6 } }, goalRows.map(function(keys, i) {

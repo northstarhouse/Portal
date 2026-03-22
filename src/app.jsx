@@ -277,11 +277,12 @@ const typeColors = {
       </div>
 
       {(function() {
-        var due = quarterDueDate(currentQuarterStr(), new Date().getFullYear());
+        var next = nextUpcomingDue();
+        var due = next.date;
         var now = new Date(); now.setHours(0,0,0,0);
         var days = Math.round((due - now) / 86400000);
-        var dueStr = due.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        var label = days === 0 ? 'Due today' : days < 0 ? Math.abs(days) + ' days overdue' : days + ' days away';
+        var dueStr = next.q + ' — ' + due.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        var label = days === 0 ? 'Due today' : days + ' days away';
         var labelColor = '#c0392b';
         var labelBg = '#fce4e4';
         return (
@@ -1889,7 +1890,14 @@ function quarterDueDate(q, yr) {
   if (q === 'Q1') return new Date(yr, 2, 31);
   if (q === 'Q2') return new Date(yr, 5, 30);
   if (q === 'Q3') return new Date(yr, 8, 30);
-  return new Date(yr, 11, 31);
+  return new Date(yr, 11, 10);
+}
+function nextUpcomingDue() {
+  var now = new Date(); now.setHours(0,0,0,0);
+  var yr = now.getFullYear();
+  var candidates = ['Q1','Q2','Q3','Q4'].map(function(q) { return { q: q, yr: yr, date: quarterDueDate(q, yr) }; })
+    .concat(['Q1','Q2','Q3','Q4'].map(function(q) { return { q: q, yr: yr+1, date: quarterDueDate(q, yr+1) }; }));
+  return candidates.find(function(c) { return c.date >= now; }) || candidates[0];
 }
 function nextQ(q, yr) { return q === 'Q1' ? {q:'Q2',yr:yr} : q === 'Q2' ? {q:'Q3',yr:yr} : q === 'Q3' ? {q:'Q4',yr:yr} : {q:'Q1',yr:yr+1}; }
 
@@ -2186,25 +2194,30 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [quarterUpdate, setQuarterUpdate] = useState(null);
   var [cardFlipped, setCardFlipped] = useState(false);
   var cq = currentQuarterStr();
+  var [selectedQ, setSelectedQ] = useState(cq);
+
+  useEffect(function() {
+    setQuarterGoals(null);
+    setQuarterUpdate(null);
+    setCardFlipped(false);
+    var yr = new Date().getFullYear();
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(selectedQ) + '&year=eq.' + yr + '&select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (rows && rows[0]) setQuarterGoals(rows[0]);
+    });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(selectedQ) + '&year=eq.' + yr + '&select=*&order=date_submitted.desc&limit=1', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (rows && rows[0]) setQuarterUpdate(rows[0]);
+    });
+  }, [area, selectedQ]);
 
   useEffect(function() {
     setAreaInfo(null);
     setBudget([]);
     setVols([]);
-    setQuarterGoals(null);
-    setQuarterUpdate(null);
-    setCardFlipped(false);
     setEditLead(false);
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(cq) + '&year=eq.' + new Date().getFullYear() + '&select=*', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      if (rows && rows[0]) setQuarterGoals(rows[0]);
-    });
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(cq) + '&year=eq.' + new Date().getFullYear() + '&select=*&order=date_submitted.desc&limit=1', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      if (rows && rows[0]) setQuarterUpdate(rows[0]);
-    });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Operational Areas') + '?area=eq.' + encodeURIComponent(area) + '&select=*', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
@@ -2387,7 +2400,18 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           var goalRows = [['goal_1','goal_1_status','goal_1_summary'],['goal_2','goal_2_status','goal_2_summary'],['goal_3','goal_3_status','goal_3_summary']];
           var frontCard = (
             <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 }}>{cq} {new Date().getFullYear()} Goals</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>{selectedQ} {new Date().getFullYear()} Goals</div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {['Q1','Q2','Q3','Q4'].map(function(q) {
+                    var isActive = q === selectedQ;
+                    var isCurrent = q === cq;
+                    return (
+                      <button key={q} onClick={function() { setSelectedQ(q); }} style={{ fontSize: 11, fontWeight: isActive ? 700 : 400, padding: '2px 9px', borderRadius: 5, border: '0.5px solid ' + (isActive ? gold : '#e0d8cc'), background: isActive ? gold : '#fff', color: isActive ? '#fff' : isCurrent ? gold : '#aaa', cursor: 'pointer' }}>{q}</button>
+                    );
+                  })}
+                </div>
+              </div>
               {quarterGoals ? (
                 <div>
                   {quarterGoals.primary_focus && <div style={{ marginBottom: 12 }}><span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Primary Focus</span><div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginTop: 3, lineHeight: 1.5 }}>{quarterGoals.primary_focus}</div></div>}
@@ -2421,7 +2445,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           var backCard = (
             <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5', position: 'absolute', top: 0, left: 0, right: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>{cq} {new Date().getFullYear()} Reflection</div>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>{selectedQ} {new Date().getFullYear()} Reflection</div>
                 <button onClick={function(e) { e.stopPropagation(); setCardFlipped(false); }} style={{ fontSize: 11, color: '#888', background: 'none', border: '0.5px solid #ccc', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 500 }}>← Goals</button>
               </div>
               {(quarterGoals || quarterUpdate) ? (
