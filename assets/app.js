@@ -1728,7 +1728,7 @@
         }
       },
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, textTransform: "uppercase", letterSpacing: 1, color: "#888", fontWeight: 600, marginBottom: 8 } }, "Budget"),
-      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: gold } }, fmt(totalPurchases), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#aaa", fontWeight: 400 } }, allocation ? " / " + fmt(allocation) : "")),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: gold } }, allocation ? fmt(allocation) : fmt(totalPurchases), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#aaa", fontWeight: 400 } }, allocation ? " / " + fmt(totalPurchases) + " spent" : "")),
       allocation != null && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, marginTop: 4, color: totalPurchases > allocation ? "#c62828" : "#3a7d3a", fontWeight: 500 } }, totalPurchases > allocation ? fmt(totalPurchases - allocation) + " over budget" : fmt(allocation - totalPurchases) + " remaining"),
       allocation == null && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 4, fontStyle: "italic" } }, "No budget established"),
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 } }, "View / Add entries \u2192")
