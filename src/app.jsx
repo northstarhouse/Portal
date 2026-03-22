@@ -2330,13 +2330,14 @@ var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundrai
         </div>
       </div>
 
-      <div style={{ flex: 1, padding: "28px 32px", overflowY: "auto" }}>
-        <div style={{ maxWidth: 900 }}>
-          <div style={{ marginBottom: 22 }}>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{mod && mod.label}</h1>
-            <div style={{ height: 1, width: '100%', background: gold, marginTop: 10, opacity: 0.3 }} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+        <div style={{ background: "#fff", padding: "24px 32px 18px", borderBottom: "3px solid " + gold, flexShrink: 0 }}>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{mod && mod.label}</h1>
+        </div>
+        <div style={{ flex: 1, padding: "28px 32px" }}>
+          <div style={{ maxWidth: 900 }}>
+            <View navigate={setActive} opArea={opArea} />
           </div>
-          <View navigate={setActive} opArea={opArea} />
         </div>
       </div>
     </div>
