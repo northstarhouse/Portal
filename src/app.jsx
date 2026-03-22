@@ -2331,7 +2331,7 @@ var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundrai
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}>
-        <div style={{ background: "#fdfcfb", padding: "24px 32px 18px", borderBottom: "3px solid " + gold, flexShrink: 0 }}>
+        <div style={{ background: "#fdfcfb", padding: "24px 32px 18px", borderBottom: "3px solid rgba(136,108,68,0.35)", flexShrink: 0 }}>
           <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{mod && mod.label}</h1>
         </div>
         <div style={{ flex: 1, padding: "28px 32px" }}>
