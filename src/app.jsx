@@ -68,6 +68,7 @@ var NAV_ICONS = {
   board: '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
   strategy: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   operational: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  sponsors: '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>',
 };
 
 function NavIcon({ id, active }) {
@@ -85,6 +86,7 @@ const modules = [
   { id: "volunteers", label: "Volunteers" },
   { id: "donors", label: "Donors & Donations" },
   { id: "board", label: "Board Voting" },
+  { id: "sponsors", label: "Sponsors" },
   { id: "strategy", label: "Strategic Goal Progress" },
   { id: "operational", label: "Operational Areas", hidden: true },
 ];
@@ -238,7 +240,6 @@ const typeColors = {
   const [calEvents, setCalEvents] = useState(null);
   const [birthdays, setBirthdays] = useState(null);
   const [sponsors, setSponsors] = useState(null);
-  const [showSponsors, setShowSponsors] = useState(false);
   useEffect(function() {
     cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes']).then(function(rows) {
       if (Array.isArray(rows)) setSponsors(rows);
@@ -318,7 +319,7 @@ const typeColors = {
         <div onClick={function() { navigate('donors'); }} style={{ cursor: 'pointer' }}><StatCard label="Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /></div>
         <div onClick={function() { navigate('volunteers'); }} style={{ cursor: 'pointer' }}><StatCard label="Active Volunteers" value={activeVols === null ? '...' : activeVols} /></div>
         <StatCard label="2026 Events" value="5" />
-        <div onClick={function() { setShowSponsors(true); }} style={{ cursor: 'pointer' }}><StatCard label="Sponsors" value={sponsors === null ? '...' : sponsors.length} /></div>
+        <div onClick={function() { navigate('sponsors'); }} style={{ cursor: 'pointer' }}><StatCard label="Sponsors" value={sponsors === null ? '...' : sponsors.length} /></div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, marginBottom: 16 }}>
@@ -411,44 +412,6 @@ const typeColors = {
 
       </div>
 
-      {showSponsors && (
-        <div onClick={function() { setShowSponsors(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 580, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Sponsors</div>
-                <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{sponsors ? sponsors.length : 0} total</div>
-              </div>
-              <button onClick={function() { setShowSponsors(false); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
-            </div>
-            {(!sponsors || sponsors.length === 0) && <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>No sponsors yet.</div>}
-            {sponsors && sponsors.map(function(s) {
-              return (
-                <div key={s.id} style={{ padding: '14px 0', borderBottom: '0.5px solid #f0ece6' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 3 }}>{s['Business Name']}</div>
-                      {s['Main Contact'] && <div style={{ fontSize: 12, color: '#666' }}>Contact: {s['Main Contact']}</div>}
-                      {s['Donation'] && <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Donation: {s['Donation']}</div>}
-                      {s['Area Supported'] && <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>Area: {s['Area Supported']}</div>}
-                      {s['NSH Contact'] && <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>NSH Contact: {s['NSH Contact']}</div>}
-                      {s['Notes'] && <div style={{ fontSize: 12, color: '#888', marginTop: 4, fontStyle: 'italic' }}>{s['Notes']}</div>}
-                    </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      {s['Fair Market Value'] && <div style={{ fontSize: 13, fontWeight: 600, color: gold }}>{s['Fair Market Value']}</div>}
-                      <div style={{ marginTop: 4 }}>
-                        {s['Acknowledged']
-                          ? <span style={{ fontSize: 10, background: '#e8f5e9', color: '#2e7d32', borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>Acknowledged</span>
-                          : <span style={{ fontSize: 10, background: '#fff8e1', color: '#b8860b', borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>Pending</span>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }function EventsView() {
@@ -2748,6 +2711,105 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   );
 }
 
+function SponsorsView() {
+  var { useState, useEffect } = React;
+  var [sponsors, setSponsors] = useState(null);
+  var [selected, setSelected] = useState(null);
+
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?select=*&order=id.asc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setSponsors(rows);
+    });
+  }, []);
+
+  var total = sponsors ? sponsors.length : 0;
+  var acknowledged = sponsors ? sponsors.filter(function(s) { return s['Acknowledged']; }).length : 0;
+  var pending = total - acknowledged;
+
+  function InfoRow({ label, value, link }) {
+    if (!value) return null;
+    return (
+      <div style={{ display: 'flex', gap: 0, marginBottom: 10, alignItems: 'flex-start' }}>
+        <div style={{ width: 120, fontSize: 12, color: '#777', flexShrink: 0, paddingTop: 1 }}>{label}</div>
+        <div style={{ fontSize: 12, color: '#2a2a2a', flex: 1, lineHeight: 1.5 }}>
+          {link ? <a href={link} target="_blank" rel="noopener noreferrer" style={{ color: gold, textDecoration: 'none' }}>{value}</a> : value}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
+        <StatCard label="Total Sponsors" value={sponsors === null ? '...' : total} />
+        <StatCard label="Acknowledged" value={sponsors === null ? '...' : acknowledged} />
+        <StatCard label="Pending" value={sponsors === null ? '...' : pending} />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 320px' : '1fr', gap: 16 }}>
+        <div>
+          {sponsors === null && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>Loading…</div>}
+          {sponsors !== null && sponsors.length === 0 && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>No sponsors yet.</div>}
+          {sponsors !== null && sponsors.map(function(s) {
+            var isSelected = selected && selected.id === s.id;
+            return (
+              <div key={s.id} onClick={function() { setSelected(isSelected ? null : s); }}
+                style={{ background: isSelected ? '#faf5ee' : '#fff', border: '0.5px solid ' + (isSelected ? gold : '#e8e0d5'), borderRadius: 10, padding: '14px 18px', marginBottom: 10, cursor: 'pointer', transition: 'all 0.15s' }}
+                onMouseEnter={function(e) { if (!isSelected) e.currentTarget.style.background = '#fdfaf6'; }}
+                onMouseLeave={function(e) { if (!isSelected) e.currentTarget.style.background = '#fff'; }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>{s['Business Name']}</div>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {s['Main Contact'] && <span style={{ fontSize: 12, color: '#666' }}>{s['Main Contact']}</span>}
+                      {s['Area Supported'] && <span style={{ fontSize: 12, color: '#aaa' }}>{s['Area Supported']}</span>}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    {s['Fair Market Value'] && <div style={{ fontSize: 13, fontWeight: 600, color: gold, marginBottom: 4 }}>{s['Fair Market Value']}</div>}
+                    {s['Acknowledged']
+                      ? <span style={{ fontSize: 10, background: '#e8f5e9', color: '#2e7d32', borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>Acknowledged</span>
+                      : <span style={{ fontSize: 10, background: '#fff8e1', color: '#b8860b', borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>Pending</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {selected && (
+          <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '20px 22px', alignSelf: 'start', position: 'sticky', top: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', lineHeight: 1.3, flex: 1, paddingRight: 8 }}>{selected['Business Name']}</div>
+              <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb', lineHeight: 1, flexShrink: 0 }}>×</button>
+            </div>
+            {selected['Acknowledged']
+              ? <span style={{ fontSize: 10, background: '#e8f5e9', color: '#2e7d32', borderRadius: 20, padding: '2px 10px', fontWeight: 600, display: 'inline-block', marginBottom: 16 }}>Acknowledged</span>
+              : <span style={{ fontSize: 10, background: '#fff8e1', color: '#b8860b', borderRadius: 20, padding: '2px 10px', fontWeight: 600, display: 'inline-block', marginBottom: 16 }}>Pending Acknowledgment</span>}
+            <InfoRow label="Main Contact" value={selected['Main Contact']} />
+            <InfoRow label="Donation" value={selected['Donation']} />
+            <InfoRow label="Fair Market Value" value={selected['Fair Market Value']} />
+            <InfoRow label="Area Supported" value={selected['Area Supported']} />
+            <InfoRow label="NSH Contact" value={selected['NSH Contact']} />
+            <InfoRow label="Phone" value={selected['Phone Number']} />
+            <InfoRow label="Email" value={selected['Email Address']} link={'mailto:' + selected['Email Address']} />
+            <InfoRow label="Mailing Address" value={selected['Mailing Address']} />
+            <InfoRow label="Date Received" value={selected['Date Recieved']} />
+            {selected['Notes'] && (
+              <div style={{ marginTop: 12, background: '#faf8f5', borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ fontSize: 11, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 }}>Notes</div>
+                <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>{selected['Notes']}</div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
   events: EventsView,
@@ -2756,6 +2818,7 @@ const views = {
   donors: DonorsView,
   marketing: MarketingView,
   board: BoardView,
+  sponsors: SponsorsView,
   strategy: StrategyView,
   operational: OperationalView,
 };
