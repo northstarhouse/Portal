@@ -2003,26 +2003,33 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
         </div>
         <div style={{ background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '16px 20px' }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 }}>Quarterly Schedule</div>
-          {[
-            { q: 'Q1', dates: 'Jan 1 – Mar 31', due: 'Mar 31', champion: 'Apr 2', board: 'Apr 16' },
-            { q: 'Q2', dates: 'Apr 1 – Jun 30', due: 'Jun 30', champion: 'Jul 2', board: 'Jul 16' },
-            { q: 'Q3', dates: 'Jul 1 – Sep 30', due: 'Sep 30', champion: 'Oct 1', board: 'Oct 15' },
-            { q: 'Q4', dates: 'Oct 1 – Dec 31', due: 'Dec 10', champion: 'Dec 10', board: 'Dec 17' },
-          ].map(function(q) {
-            var isCurrent = q.q === quarter;
-            return (
-              <div key={q.q} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '0.5px solid #ede5d8', opacity: isCurrent ? 1 : 0.55 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: isCurrent ? gold : '#888' }}>{q.q}</span>
-                  <span style={{ fontSize: 11, color: '#aaa' }}>{q.dates}</span>
-                  {isCurrent && <span style={{ fontSize: 10, background: gold, color: '#fff', borderRadius: 20, padding: '1px 7px', fontWeight: 600 }}>Current</span>}
+          {(function() {
+            var all = [
+              { q: 'Q1', dates: 'Jan 1 – Mar 31', due: 'Mar 31', champion: 'Apr 2', board: 'Apr 16' },
+              { q: 'Q2', dates: 'Apr 1 – Jun 30', due: 'Jun 30', champion: 'Jul 2', board: 'Jul 16' },
+              { q: 'Q3', dates: 'Jul 1 – Sep 30', due: 'Sep 30', champion: 'Oct 1', board: 'Oct 15' },
+              { q: 'Q4', dates: 'Oct 1 – Dec 31', due: 'Dec 10', champion: 'Dec 10', board: 'Dec 17' },
+            ];
+            var ci = all.findIndex(function(x) { return x.q === quarter; });
+            var next = all[(ci + 1) % 4];
+            var visible = [all[ci], next];
+            return visible.map(function(q, idx) {
+              var isCurrent = idx === 0;
+              return (
+                <div key={q.q} style={{ marginBottom: idx === 0 ? 10 : 0, paddingBottom: idx === 0 ? 10 : 0, borderBottom: idx === 0 ? '0.5px solid #ede5d8' : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: isCurrent ? gold : '#888' }}>{q.q}</span>
+                    <span style={{ fontSize: 11, color: '#aaa' }}>{q.dates}</span>
+                    {isCurrent && <span style={{ fontSize: 10, background: gold, color: '#fff', borderRadius: 20, padding: '1px 7px', fontWeight: 600 }}>Current</span>}
+                    {!isCurrent && <span style={{ fontSize: 10, color: '#bbb', fontStyle: 'italic' }}>Up next</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: isCurrent ? '#777' : '#aaa', lineHeight: 1.8, paddingLeft: 2 }}>
+                    <span style={{ color: isCurrent ? '#999' : '#bbb' }}>Due:</span> {q.due} &nbsp;·&nbsp; <span style={{ color: isCurrent ? '#999' : '#bbb' }}>Co-Champions:</span> {q.champion} &nbsp;·&nbsp; <span style={{ color: isCurrent ? '#999' : '#bbb' }}>Board:</span> {q.board}
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: '#777', lineHeight: 1.8, paddingLeft: 2 }}>
-                  <span style={{ color: '#999' }}>Due:</span> {q.due} &nbsp;·&nbsp; <span style={{ color: '#999' }}>Co-Champions:</span> {q.champion} &nbsp;·&nbsp; <span style={{ color: '#999' }}>Board:</span> {q.board}
-                </div>
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
         </div>
       </div>
       <form onSubmit={handleSubmit}>
