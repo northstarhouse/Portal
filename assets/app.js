@@ -171,6 +171,7 @@
     const [donationTotal, setDonationTotal] = useState(null);
     const [activeVols, setActiveVols] = useState(null);
     const [calEvents, setCalEvents] = useState(null);
+    const [birthdays, setBirthdays] = useState(null);
     useEffect(function() {
       sbFetch("2026 Donations", ["Amount"]).then(function(rows) {
         if (!Array.isArray(rows)) return;
@@ -179,11 +180,32 @@
         }, 0);
         setDonationTotal(total);
       });
-      sbFetch("2026 Volunteers", ["Status"]).then(function(rows) {
+      sbFetch("2026 Volunteers", ["Status", "First Name", "Last Name", "Birthday", "Picture URL"]).then(function(rows) {
         if (!Array.isArray(rows)) return;
         setActiveVols(rows.filter(function(r) {
           return r["Status"] === "Active";
         }).length);
+        var today = /* @__PURE__ */ new Date();
+        today.setHours(0, 0, 0, 0);
+        var windowEnd = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1e3);
+        var upcoming = rows.filter(function(r) {
+          if (!r["Birthday"]) return false;
+          var parts = r["Birthday"].split("-");
+          if (parts.length < 3) return false;
+          var mo = parseInt(parts[1]) - 1, dy = parseInt(parts[2]);
+          var thisYear = new Date(today.getFullYear(), mo, dy);
+          var nextYear = new Date(today.getFullYear() + 1, mo, dy);
+          return thisYear >= today && thisYear <= windowEnd || nextYear >= today && nextYear <= windowEnd;
+        }).map(function(r) {
+          var parts = r["Birthday"].split("-");
+          var mo = parseInt(parts[1]) - 1, dy = parseInt(parts[2]);
+          var thisYear = new Date(today.getFullYear(), mo, dy);
+          var bday = thisYear >= today ? thisYear : new Date(today.getFullYear() + 1, mo, dy);
+          return Object.assign({}, r, { _bday: bday });
+        }).sort(function(a, b) {
+          return a._bday - b._bday;
+        });
+        setBirthdays(upcoming);
       });
       fetchCalendarEvents().then(function(events) {
         var now = /* @__PURE__ */ new Date();
@@ -230,7 +252,7 @@
       navigate("donors");
     }, style: { cursor: "pointer" } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Donations", value: donationTotal === null ? "..." : "$" + donationTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })), /* @__PURE__ */ React.createElement("div", { onClick: function() {
       navigate("volunteers");
-    }, style: { cursor: "pointer" } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Active Volunteers", value: activeVols === null ? "..." : activeVols })), /* @__PURE__ */ React.createElement(StatCard, { label: "2026 Events", value: "5", sub: "on the books" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Active Sponsors", value: "3", sub: "+ 1 in review" })), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("svg", { width: 13, height: 13, viewBox: "0 0 24 24", fill: "none", stroke: gold, strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "4", width: "18", height: "18", rx: "2" }), /* @__PURE__ */ React.createElement("line", { x1: "16", y1: "2", x2: "16", y2: "6" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "2", x2: "8", y2: "6" }), /* @__PURE__ */ React.createElement("line", { x1: "3", y1: "10", x2: "21", y2: "10" })), "Happening Soon at North Star House"), calEvents === null && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777" } }, "Loading\u2026"), calEvents !== null && calEvents.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777" } }, "No upcoming events in the next 2 weeks."), calEvents !== null && calEvents.map(function(ev, i) {
+    }, style: { cursor: "pointer" } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Active Volunteers", value: activeVols === null ? "..." : activeVols })), /* @__PURE__ */ React.createElement(StatCard, { label: "2026 Events", value: "5", sub: "on the books" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Active Sponsors", value: "3", sub: "+ 1 in review" })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("svg", { width: 13, height: 13, viewBox: "0 0 24 24", fill: "none", stroke: gold, strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "4", width: "18", height: "18", rx: "2" }), /* @__PURE__ */ React.createElement("line", { x1: "16", y1: "2", x2: "16", y2: "6" }), /* @__PURE__ */ React.createElement("line", { x1: "8", y1: "2", x2: "8", y2: "6" }), /* @__PURE__ */ React.createElement("line", { x1: "3", y1: "10", x2: "21", y2: "10" })), "Happening Soon at North Star House"), calEvents === null && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777" } }, "Loading\u2026"), calEvents !== null && calEvents.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777" } }, "No upcoming events in the next 2 weeks."), calEvents !== null && calEvents.map(function(ev, i) {
       var start = parseIcalDate(ev["DTSTART"]);
       var isAllDay = ev["DTSTART"] && ev["DTSTART"].replace(/[^0-9TZ]/g, "").length === 8;
       var dayStr = start ? start.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "";
@@ -268,7 +290,11 @@
       var label = isDocent ? "Docent Tour" : isEstate ? "Estate Tour" : isWedding ? "Wedding" : isCommittee ? "Committee" : isMeeting ? "Meeting" : isCreative ? "Creative" : isEvent ? "Event" : isGoals ? "Goals" : "Other";
       var labelBg = isDocent ? "#e8f5e9" : isEstate ? "#fce4ec" : isWedding ? "#ffebee" : isCommittee ? "#fff3e0" : isMeeting ? "#fff9c4" : isCreative ? "#e0f7fa" : isEvent ? "#e3f2fd" : isGoals ? "#fff8e1" : "#f0ebe2";
       return /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 10, background: isToday ? "#fffbf0" : "transparent", border: isToday ? "0.5px solid #e8d9b0" : "none", borderRadius: isToday ? 8 : 0, padding: isToday ? "8px 10px" : "2px 0" } }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 6, height: 6, borderRadius: "50%", background: dotColor, marginTop: 5, flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, fontWeight: isToday ? 700 : 500, color: "#2a2a2a" } }, title), isToday && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: gold, textTransform: "uppercase", letterSpacing: 0.8 } }, "Today")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777", marginTop: 2 } }, dayStr, timeStr !== "All day" ? " \xB7 " + timeStr : "")), label && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, background: labelBg, color: dotColor, borderRadius: 20, fontWeight: 500, flexShrink: 0, width: 90, textAlign: "center", display: "inline-block", padding: "2px 0" } }, label));
-    }), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: "0.5px solid #f0ebe2", fontSize: 12, color: "#999" } }, "Synced from Google Calendar"))));
+    }), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: "0.5px solid #f0ebe2", fontSize: 12, color: "#999" } }, "Synced from Google Calendar")), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("svg", { width: 13, height: 13, viewBox: "0 0 24 24", fill: "none", stroke: gold, strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }), /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "7", r: "4" })), "Upcoming Birthdays"), birthdays === null && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#aaa" } }, "Loading\u2026"), birthdays !== null && birthdays.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#aaa", fontStyle: "italic" } }, "No birthdays in the next 30 days."), birthdays !== null && birthdays.map(function(v, i) {
+      var isToday = v._bday.toDateString() === (/* @__PURE__ */ new Date()).toDateString();
+      var dayStr = v._bday.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      return /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 12, background: isToday ? "#fffbf0" : "transparent", border: isToday ? "0.5px solid #e8d9b0" : "none", borderRadius: isToday ? 8 : 0, padding: isToday ? "8px 10px" : "2px 0" } }, v["Picture URL"] ? /* @__PURE__ */ React.createElement("img", { src: driveImg(v["Picture URL"]), alt: v["First Name"], style: { width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 } }) : /* @__PURE__ */ React.createElement("div", { style: { width: 36, height: 36, borderRadius: "50%", background: "#f0ebe2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: gold, flexShrink: 0 } }, (v["First Name"] || "?")[0]), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, v["First Name"], " ", v["Last Name"]), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#888", marginTop: 1 } }, dayStr, isToday ? " \u{1F382}" : "")));
+    }))));
   }
   function EventsView() {
     return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 } }, /* @__PURE__ */ React.createElement(StatCard, { label: "Total Events", value: "5", sub: "next 90 days" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Confirmed", value: "3" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Est. Revenue", value: "$6,600", sub: "confirmed only" }), /* @__PURE__ */ React.createElement(StatCard, { label: "Est. Guests", value: "395", sub: "across all events" })), /* @__PURE__ */ React.createElement(
