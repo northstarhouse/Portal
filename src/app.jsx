@@ -2712,9 +2712,14 @@ function OperationalView({ opArea, navigateToQuarterly }) {
 }
 
 function SponsorsView() {
-  var { useState, useEffect } = React;
+  var { useState, useEffect, useRef } = React;
   var [sponsors, setSponsors] = useState(null);
   var [selected, setSelected] = useState(null);
+  var [acks, setAcks] = useState([]);
+  var [ackForm, setAckForm] = useState({ date: new Date().toISOString().slice(0,10), method: '', notes: '' });
+  var [ackSaving, setAckSaving] = useState(false);
+  var [logoUploading, setLogoUploading] = useState(false);
+  var logoInputRef = useRef(null);
 
   useEffect(function() {
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?select=*&order=id.asc', {
@@ -2724,9 +2729,67 @@ function SponsorsView() {
     });
   }, []);
 
-  var total = sponsors ? sponsors.length : 0;
-  var acknowledged = sponsors ? sponsors.filter(function(s) { return s['Acknowledged']; }).length : 0;
-  var pending = total - acknowledged;
+  useEffect(function() {
+    if (!selected) { setAcks([]); return; }
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor Acknowledgments') + '?sponsor_id=eq.' + selected.id + '&select=*&order=date.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setAcks(rows);
+    });
+  }, [selected]);
+
+  function selectSponsor(s) {
+    setSelected(s);
+    setAckForm({ date: new Date().toISOString().slice(0,10), method: '', notes: '' });
+  }
+
+  function handleLogoUpload(e) {
+    var file = e.target.files[0];
+    if (!file || !selected) return;
+    setLogoUploading(true);
+    var ext = file.name.split('.').pop();
+    var filename = 'sponsor-' + selected.id + '-' + Date.now() + '.' + ext;
+    fetch(SUPABASE_URL + '/storage/v1/object/sponsor-logos/' + filename, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
+      body: file
+    }).then(function() {
+      var url = SUPABASE_URL + '/storage/v1/object/public/sponsor-logos/' + filename;
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?id=eq.' + selected.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logo_url: url })
+      }).then(function() {
+        var updated = Object.assign({}, selected, { logo_url: url });
+        setSelected(updated);
+        setSponsors(function(prev) { return prev.map(function(s) { return s.id === selected.id ? updated : s; }); });
+        setLogoUploading(false);
+        e.target.value = '';
+      });
+    }).catch(function() { setLogoUploading(false); });
+  }
+
+  function submitAck(e) {
+    e.preventDefault();
+    if (!ackForm.date) return;
+    setAckSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor Acknowledgments'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ sponsor_id: selected.id, date: ackForm.date, method: ackForm.method || null, notes: ackForm.notes || null })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setAckSaving(false);
+      if (Array.isArray(rows) && rows[0]) setAcks(function(prev) { return [rows[0]].concat(prev); });
+      setAckForm({ date: new Date().toISOString().slice(0,10), method: '', notes: '' });
+    }).catch(function() { setAckSaving(false); });
+  }
+
+  function deleteAck(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor Acknowledgments') + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() { setAcks(function(prev) { return prev.filter(function(a) { return a.id !== id; }); }); });
+  }
 
   function InfoRow({ label, value, link }) {
     if (!value) return null;
@@ -2740,40 +2803,37 @@ function SponsorsView() {
     );
   }
 
+  var inpStyle = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, background: '#fff', boxSizing: 'border-box' };
+
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
-        <StatCard label="Total Sponsors" value={sponsors === null ? '...' : total} />
-        <StatCard label="Acknowledged" value={sponsors === null ? '...' : acknowledged} />
-        <StatCard label="Pending" value={sponsors === null ? '...' : pending} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1,1fr)', gap: 12, marginBottom: 24 }}>
+        <StatCard label="Total Sponsors" value={sponsors === null ? '...' : sponsors.length} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 320px' : '1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 360px' : '1fr', gap: 16 }}>
         <div>
           {sponsors === null && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>Loading…</div>}
           {sponsors !== null && sponsors.length === 0 && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>No sponsors yet.</div>}
           {sponsors !== null && sponsors.map(function(s) {
             var isSelected = selected && selected.id === s.id;
             return (
-              <div key={s.id} onClick={function() { setSelected(isSelected ? null : s); }}
-                style={{ background: isSelected ? '#faf5ee' : '#fff', border: '0.5px solid ' + (isSelected ? gold : '#e8e0d5'), borderRadius: 10, padding: '14px 18px', marginBottom: 10, cursor: 'pointer', transition: 'all 0.15s' }}
+              <div key={s.id} onClick={function() { selectSponsor(isSelected ? null : s); }}
+                style={{ background: isSelected ? '#faf5ee' : '#fff', border: '0.5px solid ' + (isSelected ? gold : '#e8e0d5'), borderRadius: 10, padding: '14px 18px', marginBottom: 10, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 14 }}
                 onMouseEnter={function(e) { if (!isSelected) e.currentTarget.style.background = '#fdfaf6'; }}
-                onMouseLeave={function(e) { if (!isSelected) e.currentTarget.style.background = '#fff'; }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>{s['Business Name']}</div>
-                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                      {s['Main Contact'] && <span style={{ fontSize: 12, color: '#666' }}>{s['Main Contact']}</span>}
-                      {s['Area Supported'] && <span style={{ fontSize: 12, color: '#aaa' }}>{s['Area Supported']}</span>}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    {s['Fair Market Value'] && <div style={{ fontSize: 13, fontWeight: 600, color: gold, marginBottom: 4 }}>{s['Fair Market Value']}</div>}
-                    {s['Acknowledged']
-                      ? <span style={{ fontSize: 10, background: '#e8f5e9', color: '#2e7d32', borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>Acknowledged</span>
-                      : <span style={{ fontSize: 10, background: '#fff8e1', color: '#b8860b', borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>Pending</span>}
+                onMouseLeave={function(e) { if (!isSelected) e.currentTarget.style.background = isSelected ? '#faf5ee' : '#fff'; }}>
+                {s.logo_url
+                  ? <img src={s.logo_url} alt={s['Business Name']} style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 6, flexShrink: 0, border: '0.5px solid #e8e0d5' }} />
+                  : <div style={{ width: 44, height: 44, borderRadius: 6, background: '#f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: gold, flexShrink: 0 }}>{(s['Business Name'] || '?')[0]}</div>
+                }
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 3 }}>{s['Business Name']}</div>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {s['Main Contact'] && <span style={{ fontSize: 12, color: '#666' }}>{s['Main Contact']}</span>}
+                    {s['Area Supported'] && <span style={{ fontSize: 12, color: '#aaa' }}>{s['Area Supported']}</span>}
                   </div>
                 </div>
+                {s['Fair Market Value'] && <div style={{ fontSize: 13, fontWeight: 600, color: gold, flexShrink: 0 }}>{s['Fair Market Value']}</div>}
               </div>
             );
           })}
@@ -2781,13 +2841,26 @@ function SponsorsView() {
 
         {selected && (
           <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '20px 22px', alignSelf: 'start', position: 'sticky', top: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', lineHeight: 1.3, flex: 1, paddingRight: 8 }}>{selected['Business Name']}</div>
               <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb', lineHeight: 1, flexShrink: 0 }}>×</button>
             </div>
-            {selected['Acknowledged']
-              ? <span style={{ fontSize: 10, background: '#e8f5e9', color: '#2e7d32', borderRadius: 20, padding: '2px 10px', fontWeight: 600, display: 'inline-block', marginBottom: 16 }}>Acknowledged</span>
-              : <span style={{ fontSize: 10, background: '#fff8e1', color: '#b8860b', borderRadius: 20, padding: '2px 10px', fontWeight: 600, display: 'inline-block', marginBottom: 16 }}>Pending Acknowledgment</span>}
+
+            {/* Logo */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, marginBottom: 8 }}>Logo</div>
+              {selected.logo_url
+                ? <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <img src={selected.logo_url} alt="logo" style={{ maxHeight: 60, maxWidth: 160, objectFit: 'contain', border: '0.5px solid #e8e0d5', borderRadius: 6, padding: 4 }} />
+                    <button onClick={function() { logoInputRef.current.click(); }} disabled={logoUploading} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{logoUploading ? 'Uploading…' : 'Replace'}</button>
+                  </div>
+                : <button onClick={function() { logoInputRef.current.click(); }} disabled={logoUploading} style={{ fontSize: 12, color: gold, background: '#faf8f5', border: '0.5px dashed ' + gold, borderRadius: 8, padding: '10px 16px', cursor: 'pointer', width: '100%' }}>{logoUploading ? 'Uploading…' : '+ Upload Logo'}</button>
+              }
+              <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoUpload} />
+            </div>
+
+            {/* Info */}
             <InfoRow label="Main Contact" value={selected['Main Contact']} />
             <InfoRow label="Donation" value={selected['Donation']} />
             <InfoRow label="Fair Market Value" value={selected['Fair Market Value']} />
@@ -2798,11 +2871,50 @@ function SponsorsView() {
             <InfoRow label="Mailing Address" value={selected['Mailing Address']} />
             <InfoRow label="Date Received" value={selected['Date Recieved']} />
             {selected['Notes'] && (
-              <div style={{ marginTop: 12, background: '#faf8f5', borderRadius: 8, padding: '10px 14px' }}>
+              <div style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', marginBottom: 18 }}>
                 <div style={{ fontSize: 11, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 }}>Notes</div>
                 <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>{selected['Notes']}</div>
               </div>
             )}
+
+            {/* Acknowledgments */}
+            <div style={{ borderTop: '0.5px solid #f0ece6', paddingTop: 16, marginTop: 8 }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, marginBottom: 12 }}>Acknowledgment Log</div>
+              <form onSubmit={submitAck} style={{ background: '#faf8f5', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Date</div>
+                    <input type="date" value={ackForm.date} onChange={function(e) { setAckForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={inpStyle} required />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Method</div>
+                    <input value={ackForm.method} onChange={function(e) { setAckForm(function(f) { return Object.assign({}, f, { method: e.target.value }); }); }} style={inpStyle} placeholder="Letter, email, call…" />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Notes</div>
+                  <textarea value={ackForm.notes} onChange={function(e) { setAckForm(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={2} style={Object.assign({}, inpStyle, { resize: 'vertical' })} placeholder="Details…" />
+                </div>
+                <button type="submit" disabled={ackSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: ackSaving ? 0.7 : 1, width: '100%' }}>{ackSaving ? 'Saving…' : 'Log Acknowledgment'}</button>
+              </form>
+              {acks.length === 0
+                ? <div style={{ fontSize: 12, color: '#ccc', fontStyle: 'italic' }}>No acknowledgments logged yet.</div>
+                : acks.map(function(a) {
+                    return (
+                      <div key={a.id} style={{ padding: '8px 0', borderBottom: '0.5px solid #f5f0ea', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{a.date}</span>
+                            {a.method && <span style={{ fontSize: 11, color: gold, background: '#faf5ee', borderRadius: 20, padding: '1px 8px' }}>{a.method}</span>}
+                          </div>
+                          {a.notes && <div style={{ fontSize: 12, color: '#666', lineHeight: 1.5 }}>{a.notes}</div>}
+                        </div>
+                        <button onClick={function() { deleteAck(a.id); }} style={{ background: 'none', border: 'none', color: '#ddd', fontSize: 14, cursor: 'pointer', flexShrink: 0, padding: '2px 4px' }}>×</button>
+                      </div>
+                    );
+                  })
+              }
+            </div>
           </div>
         )}
       </div>
