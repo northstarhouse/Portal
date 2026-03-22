@@ -268,7 +268,7 @@ const typeColors = {
           <div onClick={function() { navigate('quarterly'); }} style={{ background: "#fce4e4", border: "0.5px solid #e8a0a0", borderRadius: 6, padding: "7px 14px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, cursor: 'pointer' }}
             onMouseEnter={function(e) { e.currentTarget.style.background = '#f8d7d7'; }}
             onMouseLeave={function(e) { e.currentTarget.style.background = '#fce4e4'; }}>
-            <div style={{ fontSize: 13, color: '#c0392b' }}>⏎</div>
+            <div style={{ fontSize: 14, color: '#c0392b' }}>⚠</div>
             <div style={{ fontSize: 12, fontWeight: 500, color: "#c0392b" }}>Quarterly Update Due — {dueStr}</div>
             <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 600, color: '#c0392b', flexShrink: 0 }}>{label} →</div>
           </div>

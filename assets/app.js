@@ -221,7 +221,7 @@
             e.currentTarget.style.background = "#fce4e4";
           }
         },
-        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#c0392b" } }, "\u23CE"),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "#c0392b" } }, "\u26A0"),
         /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: "#c0392b" } }, "Quarterly Update Due \u2014 ", dueStr),
         /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", fontSize: 12, fontWeight: 600, color: "#c0392b", flexShrink: 0 } }, label, " \u2192")
       );
