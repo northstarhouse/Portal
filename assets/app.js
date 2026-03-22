@@ -1486,7 +1486,7 @@
   function nextQ(q, yr) {
     return q === "Q1" ? { q: "Q2", yr } : q === "Q2" ? { q: "Q3", yr } : q === "Q3" ? { q: "Q4", yr } : { q: "Q1", yr: yr + 1 };
   }
-  function QuarterlyView() {
+  function QuarterlyView({ navigateOp }) {
     var { useState: useState2, useEffect: useEffect2 } = React;
     var cq = currentQuarterStr();
     var cy = (/* @__PURE__ */ new Date()).getFullYear();
@@ -1560,11 +1560,14 @@
         ]);
       }).then(function() {
         setSaving(false);
-        setSaved(true);
-        setForm(emptyForm);
-        setTimeout(function() {
-          setSaved(false);
-        }, 4e3);
+        if (navigateOp && area) {
+          navigateOp(area);
+        } else {
+          setSaved(true);
+          setTimeout(function() {
+            setSaved(false);
+          }, 4e3);
+        }
       });
     }
     var secStyle = { fontSize: 12, textTransform: "uppercase", letterSpacing: 1.2, color: "#888", fontWeight: 600, marginBottom: 12, marginTop: 4, display: "block" };
@@ -1665,12 +1668,14 @@
     var [noteVal, setNoteVal] = useState2("");
     var [noteSaving, setNoteSaving] = useState2(null);
     var [quarterGoals, setQuarterGoals] = useState2(null);
+    var [flippedGoals, setFlippedGoals] = useState2({});
     var cq = currentQuarterStr();
     useEffect2(function() {
       setAreaInfo(null);
       setBudget([]);
       setVols([]);
       setQuarterGoals(null);
+      setFlippedGoals({});
       setEditLead(false);
       fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Quarter Goals") + "?area=eq." + encodeURIComponent(area) + "&quarter=eq." + encodeURIComponent(cq) + "&year=eq." + (/* @__PURE__ */ new Date()).getFullYear() + "&select=*", {
         headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
@@ -1696,13 +1701,7 @@
       }).then(function(rows) {
         if (Array.isArray(rows)) setBudget(rows);
       });
-      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("2026 Volunteers") + "?select=" + ["id", "First Name", "Last Name", "Team", "Notes", "Overview Notes", "Status", "Picture URL"].map(function(c) {
-        return encodeURIComponent(c);
-      }).join(","), {
-        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
-      }).then(function(r) {
-        return r.json();
-      }).then(function(rows) {
+      sbFetch("2026 Volunteers", ["id", "First Name", "Last Name", "Team", "Notes", "Overview Notes", "Status", "Picture URL", "Phone Number", "Email"]).then(function(rows) {
         if (!Array.isArray(rows)) return;
         setVols(rows.filter(function(v) {
           if (!v.Team) return false;
@@ -1853,14 +1852,35 @@
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: "#2a2a2a" } }, vols.length),
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 4 } }, "assigned to ", area),
       /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 } }, "View / Add notes \u2192")
-    ))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 280px", gap: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 12, padding: "18px 24px", border: "0.5px solid #e8e0d5" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 } }, cq, " ", (/* @__PURE__ */ new Date()).getFullYear(), " Goals"), quarterGoals ? /* @__PURE__ */ React.createElement("div", null, quarterGoals.primary_focus && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#aaa", fontWeight: 600 } }, "Primary Focus"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", marginTop: 3, lineHeight: 1.5 } }, quarterGoals.primary_focus)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, [["goal_1", "goal_1_status", "goal_1_summary"], ["goal_2", "goal_2_status", "goal_2_summary"], ["goal_3", "goal_3_status", "goal_3_summary"]].map(function(keys, i) {
+    ))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 280px", gap: 16, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 12, padding: "18px 24px", border: "0.5px solid #e8e0d5" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 } }, cq, " ", (/* @__PURE__ */ new Date()).getFullYear(), " Goals"), quarterGoals ? /* @__PURE__ */ React.createElement("div", null, quarterGoals.primary_focus && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#aaa", fontWeight: 600 } }, "Primary Focus"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2a2a2a", marginTop: 3, lineHeight: 1.5 } }, quarterGoals.primary_focus)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [["goal_1", "goal_1_status", "goal_1_summary"], ["goal_2", "goal_2_status", "goal_2_summary"], ["goal_3", "goal_3_status", "goal_3_summary"]].map(function(keys, i) {
       var g = quarterGoals[keys[0]];
       if (!g) return null;
       var st = quarterGoals[keys[1]];
       var sm = quarterGoals[keys[2]];
       var stColors = { "On Track": { bg: "#eaf3ea", color: "#3a7d3a" }, "Behind": { bg: "#fff3e0", color: "#c07040" }, "Complete": { bg: "#e8f5e9", color: "#2e7d32" }, "At Risk": { bg: "#fdecea", color: "#c62828" } };
       var sc = st && stColors[st] ? stColors[st] : null;
-      return /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#aaa", fontWeight: 600 } }, "Goal ", i + 1), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8, marginTop: 3, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#2a2a2a", flex: 1, lineHeight: 1.5 } }, g), sc && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: sc.bg, color: sc.color, flexShrink: 0 } }, st)), sm && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#777", marginTop: 2 } }, sm));
+      var hasReflection = !!(st || sm);
+      var isFlipped = !!flippedGoals[i];
+      return /* @__PURE__ */ React.createElement("div", { key: i, style: { perspective: "900px" } }, /* @__PURE__ */ React.createElement("div", { style: {
+        position: "relative",
+        width: "100%",
+        transformStyle: "preserve-3d",
+        transition: "transform 0.45s cubic-bezier(0.4,0,0.2,1)",
+        transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+        minHeight: 64
+      } }, /* @__PURE__ */ React.createElement("div", { style: { backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", background: "#faf8f5", borderRadius: 8, padding: "10px 12px", border: "0.5px solid #e8e0d5" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#bbb", fontWeight: 600 } }, "Goal ", i + 1), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#2a2a2a", marginTop: 2, lineHeight: 1.5 } }, g)), hasReflection && /* @__PURE__ */ React.createElement("button", { onClick: function() {
+        setFlippedGoals(function(f) {
+          var n = Object.assign({}, f);
+          n[i] = true;
+          return n;
+        });
+      }, style: { flexShrink: 0, fontSize: 11, color: gold, background: "none", border: "0.5px solid " + gold, borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontWeight: 500, marginTop: 1, whiteSpace: "nowrap" } }, "\u21A9 Reflection"))), /* @__PURE__ */ React.createElement("div", { style: { backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)", position: "absolute", top: 0, left: 0, width: "100%", minHeight: "100%", background: sc ? sc.bg : "#f5f0ea", borderRadius: 8, padding: "10px 12px", border: "0.5px solid " + (sc ? sc.color + "44" : "#e8e0d5"), boxSizing: "border-box" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 4 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#bbb", fontWeight: 600 } }, "Goal ", i + 1, " \u2014 Reflection"), sc && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: "#fff", color: sc.color } }, st)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: sc ? sc.color : "#555", lineHeight: 1.5 } }, sm || /* @__PURE__ */ React.createElement("span", { style: { fontStyle: "italic", color: "#aaa" } }, "No notes submitted."))), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+        setFlippedGoals(function(f) {
+          var n = Object.assign({}, f);
+          n[i] = false;
+          return n;
+        });
+      }, style: { flexShrink: 0, fontSize: 11, color: "#888", background: "none", border: "0.5px solid #ccc", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontWeight: 500, marginTop: 1, whiteSpace: "nowrap" } }, "\u2190 Goal")))));
     }))) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ccc", fontStyle: "italic" } }, "No goals set for ", cq, " yet. Submit a quarterly update to populate.")), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 12, padding: "18px 24px", border: "0.5px solid #e8e0d5" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 } }, "Area Resources"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ccc", fontStyle: "italic" } }, "No resources added yet."))), showBudget && /* @__PURE__ */ React.createElement("div", { onClick: function() {
       setShowBudget(false);
     }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.32)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1010, padding: 20 } }, /* @__PURE__ */ React.createElement("div", { onClick: function(e) {
@@ -1901,7 +1921,9 @@
       setShowVols(false);
     }, style: { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#bbb" } }, "x")), vols.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#bbb", fontSize: 13, textAlign: "center", padding: "30px 0" } }, "No volunteers assigned to ", area, ".") : vols.map(function(v) {
       var isEditing = noteEdit === v.id;
-      return /* @__PURE__ */ React.createElement("div", { key: v.id, style: { borderBottom: "0.5px solid #f0ece6", paddingBottom: 14, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" } }, v["Picture URL"] ? /* @__PURE__ */ React.createElement("img", { src: driveImg(v["Picture URL"]), alt: v["First Name"], style: { width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 } }) : /* @__PURE__ */ React.createElement("div", { style: { width: 32, height: 32, borderRadius: "50%", background: "#f0ece6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 600, color: "#999", flexShrink: 0 } }, (v["First Name"] || "?")[0]), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: "#2a2a2a" } }, v["First Name"], " ", v["Last Name"]), v["Overview Notes"] && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc" } }, "\u2014"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#777" } }, v["Overview Notes"])), /* @__PURE__ */ React.createElement(
+      return /* @__PURE__ */ React.createElement("div", { key: v.id, style: { borderBottom: "0.5px solid #f0ece6", paddingBottom: 14, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" } }, v["Picture URL"] ? /* @__PURE__ */ React.createElement("img", { src: driveImg(v["Picture URL"]), alt: v["First Name"], style: { width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 } }) : /* @__PURE__ */ React.createElement("div", { style: { width: 32, height: 32, borderRadius: "50%", background: "#f0ece6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 600, color: "#999", flexShrink: 0 } }, (v["First Name"] || "?")[0]), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: "#2a2a2a" } }, v["First Name"], " ", v["Last Name"]), v["Phone Number"] || v["Email"] ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#888", marginTop: 1 } }, [v["Phone Number"], v["Email"]].filter(function(x) {
+        return x && x.trim();
+      }).join(" | ")) : null), v["Overview Notes"] && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "#ccc" } }, "\u2014"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#777" } }, v["Overview Notes"])), /* @__PURE__ */ React.createElement(
         "select",
         {
           value: v.Status || "Active",
@@ -2026,7 +2048,10 @@
         },
         area
       );
-    })))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#fdfcfb", padding: "24px 32px 18px", borderBottom: "3px solid rgba(136,108,68,0.35)", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(NavIcon, { id: active, active: true })), /* @__PURE__ */ React.createElement("h1", { style: { margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" } }, mod && mod.label))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: "28px 32px" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900 } }, /* @__PURE__ */ React.createElement(View, { navigate: setActive, opArea })))));
+    })))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" } }, /* @__PURE__ */ React.createElement("div", { style: { background: "#fdfcfb", padding: "24px 32px 18px", borderBottom: "3px solid rgba(136,108,68,0.35)", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(NavIcon, { id: active, active: true })), /* @__PURE__ */ React.createElement("h1", { style: { margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" } }, mod && mod.label))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, padding: "28px 32px" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 900 } }, /* @__PURE__ */ React.createElement(View, { navigate: setActive, opArea, navigateOp: function(a) {
+      setOpArea(a);
+      setActive("operational");
+    } })))));
   }
   var root = ReactDOM.createRoot(document.getElementById("root"));
   root.render(React.createElement(Dashboard));

@@ -51,9 +51,10 @@ var NAV_ICONS = {
   home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
   quarterly: '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/>',
   volunteers: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-  donors: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  donors: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
   board: '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
   strategy: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  operational: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
 };
 
 function NavIcon({ id, active }) {
@@ -222,6 +223,7 @@ const typeColors = {
   const [donationTotal, setDonationTotal] = useState(null);
   const [activeVols, setActiveVols] = useState(null);
   const [calEvents, setCalEvents] = useState(null);
+  const [birthdays, setBirthdays] = useState(null);
   useEffect(function() {
     sbFetch('2026 Donations', ['Amount']).then(function(rows) {
       if (!Array.isArray(rows)) return;
@@ -230,9 +232,27 @@ const typeColors = {
       }, 0);
       setDonationTotal(total);
     });
-    sbFetch('2026 Volunteers', ['Status']).then(function(rows) {
+    sbFetch('2026 Volunteers', ['Status', 'First Name', 'Last Name', 'Birthday', 'Picture URL']).then(function(rows) {
       if (!Array.isArray(rows)) return;
       setActiveVols(rows.filter(function(r) { return r['Status'] === 'Active'; }).length);
+      var today = new Date(); today.setHours(0,0,0,0);
+      var windowEnd = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+      var upcoming = rows.filter(function(r) {
+        if (!r['Birthday']) return false;
+        var parts = r['Birthday'].split('-');
+        if (parts.length < 3) return false;
+        var mo = parseInt(parts[1]) - 1, dy = parseInt(parts[2]);
+        var thisYear = new Date(today.getFullYear(), mo, dy);
+        var nextYear = new Date(today.getFullYear() + 1, mo, dy);
+        return (thisYear >= today && thisYear <= windowEnd) || (nextYear >= today && nextYear <= windowEnd);
+      }).map(function(r) {
+        var parts = r['Birthday'].split('-');
+        var mo = parseInt(parts[1]) - 1, dy = parseInt(parts[2]);
+        var thisYear = new Date(today.getFullYear(), mo, dy);
+        var bday = thisYear >= today ? thisYear : new Date(today.getFullYear() + 1, mo, dy);
+        return Object.assign({}, r, { _bday: bday });
+      }).sort(function(a, b) { return a._bday - b._bday; });
+      setBirthdays(upcoming);
     });
     fetchCalendarEvents().then(function(events) {
       var now = new Date();
@@ -269,7 +289,7 @@ const typeColors = {
             onMouseEnter={function(e) { e.currentTarget.style.background = '#f8d7d7'; }}
             onMouseLeave={function(e) { e.currentTarget.style.background = '#fce4e4'; }}>
             <div style={{ fontSize: 14, color: '#c0392b' }}>⚠</div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: "#c0392b" }}>Quarterly Update Due — {dueStr}</div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: "#c0392b", fontStyle: 'italic' }}>Quarterly Update Due — {dueStr}</div>
             <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 600, color: '#c0392b', flexShrink: 0 }}>{label} →</div>
           </div>
         );
@@ -282,11 +302,11 @@ const typeColors = {
         <StatCard label="Active Sponsors" value="3" sub="+ 1 in review" />
       </div>
 
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, marginBottom: 16 }}>
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            Happening Soon at North Star House
+            Happening This Week at North Star House
           </div>
           {calEvents === null && <div style={{ fontSize: 12, color: "#777" }}>Loading…</div>}
           {calEvents !== null && calEvents.length === 0 && <div style={{ fontSize: 12, color: "#777" }}>No upcoming events in the next 2 weeks.</div>}
@@ -340,6 +360,34 @@ const typeColors = {
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: "0.5px solid #f0ebe2", fontSize: 12, color: "#999" }}>
             Synced from Google Calendar
           </div>
+        </div>
+
+        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Upcoming Birthdays
+          </div>
+          {birthdays === null && <div style={{ fontSize: 12, color: '#aaa' }}>Loading…</div>}
+          {birthdays !== null && birthdays.length === 0 && <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No birthdays in the next 30 days.</div>}
+          {birthdays !== null && birthdays.map(function(v, i) {
+            var isToday = v._bday.toDateString() === new Date().toDateString();
+            var dayStr = v._bday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, background: isToday ? '#fffbf0' : 'transparent', border: isToday ? '0.5px solid #e8d9b0' : 'none', borderRadius: isToday ? 8 : 0, padding: isToday ? '8px 10px' : '2px 0' }}>
+                {v['Picture URL'] ? (
+                  <img src={driveImg(v['Picture URL'])} alt={v['First Name']} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                ) : (
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#f0ebe2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 600, color: gold, flexShrink: 0 }}>
+                    {(v['First Name'] || '?')[0]}
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v['First Name']} {v['Last Name']}</div>
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{dayStr}{isToday ? ' 🎂' : ''}</div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
       </div>
@@ -412,6 +460,7 @@ var TEAM_COLORS = {
   'Volunteer Exchange': { bg: '#e8f4fd', color: '#0d6eab' },
   'Support List':      { bg: '#f0f4f8', color: '#3a5068' },
   'Venue':             { bg: '#ede7f6', color: '#4527a0' },
+  'Marketing':         { bg: '#fce4ec', color: '#c2185b' },
 };
 var TEAM_OPTIONS = Object.keys(TEAM_COLORS);
 
@@ -496,7 +545,7 @@ var volLabelStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
 var volGrp = { marginBottom: 14 };
 var volSecLabel = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
 
-function VolForm({ form, onChange, saving, onSubmit, title, onCancel }) {
+function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }) {
   return (
     <div onClick={onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
       <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -537,6 +586,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel }) {
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
             <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : 'Save'}</button>
             <button type="button" onClick={onCancel} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
+            {onDelete && <button type="button" onClick={onDelete} style={{ padding: '10px 14px', background: 'transparent', border: '0.5px solid #e8a0a0', borderRadius: 8, fontSize: 12, color: '#c0392b', cursor: 'pointer', fontWeight: 500 }}>Delete</button>}
           </div>
         </form>
       </div>
@@ -653,6 +703,19 @@ function VolunteersView() {
       setShowAdd(false);
       setForm(emptyForm);
     }).catch(function() { setSaving(false); });
+  }
+
+  function handleDeleteVolunteer() {
+    if (!selected) return;
+    if (!window.confirm('Delete ' + selected['First Name'] + ' ' + selected['Last Name'] + '? This cannot be undone.')) return;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?id=eq.' + selected.id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      setVolunteers(function(prev) { return prev.filter(function(v) { return v.id !== selected.id; }); });
+      setSelected(null);
+      setEditing(false);
+    });
   }
 
   function handleEditSubmit(e) {
@@ -843,6 +906,7 @@ function VolunteersView() {
           title={'Edit — ' + selected['First Name'] + ' ' + selected['Last Name']}
           onSubmit={handleEditSubmit}
           onCancel={function() { setEditing(false); }}
+          onDelete={handleDeleteVolunteer}
         />
       )}
 
@@ -884,7 +948,7 @@ function DonorsView() {
   const [form, setForm] = useState(emptyDonForm);
 
   useEffect(function() {
-    sbFetch('2026 Donations', ['Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes'])
+    sbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes'])
       .then(function(data) {
         if (Array.isArray(data)) setDonations(data.sort(function(a, b) { return new Date(b['Close Date']) - new Date(a['Close Date']); }));
         else setError(JSON.stringify(data));
@@ -915,6 +979,22 @@ function DonorsView() {
   var acknowledged = donations.filter(function(r) { return r['Acknowledged'] === true || String(r['Acknowledged']).toUpperCase() === 'TRUE'; }).length;
   var unacknowledged = totalDonors - acknowledged;
 
+  function deleteDonation(d) {
+    if (!window.confirm('Delete this donation from ' + d['Donor Name'] + '? This cannot be undone.')) return;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Donations') + '?id=eq.' + d.id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      setDonations(function(prev) { return prev.filter(function(x) { return x.id !== d.id; }); });
+      setSelected(null);
+    });
+    fetch('https://script.google.com/macros/s/AKfycbxknvigF90NbBe86zrXT6JvRlaDQmvsuYuRYCfOOLISwtzDO3X7hH5TIDH7ALemwCWy/exec', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'delete', sheet: '2026 Donations', 'Donor Name': d['Donor Name'], 'Close Date': d['Close Date'] })
+    });
+  }
+
   function handleDonFormChange(e) {
     var key = e.target.name;
     var val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -934,6 +1014,12 @@ function DonorsView() {
       if (inserted && inserted['Donor Name']) setDonations(function(p) { return p.concat([inserted]); });
       setShowAdd(false);
       setForm(emptyDonForm);
+      // Sync to Google Sheets → triggers thank you letter generation
+      fetch('https://script.google.com/macros/s/AKfycbxknvigF90NbBe86zrXT6JvRlaDQmvsuYuRYCfOOLISwtzDO3X7hH5TIDH7ALemwCWy/exec', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ sheet: '2026 Donations', row: row })
+      });
     }).catch(function() { setSaving(false); });
   }
 
@@ -1055,7 +1141,10 @@ function DonorsView() {
                   {selected['Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Notes</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Notes']}</div></div>}
                 </div>
               </div>
-              <button onClick={function() { setSelected(null); }} style={{ marginTop: 16, width: '100%', padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#999', fontWeight: 500 }}>Close</button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <button onClick={function() { setSelected(null); }} style={{ flex: 1, padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#999', fontWeight: 500 }}>Close</button>
+                <button onClick={function() { deleteDonation(selected); }} style={{ padding: '9px 16px', background: 'transparent', border: '0.5px solid #e8a0a0', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#c0392b', fontWeight: 500 }}>Delete</button>
+              </div>
             </div>
           </div>
         </div>
@@ -1724,7 +1813,7 @@ function quarterDueDate(q, yr) {
 }
 function nextQ(q, yr) { return q === 'Q1' ? {q:'Q2',yr:yr} : q === 'Q2' ? {q:'Q3',yr:yr} : q === 'Q3' ? {q:'Q4',yr:yr} : {q:'Q1',yr:yr+1}; }
 
-function QuarterlyView() {
+function QuarterlyView({ navigateOp }) {
   var { useState, useEffect } = React;
   var cq = currentQuarterStr();
   var cy = new Date().getFullYear();
@@ -1743,7 +1832,19 @@ function QuarterlyView() {
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(quarter) + '&year=eq.' + year + '&select=*', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
-      if (rows && rows[0]) setCurrentGoals(rows[0]);
+      if (rows && rows[0]) {
+        setCurrentGoals(rows[0]);
+        setForm(function(f) {
+          return Object.assign({}, f, {
+            goal_1_status: rows[0].goal_1_status || 'On Track',
+            goal_1_summary: rows[0].goal_1_summary || '',
+            goal_2_status: rows[0].goal_2_status || 'On Track',
+            goal_2_summary: rows[0].goal_2_summary || '',
+            goal_3_status: rows[0].goal_3_status || 'On Track',
+            goal_3_summary: rows[0].goal_3_summary || ''
+          });
+        });
+      }
     });
   }, [area, quarter, year]);
 
@@ -1781,8 +1882,8 @@ function QuarterlyView() {
         currentGoalsUpdate
       ]);
     }).then(function() {
-      setSaving(false); setSaved(true); setForm(emptyForm);
-      setTimeout(function() { setSaved(false); }, 4000);
+      setSaving(false);
+      if (navigateOp && area) { navigateOp(area); } else { setSaved(true); setTimeout(function() { setSaved(false); }, 4000); }
     });
   }
 
@@ -1797,7 +1898,7 @@ function QuarterlyView() {
 
   return (
     <div style={{ maxWidth: "100%" }}>
-      <div style={{ background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 20px', marginBottom: 20, fontSize: 13, color: '#777', lineHeight: 1.6 }}>
+      <div style={{ background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 20px', marginBottom: 20, fontSize: 13, color: '#777', lineHeight: 1.6, fontStyle: 'italic' }}>
         Share quarterly progress, challenges, and support needs for each focus area.
       </div>
       <form onSubmit={handleSubmit}>
@@ -1826,16 +1927,16 @@ function QuarterlyView() {
             <div><label style={lbl}>Date Submitted</label><input readOnly value={new Date().toLocaleDateString('en-US')} style={Object.assign({}, inpStyle, { background: '#f9f7f4', color: '#999' })} /></div>
             <div><label style={lbl}>Due Date</label><input readOnly value={quarterDueDate(quarter, year).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} style={Object.assign({}, inpStyle, { background: '#f9f7f4', color: '#999' })} /></div>
           </div>
-          {currentGoals && (
-            <div style={{ marginTop: 14, padding: '12px 14px', background: '#faf8f5', borderRadius: 6, borderLeft: '3px solid ' + gold }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: gold, fontWeight: 600, marginBottom: 4 }}>Current {quarter} Goals</div>
-              {currentGoals.primary_focus && <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginTop: 4 }}>{currentGoals.primary_focus}</div>}
-            </div>
-          )}
         </div>
 
         <div style={card}>
           <span style={secStyle}>Goal Progress</span>
+          {currentGoals && currentGoals.primary_focus && (
+            <div style={{ marginBottom: 16, padding: '10px 14px', background: '#faf8f5', borderRadius: 6, borderLeft: '3px solid ' + gold }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: gold, fontWeight: 600, marginBottom: 4 }}>Primary Focus — {quarter} {year}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{currentGoals.primary_focus}</div>
+            </div>
+          )}
           {currentGoals ? (
             [['goal_1','goal_1_status','goal_1_summary'], ['goal_2','goal_2_status','goal_2_summary'], ['goal_3','goal_3_status','goal_3_summary']].map(function(keys, i) {
               var goalText = currentGoals[keys[0]];
@@ -1960,10 +2061,13 @@ function OperationalView({ opArea }) {
   var today = new Date().toISOString().slice(0, 10);
   var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today });
   var [budgetSaving, setBudgetSaving] = useState(false);
+  var [uploadingId, setUploadingId] = useState(null);
+  var fileInputRef = React.useRef(null);
   var [noteEdit, setNoteEdit] = useState(null);
   var [noteVal, setNoteVal] = useState('');
   var [noteSaving, setNoteSaving] = useState(null);
   var [quarterGoals, setQuarterGoals] = useState(null);
+  var [flippedGoals, setFlippedGoals] = useState({});
   var cq = currentQuarterStr();
 
   useEffect(function() {
@@ -1971,6 +2075,7 @@ function OperationalView({ opArea }) {
     setBudget([]);
     setVols([]);
     setQuarterGoals(null);
+    setFlippedGoals({});
     setEditLead(false);
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(cq) + '&year=eq.' + new Date().getFullYear() + '&select=*', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -1987,15 +2092,13 @@ function OperationalView({ opArea }) {
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (Array.isArray(rows)) setBudget(rows);
     });
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?select=' + ['id','First Name','Last Name','Team','Notes','Overview Notes','Status','Picture URL'].map(function(c) { return encodeURIComponent(c); }).join(','), {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
+    sbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Notes','Overview Notes','Status','Picture URL','Phone Number','Email']).then(function(rows) {
       if (!Array.isArray(rows)) return;
       setVols(rows.filter(function(v) {
         if (!v.Team) return false;
-        var areaAliases = { 'Events': ['events team', 'event support', 'events'], 'Docents': ['docent', 'docents'] };
+        var areaAliases = { 'Events': ['events team', 'event support', 'events'], 'Docents': ['docent', 'docents'], 'Venue': ['venue'] };
         var matches = areaAliases[area] || [area.toLowerCase()];
-        return v.Team.split(',').some(function(t) { return matches.indexOf(t.trim().toLowerCase()) !== -1; });
+        return v.Team.split(/[,|]/).some(function(t) { return matches.indexOf(t.trim().toLowerCase()) !== -1; });
       }));
     });
   }, [area]);
@@ -2031,6 +2134,30 @@ function OperationalView({ opArea }) {
     });
   }
 
+  function handleReceiptSelect(e) {
+    var file = e.target.files[0];
+    if (!file || !uploadingId) { e.target.value = ''; return; }
+    var id = uploadingId;
+    var ext = file.name.split('.').pop();
+    var filename = area.toLowerCase().replace(/\s+/g, '-') + '-' + id + '-' + Date.now() + '.' + ext;
+    fetch(SUPABASE_URL + '/storage/v1/object/receipts/' + filename, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
+      body: file
+    }).then(function() {
+      var url = SUPABASE_URL + '/storage/v1/object/public/receipts/' + filename;
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receipt_url: url })
+      }).then(function() {
+        setBudget(function(prev) { return prev.map(function(b) { return b.id === id ? Object.assign({}, b, { receipt_url: url }) : b; }); });
+        setUploadingId(null);
+        e.target.value = '';
+      });
+    });
+  }
+
   function saveNote(v) {
     setNoteSaving(v.id);
     sbUpdate('2026 Volunteers', v['First Name'], v['Last Name'], { Notes: noteVal }).then(function() {
@@ -2042,12 +2169,16 @@ function OperationalView({ opArea }) {
 
   var totalPurchases = budget.filter(function(b) { return b.type === 'Purchase'; }).reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
   var totalInKind = budget.filter(function(b) { return b.type === 'In-Kind'; }).reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+  var totalSpent = totalPurchases + totalInKind;
+  var areaDefaults = AREA_DEFAULTS[area] || {};
+  var allocation = areaDefaults.budget;
+  var defaultLead = areaDefaults.lead || '';
   function fmt(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
   var cardHover = { cursor: 'pointer', background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '16px 20px', flex: 1, minWidth: 150 };
 
   return (
     <div>
-      <div style={{ background: '#fff', borderRadius: 12, padding: '22px 26px', border: '0.5px solid #e8e0d5', marginBottom: 20 }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: '14px 20px', border: '0.5px solid #e8e0d5', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
           <div>
             <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 6 }}>Operational Area</div>
@@ -2063,7 +2194,7 @@ function OperationalView({ opArea }) {
               </div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 15, color: '#2a2a2a', fontWeight: 500 }}>{areaInfo && areaInfo.lead ? areaInfo.lead : <span style={{ color: '#ccc', fontStyle: 'italic' }}>Not set</span>}</span>
+                <span style={{ fontSize: 15, color: '#2a2a2a', fontWeight: 500 }}>{areaInfo && areaInfo.lead ? areaInfo.lead : defaultLead ? defaultLead : <span style={{ color: '#ccc', fontStyle: 'italic' }}>Not set</span>}</span>
                 <button onClick={function() { setEditLead(true); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#bbb', padding: '2px 6px', borderRadius: 4 }}>Edit</button>
               </div>
             )}
@@ -2074,8 +2205,9 @@ function OperationalView({ opArea }) {
             onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'; }}
             onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}>
             <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 8 }}>Budget</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{fmt(totalPurchases + totalInKind)}</div>
-            <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>{fmt(totalPurchases)} purchases · {fmt(totalInKind)} in-kind</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{allocation ? fmt(allocation) : fmt(totalPurchases)}</div>
+            {allocation != null && <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>{fmt(totalPurchases)} / {fmt(allocation)}</div>}
+            {allocation == null && <div style={{ fontSize: 11, color: '#aaa', marginTop: 4, fontStyle: 'italic' }}>No budget established</div>}
             <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add entries →</div>
           </div>
           <div onClick={function() { setShowVols(true); }} style={cardHover}
@@ -2088,36 +2220,70 @@ function OperationalView({ opArea }) {
           </div>
         </div>
       </div>
-      <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5', marginBottom: 20 }}>
-        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 }}>{cq} {new Date().getFullYear()} Goals</div>
-        {quarterGoals ? (
-          <div>
-            {quarterGoals.primary_focus && <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 12 }}>{quarterGoals.primary_focus}</div>}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[['goal_1','goal_1_status','goal_1_summary'],['goal_2','goal_2_status','goal_2_summary'],['goal_3','goal_3_status','goal_3_summary']].map(function(keys, i) {
-                var g = quarterGoals[keys[0]]; if (!g) return null;
-                var st = quarterGoals[keys[1]];
-                var sm = quarterGoals[keys[2]];
-                var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
-                var sc = st && stColors[st] ? stColors[st] : null;
-                return (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13 }}>
-                    <span style={{ color: gold, fontWeight: 600, flexShrink: 0, marginTop: 1 }}>{i+1}.</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ color: '#2a2a2a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span>{g}</span>
-                        {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: sc.bg, color: sc.color, flexShrink: 0 }}>{st}</span>}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, marginBottom: 20 }}>
+        <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 }}>{cq} {new Date().getFullYear()} Goals</div>
+          {quarterGoals ? (
+            <div>
+              {quarterGoals.primary_focus && <div style={{ marginBottom: 14 }}><span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Primary Focus</span><div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginTop: 3, lineHeight: 1.5 }}>{quarterGoals.primary_focus}</div></div>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[['goal_1','goal_1_status','goal_1_summary'],['goal_2','goal_2_status','goal_2_summary'],['goal_3','goal_3_status','goal_3_summary']].map(function(keys, i) {
+                  var g = quarterGoals[keys[0]]; if (!g) return null;
+                  var st = quarterGoals[keys[1]];
+                  var sm = quarterGoals[keys[2]];
+                  var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
+                  var sc = st && stColors[st] ? stColors[st] : null;
+                  var hasReflection = !!(st || sm);
+                  var isFlipped = !!flippedGoals[i];
+                  return (
+                    <div key={i} style={{ perspective: '900px' }}>
+                      <div style={{
+                        position: 'relative', width: '100%',
+                        transformStyle: 'preserve-3d',
+                        transition: 'transform 0.45s cubic-bezier(0.4,0,0.2,1)',
+                        transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                        minHeight: 64
+                      }}>
+                        {/* Front */}
+                        <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', background: '#faf8f5', borderRadius: 8, padding: '10px 12px', border: '0.5px solid #e8e0d5' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                            <div>
+                              <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600 }}>Goal {i+1}</span>
+                              <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 2, lineHeight: 1.5 }}>{g}</div>
+                            </div>
+                            {hasReflection && (
+                              <button onClick={function() { setFlippedGoals(function(f) { var n = Object.assign({}, f); n[i] = true; return n; }); }} style={{ flexShrink: 0, fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontWeight: 500, marginTop: 1, whiteSpace: 'nowrap' }}>↩ Reflection</button>
+                            )}
+                          </div>
+                        </div>
+                        {/* Back */}
+                        <div style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', position: 'absolute', top: 0, left: 0, width: '100%', minHeight: '100%', background: sc ? sc.bg : '#f5f0ea', borderRadius: 8, padding: '10px 12px', border: '0.5px solid ' + (sc ? sc.color + '44' : '#e8e0d5'), boxSizing: 'border-box' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#bbb', fontWeight: 600 }}>Goal {i+1} — Reflection</span>
+                                {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: '#fff', color: sc.color }}>{st}</span>}
+                              </div>
+                              <div style={{ fontSize: 13, color: sc ? sc.color : '#555', lineHeight: 1.5 }}>{sm || <span style={{ fontStyle: 'italic', color: '#aaa' }}>No notes submitted.</span>}</div>
+                            </div>
+                            <button onClick={function() { setFlippedGoals(function(f) { var n = Object.assign({}, f); n[i] = false; return n; }); }} style={{ flexShrink: 0, fontSize: 11, color: '#888', background: 'none', border: '0.5px solid #ccc', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontWeight: 500, marginTop: 1, whiteSpace: 'nowrap' }}>← Goal</button>
+                          </div>
+                        </div>
                       </div>
-                      {sm && <div style={{ fontSize: 12, color: '#777', marginTop: 2 }}>{sm}</div>}
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ) : (
-          <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No goals set for {cq} yet. Submit a quarterly update to populate.</div>
-        )}
+          ) : (
+            <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No goals set for {cq} yet. Submit a quarterly update to populate.</div>
+          )}
+        </div>
+
+        <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 10 }}>Area Resources</div>
+          <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No resources added yet.</div>
+        </div>
       </div>
 
       {showBudget && (
@@ -2169,16 +2335,23 @@ function OperationalView({ opArea }) {
             {budget.length === 0 ? (
               <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No entries yet.</div>
             ) : budget.map(function(b) {
+              var isUploading = uploadingId === b.id;
               return (
                 <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
                   <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, fontWeight: 500, background: b.type === 'Purchase' ? '#fef0e6' : '#eaf3ea', color: b.type === 'Purchase' ? '#c07040' : '#5a8a5a', flexShrink: 0 }}>{b.type}</span>
                   <span style={{ flex: 1, fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</span>
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</span>
                   <span style={{ fontSize: 11, color: '#bbb', flexShrink: 0 }}>{b.date}</span>
-                  <button onClick={function() { deleteBudgetItem(b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>x</button>
+                  {b.receipt_url ? (
+                    <a href={b.receipt_url} target="_blank" title="View receipt" style={{ fontSize: 14, color: gold, textDecoration: 'none', flexShrink: 0 }}>📎</a>
+                  ) : (
+                    <button onClick={function() { setUploadingId(b.id); fileInputRef.current.click(); }} disabled={isUploading} title="Attach receipt" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 13, padding: '2px 4px', flexShrink: 0, opacity: isUploading ? 0.5 : 1 }}>{isUploading ? '…' : '📎'}</button>
+                  )}
+                  <button onClick={function() { deleteBudgetItem(b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                 </div>
               );
             })}
+            <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleReceiptSelect} />
           </div>
         </div>
       )}
@@ -2204,7 +2377,14 @@ function OperationalView({ opArea }) {
                         {(v['First Name'] || '?')[0]}
                       </div>
                     )}
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</span>
+                    <div>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</span>
+                      {(v['Phone Number'] || v['Email']) ? (
+                        <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>
+                          {[v['Phone Number'], v['Email']].filter(function(x) { return x && x.trim(); }).join(' | ')}
+                        </div>
+                      ) : null}
+                    </div>
                     {v['Overview Notes'] && <><span style={{ color: '#ccc' }}>—</span><span style={{ fontSize: 13, color: '#777' }}>{v['Overview Notes']}</span></>}
                     <select
                       value={v.Status || 'Active'}
@@ -2255,7 +2435,17 @@ const views = {
   operational: OperationalView,
 };
 
-var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];function Dashboard() {
+var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];
+var AREA_DEFAULTS = {
+  'Construction':  { lead: 'Rick Panos',       budget: 12000 },
+  'Grounds':       { lead: 'Paula Campbell',    budget: 14000 },
+  'Interiors':     { lead: 'Rebeka Freeman',    budget: 2500  },
+  'Docents':       { lead: 'Rich Hill',         budget: 1000  },
+  'Fundraising':   { lead: 'Kaelen Jennings',   budget: null  },
+  'Events':        { lead: 'Barb Kusha',        budget: 7500  },
+  'Marketing':     { lead: 'Haley Wright',      budget: 1000  },
+  'Venue':         { lead: 'Staff',             budget: null  },
+};function Dashboard() {
   const [active, setActive] = useState("home");
   const [opOpen, setOpOpen] = useState(false);
   const [opArea, setOpArea] = useState(null);
@@ -2341,7 +2531,7 @@ var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundrai
         </div>
         <div style={{ flex: 1, padding: "28px 32px" }}>
           <div style={{ maxWidth: 900 }}>
-            <View navigate={setActive} opArea={opArea} />
+            <View navigate={setActive} opArea={opArea} navigateOp={function(a) { setOpArea(a); setActive('operational'); }} />
           </div>
         </div>
       </div>
