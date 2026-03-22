@@ -312,6 +312,7 @@
   function TeamPicker({ value, onChange }) {
     const { useState: useS } = React;
     const [open, setOpen] = useS(false);
+    const [search, setSearch] = useS("");
     var selected = value ? value.split("|").map(function(t) {
       return t.trim();
     }).filter(Boolean) : [];
@@ -357,7 +358,23 @@
         ));
       }),
       /* @__PURE__ */ React.createElement("span", { style: { marginLeft: "auto", fontSize: 12, color: "#999", flexShrink: 0 } }, open ? "\u25B2" : "\u25BC")
-    ), open && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 100, marginTop: 4, padding: "6px 0", maxHeight: 220, overflowY: "auto" } }, TEAM_OPTIONS.map(function(opt) {
+    ), open && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "100%", left: 0, right: 0, background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 100, marginTop: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "8px 10px", borderBottom: "0.5px solid #f0ece6" } }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        autoFocus: true,
+        value: search,
+        onChange: function(e) {
+          setSearch(e.target.value);
+        },
+        onClick: function(e) {
+          e.stopPropagation();
+        },
+        placeholder: "Search teams...",
+        style: { width: "100%", padding: "6px 10px", border: "0.5px solid #e0d8cc", borderRadius: 6, fontSize: 12, boxSizing: "border-box", outline: "none" }
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: { maxHeight: 200, overflowY: "auto", padding: "4px 0" } }, TEAM_OPTIONS.filter(function(opt) {
+      return opt.toLowerCase().indexOf(search.toLowerCase()) !== -1;
+    }).map(function(opt) {
       var isOn = selected.indexOf(opt) !== -1;
       return /* @__PURE__ */ React.createElement(
         "div",
@@ -377,7 +394,7 @@
         opt,
         isOn && /* @__PURE__ */ React.createElement("span", { style: { color: gold, fontSize: 12, fontWeight: 600 } }, "\u2713")
       );
-    })));
+    }))));
   }
   var volInputStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: "border-box", fontFamily: "system-ui, sans-serif", background: "#fff" };
   var volLabelStyle = { fontSize: 12, color: "#666", fontWeight: 500 };

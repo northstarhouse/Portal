@@ -416,6 +416,7 @@ var TEAM_OPTIONS = Object.keys(TEAM_COLORS);
 function TeamPicker({ value, onChange }) {
   const { useState: useS } = React;
   const [open, setOpen] = useS(false);
+  const [search, setSearch] = useS('');
   var selected = value ? value.split('|').map(function(t) { return t.trim(); }).filter(Boolean) : [];
 
   function toggle(opt) {
@@ -454,22 +455,34 @@ function TeamPicker({ value, onChange }) {
         <span style={{ marginLeft: 'auto', fontSize: 12, color: '#999', flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
       </div>
       {open && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 100, marginTop: 4, padding: '6px 0', maxHeight: 220, overflowY: 'auto' }}>
-          {TEAM_OPTIONS.map(function(opt) {
-            var isOn = selected.indexOf(opt) !== -1;
-            return (
-              <div
-                key={opt}
-                onClick={function() { toggle(opt); }}
-                style={{ padding: '8px 14px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: isOn ? (TEAM_COLORS[opt] || { bg: '#f3f3f3' }).bg : '#fff', color: isOn ? (TEAM_COLORS[opt] || { color: '#555' }).color : '#2a2a2a' }}
-                onMouseEnter={function(e) { if (!isOn) e.currentTarget.style.background = '#faf8f4'; }}
-                onMouseLeave={function(e) { if (!isOn) e.currentTarget.style.background = '#fff'; }}
-              >
-                {opt}
-                {isOn && <span style={{ color: gold, fontSize: 12, fontWeight: 600 }}>✓</span>}
-              </div>
-            );
-          })}
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 100, marginTop: 4 }}>
+          <div style={{ padding: '8px 10px', borderBottom: '0.5px solid #f0ece6' }}>
+            <input
+              autoFocus
+              value={search}
+              onChange={function(e) { setSearch(e.target.value); }}
+              onClick={function(e) { e.stopPropagation(); }}
+              placeholder="Search teams..."
+              style={{ width: '100%', padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', outline: 'none' }}
+            />
+          </div>
+          <div style={{ maxHeight: 200, overflowY: 'auto', padding: '4px 0' }}>
+            {TEAM_OPTIONS.filter(function(opt) { return opt.toLowerCase().indexOf(search.toLowerCase()) !== -1; }).map(function(opt) {
+              var isOn = selected.indexOf(opt) !== -1;
+              return (
+                <div
+                  key={opt}
+                  onClick={function() { toggle(opt); }}
+                  style={{ padding: '8px 14px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: isOn ? (TEAM_COLORS[opt] || { bg: '#f3f3f3' }).bg : '#fff', color: isOn ? (TEAM_COLORS[opt] || { color: '#555' }).color : '#2a2a2a' }}
+                  onMouseEnter={function(e) { if (!isOn) e.currentTarget.style.background = '#faf8f4'; }}
+                  onMouseLeave={function(e) { if (!isOn) e.currentTarget.style.background = '#fff'; }}
+                >
+                  {opt}
+                  {isOn && <span style={{ color: gold, fontSize: 12, fontWeight: 600 }}>✓</span>}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
