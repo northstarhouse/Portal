@@ -2341,13 +2341,7 @@ function OperationalView({ opArea }) {
                     return (
                       <div>
                         <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Challenges Encountered</span>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                          {checked.map(function(opt) {
-                            return (
-                              <span key={opt} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, fontWeight: 600, background: '#fff3e0', color: '#c07040', border: '0.5px solid #f0c090' }}>{opt}</span>
-                            );
-                          })}
-                        </div>
+                        <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 4, lineHeight: 1.6 }}>{checked.join(', ')}</div>
                         {quarterUpdate.challenges_details && <div style={{ fontSize: 12, color: '#555', marginTop: 6, lineHeight: 1.5 }}>{quarterUpdate.challenges_details}</div>}
                       </div>
                     );
@@ -2358,13 +2352,7 @@ function OperationalView({ opArea }) {
                     return (
                       <div>
                         <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Support Needed</span>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                          {checked.map(function(opt) {
-                            return (
-                              <span key={opt} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 20, fontWeight: 600, background: '#eaf3ea', color: '#3a7d3a', border: '0.5px solid #a0d0a0' }}>{opt}</span>
-                            );
-                          })}
-                        </div>
+                        <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 4, lineHeight: 1.6 }}>{checked.join(', ')}</div>
                         {quarterUpdate.support_details && <div style={{ fontSize: 12, color: '#555', marginTop: 6, lineHeight: 1.5 }}>{quarterUpdate.support_details}</div>}
                       </div>
                     );
