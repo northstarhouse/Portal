@@ -1498,7 +1498,10 @@ function BoardView() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div style={{ fontSize: 12, color: '#888' }}>{items.length} topic{items.length !== 1 ? 's' : ''}</div>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Voting Topics</div>
+          <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{items.length} topic{items.length !== 1 ? 's' : ''}</div>
+        </div>
         <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Topic</button>
       </div>
 
