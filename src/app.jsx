@@ -2282,11 +2282,6 @@ function OperationalView({ opArea, navigateToQuarterly }) {
             <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 6 }}>Operational Area</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{area}</div>
           </div>
-          {navigateToQuarterly && (
-            <button onClick={function() { navigateToQuarterly(area); }} style={{ marginLeft: 'auto', alignSelf: 'center', background: gold, color: '#fff', border: 'none', borderRadius: 9, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(136,108,68,0.18)' }}>
-              Submit Quarterly Update
-            </button>
-          )}
           <div style={{ width: 200, flexShrink: 0 }}>
             {(function() {
               if (area === 'Venue') {
@@ -2708,6 +2703,11 @@ var AREA_DEFAULTS = {
               <NavIcon id={active} active={true} />
             </div>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{mod && mod.label}</h1>
+            {active === "operational" && opArea && (
+              <button onClick={function() { setQuarterlyArea(opArea); setActive("quarterly"); }} style={{ marginLeft: "auto", background: gold, color: "#fff", border: "none", borderRadius: 9, padding: "9px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(136,108,68,0.2)" }}>
+                Submit Quarterly Update
+              </button>
+            )}
           </div>
         </div>
         <div style={{ flex: 1, padding: "28px 32px" }}>
