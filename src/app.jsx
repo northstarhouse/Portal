@@ -1963,16 +1963,13 @@ function BoardView() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {BOARD_MEMBERS.map(function(m) {
                     var mv = itemVotes(selected).find(function(v) { return v.voter === m; });
-                    var vc = mv ? (VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' }) : null;
                     return (
                       <div key={m} style={{ background: '#fafafa', borderRadius: 2, padding: '10px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 12, fontWeight: 500, color: mv ? '#aaa' : '#2a2a2a' }}>{m}</span>
-                          {mv && <><span style={{ color: '#999' }}>—</span><span style={{ background: vc.bg, color: vc.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{mv.choice}</span></>}
-                          {mv && mv.changed_in_meeting && <span style={{ fontSize: 12, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>Changed in meeting</span>}
+                          <span style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a' }}>{m}</span>
+                          {mv && <><span style={{ color: '#999' }}>—</span><span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>Voted</span></>}
                           {!mv && <span style={{ fontSize: 12, color: '#777' }}>No vote yet</span>}
                         </div>
-                        {mv && mv.note && <div style={{ fontSize: 12, color: '#777', marginTop: 4, fontStyle: 'italic' }}>{mv.note}</div>}
                       </div>
                     );
                   })}
