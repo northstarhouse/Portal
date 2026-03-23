@@ -3236,7 +3236,7 @@ function ReviewsView() {
         var arr = Array.isArray(checked) ? checked : [];
         return '<div style="display:flex;flex-direction:column;gap:7px;margin-bottom:8px">' + opts.map(function(o) {
           var on = arr.indexOf(o) !== -1;
-          return '<label style="display:flex;align-items:center;gap:7px;font-size:12px;color:#333"><span style="width:13px;height:13px;border:1.5px solid ' + (on ? '#2a2a2a' : '#888') + ';border-radius:2px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:' + (on ? '#2a2a2a' : '#fff') + '">' + (on ? '<svg width="9" height="9" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '') + '</span>' + o + '</label>';
+          return '<label style="display:flex;align-items:center;gap:7px;font-size:12px;color:#333"><span style="width:14px;height:14px;border:1.5px solid ' + (on ? '#2a2a2a' : '#888') + ';border-radius:2px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;color:#2a2a2a;line-height:1">' + (on ? '&#10003;' : '&nbsp;') + '</span>' + o + '</label>';
         }).join('') + '</div>';
       };
 
