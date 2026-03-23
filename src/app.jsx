@@ -2251,8 +2251,11 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [showVols, setShowVols] = useState(false);
   var [editLead, setEditLead] = useState(false);
   var [leadInput, setLeadInput] = useState('');
-  var [earningsInput, setEarningsInput] = useState('');
-  var [editEarnings, setEditEarnings] = useState(false);
+  var [showEarnings, setShowEarnings] = useState(false);
+  var [earnings, setEarnings] = useState([]);
+  var emptyEarningsForm = { event: '', earning_source: '', amount: '', notes: '', date: today };
+  var [earningsForm, setEarningsForm] = useState(emptyEarningsForm);
+  var [earningsSaving, setEarningsSaving] = useState(false);
   var today = new Date().toISOString().slice(0, 10);
   var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false });
   var [budgetSaving, setBudgetSaving] = useState(false);
@@ -2328,6 +2331,11 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     cachedFetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?area=eq.' + encodeURIComponent(area) + '&select=*&order=created_at.asc').then(function(rows) {
       if (Array.isArray(rows)) setResources(rows);
     });
+    if (area === 'Events') {
+      cachedFetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?area=eq.' + encodeURIComponent(area) + '&select=*&order=date.desc,id.desc').then(function(rows) {
+        if (Array.isArray(rows)) setEarnings(rows);
+      });
+    }
   }, [area]);
 
   function saveLead() {
@@ -2351,25 +2359,31 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     }
   }
 
-  function saveEarnings() {
-    var val = parseFloat(earningsInput) || 0;
-    if (areaInfo) {
-      sbPatchById('Operational Areas', areaInfo.id, { earnings: val }).then(function() {
-        clearCache('Operational Areas');
-        setAreaInfo(Object.assign({}, areaInfo, { earnings: val }));
-        setEditEarnings(false);
-      });
-    } else {
-      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Operational Areas'), {
-        method: 'POST',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-        body: JSON.stringify({ area: area, earnings: val })
-      }).then(function(r) { return r.json(); }).then(function(rows) {
-        clearCache('Operational Areas');
-        if (rows && rows[0]) setAreaInfo(rows[0]);
-        setEditEarnings(false);
-      });
-    }
+  function addEarningItem(e) {
+    e.preventDefault();
+    setEarningsSaving(true);
+    var payload = { area: area, event: earningsForm.event, earning_source: earningsForm.earning_source, amount: parseFloat(earningsForm.amount) || 0, notes: earningsForm.notes || null, date: earningsForm.date || null };
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (rows && rows.code) { setEarningsSaving(false); alert('Add failed: ' + (rows.message || rows.code)); return; }
+      clearCache('Op Earnings');
+      setEarningsSaving(false);
+      if (rows && rows[0]) setEarnings(function(prev) { return [rows[0]].concat(prev); });
+      setEarningsForm(emptyEarningsForm);
+    });
+  }
+
+  function deleteEarningItem(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      clearCache('Op Earnings');
+      setEarnings(function(prev) { return prev.filter(function(e) { return e.id !== id; }); });
+    });
   }
 
   function addBudgetItem(e) {
@@ -2560,23 +2574,13 @@ function OperationalView({ opArea, navigateToQuarterly }) {
             <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add entries →</div>
           </div>
           {area === 'Events' && (
-            <div style={Object.assign({}, cardHover, { cursor: 'default' })}>
+            <div onClick={function() { setShowEarnings(true); }} style={cardHover}
+              onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'; }}
+              onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}>
               <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 8 }}>Earnings</div>
-              {editEarnings ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-                  <input autoFocus type="number" step="0.01" min="0" value={earningsInput} onChange={function(e) { setEarningsInput(e.target.value); }} style={{ width: '100%', padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' }} placeholder="0.00" onKeyDown={function(e) { if (e.key === 'Enter') saveEarnings(); if (e.key === 'Escape') setEditEarnings(false); }} />
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={saveEarnings} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 0', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}>Save</button>
-                    <button onClick={function() { setEditEarnings(false); }} style={{ flex: 1, background: '#f0ece6', border: 'none', borderRadius: 6, padding: '5px 0', fontSize: 12, cursor: 'pointer', color: '#666' }}>Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{areaInfo && areaInfo.earnings != null ? fmt(areaInfo.earnings) : '—'}</div>
-                  <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>event revenue</div>
-                  <button onClick={function() { setEarningsInput(areaInfo && areaInfo.earnings != null ? String(areaInfo.earnings) : ''); setEditEarnings(true); }} style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Edit →</button>
-                </div>
-              )}
+              <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{fmt(earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0))}</div>
+              <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>{earnings.length} {earnings.length === 1 ? 'entry' : 'entries'}</div>
+              <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add entries →</div>
             </div>
           )}
           <div onClick={function() { setShowVols(true); }} style={cardHover}
@@ -2939,6 +2943,69 @@ function OperationalView({ opArea, navigateToQuarterly }) {
               );
             })}
             <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleReceiptSelect} />
+          </div>
+        </div>
+      )}
+
+      {showEarnings && (
+        <div onClick={function() { setShowEarnings(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Events — Earnings</div>
+              <button onClick={function() { setShowEarnings(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>×</button>
+            </div>
+            <div style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', textAlign: 'center', marginBottom: 22 }}>
+              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Total Earnings</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: gold, marginTop: 4 }}>{fmt(earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0))}</div>
+            </div>
+            <div style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 18 }}>
+              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 12 }}>Add Entry</div>
+              <form onSubmit={addEarningItem}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Event</div>
+                    <input value={earningsForm.event} onChange={function(e) { setEarningsForm(function(f) { return Object.assign({}, f, { event: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="e.g. Spring Gala" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Earning Source</div>
+                    <input value={earningsForm.earning_source} onChange={function(e) { setEarningsForm(function(f) { return Object.assign({}, f, { earning_source: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="e.g. Ticket sales" />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Amount ($)</div>
+                    <input required type="number" step="0.01" min="0" value={earningsForm.amount} onChange={function(e) { setEarningsForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="0.00" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Date</div>
+                    <input type="date" value={earningsForm.date} onChange={function(e) { setEarningsForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Notes</div>
+                  <input value={earningsForm.notes} onChange={function(e) { setEarningsForm(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="Optional notes…" />
+                </div>
+                <button type="submit" disabled={earningsSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: earningsSaving ? 0.7 : 1 }}>{earningsSaving ? 'Saving…' : 'Add'}</button>
+              </form>
+            </div>
+            {earnings.length === 0 ? (
+              <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No entries yet.</div>
+            ) : earnings.map(function(e) {
+              return (
+                <div key={e.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 2 }}>
+                      {e.event && <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{e.event}</span>}
+                      {e.earning_source && <span style={{ fontSize: 12, color: '#888' }}>{e.earning_source}</span>}
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#2e7d32', marginLeft: 'auto' }}>{fmt(e.amount || 0)}</span>
+                    </div>
+                    {e.notes && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{e.notes}</div>}
+                    {e.date && <div style={{ fontSize: 11, color: '#bbb', marginTop: 2 }}>{e.date}</div>}
+                  </div>
+                  <button onClick={function() { deleteEarningItem(e.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
