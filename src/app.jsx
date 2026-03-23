@@ -2251,6 +2251,8 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [showVols, setShowVols] = useState(false);
   var [editLead, setEditLead] = useState(false);
   var [leadInput, setLeadInput] = useState('');
+  var [earningsInput, setEarningsInput] = useState('');
+  var [editEarnings, setEditEarnings] = useState(false);
   var today = new Date().toISOString().slice(0, 10);
   var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false });
   var [budgetSaving, setBudgetSaving] = useState(false);
@@ -2345,6 +2347,27 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         clearCache('Operational Areas');
         if (rows && rows[0]) setAreaInfo(rows[0]);
         setEditLead(false);
+      });
+    }
+  }
+
+  function saveEarnings() {
+    var val = parseFloat(earningsInput) || 0;
+    if (areaInfo) {
+      sbPatchById('Operational Areas', areaInfo.id, { earnings: val }).then(function() {
+        clearCache('Operational Areas');
+        setAreaInfo(Object.assign({}, areaInfo, { earnings: val }));
+        setEditEarnings(false);
+      });
+    } else {
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Operational Areas'), {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ area: area, earnings: val })
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        clearCache('Operational Areas');
+        if (rows && rows[0]) setAreaInfo(rows[0]);
+        setEditEarnings(false);
       });
     }
   }
@@ -2536,6 +2559,26 @@ function OperationalView({ opArea, navigateToQuarterly }) {
             {allocation == null && <div style={{ fontSize: 11, color: '#aaa', marginTop: 4, fontStyle: 'italic' }}>No budget established</div>}
             <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add entries →</div>
           </div>
+          {area === 'Events' && (
+            <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '16px 20px', minWidth: 160, cursor: 'default' }}>
+              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 8 }}>Earnings</div>
+              {editEarnings ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                  <input autoFocus type="number" step="0.01" min="0" value={earningsInput} onChange={function(e) { setEarningsInput(e.target.value); }} style={{ width: '100%', padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' }} placeholder="0.00" onKeyDown={function(e) { if (e.key === 'Enter') saveEarnings(); if (e.key === 'Escape') setEditEarnings(false); }} />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={saveEarnings} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 0', fontSize: 12, cursor: 'pointer', fontWeight: 500 }}>Save</button>
+                    <button onClick={function() { setEditEarnings(false); }} style={{ flex: 1, background: '#f0ece6', border: 'none', borderRadius: 6, padding: '5px 0', fontSize: 12, cursor: 'pointer', color: '#666' }}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: '#2e7d32' }}>{areaInfo && areaInfo.earnings != null ? fmt(areaInfo.earnings) : '—'}</div>
+                  <div style={{ fontSize: 11, color: '#aaa', marginTop: 3 }}>event revenue</div>
+                  <button onClick={function() { setEarningsInput(areaInfo && areaInfo.earnings != null ? String(areaInfo.earnings) : ''); setEditEarnings(true); }} style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Edit →</button>
+                </div>
+              )}
+            </div>
+          )}
           <div onClick={function() { setShowVols(true); }} style={cardHover}
             onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'; }}
             onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}>
