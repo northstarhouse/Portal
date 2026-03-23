@@ -1,8 +1,8 @@
-var CACHE = 'nsh-v300';
+var CACHE = 'nsh-v301';
 var STATIC = [
   '/Portal/',
   '/Portal/index.html',
-  '/Portal/assets/app.js?v=300',
+  '/Portal/assets/app.js?v=301',
   '/Portal/assets/logo.png',
   '/Portal/favicon.svg',
 ];

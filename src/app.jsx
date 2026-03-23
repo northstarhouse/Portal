@@ -601,7 +601,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }
             <div><label style={volLabelStyle}>First Name *</label><input required name="First Name" value={form['First Name']} onChange={onChange} style={volInputStyle} /></div>
             <div><label style={volLabelStyle}>Last Name *</label><input required name="Last Name" value={form['Last Name']} onChange={onChange} style={volInputStyle} /></div>
           </div>
-          <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="Inactive">Inactive</option><option value="Onboarding">Onboarding</option></select></div>
+          <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
           <div style={volGrp}><label style={volLabelStyle}>Team</label><div style={{ marginTop: 4 }}><TeamPicker value={form['Team']} onChange={onChange} /></div></div>
           <span style={volSecLabel}>Contact</span>
           <div style={volGrp}><label style={volLabelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={onChange} style={volInputStyle} /></div>
@@ -651,6 +651,13 @@ function VolunteersView() {
   const [filterTeam, setFilterTeam] = useState('All');
   const [tab, setTab] = useState('active');
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboarding, setOnboarding] = useState([]);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+  var emptyOBForm = { first_name: '', last_name: '', email: '', phone: '', start_date: today, notes: '' };
+  const [obForm, setObForm] = useState(emptyOBForm);
+  const [obSaving, setObSaving] = useState(false);
+  const [obActing, setObActing] = useState(null);
 
   var emptyForm = {
     'First Name': '', 'Last Name': '', 'Team': '', 'Status': 'Active',
@@ -670,7 +677,58 @@ function VolunteersView() {
         setLoading(false);
       })
       .catch(function(err) { setError(err.message); setLoading(false); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + "?status=eq.In Progress&select=*&order=start_date.asc,id.asc", { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); }).then(function(rows) { if (Array.isArray(rows)) setOnboarding(rows); });
   }, []);
+
+  function addObEntry(e) {
+    e.preventDefault();
+    setObSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ first_name: obForm.first_name, last_name: obForm.last_name || null, email: obForm.email || null, phone: obForm.phone || null, start_date: obForm.start_date || null, notes: obForm.notes || null, status: 'In Progress' })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (rows && rows.code) { setObSaving(false); alert('Failed: ' + (rows.message || rows.code)); return; }
+      setObSaving(false);
+      if (rows && rows[0]) setOnboarding(function(p) { return p.concat([rows[0]]); });
+      setObForm(emptyOBForm);
+    });
+  }
+
+  function obPromote(ob) {
+    setObActing(ob.id);
+    var volPayload = { 'First Name': ob.first_name, 'Last Name': ob.last_name || '', 'Status': 'Active', 'Email': ob.email || '', 'Phone Number': ob.phone || '', 'Notes': ob.notes || '' };
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(volPayload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var newVol = rows && rows[0];
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + '?id=eq.' + ob.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Complete' })
+      }).then(function() {
+        clearCache('2026 Volunteers');
+        setOnboarding(function(p) { return p.filter(function(o) { return o.id !== ob.id; }); });
+        if (newVol) setVolunteers(function(p) { return p.concat([newVol]); });
+        setObActing(null);
+      });
+    });
+  }
+
+  function obDismiss(ob) {
+    setObActing(ob.id);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + '?id=eq.' + ob.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: "Didn't Stick" })
+    }).then(function() {
+      setOnboarding(function(p) { return p.filter(function(o) { return o.id !== ob.id; }); });
+      setObActing(null);
+    });
+  }
 
   var active = volunteers.filter(function(v) { return v['Status'] === 'Active'; }).length;
   var inactive = volunteers.filter(function(v) { return v['Status'] === 'Inactive'; }).length;
@@ -821,7 +879,7 @@ function VolunteersView() {
         <StatCard label="Total Volunteers" value={loading ? '...' : volunteers.length} />
         <StatCard label="Active" value={loading ? '...' : active} />
         <div onClick={function() { setShowOnboarding(true); }} style={{ cursor: 'pointer' }} onMouseEnter={function(e) { e.currentTarget.style.opacity='0.85'; }} onMouseLeave={function(e) { e.currentTarget.style.opacity='1'; }}>
-          <StatCard label="Onboarding" value={loading ? '...' : volunteers.filter(function(v) { return v['Status'] === 'Onboarding'; }).length} />
+          <StatCard label="Onboarding" value={onboarding.length} />
         </div>
         <StatCard label="Teams" value={loading ? '...' : teams} />
       </div>
@@ -969,31 +1027,52 @@ function VolunteersView() {
 
       {showOnboarding && (
         <div onClick={function() { setShowOnboarding(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 500, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '88vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Onboarding</div>
+              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Onboarding <span style={{ fontSize: 13, color: '#aaa', fontWeight: 400 }}>({onboarding.length} in progress)</span></div>
               <button onClick={function() { setShowOnboarding(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>×</button>
             </div>
-            {(function() {
-              var list = volunteers.filter(function(v) { return v['Status'] === 'Onboarding'; });
-              if (list.length === 0) return <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No volunteers currently onboarding.<br/><span style={{ fontSize: 12 }}>Set a volunteer's Status to "Onboarding" to track them here.</span></div>;
-              return list.map(function(v) {
-                var imgUrl = v['Picture URL'] ? driveImg(v['Picture URL']) : null;
-                return (
-                  <div key={v.id || v['First Name']} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
-                    {imgUrl
-                      ? <img src={imgUrl} style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                      : <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(136,108,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: gold, flexShrink: 0 }}>{((v['First Name']||'')[0]||'').toUpperCase()}{((v['Last Name']||'')[0]||'').toUpperCase()}</div>
-                    }
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</div>
-                      {v['Team'] && <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{v['Team']}</div>}
+
+            {/* Add new */}
+            <div style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 12 }}>Add to Onboarding</div>
+              <form onSubmit={addObEntry}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <div><div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>First Name *</div><input required value={obForm.first_name} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { first_name: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
+                  <div><div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Last Name</div><input value={obForm.last_name} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { last_name: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <div><div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Email</div><input type="email" value={obForm.email} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { email: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
+                  <div><div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Phone</div><input value={obForm.phone} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { phone: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <div><div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Start Date</div><input type="date" value={obForm.start_date} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { start_date: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
+                  <div><div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Notes</div><input value={obForm.notes} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} placeholder="Optional…" /></div>
+                </div>
+                <button type="submit" disabled={obSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: obSaving ? 0.7 : 1 }}>{obSaving ? 'Adding…' : 'Add'}</button>
+              </form>
+            </div>
+
+            {/* List */}
+            {onboarding.length === 0
+              ? <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No one currently onboarding.</div>
+              : onboarding.map(function(ob) {
+                  var acting = obActing === ob.id;
+                  return (
+                    <div key={ob.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(136,108,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: gold, flexShrink: 0 }}>
+                        {(ob.first_name||'')[0]}{(ob.last_name||'')[0]}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{ob.first_name} {ob.last_name}</div>
+                        <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{ob.email || ob.phone || ''}{ob.start_date ? ' · started ' + ob.start_date : ''}</div>
+                      </div>
+                      <button onClick={function() { if (!acting) obPromote(ob); }} disabled={acting} title="Fully onboarded — add to volunteer list" style={{ fontSize: 11, background: '#ecfdf5', color: '#059669', border: '0.5px solid #a7f3d0', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontWeight: 500, flexShrink: 0, opacity: acting ? 0.5 : 1 }}>✓ Onboarded</button>
+                      <button onClick={function() { if (!acting) obDismiss(ob); }} disabled={acting} title="Didn't stick" style={{ fontSize: 11, background: '#fef2f2', color: '#ef4444', border: '0.5px solid #fecaca', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontWeight: 500, flexShrink: 0, opacity: acting ? 0.5 : 1 }}>✕ Didn't stick</button>
                     </div>
-                    <button onClick={function() { setShowOnboarding(false); setSelected(v); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 500, flexShrink: 0 }}>View</button>
-                  </div>
-                );
-              });
-            })()}
+                  );
+                })
+            }
           </div>
         </div>
       )}
