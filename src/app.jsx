@@ -601,7 +601,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }
             <div><label style={volLabelStyle}>First Name *</label><input required name="First Name" value={form['First Name']} onChange={onChange} style={volInputStyle} /></div>
             <div><label style={volLabelStyle}>Last Name *</label><input required name="Last Name" value={form['Last Name']} onChange={onChange} style={volInputStyle} /></div>
           </div>
-          <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+          <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="Inactive">Inactive</option><option value="Onboarding">Onboarding</option></select></div>
           <div style={volGrp}><label style={volLabelStyle}>Team</label><div style={{ marginTop: 4 }}><TeamPicker value={form['Team']} onChange={onChange} /></div></div>
           <span style={volSecLabel}>Contact</span>
           <div style={volGrp}><label style={volLabelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={onChange} style={volInputStyle} /></div>
@@ -650,6 +650,7 @@ function VolunteersView() {
   const [saving, setSaving] = useState(false);
   const [filterTeam, setFilterTeam] = useState('All');
   const [tab, setTab] = useState('active');
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   var emptyForm = {
     'First Name': '', 'Last Name': '', 'Team': '', 'Status': 'Active',
@@ -816,9 +817,12 @@ function VolunteersView() {
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
         <StatCard label="Total Volunteers" value={loading ? '...' : volunteers.length} />
         <StatCard label="Active" value={loading ? '...' : active} />
+        <div onClick={function() { setShowOnboarding(true); }} style={{ cursor: 'pointer' }} onMouseEnter={function(e) { e.currentTarget.style.opacity='0.85'; }} onMouseLeave={function(e) { e.currentTarget.style.opacity='1'; }}>
+          <StatCard label="Onboarding" value={loading ? '...' : volunteers.filter(function(v) { return v['Status'] === 'Onboarding'; }).length} />
+        </div>
         <StatCard label="Teams" value={loading ? '...' : teams} />
       </div>
 
@@ -961,6 +965,37 @@ function VolunteersView() {
           onCancel={function() { setEditing(false); }}
           onDelete={handleDeleteVolunteer}
         />
+      )}
+
+      {showOnboarding && (
+        <div onClick={function() { setShowOnboarding(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Onboarding</div>
+              <button onClick={function() { setShowOnboarding(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>×</button>
+            </div>
+            {(function() {
+              var list = volunteers.filter(function(v) { return v['Status'] === 'Onboarding'; });
+              if (list.length === 0) return <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No volunteers currently onboarding.<br/><span style={{ fontSize: 12 }}>Set a volunteer's Status to "Onboarding" to track them here.</span></div>;
+              return list.map(function(v) {
+                var imgUrl = v['Picture URL'] ? driveImg(v['Picture URL']) : null;
+                return (
+                  <div key={v.id || v['First Name']} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                    {imgUrl
+                      ? <img src={imgUrl} style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                      : <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(136,108,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: gold, flexShrink: 0 }}>{((v['First Name']||'')[0]||'').toUpperCase()}{((v['Last Name']||'')[0]||'').toUpperCase()}</div>
+                    }
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</div>
+                      {v['Team'] && <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{v['Team']}</div>}
+                    </div>
+                    <button onClick={function() { setShowOnboarding(false); setSelected(v); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 500, flexShrink: 0 }}>View</button>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        </div>
       )}
 
       {showAdd && (
