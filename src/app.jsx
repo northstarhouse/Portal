@@ -3232,6 +3232,13 @@ function ReviewsView() {
           return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#333"><span style="width:13px;height:13px;border-radius:50%;border:1.5px solid #888;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">' + (on ? '<span style="width:7px;height:7px;border-radius:50%;background:#888;display:block"></span>' : '') + '</span>' + o + '</label>';
         }).join('') + '</div>';
       };
+      var checkboxList = function(opts, checked) {
+        var arr = Array.isArray(checked) ? checked : [];
+        return '<div style="display:flex;flex-direction:column;gap:7px;margin-bottom:8px">' + opts.map(function(o) {
+          var on = arr.indexOf(o) !== -1;
+          return '<label style="display:flex;align-items:center;gap:7px;font-size:12px;color:#333"><span style="width:13px;height:13px;border:1.5px solid ' + (on ? '#2a2a2a' : '#888') + ';border-radius:2px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:' + (on ? '#2a2a2a' : '#fff') + '">' + (on ? '<svg width="9" height="9" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '') + '</span>' + o + '</label>';
+        }).join('') + '</div>';
+      };
 
       var pages = OPERATIONAL_AREAS.map(function(area, idx) {
         var g = goalsMap[area] || {};
@@ -3266,15 +3273,17 @@ function ReviewsView() {
         html += '<div style="font-size:14px;font-weight:700;color:#2a2a2a;margin-bottom:2px">Quarterly Reflection</div>';
         if (u) {
           html += label('What Went Well') + field(u.successes, 2);
-          html += label('Challenges') + field(u.challenges_details || (u.challenges && u.challenges.join(', ')), 2);
-          html += label('Support Needed') + field(u.support_details || (u.support_needed && u.support_needed.join(', ')), 2);
+          html += label('Challenges') + checkboxList(['Capacity or volunteer limitations','Budget or funding constraints','Scheduling or timing issues','Cross-area coordination gaps','External factors','Other'], u.challenges);
+          if (u.challenges_details) html += '<div style="font-size:12px;color:#555;margin-bottom:8px;margin-top:2px">' + u.challenges_details.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
+          html += label('Support Needed') + checkboxList(['Staff or volunteer help','Marketing or communications','Board guidance or decision','Funding or fundraising support','Facilities or logistics','Other'], u.support_needed);
+          if (u.support_details) html += '<div style="font-size:12px;color:#555;margin-bottom:8px;margin-top:2px">' + u.support_details.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
           html += label('Other Notes') + field(u.other_notes, 2);
           html += label('Next Quarter Focus') + field(u.next_focus, 2);
           if (u.date_submitted) html += '<div style="font-size:11px;color:#aaa;margin-top:8px">Submitted ' + u.date_submitted + '</div>';
         } else {
           html += label('What Went Well') + field(null, 3);
-          html += label('Challenges') + field(null, 3);
-          html += label('Support Needed') + field(null, 2);
+          html += label('Challenges') + checkboxList(['Capacity or volunteer limitations','Budget or funding constraints','Scheduling or timing issues','Cross-area coordination gaps','External factors','Other'], []);
+          html += label('Support Needed') + checkboxList(['Staff or volunteer help','Marketing or communications','Board guidance or decision','Funding or fundraising support','Facilities or logistics','Other'], []);
           html += label('Other Notes') + field(null, 2);
           html += label('Next Quarter Focus') + field(null, 2);
         }
