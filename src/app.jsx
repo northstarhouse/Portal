@@ -717,7 +717,9 @@ function VolunteersView() {
       sbRows.forEach(function(r) { if (r.email) stageMap[r.email.toLowerCase()] = r; });
       var merged = sheetPeople.map(function(p, i) {
         var sb = p.email ? stageMap[p.email.toLowerCase()] : null;
-        return { _sbId: sb ? sb.id : null, id: sb ? sb.id : ('sheet-' + i), first_name: p.first_name, last_name: p.last_name, email: p.email, phone: p.phone, area_of_interest: p.area_of_interest, start_date: p.start_date, pipeline_stage: sb ? (sb.pipeline_stage || 'Form Submitted') : 'Form Submitted', status: sb ? (sb.status || 'In Progress') : 'In Progress' };
+        var sd = (sb && sb.stage_dates) ? Object.assign({}, sb.stage_dates) : {};
+        if (!sd['Form Submitted'] && p.start_date) sd['Form Submitted'] = p.start_date;
+        return { _sbId: sb ? sb.id : null, id: sb ? sb.id : ('sheet-' + i), first_name: p.first_name, last_name: p.last_name, email: p.email, phone: p.phone, area_of_interest: p.area_of_interest, start_date: p.start_date, pipeline_stage: sb ? (sb.pipeline_stage || 'Form Submitted') : 'Form Submitted', status: sb ? (sb.status || 'In Progress') : 'In Progress', stage_dates: sd };
       });
       setOnboarding(merged);
     });
@@ -741,7 +743,10 @@ function VolunteersView() {
 
   function obSetStage(ob, stage) {
     setObActing(ob.id);
-    var patch = { pipeline_stage: stage };
+    var stageToday = new Date().toISOString().slice(0, 10);
+    var newStageDates = Object.assign({}, ob.stage_dates || {});
+    newStageDates[stage] = stageToday;
+    var patch = { pipeline_stage: stage, stage_dates: newStageDates };
     if (stage === 'Successfully Onboarded') patch.status = 'Complete';
     else if (stage === 'No Longer Interested') patch.status = "Didn't Stick";
     var req;
@@ -921,6 +926,8 @@ function VolunteersView() {
 
   return (
     <div>
+      {!showOnboarding && (
+      <React.Fragment>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
         <StatCard label="Total Volunteers" value={loading ? '...' : volunteers.length} />
         <StatCard label="Active" value={loading ? '...' : active} />
@@ -995,6 +1002,8 @@ function VolunteersView() {
             );
           })}
         </div>
+      )}
+      </React.Fragment>
       )}
 
       {selected && !editing && (
@@ -1072,100 +1081,93 @@ function VolunteersView() {
       )}
 
       {showOnboarding && (
-        <div onClick={function() { setShowOnboarding(false); setObSelectedId(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: isMobile ? 0 : 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#f5f1eb', borderRadius: isMobile ? 0 : 18, width: '100%', maxWidth: 900, height: isMobile ? '100vh' : '88vh', boxShadow: '0 8px 40px rgba(0,0,0,0.22)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
-            {/* Header */}
-            <div style={{ background: '#fff', padding: '16px 22px', borderBottom: '0.5px solid #e8e0d5', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>Volunteer Onboarding Pipeline</div>
-              <button onClick={function() { setShowOnboarding(false); setObSelectedId(null); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+            <button onClick={function() { setShowOnboarding(false); setObSelectedId(null); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '6px 14px', fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>← Back</button>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>Volunteer Onboarding Pipeline</div>
+            <div style={{ fontSize: 12, color: '#aaa', marginLeft: 4 }}>{onboarding.filter(function(o) { return o.status === 'In Progress'; }).length} in pipeline</div>
+          </div>
+          <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 200px)', overflow: 'hidden' }}>
+            <div style={{ width: isMobile ? '45%' : 260, background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflowY: 'auto', flexShrink: 0 }}>
+              <div style={{ padding: '12px 16px 8px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#aaa', fontWeight: 600, borderBottom: '0.5px solid #f0ebe3' }}>In Pipeline</div>
+              {onboarding.filter(function(o) { return o.status === 'In Progress'; }).map(function(ob) {
+                var isSel = obSelectedId === ob.id;
+                return (
+                  <div key={ob.id} onClick={function() { setObSelectedId(isSel ? null : ob.id); }}
+                    style={{ padding: '12px 16px', cursor: 'pointer', background: isSel ? '#fef9f0' : 'transparent', borderLeft: isSel ? '3px solid ' + gold : '3px solid transparent', borderBottom: '0.5px solid #f5f1eb', transition: 'all 0.12s' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginBottom: 3 }}>{ob.first_name} {ob.last_name}</div>
+                    {ob.area_of_interest && <div style={{ display: 'inline-block', fontSize: 10, background: 'rgba(136,108,68,0.1)', color: gold, padding: '2px 8px', borderRadius: 10, fontWeight: 600, marginBottom: 3 }}>{ob.area_of_interest}</div>}
+                    <div style={{ fontSize: 11, color: '#bbb' }}>{ob.pipeline_stage || 'Form Submitted'}</div>
+                  </div>
+                );
+              })}
+              {onboarding.filter(function(o) { return o.status === 'In Progress'; }).length === 0 && (
+                <div style={{ padding: '30px 16px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No submissions yet</div>
+              )}
             </div>
-
-            {/* Two-panel body */}
-            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-
-              {/* Left: person cards */}
-              <div style={{ width: isMobile ? '45%' : 240, background: '#fff', borderRight: '0.5px solid #e8e0d5', overflowY: 'auto', flexShrink: 0 }}>
-                <div style={{ padding: '12px 14px 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#aaa', fontWeight: 600 }}>In Pipeline</div>
-                {onboarding.filter(function(o) { return o.status === 'In Progress'; }).map(function(ob) {
-                  var sel = obSelectedId === ob.id;
-                  return (
-                    <div key={ob.id} onClick={function() { setObSelectedId(sel ? null : ob.id); }}
-                      style={{ padding: '11px 14px', cursor: 'pointer', background: sel ? '#fef9f0' : 'transparent', borderLeft: sel ? '3px solid ' + gold : '3px solid transparent', borderBottom: '0.5px solid #f5f1eb', transition: 'all 0.12s' }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginBottom: 3 }}>{ob.first_name} {ob.last_name}</div>
-                      {ob.area_of_interest && <div style={{ display: 'inline-block', fontSize: 10, background: 'rgba(136,108,68,0.1)', color: gold, padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>{ob.area_of_interest}</div>}
-                    </div>
-                  );
-                })}
-                {onboarding.filter(function(o) { return o.status === 'In Progress'; }).length === 0 && (
-                  <div style={{ padding: '20px 14px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No one in pipeline</div>
-                )}
-              </div>
-
-              {/* Right: pipeline */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
-                {OB_STAGES.map(function(stage, si) {
-                  var people = onboarding.filter(function(o) { return (o.pipeline_stage || 'Form Submitted') === stage && o.status === 'In Progress'; });
-                  var isNext = obSelectedId && (function() {
-                    var sel = onboarding.find(function(o) { return o.id === obSelectedId; });
-                    if (!sel) return false;
-                    var curIdx = OB_STAGES.indexOf(sel.pipeline_stage || 'Form Submitted');
-                    return curIdx + 1 === si;
-                  })();
-                  return (
-                    <div key={stage} style={{ marginBottom: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 22, height: 22, borderRadius: '50%', background: people.length > 0 ? gold : '#e8e0d5', color: people.length > 0 ? '#fff' : '#bbb', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{si + 1}</div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#555', flex: 1 }}>{stage}</div>
-                        {obSelectedId && isNext && (
-                          <button onClick={function() {
-                            var sel = onboarding.find(function(o) { return o.id === obSelectedId; });
-                            if (sel) obSetStage(sel, stage);
-                          }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 500 }}>Move here →</button>
-                        )}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {!obSelectedId ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 180, color: '#ccc', fontSize: 13 }}>← Select a person to view their pipeline</div>
+              ) : (function() {
+                var selOb = onboarding.find(function(o) { return o.id === obSelectedId; });
+                if (!selOb) return null;
+                var curStageIdx = OB_STAGES.indexOf(selOb.pipeline_stage || 'Form Submitted');
+                var stageDates = selOb.stage_dates || {};
+                return (
+                  <div>
+                    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '16px 20px', marginBottom: 16 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', marginBottom: 6 }}>{selOb.first_name} {selOb.last_name}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, fontSize: 12, color: '#888' }}>
+                        {selOb.area_of_interest && <span>{selOb.area_of_interest}</span>}
+                        {selOb.email && <span>{selOb.email}</span>}
+                        {selOb.phone && <span>{selOb.phone}</span>}
+                        {selOb.start_date && <span>Submitted: {selOb.start_date}</span>}
                       </div>
-                      {people.length > 0 && (
-                        <div style={{ marginLeft: 32, marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {people.map(function(ob) {
-                            var sel = obSelectedId === ob.id;
-                            return (
-                              <div key={ob.id} onClick={function() { setObSelectedId(sel ? null : ob.id); }}
-                                style={{ fontSize: 12, padding: '4px 12px', borderRadius: 20, cursor: 'pointer', fontWeight: sel ? 600 : 400, background: sel ? gold : '#f0ebe2', color: sel ? '#fff' : '#2a2a2a', border: '0.5px solid ' + (sel ? gold : '#e0d8cc'), transition: 'all 0.12s' }}>
-                                {ob.first_name} {ob.last_name}
+                    </div>
+                    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '16px 20px' }}>
+                      {OB_STAGES.map(function(stage, si) {
+                        var isCurrent = si === curStageIdx;
+                        var isPast = si < curStageIdx;
+                        var dateStr = stageDates[stage] || (stage === 'Form Submitted' ? selOb.start_date : null);
+                        return (
+                          <div key={stage} style={{ marginBottom: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{ width: 24, height: 24, borderRadius: '50%', background: isCurrent ? gold : isPast ? '#d4edda' : '#f0ebe2', color: isCurrent ? '#fff' : isPast ? '#2d7a47' : '#bbb', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{isPast ? '✓' : si + 1}</div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: isCurrent ? 700 : 500, color: isCurrent ? '#2a2a2a' : isPast ? '#555' : '#aaa' }}>{stage}</div>
+                                {dateStr && <div style={{ fontSize: 11, color: '#bbb', marginTop: 1 }}>{dateStr}</div>}
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {si < OB_STAGES.length - 1 && <div style={{ marginLeft: 10, width: 2, height: 12, background: '#e8e0d5', marginTop: 4 }} />}
-                    </div>
-                  );
-                })}
-
-                {/* Terminal stages */}
-                <div style={{ marginTop: 16, borderTop: '0.5px solid #e8e0d5', paddingTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  {[{ stage: 'Successfully Onboarded', bg: '#ecfdf5', color: '#059669', border: '#a7f3d0', icon: '✓' }, { stage: 'No Longer Interested', bg: '#fef2f2', color: '#ef4444', border: '#fecaca', icon: '✕' }].map(function(t) {
-                    var people = onboarding.filter(function(o) { return o.pipeline_stage === t.stage; });
-                    var selectedOb = obSelectedId ? onboarding.find(function(o) { return o.id === obSelectedId; }) : null;
-                    var canMove = selectedOb && selectedOb.status === 'In Progress';
-                    return (
-                      <div key={t.stage} style={{ background: t.bg, border: '0.5px solid ' + t.border, borderRadius: 10, padding: '12px 14px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{t.icon} {t.stage}</div>
-                          {canMove && (
-                            <button onClick={function() { if (selectedOb) obSetStage(selectedOb, t.stage); }}
-                              style={{ fontSize: 11, background: t.color, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontWeight: 500 }}>Move</button>
-                          )}
-                        </div>
-                        {people.length === 0
-                          ? <div style={{ fontSize: 11, color: t.color, opacity: 0.5 }}>None yet</div>
-                          : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{people.map(function(ob) { return <span key={ob.id} style={{ fontSize: 11, background: '#fff', color: t.color, border: '0.5px solid ' + t.border, borderRadius: 12, padding: '2px 9px', fontWeight: 500 }}>{ob.first_name} {ob.last_name}</span>; })}</div>
-                        }
+                              {!isCurrent && (
+                                <button onClick={function() { obSetStage(selOb, stage); }} disabled={obActing === selOb.id}
+                                  style={{ fontSize: 11, background: '#f0ebe2', color: '#7a5c30', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 500, opacity: obActing === selOb.id ? 0.5 : 1 }}>Move here</button>
+                              )}
+                            </div>
+                            {si < OB_STAGES.length - 1 && <div style={{ marginLeft: 11, width: 2, height: 12, background: isPast ? '#a7d7b5' : '#e8e0d5', marginTop: 4 }} />}
+                          </div>
+                        );
+                      })}
+                      <div style={{ marginTop: 16, borderTop: '0.5px solid #e8e0d5', paddingTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        {[{ stage: 'Successfully Onboarded', bg: '#ecfdf5', color: '#059669', border: '#a7f3d0', icon: '✓' }, { stage: 'No Longer Interested', bg: '#fef2f2', color: '#ef4444', border: '#fecaca', icon: '✕' }].map(function(t) {
+                          var isCurrent = selOb.pipeline_stage === t.stage;
+                          var dateStr = stageDates[t.stage];
+                          return (
+                            <div key={t.stage} style={{ background: t.bg, border: '0.5px solid ' + t.border, borderRadius: 10, padding: '12px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{t.icon} {t.stage}</div>
+                                {!isCurrent && selOb.status === 'In Progress' && (
+                                  <button onClick={function() { obSetStage(selOb, t.stage); }} disabled={obActing === selOb.id}
+                                    style={{ fontSize: 11, background: t.color, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontWeight: 500, opacity: obActing === selOb.id ? 0.5 : 1 }}>Move</button>
+                                )}
+                              </div>
+                              {dateStr && <div style={{ fontSize: 11, color: t.color, opacity: 0.7 }}>{dateStr}</div>}
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
