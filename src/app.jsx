@@ -2867,7 +2867,6 @@ function OperationalView({ opArea, navigateToQuarterly }) {
               </div>
               {(quarterGoals || quarterUpdate) ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {quarterUpdate && (quarterUpdate.what_went_well || quarterUpdate.successes) && <div><span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>What Went Well</span><div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 3, lineHeight: 1.6 }}>{quarterUpdate.what_went_well || quarterUpdate.successes}</div></div>}
                   {quarterGoals && (
                     <div>
                       <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Goal Progress</span>
@@ -2892,6 +2891,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                       </div>
                     </div>
                   )}
+                  {quarterUpdate && (quarterUpdate.what_went_well || quarterUpdate.successes) && <div><span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>What Went Well</span><div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 3, lineHeight: 1.6 }}>{quarterUpdate.what_went_well || quarterUpdate.successes}</div></div>}
                   {quarterUpdate && (function() {
                     var checked = [].concat(quarterUpdate.challenges || []);
                     if (!checked.length) return null;
