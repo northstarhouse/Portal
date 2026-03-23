@@ -3309,10 +3309,10 @@ function ReviewsView() {
   }
 
   function loadData() {
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?year=eq.' + year + '&select=area,quarter', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?year=eq.' + year + '&select=area,quarter,support_needed&order=date_submitted.desc', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
       .then(function(r) { return r.json(); }).then(function(rows) {
         var s = {};
-        if (Array.isArray(rows)) rows.forEach(function(r) { s[r.area + ':' + r.quarter] = true; });
+        if (Array.isArray(rows)) rows.forEach(function(r) { if (!s[r.area + ':' + r.quarter]) s[r.area + ':' + r.quarter] = r; });
         setSubmitted(s);
       });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Co-Champion Reviews') + '?year=eq.' + year + '&select=*', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
@@ -3379,23 +3379,30 @@ function ReviewsView() {
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{area}</div>
                   {quarters.map(function(q) {
                     var key = area + ':' + q;
-                    var hasReflection = submitted && submitted[key];
+                    var submission = submitted && submitted[key];
+                    var hasReflection = !!submission;
                     var hasReview = reviewed[key];
+                    var needsSupport = submission && Array.isArray(submission.support_needed) && submission.support_needed.length > 0;
                     return (
                       <div key={q} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                        {hasReview ? (
-                          <button onClick={function() { openCell(area, q); }} title="Review submitted — click to edit" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill={gold} stroke={gold} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                          </button>
-                        ) : hasReflection ? (
-                          <button onClick={function() { openCell(area, q); }} title="Reflection received — click to add review" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                            </div>
-                          </button>
-                        ) : (
-                          <div title="Not yet submitted" style={{ width: 22, height: 22, borderRadius: '50%', border: '1.5px solid #e0d8cc', background: '#faf8f5' }} />
-                        )}
+                        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {hasReview ? (
+                            <button onClick={function() { openCell(area, q); }} title="Review submitted — click to edit" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill={gold} stroke={gold} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            </button>
+                          ) : hasReflection ? (
+                            <button onClick={function() { openCell(area, q); }} title="Reflection received — click to add review" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                              </div>
+                            </button>
+                          ) : (
+                            <div title="Not yet submitted" style={{ width: 22, height: 22, borderRadius: '50%', border: '1.5px solid #e0d8cc', background: '#faf8f5' }} />
+                          )}
+                          {needsSupport && (
+                            <div title={'Needs support: ' + submission.support_needed.join(', ')} style={{ position: 'absolute', top: -4, right: -6, width: 10, height: 10, borderRadius: '50%', background: '#ef4444', border: '1.5px solid #fff', flexShrink: 0 }} />
+                          )}
+                        </div>
                       </div>
                     );
                   })}
