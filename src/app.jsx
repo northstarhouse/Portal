@@ -20,8 +20,25 @@ function cachedSbFetch(table, columns) {
     return data;
   });
 }
+function cachedFetchAll(table) {
+  var key = table + ':*';
+  if (_cache[key]) return Promise.resolve(_cache[key]);
+  var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table) + '?select=*';
+  return fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (Array.isArray(data)) _cache[key] = data; return data; });
+}
+function cachedFetch(url) {
+  if (_cache[url]) return Promise.resolve(_cache[url]);
+  return fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (Array.isArray(data)) _cache[url] = data; return data; });
+}
 function clearCache(table) {
-  Object.keys(_cache).forEach(function(k) { if (k.indexOf(table + ':') === 0) delete _cache[k]; });
+  var enc = encodeURIComponent(table);
+  Object.keys(_cache).forEach(function(k) {
+    if (k.indexOf(table + ':') === 0 || k.indexOf('/' + enc + '?') !== -1) delete _cache[k];
+  });
 }
 
 const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthstarhouse%40gmail.com/private-06287b2ca0d9ee6acd4f49f9d4d0d2da/basic.ics";
@@ -69,6 +86,8 @@ var NAV_ICONS = {
   strategy: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   operational: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   sponsors: '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>',
+  financials: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  reviews: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
 };
 
 function NavIcon({ id, active }) {
@@ -89,6 +108,8 @@ const modules = [
   { id: "board", label: "Board Voting" },
   { id: "strategy", label: "Strategic Goal Progress" },
   { id: "operational", label: "Operational Areas", hidden: true },
+  { id: "financials", label: "Financials", hidden: true },
+  { id: "reviews", label: "Reviews", hidden: true },
 ];
 
 const mockData = {
@@ -1100,7 +1121,7 @@ function DonorsView() {
         <StatCard label="Total Raised" value={loading ? '...' : '$' + totalRaised.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub="2026 YTD" />
         <StatCard label="Donations" value={loading ? '...' : totalDonors} />
         <StatCard label="Memberships" value={loading ? '...' : memberships} />
-        <StatCard label="Need Thank You" value={loading ? '...' : unacknowledged} sub={unacknowledged > 0 ? 'pending' : 'all clear'} />
+        <StatCard label="Need Thank You" value={loading ? '...' : unacknowledged} sub={unacknowledged > 0 ? '' : 'all clear'} />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
@@ -1404,8 +1425,8 @@ function BoardView() {
     setLoading(true);
     setLoadError(null);
     Promise.all([
-      sbFetchAll('Board Voting Items'),
-      sbFetchAll('Board-Votes')
+      cachedFetchAll('Board Voting Items'),
+      cachedFetchAll('Board-Votes')
     ]).then(function(results) {
       var itemsData = results[0];
       var votesData = results[1];
@@ -1469,6 +1490,7 @@ function BoardView() {
       setVoteSaving(false);
       setVoteForm({ voter: '', choice: '', note: '' });
       setShowPostMeeting(false);
+      clearCache('Board-Votes');
       load();
     });
   }
@@ -1490,6 +1512,7 @@ function BoardView() {
       setShowAdd(false);
       setTopicForm({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
       setAttachFileName(''); setAttachUploading(false);
+      clearCache('Board Voting Items');
       load();
     });
   }
@@ -1772,11 +1795,12 @@ function StrategyView() {
   const [editForm, setEditForm] = useS({});
   const [saving, setSaving] = useS(false);
 
-  function load() {
-    var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Strategic Goals') + '?select=*&order=category,id';
-    fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
-      .then(function(r) { return r.json(); })
-      .then(function(d) { setGoals(Array.isArray(d) ? d : []); setLoading(false); });
+  function load(bustCache) {
+    if (bustCache) clearCache('Strategic Goals');
+    cachedFetchAll('Strategic Goals').then(function(d) {
+      var sorted = Array.isArray(d) ? d.slice().sort(function(a,b){ return (a.category||'').localeCompare(b.category||'') || a.id - b.id; }) : [];
+      setGoals(sorted); setLoading(false);
+    });
   }
   useE(function() { load(); }, []);
 
@@ -1790,7 +1814,7 @@ function StrategyView() {
     sbPatchById('Strategic Goals', g.id, editForm).then(function() {
       setSaving(false);
       setEditing(null);
-      load();
+      load(true);
     });
   }
 
@@ -1831,8 +1855,13 @@ function StrategyView() {
   return (
     <div>
       {!activeCat ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-          {CATEGORY_ORDER.map(function(cat) { return CatBox(cat); })}
+        <div>
+          <div style={{ fontSize: 13, color: '#888', marginBottom: 16, lineHeight: 1.6 }}>
+            View progress across strategic goals at a glance. Click any progress line to see more details for that focus area.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+            {CATEGORY_ORDER.map(function(cat) { return CatBox(cat); })}
+          </div>
         </div>
       ) : (
       <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '20px 24px', marginBottom: 20 }}>
@@ -1950,9 +1979,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
   useEffect(function() {
     if (!area) return;
     setCurrentGoals(null);
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(quarter) + '&year=eq.' + year + '&select=*', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
+    cachedFetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(quarter) + '&year=eq.' + year + '&select=*').then(function(rows) {
       if (rows && rows[0]) {
         setCurrentGoals(rows[0]);
         setForm(function(f) {
@@ -2003,6 +2030,8 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
         currentGoalsUpdate
       ]);
     }).then(function() {
+      clearCache('Op Quarter Goals');
+      clearCache('Op Quarterly Updates');
       setSaving(false);
       if (navigateOp && area) { navigateOp(area); } else { setSaved(true); setTimeout(function() { setSaved(false); }, 4000); }
     });
@@ -2223,10 +2252,12 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [editLead, setEditLead] = useState(false);
   var [leadInput, setLeadInput] = useState('');
   var today = new Date().toISOString().slice(0, 10);
-  var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today });
+  var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false });
   var [budgetSaving, setBudgetSaving] = useState(false);
   var [uploadingId, setUploadingId] = useState(null);
   var fileInputRef = React.useRef(null);
+  var [budgetReceiptFile, setBudgetReceiptFile] = useState(null);
+  var budgetReceiptRef = React.useRef(null);
   var [noteEdit, setNoteEdit] = useState(null);
   var [noteVal, setNoteVal] = useState('');
   var [noteSaving, setNoteSaving] = useState(null);
@@ -2247,21 +2278,27 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [sponsorSaved, setSponsorSaved] = useState(false);
   var cq = currentQuarterStr();
   var [selectedQ, setSelectedQ] = useState(cq);
+  var emptyCcForm = { status: 'On track', discussion_focus: '', potential_actions: '', escalation: 'None', escalation_other: '', priority_confirmation: 'Approved', review_date: '' };
+  var [ccReview, setCcReview] = useState(null);
+  var [ccForm, setCcForm] = useState(emptyCcForm);
+  var [ccSaving, setCcSaving] = useState(false);
+  var [ccEditing, setCcEditing] = useState(false);
 
   useEffect(function() {
     setQuarterGoals(null);
     setQuarterUpdate(null);
+    setCcReview(null);
+    setCcEditing(false);
     setCardFlipped(false);
     var yr = new Date().getFullYear();
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(selectedQ) + '&year=eq.' + yr + '&select=*', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
+    cachedFetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(selectedQ) + '&year=eq.' + yr + '&select=*').then(function(rows) {
       if (rows && rows[0]) setQuarterGoals(rows[0]);
     });
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(selectedQ) + '&year=eq.' + yr + '&select=*&order=date_submitted.desc&limit=1', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
+    cachedFetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(selectedQ) + '&year=eq.' + yr + '&select=*&order=date_submitted.desc&limit=1').then(function(rows) {
       if (rows && rows[0]) setQuarterUpdate(rows[0]);
+    });
+    cachedFetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Co-Champion Reviews') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(selectedQ) + '&year=eq.' + yr + '&select=*&limit=1').then(function(rows) {
+      if (rows && rows[0]) { setCcReview(rows[0]); setCcForm(Object.assign({}, emptyCcForm, rows[0])); }
     });
   }, [area, selectedQ]);
 
@@ -2271,17 +2308,13 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     setVols([]);
     setResources([]);
     setEditLead(false);
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Operational Areas') + '?area=eq.' + encodeURIComponent(area) + '&select=*', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
+    cachedFetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Operational Areas') + '?area=eq.' + encodeURIComponent(area) + '&select=*').then(function(rows) {
       if (rows && rows[0]) { setAreaInfo(rows[0]); setLeadInput(rows[0].lead || ''); }
     });
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?area=eq.' + encodeURIComponent(area) + '&select=*&order=date.desc,id.desc', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
+    cachedFetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?area=eq.' + encodeURIComponent(area) + '&select=*&order=date.desc,id.desc').then(function(rows) {
       if (Array.isArray(rows)) setBudget(rows);
     });
-    sbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Notes','Overview Notes','Status','Picture URL','Phone Number','Email']).then(function(rows) {
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Notes','Overview Notes','Status','Picture URL','Phone Number','Email']).then(function(rows) {
       if (!Array.isArray(rows)) return;
       setVols(rows.filter(function(v) {
         if (!v.Team) return false;
@@ -2290,9 +2323,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         return v.Team.split(/[,|]/).some(function(t) { return matches.indexOf(t.trim().toLowerCase()) !== -1; });
       }));
     });
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?area=eq.' + encodeURIComponent(area) + '&select=*&order=created_at.asc', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
+    cachedFetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?area=eq.' + encodeURIComponent(area) + '&select=*&order=created_at.asc').then(function(rows) {
       if (Array.isArray(rows)) setResources(rows);
     });
   }, [area]);
@@ -2301,6 +2332,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     if (!leadInput) return;
     if (areaInfo) {
       sbPatchById('Operational Areas', areaInfo.id, { lead: leadInput }).then(function() {
+        clearCache('Operational Areas');
         setAreaInfo(Object.assign({}, areaInfo, { lead: leadInput }));
         setEditLead(false);
       });
@@ -2310,6 +2342,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
         body: JSON.stringify({ area: area, lead: leadInput })
       }).then(function(r) { return r.json(); }).then(function(rows) {
+        clearCache('Operational Areas');
         if (rows && rows[0]) setAreaInfo(rows[0]);
         setEditLead(false);
       });
@@ -2319,14 +2352,46 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   function addBudgetItem(e) {
     e.preventDefault();
     setBudgetSaving(true);
+    var file = budgetReceiptFile;
+    var payload = { area: area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null };
+    if (budgetForm.needs_reimbursement) payload.needs_reimbursement = true;
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ area: area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null })
+      body: JSON.stringify(payload)
     }).then(function(r) { return r.json(); }).then(function(rows) {
-      setBudgetSaving(false);
-      if (rows && rows[0]) setBudget(function(prev) { return [rows[0]].concat(prev); });
-      setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today });
+      if (rows && rows.code) { setBudgetSaving(false); alert('Add failed: ' + (rows.message || rows.hint || rows.code)); return; }
+      var newRow = rows && rows[0];
+      if (!newRow) { setBudgetSaving(false); return; }
+      if (!file) {
+        clearCache('Op Budget');
+        setBudgetSaving(false);
+        setBudget(function(prev) { return [newRow].concat(prev); });
+        setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false });
+        setBudgetReceiptFile(null);
+        return;
+      }
+      var ext = file.name.split('.').pop();
+      var filename = area.toLowerCase().replace(/\s+/g, '-') + '-' + newRow.id + '-' + Date.now() + '.' + ext;
+      fetch(SUPABASE_URL + '/storage/v1/object/receipts/' + filename, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
+        body: file
+      }).then(function() {
+        var url = SUPABASE_URL + '/storage/v1/object/public/receipts/' + filename;
+        return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + newRow.id, {
+          method: 'PATCH',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ receipt_url: url })
+        }).then(function() {
+          clearCache('Op Budget');
+          setBudgetSaving(false);
+          setBudget(function(prev) { return [Object.assign({}, newRow, { receipt_url: url })].concat(prev); });
+          setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false });
+          setBudgetReceiptFile(null);
+          if (budgetReceiptRef.current) budgetReceiptRef.current.value = '';
+        });
+      });
     });
   }
 
@@ -2335,6 +2400,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       method: 'DELETE',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function() {
+      clearCache('Op Budget');
       setBudget(function(prev) { return prev.filter(function(b) { return b.id !== id; }); });
     });
   }
@@ -2356,11 +2422,40 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({ receipt_url: url })
       }).then(function() {
+        clearCache('Op Budget');
         setBudget(function(prev) { return prev.map(function(b) { return b.id === id ? Object.assign({}, b, { receipt_url: url }) : b; }); });
         setUploadingId(null);
         e.target.value = '';
       });
     });
+  }
+
+  function submitCcReview(e) {
+    e.preventDefault();
+    setCcSaving(true);
+    var yr = new Date().getFullYear();
+    var payload = { area: area, quarter: selectedQ, year: yr, status: ccForm.status, discussion_focus: ccForm.discussion_focus || null, potential_actions: ccForm.potential_actions || null, escalation: ccForm.escalation, escalation_other: ccForm.escalation === 'Other' ? ccForm.escalation_other || null : null, priority_confirmation: ccForm.priority_confirmation, review_date: ccForm.review_date || null };
+    if (ccReview) {
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Co-Champion Reviews') + '?id=eq.' + ccReview.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify(payload)
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        clearCache('Op Co-Champion Reviews');
+        var updated = (rows && rows[0]) ? rows[0] : Object.assign({}, ccReview, payload);
+        setCcReview(updated); setCcSaving(false); setCcEditing(false);
+      });
+    } else {
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Co-Champion Reviews'), {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify(payload)
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        clearCache('Op Co-Champion Reviews');
+        if (rows && rows[0]) setCcReview(rows[0]);
+        setCcSaving(false); setCcEditing(false);
+      });
+    }
   }
 
   function saveNote(v) {
@@ -2566,6 +2661,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           return cardFlipped ? backCard : frontCard;
         })()}
 
+
         <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 12 }}>Area Resources</div>
           {resources.length === 0
@@ -2615,6 +2711,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
                       body: JSON.stringify({ area: area, title: resourceTitle, url: url })
                     }).then(function(r) { return r.json(); }).then(function(rows) {
+                      clearCache('Op Resources');
                       setResourceSaving(false);
                       if (rows && rows[0]) setResources(function(prev) { return prev.concat([rows[0]]); });
                       setResourceTitle(''); setResourceUrl(''); setShowAddResource(false);
@@ -2640,8 +2737,8 @@ function OperationalView({ opArea, navigateToQuarterly }) {
               </div>
             </div>
           ) : (
-            <button onClick={function() { setShowAddResource(true); setResourceType('link'); }} style={{ width: '100%', marginTop: 4, padding: '8px 12px', background: '#faf8f5', border: '0.5px dashed #d0c8bc', borderRadius: 8, fontSize: 12, color: '#aaa', cursor: 'pointer', textAlign: 'left' }}>
-              + Add Resource
+            <button onClick={function() { setShowAddResource(true); setResourceType('link'); }} style={{ width: '100%', marginTop: 4, padding: '8px 12px', background: 'none', border: 'none', fontSize: 12, color: gold, fontWeight: 500, cursor: 'pointer', textAlign: 'right', display: 'block' }}>
+              Add Resource →
             </button>
           )}
 
@@ -2667,6 +2764,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
             headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
             body: JSON.stringify(row)
           }).then(function(r) { return r.json(); }).then(function() {
+            clearCache('Sponsors');
             setSponsorSaving(false);
             setSponsorSaved(true);
             setSponsorForm(Object.assign({}, emptySponsorForm, { 'Area Supported': area }));
@@ -2749,12 +2847,31 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                   <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Description</div>
                   <input value={budgetForm.description} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="What was purchased or donated..." />
                 </div>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Receipt (optional)</div>
+                  <div
+                    onClick={function() { budgetReceiptRef.current && budgetReceiptRef.current.click(); }}
+                    style={{ border: '0.5px dashed #e0d8cc', borderRadius: 7, padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: budgetReceiptFile ? '#2a2a2a' : '#bbb', background: '#fafaf8', display: 'flex', alignItems: 'center', gap: 8 }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    <span>{budgetReceiptFile ? budgetReceiptFile.name : 'Attach image or PDF…'}</span>
+                    {budgetReceiptFile && <span onClick={function(ev) { ev.stopPropagation(); setBudgetReceiptFile(null); if (budgetReceiptRef.current) budgetReceiptRef.current.value = ''; }} style={{ marginLeft: 'auto', color: '#bbb', cursor: 'pointer', fontSize: 14 }}>×</span>}
+                  </div>
+                  <input ref={budgetReceiptRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={function(e) { setBudgetReceiptFile(e.target.files[0] || null); }} />
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: budgetForm.needs_reimbursement ? '#b45309' : '#555' }}>
+                    <input type="checkbox" checked={budgetForm.needs_reimbursement} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { needs_reimbursement: e.target.checked }); }); }} style={{ width: 15, height: 15, accentColor: gold, cursor: 'pointer' }} />
+                    Needs reimbursement?
+                    {budgetForm.needs_reimbursement && <span style={{ fontSize: 11, background: '#fef3c7', color: '#b45309', padding: '2px 7px', borderRadius: 10, fontWeight: 500 }}>Will appear in Financials</span>}
+                  </label>
+                </div>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Date</div>
                     <input type="date" value={budgetForm.date} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
                   </div>
-                  <button type="submit" disabled={budgetSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: budgetSaving ? 0.7 : 1 }}>Add</button>
+                  <button type="submit" disabled={budgetSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: budgetSaving ? 0.7 : 1 }}>{budgetSaving ? 'Saving…' : 'Add'}</button>
                 </div>
               </form>
             </div>
@@ -2768,10 +2885,11 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                   <span style={{ flex: 1, fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</span>
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</span>
                   <span style={{ fontSize: 11, color: '#bbb', flexShrink: 0 }}>{b.date}</span>
+                  {b.needs_reimbursement && <span title="Needs reimbursement" style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 10, fontWeight: 600, flexShrink: 0 }}>$ Reimburse</span>}
                   {b.receipt_url ? (
-                    <a href={b.receipt_url} target="_blank" title="View receipt" style={{ fontSize: 14, color: gold, textDecoration: 'none', flexShrink: 0 }}>📎</a>
+                    <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></a>
                   ) : (
-                    <button onClick={function() { setUploadingId(b.id); fileInputRef.current.click(); }} disabled={isUploading} title="Attach receipt" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 13, padding: '2px 4px', flexShrink: 0, opacity: isUploading ? 0.5 : 1 }}>{isUploading ? '…' : '📎'}</button>
+                    <button onClick={function() { setUploadingId(b.id); fileInputRef.current.click(); }} disabled={isUploading} title="Attach receipt" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px 4px', flexShrink: 0, opacity: isUploading ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>{isUploading ? <span style={{ fontSize: 11 }}>…</span> : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>}</button>
                   )}
                   <button onClick={function() { deleteBudgetItem(b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                 </div>
@@ -2860,10 +2978,8 @@ function SponsorsView() {
   var logoInputRef = useRef(null);
 
   useEffect(function() {
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?select=*&order=id.asc', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      if (Array.isArray(rows)) setSponsors(rows);
+    cachedFetchAll('Sponsors').then(function(rows) {
+      if (Array.isArray(rows)) setSponsors(rows.slice().sort(function(a,b){return a.id-b.id;}));
     });
   }, []);
 
@@ -2891,20 +3007,33 @@ function SponsorsView() {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
       body: file
-    }).then(function() {
+    }).then(function(storageRes) {
+      if (!storageRes.ok) {
+        return storageRes.json().then(function(err) {
+          alert('Logo upload failed: ' + (err.message || err.error || storageRes.status));
+          setLogoUploading(false);
+        });
+      }
       var url = SUPABASE_URL + '/storage/v1/object/public/sponsor-logos/' + filename;
       return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?id=eq.' + selected.id, {
         method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
         body: JSON.stringify({ logo_url: url })
-      }).then(function() {
+      }).then(function(patchRes) {
+        if (!patchRes.ok) {
+          return patchRes.json().then(function(err) {
+            alert('Failed to save logo URL: ' + (err.message || err.hint || patchRes.status) + '\n\nMake sure you have run: ALTER TABLE "Sponsors" ADD COLUMN IF NOT EXISTS logo_url TEXT;');
+            setLogoUploading(false);
+          });
+        }
         var updated = Object.assign({}, selected, { logo_url: url });
         setSelected(updated);
+        clearCache('Sponsors');
         setSponsors(function(prev) { return prev.map(function(s) { return s.id === selected.id ? updated : s; }); });
         setLogoUploading(false);
         e.target.value = '';
       });
-    }).catch(function() { setLogoUploading(false); });
+    }).catch(function(err) { alert('Upload error: ' + err.message); setLogoUploading(false); });
   }
 
   function submitAck(e) {
@@ -2961,9 +3090,9 @@ function SponsorsView() {
                 onMouseEnter={function(e) { if (!isSelected) e.currentTarget.style.background = '#fdfaf6'; }}
                 onMouseLeave={function(e) { if (!isSelected) e.currentTarget.style.background = isSelected ? '#faf5ee' : '#fff'; }}>
                 {s.logo_url
-                  ? <img src={s.logo_url} alt={s['Business Name']} style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 6, flexShrink: 0, border: '0.5px solid #e8e0d5' }} />
-                  : <div style={{ width: 44, height: 44, borderRadius: 6, background: '#f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: gold, flexShrink: 0 }}>{(s['Business Name'] || '?')[0]}</div>
-                }
+                  ? <img src={s.logo_url} alt={s['Business Name']} onError={function(e) { e.currentTarget.style.display='none'; e.currentTarget.nextSibling.style.display='flex'; }} style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 6, flexShrink: 0, border: '0.5px solid #e8e0d5' }} />
+                  : null}
+                <div style={{ width: 44, height: 44, borderRadius: 6, background: '#f0ece6', display: s.logo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: gold, flexShrink: 0 }}>{(s['Business Name'] || '?')[0]}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 3 }}>{s['Business Name']}</div>
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -2990,7 +3119,7 @@ function SponsorsView() {
               <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, marginBottom: 8 }}>Logo</div>
               {selected.logo_url
                 ? <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <img src={selected.logo_url} alt="logo" style={{ maxHeight: 60, maxWidth: 160, objectFit: 'contain', border: '0.5px solid #e8e0d5', borderRadius: 6, padding: 4 }} />
+                    <img src={selected.logo_url} alt="logo" onError={function(e) { e.currentTarget.style.display='none'; e.currentTarget.nextSibling.style.display='block'; }} style={{ maxHeight: 60, maxWidth: 160, objectFit: 'contain', border: '0.5px solid #e8e0d5', borderRadius: 6, padding: 4 }} />
                     <button onClick={function() { logoInputRef.current.click(); }} disabled={logoUploading} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{logoUploading ? 'Uploading…' : 'Replace'}</button>
                   </div>
                 : <button onClick={function() { logoInputRef.current.click(); }} disabled={logoUploading} style={{ fontSize: 12, color: gold, background: '#faf8f5', border: '0.5px dashed ' + gold, borderRadius: 8, padding: '10px 16px', cursor: 'pointer', width: '100%' }}>{logoUploading ? 'Uploading…' : '+ Upload Logo'}</button>
@@ -3060,6 +3189,407 @@ function SponsorsView() {
   );
 }
 
+function ReviewsView() {
+  var { useState, useEffect } = React;
+  var year = new Date().getFullYear();
+  var quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+  var [submitted, setSubmitted] = useState(null);
+  var [reviewed, setReviewed] = useState({});   // 'area:quarter' -> review row
+  var [activeCell, setActiveCell] = useState(null); // {area, quarter}
+  var emptyCcForm = { status: 'On track', discussion_focus: '', potential_actions: '', escalation: 'None', escalation_other: '', priority_confirmation: 'Approved', review_date: '' };
+  var [ccForm, setCcForm] = useState(emptyCcForm);
+  var [ccSaving, setCcSaving] = useState(false);
+  var [printQ, setPrintQ] = useState(null); // null = closed, else 'Q1'-'Q4'
+  var [printing, setPrinting] = useState(false);
+
+  function doPrint(quarter) {
+    setPrinting(true);
+    var headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?quarter=eq.' + encodeURIComponent(quarter) + '&year=eq.' + year + '&select=*', { headers: headers }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?quarter=eq.' + encodeURIComponent(quarter) + '&year=eq.' + year + '&select=*&order=date_submitted.desc', { headers: headers }).then(function(r) { return r.json(); })
+    ]).then(function(results) {
+      var goals = Array.isArray(results[0]) ? results[0] : [];
+      var updates = Array.isArray(results[1]) ? results[1] : [];
+      var goalsMap = {};
+      goals.forEach(function(g) { goalsMap[g.area] = g; });
+      var updatesMap = {};
+      updates.forEach(function(u) { if (!updatesMap[u.area]) updatesMap[u.area] = u; });
+
+      var line = '<hr style="border:none;border-top:1px solid #ccc;margin:14px 0">';
+      var label = function(t) { return '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;margin-bottom:6px;margin-top:16px">' + t + '</div>'; };
+      var field = function(val, lines) {
+        lines = lines || 1;
+        if (val) return '<div style="font-size:13px;color:#222;line-height:1.6;margin-bottom:4px">' + val.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>') + '</div>';
+        if (lines === 1) return '<div style="border-bottom:1px solid #bbb;height:22px;margin-bottom:8px"></div>';
+        var out = '';
+        for (var i = 0; i < lines; i++) out += '<div style="border-bottom:1px solid #bbb;height:22px;margin-bottom:8px"></div>';
+        return out;
+      };
+      var radio = function(opts, checked) {
+        return '<div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:8px">' + opts.map(function(o) {
+          var on = checked === o;
+          return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#333"><span style="width:13px;height:13px;border-radius:50%;border:1.5px solid #888;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">' + (on ? '<span style="width:7px;height:7px;border-radius:50%;background:#888;display:block"></span>' : '') + '</span>' + o + '</label>';
+        }).join('') + '</div>';
+      };
+
+      var pages = OPERATIONAL_AREAS.map(function(area, idx) {
+        var g = goalsMap[area] || {};
+        var u = updatesMap[area];
+        var pageBreak = idx > 0 ? 'page-break-before:always;' : '';
+        var html = '<div style="' + pageBreak + 'padding:32px 40px;font-family:Georgia,serif;max-width:700px;margin:0 auto">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">';
+        html += '<div style="font-size:22px;font-weight:700;color:#2a2a2a">' + area + '</div>';
+        html += '<div style="font-size:13px;color:#888">' + quarter + ' ' + year + '</div>';
+        html += '</div>' + line;
+
+        // Goals
+        html += '<div style="font-size:14px;font-weight:700;color:#2a2a2a;margin-bottom:2px">Quarterly Goals</div>';
+        if (g.primary_focus || !u) {
+          html += label('Primary Focus') + field(g.primary_focus, 1);
+        }
+        ['1','2','3'].forEach(function(n) {
+          var gval = g['goal_' + n];
+          var st = g['goal_' + n + '_status'];
+          var sm = g['goal_' + n + '_summary'];
+          html += label('Goal ' + n);
+          html += '<div style="margin-bottom:4px">' + field(gval, 1) + '</div>';
+          html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+          html += '<div>' + label('Status') + field(st, 1) + '</div>';
+          html += '<div>' + label('Summary') + field(sm, 1) + '</div>';
+          html += '</div>';
+        });
+
+        html += line;
+
+        // Reflection
+        html += '<div style="font-size:14px;font-weight:700;color:#2a2a2a;margin-bottom:2px">Quarterly Reflection</div>';
+        if (u) {
+          html += label('What Went Well') + field(u.successes, 2);
+          html += label('Challenges') + field(u.challenges_details || (u.challenges && u.challenges.join(', ')), 2);
+          html += label('Support Needed') + field(u.support_details || (u.support_needed && u.support_needed.join(', ')), 2);
+          html += label('Other Notes') + field(u.other_notes, 2);
+          html += label('Next Quarter Focus') + field(u.next_focus, 2);
+          if (u.date_submitted) html += '<div style="font-size:11px;color:#aaa;margin-top:8px">Submitted ' + u.date_submitted + '</div>';
+        } else {
+          html += label('What Went Well') + field(null, 3);
+          html += label('Challenges') + field(null, 3);
+          html += label('Support Needed') + field(null, 2);
+          html += label('Other Notes') + field(null, 2);
+          html += label('Next Quarter Focus') + field(null, 2);
+        }
+
+        html += line;
+
+        // Co-Champion Review (blank)
+        html += '<div style="font-size:14px;font-weight:700;color:#2a2a2a;margin-bottom:2px">Co-Champion Review</div>';
+        html += label('Review Status');
+        html += radio(['On track', 'Minor adjustments needed', 'Off track - intervention required'], null);
+        html += label('Discussion Focus') + '<div style="font-size:11px;color:#aaa;margin-bottom:6px">What should the board focus on during discussion regarding this area?</div>' + field(null, 3);
+        html += label('Potential Actions') + '<div style="font-size:11px;color:#aaa;margin-bottom:6px">Are there actions the board may want to consider?</div>' + field(null, 3);
+        html += label('Escalation');
+        html += radio(['None', 'Requires budget review', 'Requires policy clarification', 'Other'], null);
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:12px;color:#555">If Other:</span>' + field(null,1) + '</div>';
+        html += label('Priority Confirmation (Next Quarter)');
+        html += radio(['Approved', 'Adjusted', 'Replaced'], null);
+        html += label('Review Completed') + '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:#555">Date:</span><div style="border-bottom:1px solid #bbb;width:160px;height:22px"></div></div>';
+        html += '</div>';
+        return html;
+      });
+
+      var doc = '<!DOCTYPE html><html><head><title>NSH ' + quarter + ' ' + year + ' Review Packet</title><style>@media print{body{margin:0}}</style></head><body>' + pages.join('') + '</body></html>';
+      var w = window.open('', '_blank');
+      w.document.write(doc);
+      w.document.close();
+      w.focus();
+      setTimeout(function() { w.print(); }, 400);
+      setPrinting(false);
+      setPrintQ(null);
+    });
+  }
+
+  function loadData() {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?year=eq.' + year + '&select=area,quarter', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); }).then(function(rows) {
+        var s = {};
+        if (Array.isArray(rows)) rows.forEach(function(r) { s[r.area + ':' + r.quarter] = true; });
+        setSubmitted(s);
+      });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Co-Champion Reviews') + '?year=eq.' + year + '&select=*', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); }).then(function(rows) {
+        var rv = {};
+        if (Array.isArray(rows)) rows.forEach(function(r) { rv[r.area + ':' + r.quarter] = r; });
+        setReviewed(rv);
+      });
+  }
+
+  useEffect(function() { loadData(); }, []);
+
+  function openCell(area, quarter) {
+    var key = area + ':' + quarter;
+    var existing = reviewed[key];
+    setCcForm(existing ? Object.assign({}, emptyCcForm, existing) : emptyCcForm);
+    setActiveCell({ area: area, quarter: quarter });
+  }
+
+  function submitReview(e) {
+    e.preventDefault();
+    setCcSaving(true);
+    var key = activeCell.area + ':' + activeCell.quarter;
+    var existing = reviewed[key];
+    var payload = { area: activeCell.area, quarter: activeCell.quarter, year: year, status: ccForm.status, discussion_focus: ccForm.discussion_focus || null, potential_actions: ccForm.potential_actions || null, escalation: ccForm.escalation, escalation_other: ccForm.escalation === 'Other' ? ccForm.escalation_other || null : null, priority_confirmation: ccForm.priority_confirmation, review_date: ccForm.review_date || null };
+    var req = existing
+      ? fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Co-Champion Reviews') + '?id=eq.' + existing.id, { method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(payload) })
+      : fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Co-Champion Reviews'), { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(payload) });
+    req.then(function(r) { return r.json(); }).then(function(rows) {
+      var saved = (rows && rows[0]) ? rows[0] : Object.assign({ id: existing && existing.id }, payload);
+      setReviewed(function(prev) { var next = Object.assign({}, prev); next[key] = saved; return next; });
+      setCcSaving(false);
+      setActiveCell(null);
+    });
+  }
+
+  var statusColors = { 'On track': { bg: '#e8f5e9', color: '#2e7d32' }, 'Minor adjustments needed': { bg: '#fff3e0', color: '#e65100' }, 'Off track - intervention required': { bg: '#ffebee', color: '#c62828' } };
+  var ccInp = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
+  var ccLbl = { fontSize: 11, color: '#888', fontWeight: 500, marginBottom: 4, display: 'block' };
+  var ccGrp = { marginBottom: 14 };
+
+  return (
+    <div>
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', marginBottom: 24, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600 }}>Quarterly Updates — {year}</div>
+          <button onClick={function() { setPrintQ('Q1'); }} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontWeight: 500 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print Packet
+          </button>
+        </div>
+        <div style={{ padding: '0 20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '160px repeat(4, 1fr)', borderBottom: '0.5px solid #f0ece6', padding: '10px 0' }}>
+            <div />
+            {quarters.map(function(q) {
+              return <div key={q} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#aaa', textTransform: 'uppercase', letterSpacing: 1 }}>{q}</div>;
+            })}
+          </div>
+          {submitted === null
+            ? <div style={{ padding: '20px 0', color: '#bbb', fontSize: 13, textAlign: 'center' }}>Loading…</div>
+            : OPERATIONAL_AREAS.map(function(area) {
+              return (
+                <div key={area} style={{ display: 'grid', gridTemplateColumns: '160px repeat(4, 1fr)', borderBottom: '0.5px solid #f9f6f2', padding: '12px 0', alignItems: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{area}</div>
+                  {quarters.map(function(q) {
+                    var key = area + ':' + q;
+                    var hasReflection = submitted && submitted[key];
+                    var hasReview = reviewed[key];
+                    return (
+                      <div key={q} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                        {hasReview ? (
+                          <button onClick={function() { openCell(area, q); }} title="Review submitted — click to edit" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill={gold} stroke={gold} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                          </button>
+                        ) : hasReflection ? (
+                          <button onClick={function() { openCell(area, q); }} title="Reflection received — click to add review" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            </div>
+                          </button>
+                        ) : (
+                          <div title="Not yet submitted" style={{ width: 22, height: 22, borderRadius: '50%', border: '1.5px solid #e0d8cc', background: '#faf8f5' }} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })
+          }
+        </div>
+      </div>
+
+      {printQ && (
+        <div onClick={function() { setPrintQ(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, padding: 28, maxWidth: 340, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', marginBottom: 6, fontFamily: "'Cardo', serif" }}>Print Review Packet</div>
+            <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>Select a quarter to print goals, reflections, and blank co-champion review forms for all areas.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+              {['Q1','Q2','Q3','Q4'].map(function(q) {
+                return (
+                  <button key={q} onClick={function() { setPrintQ(q); }}
+                    style={{ padding: '12px', borderRadius: 9, border: '0.5px solid ' + (printQ === q ? gold : '#e0d8cc'), background: printQ === q ? '#fef9f0' : '#faf8f5', color: printQ === q ? gold : '#555', fontSize: 14, fontWeight: printQ === q ? 700 : 400, cursor: 'pointer', transition: 'all 0.1s' }}>
+                    {q}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={function() { doPrint(printQ); }} disabled={printing} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: printing ? 0.7 : 1 }}>
+                {printing ? 'Preparing…' : 'Print ' + printQ + ' Packet'}
+              </button>
+              <button onClick={function() { setPrintQ(null); }} style={{ padding: '10px 16px', background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeCell && (
+        <div onClick={function() { setActiveCell(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 500, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{activeCell.area}</div>
+                <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{activeCell.quarter} {year} — Co-Champion Review</div>
+              </div>
+              <button onClick={function() { setActiveCell(null); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>×</button>
+            </div>
+            <form onSubmit={submitReview}>
+              <div style={ccGrp}>
+                <span style={ccLbl}>Review Status</span>
+                {['On track', 'Minor adjustments needed', 'Off track - intervention required'].map(function(opt) {
+                  return (
+                    <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                      <input type="radio" name="cc_status" value={opt} checked={ccForm.status === opt} onChange={function() { setCcForm(function(f) { return Object.assign({}, f, { status: opt }); }); }} style={{ accentColor: gold }} />
+                      {opt}
+                    </label>
+                  );
+                })}
+              </div>
+              <div style={ccGrp}>
+                <span style={ccLbl}>Discussion Focus</span>
+                <div style={{ fontSize: 11, color: '#bbb', marginBottom: 6 }}>What should the board focus on during discussion regarding this area?</div>
+                <textarea value={ccForm.discussion_focus} onChange={function(e) { setCcForm(function(f) { return Object.assign({}, f, { discussion_focus: e.target.value }); }); }} rows={3} style={Object.assign({}, ccInp, { resize: 'vertical' })} />
+              </div>
+              <div style={ccGrp}>
+                <span style={ccLbl}>Potential Actions</span>
+                <div style={{ fontSize: 11, color: '#bbb', marginBottom: 6 }}>Are there actions the board may want to consider?</div>
+                <textarea value={ccForm.potential_actions} onChange={function(e) { setCcForm(function(f) { return Object.assign({}, f, { potential_actions: e.target.value }); }); }} rows={3} style={Object.assign({}, ccInp, { resize: 'vertical' })} />
+              </div>
+              <div style={ccGrp}>
+                <span style={ccLbl}>Escalation</span>
+                {['None', 'Requires budget review', 'Requires policy clarification', 'Other'].map(function(opt) {
+                  return (
+                    <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                      <input type="radio" name="cc_escalation" value={opt} checked={ccForm.escalation === opt} onChange={function() { setCcForm(function(f) { return Object.assign({}, f, { escalation: opt }); }); }} style={{ accentColor: gold }} />
+                      {opt}
+                    </label>
+                  );
+                })}
+                {ccForm.escalation === 'Other' && <input value={ccForm.escalation_other} onChange={function(e) { setCcForm(function(f) { return Object.assign({}, f, { escalation_other: e.target.value }); }); }} style={Object.assign({}, ccInp, { marginTop: 4 })} placeholder="Describe escalation…" />}
+              </div>
+              <div style={ccGrp}>
+                <span style={ccLbl}>Priority Confirmation (Next Quarter)</span>
+                {['Approved', 'Adjusted', 'Replaced'].map(function(opt) {
+                  return (
+                    <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                      <input type="radio" name="cc_priority" value={opt} checked={ccForm.priority_confirmation === opt} onChange={function() { setCcForm(function(f) { return Object.assign({}, f, { priority_confirmation: opt }); }); }} style={{ accentColor: gold }} />
+                      {opt}
+                    </label>
+                  );
+                })}
+              </div>
+              <div style={ccGrp}>
+                <span style={ccLbl}>Review Completed</span>
+                <input type="date" value={ccForm.review_date} onChange={function(e) { setCcForm(function(f) { return Object.assign({}, f, { review_date: e.target.value }); }); }} style={ccInp} />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" disabled={ccSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: ccSaving ? 0.7 : 1 }}>{ccSaving ? 'Saving…' : 'Submit Review'}</button>
+                <button type="button" onClick={function() { setActiveCell(null); }} style={{ padding: '10px 16px', background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FinancialsView() {
+  var { useState, useEffect } = React;
+  var [items, setItems] = useState([]);
+  var [loading, setLoading] = useState(true);
+  var [markingId, setMarkingId] = useState(null);
+
+  function load() {
+    setLoading(true);
+    var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?needs_reimbursement=eq.true&select=*&order=date.desc,id.desc';
+    fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(rows) { setItems(Array.isArray(rows) ? rows : []); setLoading(false); });
+  }
+
+  useEffect(function() { load(); }, []);
+
+  function markReimbursed(id) {
+    setMarkingId(id);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ needs_reimbursement: false })
+    }).then(function() {
+      clearCache('Op Budget');
+      setMarkingId(null);
+      setItems(function(prev) { return prev.filter(function(b) { return b.id !== id; }); });
+    });
+  }
+
+  var total = items.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+  function fmt(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  var byArea = {};
+  items.forEach(function(b) {
+    var a = b.area || 'Unknown';
+    if (!byArea[a]) byArea[a] = [];
+    byArea[a].push(b);
+  });
+
+  return (
+    <div>
+      <div style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', border: '0.5px solid #e8e0d5', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 4 }}>Pending Reimbursements</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: '#b45309' }}>{fmt(total)}</div>
+        </div>
+        <div style={{ fontSize: 13, color: '#aaa' }}>{items.length} item{items.length !== 1 ? 's' : ''} across {Object.keys(byArea).length} area{Object.keys(byArea).length !== 1 ? 's' : ''}</div>
+      </div>
+      {loading ? (
+        <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>Loading…</div>
+      ) : items.length === 0 ? (
+        <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No pending reimbursements.</div>
+      ) : Object.keys(byArea).sort().map(function(area) {
+        var areaItems = byArea[area];
+        var areaTotal = areaItems.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+        return (
+          <div key={area} style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', marginBottom: 16, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{area}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#b45309' }}>{fmt(areaTotal)}</div>
+            </div>
+            {areaItems.map(function(b) {
+              var isMarking = markingId === b.id;
+              return (
+                <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
+                  {b.receipt_url && (
+                    <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    </a>
+                  )}
+                  <button onClick={function() { markReimbursed(b.id); }} disabled={isMarking} style={{ fontSize: 11, background: '#ecfdf5', color: '#059669', border: '0.5px solid #a7f3d0', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontWeight: 500, flexShrink: 0, opacity: isMarking ? 0.6 : 1 }}>
+                    {isMarking ? '…' : 'Mark Reimbursed'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
   events: EventsView,
@@ -3071,6 +3601,8 @@ const views = {
   sponsors: SponsorsView,
   strategy: StrategyView,
   operational: OperationalView,
+  financials: FinancialsView,
+  reviews: ReviewsView,
 };
 
 var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];
@@ -3155,6 +3687,29 @@ var AREA_DEFAULTS = {
                 </button>
               );
             })}
+            <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "10px 16px 8px" }} />
+            <button onClick={function() { setActive("financials"); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 16px",
+                background: active === "financials" ? "rgba(181,161,133,0.15)" : "transparent",
+                border: "none", cursor: "pointer", textAlign: "left",
+                color: active === "financials" ? "#b5a185" : "rgba(255,255,255,0.45)",
+                fontSize: 13, fontWeight: active === "financials" ? 600 : 400,
+                transition: "all 0.15s"
+              }}>
+              Financials
+            </button>
+            <button onClick={function() { setActive("reviews"); }}
+              style={{
+                display: "block", width: "100%", padding: "9px 16px",
+                background: active === "reviews" ? "rgba(181,161,133,0.15)" : "transparent",
+                border: "none", cursor: "pointer", textAlign: "left",
+                color: active === "reviews" ? "#b5a185" : "rgba(255,255,255,0.45)",
+                fontSize: 13, fontWeight: active === "reviews" ? 600 : 400,
+                transition: "all 0.15s"
+              }}>
+              Reviews
+            </button>
           </div>
         </div>
       </div>
@@ -3165,7 +3720,7 @@ var AREA_DEFAULTS = {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{mod && mod.label}</h1>
+            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Financials" : active === "reviews" ? "Reviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); setActive("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: "9px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 Submit Quarterly Update
