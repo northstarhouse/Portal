@@ -77,6 +77,8 @@ function parseIcalDate(val) {
 const gold = "#886c44";
 const cream = "#f8f4ec";
 
+var MobileCtx = React.createContext(false);
+
 var NAV_ICONS = {
   home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
   quarterly: '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/>',
@@ -261,6 +263,7 @@ const typeColors = {
   const [calEvents, setCalEvents] = useState(null);
   const [birthdays, setBirthdays] = useState(null);
   const [sponsors, setSponsors] = useState(null);
+  var isMobile = React.useContext(MobileCtx);
   useEffect(function() {
     cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes']).then(function(rows) {
       if (Array.isArray(rows)) setSponsors(rows);
@@ -336,14 +339,14 @@ const typeColors = {
         );
       })()}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         <div onClick={function() { navigate('donors'); }} style={{ cursor: 'pointer' }}><StatCard label="Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /></div>
         <div onClick={function() { navigate('volunteers'); }} style={{ cursor: 'pointer' }}><StatCard label="Active Volunteers" value={activeVols === null ? '...' : activeVols} /></div>
         <StatCard label="2026 Events" value="5" />
         <div onClick={function() { navigate('sponsors'); }} style={{ cursor: 'pointer' }}><StatCard label="Sponsors" value={sponsors === null ? '...' : sponsors.length} /></div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 16, marginBottom: 16 }}>
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -637,6 +640,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }
 }
 
 function VolunteersView() {
+  var isMobile = React.useContext(MobileCtx);
   const [volunteers, setVolunteers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -1787,6 +1791,7 @@ var CATEGORY_ORDER = ['Fund Development', 'House and Grounds Development', 'Prog
 
 function StrategyView() {
   const { useState: useS, useEffect: useE } = React;
+  var isMobile = React.useContext(MobileCtx);
   const [goals, setGoals] = useS([]);
   const [loading, setLoading] = useS(true);
   const [tab, setTab] = useS('annual');
@@ -1859,7 +1864,7 @@ function StrategyView() {
           <div style={{ fontSize: 13, color: '#888', marginBottom: 16, lineHeight: 1.6 }}>
             View progress across strategic goals at a glance. Click any progress line to see more details for that focus area.
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 20 }}>
             {CATEGORY_ORDER.map(function(cat) { return CatBox(cat); })}
           </div>
         </div>
@@ -1965,6 +1970,7 @@ function nextQ(q, yr) { return q === 'Q1' ? {q:'Q2',yr:yr} : q === 'Q2' ? {q:'Q3
 
 function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
   var { useState, useEffect } = React;
+  var isMobile = React.useContext(MobileCtx);
   var cq = currentQuarterStr();
   var cy = new Date().getFullYear();
   var [area, setArea] = useState(quarterlyArea || '');
@@ -2048,7 +2054,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
 
   return (
     <div style={{ maxWidth: "100%" }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14, marginBottom: 20 }}>
         <div style={{ background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '16px 20px' }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 8 }}>About Quarterly Updates</div>
           <div style={{ fontSize: 13, color: '#555', lineHeight: 1.7, fontStyle: 'italic' }}>Share quarterly progress, challenges, and support needs for each focus area.</div>
@@ -2116,7 +2122,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
               <input type="number" value={year} onChange={function(e) { setYear(parseInt(e.target.value) || cy); }} style={inpStyle} />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
             <div><label style={lbl}>Date Submitted</label><input readOnly value={new Date().toLocaleDateString('en-US')} style={Object.assign({}, inpStyle, { background: '#f9f7f4', color: '#999' })} /></div>
             <div><label style={lbl}>Due Date</label><input readOnly value={quarterDueDate(quarter, year).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} style={Object.assign({}, inpStyle, { background: '#f9f7f4', color: '#999' })} /></div>
           </div>
@@ -2243,6 +2249,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
 
 function OperationalView({ opArea, navigateToQuarterly }) {
   var { useState, useEffect } = React;
+  var isMobile = React.useContext(MobileCtx);
   var area = opArea || OPERATIONAL_AREAS[0];
   var [areaInfo, setAreaInfo] = useState(null);
   var [budget, setBudget] = useState([]);
@@ -2593,7 +2600,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 280px', gap: 16, marginBottom: 20 }}>
         {/* Goals card — full card flip */}
         {(function() {
           var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
@@ -3079,6 +3086,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
 
 function SponsorsView() {
   var { useState, useEffect, useRef } = React;
+  var isMobile = React.useContext(MobileCtx);
   var [sponsors, setSponsors] = useState(null);
   var [selected, setSelected] = useState(null);
   var [acks, setAcks] = useState([]);
@@ -3188,7 +3196,7 @@ function SponsorsView() {
         <StatCard label="Total Sponsors" value={sponsors === null ? '...' : sponsors.length} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 360px' : '1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: (selected && !isMobile) ? '1fr 360px' : '1fr', gap: 16 }}>
         <div>
           {sponsors === null && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>Loading…</div>}
           {sponsors !== null && sponsors.length === 0 && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>No sponsors yet.</div>}
@@ -3483,7 +3491,8 @@ function ReviewsView() {
             Print Packet
           </button>
         </div>
-        <div style={{ padding: '0 20px' }}>
+        <div className="nsh-reviews-scroll" style={{ padding: '0 20px' }}>
+          <div style={{ minWidth: 400 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '160px repeat(4, 1fr)', borderBottom: '0.5px solid #f0ece6', padding: '10px 0' }}>
             <div />
             {quarters.map(function(q) {
@@ -3529,6 +3538,7 @@ function ReviewsView() {
               );
             })
           }
+        </div>
         </div>
       </div>
 
@@ -3746,13 +3756,22 @@ var AREA_DEFAULTS = {
   const [opOpen, setOpOpen] = useState(false);
   const [opArea, setOpArea] = useState(null);
   const [quarterlyArea, setQuarterlyArea] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const View = views[active];
   const mod = modules.find(m => m.id === active);
 
+  React.useEffect(function() {
+    var fn = function() { setIsMobile(window.innerWidth < 768); };
+    window.addEventListener('resize', fn);
+    return function() { window.removeEventListener('resize', fn); };
+  }, []);
+
   return (
+    <MobileCtx.Provider value={isMobile}>
     <div style={{ display: "flex", minHeight: "100vh", background: cream, fontFamily: 'system-ui, sans-serif' }}>
-      <style>{".nsh-sidebar::-webkit-scrollbar { display: none; }"}</style>
-      <div style={{ display: "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 }}>
+      <style>{".nsh-sidebar::-webkit-scrollbar { display: none; } .nsh-reviews-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }"}</style>
+      <div style={{ display: isMobile ? "none" : "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 }}>
         <div className="nsh-sidebar" style={{ width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", scrollbarWidth: "none" }}>
           <div style={{ padding: "20px 20px 14px", display: "flex", justifyContent: "center" }}>
             <img src="assets/logo.png" alt="North Star House" style={{ width: 195, display: "block" }} />
@@ -3840,27 +3859,76 @@ var AREA_DEFAULTS = {
         </div>
       </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <div style={{ background: "#fdfcfb", padding: "24px 32px 18px", borderBottom: "3px solid rgba(136,108,68,0.35)", position: "sticky", top: 0, zIndex: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        {/* Mobile menu overlay */}
+        {isMobile && mobileMenuOpen && (
+          <div onClick={function() { setMobileMenuOpen(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200 }}>
+            <div onClick={function(e) { e.stopPropagation(); }} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 260, background: '#2a2a2e', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '20px 16px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
+                <img src="assets/logo.png" alt="NSH" style={{ height: 32 }} />
+                <button onClick={function() { setMobileMenuOpen(false); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+              </div>
+              <nav style={{ flex: 1, padding: '8px 8px' }}>
+                {modules.filter(function(m) { return !m.hidden; }).map(function(m) {
+                  return (
+                    <button key={m.id} onClick={function() { setActive(m.id); setOpOpen(false); setMobileMenuOpen(false); }} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 12px',
+                      background: active === m.id ? 'rgba(181,161,133,0.15)' : 'transparent',
+                      border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                      color: active === m.id ? '#f0ebe3' : 'rgba(255,255,255,0.5)',
+                      fontSize: 13, fontWeight: active === m.id ? 600 : 400, marginBottom: 2
+                    }}>
+                      <NavIcon id={m.id} active={active === m.id} />
+                      {m.label}
+                    </button>
+                  );
+                })}
+              </nav>
+              <div style={{ padding: '12px 8px 20px', borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600, letterSpacing: 1.4, textTransform: 'uppercase', padding: '0 8px', marginBottom: 8 }}>Operational Areas</div>
+                {OPERATIONAL_AREAS.map(function(area) {
+                  return (
+                    <button key={area} onClick={function() { setOpArea(area); setActive('operational'); setMobileMenuOpen(false); }} style={{
+                      display: 'block', width: '100%', padding: '9px 12px', background: opArea === area && active === 'operational' ? 'rgba(181,161,133,0.15)' : 'transparent',
+                      border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
+                      color: opArea === area && active === 'operational' ? '#b5a185' : 'rgba(255,255,255,0.45)',
+                      fontSize: 13, fontWeight: opArea === area && active === 'operational' ? 600 : 400, marginBottom: 2
+                    }}>{area}</button>
+                  );
+                })}
+                <div style={{ borderTop: '0.5px solid rgba(255,255,255,0.08)', margin: '8px 4px' }} />
+                <button onClick={function() { setActive('financials'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'financials' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financials' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financials' ? 600 : 400, marginBottom: 2 }}>Financials</button>
+                <button onClick={function() { setActive('reviews'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'reviews' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'reviews' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'reviews' ? 600 : 400, marginBottom: 2 }}>Reviews</button>
+              </div>
+            </div>
+          </div>
+        )}
+        <div style={{ background: "#fdfcfb", padding: isMobile ? "12px 16px 10px" : "24px 32px 18px", borderBottom: "3px solid rgba(136,108,68,0.35)", position: "sticky", top: 0, zIndex: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14 }}>
+            {isMobile && (
+              <button onClick={function() { setMobileMenuOpen(true); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#888', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              </button>
+            )}
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Financials" : active === "reviews" ? "Reviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Financials" : active === "reviews" ? "Reviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
-              <button onClick={function() { setQuarterlyArea(opArea); setActive("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: "9px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
-                Submit Quarterly Update
+              <button onClick={function() { setQuarterlyArea(opArea); setActive("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
               </button>
             )}
           </div>
         </div>
-        <div style={{ flex: 1, padding: "28px 32px" }}>
+        <div style={{ flex: 1, padding: isMobile ? "16px 14px" : "28px 32px", paddingBottom: isMobile ? 20 : undefined }}>
           <div style={{ maxWidth: 900 }}>
             <View navigate={setActive} opArea={opArea} navigateOp={function(a) { setOpArea(a); setActive('operational'); }} quarterlyArea={quarterlyArea} navigateToQuarterly={function(a) { setQuarterlyArea(a); setActive('quarterly'); }} />
           </div>
         </div>
       </div>
     </div>
+    </MobileCtx.Provider>
   );
 }
 
