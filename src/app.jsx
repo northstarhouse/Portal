@@ -2560,7 +2560,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
             <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add entries →</div>
           </div>
           {area === 'Events' && (
-            <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '16px 20px', minWidth: 160, cursor: 'default' }}>
+            <div style={Object.assign({}, cardHover, { cursor: 'default' })}>
               <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 8 }}>Earnings</div>
               {editEarnings ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
@@ -2572,8 +2572,8 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 </div>
               ) : (
                 <div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: '#2e7d32' }}>{areaInfo && areaInfo.earnings != null ? fmt(areaInfo.earnings) : '—'}</div>
-                  <div style={{ fontSize: 11, color: '#aaa', marginTop: 3 }}>event revenue</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{areaInfo && areaInfo.earnings != null ? fmt(areaInfo.earnings) : '—'}</div>
+                  <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>event revenue</div>
                   <button onClick={function() { setEarningsInput(areaInfo && areaInfo.earnings != null ? String(areaInfo.earnings) : ''); setEditEarnings(true); }} style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Edit →</button>
                 </div>
               )}
