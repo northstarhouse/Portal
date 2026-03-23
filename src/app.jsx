@@ -719,7 +719,7 @@ function VolunteersView() {
         var sb = p.email ? stageMap[p.email.toLowerCase()] : null;
         var sd = (sb && sb.stage_dates) ? Object.assign({}, sb.stage_dates) : {};
         if (!sd['Form Submitted'] && p.start_date) sd['Form Submitted'] = p.start_date;
-        return { _sbId: sb ? sb.id : null, id: sb ? sb.id : ('sheet-' + i), first_name: p.first_name, last_name: p.last_name, email: p.email, phone: p.phone, area_of_interest: p.area_of_interest, start_date: p.start_date, pipeline_stage: sb ? (sb.pipeline_stage || 'Form Submitted') : 'Form Submitted', status: sb ? (sb.status || 'In Progress') : 'In Progress', stage_dates: sd };
+        return { _sbId: sb ? sb.id : null, id: sb ? sb.id : ('sheet-' + i), first_name: p.first_name, last_name: p.last_name, email: p.email, phone: p.phone, area_of_interest: p.area_of_interest, start_date: p.start_date, pipeline_stage: sb ? (sb.pipeline_stage || 'Form Submitted') : 'Form Submitted', status: sb ? (sb.status || 'In Progress') : 'In Progress', stage_dates: sd, survey_sent: sb ? !!sb.survey_sent : false };
       });
       setOnboarding(merged);
     });
@@ -779,6 +779,17 @@ function VolunteersView() {
       setObActing(null);
       setObSelectedId(null);
     });
+  }
+
+  function toggleSurvey(ob) {
+    var newVal = !ob.survey_sent;
+    if (!ob._sbId) return;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + '?id=eq.' + ob._sbId, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ survey_sent: newVal })
+    });
+    setOnboarding(function(p) { return p.map(function(o) { return o.id === ob.id ? Object.assign({}, o, { survey_sent: newVal }) : o; }); });
   }
 
   var active = volunteers.filter(function(v) { return v['Status'] === 'Active'; }).length;
@@ -1170,6 +1181,65 @@ function VolunteersView() {
               })}
             </div>
           </div>
+
+          {/* Year in Review */}
+          <div style={{ marginTop: 28 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12 }}>Volunteer Year in Review</div>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
+              <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ background: '#ecfdf5', borderBottom: '0.5px solid #a7f3d0', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#059669' }}>✓ Successfully Onboarded</span>
+                  <span style={{ fontSize: 11, color: '#059669', opacity: 0.7 }}>{onboarding.filter(function(o) { return o.pipeline_stage === 'Successfully Onboarded'; }).length}</span>
+                </div>
+                {onboarding.filter(function(o) { return o.pipeline_stage === 'Successfully Onboarded'; }).length === 0
+                  ? <div style={{ padding: '20px 16px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>None yet</div>
+                  : onboarding.filter(function(o) { return o.pipeline_stage === 'Successfully Onboarded'; }).map(function(ob) {
+                      var d = (ob.stage_dates || {})['Successfully Onboarded'];
+                      return (
+                        <div key={ob.id} style={{ padding: '10px 16px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{ob.first_name} {ob.last_name}</div>
+                            {ob.area_of_interest && <div style={{ fontSize: 11, color: '#888' }}>{ob.area_of_interest}</div>}
+                          </div>
+                          {d && <div style={{ fontSize: 11, color: '#aaa' }}>{d}</div>}
+                        </div>
+                      );
+                    })
+                }
+              </div>
+              <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ background: '#fef2f2', borderBottom: '0.5px solid #fecaca', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#ef4444' }}>✕ No Longer Interested</span>
+                  <span style={{ fontSize: 11, color: '#ef4444', opacity: 0.7 }}>{onboarding.filter(function(o) { return o.pipeline_stage === 'No Longer Interested'; }).length}</span>
+                </div>
+                {onboarding.filter(function(o) { return o.pipeline_stage === 'No Longer Interested'; }).length === 0
+                  ? <div style={{ padding: '20px 16px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>None yet</div>
+                  : onboarding.filter(function(o) { return o.pipeline_stage === 'No Longer Interested'; }).map(function(ob) {
+                      var d = (ob.stage_dates || {})['No Longer Interested'];
+                      return (
+                        <div key={ob.id} style={{ padding: '10px 16px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div onClick={function() { toggleSurvey(ob); }} title={ob.survey_sent ? 'Survey sent' : 'Mark survey sent'}
+                            style={{ width: 18, height: 18, border: '1.5px solid ' + (ob.survey_sent ? '#059669' : '#d0ccc6'), borderRadius: 4, background: ob.survey_sent ? '#059669' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, fontSize: 11, color: '#fff', fontWeight: 700, transition: 'all 0.15s' }}>
+                            {ob.survey_sent ? '✓' : ''}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{ob.first_name} {ob.last_name}</div>
+                            {ob.area_of_interest && <div style={{ fontSize: 11, color: '#888' }}>{ob.area_of_interest}</div>}
+                          </div>
+                          {d && <div style={{ fontSize: 11, color: '#aaa', flexShrink: 0 }}>{d}</div>}
+                        </div>
+                      );
+                    })
+                }
+                {onboarding.filter(function(o) { return o.pipeline_stage === 'No Longer Interested'; }).length > 0 && (
+                  <div style={{ padding: '8px 16px', borderTop: '0.5px solid #f0ebe3' }}>
+                    <span style={{ fontSize: 11, color: '#bbb' }}>Check box when exit survey has been sent</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
         </div>
       )}
 
