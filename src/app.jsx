@@ -652,12 +652,15 @@ function VolunteersView() {
   const [tab, setTab] = useState('active');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboarding, setOnboarding] = useState([]);
-  const [onboardingLoading, setOnboardingLoading] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
-  var emptyOBForm = { first_name: '', last_name: '', email: '', phone: '', start_date: today, notes: '' };
+  var OB_STAGES = ['Form Submitted', 'Processed by Haley', 'Welcome Email Sent', 'Info Sent to Lead', 'Lead Contact Made', 'First Meeting', 'Paperwork Received', 'Added to Kiosk', '30-Day Check-In', '60-Day Check-In'];
+  var OB_TERMINAL = ['Successfully Onboarded', 'No Longer Interested'];
+  var emptyOBForm = { first_name: '', last_name: '', email: '', phone: '', area_of_interest: '', start_date: today, notes: '' };
   const [obForm, setObForm] = useState(emptyOBForm);
+  const [showAddOb, setShowAddOb] = useState(false);
   const [obSaving, setObSaving] = useState(false);
   const [obActing, setObActing] = useState(null);
+  const [obSelectedId, setObSelectedId] = useState(null);
 
   var emptyForm = {
     'First Name': '', 'Last Name': '', 'Team': '', 'Status': 'Active',
@@ -677,7 +680,7 @@ function VolunteersView() {
         setLoading(false);
       })
       .catch(function(err) { setError(err.message); setLoading(false); });
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + "?status=eq.In Progress&select=*&order=start_date.asc,id.asc", { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + '?select=*&order=start_date.asc,id.asc', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
       .then(function(r) { return r.json(); }).then(function(rows) { if (Array.isArray(rows)) setOnboarding(rows); });
   }, []);
 
@@ -687,46 +690,41 @@ function VolunteersView() {
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ first_name: obForm.first_name, last_name: obForm.last_name || null, email: obForm.email || null, phone: obForm.phone || null, start_date: obForm.start_date || null, notes: obForm.notes || null, status: 'In Progress' })
+      body: JSON.stringify({ first_name: obForm.first_name, last_name: obForm.last_name || null, email: obForm.email || null, phone: obForm.phone || null, area_of_interest: obForm.area_of_interest || null, start_date: obForm.start_date || null, notes: obForm.notes || null, pipeline_stage: 'New Inquiry', status: 'In Progress' })
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (rows && rows.code) { setObSaving(false); alert('Failed: ' + (rows.message || rows.code)); return; }
       setObSaving(false);
       if (rows && rows[0]) setOnboarding(function(p) { return p.concat([rows[0]]); });
       setObForm(emptyOBForm);
+      setShowAddOb(false);
     });
   }
 
-  function obPromote(ob) {
+  function obSetStage(ob, stage) {
     setObActing(ob.id);
-    var volPayload = { 'First Name': ob.first_name, 'Last Name': ob.last_name || '', 'Status': 'Active', 'Email': ob.email || '', 'Phone Number': ob.phone || '', 'Notes': ob.notes || '' };
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers'), {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify(volPayload)
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      var newVol = rows && rows[0];
-      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + '?id=eq.' + ob.id, {
-        method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'Complete' })
-      }).then(function() {
-        clearCache('2026 Volunteers');
-        setOnboarding(function(p) { return p.filter(function(o) { return o.id !== ob.id; }); });
-        if (newVol) setVolunteers(function(p) { return p.concat([newVol]); });
-        setObActing(null);
-      });
-    });
-  }
-
-  function obDismiss(ob) {
-    setObActing(ob.id);
+    var isTerminal = OB_TERMINAL.indexOf(stage) !== -1;
+    var patch = { pipeline_stage: stage };
+    if (stage === 'Successfully Onboarded') patch.status = 'Complete';
+    else if (stage === 'No Longer Interested') patch.status = "Didn't Stick";
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + '?id=eq.' + ob.id, {
       method: 'PATCH',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: "Didn't Stick" })
+      body: JSON.stringify(patch)
     }).then(function() {
-      setOnboarding(function(p) { return p.filter(function(o) { return o.id !== ob.id; }); });
+      if (stage === 'Successfully Onboarded') {
+        var volPayload = { 'First Name': ob.first_name, 'Last Name': ob.last_name || '', 'Status': 'Active', 'Email': ob.email || '', 'Phone Number': ob.phone || '', 'Notes': ob.notes || '' };
+        fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers'), {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+          body: JSON.stringify(volPayload)
+        }).then(function(r) { return r.json(); }).then(function(rows) {
+          clearCache('2026 Volunteers');
+          if (rows && rows[0]) setVolunteers(function(p) { return p.concat([rows[0]]); });
+        });
+      }
+      setOnboarding(function(p) { return p.map(function(o) { return o.id === ob.id ? Object.assign({}, o, patch) : o; }); });
       setObActing(null);
+      setObSelectedId(null);
     });
   }
 
@@ -879,7 +877,7 @@ function VolunteersView() {
         <StatCard label="Total Volunteers" value={loading ? '...' : volunteers.length} />
         <StatCard label="Active" value={loading ? '...' : active} />
         <div onClick={function() { setShowOnboarding(true); }} style={{ cursor: 'pointer' }} onMouseEnter={function(e) { e.currentTarget.style.opacity='0.85'; }} onMouseLeave={function(e) { e.currentTarget.style.opacity='1'; }}>
-          <StatCard label="Onboarding" value={onboarding.length} />
+          <StatCard label="Onboarding" value={onboarding.filter(function(o) { return o.status === 'In Progress'; }).length} />
         </div>
         <StatCard label="Teams" value={loading ? '...' : teams} />
       </div>
@@ -1026,53 +1024,120 @@ function VolunteersView() {
       )}
 
       {showOnboarding && (
-        <div onClick={function() { setShowOnboarding(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 500, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '88vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Onboarding <span style={{ fontSize: 13, color: '#aaa', fontWeight: 400 }}>({onboarding.length} in progress)</span></div>
-              <button onClick={function() { setShowOnboarding(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>×</button>
+        <div onClick={function() { setShowOnboarding(false); setObSelectedId(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: isMobile ? 0 : 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#f5f1eb', borderRadius: isMobile ? 0 : 18, width: '100%', maxWidth: 900, height: isMobile ? '100vh' : '88vh', boxShadow: '0 8px 40px rgba(0,0,0,0.22)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+            {/* Header */}
+            <div style={{ background: '#fff', padding: '16px 22px', borderBottom: '0.5px solid #e8e0d5', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>Volunteer Onboarding Pipeline</div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <button onClick={function() { setShowAddOb(function(v) { return !v; }); setObForm(emptyOBForm); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ Add Person</button>
+                <button onClick={function() { setShowOnboarding(false); setObSelectedId(null); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
+              </div>
             </div>
 
-            {/* Add new */}
-            <div style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 12 }}>Add to Onboarding</div>
-              <form onSubmit={addObEntry}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                  <div><div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>First Name *</div><input required value={obForm.first_name} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { first_name: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
-                  <div><div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Last Name</div><input value={obForm.last_name} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { last_name: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                  <div><div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Email</div><input type="email" value={obForm.email} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { email: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
-                  <div><div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Phone</div><input value={obForm.phone} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { phone: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                  <div><div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Start Date</div><input type="date" value={obForm.start_date} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { start_date: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
-                  <div><div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Notes</div><input value={obForm.notes} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} placeholder="Optional…" /></div>
-                </div>
-                <button type="submit" disabled={obSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: obSaving ? 0.7 : 1 }}>{obSaving ? 'Adding…' : 'Add'}</button>
-              </form>
-            </div>
+            {/* Add form (collapsible) */}
+            {showAddOb && (
+              <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e0d5', padding: '16px 22px', flexShrink: 0 }}>
+                <form onSubmit={addObEntry}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr) auto', gap: 10, alignItems: 'flex-end' }}>
+                    <div><div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>First Name *</div><input required value={obForm.first_name} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { first_name: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
+                    <div><div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Last Name</div><input value={obForm.last_name} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { last_name: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
+                    <div><div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Area of Interest</div><input value={obForm.area_of_interest} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { area_of_interest: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} placeholder="e.g. Events" /></div>
+                    <div><div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Email</div><input type="email" value={obForm.email} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { email: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
+                    <div><div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Phone</div><input value={obForm.phone} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { phone: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
+                    <button type="submit" disabled={obSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: obSaving ? 0.7 : 1, whiteSpace: 'nowrap' }}>{obSaving ? '…' : 'Add'}</button>
+                  </div>
+                </form>
+              </div>
+            )}
 
-            {/* List */}
-            {onboarding.length === 0
-              ? <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No one currently onboarding.</div>
-              : onboarding.map(function(ob) {
-                  var acting = obActing === ob.id;
+            {/* Two-panel body */}
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+              {/* Left: person cards */}
+              <div style={{ width: isMobile ? '45%' : 240, background: '#fff', borderRight: '0.5px solid #e8e0d5', overflowY: 'auto', flexShrink: 0 }}>
+                <div style={{ padding: '12px 14px 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, color: '#aaa', fontWeight: 600 }}>In Pipeline</div>
+                {onboarding.filter(function(o) { return o.status === 'In Progress'; }).map(function(ob) {
+                  var sel = obSelectedId === ob.id;
                   return (
-                    <div key={ob.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 0', borderBottom: '0.5px solid #f0ece6' }}>
-                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(136,108,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: gold, flexShrink: 0 }}>
-                        {(ob.first_name||'')[0]}{(ob.last_name||'')[0]}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{ob.first_name} {ob.last_name}</div>
-                        <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{ob.email || ob.phone || ''}{ob.start_date ? ' · started ' + ob.start_date : ''}</div>
-                      </div>
-                      <button onClick={function() { if (!acting) obPromote(ob); }} disabled={acting} title="Fully onboarded — add to volunteer list" style={{ fontSize: 11, background: '#ecfdf5', color: '#059669', border: '0.5px solid #a7f3d0', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontWeight: 500, flexShrink: 0, opacity: acting ? 0.5 : 1 }}>✓ Onboarded</button>
-                      <button onClick={function() { if (!acting) obDismiss(ob); }} disabled={acting} title="Didn't stick" style={{ fontSize: 11, background: '#fef2f2', color: '#ef4444', border: '0.5px solid #fecaca', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontWeight: 500, flexShrink: 0, opacity: acting ? 0.5 : 1 }}>✕ Didn't stick</button>
+                    <div key={ob.id} onClick={function() { setObSelectedId(sel ? null : ob.id); }}
+                      style={{ padding: '11px 14px', cursor: 'pointer', background: sel ? '#fef9f0' : 'transparent', borderLeft: sel ? '3px solid ' + gold : '3px solid transparent', borderBottom: '0.5px solid #f5f1eb', transition: 'all 0.12s' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginBottom: 3 }}>{ob.first_name} {ob.last_name}</div>
+                      {ob.area_of_interest && <div style={{ display: 'inline-block', fontSize: 10, background: 'rgba(136,108,68,0.1)', color: gold, padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>{ob.area_of_interest}</div>}
                     </div>
                   );
-                })
-            }
+                })}
+                {onboarding.filter(function(o) { return o.status === 'In Progress'; }).length === 0 && (
+                  <div style={{ padding: '20px 14px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No one in pipeline</div>
+                )}
+              </div>
+
+              {/* Right: pipeline */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+                {OB_STAGES.map(function(stage, si) {
+                  var people = onboarding.filter(function(o) { return (o.pipeline_stage || 'Form Submitted') === stage && o.status === 'In Progress'; });
+                  var isNext = obSelectedId && (function() {
+                    var sel = onboarding.find(function(o) { return o.id === obSelectedId; });
+                    if (!sel) return false;
+                    var curIdx = OB_STAGES.indexOf(sel.pipeline_stage || 'Form Submitted');
+                    return curIdx + 1 === si;
+                  })();
+                  return (
+                    <div key={stage} style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 22, height: 22, borderRadius: '50%', background: people.length > 0 ? gold : '#e8e0d5', color: people.length > 0 ? '#fff' : '#bbb', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{si + 1}</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#555', flex: 1 }}>{stage}</div>
+                        {obSelectedId && isNext && (
+                          <button onClick={function() {
+                            var sel = onboarding.find(function(o) { return o.id === obSelectedId; });
+                            if (sel) obSetStage(sel, stage);
+                          }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 500 }}>Move here →</button>
+                        )}
+                      </div>
+                      {people.length > 0 && (
+                        <div style={{ marginLeft: 32, marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {people.map(function(ob) {
+                            var sel = obSelectedId === ob.id;
+                            return (
+                              <div key={ob.id} onClick={function() { setObSelectedId(sel ? null : ob.id); }}
+                                style={{ fontSize: 12, padding: '4px 12px', borderRadius: 20, cursor: 'pointer', fontWeight: sel ? 600 : 400, background: sel ? gold : '#f0ebe2', color: sel ? '#fff' : '#2a2a2a', border: '0.5px solid ' + (sel ? gold : '#e0d8cc'), transition: 'all 0.12s' }}>
+                                {ob.first_name} {ob.last_name}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {si < OB_STAGES.length - 1 && <div style={{ marginLeft: 10, width: 2, height: 12, background: '#e8e0d5', marginTop: 4 }} />}
+                    </div>
+                  );
+                })}
+
+                {/* Terminal stages */}
+                <div style={{ marginTop: 16, borderTop: '0.5px solid #e8e0d5', paddingTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  {[{ stage: 'Successfully Onboarded', bg: '#ecfdf5', color: '#059669', border: '#a7f3d0', icon: '✓' }, { stage: 'No Longer Interested', bg: '#fef2f2', color: '#ef4444', border: '#fecaca', icon: '✕' }].map(function(t) {
+                    var people = onboarding.filter(function(o) { return o.pipeline_stage === t.stage; });
+                    var selectedOb = obSelectedId ? onboarding.find(function(o) { return o.id === obSelectedId; }) : null;
+                    var canMove = selectedOb && selectedOb.status === 'In Progress';
+                    return (
+                      <div key={t.stage} style={{ background: t.bg, border: '0.5px solid ' + t.border, borderRadius: 10, padding: '12px 14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{t.icon} {t.stage}</div>
+                          {canMove && (
+                            <button onClick={function() { if (selectedOb) obSetStage(selectedOb, t.stage); }}
+                              style={{ fontSize: 11, background: t.color, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontWeight: 500 }}>Move</button>
+                          )}
+                        </div>
+                        {people.length === 0
+                          ? <div style={{ fontSize: 11, color: t.color, opacity: 0.5 }}>None yet</div>
+                          : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{people.map(function(ob) { return <span key={ob.id} style={{ fontSize: 11, background: '#fff', color: t.color, border: '0.5px solid ' + t.border, borderRadius: 12, padding: '2px 9px', fontWeight: 500 }}>{ob.first_name} {ob.last_name}</span>; })}</div>
+                        }
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
