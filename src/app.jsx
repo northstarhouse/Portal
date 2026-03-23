@@ -652,12 +652,39 @@ function VolunteersView() {
   const [tab, setTab] = useState('active');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboarding, setOnboarding] = useState([]);
+  var OB_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRvOZozfWfzXyS5GyAHDyzQbXf-A8GxNMKTTRh6BGDJCVAAdimGW7MvLdhl0Ab0PuUgmUfm8xpZRUyP/pub?gid=544068320&single=true&output=csv';
+  function parseObCSV(text) {
+    var lines = text.split('\n').filter(function(l) { return l.trim(); });
+    if (lines.length < 2) return [];
+    function splitCSVLine(line) {
+      var cols = []; var cur = ''; var inQ = false;
+      for (var i = 0; i < line.length; i++) {
+        var c = line[i];
+        if (c === '"') { inQ = !inQ; }
+        else if (c === ',' && !inQ) { cols.push(cur); cur = ''; }
+        else { cur += c; }
+      }
+      cols.push(cur);
+      return cols.map(function(v) { return v.trim(); });
+    }
+    var headers = splitCSVLine(lines[0]).map(function(h) { return h.toLowerCase().replace(/^"|"$/g, ''); });
+    return lines.slice(1).map(function(line) {
+      var cols = splitCSVLine(line);
+      var obj = {};
+      headers.forEach(function(h, i) { obj[h] = (cols[i] || '').replace(/^"|"$/g, '').trim(); });
+      return {
+        first_name: obj['first name'] || obj['firstname'] || '',
+        last_name: obj['last name'] || obj['lastname'] || '',
+        area_of_interest: obj['area'] || obj['area of interest'] || '',
+        email: obj['email'] || '',
+        phone: obj['phone number'] || obj['phone'] || '',
+        start_date: obj['date'] || obj['timestamp'] || ''
+      };
+    }).filter(function(p) { return p.first_name; });
+  }
   const today = new Date().toISOString().slice(0, 10);
   var OB_STAGES = ['Form Submitted', 'Processed by Haley', 'Welcome Email Sent', 'Info Sent to Lead', 'Lead Contact Made', 'First Meeting', 'Paperwork Received', 'Added to Kiosk', '30-Day Check-In', '60-Day Check-In'];
   var OB_TERMINAL = ['Successfully Onboarded', 'No Longer Interested'];
-  var emptyOBForm = { first_name: '', last_name: '', email: '', phone: '', area_of_interest: '', start_date: today, notes: '' };
-  const [obForm, setObForm] = useState(emptyOBForm);
-  const [showAddOb, setShowAddOb] = useState(false);
   const [obSaving, setObSaving] = useState(false);
   const [obActing, setObActing] = useState(null);
   const [obSelectedId, setObSelectedId] = useState(null);
@@ -680,8 +707,20 @@ function VolunteersView() {
         setLoading(false);
       })
       .catch(function(err) { setError(err.message); setLoading(false); });
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + '?select=*&order=start_date.asc,id.asc', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
-      .then(function(r) { return r.json(); }).then(function(rows) { if (Array.isArray(rows)) setOnboarding(rows); });
+    Promise.all([
+      fetch(OB_SHEET_URL).then(function(r) { return r.text(); }).catch(function() { return ''; }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + '?select=*', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }).catch(function() { return []; })
+    ]).then(function(results) {
+      var sheetPeople = parseObCSV(results[0]);
+      var sbRows = Array.isArray(results[1]) ? results[1] : [];
+      var stageMap = {};
+      sbRows.forEach(function(r) { if (r.email) stageMap[r.email.toLowerCase()] = r; });
+      var merged = sheetPeople.map(function(p, i) {
+        var sb = p.email ? stageMap[p.email.toLowerCase()] : null;
+        return { _sbId: sb ? sb.id : null, id: sb ? sb.id : ('sheet-' + i), first_name: p.first_name, last_name: p.last_name, email: p.email, phone: p.phone, area_of_interest: p.area_of_interest, start_date: p.start_date, pipeline_stage: sb ? (sb.pipeline_stage || 'Form Submitted') : 'Form Submitted', status: sb ? (sb.status || 'In Progress') : 'In Progress' };
+      });
+      setOnboarding(merged);
+    });
   }, []);
 
   function addObEntry(e) {
@@ -702,17 +741,26 @@ function VolunteersView() {
 
   function obSetStage(ob, stage) {
     setObActing(ob.id);
-    var isTerminal = OB_TERMINAL.indexOf(stage) !== -1;
     var patch = { pipeline_stage: stage };
     if (stage === 'Successfully Onboarded') patch.status = 'Complete';
     else if (stage === 'No Longer Interested') patch.status = "Didn't Stick";
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + '?id=eq.' + ob.id, {
-      method: 'PATCH',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch)
-    }).then(function() {
+    var req;
+    if (ob._sbId) {
+      req = fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + '?id=eq.' + ob._sbId, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      }).then(function() { return { sbId: ob._sbId }; });
+    } else {
+      req = fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding'), {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify(Object.assign({ first_name: ob.first_name, last_name: ob.last_name || null, email: ob.email || null, phone: ob.phone || null, area_of_interest: ob.area_of_interest || null, start_date: ob.start_date || null, status: patch.status || 'In Progress' }, patch))
+      }).then(function(r) { return r.json(); }).then(function(rows) { return { sbId: rows && rows[0] ? rows[0].id : null }; });
+    }
+    req.then(function(result) {
       if (stage === 'Successfully Onboarded') {
-        var volPayload = { 'First Name': ob.first_name, 'Last Name': ob.last_name || '', 'Status': 'Active', 'Email': ob.email || '', 'Phone Number': ob.phone || '', 'Notes': ob.notes || '' };
+        var volPayload = { 'First Name': ob.first_name, 'Last Name': ob.last_name || '', 'Status': 'Active', 'Email': ob.email || '', 'Phone Number': ob.phone || '' };
         fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers'), {
           method: 'POST',
           headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -722,7 +770,7 @@ function VolunteersView() {
           if (rows && rows[0]) setVolunteers(function(p) { return p.concat([rows[0]]); });
         });
       }
-      setOnboarding(function(p) { return p.map(function(o) { return o.id === ob.id ? Object.assign({}, o, patch) : o; }); });
+      setOnboarding(function(p) { return p.map(function(o) { return o.id === ob.id ? Object.assign({}, o, patch, { _sbId: result.sbId || o._sbId, id: result.sbId || o.id }) : o; }); });
       setObActing(null);
       setObSelectedId(null);
     });
@@ -1030,28 +1078,8 @@ function VolunteersView() {
             {/* Header */}
             <div style={{ background: '#fff', padding: '16px 22px', borderBottom: '0.5px solid #e8e0d5', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>Volunteer Onboarding Pipeline</div>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <button onClick={function() { setShowAddOb(function(v) { return !v; }); setObForm(emptyOBForm); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ Add Person</button>
-                <button onClick={function() { setShowOnboarding(false); setObSelectedId(null); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
-              </div>
+              <button onClick={function() { setShowOnboarding(false); setObSelectedId(null); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
             </div>
-
-            {/* Add form (collapsible) */}
-            {showAddOb && (
-              <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e0d5', padding: '16px 22px', flexShrink: 0 }}>
-                <form onSubmit={addObEntry}>
-                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(6, 1fr) auto', gap: 10, alignItems: 'flex-end' }}>
-                    <div><div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>First Name *</div><input required value={obForm.first_name} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { first_name: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
-                    <div><div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Last Name</div><input value={obForm.last_name} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { last_name: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
-                    <div><div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Area</div><input value={obForm.area_of_interest} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { area_of_interest: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
-                    <div><div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Email</div><input type="email" value={obForm.email} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { email: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
-                    <div><div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Phone Number</div><input value={obForm.phone} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { phone: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
-                    <div><div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Date</div><input type="date" value={obForm.start_date} onChange={function(e) { setObForm(function(f) { return Object.assign({}, f, { start_date: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} /></div>
-                    <button type="submit" disabled={obSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: obSaving ? 0.7 : 1, whiteSpace: 'nowrap' }}>{obSaving ? '…' : 'Add'}</button>
-                  </div>
-                </form>
-              </div>
-            )}
 
             {/* Two-panel body */}
             <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
