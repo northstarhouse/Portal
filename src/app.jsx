@@ -4046,19 +4046,37 @@ function ReviewsView() {
 
 function FinancialsView() {
   var { useState, useEffect } = React;
+
+  // Reimbursements
   var [items, setItems] = useState([]);
   var [loading, setLoading] = useState(true);
   var [markingId, setMarkingId] = useState(null);
 
-  function load() {
+  // Earnings (Creative Rentals)
+  var RENTAL_NAMES = ['Yoga with Teena Bates', 'Mahjong Group', 'Other'];
+  var PAYMENT_TYPES = ['Cash', 'Card', 'Check'];
+  var emptyRentalForm = { name: 'Yoga with Teena Bates', custom_name: '', amount: '', date: new Date().toISOString().slice(0,10), payment_type: 'Cash' };
+  var [rentals, setRentals] = useState([]);
+  var [rentalsLoading, setRentalsLoading] = useState(true);
+  var [rentalForm, setRentalForm] = useState(emptyRentalForm);
+  var [rentalSaving, setRentalSaving] = useState(false);
+  var [showRentalForm, setShowRentalForm] = useState(false);
+
+  function loadReimbursements() {
     setLoading(true);
-    var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?needs_reimbursement=eq.true&select=*&order=date.desc,id.desc';
-    fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
-      .then(function(r) { return r.json(); })
-      .then(function(rows) { setItems(Array.isArray(rows) ? rows : []); setLoading(false); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?needs_reimbursement=eq.true&select=*&order=date.desc,id.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setItems(Array.isArray(rows) ? rows : []); setLoading(false); });
   }
 
-  useEffect(function() { load(); }, []);
+  function loadRentals() {
+    setRentalsLoading(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=*&order=date.desc,id.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setRentals(Array.isArray(rows) ? rows : []); setRentalsLoading(false); });
+  }
+
+  useEffect(function() { loadReimbursements(); loadRentals(); }, []);
 
   function markReimbursed(id) {
     setMarkingId(id);
@@ -4073,61 +4091,143 @@ function FinancialsView() {
     });
   }
 
-  var total = items.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
-  function fmt(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function submitRental(e) {
+    e.preventDefault();
+    var finalName = rentalForm.name === 'Other' ? rentalForm.custom_name : rentalForm.name;
+    if (!finalName || !rentalForm.amount || !rentalForm.date) return;
+    setRentalSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ name: finalName, amount: parseFloat(rentalForm.amount), date: rentalForm.date, payment_type: rentalForm.payment_type })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var newRow = (rows && rows[0]) ? rows[0] : { name: finalName, amount: parseFloat(rentalForm.amount), date: rentalForm.date, payment_type: rentalForm.payment_type };
+      setRentals(function(prev) { return [newRow].concat(prev); });
+      setRentalForm(emptyRentalForm);
+      setShowRentalForm(false);
+      setRentalSaving(false);
+    }).catch(function() { setRentalSaving(false); });
+  }
 
+  function fmt(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  var reimTotal = items.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+  var rentTotal = rentals.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
   var byArea = {};
-  items.forEach(function(b) {
-    var a = b.area || 'Unknown';
-    if (!byArea[a]) byArea[a] = [];
-    byArea[a].push(b);
-  });
+  items.forEach(function(b) { var a = b.area || 'Unknown'; if (!byArea[a]) byArea[a] = []; byArea[a].push(b); });
+
+  var inpSt = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff', boxSizing: 'border-box' };
 
   return (
-    <div>
-      <div style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', border: '0.5px solid #e8e0d5', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 4 }}>Pending Reimbursements</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#b45309' }}>{fmt(total)}</div>
-        </div>
-        <div style={{ fontSize: 13, color: '#aaa' }}>{items.length} item{items.length !== 1 ? 's' : ''} across {Object.keys(byArea).length} area{Object.keys(byArea).length !== 1 ? 's' : ''}</div>
-      </div>
-      {loading ? (
-        <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>Loading…</div>
-      ) : items.length === 0 ? (
-        <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No pending reimbursements.</div>
-      ) : Object.keys(byArea).sort().map(function(area) {
-        var areaItems = byArea[area];
-        var areaTotal = areaItems.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
-        return (
-          <div key={area} style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', marginBottom: 16, overflow: 'hidden' }}>
-            <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{area}</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#b45309' }}>{fmt(areaTotal)}</div>
-            </div>
-            {areaItems.map(function(b) {
-              var isMarking = markingId === b.id;
-              return (
-                <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
-                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
-                  {b.receipt_url && (
-                    <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                    </a>
-                  )}
-                  <button onClick={function() { markReimbursed(b.id); }} disabled={isMarking} style={{ fontSize: 11, background: '#ecfdf5', color: '#059669', border: '0.5px solid #a7f3d0', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontWeight: 500, flexShrink: 0, opacity: isMarking ? 0.6 : 1 }}>
-                    {isMarking ? '…' : 'Mark Reimbursed'}
-                  </button>
-                </div>
-              );
-            })}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+
+      {/* Reimbursements */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+        <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Pending Reimbursements</div>
+            {!loading && items.length > 0 && <div style={{ fontSize: 12, color: '#b45309', fontWeight: 600, marginTop: 2 }}>{fmt(reimTotal)} total · {items.length} item{items.length !== 1 ? 's' : ''}</div>}
           </div>
-        );
-      })}
+        </div>
+        {loading ? (
+          <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
+        ) : items.length === 0 ? (
+          <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No pending reimbursements.</div>
+        ) : Object.keys(byArea).sort().map(function(area) {
+          var areaItems = byArea[area];
+          var areaTotal = areaItems.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+          return (
+            <div key={area}>
+              <div style={{ padding: '10px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{area}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309' }}>{fmt(areaTotal)}</div>
+              </div>
+              {areaItems.map(function(b) {
+                var isMarking = markingId === b.id;
+                return (
+                  <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
+                      {b.volunteer_name && <div style={{ fontSize: 12, color: '#555', fontWeight: 500, marginTop: 2 }}>{b.volunteer_name}{b.volunteer_address ? ' · ' + b.volunteer_address : ''}</div>}
+                      <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
+                    {b.receipt_url && (
+                      <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                      </a>
+                    )}
+                    <button onClick={function() { markReimbursed(b.id); }} disabled={isMarking} style={{ fontSize: 11, background: '#ecfdf5', color: '#059669', border: '0.5px solid #a7f3d0', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontWeight: 500, flexShrink: 0, opacity: isMarking ? 0.6 : 1 }}>
+                      {isMarking ? '…' : 'Mark Reimbursed'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Earnings */}
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+        <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Earnings</div>
+            {!rentalsLoading && rentals.length > 0 && <div style={{ fontSize: 12, color: '#059669', fontWeight: 600, marginTop: 2 }}>{fmt(rentTotal)} total · {rentals.length} entr{rentals.length !== 1 ? 'ies' : 'y'}</div>}
+          </div>
+          <button onClick={function() { setShowRentalForm(function(v) { return !v; }); }} style={{ fontSize: 12, background: showRentalForm ? '#f5f0ea' : gold, color: showRentalForm ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}>{showRentalForm ? 'Cancel' : '+ Log Earning'}</button>
+        </div>
+        {showRentalForm && (
+          <form onSubmit={submitRental} style={{ padding: '16px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fefcf8' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Rental Name</label>
+                <select name="name" value={rentalForm.name} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { name: e.target.value, custom_name: '' }); }); }} style={inpSt}>
+                  {RENTAL_NAMES.map(function(n) { return <option key={n} value={n}>{n}</option>; })}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Payment Type</label>
+                <select name="payment_type" value={rentalForm.payment_type} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { payment_type: e.target.value }); }); }} style={inpSt}>
+                  {PAYMENT_TYPES.map(function(p) { return <option key={p} value={p}>{p}</option>; })}
+                </select>
+              </div>
+            </div>
+            {rentalForm.name === 'Other' && (
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Specify Name</label>
+                <input required name="custom_name" value={rentalForm.custom_name} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { custom_name: e.target.value }); }); }} placeholder="Enter rental name" style={inpSt} />
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Amount</label>
+                <input required name="amount" type="number" step="0.01" min="0" value={rentalForm.amount} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} placeholder="0.00" style={inpSt} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Date</label>
+                <input required name="date" type="date" value={rentalForm.date} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={inpSt} />
+              </div>
+            </div>
+            <button type="submit" disabled={rentalSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: rentalSaving ? 0.7 : 1 }}>{rentalSaving ? 'Saving…' : 'Save Earning'}</button>
+          </form>
+        )}
+        {rentalsLoading ? (
+          <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
+        ) : rentals.length === 0 ? (
+          <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No earnings logged yet.</div>
+        ) : rentals.map(function(r) {
+          return (
+            <div key={r.id || r.date + r.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, color: '#2a2a2a', fontWeight: 500 }}>{r.name}</div>
+                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{r.date}{r.payment_type ? ' · ' + r.payment_type : ''}</div>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#059669', flexShrink: 0 }}>{fmt(parseFloat(r.amount) || 0)}</div>
+            </div>
+          );
+        })}
+      </div>
+
     </div>
   );
 }
