@@ -653,7 +653,8 @@ function VolunteersView() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboarding, setOnboarding] = useState([]);
   var OB_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRvOZozfWfzXyS5GyAHDyzQbXf-A8GxNMKTTRh6BGDJCVAAdimGW7MvLdhl0Ab0PuUgmUfm8xpZRUyP/pub?gid=544068320&single=true&output=csv';
-  var HOURS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1sp4c5HRzVs3js3MURSedX82e6Hc6mAenjY-Szliaeno/export?format=csv';
+  var HOURS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1sp4c5HRzVs3js3MURSedX82e6Hc6mAenjY-Szliaeno/gviz/tq?tqx=out:csv&sheet=Hours+Summary';
+  var HOUR_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const [hoursData, setHoursData] = React.useState({});
 
   function parseHoursCSV(text) {
@@ -670,26 +671,42 @@ function VolunteersView() {
       cols.push(cur);
       return cols.map(function(v) { return v.trim().replace(/^"|"$/g, ''); });
     }
+    // Format: Name, Total Hours, Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec
     var result = {};
     lines.slice(1).forEach(function(line) {
       var cols = splitLine(line);
-      var name = cols[0] || '';
-      var area = cols[1] || '';
-      var date = cols[2] || '';
-      var hours = parseFloat(cols[5]) || 0; // "Total" decimal column
-      if (!name || !hours) return;
-      var key = name.trim().toLowerCase();
-      if (!result[key]) result[key] = [];
-      result[key].push({ area: area, date: date, hours: hours });
+      var name = (cols[0] || '').trim();
+      if (!name) return;
+      var key = name.toLowerCase();
+      var months = {};
+      HOUR_MONTHS.forEach(function(m, i) {
+        var v = parseFloat(cols[i + 2]) || 0;
+        if (v > 0) months[m] = v;
+      });
+      var total = parseFloat(cols[1]) || 0;
+      if (!result[key]) { result[key] = { total: total, months: months }; }
+      else {
+        result[key].total += total;
+        HOUR_MONTHS.forEach(function(m) { if (months[m]) result[key].months[m] = (result[key].months[m] || 0) + months[m]; });
+      }
     });
     return result;
   }
 
   function getVolHours(vol) {
-    var full = ((vol['First Name'] || '') + ' ' + (vol['Last Name'] || '')).trim().toLowerCase();
-    if (hoursData[full]) return hoursData[full];
     var first = (vol['First Name'] || '').trim().toLowerCase();
-    return hoursData[first] || [];
+    var last = (vol['Last Name'] || '').trim().toLowerCase();
+    var full = (first + ' ' + last).trim();
+    var merged = { total: 0, months: {} };
+    var found = false;
+    Object.keys(hoursData).forEach(function(key) {
+      if (key === full || key === first || (last && key === last) || (first && key.split(' ')[0] === first && (!last || key.split(' ')[1] === last))) {
+        found = true;
+        merged.total += hoursData[key].total;
+        HOUR_MONTHS.forEach(function(m) { if (hoursData[key].months[m]) merged.months[m] = (merged.months[m] || 0) + hoursData[key].months[m]; });
+      }
+    });
+    return found ? merged : null;
   }
   function parseObCSV(text) {
     var lines = text.split('\n').filter(function(l) { return l.trim(); });
@@ -1116,33 +1133,20 @@ function VolunteersView() {
                 </div>
               )}
               {(function() {
-                var entries = getVolHours(selected);
-                if (entries.length === 0) return null;
-                var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                var byMonth = {}, byArea = {}, total = 0;
-                entries.forEach(function(e) {
-                  var parts = e.date.split('/');
-                  if (parts.length < 3) return;
-                  var mo = parseInt(parts[0], 10) - 1;
-                  var yr = parseInt(parts[2], 10);
-                  var key = yr + '-' + String(mo + 1).padStart(2, '0');
-                  if (!byMonth[key]) byMonth[key] = { yr: yr, mo: mo, hrs: 0 };
-                  byMonth[key].hrs += e.hours;
-                  byArea[e.area] = (byArea[e.area] || 0) + e.hours;
-                  total += e.hours;
-                });
-                var monthKeys = Object.keys(byMonth).sort().reverse();
+                var data = getVolHours(selected);
+                if (!data || data.total === 0) return null;
+                var activeMonths = HOUR_MONTHS.filter(function(m) { return data.months[m] > 0; }).reverse();
+                var yr = new Date().getFullYear();
                 return (
                   <div style={{ marginBottom: 4 }}>
                     <span style={volSecLabel}>Volunteer Hours</span>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: gold, marginBottom: 10 }}>{total.toFixed(1)} hrs total</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: gold, marginBottom: 10 }}>{data.total.toFixed(1)} hrs total</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                      {monthKeys.map(function(key) {
-                        var m = byMonth[key];
+                      {activeMonths.map(function(m) {
                         return (
-                          <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', padding: '5px 0', borderBottom: '0.5px solid #f5f0ea' }}>
-                            <span>{MONTHS[m.mo]} {m.yr}</span>
-                            <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{m.hrs.toFixed(1)} hrs</span>
+                          <div key={m} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', padding: '5px 0', borderBottom: '0.5px solid #f5f0ea' }}>
+                            <span>{m} {yr}</span>
+                            <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{data.months[m].toFixed(1)} hrs</span>
                           </div>
                         );
                       })}
