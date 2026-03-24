@@ -121,7 +121,7 @@ var NAV_ICONS = {
   operational: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   sponsors: '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>',
   financials: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
-  ideas: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+  ideas: '<path d="M9 21h6"/><path d="M9 17.5h6"/><path d="M12 2a7 7 0 0 1 4.9 11.9l-.1.1c-.4.4-.8 1-1.1 1.5H8.3c-.3-.5-.7-1.1-1.1-1.5l-.1-.1A7 7 0 0 1 12 2z"/>',
   reviews: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
 };
 
@@ -2339,7 +2339,7 @@ function BoardView() {
                         </div>
                         <div>
                           <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Vote</div>
-                          <select value={quickVote.choice} onChange={function(e) { setQuickVote(function(f) { return Object.assign({}, f, { choice: e.target.value }); })}
+                          <select value={quickVote.choice} onChange={function(e) { setQuickVote(function(f) { return Object.assign({}, f, { choice: e.target.value }); }); }}
                             style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, background: '#fff' }}>
                             <option value="">Select…</option>
                             <option value="Yes">Yes</option>
@@ -5069,6 +5069,34 @@ function FinancialsView() {
   );
 }
 
+function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSaving }) {
+  var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
+  var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 };
+  var STATUS_OPTIONS = ['Exploring', 'Active', 'On Hold', 'Declined', 'Completed'];
+  return (
+    <form onSubmit={onSubmit}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+        <div><label style={lb}>Title *</label><input required value={formData.title} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { title: e.target.value }); }); }} style={inpSt} placeholder="Name of idea or initiative" /></div>
+        <div><label style={lb}>Status</label>
+          <select value={formData.status} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { status: e.target.value }); }); }} style={inpSt}>
+            {STATUS_OPTIONS.map(function(s) { return <option key={s} value={s}>{s}</option>; })}
+          </select>
+        </div>
+      </div>
+      <div style={{ marginBottom: 12 }}><label style={lb}>Submitted By</label><input value={formData.submitted_by} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { submitted_by: e.target.value }); }); }} style={inpSt} placeholder="Person's name" /></div>
+      <div style={{ marginBottom: 12 }}><label style={lb}>Notes — why it matters, context, ideas</label><textarea value={formData.notes} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Why this matters, background context, related ideas…" /></div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+        <div><label style={{ fontSize: 11, color: '#b45309', fontWeight: 600, display: 'block', marginBottom: 4 }}>Blockers — what's in the way</label><textarea value={formData.blockers} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { blockers: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Obstacles, constraints, risks…" /></div>
+        <div><label style={{ fontSize: 11, color: '#1565c0', fontWeight: 600, display: 'block', marginBottom: 4 }}>Gaps — what's missing</label><textarea value={formData.gaps} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { gaps: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Resources, knowledge, support needed…" /></div>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="submit" disabled={isSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving…' : submitLabel}</button>
+        <button type="button" onClick={onCancel} style={{ padding: '9px 18px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
+      </div>
+    </form>
+  );
+}
+
 function IdeasView() {
   var { useState, useEffect, useRef } = React;
   var isMobile = React.useContext(MobileCtx);
@@ -5204,31 +5232,6 @@ function IdeasView() {
     if (!tabStatuses.includes(i.status)) return false;
     return filterStatus === 'All' || i.status === filterStatus;
   });
-
-  function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSaving }) {
-    return (
-      <form onSubmit={onSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-          <div><label style={lb}>Title *</label><input required value={formData.title} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { title: e.target.value }); }); }} style={inpSt} placeholder="Name of idea or initiative" /></div>
-          <div><label style={lb}>Status</label>
-            <select value={formData.status} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { status: e.target.value }); }); }} style={inpSt}>
-              {STATUS_OPTIONS.map(function(s) { return <option key={s} value={s}>{s}</option>; })}
-            </select>
-          </div>
-        </div>
-        <div style={{ marginBottom: 12 }}><label style={lb}>Submitted By</label><input value={formData.submitted_by} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { submitted_by: e.target.value }); }); }} style={inpSt} placeholder="Person's name" /></div>
-        <div style={{ marginBottom: 12 }}><label style={lb}>Notes — why it matters, context, ideas</label><textarea value={formData.notes} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Why this matters, background context, related ideas…" /></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
-          <div><label style={{ fontSize: 11, color: '#b45309', fontWeight: 600, display: 'block', marginBottom: 4 }}>Blockers — what's in the way</label><textarea value={formData.blockers} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { blockers: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Obstacles, constraints, risks…" /></div>
-          <div><label style={{ fontSize: 11, color: '#1565c0', fontWeight: 600, display: 'block', marginBottom: 4 }}>Gaps — what's missing</label><textarea value={formData.gaps} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { gaps: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Resources, knowledge, support needed…" /></div>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="submit" disabled={isSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving…' : submitLabel}</button>
-          <button type="button" onClick={onCancel} style={{ padding: '9px 18px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
-        </div>
-      </form>
-    );
-  }
 
   return (
     <div>
