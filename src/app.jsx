@@ -294,11 +294,20 @@ const typeColors = {
   const [calEvents, setCalEvents] = useState(null);
   const [birthdays, setBirthdays] = useState(null);
   const [sponsors, setSponsors] = useState(null);
+  const [inHouseEvents, setInHouseEvents] = useState([]);
+  const [iheForm, setIheForm] = useState({ name: '', date: '', cost: '' });
+  const [iheAdding, setIheAdding] = useState(false);
+  const [iheSaving, setIheSaving] = useState(false);
   var isMobile = React.useContext(MobileCtx);
   useEffect(function() {
     cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes']).then(function(rows) {
       if (Array.isArray(rows)) setSponsors(rows);
     });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('In-House Events') + '?select=*&order=date.asc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setInHouseEvents(rows);
+    }).catch(function() {});
     cachedSbFetch('2026 Donations', ['Amount']).then(function(rows) {
       if (!Array.isArray(rows)) return;
       var total = rows.reduce(function(s, r) {
@@ -460,6 +469,72 @@ const typeColors = {
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v['First Name']} {v['Last Name']}</div>
                   <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{dayStr}{isToday ? ' 🎂' : ''}</div>
                 </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* In-House Events */}
+        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: gold, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              In-House Events
+            </div>
+            <button onClick={function() { setIheAdding(true); setIheForm({ name: '', date: '', cost: '' }); }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 600 }}>+ Add</button>
+          </div>
+
+          {iheAdding && (
+            <div style={{ background: '#faf8f4', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '12px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input placeholder="Event name" value={iheForm.name} onChange={function(e) { setIheForm(function(f) { return Object.assign({}, f, { name: e.target.value }); }); }}
+                  style={{ fontSize: 13, border: '0.5px solid #d0c8bc', borderRadius: 6, padding: '6px 10px', outline: 'none' }} />
+                <input type="date" value={iheForm.date} onChange={function(e) { setIheForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }}
+                  style={{ fontSize: 13, border: '0.5px solid #d0c8bc', borderRadius: 6, padding: '6px 10px', outline: 'none' }} />
+                <input placeholder="Cost (e.g. 150)" type="number" value={iheForm.cost} onChange={function(e) { setIheForm(function(f) { return Object.assign({}, f, { cost: e.target.value }); }); }}
+                  style={{ fontSize: 13, border: '0.5px solid #d0c8bc', borderRadius: 6, padding: '6px 10px', outline: 'none' }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button disabled={iheSaving || !iheForm.name || !iheForm.date} onClick={function() {
+                    setIheSaving(true);
+                    var row = { name: iheForm.name, date: iheForm.date, cost: parseFloat(iheForm.cost) || 0 };
+                    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('In-House Events'), {
+                      method: 'POST',
+                      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+                      body: JSON.stringify(row)
+                    }).then(function(r) { return r.json(); }).then(function(res) {
+                      var created = Array.isArray(res) ? res[0] : res;
+                      setInHouseEvents(function(prev) { return prev.concat([created]).sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); }); });
+                      setIheAdding(false);
+                      setIheSaving(false);
+                    }).catch(function() { setIheSaving(false); });
+                  }} style={{ flex: 1, fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontWeight: 600, opacity: (iheSaving || !iheForm.name || !iheForm.date) ? 0.5 : 1 }}>
+                    {iheSaving ? 'Saving…' : 'Save'}
+                  </button>
+                  <button onClick={function() { setIheAdding(false); }} style={{ fontSize: 12, background: '#f0ebe2', color: '#555', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {inHouseEvents.length === 0 && !iheAdding && <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No events added yet.</div>}
+          {inHouseEvents.map(function(ev, i) {
+            var d = ev.date ? new Date(ev.date + 'T00:00:00') : null;
+            var dateStr = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+            var isPast = d && d < new Date();
+            return (
+              <div key={ev.id || i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, opacity: isPast ? 0.5 : 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.name}</div>
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{dateStr}{ev.cost ? ' · $' + Number(ev.cost).toLocaleString() : ''}</div>
+                </div>
+                <button onClick={function() {
+                  fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('In-House Events') + '?id=eq.' + ev.id, {
+                    method: 'DELETE',
+                    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+                  }).then(function() {
+                    setInHouseEvents(function(prev) { return prev.filter(function(e) { return e.id !== ev.id; }); });
+                  });
+                }} style={{ fontSize: 11, background: 'none', border: 'none', color: '#bbb', cursor: 'pointer', padding: '2px 4px', flexShrink: 0 }} title="Remove">✕</button>
               </div>
             );
           })}
