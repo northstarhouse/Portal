@@ -12,32 +12,48 @@ function sbFetch(table, columns) {
 }
 
 var _cache = {};
+var LS_TTL = 4 * 60 * 1000; // 4 minutes
+var LS_PREFIX = 'nsh2_';
+function lsGet(key) {
+  try { var r = localStorage.getItem(LS_PREFIX + key); if (!r) return null; var e = JSON.parse(r); if (Date.now() - e.ts > LS_TTL) { localStorage.removeItem(LS_PREFIX + key); return null; } return e.data; } catch(e) { return null; }
+}
+function lsSet(key, data) {
+  try { localStorage.setItem(LS_PREFIX + key, JSON.stringify({ ts: Date.now(), data: data })); } catch(e) {}
+}
 function cachedSbFetch(table, columns) {
   var key = table + ':' + columns.slice().sort().join(',');
   if (_cache[key]) return Promise.resolve(_cache[key]);
+  var ls = lsGet(key); if (ls) { _cache[key] = ls; return Promise.resolve(ls); }
   return sbFetch(table, columns).then(function(data) {
-    if (Array.isArray(data)) _cache[key] = data;
+    if (Array.isArray(data)) { _cache[key] = data; lsSet(key, data); }
     return data;
   });
 }
 function cachedFetchAll(table) {
   var key = table + ':*';
   if (_cache[key]) return Promise.resolve(_cache[key]);
+  var ls = lsGet(key); if (ls) { _cache[key] = ls; return Promise.resolve(ls); }
   var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table) + '?select=*';
   return fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
     .then(function(r) { return r.json(); })
-    .then(function(data) { if (Array.isArray(data)) _cache[key] = data; return data; });
+    .then(function(data) { if (Array.isArray(data)) { _cache[key] = data; lsSet(key, data); } return data; });
 }
 function cachedFetch(url) {
   if (_cache[url]) return Promise.resolve(_cache[url]);
+  var ls = lsGet(url); if (ls) { _cache[url] = ls; return Promise.resolve(ls); }
   return fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
     .then(function(r) { return r.json(); })
-    .then(function(data) { if (Array.isArray(data)) _cache[url] = data; return data; });
+    .then(function(data) { if (Array.isArray(data)) { _cache[url] = data; lsSet(url, data); } return data; });
 }
 function clearCache(table) {
   var enc = encodeURIComponent(table);
   Object.keys(_cache).forEach(function(k) {
     if (k.indexOf(table + ':') === 0 || k.indexOf('/' + enc + '?') !== -1) delete _cache[k];
+  });
+  Object.keys(localStorage).forEach(function(k) {
+    if (!k.startsWith(LS_PREFIX)) return;
+    var inner = k.slice(LS_PREFIX.length);
+    if (inner.indexOf(table + ':') === 0 || inner.indexOf('/' + enc + '?') !== -1) localStorage.removeItem(k);
   });
 }
 
@@ -762,9 +778,11 @@ function VolunteersView() {
         setLoading(false);
       })
       .catch(function(err) { setError(err.message); setLoading(false); });
-    fetch(HOURS_SHEET_URL).then(function(r) { return r.text(); }).then(function(text) {
-      setHoursData(parseHoursCSV(text));
-    }).catch(function() {});
+    var cachedHours = lsGet('hours_summary');
+    if (cachedHours) { setHoursData(cachedHours); }
+    else { fetch(HOURS_SHEET_URL).then(function(r) { return r.text(); }).then(function(text) {
+      var parsed = parseHoursCSV(text); setHoursData(parsed); lsSet('hours_summary', parsed);
+    }).catch(function() {}); }
 
     Promise.all([
       fetch(OB_SHEET_URL).then(function(r) { return r.text(); }).catch(function() { return ''; }),
