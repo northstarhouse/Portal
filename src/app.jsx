@@ -623,7 +623,10 @@ var TEAM_COLORS = {
   'Support':      { bg: '#f0f4f8', color: '#3a5068' },
   'Venue':        { bg: '#ede7f6', color: '#4527a0' },
   'Marketing':    { bg: '#fce4ec', color: '#c2185b' },
-  'Restoration':  { bg: '#fdf3e3', color: '#a0522d' },
+  'Restoration':  { bg: '#fff3e0', color: '#e65100' },
+  'Garden and Landscaping': { bg: '#e8f5e9', color: '#2e7d32' },
+  'Landscaping':  { bg: '#e8f5e9', color: '#2e7d32' },
+  'Garden':       { bg: '#e8f5e9', color: '#2e7d32' },
   'General':      { bg: '#f5f5f5', color: '#555' },
   'Other':        { bg: '#f5f5f5', color: '#777' },
 };
