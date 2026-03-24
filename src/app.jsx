@@ -1134,11 +1134,6 @@ function VolunteersView() {
                   <div style={{ marginBottom: 4 }}>
                     <span style={volSecLabel}>Volunteer Hours</span>
                     <div style={{ fontSize: 15, fontWeight: 700, color: gold, marginBottom: 10 }}>{total.toFixed(1)} hrs total</div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-                      {Object.keys(byArea).map(function(area) {
-                        return <span key={area} style={{ fontSize: 11, background: '#faf5ee', color: gold, borderRadius: 20, padding: '2px 9px', fontWeight: 600 }}>{area} · {byArea[area].toFixed(1)}h</span>;
-                      })}
-                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                       {monthKeys.map(function(key) {
                         var m = byMonth[key];
