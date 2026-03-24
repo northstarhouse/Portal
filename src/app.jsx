@@ -1510,7 +1510,7 @@ function DonorsView() {
     { name: 'Morning Star', min: 250, range: '$250–$499', color: '#7c3aed', bg: '#ede9fe', border: '#c4b5fd',
       ownBenefits: ['Recognition in our printed and digital event programs'] },
     { name: 'Rising Star', min: 100, range: '$100–$249', color: '#15803d', bg: '#dcfce7', border: '#86efac',
-      ownBenefits: ['Invitation to an exclusive Members\' Only Mixer'] },
+      ownBenefits: [] },
     { name: 'Shooting Star', min: 50, range: '$50–$99', color: '#b45309', bg: '#fef9c3', border: '#fde047',
       ownBenefits: ['Access to our Online Loyalty Program & Newsletter subscription', 'Invitation to our State of the Star Membership Celebration'] },
   ];
