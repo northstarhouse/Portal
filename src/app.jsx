@@ -2951,9 +2951,8 @@ function OperationalView({ opArea, navigateToQuarterly }) {
             onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'; }}
             onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}>
             <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 8 }}>Budget</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{allocation ? fmt(allocation) : fmt(totalPurchases)}</div>
-            {allocation != null && <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>{fmt(totalPurchases)} / {fmt(allocation)}</div>}
-            {allocation == null && <div style={{ fontSize: 11, color: '#aaa', marginTop: 4, fontStyle: 'italic' }}>No budget established</div>}
+            <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{allocation != null ? fmt(allocation) : '$0'}</div>
+            <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>{fmt(totalPurchases)} / {allocation != null ? fmt(allocation) : '$0'}</div>
             <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add entries →</div>
           </div>
           {area === 'Events' && (
