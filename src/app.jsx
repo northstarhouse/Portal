@@ -610,19 +610,33 @@ var TEAM_COLORS = {
   'Grounds':      { bg: '#e8f5e9', color: '#2e7d32' },
   'Construction': { bg: '#fff3e0', color: '#e65100' },
   'Events Team':  { bg: '#e3f2fd', color: '#1565c0' },
+  'Events':       { bg: '#e3f2fd', color: '#1565c0' },
   'Event Support':{ bg: '#e8eaf6', color: '#3949ab' },
   'Interiors':    { bg: '#f3e5f5', color: '#6a1b9a' },
   'Fundraising':  { bg: '#fff8e1', color: '#8a6200' },
   'Staff':        { bg: '#f3f3f3', color: '#555' },
   'Board Member': { bg: '#fce4ec', color: '#880e4f' },
   'New':          { bg: '#e0f7fa', color: '#006064' },
-  'Docent':           { bg: '#fbe9e7', color: '#8d3d2b' },
+  'Docent':       { bg: '#fbe9e7', color: '#8d3d2b' },
+  'Docents':      { bg: '#fbe9e7', color: '#8d3d2b' },
   'Volunteer Exchange': { bg: '#e8f4fd', color: '#0d6eab' },
-  'Support':           { bg: '#f0f4f8', color: '#3a5068' },
-  'Venue':             { bg: '#ede7f6', color: '#4527a0' },
-  'Marketing':         { bg: '#fce4ec', color: '#c2185b' },
+  'Support':      { bg: '#f0f4f8', color: '#3a5068' },
+  'Venue':        { bg: '#ede7f6', color: '#4527a0' },
+  'Marketing':    { bg: '#fce4ec', color: '#c2185b' },
+  'Restoration':  { bg: '#fdf3e3', color: '#a0522d' },
+  'General':      { bg: '#f5f5f5', color: '#555' },
+  'Other':        { bg: '#f5f5f5', color: '#777' },
 };
-var TEAM_OPTIONS = Object.keys(TEAM_COLORS);
+function getAreaColor(aoi) {
+  if (!aoi) return { bg: '#f5f1eb', color: '#888' };
+  if (TEAM_COLORS[aoi]) return TEAM_COLORS[aoi];
+  var lower = aoi.toLowerCase();
+  var key = Object.keys(TEAM_COLORS).find(function(k) {
+    return k.toLowerCase() === lower || lower.indexOf(k.toLowerCase()) === 0 || k.toLowerCase().indexOf(lower) === 0;
+  });
+  return key ? TEAM_COLORS[key] : { bg: '#f5f1eb', color: '#888' };
+}
+var TEAM_OPTIONS = Object.keys(TEAM_COLORS).filter(function(k) { return ['Events','Docents','Restoration','General','Other'].indexOf(k) === -1; });
 
 function TeamPicker({ value, onChange }) {
   const { useState: useS } = React;
@@ -1300,7 +1314,7 @@ function VolunteersView() {
                 ? <div style={{ padding: '20px 14px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No one in pipeline</div>
                 : onboarding.filter(function(o) { return o.status === 'In Progress'; }).map(function(ob) {
                     var isSel = obSelectedId === ob.id;
-                    var tc = TEAM_COLORS[ob.area_of_interest] || { bg: '#f5f1eb', color: '#888' };
+                    var tc = getAreaColor(ob.area_of_interest);
                     return (
                       <div key={ob.id} onClick={function() { setObSelectedId(isSel ? null : ob.id); }}
                         style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb', cursor: 'pointer', background: isSel ? tc.bg : '#fff', borderLeft: '3px solid ' + (isSel ? tc.color : 'transparent'), transition: 'all 0.12s' }}
@@ -1322,7 +1336,7 @@ function VolunteersView() {
               {obSelectedId && (function() {
                 var selOb = onboarding.find(function(o) { return o.id === obSelectedId; });
                 if (!selOb) return null;
-                var tc = TEAM_COLORS[selOb.area_of_interest] || { bg: '#fef9f0', color: gold };
+                var tc = getAreaColor(selOb.area_of_interest);
                 return (
                   <div style={{ background: tc.bg, border: '0.5px solid ' + tc.color + '66', borderRadius: 10, padding: '10px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>{selOb.first_name} {selOb.last_name}</div>
@@ -1355,7 +1369,7 @@ function VolunteersView() {
                         <div style={{ padding: '2px 16px 10px 46px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                           {peopleHere.map(function(ob) {
                             var isSel = obSelectedId === ob.id;
-                            var tc = TEAM_COLORS[ob.area_of_interest] || { bg: '#f5f1eb', color: '#888' };
+                            var tc = getAreaColor(ob.area_of_interest);
                             return (
                               <div key={ob.id} onClick={function() { setObSelectedId(isSel ? null : ob.id); }}
                                 style={{ display: 'flex', flexDirection: 'column', background: isSel ? tc.color : tc.bg, border: '0.5px solid ' + tc.color + '66', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', transition: 'all 0.12s', minWidth: 90 }}>
@@ -1388,7 +1402,7 @@ function VolunteersView() {
                         {peopleHere.length === 0
                           ? <div style={{ fontSize: 11, color: t.color, opacity: 0.4 }}>None yet</div>
                           : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>{peopleHere.map(function(ob) {
-                              var tc = TEAM_COLORS[ob.area_of_interest] || { bg: '#fff', color: t.color };
+                              var tc = getAreaColor(ob.area_of_interest);
                               return <span key={ob.id} style={{ fontSize: 11, background: '#fff', color: t.color, border: '0.5px solid ' + t.border, borderRadius: 20, padding: '2px 10px', fontWeight: 500 }}>{ob.first_name} {ob.last_name}</span>;
                             })}</div>
                         }
