@@ -136,7 +136,7 @@ const modules = [
   { id: "home", label: "Overview" },
   { id: "quarterly", label: "Quarterly Update" },
   { id: "volunteers", label: "Volunteers" },
-  { id: "donors", label: "Donors & Donations" },
+  { id: "donors", label: "Donations" },
   { id: "sponsors", label: "Sponsors" },
   { id: "board", label: "Board Voting" },
   { id: "strategy", label: "Strategic Goal Progress" },
