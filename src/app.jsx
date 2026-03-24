@@ -12,13 +12,12 @@ function sbFetch(table, columns) {
 }
 
 var _cache = {};
-var LS_TTL = 4 * 60 * 1000; // 4 minutes
 var LS_PREFIX = 'nsh2_';
 function lsGet(key) {
-  try { var r = localStorage.getItem(LS_PREFIX + key); if (!r) return null; var e = JSON.parse(r); if (Date.now() - e.ts > LS_TTL) { localStorage.removeItem(LS_PREFIX + key); return null; } return e.data; } catch(e) { return null; }
+  try { var r = localStorage.getItem(LS_PREFIX + key); if (!r) return null; return JSON.parse(r); } catch(e) { return null; }
 }
 function lsSet(key, data) {
-  try { localStorage.setItem(LS_PREFIX + key, JSON.stringify({ ts: Date.now(), data: data })); } catch(e) {}
+  try { localStorage.setItem(LS_PREFIX + key, JSON.stringify(data)); } catch(e) {}
 }
 function cachedSbFetch(table, columns) {
   var key = table + ':' + columns.slice().sort().join(',');
@@ -781,7 +780,9 @@ function VolunteersView() {
     var cachedHours = lsGet('hours_summary');
     if (cachedHours) { setHoursData(cachedHours); }
     else { fetch(HOURS_SHEET_URL).then(function(r) { return r.text(); }).then(function(text) {
-      var parsed = parseHoursCSV(text); setHoursData(parsed); lsSet('hours_summary', parsed);
+      var parsed = parseHoursCSV(text);
+      setHoursData(parsed);
+      lsSet('hours_summary', parsed);
     }).catch(function() {}); }
 
     Promise.all([
