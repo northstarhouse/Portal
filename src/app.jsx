@@ -5023,6 +5023,7 @@ function IdeasView() {
   var [ideas, setIdeas] = useState([]);
   var [loading, setLoading] = useState(true);
   var [selected, setSelected] = useState(null);
+  var [mainTab, setMainTab] = useState('initiatives');
   var [filterStatus, setFilterStatus] = useState('All');
   var [showAdd, setShowAdd] = useState(false);
   var [editing, setEditing] = useState(false);
@@ -5133,7 +5134,13 @@ function IdeasView() {
 
   function fmtMoney(n) { return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-  var filtered = ideas.filter(function(i) { return filterStatus === 'All' || i.status === filterStatus; });
+  var INITIATIVES_STATUSES = ['Active', 'On Hold', 'Completed', 'Declined'];
+  var IDEA_STATUSES = ['Exploring'];
+  var tabStatuses = mainTab === 'initiatives' ? INITIATIVES_STATUSES : IDEA_STATUSES;
+  var filtered = ideas.filter(function(i) {
+    if (!tabStatuses.includes(i.status)) return false;
+    return filterStatus === 'All' || i.status === filterStatus;
+  });
 
   function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSaving }) {
     return (
@@ -5167,18 +5174,31 @@ function IdeasView() {
         <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ New Idea</button>
       </div>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
-        {['All'].concat(STATUS_OPTIONS).map(function(s) {
-          var sc = STATUS_COLORS[s] || { bg: '#f5f0ea', color: '#888' };
-          var isActive = filterStatus === s;
+      <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '1px solid #e8e0d5' }}>
+        {[{ id: 'initiatives', label: 'Active Initiatives' }, { id: 'ideas', label: 'Idea Stage' }].map(function(t) {
+          var isOn = mainTab === t.id;
           return (
-            <button key={s} onClick={function() { setFilterStatus(s); setSelected(null); }}
-              style={{ fontSize: 11, fontWeight: isActive ? 700 : 400, padding: '4px 14px', borderRadius: 20, border: '0.5px solid ' + (isActive ? sc.color : '#e0d8cc'), background: isActive ? sc.bg : '#fff', color: isActive ? sc.color : '#999', cursor: 'pointer' }}>
-              {s}
+            <button key={t.id} onClick={function() { setMainTab(t.id); setFilterStatus('All'); setSelected(null); }}
+              style={{ padding: '8px 20px', fontSize: 13, fontWeight: isOn ? 700 : 400, color: isOn ? gold : '#aaa', background: 'none', border: 'none', borderBottom: '2px solid ' + (isOn ? gold : 'transparent'), cursor: 'pointer', marginBottom: -1 }}>
+              {t.label}
             </button>
           );
         })}
       </div>
+      {mainTab === 'initiatives' && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+          {['All', 'Active', 'On Hold', 'Completed', 'Declined'].map(function(s) {
+            var sc = STATUS_COLORS[s] || { bg: '#f5f0ea', color: '#888' };
+            var isOn = filterStatus === s;
+            return (
+              <button key={s} onClick={function() { setFilterStatus(s); setSelected(null); }}
+                style={{ fontSize: 11, fontWeight: isOn ? 700 : 400, padding: '3px 12px', borderRadius: 20, border: '0.5px solid ' + (isOn ? sc.color : '#e0d8cc'), background: isOn ? sc.bg : '#fff', color: isOn ? sc.color : '#999', cursor: 'pointer' }}>
+                {s}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
