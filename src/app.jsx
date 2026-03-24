@@ -12,9 +12,16 @@ function sbFetch(table, columns) {
 }
 
 var _cache = {};
-var LS_PREFIX = 'nsh2_';
+var LS_PREFIX = 'nsh3_';
 function lsGet(key) {
-  try { var r = localStorage.getItem(LS_PREFIX + key); if (!r) return null; return JSON.parse(r); } catch(e) { return null; }
+  try {
+    var r = localStorage.getItem(LS_PREFIX + key);
+    if (!r) return null;
+    var parsed = JSON.parse(r);
+    // guard against old {ts, data} format
+    if (parsed && !Array.isArray(parsed) && typeof parsed === 'object' && parsed.data !== undefined) return parsed.data;
+    return parsed;
+  } catch(e) { return null; }
 }
 function lsSet(key, data) {
   try { localStorage.setItem(LS_PREFIX + key, JSON.stringify(data)); } catch(e) {}
@@ -57,6 +64,15 @@ function clearCache(table) {
 }
 
 const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthstarhouse%40gmail.com/private-06287b2ca0d9ee6acd4f49f9d4d0d2da/basic.ics";
+
+// Kick off critical fetches immediately so data is ready when views mount
+(function prefetch() {
+  cachedSbFetch('2026 Volunteers', ['First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day']);
+  cachedSbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes']);
+  cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes']);
+  cachedFetchAll('Board Voting Items');
+  cachedFetchAll('Board-Votes');
+})();
 
 function fetchCalendarEvents() {
   var proxy = "https://corsproxy.io/?" + encodeURIComponent(CALENDAR_ICAL_URL);
