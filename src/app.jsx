@@ -5165,7 +5165,13 @@ function IdeasView() {
       body: JSON.stringify({ title: form.title, status: form.status, submitted_by: form.submitted_by || null, notes: form.notes || null, blockers: form.blockers || null, gaps: form.gaps || null })
     }).then(function(r) { return r.json(); }).then(function(rows) {
       setSaving(false);
-      if (rows && rows[0]) { setIdeas(function(p) { return [rows[0]].concat(p); }); setSelected(rows[0]); }
+      if (rows && rows[0]) {
+        setIdeas(function(p) { return [rows[0]].concat(p); });
+        setSelected(rows[0]);
+        var newStatus = rows[0].status;
+        setMainTab(['Active','On Hold','Completed','Declined'].includes(newStatus) ? 'initiatives' : 'ideas');
+        setFilterStatus('All');
+      }
       setForm(emptyForm); setShowAdd(false);
     }).catch(function() { setSaving(false); });
   }
