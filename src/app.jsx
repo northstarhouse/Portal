@@ -4482,6 +4482,14 @@ function FinancialsView() {
   var [rentalSaving, setRentalSaving] = useState(false);
   var [showRentalForm, setShowRentalForm] = useState(false);
 
+  // Cash Log (Expenditures)
+  var [cashLog, setCashLog] = useState([]);
+  var [cashLoading, setCashLoading] = useState(true);
+  var emptyCashForm = { description: '', amount: '', date: new Date().toISOString().slice(0,10), direction: 'Out' };
+  var [cashForm, setCashForm] = useState(emptyCashForm);
+  var [showCashForm, setShowCashForm] = useState(false);
+  var [cashSaving, setCashSaving] = useState(false);
+
   // Resources
   var [resources, setResources] = useState([]);
   var [resourcesLoading, setResourcesLoading] = useState(true);
@@ -4519,6 +4527,12 @@ function FinancialsView() {
   useEffect(function() {
     loadReimbursements();
     loadRentals();
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=*&order=date.desc,id.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setCashLog(rows);
+      setCashLoading(false);
+    }).catch(function() { setCashLoading(false); });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?area=eq.Financials&select=*&order=created_at.asc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
@@ -4568,6 +4582,27 @@ function FinancialsView() {
       setShowRentalForm(false);
       setRentalSaving(false);
     }).catch(function() { setRentalSaving(false); });
+  }
+
+  function submitCash(e) {
+    e.preventDefault();
+    if (!cashForm.description || !cashForm.amount || !cashForm.date) return;
+    setCashSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ description: cashForm.description, amount: parseFloat(cashForm.amount), date: cashForm.date, direction: cashForm.direction })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var newRow = rows && rows[0] ? rows[0] : { description: cashForm.description, amount: parseFloat(cashForm.amount), date: cashForm.date, direction: cashForm.direction };
+      setCashLog(function(p) { return [newRow].concat(p); });
+      setCashForm(emptyCashForm); setShowCashForm(false); setCashSaving(false);
+    }).catch(function() { setCashSaving(false); });
+  }
+
+  function deleteCash(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?id=eq.' + id, {
+      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() { setCashLog(function(p) { return p.filter(function(c) { return c.id !== id; }); }); });
   }
 
   function submitProjItem(area, e) {
@@ -4680,6 +4715,7 @@ function FinancialsView() {
         })}
       </div>
 
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
         <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
           <div>
@@ -4738,6 +4774,76 @@ function FinancialsView() {
             </div>
           );
         })}
+      </div>
+
+      {/* Expenditures / Cash Log */}
+      {(function() {
+        var cashIn = cashLog.filter(function(c) { return c.direction === 'In'; }).reduce(function(s, c) { return s + (parseFloat(c.amount) || 0); }, 0);
+        var cashOut = cashLog.filter(function(c) { return c.direction === 'Out'; }).reduce(function(s, c) { return s + (parseFloat(c.amount) || 0); }, 0);
+        return (
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Cash Log</div>
+                {!cashLoading && cashLog.length > 0 && (
+                  <div style={{ fontSize: 12, marginTop: 2 }}>
+                    <span style={{ color: '#059669', fontWeight: 600 }}>↑ {fmt(cashIn)}</span>
+                    <span style={{ color: '#aaa', margin: '0 4px' }}>·</span>
+                    <span style={{ color: '#c62828', fontWeight: 600 }}>↓ {fmt(cashOut)}</span>
+                    <span style={{ color: '#aaa', margin: '0 4px' }}>·</span>
+                    <span style={{ color: '#2a2a2a', fontWeight: 600 }}>Net {fmt(cashIn - cashOut)}</span>
+                  </div>
+                )}
+              </div>
+              <button onClick={function() { setShowCashForm(function(v) { return !v; }); }} style={{ fontSize: 12, background: showCashForm ? '#f5f0ea' : gold, color: showCashForm ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}>{showCashForm ? 'Cancel' : '+ Log Cash'}</button>
+            </div>
+            {showCashForm && (
+              <form onSubmit={submitCash} style={{ padding: '14px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fefcf8' }}>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Description *</label>
+                  <input required value={cashForm.description} onChange={function(e) { setCashForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} placeholder="What is this for?" style={inpSt} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Amount *</label>
+                    <input required type="number" step="0.01" min="0" value={cashForm.amount} onChange={function(e) { setCashForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} placeholder="0.00" style={inpSt} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Date *</label>
+                    <input required type="date" value={cashForm.date} onChange={function(e) { setCashForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={inpSt} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Direction</label>
+                    <select value={cashForm.direction} onChange={function(e) { setCashForm(function(f) { return Object.assign({}, f, { direction: e.target.value }); }); }} style={inpSt}>
+                      <option value="Out">Cash Out</option>
+                      <option value="In">Cash In</option>
+                    </select>
+                  </div>
+                </div>
+                <button type="submit" disabled={cashSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: cashSaving ? 0.7 : 1 }}>{cashSaving ? 'Saving…' : 'Save'}</button>
+              </form>
+            )}
+            {cashLoading ? (
+              <div style={{ padding: '20px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
+            ) : cashLog.length === 0 ? (
+              <div style={{ padding: '20px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No cash entries yet.</div>
+            ) : cashLog.map(function(c) {
+              var isIn = c.direction === 'In';
+              return (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: isIn ? '#ecfdf5' : '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 700, color: isIn ? '#059669' : '#c62828' }}>{isIn ? '↑' : '↓'}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: '#2a2a2a' }}>{c.description}</div>
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{c.date}</div>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: isIn ? '#059669' : '#c62828', flexShrink: 0 }}>{isIn ? '+' : '-'}{fmt(parseFloat(c.amount) || 0)}</div>
+                  <button onClick={function() { deleteCash(c.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
       </div>
 
     </div>
