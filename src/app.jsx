@@ -3371,25 +3371,86 @@ function SponsorsView() {
   var [ackSaving, setAckSaving] = useState(false);
   var [logoUploading, setLogoUploading] = useState(false);
   var logoInputRef = useRef(null);
+  var [allInKind, setAllInKind] = useState([]);
+  var [inkind, setInkind] = useState([]);
+  var [inkindForm, setInkindForm] = useState({ description: '', date: new Date().toISOString().slice(0,10), value: '' });
+  var [inkindSaving, setInkindSaving] = useState(false);
 
   useEffect(function() {
     cachedFetchAll('Sponsors').then(function(rows) {
       if (Array.isArray(rows)) setSponsors(rows.slice().sort(function(a,b){return a.id-b.id;}));
     });
+    cachedFetchAll('Sponsor In-Kind').then(function(rows) {
+      if (Array.isArray(rows)) setAllInKind(rows);
+    });
   }, []);
 
   useEffect(function() {
-    if (!selected) { setAcks([]); return; }
+    if (!selected) { setAcks([]); setInkind([]); return; }
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor Acknowledgments') + '?sponsor_id=eq.' + selected.id + '&select=*&order=date.desc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (Array.isArray(rows)) setAcks(rows);
+    });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?sponsor_id=eq.' + selected.id + '&select=*&order=date.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setInkind(rows);
     });
   }, [selected]);
 
   function selectSponsor(s) {
     setSelected(s);
     setAckForm({ date: new Date().toISOString().slice(0,10), method: '', notes: '' });
+    setInkindForm({ description: '', date: new Date().toISOString().slice(0,10), value: '' });
+  }
+
+  var TIERS = [
+    { name: 'Innovator', min: 5000, color: '#7c3aed', bg: '#f3f0ff', border: '#c4b5fd', range: '$5,000–$9,999',
+      benefits: ['Builder benefits, plus:', 'One "Sponsor Highlight" article in one of our quarterly newsletters', 'An 8"×8" commemorative brick placed as part of the brick terrace capital project', 'Picnic lunch or reception for you and ten guests in the North Star House'] },
+    { name: 'Builder', min: 2500, color: '#1565c0', bg: '#e3f2fd', border: '#90caf9', range: '$2,500–$4,999',
+      benefits: ['Believer benefits, plus:', 'Named Solo Sponsor of one NSHC event (name/logo in materials, event signage, recognized from stage)', 'A 4"×8" commemorative brick placed as part of the brick terrace capital project', 'Personal VIP tour of the upstairs construction project!'] },
+    { name: 'Believer', min: 1000, color: '#2e7d32', bg: '#e8f5e9', border: '#a5d6a7', range: '$1,000–$2,499',
+      benefits: ['Company name/logo listed as a Sponsor in event programs, newsletters, website and yearly Sponsorship Banner', 'Invitation to State of the Star membership celebration', 'Two complimentary tickets to a NSHC event', 'Custom made plaque with yearly stars', 'Sponsor Spotlight on our social media platforms'] },
+  ];
+
+  function getTier(total) {
+    return TIERS.find(function(t) { return total >= t.min; }) || null;
+  }
+
+  function sponsorInKindTotal(sponsorId) {
+    return allInKind.filter(function(e) { return e.sponsor_id === sponsorId; })
+      .reduce(function(sum, e) { return sum + (parseFloat(e.value) || 0); }, 0);
+  }
+
+  function submitInKind(e) {
+    e.preventDefault();
+    if (!inkindForm.description || !inkindForm.date || !inkindForm.value) return;
+    setInkindSaving(true);
+    var payload = { sponsor_id: selected.id, description: inkindForm.description, date: inkindForm.date, value: parseFloat(inkindForm.value) };
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setInkindSaving(false);
+      if (Array.isArray(rows) && rows[0]) {
+        setInkind(function(prev) { return [rows[0]].concat(prev); });
+        setAllInKind(function(prev) { return prev.concat([rows[0]]); });
+        clearCache('Sponsor In-Kind');
+      }
+      setInkindForm({ description: '', date: new Date().toISOString().slice(0,10), value: '' });
+    }).catch(function() { setInkindSaving(false); });
+  }
+
+  function deleteInKind(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      setInkind(function(prev) { return prev.filter(function(e) { return e.id !== id; }); });
+      setAllInKind(function(prev) { return prev.filter(function(e) { return e.id !== id; }); });
+    });
   }
 
   function handleLogoUpload(e) {
@@ -3469,8 +3530,10 @@ function SponsorsView() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(1,1fr)', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
         <StatCard label="Total Sponsors" value={sponsors === null ? '...' : sponsors.length} />
+        <StatCard label="Total In-Kind" value={allInKind.length === 0 && sponsors !== null ? '$0' : ('$' + allInKind.reduce(function(s,e){return s+(parseFloat(e.value)||0);},0).toLocaleString())} />
+        <StatCard label="Tiered Sponsors" value={sponsors === null ? '...' : sponsors.filter(function(s){return getTier(sponsorInKindTotal(s.id));}).length} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: (selected && !isMobile) ? '1fr 360px' : '1fr', gap: 16 }}>
@@ -3495,7 +3558,13 @@ function SponsorsView() {
                     {s['Area Supported'] && <span style={{ fontSize: 12, color: '#aaa' }}>{s['Area Supported']}</span>}
                   </div>
                 </div>
-                {s['Fair Market Value'] && <div style={{ fontSize: 13, fontWeight: 600, color: gold, flexShrink: 0 }}>{s['Fair Market Value']}</div>}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                  {s['Fair Market Value'] && <div style={{ fontSize: 13, fontWeight: 600, color: gold }}>{s['Fair Market Value']}</div>}
+                  {(function() {
+                    var tier = getTier(sponsorInKindTotal(s.id));
+                    return tier ? <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '1px 8px' }}>{tier.name}</span> : null;
+                  })()}
+                </div>
               </div>
             );
           })}
@@ -3538,6 +3607,66 @@ function SponsorsView() {
                 <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>{selected['Notes']}</div>
               </div>
             )}
+
+            {/* In-Kind Contributions */}
+            <div style={{ borderTop: '0.5px solid #f0ece6', paddingTop: 16, marginTop: 8, marginBottom: 8 }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, marginBottom: 12 }}>In-Kind Contributions</div>
+              {(function() {
+                var total = inkind.reduce(function(s,e){return s+(parseFloat(e.value)||0);},0);
+                var tier = getTier(total);
+                return (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: tier ? 10 : 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>${total.toLocaleString()}</span>
+                      <span style={{ fontSize: 12, color: '#aaa' }}>total in-kind value</span>
+                      {tier && <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '2px 10px' }}>{tier.name}</span>}
+                    </div>
+                    {tier && (
+                      <div style={{ background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 8, padding: '10px 14px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: tier.color, marginBottom: 6 }}>{tier.name} Benefits · {tier.range}</div>
+                        {tier.benefits.map(function(b, i) {
+                          return <div key={i} style={{ fontSize: 11, color: tier.color, opacity: 0.85, marginBottom: 3, paddingLeft: b.endsWith(':') ? 0 : 8 }}>{b.endsWith(':') ? b : '• ' + b}</div>;
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              <form onSubmit={submitInKind} style={{ background: '#faf8f5', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Scope of Work *</div>
+                  <textarea value={inkindForm.description} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{description:e.target.value});});}} rows={2} style={Object.assign({}, inpStyle, { resize: 'vertical' })} placeholder="Describe the in-kind work or service…" required />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Date *</div>
+                    <input type="date" value={inkindForm.date} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={inpStyle} required />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Ballpark Value ($) *</div>
+                    <input type="number" min="0" step="1" value={inkindForm.value} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{value:e.target.value});});}} style={inpStyle} placeholder="e.g. 1500" required />
+                  </div>
+                </div>
+                <button type="submit" disabled={inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: (inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value) ? 0.6 : 1, width: '100%' }}>{inkindSaving ? 'Saving…' : 'Add In-Kind Entry'}</button>
+              </form>
+              {inkind.length === 0
+                ? <div style={{ fontSize: 12, color: '#ccc', fontStyle: 'italic' }}>No in-kind entries yet.</div>
+                : inkind.map(function(e) {
+                    return (
+                      <div key={e.id} style={{ padding: '8px 0', borderBottom: '0.5px solid #f5f0ea', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>${(parseFloat(e.value)||0).toLocaleString()}</span>
+                            <span style={{ fontSize: 11, color: '#aaa' }}>{e.date}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{e.description}</div>
+                        </div>
+                        <button onClick={function() { deleteInKind(e.id); }} style={{ background: 'none', border: 'none', color: '#ddd', fontSize: 14, cursor: 'pointer', flexShrink: 0, padding: '2px 4px' }}>×</button>
+                      </div>
+                    );
+                  })
+              }
+            </div>
 
             {/* Acknowledgments */}
             <div style={{ borderTop: '0.5px solid #f0ece6', paddingTop: 16, marginTop: 8 }}>
