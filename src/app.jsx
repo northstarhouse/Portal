@@ -1268,6 +1268,7 @@ function DonorsView() {
   const [editDon, setEditDon] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
+  const [donorBenefits, setDonorBenefits] = useState([]);
 
   var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
   var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
@@ -1292,6 +1293,15 @@ function DonorsView() {
       })
       .catch(function(err) { setError(err.message); setLoading(false); });
   }, []);
+
+  useEffect(function() {
+    if (!selected) { setDonorBenefits([]); return; }
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Donor Benefits') + '?donor_name=eq.' + encodeURIComponent(selected['Donor Name']) + '&select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setDonorBenefits(Array.isArray(rows) ? rows.map(function(r) { return r.benefit; }) : []);
+    });
+  }, [selected]);
 
   function parseAmount(val) {
     return parseFloat((val || '0').replace(/[^\d.]/g, '') || 0);
@@ -1385,6 +1395,59 @@ function DonorsView() {
     }).catch(function() { setSaving(false); });
   }
 
+  var DONOR_TIERS = [
+    { name: 'Blue Giant Star Sponsor', min: 2500, range: '$2,500–$4,999', color: '#1565c0', bg: '#dbeafe', border: '#93c5fd',
+      ownBenefits: ['Private docent-led tour with complimentary refreshments for up to 12 guests', '4 Complimentary Event Tickets'] },
+    { name: 'Red Giant Star Sponsor', min: 1000, range: '$1,000–$2,499', color: '#b91c1c', bg: '#fee2e2', border: '#fca5a5',
+      ownBenefits: ['Custom engraved plaque with annual "stars"'] },
+    { name: 'Evening Star', min: 500, range: '$500–$999', color: '#c2410c', bg: '#ffedd5', border: '#fdba74',
+      ownBenefits: ['2 Complimentary Tickets to a North Star House event'] },
+    { name: 'Morning Star', min: 250, range: '$250–$499', color: '#7c3aed', bg: '#ede9fe', border: '#c4b5fd',
+      ownBenefits: ['Recognition in our printed and digital event programs'] },
+    { name: 'Rising Star', min: 100, range: '$100–$249', color: '#15803d', bg: '#dcfce7', border: '#86efac',
+      ownBenefits: ['Invitation to an exclusive Members\' Only Mixer'] },
+    { name: 'Shooting Star', min: 50, range: '$50–$99', color: '#b45309', bg: '#fef9c3', border: '#fde047',
+      ownBenefits: ['Access to our Online Loyalty Program & Newsletter subscription', 'Invitation to our State of the Star Membership Celebration'] },
+  ];
+
+  function getDonorTier(total) {
+    return DONOR_TIERS.find(function(t) { return total >= t.min; }) || null;
+  }
+
+  function getAllBenefits(tier) {
+    if (!tier) return [];
+    var tiersAsc = DONOR_TIERS.slice().reverse();
+    var result = [];
+    for (var i = 0; i < tiersAsc.length; i++) {
+      result = result.concat(tiersAsc[i].ownBenefits);
+      if (tiersAsc[i].name === tier.name) break;
+    }
+    return result;
+  }
+
+  function toggleBenefit(benefit) {
+    var checked = donorBenefits.indexOf(benefit) !== -1;
+    if (checked) {
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Donor Benefits') + '?donor_name=eq.' + encodeURIComponent(selected['Donor Name']) + '&benefit=eq.' + encodeURIComponent(benefit), {
+        method: 'DELETE',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function() { setDonorBenefits(function(prev) { return prev.filter(function(b) { return b !== benefit; }); }); });
+    } else {
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Donor Benefits'), {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ donor_name: selected['Donor Name'], benefit: benefit })
+      }).then(function() { setDonorBenefits(function(prev) { return prev.concat([benefit]); }); });
+    }
+  }
+
+  var donorYTD = {};
+  donations.forEach(function(d) {
+    var n = d['Donor Name'];
+    if (!donorYTD[n]) donorYTD[n] = 0;
+    donorYTD[n] += parseAmount(d['Amount']);
+  });
+
   var iStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
   var lStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
   var grp = { marginBottom: 14 };
@@ -1449,7 +1512,13 @@ function DonorsView() {
                 style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 0, padding: '11px 16px', borderBottom: '0.5px solid #f0ebe2', cursor: 'pointer', background: '#fff', alignItems: 'center', transition: 'background 0.12s' }}
               >
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a' }}>{d['Donor Name']}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a' }}>{d['Donor Name']}</span>
+                    {(function() {
+                      var tier = getDonorTier(donorYTD[d['Donor Name']] || 0);
+                      return tier ? <span style={{ fontSize: 10, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '1px 7px', whiteSpace: 'nowrap' }}>✦ {tier.name}</span> : null;
+                    })()}
+                  </div>
                   <div style={{ fontSize: 12, color: '#999', marginTop: 1 }}>{d['Account Type']}</div>
                 </div>
                 <div>
@@ -1474,6 +1543,11 @@ function DonorsView() {
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {(function() { var tc = typeColors[selected['Donation Type']] || { bg: '#f3f3f3', color: '#555' }; return <span style={{ background: tc.bg, color: tc.color, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20 }}>{selected['Donation Type']}</span>; })()}
                 <span style={{ fontSize: 12, color: '#777' }}>{fmtDate(selected['Close Date'])}</span>
+                {(function() {
+                  var ytd = donorYTD[selected['Donor Name']] || 0;
+                  var tier = getDonorTier(ytd);
+                  return tier ? <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '2px 10px' }}>✦ {tier.name}</span> : null;
+                })()}
               </div>
               <button onClick={function() { setSelected(null); }} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: '#666' }}>×</button>
             </div>
@@ -1503,6 +1577,31 @@ function DonorsView() {
                   {selected['Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Notes</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Notes']}</div></div>}
                 </div>
               </div>
+              {(function() {
+                var ytd = donorYTD[selected['Donor Name']] || 0;
+                var tier = getDonorTier(ytd);
+                if (!tier) return null;
+                var benefits = getAllBenefits(tier);
+                return (
+                  <div style={{ marginTop: 20, padding: '14px 16px', background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: tier.color }}>✦ {tier.name}</span>
+                      <span style={{ fontSize: 11, color: tier.color, opacity: 0.7 }}>{tier.range} · YTD ${ytd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {benefits.map(function(b) {
+                        var checked = donorBenefits.indexOf(b) !== -1;
+                        return (
+                          <label key={b} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+                            <input type="checkbox" checked={checked} onChange={function() { toggleBenefit(b); }} style={{ marginTop: 2, accentColor: tier.color, flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, color: tier.color, opacity: checked ? 1 : 0.7, textDecoration: checked ? 'none' : 'none', fontWeight: checked ? 600 : 400, lineHeight: 1.4 }}>{b}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                 <button onClick={function() { setSelected(null); }} style={{ flex: 1, padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#999', fontWeight: 500 }}>Close</button>
                 <button onClick={function() { setEditDon(selected); setEditForm(Object.assign({}, selected)); }} style={{ padding: '9px 20px', background: gold, border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#fff', fontWeight: 500 }}>Edit</button>
