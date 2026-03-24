@@ -4490,6 +4490,15 @@ function FinancialsView() {
   var [resourceSaving, setResourceSaving] = useState(false);
   var resourceFileRef = useRef(null);
 
+  // Project Budgets
+  var PROJECT_AREAS = ['Pathway Initiative - Ken Underwood', 'Trash Enclosure - David Wright'];
+  var emptyProjForm = { description: '', amount: '', date: new Date().toISOString().slice(0, 10), needs_reimbursement: false };
+  var [projItems, setProjItems] = useState({});
+  var [projLoading, setProjLoading] = useState(true);
+  var [projForms, setProjForms] = useState({ 'Pathway Initiative - Ken Underwood': emptyProjForm, 'Trash Enclosure - David Wright': emptyProjForm });
+  var [projShowing, setProjShowing] = useState({});
+  var [projSaving, setProjSaving] = useState({});
+
   function loadReimbursements() {
     setLoading(true);
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?needs_reimbursement=eq.true&select=*&order=date.desc,id.desc', {
@@ -4513,6 +4522,18 @@ function FinancialsView() {
       if (Array.isArray(rows)) setResources(rows);
       setResourcesLoading(false);
     }).catch(function() { setResourcesLoading(false); });
+    Promise.all(PROJECT_AREAS.map(function(area) {
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?area=eq.' + encodeURIComponent(area) + '&select=*&order=date.desc,id.desc', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        return { area: area, rows: Array.isArray(rows) ? rows : [] };
+      }).catch(function() { return { area: area, rows: [] }; });
+    })).then(function(results) {
+      var map = {};
+      results.forEach(function(r) { map[r.area] = r.rows; });
+      setProjItems(map);
+      setProjLoading(false);
+    });
   }, []);
 
   function markReimbursed(id) {
@@ -4544,6 +4565,35 @@ function FinancialsView() {
       setShowRentalForm(false);
       setRentalSaving(false);
     }).catch(function() { setRentalSaving(false); });
+  }
+
+  function submitProjItem(area, e) {
+    e.preventDefault();
+    var f = projForms[area];
+    if (!f.description || !f.amount || !f.date) return;
+    setProjSaving(function(s) { return Object.assign({}, s, { [area]: true }); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ area: area, description: f.description, amount: parseFloat(f.amount), date: f.date, needs_reimbursement: f.needs_reimbursement, type: 'Purchase' })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var newRow = (rows && rows[0]) ? rows[0] : { area: area, description: f.description, amount: parseFloat(f.amount), date: f.date, needs_reimbursement: f.needs_reimbursement };
+      setProjItems(function(prev) { return Object.assign({}, prev, { [area]: [newRow].concat(prev[area] || []) }); });
+      if (f.needs_reimbursement) loadReimbursements();
+      setProjForms(function(pf) { return Object.assign({}, pf, { [area]: emptyProjForm }); });
+      setProjShowing(function(ps) { return Object.assign({}, ps, { [area]: false }); });
+      setProjSaving(function(ps) { return Object.assign({}, ps, { [area]: false }); });
+    }).catch(function() { setProjSaving(function(ps) { return Object.assign({}, ps, { [area]: false }); }); });
+  }
+
+  function deleteProjItem(area, id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      setProjItems(function(prev) { var next = Object.assign({}, prev); next[area] = (next[area] || []).filter(function(b) { return b.id !== id; }); return next; });
+      loadReimbursements();
+    });
   }
 
   function fmt(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -4665,6 +4715,69 @@ function FinancialsView() {
         })}
       </div>
 
+    </div>
+
+    {/* Project Budgets */}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
+      {PROJECT_AREAS.map(function(area) {
+        var areaItems = projItems[area] || [];
+        var total = areaItems.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+        var pendingCount = areaItems.filter(function(b) { return b.needs_reimbursement; }).length;
+        var showing = !!projShowing[area];
+        var f = projForms[area] || emptyProjForm;
+        var saving = !!projSaving[area];
+        return (
+          <div key={area} style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>{area}</div>
+                {!projLoading && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{fmt(total)} total · {areaItems.length} item{areaItems.length !== 1 ? 's' : ''}{pendingCount > 0 ? ' · ' + pendingCount + ' pending reimb.' : ''}</div>}
+              </div>
+              <button onClick={function() { setProjShowing(function(ps) { return Object.assign({}, ps, { [area]: !showing }); }); }} style={{ fontSize: 12, background: showing ? '#f5f0ea' : gold, color: showing ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}>{showing ? 'Cancel' : '+ Log Purchase'}</button>
+            </div>
+            {showing && (
+              <form onSubmit={function(e) { submitProjItem(area, e); }} style={{ padding: '14px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fefcf8' }}>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>What was bought *</label>
+                  <input required value={f.description} onChange={function(e) { var v = e.target.value; setProjForms(function(pf) { return Object.assign({}, pf, { [area]: Object.assign({}, pf[area], { description: v }) }); }); }} placeholder="Description of purchase" style={inpSt} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Amount *</label>
+                    <input required type="number" step="0.01" min="0" value={f.amount} onChange={function(e) { var v = e.target.value; setProjForms(function(pf) { return Object.assign({}, pf, { [area]: Object.assign({}, pf[area], { amount: v }) }); }); }} placeholder="0.00" style={inpSt} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Date *</label>
+                    <input required type="date" value={f.date} onChange={function(e) { var v = e.target.value; setProjForms(function(pf) { return Object.assign({}, pf, { [area]: Object.assign({}, pf[area], { date: v }) }); }); }} style={inpSt} />
+                  </div>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, cursor: 'pointer', fontSize: 13, color: '#555' }}>
+                  <input type="checkbox" checked={f.needs_reimbursement} onChange={function(e) { var v = e.target.checked; setProjForms(function(pf) { return Object.assign({}, pf, { [area]: Object.assign({}, pf[area], { needs_reimbursement: v }) }); }); }} style={{ accentColor: '#b45309', width: 14, height: 14 }} />
+                  Needs reimbursement
+                </label>
+                <button type="submit" disabled={saving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving…' : 'Save'}</button>
+              </form>
+            )}
+            {projLoading ? (
+              <div style={{ padding: '20px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
+            ) : areaItems.length === 0 ? (
+              <div style={{ padding: '20px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No purchases logged yet.</div>
+            ) : areaItems.map(function(b) {
+              return (
+                <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
+                  {b.needs_reimbursement && <span style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 10, fontWeight: 600, flexShrink: 0 }}>$ Reimb.</span>}
+                  <button onClick={function() { deleteProjItem(area, b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
 
     {/* Resources */}
