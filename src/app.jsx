@@ -2101,6 +2101,9 @@ function BoardView() {
   const [voteForm, setVoteForm] = React.useState({ voter: '', choice: '', note: '' });
   const [showPostMeeting, setShowPostMeeting] = React.useState(false);
   const [voteSaving, setVoteSaving] = React.useState(false);
+  const [castingItemId, setCastingItemId] = React.useState(null);
+  const [quickVote, setQuickVote] = React.useState({ voter: '', choice: '' });
+  const [quickSaving, setQuickSaving] = React.useState(false);
   const [topicSaving, setTopicSaving] = React.useState(false);
   const [attachUploading, setAttachUploading] = React.useState(false);
   const [attachFileName, setAttachFileName] = React.useState('');
@@ -2201,6 +2204,21 @@ function BoardView() {
     });
   }
 
+  function handleQuickVote(item) {
+    if (!quickVote.voter || !quickVote.choice) return;
+    setQuickSaving(true);
+    var existing = votes.find(function(v) { return v.topicId === item.id && v.voter === quickVote.voter; });
+    var payload = { topicId: item.id, voter: quickVote.voter, choice: quickVote.choice, note: null, changed_in_meeting: false };
+    var prom = existing ? sbPatchById('Board-Votes', existing.id, payload) : sbInsert('Board-Votes', payload);
+    prom.then(function() {
+      setQuickSaving(false);
+      setCastingItemId(null);
+      setQuickVote({ voter: '', choice: '' });
+      clearCache('Board-Votes');
+      load();
+    });
+  }
+
   function handleTopicSubmit(e) {
     e.preventDefault();
     if (!topicForm.title) return;
@@ -2295,6 +2313,51 @@ function BoardView() {
                   {[['Yes', t.yes, '#2e7d32'], ['No', t.no, '#c62828'], ['Abstain', t.abstain, '#7c3aed']].map(function(entry) {
                     return <div key={entry[0]} style={{ fontSize: 12, color: entry[2], fontWeight: 600 }}>{entry[1]} {entry[0]}</div>;
                   })}
+                </div>
+              )}
+              {!revealed && (
+                <div style={{ marginTop: 12 }} onClick={function(e) { e.stopPropagation(); }}>
+                  {castingItemId !== item.id ? (
+                    <button onClick={function(e) { e.stopPropagation(); setCastingItemId(item.id); setQuickVote({ voter: '', choice: '' }); }}
+                      style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}>
+                      Cast your vote
+                    </button>
+                  ) : (
+                    <div style={{ background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: '12px 14px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 10 }}>Cast your vote</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                        <div>
+                          <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Your name</div>
+                          <select value={quickVote.voter} onChange={function(e) { setQuickVote(function(f) { return Object.assign({}, f, { voter: e.target.value }); }); }}
+                            style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, background: '#fff' }}>
+                            <option value="">Select name…</option>
+                            {BOARD_MEMBERS.map(function(m) {
+                              var hasVoted = iv.some(function(v) { return v.voter === m; });
+                              return <option key={m} value={m} style={{ color: hasVoted ? '#bbb' : '#2a2a2a' }}>{m}{hasVoted ? ' (Already voted)' : ''}</option>;
+                            })}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Vote</div>
+                          <select value={quickVote.choice} onChange={function(e) { setQuickVote(function(f) { return Object.assign({}, f, { choice: e.target.value }); })}
+                            style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, background: '#fff' }}>
+                            <option value="">Select…</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                            <option value="Abstain">Abstain</option>
+                            <option value="Not in attendance">Not in attendance</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={function() { handleQuickVote(item); }} disabled={!quickVote.voter || !quickVote.choice || quickSaving}
+                          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (!quickVote.voter || !quickVote.choice || quickSaving) ? 0.5 : 1 }}>
+                          {quickSaving ? 'Saving…' : 'Submit'}
+                        </button>
+                        <button onClick={function() { setCastingItemId(null); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '6px 12px', fontSize: 12, color: '#888', cursor: 'pointer' }}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
