@@ -5139,7 +5139,7 @@ function IdeasView() {
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas') + '?select=*&order=created_at.desc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
-      if (Array.isArray(rows)) setIdeas(rows);
+      if (Array.isArray(rows)) { setIdeas(rows); } else { alert('Ideas table error: ' + JSON.stringify(rows)); }
       setLoading(false);
     }).catch(function() { setLoading(false); });
   }, []);
@@ -5155,25 +5155,37 @@ function IdeasView() {
     }).catch(function() { setBudgetLoading(false); });
   }, [selected]);
 
+  function loadIdeas(thenFn) {
+    return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas') + '?select=*&order=created_at.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) { setIdeas(rows); if (thenFn) thenFn(rows); }
+    });
+  }
+
   function addIdea(e) {
     e.preventDefault();
     if (!form.title) return;
     setSaving(true);
+    var payload = { title: form.title, status: form.status, submitted_by: form.submitted_by || null, notes: form.notes || null, blockers: form.blockers || null, gaps: form.gaps || null };
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ title: form.title, status: form.status, submitted_by: form.submitted_by || null, notes: form.notes || null, blockers: form.blockers || null, gaps: form.gaps || null })
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      setSaving(false);
-      if (rows && rows[0]) {
-        setIdeas(function(p) { return [rows[0]].concat(p); });
-        setSelected(rows[0]);
-        var newStatus = rows[0].status;
+      body: JSON.stringify(payload)
+    }).then(function(r) {
+      if (!r.ok) { return r.json().then(function(e) { alert('Error: ' + (e.message || JSON.stringify(e))); setSaving(false); }); }
+      return r.json().then(function(rows) {
+        setSaving(false);
+        setForm(emptyForm); setShowAdd(false);
+        var newStatus = payload.status;
         setMainTab(['Active','On Hold','Completed','Declined'].includes(newStatus) ? 'initiatives' : 'ideas');
         setFilterStatus('All');
-      }
-      setForm(emptyForm); setShowAdd(false);
-    }).catch(function() { setSaving(false); });
+        loadIdeas(function(allRows) {
+          var match = allRows.find(function(x) { return rows && rows[0] ? x.id === rows[0].id : x.title === payload.title; });
+          if (match) setSelected(match);
+        });
+      });
+    }).catch(function(err) { setSaving(false); alert('Network error: ' + err); });
   }
 
   function saveEdit() {
