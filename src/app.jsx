@@ -4254,9 +4254,10 @@ function FinancialsView() {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                       </a>
                     )}
-                    <button onClick={function() { markReimbursed(b.id); }} disabled={isMarking} style={{ fontSize: 11, background: '#ecfdf5', color: '#059669', border: '0.5px solid #a7f3d0', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontWeight: 500, flexShrink: 0, opacity: isMarking ? 0.6 : 1 }}>
-                      {isMarking ? '…' : 'Mark Reimbursed'}
-                    </button>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: isMarking ? 'default' : 'pointer', flexShrink: 0 }}>
+                      <input type="checkbox" checked={false} disabled={isMarking} onChange={function() { markReimbursed(b.id); }} style={{ accentColor: '#059669', width: 14, height: 14 }} />
+                      <span style={{ fontSize: 11, color: '#059669', fontWeight: 500 }}>{isMarking ? '…' : 'Reimbursed'}</span>
+                    </label>
                   </div>
                 );
               })}
