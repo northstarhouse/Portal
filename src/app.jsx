@@ -4334,7 +4334,7 @@ function ReviewsView() {
 }
 
 function FinancialsView() {
-  var { useState, useEffect } = React;
+  var { useState, useEffect, useRef } = React;
 
   // Reimbursements
   var [items, setItems] = useState([]);
@@ -4351,6 +4351,16 @@ function FinancialsView() {
   var [rentalSaving, setRentalSaving] = useState(false);
   var [showRentalForm, setShowRentalForm] = useState(false);
 
+  // Resources
+  var [resources, setResources] = useState([]);
+  var [resourcesLoading, setResourcesLoading] = useState(true);
+  var [showAddResource, setShowAddResource] = useState(false);
+  var [resourceType, setResourceType] = useState('link');
+  var [resourceTitle, setResourceTitle] = useState('');
+  var [resourceUrl, setResourceUrl] = useState('');
+  var [resourceSaving, setResourceSaving] = useState(false);
+  var resourceFileRef = useRef(null);
+
   function loadReimbursements() {
     setLoading(true);
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?needs_reimbursement=eq.true&select=*&order=date.desc,id.desc', {
@@ -4365,7 +4375,16 @@ function FinancialsView() {
     }).then(function(r) { return r.json(); }).then(function(rows) { setRentals(Array.isArray(rows) ? rows : []); setRentalsLoading(false); });
   }
 
-  useEffect(function() { loadReimbursements(); loadRentals(); }, []);
+  useEffect(function() {
+    loadReimbursements();
+    loadRentals();
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?area=eq.Financials&select=*&order=created_at.asc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setResources(rows);
+      setResourcesLoading(false);
+    }).catch(function() { setResourcesLoading(false); });
+  }, []);
 
   function markReimbursed(id) {
     setMarkingId(id);
@@ -4407,9 +4426,91 @@ function FinancialsView() {
   var inpSt = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff', boxSizing: 'border-box' };
 
   return (
+    <div>
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden', maxWidth: 600 }}>
+        <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Financial Resources</div>
+        </div>
+        <div style={{ padding: '12px 16px' }}>
+          {resourcesLoading ? <div style={{ fontSize: 12, color: '#ccc' }}>Loading…</div> : resources.length === 0 && !showAddResource ? <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No resources yet.</div> : null}
+          {resources.map(function(r) {
+            return (
+              <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 8, marginBottom: 4, background: '#faf8f5', textDecoration: 'none', cursor: 'pointer' }}
+                onMouseEnter={function(e) { e.currentTarget.style.background = '#f5f0e8'; }}
+                onMouseLeave={function(e) { e.currentTarget.style.background = '#faf8f5'; }}>
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                <span style={{ fontSize: 13, fontWeight: 500, color: gold, flex: 1 }}>{r.title}</span>
+              </a>
+            );
+          })}
+          {showAddResource ? (
+            <div style={{ background: '#faf8f5', borderRadius: 8, padding: '12px 14px', marginTop: 8, border: '0.5px solid #e8e0d5' }}>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                {['link','file'].map(function(t) {
+                  return <button key={t} onClick={function() { setResourceType(t); }} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 5, border: '0.5px solid ' + (resourceType === t ? gold : '#e0d8cc'), background: resourceType === t ? gold : '#fff', color: resourceType === t ? '#fff' : '#888', cursor: 'pointer', fontWeight: resourceType === t ? 600 : 400 }}>{t === 'link' ? 'Link' : 'Upload File'}</button>;
+                })}
+              </div>
+              <input value={resourceTitle} onChange={function(e) { setResourceTitle(e.target.value); }} placeholder="Title" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} />
+              {resourceType === 'link'
+                ? <input value={resourceUrl} onChange={function(e) { setResourceUrl(e.target.value); }} placeholder="https://…" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} />
+                : <div style={{ marginBottom: 8 }}>
+                    <button onClick={function() { resourceFileRef.current.click(); }} style={{ fontSize: 12, color: gold, background: '#fff', border: '0.5px dashed ' + gold, borderRadius: 7, padding: '7px 14px', cursor: 'pointer', width: '100%' }}>
+                      {resourceUrl ? '✓ ' + resourceUrl.split('/').pop().slice(0,30) : 'Choose file…'}
+                    </button>
+                    <input ref={resourceFileRef} type="file" style={{ display: 'none' }} onChange={function(e) {
+                      var file = e.target.files[0];
+                      if (!file) return;
+                      if (!resourceTitle) setResourceTitle(file.name.replace(/\.[^.]+$/, ''));
+                      setResourceUrl('__file__:' + file.name);
+                    }} />
+                  </div>
+              }
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button disabled={resourceSaving} onClick={function() {
+                  if (!resourceTitle) return;
+                  setResourceSaving(true);
+                  function saveRecord(url) {
+                    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources'), {
+                      method: 'POST',
+                      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+                      body: JSON.stringify({ area: 'Financials', title: resourceTitle, url: url })
+                    }).then(function(r) { return r.json(); }).then(function(rows) {
+                      clearCache('Op Resources');
+                      setResourceSaving(false);
+                      if (rows && rows[0]) setResources(function(prev) { return prev.concat([rows[0]]); });
+                      setResourceTitle(''); setResourceUrl(''); setShowAddResource(false);
+                    });
+                  }
+                  if (resourceType === 'link') {
+                    saveRecord(resourceUrl);
+                  } else {
+                    var file = resourceFileRef.current && resourceFileRef.current.files[0];
+                    if (!file) { setResourceSaving(false); return; }
+                    var ext = file.name.split('.').pop();
+                    var filename = 'financials-' + Date.now() + '.' + ext;
+                    fetch(SUPABASE_URL + '/storage/v1/object/area-resources/' + filename, {
+                      method: 'POST',
+                      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
+                      body: file
+                    }).then(function() {
+                      saveRecord(SUPABASE_URL + '/storage/v1/object/public/area-resources/' + filename);
+                    }).catch(function() { setResourceSaving(false); });
+                  }
+                }} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: resourceSaving ? 0.7 : 1 }}>{resourceSaving ? 'Saving…' : 'Add'}</button>
+                <button onClick={function() { setShowAddResource(false); setResourceTitle(''); setResourceUrl(''); }} style={{ padding: '7px 12px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={function() { setShowAddResource(true); setResourceType('link'); }} style={{ width: '100%', marginTop: 8, padding: '8px 12px', background: 'none', border: 'none', fontSize: 12, color: gold, fontWeight: 500, cursor: 'pointer', textAlign: 'right', display: 'block' }}>
+              Add Resource →
+            </button>
+          )}
+        </div>
+      </div>
+    ) : (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
 
-      {/* Reimbursements */}
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
         <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
           <div>
@@ -4457,7 +4558,6 @@ function FinancialsView() {
         })}
       </div>
 
-      {/* Earnings */}
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
         <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
           <div>
@@ -4517,6 +4617,91 @@ function FinancialsView() {
           );
         })}
       </div>
+
+    </div>
+
+    {/* Resources */}
+    <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden', marginTop: 16 }}>
+      <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Resources</div>
+      </div>
+      <div style={{ padding: '12px 16px' }}>
+        {resourcesLoading ? <div style={{ fontSize: 12, color: '#ccc' }}>Loading…</div> : resources.length === 0 && !showAddResource ? <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No resources yet.</div> : null}
+        {resources.map(function(r) {
+          return (
+            <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 8, marginBottom: 4, background: '#faf8f5', textDecoration: 'none', cursor: 'pointer' }}
+              onMouseEnter={function(e) { e.currentTarget.style.background = '#f5f0e8'; }}
+              onMouseLeave={function(e) { e.currentTarget.style.background = '#faf8f5'; }}>
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              <span style={{ fontSize: 13, fontWeight: 500, color: gold, flex: 1 }}>{r.title}</span>
+            </a>
+          );
+        })}
+        {showAddResource ? (
+          <div style={{ background: '#faf8f5', borderRadius: 8, padding: '12px 14px', marginTop: 8, border: '0.5px solid #e8e0d5' }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+              {['link','file'].map(function(t) {
+                return <button key={t} onClick={function() { setResourceType(t); }} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 5, border: '0.5px solid ' + (resourceType === t ? gold : '#e0d8cc'), background: resourceType === t ? gold : '#fff', color: resourceType === t ? '#fff' : '#888', cursor: 'pointer', fontWeight: resourceType === t ? 600 : 400 }}>{t === 'link' ? 'Link' : 'Upload File'}</button>;
+              })}
+            </div>
+            <input value={resourceTitle} onChange={function(e) { setResourceTitle(e.target.value); }} placeholder="Title" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} />
+            {resourceType === 'link'
+              ? <input value={resourceUrl} onChange={function(e) { setResourceUrl(e.target.value); }} placeholder="https://…" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} />
+              : <div style={{ marginBottom: 8 }}>
+                  <button onClick={function() { resourceFileRef.current.click(); }} style={{ fontSize: 12, color: gold, background: '#fff', border: '0.5px dashed ' + gold, borderRadius: 7, padding: '7px 14px', cursor: 'pointer', width: '100%' }}>
+                    {resourceUrl ? '✓ ' + resourceUrl.split('/').pop().slice(0,30) : 'Choose file…'}
+                  </button>
+                  <input ref={resourceFileRef} type="file" style={{ display: 'none' }} onChange={function(e) {
+                    var file = e.target.files[0];
+                    if (!file) return;
+                    if (!resourceTitle) setResourceTitle(file.name.replace(/\.[^.]+$/, ''));
+                    setResourceUrl('__file__:' + file.name);
+                  }} />
+                </div>
+            }
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button disabled={resourceSaving} onClick={function() {
+                if (!resourceTitle) return;
+                setResourceSaving(true);
+                function saveRecord(url) {
+                  fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources'), {
+                    method: 'POST',
+                    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+                    body: JSON.stringify({ area: 'Financials', title: resourceTitle, url: url })
+                  }).then(function(r) { return r.json(); }).then(function(rows) {
+                    clearCache('Op Resources');
+                    setResourceSaving(false);
+                    if (rows && rows[0]) setResources(function(prev) { return prev.concat([rows[0]]); });
+                    setResourceTitle(''); setResourceUrl(''); setShowAddResource(false);
+                  });
+                }
+                if (resourceType === 'link') {
+                  saveRecord(resourceUrl);
+                } else {
+                  var file = resourceFileRef.current && resourceFileRef.current.files[0];
+                  if (!file) { setResourceSaving(false); return; }
+                  var ext = file.name.split('.').pop();
+                  var filename = 'financials-' + Date.now() + '.' + ext;
+                  fetch(SUPABASE_URL + '/storage/v1/object/area-resources/' + filename, {
+                    method: 'POST',
+                    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
+                    body: file
+                  }).then(function() {
+                    saveRecord(SUPABASE_URL + '/storage/v1/object/public/area-resources/' + filename);
+                  }).catch(function() { setResourceSaving(false); });
+                }
+              }} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: resourceSaving ? 0.7 : 1 }}>{resourceSaving ? 'Saving…' : 'Add'}</button>
+              <button onClick={function() { setShowAddResource(false); setResourceTitle(''); setResourceUrl(''); }} style={{ padding: '7px 12px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={function() { setShowAddResource(true); setResourceType('link'); }} style={{ width: '100%', marginTop: 4, padding: '8px 12px', background: 'none', border: 'none', fontSize: 12, color: gold, fontWeight: 500, cursor: 'pointer', textAlign: 'right', display: 'block' }}>
+            Add Resource →
+          </button>
+        )}
+      </div>
+    </div>
 
     </div>
   );
