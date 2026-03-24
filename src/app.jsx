@@ -653,6 +653,42 @@ function VolunteersView() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboarding, setOnboarding] = useState([]);
   var OB_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRvOZozfWfzXyS5GyAHDyzQbXf-A8GxNMKTTRh6BGDJCVAAdimGW7MvLdhl0Ab0PuUgmUfm8xpZRUyP/pub?gid=544068320&single=true&output=csv';
+  var HOURS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1sp4c5HRzVs3js3MURSedX82e6Hc6mAenjY-Szliaeno/export?format=csv';
+  const [hoursData, setHoursData] = React.useState({});
+
+  function parseHoursCSV(text) {
+    var lines = text.split('\n').filter(function(l) { return l.trim(); });
+    if (lines.length < 2) return {};
+    function splitLine(line) {
+      var cols = [], cur = '', inQ = false;
+      for (var i = 0; i < line.length; i++) {
+        var c = line[i];
+        if (c === '"') { inQ = !inQ; }
+        else if (c === ',' && !inQ) { cols.push(cur); cur = ''; }
+        else cur += c;
+      }
+      cols.push(cur);
+      return cols.map(function(v) { return v.trim().replace(/^"|"$/g, ''); });
+    }
+    var result = {};
+    lines.slice(1).forEach(function(line) {
+      var cols = splitLine(line);
+      var name = cols[0] || '';
+      var area = cols[1] || '';
+      var date = cols[2] || '';
+      var hours = parseFloat(cols[5]) || 0; // "Total" decimal column
+      if (!name || !hours) return;
+      var key = name.trim().toLowerCase();
+      if (!result[key]) result[key] = [];
+      result[key].push({ area: area, date: date, hours: hours });
+    });
+    return result;
+  }
+
+  function getVolHours(vol) {
+    var full = ((vol['First Name'] || '') + ' ' + (vol['Last Name'] || '')).trim().toLowerCase();
+    return hoursData[full] || [];
+  }
   function parseObCSV(text) {
     var lines = text.split('\n').filter(function(l) { return l.trim(); });
     if (lines.length < 2) return [];
@@ -707,6 +743,10 @@ function VolunteersView() {
         setLoading(false);
       })
       .catch(function(err) { setError(err.message); setLoading(false); });
+    fetch(HOURS_SHEET_URL).then(function(r) { return r.text(); }).then(function(text) {
+      setHoursData(parseHoursCSV(text));
+    }).catch(function() {});
+
     Promise.all([
       fetch(OB_SHEET_URL).then(function(r) { return r.text(); }).catch(function() { return ''; }),
       fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + '?select=*', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }).catch(function() { return []; })
@@ -1073,6 +1113,46 @@ function VolunteersView() {
                   <NoteBlock value={selected['What they want to see at NSH']} />
                 </div>
               )}
+              {(function() {
+                var entries = getVolHours(selected);
+                if (entries.length === 0) return null;
+                var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                var byMonth = {}, byArea = {}, total = 0;
+                entries.forEach(function(e) {
+                  var parts = e.date.split('/');
+                  if (parts.length < 3) return;
+                  var mo = parseInt(parts[0], 10) - 1;
+                  var yr = parseInt(parts[2], 10);
+                  var key = yr + '-' + String(mo + 1).padStart(2, '0');
+                  if (!byMonth[key]) byMonth[key] = { yr: yr, mo: mo, hrs: 0 };
+                  byMonth[key].hrs += e.hours;
+                  byArea[e.area] = (byArea[e.area] || 0) + e.hours;
+                  total += e.hours;
+                });
+                var monthKeys = Object.keys(byMonth).sort().reverse();
+                return (
+                  <div style={{ marginBottom: 4 }}>
+                    <span style={volSecLabel}>Volunteer Hours</span>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: gold, marginBottom: 10 }}>{total.toFixed(1)} hrs total</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                      {Object.keys(byArea).map(function(area) {
+                        return <span key={area} style={{ fontSize: 11, background: '#faf5ee', color: gold, borderRadius: 20, padding: '2px 9px', fontWeight: 600 }}>{area} · {byArea[area].toFixed(1)}h</span>;
+                      })}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                      {monthKeys.map(function(key) {
+                        var m = byMonth[key];
+                        return (
+                          <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', padding: '5px 0', borderBottom: '0.5px solid #f5f0ea' }}>
+                            <span>{MONTHS[m.mo]} {m.yr}</span>
+                            <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{m.hrs.toFixed(1)} hrs</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
               <button onClick={function() { setSelected(null); }} style={{ marginTop: 16, width: '100%', padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#999', fontWeight: 500 }}>Close</button>
             </div>
           </div>
