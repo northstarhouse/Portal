@@ -4053,7 +4053,7 @@ function FinancialsView() {
   var [markingId, setMarkingId] = useState(null);
 
   // Earnings (Creative Rentals)
-  var RENTAL_NAMES = ['Yoga with Teena Bates', 'Mahjong Group', 'Other'];
+  var RENTAL_NAMES = ['Yoga with Teena Bates', 'Mahjong Group', 'Donation Box', 'Book Sales', 'Other'];
   var PAYMENT_TYPES = ['Cash', 'Card', 'Check'];
   var emptyRentalForm = { name: 'Yoga with Teena Bates', custom_name: '', amount: '', date: new Date().toISOString().slice(0,10), payment_type: 'Cash' };
   var [rentals, setRentals] = useState([]);
