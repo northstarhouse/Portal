@@ -507,11 +507,13 @@ const typeColors = {
                       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
                       body: JSON.stringify(row)
                     }).then(function(r) { return r.json(); }).then(function(res) {
+                      console.log('IHE insert response:', JSON.stringify(res));
+                      if (res && res.code) { alert('Error: ' + (res.message || res.code)); setIheSaving(false); return; }
                       var created = Array.isArray(res) ? res[0] : res;
                       setInHouseEvents(function(prev) { return prev.concat([created]).sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); }); });
                       setIheAdding(false);
                       setIheSaving(false);
-                    }).catch(function() { setIheSaving(false); });
+                    }).catch(function(err) { console.error('IHE error:', err); setIheSaving(false); });
                   }} style={{ flex: 1, fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontWeight: 600, opacity: (iheSaving || !iheForm.name || !iheForm.date) ? 0.5 : 1 }}>
                     {iheSaving ? 'Saving…' : 'Save'}
                   </button>
