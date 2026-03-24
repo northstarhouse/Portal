@@ -3536,7 +3536,7 @@ function SponsorsView() {
         <StatCard label="Tiered Sponsors" value={sponsors === null ? '...' : sponsors.filter(function(s){return getTier(sponsorInKindTotal(s.id));}).length} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: (selected && !isMobile) ? '1fr 360px' : '1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: (selected && !isMobile) ? '240px 1fr' : '1fr', gap: 16 }}>
         <div>
           {sponsors === null && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>Loading…</div>}
           {sponsors !== null && sponsors.length === 0 && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>No sponsors yet.</div>}
