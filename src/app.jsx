@@ -530,7 +530,7 @@ const typeColors = {
               <div key={ev.id || i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, opacity: isPast ? 0.5 : 1 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {ev.link
-                    ? <a href={ev.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: gold, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', textDecoration: 'none' }}>{ev.name} ↗</a>
+                    ? <a href={ev.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', textDecoration: 'none' }}>{ev.name} ↗</a>
                     : <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.name}</div>
                   }
                   <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{dateStr}{ev.cost ? ' · $' + Number(ev.cost).toLocaleString() : ''}</div>
