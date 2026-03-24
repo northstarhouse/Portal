@@ -1494,3 +1494,97 @@ function testScript() {
   const deleted = deleteObject(created.id);
   Logger.log('Deleted: ' + JSON.stringify(deleted));
 }
+
+// ─────────────────────────────────────────────
+// HOURS SUMMARY → SUPABASE SYNC
+// ─────────────────────────────────────────────
+
+const HOURS_SHEET_ID = '1sp4c5HRzVs3js3MURSedX82e6Hc6mAenjY-Szliaeno';
+const HOURS_SHEET_NAME = 'Hours Summary';
+const SB_URL = 'https://uvzwhhwzelaelfhfkvdb.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2endoaHd6ZWxhZWxmaGZrdmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMzI4OTksImV4cCI6MjA4OTYwODg5OX0.xw5n0MGm69u_FOiZHxbLNUCNQHehIJliO_s4YbTyfh8';
+
+/**
+ * Reads the Hours Summary sheet and upserts all rows into
+ * the Supabase `volunteer_hours` table.
+ *
+ * Columns expected in sheet (row 1 = headers):
+ *   Name | Total Hours | Jan | Feb | Mar | Apr | May | Jun | Jul | Aug | Sep | Oct | Nov | Dec
+ *
+ * TO SET UP WEEKLY TRIGGER:
+ *   1. Open Apps Script editor (Extensions > Apps Script)
+ *   2. Click the clock icon (Triggers) in the left sidebar
+ *   3. Click "+ Add Trigger" (bottom right)
+ *   4. Choose function: syncHoursToSupabase
+ *   5. Event source: Time-driven
+ *   6. Type: Week timer
+ *   7. Day: Monday (or whichever day you prefer)
+ *   8. Time: 6am–7am
+ *   9. Click Save
+ */
+function syncHoursToSupabase() {
+  var ss = SpreadsheetApp.openById(HOURS_SHEET_ID);
+  var sheet = ss.getSheetByName(HOURS_SHEET_NAME);
+  var data = sheet.getDataRange().getValues();
+
+  // Row 0 is headers, skip it
+  var rows = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var name = String(row[0]).trim();
+    if (!name) continue;
+    rows.push({
+      name:        name,
+      total_hours: parseFloat(row[1]) || 0,
+      jan:         parseFloat(row[2]) || 0,
+      feb:         parseFloat(row[3]) || 0,
+      mar:         parseFloat(row[4]) || 0,
+      apr:         parseFloat(row[5]) || 0,
+      may:         parseFloat(row[6]) || 0,
+      jun:         parseFloat(row[7]) || 0,
+      jul:         parseFloat(row[8]) || 0,
+      aug:         parseFloat(row[9]) || 0,
+      sep:         parseFloat(row[10]) || 0,
+      oct:         parseFloat(row[11]) || 0,
+      nov:         parseFloat(row[12]) || 0,
+      dec:         parseFloat(row[13]) || 0,
+    });
+  }
+
+  if (rows.length === 0) {
+    Logger.log('No rows found in Hours Summary sheet.');
+    return;
+  }
+
+  // Upsert into Supabase (name is the unique key)
+  var response = UrlFetchApp.fetch(SB_URL + '/rest/v1/volunteer_hours', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + SB_KEY,
+      'Prefer': 'resolution=merge-duplicates',
+    },
+    payload: JSON.stringify(rows),
+    muteHttpExceptions: true,
+  });
+
+  Logger.log('Status: ' + response.getResponseCode());
+  Logger.log('Response: ' + response.getContentText());
+}
+
+/**
+ * Run this once to delete all rows from volunteer_hours before a full re-sync.
+ * Only needed if you want a clean slate (e.g. names were removed from the sheet).
+ */
+function clearHoursTable() {
+  var response = UrlFetchApp.fetch(SB_URL + '/rest/v1/volunteer_hours?name=neq.NONE', {
+    method: 'delete',
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + SB_KEY,
+    },
+    muteHttpExceptions: true,
+  });
+  Logger.log('Cleared: ' + response.getResponseCode());
+}

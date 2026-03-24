@@ -684,37 +684,21 @@ function VolunteersView() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboarding, setOnboarding] = useState([]);
   var OB_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRvOZozfWfzXyS5GyAHDyzQbXf-A8GxNMKTTRh6BGDJCVAAdimGW7MvLdhl0Ab0PuUgmUfm8xpZRUyP/pub?gid=544068320&single=true&output=csv';
-  var HOURS_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1sp4c5HRzVs3js3MURSedX82e6Hc6mAenjY-Szliaeno/gviz/tq?tqx=out:csv&sheet=Hours+Summary';
   var HOUR_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const [hoursData, setHoursData] = React.useState({});
 
-  function parseHoursCSV(text) {
-    var lines = text.split('\n').filter(function(l) { return l.trim(); });
-    if (lines.length < 2) return {};
-    function splitLine(line) {
-      var cols = [], cur = '', inQ = false;
-      for (var i = 0; i < line.length; i++) {
-        var c = line[i];
-        if (c === '"') { inQ = !inQ; }
-        else if (c === ',' && !inQ) { cols.push(cur); cur = ''; }
-        else cur += c;
-      }
-      cols.push(cur);
-      return cols.map(function(v) { return v.trim().replace(/^"|"$/g, ''); });
-    }
-    // Format: Name, Total Hours, Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec
+  function hoursRowsToMap(rows) {
     var result = {};
-    lines.slice(1).forEach(function(line) {
-      var cols = splitLine(line);
-      var name = (cols[0] || '').trim();
+    rows.forEach(function(row) {
+      var name = (row.name || '').trim();
       if (!name) return;
       var key = name.toLowerCase();
       var months = {};
-      HOUR_MONTHS.forEach(function(m, i) {
-        var v = parseFloat(cols[i + 2]) || 0;
+      HOUR_MONTHS.forEach(function(m) {
+        var v = parseFloat(row[m.toLowerCase()]) || 0;
         if (v > 0) months[m] = v;
       });
-      var total = parseFloat(cols[1]) || 0;
+      var total = parseFloat(row.total_hours) || 0;
       if (!result[key]) { result[key] = { total: total, months: months }; }
       else {
         result[key].total += total;
@@ -795,11 +779,16 @@ function VolunteersView() {
       .catch(function(err) { setError(err.message); setLoading(false); });
     var cachedHours = lsGet('hours_summary');
     if (cachedHours) { setHoursData(cachedHours); }
-    else { fetch(HOURS_SHEET_URL).then(function(r) { return r.text(); }).then(function(text) {
-      var parsed = parseHoursCSV(text);
-      setHoursData(parsed);
-      lsSet('hours_summary', parsed);
-    }).catch(function() {}); }
+    else {
+      fetch(SUPABASE_URL + '/rest/v1/volunteer_hours?select=*', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        if (!Array.isArray(rows)) return;
+        var parsed = hoursRowsToMap(rows);
+        setHoursData(parsed);
+        lsSet('hours_summary', parsed);
+      }).catch(function() {});
+    }
 
     Promise.all([
       fetch(OB_SHEET_URL).then(function(r) { return r.text(); }).catch(function() { return ''; }),
