@@ -1,10 +1,12 @@
-var CACHE = 'nsh-v323';
+var CACHE = 'nsh-v330';
 var STATIC = [
   '/Portal/',
   '/Portal/index.html',
-  '/Portal/assets/app.js?v=323',
+  '/Portal/assets/app.js?v=330',
   '/Portal/assets/logo.png',
   '/Portal/favicon.svg',
+  'https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js',
+  'https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js',
 ];
 
 self.addEventListener('install', function(e) {
@@ -23,8 +25,8 @@ self.addEventListener('activate', function(e) {
 
 self.addEventListener('fetch', function(e) {
   var url = e.request.url;
-  // Always go to network for API calls and external resources
-  if (url.includes('supabase.co') || url.includes('corsproxy.io') || url.includes('googleapis.com') || url.includes('jsdelivr.net')) {
+  // Always go to network for API calls and Google resources
+  if (url.includes('supabase.co') || url.includes('corsproxy.io') || url.includes('googleapis.com') || url.includes('google.com')) {
     return;
   }
   e.respondWith(
