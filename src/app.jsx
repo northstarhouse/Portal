@@ -687,7 +687,9 @@ function VolunteersView() {
 
   function getVolHours(vol) {
     var full = ((vol['First Name'] || '') + ' ' + (vol['Last Name'] || '')).trim().toLowerCase();
-    return hoursData[full] || [];
+    if (hoursData[full]) return hoursData[full];
+    var first = (vol['First Name'] || '').trim().toLowerCase();
+    return hoursData[first] || [];
   }
   function parseObCSV(text) {
     var lines = text.split('\n').filter(function(l) { return l.trim(); });
