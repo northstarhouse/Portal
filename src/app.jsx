@@ -3720,14 +3720,16 @@ function SponsorsView() {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
       body: JSON.stringify(payload)
     }).then(function(r) { return r.json(); }).then(function(rows) {
+      console.log('InKind insert response:', JSON.stringify(rows));
       setInkindSaving(false);
+      if (rows && rows.code) { alert('Error: ' + (rows.message || rows.code)); return; }
       if (Array.isArray(rows) && rows[0]) {
         setInkind(function(prev) { return [rows[0]].concat(prev); });
         setAllInKind(function(prev) { return prev.concat([rows[0]]); });
         clearCache('Sponsor In-Kind');
       }
       setInkindForm({ description: '', date: new Date().toISOString().slice(0,10), value: '' });
-    }).catch(function() { setInkindSaving(false); });
+    }).catch(function(err) { console.error('InKind error:', err); setInkindSaving(false); });
   }
 
   function deleteInKind(id) {
