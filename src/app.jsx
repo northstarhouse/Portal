@@ -121,6 +121,7 @@ var NAV_ICONS = {
   operational: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   sponsors: '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>',
   financials: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  ideas: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
   reviews: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
 };
 
@@ -141,6 +142,7 @@ const modules = [
   { id: "sponsors", label: "Sponsors" },
   { id: "board", label: "Board Voting" },
   { id: "strategy", label: "Strategic Goal Progress" },
+  { id: "ideas", label: "Ideas & Initiatives" },
   { id: "operational", label: "Operational Areas", hidden: true },
   { id: "financials", label: "Financials", hidden: true },
   { id: "reviews", label: "Reviews", hidden: true },
@@ -4898,6 +4900,337 @@ function FinancialsView() {
   );
 }
 
+function IdeasView() {
+  var { useState, useEffect, useRef } = React;
+  var isMobile = React.useContext(MobileCtx);
+  var today = new Date().toISOString().slice(0, 10);
+
+  var STATUS_OPTIONS = ['Exploring', 'Active', 'On Hold', 'Declined', 'Completed'];
+  var STATUS_COLORS = {
+    'Exploring': { bg: '#e3f2fd', color: '#1565c0' },
+    'Active':    { bg: '#e8f5e9', color: '#2e7d32' },
+    'On Hold':   { bg: '#fff8e1', color: '#f57f17' },
+    'Declined':  { bg: '#fce4ec', color: '#c62828' },
+    'Completed': { bg: '#f3e5f5', color: '#6a1b9a' },
+  };
+
+  var [ideas, setIdeas] = useState([]);
+  var [loading, setLoading] = useState(true);
+  var [selected, setSelected] = useState(null);
+  var [filterStatus, setFilterStatus] = useState('All');
+  var [showAdd, setShowAdd] = useState(false);
+  var [editing, setEditing] = useState(false);
+  var emptyForm = { title: '', status: 'Exploring', submitted_by: '', notes: '', blockers: '', gaps: '' };
+  var [form, setForm] = useState(emptyForm);
+  var [editForm, setEditForm] = useState({});
+  var [saving, setSaving] = useState(false);
+  var [editSaving, setEditSaving] = useState(false);
+
+  var [budgetItems, setBudgetItems] = useState([]);
+  var [budgetLoading, setBudgetLoading] = useState(false);
+  var emptyBF = { description: '', amount: '', date: today, expense_type: 'Purchase' };
+  var [budgetForm, setBudgetForm] = useState(emptyBF);
+  var [showBudgetForm, setShowBudgetForm] = useState(false);
+  var [budgetSaving, setBudgetSaving] = useState(false);
+  var receiptRef = useRef(null);
+
+  var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
+  var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 };
+
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas') + '?select=*&order=created_at.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setIdeas(rows);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }, []);
+
+  useEffect(function() {
+    if (!selected || selected.status !== 'Active') { setBudgetItems([]); return; }
+    setBudgetLoading(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?area=eq.' + encodeURIComponent(selected.title) + '&select=*&order=date.desc,id.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setBudgetItems(Array.isArray(rows) ? rows : []);
+      setBudgetLoading(false);
+    }).catch(function() { setBudgetLoading(false); });
+  }, [selected]);
+
+  function addIdea(e) {
+    e.preventDefault();
+    if (!form.title) return;
+    setSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ title: form.title, status: form.status, submitted_by: form.submitted_by || null, notes: form.notes || null, blockers: form.blockers || null, gaps: form.gaps || null })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setSaving(false);
+      if (rows && rows[0]) { setIdeas(function(p) { return [rows[0]].concat(p); }); setSelected(rows[0]); }
+      setForm(emptyForm); setShowAdd(false);
+    }).catch(function() { setSaving(false); });
+  }
+
+  function saveEdit() {
+    if (!selected) return;
+    setEditSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas') + '?id=eq.' + selected.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm)
+    }).then(function() {
+      var updated = Object.assign({}, selected, editForm);
+      setIdeas(function(p) { return p.map(function(i) { return i.id === selected.id ? updated : i; }); });
+      setSelected(updated); setEditing(false); setEditSaving(false);
+    }).catch(function() { setEditSaving(false); });
+  }
+
+  function submitBudget(e) {
+    e.preventDefault();
+    if (!budgetForm.description || !budgetForm.amount || !budgetForm.date || !selected) return;
+    setBudgetSaving(true);
+    var isInKind = budgetForm.expense_type === 'In-Kind';
+    var needsReimb = budgetForm.expense_type === 'Reimbursement';
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ area: selected.title, description: budgetForm.description, amount: parseFloat(budgetForm.amount), date: budgetForm.date, type: isInKind ? 'In-Kind' : 'Purchase', needs_reimbursement: needsReimb })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var newRow = rows && rows[0] ? rows[0] : {};
+      var file = receiptRef.current && receiptRef.current.files[0];
+      function finish(row) {
+        setBudgetItems(function(p) { return [row].concat(p); });
+        setBudgetForm(emptyBF); setShowBudgetForm(false); setBudgetSaving(false);
+        if (receiptRef.current) receiptRef.current.value = '';
+      }
+      if (file && newRow.id) {
+        var ext = file.name.split('.').pop();
+        var fn = 'idea-' + newRow.id + '-' + Date.now() + '.' + ext;
+        fetch(SUPABASE_URL + '/storage/v1/object/receipts/' + fn, {
+          method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type }, body: file
+        }).then(function() {
+          var url = SUPABASE_URL + '/storage/v1/object/public/receipts/' + fn;
+          fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + newRow.id, {
+            method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ receipt_url: url })
+          }).then(function() { finish(Object.assign({}, newRow, { receipt_url: url })); });
+        }).catch(function() { finish(newRow); });
+      } else { finish(newRow); }
+    }).catch(function() { setBudgetSaving(false); });
+  }
+
+  function deleteBudgetItem(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() { setBudgetItems(function(p) { return p.filter(function(b) { return b.id !== id; }); }); });
+  }
+
+  function fmtMoney(n) { return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  var filtered = ideas.filter(function(i) { return filterStatus === 'All' || i.status === filterStatus; });
+
+  function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSaving }) {
+    return (
+      <form onSubmit={onSubmit}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+          <div><label style={lb}>Title *</label><input required value={formData.title} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { title: e.target.value }); }); }} style={inpSt} placeholder="Name of idea or initiative" /></div>
+          <div><label style={lb}>Status</label>
+            <select value={formData.status} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { status: e.target.value }); }); }} style={inpSt}>
+              {STATUS_OPTIONS.map(function(s) { return <option key={s} value={s}>{s}</option>; })}
+            </select>
+          </div>
+        </div>
+        <div style={{ marginBottom: 12 }}><label style={lb}>Submitted By</label><input value={formData.submitted_by} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { submitted_by: e.target.value }); }); }} style={inpSt} placeholder="Person's name" /></div>
+        <div style={{ marginBottom: 12 }}><label style={lb}>Notes — why it matters, context, ideas</label><textarea value={formData.notes} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Why this matters, background context, related ideas…" /></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+          <div><label style={{ fontSize: 11, color: '#b45309', fontWeight: 600, display: 'block', marginBottom: 4 }}>Blockers — what's in the way</label><textarea value={formData.blockers} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { blockers: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Obstacles, constraints, risks…" /></div>
+          <div><label style={{ fontSize: 11, color: '#1565c0', fontWeight: 600, display: 'block', marginBottom: 4 }}>Gaps — what's missing</label><textarea value={formData.gaps} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { gaps: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Resources, knowledge, support needed…" /></div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="submit" disabled={isSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving…' : submitLabel}</button>
+          <button type="button" onClick={onCancel} style={{ padding: '9px 18px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Ideas & Initiatives</div>
+        <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ New Idea</button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20, flexWrap: 'wrap' }}>
+        {['All'].concat(STATUS_OPTIONS).map(function(s) {
+          var sc = STATUS_COLORS[s] || { bg: '#f5f0ea', color: '#888' };
+          var isActive = filterStatus === s;
+          return (
+            <button key={s} onClick={function() { setFilterStatus(s); setSelected(null); }}
+              style={{ fontSize: 11, fontWeight: isActive ? 700 : 400, padding: '4px 14px', borderRadius: 20, border: '0.5px solid ' + (isActive ? sc.color : '#e0d8cc'), background: isActive ? sc.bg : '#fff', color: isActive ? sc.color : '#999', cursor: 'pointer' }}>
+              {s}
+            </button>
+          );
+        })}
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: selected && !isMobile ? '240px 1fr' : '1fr', gap: 16, alignItems: 'start' }}>
+          <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '10px 14px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 0.8 }}>{filtered.length} idea{filtered.length !== 1 ? 's' : ''}</div>
+            </div>
+            {filtered.length === 0
+              ? <div style={{ padding: '20px 14px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No ideas yet.</div>
+              : filtered.map(function(idea) {
+                  var sc = STATUS_COLORS[idea.status] || { bg: '#f5f5f5', color: '#888' };
+                  var isSel = selected && selected.id === idea.id;
+                  return (
+                    <div key={idea.id} onClick={function() { setSelected(isSel ? null : idea); setEditing(false); }}
+                      style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb', cursor: 'pointer', background: isSel ? sc.bg : '#fff', borderLeft: '3px solid ' + (isSel ? sc.color : 'transparent'), transition: 'all 0.12s' }}
+                      onMouseEnter={function(e) { if (!isSel) e.currentTarget.style.background = '#faf8f5'; }}
+                      onMouseLeave={function(e) { if (!isSel) e.currentTarget.style.background = '#fff'; }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>{idea.title}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, background: sc.bg, color: sc.color, border: '0.5px solid ' + sc.color + '44', borderRadius: 10, padding: '1px 7px' }}>{idea.status}</span>
+                        {idea.submitted_by && <span style={{ fontSize: 11, color: '#aaa' }}>{idea.submitted_by}</span>}
+                      </div>
+                    </div>
+                  );
+                })
+            }
+          </div>
+
+          {selected && (function() {
+            var sc = STATUS_COLORS[selected.status] || { bg: '#f5f5f5', color: '#888' };
+            var budgetTotal = budgetItems.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+            return (
+              <div>
+                <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+                  <div style={{ background: sc.bg, padding: '16px 20px', borderBottom: '0.5px solid ' + sc.color + '33', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 17, fontWeight: 700, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, background: '#fff', color: sc.color, border: '0.5px solid ' + sc.color + '66', borderRadius: 10, padding: '2px 8px' }}>{selected.status}</span>
+                        {selected.submitted_by && <span style={{ fontSize: 12, color: '#888' }}>by {selected.submitted_by}</span>}
+                      </div>
+                    </div>
+                    <button onClick={function() { setEditing(true); setEditForm({ title: selected.title, status: selected.status, submitted_by: selected.submitted_by || '', notes: selected.notes || '', blockers: selected.blockers || '', gaps: selected.gaps || '' }); }}
+                      style={{ background: '#fff', border: '0.5px solid ' + sc.color + '66', borderRadius: 7, padding: '5px 12px', fontSize: 12, color: sc.color, cursor: 'pointer', fontWeight: 500, flexShrink: 0 }}>Edit</button>
+                  </div>
+                  <div style={{ padding: '16px 20px' }}>
+                    {selected.notes && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 6 }}>Notes</div>
+                        <div style={{ fontSize: 13, color: '#555', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{selected.notes}</div>
+                      </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      {selected.blockers && (
+                        <div>
+                          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#b45309', fontWeight: 600, marginBottom: 6 }}>Blockers</div>
+                          <div style={{ fontSize: 13, color: '#555', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{selected.blockers}</div>
+                        </div>
+                      )}
+                      {selected.gaps && (
+                        <div>
+                          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#1565c0', fontWeight: 600, marginBottom: 6 }}>Gaps</div>
+                          <div style={{ fontSize: 13, color: '#555', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{selected.gaps}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {selected.status === 'Active' && (
+                  <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Initiative Budget</div>
+                        {!budgetLoading && budgetItems.length > 0 && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{fmtMoney(budgetTotal)} total · {budgetItems.length} item{budgetItems.length !== 1 ? 's' : ''}</div>}
+                      </div>
+                      <button onClick={function() { setShowBudgetForm(function(v) { return !v; }); }} style={{ fontSize: 12, background: showBudgetForm ? '#f5f0ea' : gold, color: showBudgetForm ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}>{showBudgetForm ? 'Cancel' : '+ Log Expense'}</button>
+                    </div>
+                    {showBudgetForm && (
+                      <form onSubmit={submitBudget} style={{ padding: '14px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fefcf8' }}>
+                        <div style={{ marginBottom: 10 }}><label style={lb}>Description *</label><input required value={budgetForm.description} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} placeholder="What was purchased or contributed" style={inpSt} /></div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
+                          <div><label style={lb}>Amount *</label><input required type="number" step="0.01" min="0" value={budgetForm.amount} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} placeholder="0.00" style={inpSt} /></div>
+                          <div><label style={lb}>Date *</label><input required type="date" value={budgetForm.date} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={inpSt} /></div>
+                          <div><label style={lb}>Type</label>
+                            <select value={budgetForm.expense_type} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { expense_type: e.target.value }); }); }} style={inpSt}>
+                              <option value="Purchase">Purchase</option>
+                              <option value="Reimbursement">Reimbursement</option>
+                              <option value="In-Kind">In-Kind</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: gold, fontWeight: 500 }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                            Attach receipt
+                            <input ref={receiptRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} />
+                          </label>
+                          <button type="submit" disabled={budgetSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: budgetSaving ? 0.7 : 1 }}>{budgetSaving ? 'Saving…' : 'Save'}</button>
+                        </div>
+                      </form>
+                    )}
+                    {budgetLoading ? (
+                      <div style={{ padding: '20px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
+                    ) : budgetItems.length === 0 ? (
+                      <div style={{ padding: '20px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No expenses logged yet.</div>
+                    ) : budgetItems.map(function(b) {
+                      return (
+                        <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description}</div>
+                            <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date}</div>
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: b.type === 'In-Kind' ? '#2e7d32' : b.needs_reimbursement ? '#b45309' : '#2a2a2a', flexShrink: 0 }}>{fmtMoney(b.amount)}</div>
+                          {b.type === 'In-Kind' && <span style={{ fontSize: 10, background: '#e8f5e9', color: '#2e7d32', padding: '2px 6px', borderRadius: 10, fontWeight: 600, flexShrink: 0 }}>In-Kind</span>}
+                          {b.needs_reimbursement && <span style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 10, fontWeight: 600, flexShrink: 0 }}>$ Reimb.</span>}
+                          {b.receipt_url && <a href={b.receipt_url} target="_blank" rel="noopener noreferrer" title="View attachment" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></a>}
+                          <button onClick={function() { deleteBudgetItem(b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {editing && selected && (
+        <div onClick={function() { setEditing(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 540, width: '100%', boxShadow: '0 12px 48px rgba(0,0,0,0.2)', maxHeight: '92vh', overflowY: 'auto', padding: 28 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>Edit Idea</div>
+              <button type="button" onClick={function() { setEditing(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>✕ Close</button>
+            </div>
+            <IdeaForm formData={editForm} setFormData={setEditForm} onSubmit={function(e) { e.preventDefault(); saveEdit(); }} onCancel={function() { setEditing(false); }} submitLabel="Save Changes" isSaving={editSaving} />
+          </div>
+        </div>
+      )}
+
+      {showAdd && (
+        <div onClick={function() { setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 540, width: '100%', boxShadow: '0 12px 48px rgba(0,0,0,0.2)', maxHeight: '92vh', overflowY: 'auto', padding: 28 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>New Idea</div>
+              <button type="button" onClick={function() { setShowAdd(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>✕ Close</button>
+            </div>
+            <IdeaForm formData={form} setFormData={setForm} onSubmit={addIdea} onCancel={function() { setShowAdd(false); }} submitLabel="Add Idea" isSaving={saving} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DonorsGate({ onUnlock }) {
   var { useState } = React;
   var [val, setVal] = useState('');
@@ -4939,6 +5272,7 @@ const views = {
   board: BoardView,
   sponsors: SponsorsView,
   strategy: StrategyView,
+  ideas: IdeasView,
   operational: OperationalView,
   financials: FinancialsView,
   reviews: ReviewsView,
