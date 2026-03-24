@@ -380,7 +380,7 @@ const typeColors = {
         );
       })()}
 
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
         <div onClick={function() { navigate('donors'); }} style={{ cursor: 'pointer' }}><StatCard label="Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /></div>
         <div onClick={function() { navigate('volunteers'); }} style={{ cursor: 'pointer' }}><StatCard label="Active Volunteers" value={activeVols === null ? '...' : activeVols} /></div>
 <div onClick={function() { navigate('sponsors'); }} style={{ cursor: 'pointer' }}><StatCard label="Sponsors" value={sponsors === null ? '...' : sponsors.length} /></div>
