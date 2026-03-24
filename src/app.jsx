@@ -295,7 +295,7 @@ const typeColors = {
   const [birthdays, setBirthdays] = useState(null);
   const [sponsors, setSponsors] = useState(null);
   const [inHouseEvents, setInHouseEvents] = useState([]);
-  const [iheForm, setIheForm] = useState({ name: '', date: '', cost: '' });
+  const [iheForm, setIheForm] = useState({ name: '', date: '', cost: '', link: '' });
   const [iheAdding, setIheAdding] = useState(false);
   const [iheSaving, setIheSaving] = useState(false);
   var isMobile = React.useContext(MobileCtx);
@@ -493,10 +493,12 @@ const typeColors = {
                   style={{ fontSize: 13, border: '0.5px solid #d0c8bc', borderRadius: 6, padding: '6px 10px', outline: 'none' }} />
                 <input placeholder="Cost (e.g. 150)" type="number" value={iheForm.cost} onChange={function(e) { setIheForm(function(f) { return Object.assign({}, f, { cost: e.target.value }); }); }}
                   style={{ fontSize: 13, border: '0.5px solid #d0c8bc', borderRadius: 6, padding: '6px 10px', outline: 'none' }} />
+                <input placeholder="Link (optional)" value={iheForm.link} onChange={function(e) { setIheForm(function(f) { return Object.assign({}, f, { link: e.target.value }); }); }}
+                  style={{ fontSize: 13, border: '0.5px solid #d0c8bc', borderRadius: 6, padding: '6px 10px', outline: 'none' }} />
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button disabled={iheSaving || !iheForm.name || !iheForm.date} onClick={function() {
                     setIheSaving(true);
-                    var row = { name: iheForm.name, date: iheForm.date, cost: parseFloat(iheForm.cost) || 0 };
+                    var row = { name: iheForm.name, date: iheForm.date, cost: parseFloat(iheForm.cost) || 0, link: iheForm.link || null };
                     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('In-House Events'), {
                       method: 'POST',
                       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -524,7 +526,10 @@ const typeColors = {
             return (
               <div key={ev.id || i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, opacity: isPast ? 0.5 : 1 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.name}</div>
+                  {ev.link
+                    ? <a href={ev.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: gold, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', textDecoration: 'none' }}>{ev.name} ↗</a>
+                    : <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.name}</div>
+                  }
                   <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{dateStr}{ev.cost ? ' · $' + Number(ev.cost).toLocaleString() : ''}</div>
                 </div>
                 <button onClick={function() {
