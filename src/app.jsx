@@ -2101,9 +2101,6 @@ function BoardView() {
   const [voteForm, setVoteForm] = React.useState({ voter: '', choice: '', note: '' });
   const [showPostMeeting, setShowPostMeeting] = React.useState(false);
   const [voteSaving, setVoteSaving] = React.useState(false);
-  const [castingItemId, setCastingItemId] = React.useState(null);
-  const [quickVote, setQuickVote] = React.useState({ voter: '', choice: '' });
-  const [quickSaving, setQuickSaving] = React.useState(false);
   const [topicSaving, setTopicSaving] = React.useState(false);
   const [attachUploading, setAttachUploading] = React.useState(false);
   const [attachFileName, setAttachFileName] = React.useState('');
@@ -2198,22 +2195,6 @@ function BoardView() {
     prom.then(function() {
       setVoteSaving(false);
       setVoteForm({ voter: '', choice: '', note: '' });
-      setShowPostMeeting(false);
-      clearCache('Board-Votes');
-      load();
-    });
-  }
-
-  function handleQuickVote(item) {
-    if (!quickVote.voter || !quickVote.choice) return;
-    setQuickSaving(true);
-    var existing = votes.find(function(v) { return v.topicId === item.id && v.voter === quickVote.voter; });
-    var payload = { topicId: item.id, voter: quickVote.voter, choice: quickVote.choice, note: null, changed_in_meeting: false };
-    var prom = existing ? sbPatchById('Board-Votes', existing.id, payload) : sbInsert('Board-Votes', payload);
-    prom.then(function() {
-      setQuickSaving(false);
-      setCastingItemId(null);
-      setQuickVote({ voter: '', choice: '' });
       clearCache('Board-Votes');
       load();
     });
@@ -2315,51 +2296,6 @@ function BoardView() {
                   })}
                 </div>
               )}
-              {!revealed && (
-                <div style={{ marginTop: 12 }} onClick={function(e) { e.stopPropagation(); }}>
-                  {castingItemId !== item.id ? (
-                    <button onClick={function(e) { e.stopPropagation(); setCastingItemId(item.id); setQuickVote({ voter: '', choice: '' }); }}
-                      style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}>
-                      Cast your vote
-                    </button>
-                  ) : (
-                    <div style={{ background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: '12px 14px' }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 10 }}>Cast your vote</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                        <div>
-                          <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Your name</div>
-                          <select value={quickVote.voter} onChange={function(e) { setQuickVote(function(f) { return Object.assign({}, f, { voter: e.target.value }); }); }}
-                            style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, background: '#fff' }}>
-                            <option value="">Select name…</option>
-                            {BOARD_MEMBERS.map(function(m) {
-                              var hasVoted = iv.some(function(v) { return v.voter === m; });
-                              return <option key={m} value={m} style={{ color: hasVoted ? '#bbb' : '#2a2a2a' }}>{m}{hasVoted ? ' (Already voted)' : ''}</option>;
-                            })}
-                          </select>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Vote</div>
-                          <select value={quickVote.choice} onChange={function(e) { setQuickVote(function(f) { return Object.assign({}, f, { choice: e.target.value }); }); }}
-                            style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, background: '#fff' }}>
-                            <option value="">Select…</option>
-                            <option value="Yes">Yes</option>
-                            <option value="No">No</option>
-                            <option value="Abstain">Abstain</option>
-                            <option value="Not in attendance">Not in attendance</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={function() { handleQuickVote(item); }} disabled={!quickVote.voter || !quickVote.choice || quickSaving}
-                          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (!quickVote.voter || !quickVote.choice || quickSaving) ? 0.5 : 1 }}>
-                          {quickSaving ? 'Saving…' : 'Submit'}
-                        </button>
-                        <button onClick={function() { setCastingItemId(null); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '6px 12px', fontSize: 12, color: '#888', cursor: 'pointer' }}>Cancel</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
             </React.Fragment>
           );
@@ -2442,64 +2378,55 @@ function BoardView() {
               </div>
             ) : (
               <div>
-                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 12 }}>
-                  Votes · {itemVotes(selected).length}/{BOARD_MEMBERS.length} submitted
+                <div style={{ background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '18px 20px', marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 14 }}>Cast your vote</div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={bLbl}>Your name</label>
+                    <select value={voteForm.voter} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { voter: e.target.value, choice: '', note: '' }); }); }} style={Object.assign({}, bInp, { marginTop: 4 })}>
+                      <option value="">Select name…</option>
+                      {BOARD_MEMBERS.map(function(m) {
+                        var hasVoted = itemVotes(selected).some(function(v) { return v.voter === m; });
+                        return <option key={m} value={m} style={{ color: hasVoted ? '#bbb' : '#2a2a2a' }}>{m}{hasVoted ? ' (Already voted)' : ''}</option>;
+                      })}
+                    </select>
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={bLbl}>Vote</label>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                      {['Yes', 'No', 'Abstain', 'Not in attendance'].map(function(opt) {
+                        var vc2 = VOTE_COLORS[opt];
+                        var active = voteForm.choice === opt;
+                        return (
+                          <button key={opt} type="button" onClick={function() { setVoteForm(function(f) { return Object.assign({}, f, { choice: opt }); }); }}
+                            style={{ padding: '7px 14px', borderRadius: 20, border: '1.5px solid ' + (active ? vc2.color : '#e0d8cc'), background: active ? vc2.bg : '#fff', color: active ? vc2.color : '#888', fontSize: 13, fontWeight: active ? 700 : 400, cursor: 'pointer', transition: 'all 0.1s' }}>
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={2} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 12 })} placeholder="Note (optional)…" />
+                  <button onClick={handleVoteSubmit} disabled={voteSaving || !voteForm.choice || !voteForm.voter}
+                    style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (voteSaving || !voteForm.choice || !voteForm.voter) ? 0.5 : 1 }}>
+                    {voteSaving ? 'Saving…' : 'Submit Vote'}
+                  </button>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10 }}>
+                  Vote Status · {itemVotes(selected).length}/{BOARD_MEMBERS.length} submitted
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {BOARD_MEMBERS.map(function(m) {
                     var mv = itemVotes(selected).find(function(v) { return v.voter === m; });
                     return (
-                      <div key={m} style={{ background: '#fafafa', borderRadius: 2, padding: '10px 14px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a' }}>{m}</span>
-                          {mv && <><span style={{ color: '#999' }}>—</span><span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>Voted</span></>}
-                          {!mv && <span style={{ fontSize: 12, color: '#777' }}>No vote yet</span>}
-                        </div>
+                      <div key={m} style={{ background: '#fafafa', borderRadius: 6, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a', flex: 1 }}>{m}</span>
+                        {mv
+                          ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>✓ Voted</span>
+                          : <span style={{ fontSize: 12, color: '#bbb' }}>No vote yet</span>
+                        }
                       </div>
                     );
                   })}
-                </div>
-                <div style={{ marginTop: 20 }}>
-                  {!showPostMeeting ? (
-                    <button type="button" onClick={function() { setShowPostMeeting(true); setVoteForm({ voter: '', choice: '', note: '' }); }}
-                      style={{ fontSize: 12, color: gold, background: 'none', border: '1px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 500 }}>
-                      + Add Post-Meeting Votes
-                    </button>
-                  ) : (
-                    <div style={{ background: '#fafafa', borderRadius: 2, padding: 16 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 12 }}>Add Post-Meeting Vote</div>
-                      <div style={{ marginBottom: 10 }}>
-                        <label style={bLbl}>Board Member</label>
-                        <select value={voteForm.voter} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { voter: e.target.value, choice: '', note: '' }); }); }} style={Object.assign({}, bInp, { marginTop: 4 })}>
-                          <option value="">Select member…</option>
-                          {BOARD_MEMBERS.map(function(m) { return <option key={m} value={m}>{m}</option>; })}
-                        </select>
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                        {['Yes', 'No', 'Abstain', 'Not in attendance'].map(function(opt) {
-                          var vc2 = VOTE_COLORS[opt];
-                          var active = voteForm.choice === opt;
-                          return (
-                            <button key={opt} type="button" onClick={function() { setVoteForm(function(f) { return Object.assign({}, f, { choice: opt }); }); }}
-                              style={{ padding: '6px 12px', borderRadius: 20, border: '1.5px solid ' + (active ? vc2.color : '#e0d8cc'), background: active ? vc2.bg : '#fff', color: active ? vc2.color : '#888', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer' }}>
-                              {opt}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={2} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 10 })} placeholder="Note (optional)…" />
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={handleVoteSubmit} disabled={voteSaving || !voteForm.choice || !voteForm.voter}
-                          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: (voteSaving || !voteForm.choice || !voteForm.voter) ? 0.6 : 1 }}>
-                          {voteSaving ? 'Saving…' : 'Save Vote'}
-                        </button>
-                        <button type="button" onClick={function() { setShowPostMeeting(false); setVoteForm({ voter: '', choice: '', note: '' }); }}
-                          style={{ padding: '8px 16px', background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
