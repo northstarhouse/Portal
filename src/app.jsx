@@ -499,9 +499,7 @@ const typeColors = {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button disabled={iheSaving || !iheForm.name || !iheForm.date} onClick={function() {
                     setIheSaving(true);
-                    var row = { name: iheForm.name, date: iheForm.date };
-                    if (iheForm.cost) row.cost = parseFloat(iheForm.cost) || 0;
-                    if (iheForm.link) row.link = iheForm.link;
+                    var row = { name: iheForm.name, date: iheForm.date, cost: iheForm.cost ? parseFloat(iheForm.cost) : null, link: iheForm.link || null };
                     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('In-House Events'), {
                       method: 'POST',
                       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
