@@ -4498,6 +4498,7 @@ function FinancialsView() {
   var [projForms, setProjForms] = useState({ 'Pathway Initiative - Ken Underwood': emptyProjForm, 'Trash Enclosure - David Wright': emptyProjForm });
   var [projShowing, setProjShowing] = useState({});
   var [projSaving, setProjSaving] = useState({});
+  var projReceiptRefs = useRef({});
 
   function loadReimbursements() {
     setLoading(true);
@@ -4578,11 +4579,33 @@ function FinancialsView() {
       body: JSON.stringify({ area: area, description: f.description, amount: parseFloat(f.amount), date: f.date, needs_reimbursement: f.needs_reimbursement, type: 'Purchase' })
     }).then(function(r) { return r.json(); }).then(function(rows) {
       var newRow = (rows && rows[0]) ? rows[0] : { area: area, description: f.description, amount: parseFloat(f.amount), date: f.date, needs_reimbursement: f.needs_reimbursement };
-      setProjItems(function(prev) { return Object.assign({}, prev, { [area]: [newRow].concat(prev[area] || []) }); });
-      if (f.needs_reimbursement) loadReimbursements();
-      setProjForms(function(pf) { return Object.assign({}, pf, { [area]: emptyProjForm }); });
-      setProjShowing(function(ps) { return Object.assign({}, ps, { [area]: false }); });
-      setProjSaving(function(ps) { return Object.assign({}, ps, { [area]: false }); });
+      var file = projReceiptRefs.current[area] && projReceiptRefs.current[area].files[0];
+      function finish(row) {
+        setProjItems(function(prev) { return Object.assign({}, prev, { [area]: [row].concat(prev[area] || []) }); });
+        if (f.needs_reimbursement) loadReimbursements();
+        setProjForms(function(pf) { return Object.assign({}, pf, { [area]: emptyProjForm }); });
+        setProjShowing(function(ps) { return Object.assign({}, ps, { [area]: false }); });
+        setProjSaving(function(ps) { return Object.assign({}, ps, { [area]: false }); });
+        if (projReceiptRefs.current[area]) projReceiptRefs.current[area].value = '';
+      }
+      if (file && newRow.id) {
+        var ext = file.name.split('.').pop();
+        var filename = area.toLowerCase().replace(/\s+/g, '-') + '-' + newRow.id + '-' + Date.now() + '.' + ext;
+        fetch(SUPABASE_URL + '/storage/v1/object/receipts/' + filename, {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
+          body: file
+        }).then(function() {
+          var url = SUPABASE_URL + '/storage/v1/object/public/receipts/' + filename;
+          return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + newRow.id, {
+            method: 'PATCH',
+            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receipt_url: url })
+          }).then(function() { finish(Object.assign({}, newRow, { receipt_url: url })); });
+        }).catch(function() { finish(newRow); });
+      } else {
+        finish(newRow);
+      }
     }).catch(function() { setProjSaving(function(ps) { return Object.assign({}, ps, { [area]: false }); }); });
   }
 
@@ -4751,10 +4774,17 @@ function FinancialsView() {
                     <input required type="date" value={f.date} onChange={function(e) { var v = e.target.value; setProjForms(function(pf) { return Object.assign({}, pf, { [area]: Object.assign({}, pf[area], { date: v }) }); }); }} style={inpSt} />
                   </div>
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, cursor: 'pointer', fontSize: 13, color: '#555' }}>
-                  <input type="checkbox" checked={f.needs_reimbursement} onChange={function(e) { var v = e.target.checked; setProjForms(function(pf) { return Object.assign({}, pf, { [area]: Object.assign({}, pf[area], { needs_reimbursement: v }) }); }); }} style={{ accentColor: '#b45309', width: 14, height: 14 }} />
-                  Needs reimbursement
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#555' }}>
+                    <input type="checkbox" checked={f.needs_reimbursement} onChange={function(e) { var v = e.target.checked; setProjForms(function(pf) { return Object.assign({}, pf, { [area]: Object.assign({}, pf[area], { needs_reimbursement: v }) }); }); }} style={{ accentColor: '#b45309', width: 14, height: 14 }} />
+                    Needs reimbursement
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: gold, fontWeight: 500 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    Attach receipt
+                    <input ref={function(el) { projReceiptRefs.current[area] = el; }} type="file" accept="image/*,.pdf" style={{ display: 'none' }} />
+                  </label>
+                </div>
                 <button type="submit" disabled={saving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving…' : 'Save'}</button>
               </form>
             )}
@@ -4771,6 +4801,7 @@ function FinancialsView() {
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
                   {b.needs_reimbursement && <span style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 10, fontWeight: 600, flexShrink: 0 }}>$ Reimb.</span>}
+                  {b.receipt_url && <a href={b.receipt_url} target="_blank" rel="noopener noreferrer" title="View attachment" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></a>}
                   <button onClick={function() { deleteProjItem(area, b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                 </div>
               );
