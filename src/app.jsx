@@ -859,6 +859,9 @@ function VolunteersView() {
   const [obSaving, setObSaving] = useState(false);
   const [obActing, setObActing] = useState(null);
   const [obSelectedId, setObSelectedId] = useState(null);
+  const [obEditId, setObEditId] = useState(null);
+  const [obEditForm, setObEditForm] = useState({});
+  const [obEditSaving, setObEditSaving] = useState(false);
 
   var emptyForm = {
     'First Name': '', 'Last Name': '', 'Team': '', 'Status': 'Active',
@@ -903,7 +906,7 @@ function VolunteersView() {
         var sb = p.email ? stageMap[p.email.toLowerCase()] : null;
         var sd = (sb && sb.stage_dates) ? Object.assign({}, sb.stage_dates) : {};
         if (!sd['Form Submitted'] && p.start_date) sd['Form Submitted'] = p.start_date;
-        return { _sbId: sb ? sb.id : null, id: sb ? sb.id : ('sheet-' + i), first_name: p.first_name, last_name: p.last_name, email: p.email, phone: p.phone, area_of_interest: p.area_of_interest, start_date: p.start_date, pipeline_stage: sb ? (sb.pipeline_stage || 'Form Submitted') : 'Form Submitted', status: sb ? (sb.status || 'In Progress') : 'In Progress', stage_dates: sd, survey_sent: sb ? !!sb.survey_sent : false };
+        return { _sbId: sb ? sb.id : null, id: sb ? sb.id : ('sheet-' + i), first_name: p.first_name, last_name: p.last_name, email: p.email, phone: p.phone, area_of_interest: p.area_of_interest, start_date: p.start_date, pipeline_stage: sb ? (sb.pipeline_stage || 'Form Submitted') : 'Form Submitted', status: sb ? (sb.status || 'In Progress') : 'In Progress', stage_dates: sd, survey_sent: sb ? !!sb.survey_sent : false, notes: sb ? (sb.notes || '') : '', address: sb ? (sb.address || '') : '', birthday: sb ? (sb.birthday || '') : '', emergency_contact: sb ? (sb.emergency_contact || '') : '', team: sb ? (sb.team || '') : '' };
       });
       setOnboarding(merged);
     });
@@ -949,7 +952,7 @@ function VolunteersView() {
     }
     req.then(function(result) {
       if (stage === 'Successfully Onboarded') {
-        var volPayload = { 'First Name': ob.first_name, 'Last Name': ob.last_name || '', 'Status': 'Active', 'Email': ob.email || '', 'Phone Number': ob.phone || '' };
+        var volPayload = { 'First Name': ob.first_name, 'Last Name': ob.last_name || '', 'Status': 'Active', 'Email': ob.email || '', 'Phone Number': ob.phone || '', 'Address': ob.address || '', 'Birthday': ob.birthday || '', 'Emergency Contact': ob.emergency_contact || '', 'Team': ob.team || ob.area_of_interest || '', 'Notes': ob.notes || '' };
         fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers'), {
           method: 'POST',
           headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -974,6 +977,38 @@ function VolunteersView() {
       body: JSON.stringify({ survey_sent: newVal })
     });
     setOnboarding(function(p) { return p.map(function(o) { return o.id === ob.id ? Object.assign({}, o, { survey_sent: newVal }) : o; }); });
+  }
+
+  function openObEdit(ob) {
+    setObEditId(ob.id);
+    setObEditForm({ first_name: ob.first_name || '', last_name: ob.last_name || '', email: ob.email || '', phone: ob.phone || '', area_of_interest: ob.area_of_interest || '', address: ob.address || '', birthday: ob.birthday || '', emergency_contact: ob.emergency_contact || '', notes: ob.notes || '', team: ob.team || '' });
+  }
+
+  function saveObEdit() {
+    var ob = onboarding.find(function(o) { return o.id === obEditId; });
+    if (!ob) return;
+    setObEditSaving(true);
+    var patch = { first_name: obEditForm.first_name, last_name: obEditForm.last_name, email: obEditForm.email || null, phone: obEditForm.phone || null, area_of_interest: obEditForm.area_of_interest || null, address: obEditForm.address || null, birthday: obEditForm.birthday || null, emergency_contact: obEditForm.emergency_contact || null, notes: obEditForm.notes || null, team: obEditForm.team || null };
+    if (ob._sbId) {
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding') + '?id=eq.' + ob._sbId, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      }).then(function() {
+        setOnboarding(function(p) { return p.map(function(o) { return o.id === obEditId ? Object.assign({}, o, patch) : o; }); });
+        setObEditId(null); setObEditSaving(false);
+      }).catch(function() { setObEditSaving(false); });
+    } else {
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding'), {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify(Object.assign({}, patch, { pipeline_stage: ob.pipeline_stage || 'Form Submitted', status: ob.status || 'In Progress' }))
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        var newId = rows && rows[0] ? rows[0].id : null;
+        setOnboarding(function(p) { return p.map(function(o) { return o.id === obEditId ? Object.assign({}, o, patch, newId ? { _sbId: newId, id: newId } : {}) : o; }); });
+        setObEditId(null); setObEditSaving(false);
+      }).catch(function() { setObEditSaving(false); });
+    }
   }
 
   var active = volunteers.filter(function(v) { return v['Status'] === 'Active'; }).length;
@@ -1347,6 +1382,7 @@ function VolunteersView() {
                     {selOb.email && <span style={{ fontSize: 12, color: '#888' }}>{selOb.email}</span>}
                     {selOb.phone && <span style={{ fontSize: 12, color: '#888' }}>{selOb.phone}</span>}
                     <span style={{ fontSize: 11, color: tc.color, fontWeight: 500, marginLeft: 'auto' }}>← click a stage to move</span>
+                    <button onClick={function(e) { e.stopPropagation(); openObEdit(selOb); }} style={{ fontSize: 11, background: '#fff', color: tc.color, border: '0.5px solid ' + tc.color + '66', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 500 }}>Edit</button>
                   </div>
                 );
               })()}
@@ -1478,6 +1514,52 @@ function VolunteersView() {
 
         </div>
       )}
+
+      {obEditId && (function() {
+        var ob = onboarding.find(function(o) { return o.id === obEditId; });
+        if (!ob) return null;
+        var tc = getAreaColor(ob.area_of_interest || obEditForm.area_of_interest);
+        var fi = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box', background: '#fff', fontFamily: 'system-ui, sans-serif' };
+        var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 3 };
+        var grp = { marginBottom: 12 };
+        return (
+          <div onClick={function() { setObEditId(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
+            <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 520, width: '100%', boxShadow: '0 12px 48px rgba(0,0,0,0.2)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '20px 24px 16px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: tc.bg, borderRadius: '16px 16px 0 0' }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a' }}>Edit — {ob.first_name} {ob.last_name}</div>
+                  <div style={{ fontSize: 11, color: tc.color, marginTop: 2 }}>Onboarding Record</div>
+                </div>
+                <button onClick={function() { setObEditId(null); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#aaa', lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div style={grp}><label style={lb}>First Name</label><input value={obEditForm.first_name} onChange={function(e) { setObEditForm(function(f) { return Object.assign({}, f, { first_name: e.target.value }); }); }} style={fi} /></div>
+                  <div style={grp}><label style={lb}>Last Name</label><input value={obEditForm.last_name} onChange={function(e) { setObEditForm(function(f) { return Object.assign({}, f, { last_name: e.target.value }); }); }} style={fi} /></div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div style={grp}><label style={lb}>Email</label><input type="email" value={obEditForm.email} onChange={function(e) { setObEditForm(function(f) { return Object.assign({}, f, { email: e.target.value }); }); }} style={fi} /></div>
+                  <div style={grp}><label style={lb}>Phone</label><input value={obEditForm.phone} onChange={function(e) { setObEditForm(function(f) { return Object.assign({}, f, { phone: e.target.value }); }); }} style={fi} /></div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div style={grp}><label style={lb}>Area of Interest</label><input value={obEditForm.area_of_interest} onChange={function(e) { setObEditForm(function(f) { return Object.assign({}, f, { area_of_interest: e.target.value }); }); }} style={fi} /></div>
+                  <div style={grp}><label style={lb}>Team Assignment</label><input value={obEditForm.team} onChange={function(e) { setObEditForm(function(f) { return Object.assign({}, f, { team: e.target.value }); }); }} placeholder="e.g. Grounds" style={fi} /></div>
+                </div>
+                <div style={grp}><label style={lb}>Address</label><input value={obEditForm.address} onChange={function(e) { setObEditForm(function(f) { return Object.assign({}, f, { address: e.target.value }); }); }} style={fi} /></div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div style={grp}><label style={lb}>Birthday (MM/DD/YYYY)</label><input value={obEditForm.birthday} onChange={function(e) { setObEditForm(function(f) { return Object.assign({}, f, { birthday: e.target.value }); }); }} placeholder="e.g. 06/15/1985" style={fi} /></div>
+                  <div style={grp}><label style={lb}>Emergency Contact</label><input value={obEditForm.emergency_contact} onChange={function(e) { setObEditForm(function(f) { return Object.assign({}, f, { emergency_contact: e.target.value }); }); }} placeholder="Name & phone" style={fi} /></div>
+                </div>
+                <div style={grp}><label style={lb}>Notes</label><textarea value={obEditForm.notes} onChange={function(e) { setObEditForm(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={3} style={Object.assign({}, fi, { resize: 'vertical' })} placeholder="Paperwork notes, orientation details…" /></div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <button onClick={saveObEdit} disabled={obEditSaving} style={{ flex: 1, background: '#b5a185', color: '#fff', border: 'none', borderRadius: 8, padding: '9px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: obEditSaving ? 0.7 : 1 }}>{obEditSaving ? 'Saving…' : 'Save Changes'}</button>
+                  <button onClick={function() { setObEditId(null); }} style={{ padding: '9px 18px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {showAdd && (
         <VolForm
