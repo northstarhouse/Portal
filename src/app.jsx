@@ -1,6 +1,7 @@
 const { useState, useEffect } = React;
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
+const DONORS_PASSWORD = 'NSH';
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2endoaHd6ZWxhZWxmaGZrdmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMzI4OTksImV4cCI6MjA4OTYwODg5OX0.xw5n0MGm69u_FOiZHxbLNUCNQHehIJliO_s4YbTyfh8";
 
 function sbFetch(table, columns) {
@@ -4666,6 +4667,37 @@ function FinancialsView() {
   );
 }
 
+function DonorsGate({ onUnlock }) {
+  var { useState } = React;
+  var [val, setVal] = useState('');
+  var [err, setErr] = useState(false);
+  function attempt(e) {
+    e.preventDefault();
+    if (val === DONORS_PASSWORD) { onUnlock(); }
+    else { setErr(true); setVal(''); }
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 16, padding: '40px 36px', width: '100%', maxWidth: 340, textAlign: 'center', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
+        <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 6 }}>Donations</div>
+        <div style={{ fontSize: 13, color: '#aaa', marginBottom: 28 }}>Enter password to continue</div>
+        <form onSubmit={attempt}>
+          <input
+            autoFocus
+            type="password"
+            value={val}
+            onChange={function(e) { setVal(e.target.value); setErr(false); }}
+            placeholder="Password"
+            style={{ width: '100%', padding: '10px 14px', border: '0.5px solid ' + (err ? '#e05050' : '#e0d8cc'), borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: err ? 6 : 16, outline: 'none', textAlign: 'center', letterSpacing: 2 }}
+          />
+          {err && <div style={{ fontSize: 12, color: '#e05050', marginBottom: 12 }}>Incorrect password</div>}
+          <button type="submit" style={{ width: '100%', padding: '10px', background: '#b5a185', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Unlock</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
   events: EventsView,
@@ -4698,6 +4730,7 @@ var AREA_DEFAULTS = {
   const [quarterlyArea, setQuarterlyArea] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [donorsUnlocked, setDonorsUnlocked] = useState(() => sessionStorage.getItem('nsh_donors') === '1');
   const View = views[active];
   const mod = modules.find(m => m.id === active);
 
@@ -4863,7 +4896,11 @@ var AREA_DEFAULTS = {
         </div>
         <div style={{ flex: 1, padding: isMobile ? "16px 14px" : "28px 32px", paddingBottom: isMobile ? 20 : undefined }}>
           <div style={{ maxWidth: 900 }}>
-            <View navigate={setActive} opArea={opArea} navigateOp={function(a) { setOpArea(a); setActive('operational'); }} quarterlyArea={quarterlyArea} navigateToQuarterly={function(a) { setQuarterlyArea(a); setActive('quarterly'); }} />
+            {active === 'donors' && !donorsUnlocked ? (
+              <DonorsGate onUnlock={function() { sessionStorage.setItem('nsh_donors', '1'); setDonorsUnlocked(true); }} />
+            ) : (
+              <View navigate={setActive} opArea={opArea} navigateOp={function(a) { setOpArea(a); setActive('operational'); }} quarterlyArea={quarterlyArea} navigateToQuarterly={function(a) { setQuarterlyArea(a); setActive('quarterly'); }} />
+            )}
           </div>
         </div>
       </div>
