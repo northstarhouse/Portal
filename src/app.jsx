@@ -1513,11 +1513,11 @@ function DonorsView() {
               >
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a' }}>{d['Donor Name']}</span>
                     {(function() {
                       var tier = getDonorTier(donorYTD[d['Donor Name']] || 0);
                       return tier ? <span style={{ fontSize: 13, color: tier.color, lineHeight: 1 }} title={tier.name}>✦</span> : null;
                     })()}
+                    <span style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a' }}>{d['Donor Name']}</span>
                   </div>
                   <div style={{ fontSize: 12, color: '#999', marginTop: 1 }}>{d['Account Type']}</div>
                 </div>
