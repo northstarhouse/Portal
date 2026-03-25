@@ -5116,16 +5116,16 @@ function IdeasView() {
             return (
               <div>
                 <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
-                  <div style={{ background: sc.bg, padding: '18px 20px', borderBottom: '0.5px solid ' + sc.color + '33', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', flex: 1, lineHeight: 1.2 }}>{selected.title}</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                  <div style={{ background: sc.bg, padding: '16px 20px', borderBottom: '0.5px solid ' + sc.color + '33', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 17, fontWeight: 700, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontSize: 11, fontWeight: 700, background: '#fff', color: sc.color, border: '0.5px solid ' + sc.color + '66', borderRadius: 10, padding: '2px 8px' }}>{selected.status}</span>
                         {selected.submitted_by && <span style={{ fontSize: 12, color: '#888' }}>by {selected.submitted_by}</span>}
                       </div>
-                      <button onClick={function() { setEditing(true); setEditForm({ title: selected.title, status: selected.status, submitted_by: selected.submitted_by || '', notes: selected.notes || '', blockers: selected.blockers || '', gaps: selected.gaps || '' }); }}
-                        style={{ background: '#fff', border: '0.5px solid ' + sc.color + '66', borderRadius: 7, padding: '5px 12px', fontSize: 12, color: sc.color, cursor: 'pointer', fontWeight: 500 }}>Edit</button>
                     </div>
+                    <button onClick={function() { setEditing(true); setEditForm({ title: selected.title, status: selected.status, submitted_by: selected.submitted_by || '', notes: selected.notes || '', blockers: selected.blockers || '', gaps: selected.gaps || '' }); }}
+                      style={{ background: '#fff', border: '0.5px solid ' + sc.color + '66', borderRadius: 7, padding: '5px 12px', fontSize: 12, color: sc.color, cursor: 'pointer', fontWeight: 500, flexShrink: 0 }}>Edit</button>
                   </div>
                   <div style={{ padding: '16px 20px' }}>
                     {selected.notes && (
