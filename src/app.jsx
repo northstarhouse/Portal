@@ -5072,7 +5072,7 @@ function IdeasView() {
       </div>
       {mainTab === 'initiatives' && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-          {['All', 'Active', 'On Hold', 'Completed', 'Declined'].map(function(s) {
+          {['All', 'Active', 'On Hold', 'Completed'].map(function(s) {
             var sc = STATUS_COLORS[s] || { bg: '#f5f0ea', color: '#888' };
             var isOn = filterStatus === s;
             return (
@@ -5135,25 +5135,8 @@ function IdeasView() {
                           <div style={{ fontSize: 10, color: '#aaa', marginTop: 1 }}>spent / budget</div>
                         </div>
                       )}
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {selected.status !== 'Declined' && (
-                          <button onClick={function() {
-                            var updated = Object.assign({}, selected, { status: 'Declined' });
-                            fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas') + '?id=eq.' + selected.id, {
-                              method: 'PATCH',
-                              headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ status: 'Declined' })
-                            }).then(function() {
-                              setIdeas(function(p) { return p.map(function(i) { return i.id === selected.id ? updated : i; }); });
-                              setSelected(updated);
-                              setMainTab('initiatives');
-                              setFilterStatus('All');
-                            });
-                          }} style={{ background: '#fff', border: '0.5px solid #c6282866', borderRadius: 7, padding: '5px 12px', fontSize: 12, color: '#c62828', cursor: 'pointer', fontWeight: 500 }}>Decline</button>
-                        )}
-                        <button onClick={function() { setEditing(true); setEditForm({ title: selected.title, status: selected.status, submitted_by: selected.submitted_by || '', notes: selected.notes || '', blockers: selected.blockers || '', gaps: selected.gaps || '', budget: selected.budget || '' }); }}
-                          style={{ background: '#fff', border: '0.5px solid ' + sc.color + '66', borderRadius: 7, padding: '5px 12px', fontSize: 12, color: sc.color, cursor: 'pointer', fontWeight: 500 }}>Edit</button>
-                      </div>
+                      <button onClick={function() { setEditing(true); setEditForm({ title: selected.title, status: selected.status, submitted_by: selected.submitted_by || '', notes: selected.notes || '', blockers: selected.blockers || '', gaps: selected.gaps || '', budget: selected.budget || '' }); }}
+                        style={{ background: '#fff', border: '0.5px solid ' + sc.color + '66', borderRadius: 7, padding: '5px 12px', fontSize: 12, color: sc.color, cursor: 'pointer', fontWeight: 500 }}>Edit</button>
                     </div>
                   </div>
                   <div style={{ padding: '16px 20px' }}>
