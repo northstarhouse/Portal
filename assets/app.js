@@ -4244,7 +4244,7 @@ var AppBundle = (() => {
       setResourceType("link");
     }, style: { width: "100%", marginTop: 4, padding: "8px 12px", background: "none", border: "none", fontSize: 12, color: gold, fontWeight: 500, cursor: "pointer", textAlign: "right", display: "block" } }, "Add Resource \u2192")))));
   }
-  function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSaving }) {
+  function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSaving, volunteers }) {
     var inpSt = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 7, fontSize: 13, background: "#fff", boxSizing: "border-box", fontFamily: "system-ui, sans-serif" };
     var lb = { fontSize: 11, color: "#888", fontWeight: 500, display: "block", marginBottom: 4 };
     var STATUS_OPTIONS = ["Exploring", "Active", "On Hold", "Declined", "Completed"];
@@ -4258,11 +4258,14 @@ var AppBundle = (() => {
       });
     }, style: inpSt }, STATUS_OPTIONS.map(function(s) {
       return /* @__PURE__ */ React.createElement("option", { key: s, value: s }, s);
-    })))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: formData.status === "Active" ? "1fr 1fr" : "1fr", gap: 10, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lb }, "Submitted By"), /* @__PURE__ */ React.createElement("input", { value: formData.submitted_by, onChange: function(e) {
+    })))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: formData.status === "Active" ? "1fr 1fr" : "1fr", gap: 10, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lb }, "Submitted By"), /* @__PURE__ */ React.createElement("select", { value: formData.submitted_by, onChange: function(e) {
       setFormData(function(f) {
         return Object.assign({}, f, { submitted_by: e.target.value });
       });
-    }, style: inpSt, placeholder: "Person's name" })), formData.status === "Active" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lb }, "Total Budget ($)"), /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.01", min: "0", value: formData.budget || "", onChange: function(e) {
+    }, style: inpSt }, /* @__PURE__ */ React.createElement("option", { value: "" }, "\u2014 select volunteer \u2014"), (volunteers || []).map(function(v) {
+      var name = (v["First Name"] || "") + " " + (v["Last Name"] || "");
+      return /* @__PURE__ */ React.createElement("option", { key: v.id, value: name.trim() }, name.trim());
+    }))), formData.status === "Active" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lb }, "Total Budget ($)"), /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.01", min: "0", value: formData.budget || "", onChange: function(e) {
       setFormData(function(f) {
         return Object.assign({}, f, { budget: e.target.value });
       });
@@ -4311,8 +4314,18 @@ var AppBundle = (() => {
     var [showBudgetForm, setShowBudgetForm] = useState2(false);
     var [budgetSaving, setBudgetSaving] = useState2(false);
     var receiptRef = useRef(null);
+    var [volunteers, setVolunteers] = useState2([]);
     var inpSt = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 7, fontSize: 13, background: "#fff", boxSizing: "border-box", fontFamily: "system-ui, sans-serif" };
     var lb = { fontSize: 11, color: "#888", fontWeight: 500, display: "block", marginBottom: 4 };
+    useEffect2(function() {
+      cachedSbFetch("2026 Volunteers", ["id", "First Name", "Last Name", "Address", "Status"]).then(function(rows) {
+        if (Array.isArray(rows)) setVolunteers(rows.filter(function(v) {
+          return v["Status"] === "Active";
+        }).sort(function(a, b) {
+          return (a["First Name"] || "").localeCompare(b["First Name"] || "");
+        }));
+      });
+    }, []);
     useEffect2(function() {
       fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Ideas") + "?select=*&order=created_at.desc", {
         headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
@@ -4600,7 +4613,7 @@ var AppBundle = (() => {
       saveEdit();
     }, onCancel: function() {
       setEditing(false);
-    }, submitLabel: "Save Changes", isSaving: editSaving }))), showAdd && /* @__PURE__ */ React.createElement("div", { onClick: function() {
+    }, submitLabel: "Save Changes", isSaving: editSaving, volunteers }))), showAdd && /* @__PURE__ */ React.createElement("div", { onClick: function() {
       setShowAdd(false);
     }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2e3, padding: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: function(e) {
       e.stopPropagation();
@@ -4608,7 +4621,7 @@ var AppBundle = (() => {
       setShowAdd(false);
     }, style: { background: "#f0ece6", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, color: "#666", cursor: "pointer", fontWeight: 500 } }, "\u2715 Close")), /* @__PURE__ */ React.createElement(IdeaForm, { formData: form, setFormData: setForm, onSubmit: addIdea, onCancel: function() {
       setShowAdd(false);
-    }, submitLabel: "Add Idea", isSaving: saving }))));
+    }, submitLabel: "Add Idea", isSaving: saving, volunteers }))));
   }
   function DonorsGate({ onUnlock }) {
     var { useState: useState2 } = React;

@@ -4915,7 +4915,7 @@ function FinancialsView() {
   );
 }
 
-function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSaving }) {
+function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSaving, volunteers }) {
   var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
   var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 };
   var STATUS_OPTIONS = ['Exploring', 'Active', 'On Hold', 'Declined', 'Completed'];
@@ -4930,7 +4930,15 @@ function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSa
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: formData.status === 'Active' ? '1fr 1fr' : '1fr', gap: 10, marginBottom: 12 }}>
-        <div><label style={lb}>Submitted By</label><input value={formData.submitted_by} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { submitted_by: e.target.value }); }); }} style={inpSt} placeholder="Person's name" /></div>
+        <div><label style={lb}>Submitted By</label>
+          <select value={formData.submitted_by} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { submitted_by: e.target.value }); }); }} style={inpSt}>
+            <option value="">— select volunteer —</option>
+            {(volunteers || []).map(function(v) {
+              var name = (v['First Name'] || '') + ' ' + (v['Last Name'] || '');
+              return <option key={v.id} value={name.trim()}>{name.trim()}</option>;
+            })}
+          </select>
+        </div>
         {formData.status === 'Active' && <div><label style={lb}>Total Budget ($)</label><input type="number" step="0.01" min="0" value={formData.budget || ''} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { budget: e.target.value }); }); }} style={inpSt} placeholder="0.00" /></div>}
       </div>
       <div style={{ marginBottom: 12 }}><label style={lb}>Notes — why it matters, context, ideas</label><textarea value={formData.notes} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Why this matters, background context, related ideas…" /></div>
@@ -4980,9 +4988,16 @@ function IdeasView() {
   var [showBudgetForm, setShowBudgetForm] = useState(false);
   var [budgetSaving, setBudgetSaving] = useState(false);
   var receiptRef = useRef(null);
+  var [volunteers, setVolunteers] = useState([]);
 
   var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
   var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 };
+
+  useEffect(function() {
+    cachedSbFetch('2026 Volunteers', ['id', 'First Name', 'Last Name', 'Address', 'Status']).then(function(rows) {
+      if (Array.isArray(rows)) setVolunteers(rows.filter(function(v) { return v['Status'] === 'Active'; }).sort(function(a, b) { return (a['First Name'] || '').localeCompare(b['First Name'] || ''); }));
+    });
+  }, []);
 
   useEffect(function() {
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas') + '?select=*&order=created_at.desc', {
@@ -5290,7 +5305,7 @@ function IdeasView() {
               <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>Edit Idea</div>
               <button type="button" onClick={function() { setEditing(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>✕ Close</button>
             </div>
-            <IdeaForm formData={editForm} setFormData={setEditForm} onSubmit={function(e) { e.preventDefault(); saveEdit(); }} onCancel={function() { setEditing(false); }} submitLabel="Save Changes" isSaving={editSaving} />
+            <IdeaForm formData={editForm} setFormData={setEditForm} onSubmit={function(e) { e.preventDefault(); saveEdit(); }} onCancel={function() { setEditing(false); }} submitLabel="Save Changes" isSaving={editSaving} volunteers={volunteers} />
           </div>
         </div>
       )}
@@ -5302,7 +5317,7 @@ function IdeasView() {
               <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>New Idea</div>
               <button type="button" onClick={function() { setShowAdd(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>✕ Close</button>
             </div>
-            <IdeaForm formData={form} setFormData={setForm} onSubmit={addIdea} onCancel={function() { setShowAdd(false); }} submitLabel="Add Idea" isSaving={saving} />
+            <IdeaForm formData={form} setFormData={setForm} onSubmit={addIdea} onCancel={function() { setShowAdd(false); }} submitLabel="Add Idea" isSaving={saving} volunteers={volunteers} />
           </div>
         </div>
       )}
