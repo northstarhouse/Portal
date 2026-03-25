@@ -2186,18 +2186,23 @@ function BoardView() {
     var today = new Date().toDateString();
     var isInMeeting = selected.meeting_date && new Date(selected.meeting_date + 'T12:00:00').toDateString() === today;
     var payload = { topicId: selected.id, voter: voteForm.voter, choice: voteForm.choice, note: voteForm.note || null };
-    var prom;
     if (existing) {
-      prom = sbPatchById('Board-Votes', existing.id, Object.assign({}, payload, { changed_in_meeting: isInMeeting ? true : (existing.changed_in_meeting || false) }));
+      var fullPayload = Object.assign({}, payload, { changed_in_meeting: isInMeeting ? true : (existing.changed_in_meeting || false) });
+      sbPatchById('Board-Votes', existing.id, fullPayload).then(function() {
+        setVotes(function(prev) { return prev.map(function(v) { return v.id === existing.id ? Object.assign({}, v, fullPayload) : v; }); });
+        setVoteSaving(false);
+        setVoteForm({ voter: '', choice: '', note: '' });
+        clearCache('Board-Votes');
+      });
     } else {
-      prom = sbInsert('Board-Votes', Object.assign({}, payload, { changed_in_meeting: false }));
+      sbInsert('Board-Votes', Object.assign({}, payload, { changed_in_meeting: false })).then(function(rows) {
+        var newVote = (rows && rows[0]) ? rows[0] : Object.assign({}, payload, { id: Date.now(), changed_in_meeting: false });
+        setVotes(function(prev) { return prev.concat([newVote]); });
+        setVoteSaving(false);
+        setVoteForm({ voter: '', choice: '', note: '' });
+        clearCache('Board-Votes');
+      });
     }
-    prom.then(function() {
-      setVoteSaving(false);
-      setVoteForm({ voter: '', choice: '', note: '' });
-      clearCache('Board-Votes');
-      load();
-    });
   }
 
   function handleTopicSubmit(e) {
