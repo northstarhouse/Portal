@@ -4710,7 +4710,7 @@ function FinancialsView() {
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
             <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Cash Log</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Expenditures</div>
                 {!cashLoading && cashLog.length > 0 && (
                   <div style={{ fontSize: 12, marginTop: 2 }}>
                     <span style={{ color: '#059669', fontWeight: 600 }}>↑ {fmt(cashIn)}</span>
