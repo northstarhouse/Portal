@@ -5131,8 +5131,7 @@ function IdeasView() {
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
                       {selected.status === 'Active' && selected.budget && (
                         <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: budgetTotal > parseFloat(selected.budget) ? '#c62828' : '#2e7d32' }}>{fmtMoney(budgetTotal)} / {fmtMoney(parseFloat(selected.budget))}</div>
-                          <div style={{ fontSize: 10, color: '#aaa', marginTop: 1 }}>spent / budget</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: budgetTotal > parseFloat(selected.budget) ? '#c62828' : '#2e7d32' }}>{fmtMoney(parseFloat(selected.budget) - budgetTotal)} remaining</div>
                         </div>
                       )}
                       <button onClick={function() { setEditing(true); setEditForm({ title: selected.title, status: selected.status, submitted_by: selected.submitted_by || '', notes: selected.notes || '', blockers: selected.blockers || '', gaps: selected.gaps || '', budget: selected.budget || '' }); }}
