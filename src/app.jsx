@@ -4875,7 +4875,10 @@ function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSa
           </select>
         </div>
       </div>
-      <div style={{ marginBottom: 12 }}><label style={lb}>Submitted By</label><input value={formData.submitted_by} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { submitted_by: e.target.value }); }); }} style={inpSt} placeholder="Person's name" /></div>
+      <div style={{ display: 'grid', gridTemplateColumns: formData.status === 'Active' ? '1fr 1fr' : '1fr', gap: 10, marginBottom: 12 }}>
+        <div><label style={lb}>Submitted By</label><input value={formData.submitted_by} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { submitted_by: e.target.value }); }); }} style={inpSt} placeholder="Person's name" /></div>
+        {formData.status === 'Active' && <div><label style={lb}>Total Budget ($)</label><input type="number" step="0.01" min="0" value={formData.budget || ''} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { budget: e.target.value }); }); }} style={inpSt} placeholder="0.00" /></div>}
+      </div>
       <div style={{ marginBottom: 12 }}><label style={lb}>Notes — why it matters, context, ideas</label><textarea value={formData.notes} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Why this matters, background context, related ideas…" /></div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
         <div><label style={{ fontSize: 11, color: '#b45309', fontWeight: 600, display: 'block', marginBottom: 4 }}>Blockers — what's in the way</label><textarea value={formData.blockers} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { blockers: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Obstacles, constraints, risks…" /></div>
@@ -4910,7 +4913,7 @@ function IdeasView() {
   var [filterStatus, setFilterStatus] = useState('All');
   var [showAdd, setShowAdd] = useState(false);
   var [editing, setEditing] = useState(false);
-  var emptyForm = { title: '', status: 'Exploring', submitted_by: '', notes: '', blockers: '', gaps: '' };
+  var emptyForm = { title: '', status: 'Exploring', submitted_by: '', notes: '', blockers: '', gaps: '', budget: '' };
   var [form, setForm] = useState(emptyForm);
   var [editForm, setEditForm] = useState({});
   var [saving, setSaving] = useState(false);
@@ -4959,7 +4962,7 @@ function IdeasView() {
     e.preventDefault();
     if (!form.title) return;
     setSaving(true);
-    var payload = { title: form.title, status: form.status, submitted_by: form.submitted_by || null, notes: form.notes || null, blockers: form.blockers || null, gaps: form.gaps || null };
+    var payload = { title: form.title, status: form.status, submitted_by: form.submitted_by || null, notes: form.notes || null, blockers: form.blockers || null, gaps: form.gaps || null, budget: form.budget ? parseFloat(form.budget) : null };
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -5125,7 +5128,7 @@ function IdeasView() {
                         {selected.submitted_by && <span style={{ fontSize: 12, color: '#888' }}>by {selected.submitted_by}</span>}
                       </div>
                     </div>
-                    <button onClick={function() { setEditing(true); setEditForm({ title: selected.title, status: selected.status, submitted_by: selected.submitted_by || '', notes: selected.notes || '', blockers: selected.blockers || '', gaps: selected.gaps || '' }); }}
+                    <button onClick={function() { setEditing(true); setEditForm({ title: selected.title, status: selected.status, submitted_by: selected.submitted_by || '', notes: selected.notes || '', blockers: selected.blockers || '', gaps: selected.gaps || '', budget: selected.budget || '' }); }}
                       style={{ background: '#fff', border: '0.5px solid ' + sc.color + '66', borderRadius: 7, padding: '5px 12px', fontSize: 12, color: sc.color, cursor: 'pointer', fontWeight: 500, flexShrink: 0 }}>Edit</button>
                   </div>
                   <div style={{ padding: '16px 20px' }}>
@@ -5157,7 +5160,14 @@ function IdeasView() {
                     <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Active Initiatives</div>
-                        {!budgetLoading && budgetItems.length > 0 && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{fmtMoney(budgetTotal)} total · {budgetItems.length} item{budgetItems.length !== 1 ? 's' : ''}</div>}
+                        {!budgetLoading && (
+                          <div style={{ fontSize: 12, marginTop: 2 }}>
+                            {selected.budget
+                              ? <span style={{ color: budgetTotal > parseFloat(selected.budget) ? '#c62828' : '#2e7d32', fontWeight: 600 }}>{fmtMoney(budgetTotal)} of {fmtMoney(parseFloat(selected.budget))} spent</span>
+                              : budgetItems.length > 0 ? <span style={{ color: '#888' }}>{fmtMoney(budgetTotal)} · {budgetItems.length} item{budgetItems.length !== 1 ? 's' : ''}</span> : null
+                            }
+                          </div>
+                        )}
                       </div>
                       <button onClick={function() { setShowBudgetForm(function(v) { return !v; }); }} style={{ fontSize: 12, background: showBudgetForm ? '#f5f0ea' : gold, color: showBudgetForm ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}>{showBudgetForm ? 'Cancel' : '+ Log Expense'}</button>
                     </div>
