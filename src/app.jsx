@@ -4772,11 +4772,7 @@ function FinancialsView() {
       })()}
       </div>
 
-    </div>
-
-
-    {/* Resources */}
-    <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden', marginTop: 16 }}>
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden', gridColumn: 1 }}>
       <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Resources</div>
       </div>
@@ -4856,6 +4852,8 @@ function FinancialsView() {
           </button>
         )}
       </div>
+    </div>
+
     </div>
 
     </div>
