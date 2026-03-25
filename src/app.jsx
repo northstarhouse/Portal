@@ -5128,8 +5128,16 @@ function IdeasView() {
                         {selected.submitted_by && <span style={{ fontSize: 12, color: '#888' }}>by {selected.submitted_by}</span>}
                       </div>
                     </div>
-                    <button onClick={function() { setEditing(true); setEditForm({ title: selected.title, status: selected.status, submitted_by: selected.submitted_by || '', notes: selected.notes || '', blockers: selected.blockers || '', gaps: selected.gaps || '', budget: selected.budget || '' }); }}
-                      style={{ background: '#fff', border: '0.5px solid ' + sc.color + '66', borderRadius: 7, padding: '5px 12px', fontSize: 12, color: sc.color, cursor: 'pointer', fontWeight: 500, flexShrink: 0 }}>Edit</button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                      {selected.status === 'Active' && selected.budget && (
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: budgetTotal > parseFloat(selected.budget) ? '#c62828' : '#2e7d32' }}>{fmtMoney(budgetTotal)} / {fmtMoney(parseFloat(selected.budget))}</div>
+                          <div style={{ fontSize: 10, color: '#aaa', marginTop: 1 }}>spent / budget</div>
+                        </div>
+                      )}
+                      <button onClick={function() { setEditing(true); setEditForm({ title: selected.title, status: selected.status, submitted_by: selected.submitted_by || '', notes: selected.notes || '', blockers: selected.blockers || '', gaps: selected.gaps || '', budget: selected.budget || '' }); }}
+                        style={{ background: '#fff', border: '0.5px solid ' + sc.color + '66', borderRadius: 7, padding: '5px 12px', fontSize: 12, color: sc.color, cursor: 'pointer', fontWeight: 500 }}>Edit</button>
+                    </div>
                   </div>
                   <div style={{ padding: '16px 20px' }}>
                     {selected.notes && (
