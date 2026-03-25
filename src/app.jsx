@@ -5010,6 +5010,7 @@ function IdeasView() {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
       body: JSON.stringify({ area: selected.title, description: budgetForm.description, amount: parseFloat(budgetForm.amount), date: budgetForm.date, type: isInKind ? 'In-Kind' : 'Purchase', needs_reimbursement: needsReimb })
     }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (rows && rows.message) { alert('Budget error: ' + rows.message); setBudgetSaving(false); return; }
       var newRow = rows && rows[0] ? rows[0] : {};
       var file = receiptRef.current && receiptRef.current.files[0];
       function finish(row) {
@@ -5029,7 +5030,7 @@ function IdeasView() {
           }).then(function() { finish(Object.assign({}, newRow, { receipt_url: url })); });
         }).catch(function() { finish(newRow); });
       } else { finish(newRow); }
-    }).catch(function() { setBudgetSaving(false); });
+    }).catch(function(err) { alert('Budget error: ' + err); setBudgetSaving(false); });
   }
 
   function deleteBudgetItem(id) {
@@ -5155,7 +5156,7 @@ function IdeasView() {
                   <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
                     <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Initiative Budget</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Active Initiatives</div>
                         {!budgetLoading && budgetItems.length > 0 && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{fmtMoney(budgetTotal)} total · {budgetItems.length} item{budgetItems.length !== 1 ? 's' : ''}</div>}
                       </div>
                       <button onClick={function() { setShowBudgetForm(function(v) { return !v; }); }} style={{ fontSize: 12, background: showBudgetForm ? '#f5f0ea' : gold, color: showBudgetForm ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}>{showBudgetForm ? 'Cancel' : '+ Log Expense'}</button>
