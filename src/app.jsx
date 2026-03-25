@@ -2178,6 +2178,14 @@ function BoardView() {
     };
   }
 
+  function refreshVotes() {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Board-Votes') + '?select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (Array.isArray(data)) { setVotes(data); clearCache('Board-Votes'); }
+    });
+  }
+
   function handleVoteSubmit(e) {
     if (e && e.preventDefault) e.preventDefault();
     if (!voteForm.voter || !voteForm.choice) return;
@@ -2189,19 +2197,16 @@ function BoardView() {
     if (existing) {
       var fullPayload = Object.assign({}, payload, { changed_in_meeting: isInMeeting ? true : (existing.changed_in_meeting || false) });
       sbPatchById('Board-Votes', existing.id, fullPayload).then(function() {
-        setVotes(function(prev) { return prev.map(function(v) { return v.id === existing.id ? Object.assign({}, v, fullPayload) : v; }); });
         setVoteSaving(false);
         setVoteForm({ voter: '', choice: '', note: '' });
-        clearCache('Board-Votes');
+        refreshVotes();
       });
     } else {
       sbInsert('Board-Votes', Object.assign({}, payload, { changed_in_meeting: false })).then(function(rows) {
-        if (rows && rows.message) { alert('Error: ' + rows.message); setVoteSaving(false); return; }
-        var newVote = (rows && rows[0]) ? rows[0] : Object.assign({}, payload, { id: Date.now(), changed_in_meeting: false });
-        setVotes(function(prev) { return prev.concat([newVote]); });
+        if (rows && rows.message) { alert('Error saving vote: ' + rows.message); setVoteSaving(false); return; }
         setVoteSaving(false);
         setVoteForm({ voter: '', choice: '', note: '' });
-        clearCache('Board-Votes');
+        refreshVotes();
       }).catch(function(err) { alert('Error: ' + err); setVoteSaving(false); });
     }
   }
