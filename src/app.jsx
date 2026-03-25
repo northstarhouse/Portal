@@ -4990,7 +4990,12 @@ function IdeasView() {
     }).then(function() {
       var updated = Object.assign({}, selected, editForm);
       setIdeas(function(p) { return p.map(function(i) { return i.id === selected.id ? updated : i; }); });
-      setSelected(updated); setEditing(false); setEditSaving(false);
+      setSelected(updated);
+      setEditing(false);
+      setEditSaving(false);
+      var newStatus = editForm.status;
+      setMainTab(['Active', 'On Hold', 'Completed', 'Declined'].includes(newStatus) ? 'initiatives' : 'ideas');
+      setFilterStatus('All');
     }).catch(function() { setEditSaving(false); });
   }
 
