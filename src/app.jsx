@@ -2218,14 +2218,15 @@ function BoardView() {
       due_date: topicForm.due_date || null,
       meeting_date: topicForm.meeting_date || null,
       status: 'Open'
-    }).then(function() {
+    }).then(function(rows) {
+      alert('Topic insert response: ' + JSON.stringify(rows));
       setTopicSaving(false);
       setShowAdd(false);
       setTopicForm({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
       setAttachFileName(''); setAttachUploading(false);
       clearCache('Board Voting Items');
       load();
-    });
+    }).catch(function(err) { alert('Topic insert error: ' + err); setTopicSaving(false); });
   }
 
   function fmtDate(d) {
