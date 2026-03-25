@@ -2607,7 +2607,7 @@ function StrategyView() {
                     {tab !== 'three_year_vision' && !isEdit && (g.lead || g.due_date) && (
                       <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
                         {g.lead && <div style={{ fontSize: 12, color: '#777' }}>Lead: <span style={{ color: '#555' }}>{g.lead}</span></div>}
-                        {g.due_date && <div style={{ fontSize: 12, color: '#777' }}>Due: <span style={{ color: '#555' }}>{g.due_date}</span></div>}
+                        {g.due_date && <div style={{ fontSize: 12, color: '#777' }}>Date: <span style={{ color: '#555' }}>{g.due_date}</span></div>}
                       </div>
                     )}
                     {tab !== 'three_year_vision' && !isEdit && showUpdatesFor === g.id && (
@@ -2643,7 +2643,7 @@ function StrategyView() {
                           </div>
                         </div>
                         <div style={{ marginBottom: 10 }}>
-                          <label style={{ fontSize: 12, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Due Date</label>
+                          <label style={{ fontSize: 12, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Date</label>
                           <input type="date" value={editForm.due_date} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { due_date: e.target.value }); }); }}
                             style={{ padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12 }} />
                         </div>
