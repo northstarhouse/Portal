@@ -1955,9 +1955,14 @@ var AppBundle = (() => {
     function load() {
       setLoading(true);
       setLoadError(null);
+      clearCache("Board-Votes");
       Promise.all([
         cachedFetchAll("Board Voting Items"),
-        cachedFetchAll("Board-Votes")
+        fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Board-Votes") + "?select=*", {
+          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+        }).then(function(r) {
+          return r.json();
+        })
       ]).then(function(results) {
         var itemsData = results[0];
         var votesData = results[1];
