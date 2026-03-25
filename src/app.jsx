@@ -2158,7 +2158,7 @@ function BoardView() {
   React.useEffect(function() { load(); }, []);
 
   function itemVotes(item) {
-    return votes.filter(function(v) { return v.topicId === item.id; });
+    return votes.filter(function(v) { return v.topicId == item.id; });
   }
 
   function isRevealed(item) {
@@ -2190,7 +2190,7 @@ function BoardView() {
     if (e && e.preventDefault) e.preventDefault();
     if (!voteForm.voter || !voteForm.choice) return;
     setVoteSaving(true);
-    var existing = votes.find(function(v) { return v.topicId === selected.id && v.voter === voteForm.voter; });
+    var existing = votes.find(function(v) { return v.topicId == selected.id && v.voter === voteForm.voter; });
     var today = new Date().toDateString();
     var isInMeeting = selected.meeting_date && new Date(selected.meeting_date + 'T12:00:00').toDateString() === today;
     var payload = { topicId: selected.id, voter: voteForm.voter, choice: voteForm.choice, note: voteForm.note || null };
