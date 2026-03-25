@@ -2167,7 +2167,7 @@ function BoardView() {
   function isRevealed(item) {
     var iv = itemVotes(item);
     var allVoted = BOARD_MEMBERS.every(function(m) { return iv.some(function(v) { return v.voter === m; }); });
-    var pastDue = item.due_date && new Date(item.due_date) < new Date();
+    var pastDue = item.due_date && item.due_date <= new Date().toISOString().slice(0, 10);
     return allVoted || pastDue;
   }
 

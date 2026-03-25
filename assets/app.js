@@ -2004,7 +2004,7 @@ var AppBundle = (() => {
           return v.voter === m;
         });
       });
-      var pastDue = item.due_date && new Date(item.due_date) < /* @__PURE__ */ new Date();
+      var pastDue = item.due_date && item.due_date <= (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
       return allVoted || pastDue;
     }
     function tally(item) {
