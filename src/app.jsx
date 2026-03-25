@@ -2196,13 +2196,13 @@ function BoardView() {
       });
     } else {
       sbInsert('Board-Votes', Object.assign({}, payload, { changed_in_meeting: false })).then(function(rows) {
-        alert('Vote insert response: ' + JSON.stringify(rows));
+        if (rows && rows.message) { alert('Error: ' + rows.message); setVoteSaving(false); return; }
         var newVote = (rows && rows[0]) ? rows[0] : Object.assign({}, payload, { id: Date.now(), changed_in_meeting: false });
         setVotes(function(prev) { return prev.concat([newVote]); });
         setVoteSaving(false);
         setVoteForm({ voter: '', choice: '', note: '' });
         clearCache('Board-Votes');
-      }).catch(function(err) { alert('Vote insert error: ' + err); setVoteSaving(false); });
+      }).catch(function(err) { alert('Error: ' + err); setVoteSaving(false); });
     }
   }
 
@@ -2219,14 +2219,14 @@ function BoardView() {
       meeting_date: topicForm.meeting_date || null,
       status: 'Open'
     }).then(function(rows) {
-      alert('Topic insert response: ' + JSON.stringify(rows));
+      if (rows && rows.message) { alert('Error: ' + rows.message); setTopicSaving(false); return; }
       setTopicSaving(false);
       setShowAdd(false);
       setTopicForm({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
       setAttachFileName(''); setAttachUploading(false);
       clearCache('Board Voting Items');
       load();
-    }).catch(function(err) { alert('Topic insert error: ' + err); setTopicSaving(false); });
+    }).catch(function(err) { alert('Error: ' + err); setTopicSaving(false); });
   }
 
   function fmtDate(d) {
