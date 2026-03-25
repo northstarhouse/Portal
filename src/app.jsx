@@ -4549,6 +4549,8 @@ function FinancialsView() {
   // Resources
   var [resources, setResources] = useState([]);
   var [resourcesLoading, setResourcesLoading] = useState(true);
+  var [ideas, setIdeas] = useState([]);
+  var [volList, setVolList] = useState([]);
   var [showAddResource, setShowAddResource] = useState(false);
   var [resourceType, setResourceType] = useState('link');
   var [resourceTitle, setResourceTitle] = useState('');
@@ -4574,6 +4576,12 @@ function FinancialsView() {
   useEffect(function() {
     loadReimbursements();
     loadRentals();
+    cachedSbFetch('2026 Volunteers', ['id', 'First Name', 'Last Name', 'Address', 'Status']).then(function(rows) {
+      if (Array.isArray(rows)) setVolList(rows);
+    });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas') + '?select=id,title,submitted_by', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { if (Array.isArray(rows)) setIdeas(rows); });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=*&order=date.desc,id.desc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
@@ -4667,11 +4675,18 @@ function FinancialsView() {
         ) : Object.keys(byArea).sort().map(function(area) {
           var areaItems = byArea[area];
           var areaTotal = areaItems.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+          var initiative = ideas.find(function(i) { return i.title === area; });
+          var submittedBy = initiative && initiative.submitted_by;
+          var volunteer = submittedBy && volList.find(function(v) { return ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim() === submittedBy; });
+          var volAddress = volunteer && volunteer['Address'];
           return (
             <div key={area}>
-              <div style={{ padding: '10px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{area}</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309' }}>{fmt(areaTotal)}</div>
+              <div style={{ padding: '10px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{area}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309' }}>{fmt(areaTotal)}</div>
+                </div>
+                {submittedBy && <div style={{ fontSize: 11, color: '#555', marginTop: 3 }}>{submittedBy}{volAddress ? ' · ' + volAddress : ''}</div>}
               </div>
               {areaItems.map(function(b) {
                 var isMarking = markingId === b.id;
@@ -4679,7 +4694,6 @@ function FinancialsView() {
                   <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
-                      {b.volunteer_name && <div style={{ fontSize: 12, color: '#555', fontWeight: 500, marginTop: 2 }}>{b.volunteer_name}{b.volunteer_address ? ' · ' + b.volunteer_address : ''}</div>}
                       <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>

@@ -3941,6 +3941,8 @@ var AppBundle = (() => {
     var [cashSaving, setCashSaving] = useState2(false);
     var [resources, setResources] = useState2([]);
     var [resourcesLoading, setResourcesLoading] = useState2(true);
+    var [ideas, setIdeas] = useState2([]);
+    var [volList, setVolList] = useState2([]);
     var [showAddResource, setShowAddResource] = useState2(false);
     var [resourceType, setResourceType] = useState2("link");
     var [resourceTitle, setResourceTitle] = useState2("");
@@ -3972,6 +3974,16 @@ var AppBundle = (() => {
     useEffect2(function() {
       loadReimbursements();
       loadRentals();
+      cachedSbFetch("2026 Volunteers", ["id", "First Name", "Last Name", "Address", "Status"]).then(function(rows) {
+        if (Array.isArray(rows)) setVolList(rows);
+      });
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Ideas") + "?select=id,title,submitted_by", {
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+      }).then(function(r) {
+        return r.json();
+      }).then(function(rows) {
+        if (Array.isArray(rows)) setIdeas(rows);
+      });
       fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Cash Log") + "?select=*&order=date.desc,id.desc", {
         headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
       }).then(function(r) {
@@ -4087,9 +4099,17 @@ var AppBundle = (() => {
       var areaTotal = areaItems.reduce(function(s, b) {
         return s + (parseFloat(b.amount) || 0);
       }, 0);
-      return /* @__PURE__ */ React.createElement("div", { key: area }, /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 18px", borderBottom: "0.5px solid #f0ece6", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fdfcfb" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#2a2a2a" } }, area), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#b45309" } }, fmt(areaTotal))), areaItems.map(function(b) {
+      var initiative = ideas.find(function(i) {
+        return i.title === area;
+      });
+      var submittedBy = initiative && initiative.submitted_by;
+      var volunteer = submittedBy && volList.find(function(v) {
+        return ((v["First Name"] || "") + " " + (v["Last Name"] || "")).trim() === submittedBy;
+      });
+      var volAddress = volunteer && volunteer["Address"];
+      return /* @__PURE__ */ React.createElement("div", { key: area }, /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 18px", borderBottom: "0.5px solid #f0ece6", background: "#fdfcfb" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#2a2a2a" } }, area), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#b45309" } }, fmt(areaTotal))), submittedBy && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#555", marginTop: 3 } }, submittedBy, volAddress ? " \xB7 " + volAddress : "")), areaItems.map(function(b) {
         var isMarking = markingId === b.id;
-        return /* @__PURE__ */ React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: 12, padding: "11px 18px", borderBottom: "0.5px solid #f9f6f2" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#2a2a2a" } }, b.description || "\u2014"), b.volunteer_name && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#555", fontWeight: 500, marginTop: 2 } }, b.volunteer_name, b.volunteer_address ? " \xB7 " + b.volunteer_address : ""), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 2 } }, b.date || "")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#2a2a2a", flexShrink: 0 } }, fmt(parseFloat(b.amount) || 0)), b.receipt_url && /* @__PURE__ */ React.createElement("a", { href: b.receipt_url, target: "_blank", title: "View receipt", style: { color: gold, textDecoration: "none", flexShrink: 0, display: "flex", alignItems: "center" } }, /* @__PURE__ */ React.createElement("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" }))), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 5, cursor: isMarking ? "default" : "pointer", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: false, disabled: isMarking, onChange: function() {
+        return /* @__PURE__ */ React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: 12, padding: "11px 18px", borderBottom: "0.5px solid #f9f6f2" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#2a2a2a" } }, b.description || "\u2014"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 2 } }, b.date || "")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: "#2a2a2a", flexShrink: 0 } }, fmt(parseFloat(b.amount) || 0)), b.receipt_url && /* @__PURE__ */ React.createElement("a", { href: b.receipt_url, target: "_blank", title: "View receipt", style: { color: gold, textDecoration: "none", flexShrink: 0, display: "flex", alignItems: "center" } }, /* @__PURE__ */ React.createElement("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" }))), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 5, cursor: isMarking ? "default" : "pointer", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: false, disabled: isMarking, onChange: function() {
           markReimbursed(b.id);
         }, style: { accentColor: "#059669", width: 14, height: 14 } }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#059669", fontWeight: 500 } }, isMarking ? "\u2026" : "Reimbursed")));
       }));
