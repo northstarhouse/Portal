@@ -2196,12 +2196,13 @@ function BoardView() {
       });
     } else {
       sbInsert('Board-Votes', Object.assign({}, payload, { changed_in_meeting: false })).then(function(rows) {
+        alert('Vote insert response: ' + JSON.stringify(rows));
         var newVote = (rows && rows[0]) ? rows[0] : Object.assign({}, payload, { id: Date.now(), changed_in_meeting: false });
         setVotes(function(prev) { return prev.concat([newVote]); });
         setVoteSaving(false);
         setVoteForm({ voter: '', choice: '', note: '' });
         clearCache('Board-Votes');
-      });
+      }).catch(function(err) { alert('Vote insert error: ' + err); setVoteSaving(false); });
     }
   }
 
