@@ -3318,6 +3318,9 @@ var AppBundle = (() => {
     var [inkind, setInkind] = useState2([]);
     var [inkindForm, setInkindForm] = useState2({ description: "", date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10), value: "" });
     var [inkindSaving, setInkindSaving] = useState2(false);
+    var [editing, setEditing] = useState2(false);
+    var [editSponsorForm, setEditSponsorForm] = useState2({});
+    var [editSponsorSaving, setEditSponsorSaving] = useState2(false);
     useEffect2(function() {
       cachedFetchAll("Sponsors").then(function(rows) {
         if (Array.isArray(rows)) setSponsors(rows.slice().sort(function(a, b) {
@@ -3521,6 +3524,28 @@ var AppBundle = (() => {
         });
       });
     }
+    function saveEditSponsor() {
+      if (!selected) return;
+      setEditSponsorSaving(true);
+      fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Sponsors") + "?id=eq." + selected.id, {
+        method: "PATCH",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify(editSponsorForm)
+      }).then(function() {
+        var updated = Object.assign({}, selected, editSponsorForm);
+        setSelected(updated);
+        setSponsors(function(prev) {
+          return prev.map(function(s) {
+            return s.id === selected.id ? updated : s;
+          });
+        });
+        clearCache("Sponsors");
+        setEditing(false);
+        setEditSponsorSaving(false);
+      }).catch(function() {
+        setEditSponsorSaving(false);
+      });
+    }
     function InfoRow({ label, value, link }) {
       if (!value) return null;
       return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 0, marginBottom: 10, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 120, fontSize: 12, color: "#777", flexShrink: 0, paddingTop: 1 } }, label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#2a2a2a", flex: 1, lineHeight: 1.5 } }, link ? /* @__PURE__ */ React.createElement("a", { href: link, target: "_blank", rel: "noopener noreferrer", style: { color: gold, textDecoration: "none" } }, value) : value));
@@ -3553,14 +3578,34 @@ var AppBundle = (() => {
         }, style: { width: 44, height: 44, objectFit: "contain", borderRadius: 6, flexShrink: 0, border: "0.5px solid #e8e0d5" } }) : null,
         /* @__PURE__ */ React.createElement("div", { style: { width: 44, height: 44, borderRadius: 6, background: "#f0ece6", display: s.logo_url ? "none" : "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, color: gold, flexShrink: 0 } }, (s["Business Name"] || "?")[0]),
         /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "#2a2a2a", marginBottom: 3 } }, s["Business Name"]), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, flexWrap: "wrap" } }, s["Main Contact"] && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#666" } }, s["Main Contact"]), s["Area Supported"] && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#aaa" } }, s["Area Supported"]))),
-        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 } }, s["Fair Market Value"] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: gold } }, s["Fair Market Value"]), (function() {
-          var tier = getTier(sponsorInKindTotal(s.id));
-          return tier ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: "1px solid " + tier.border, borderRadius: 20, padding: "1px 8px" } }, tier.name) : null;
+        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 } }, (function() {
+          var total = sponsorInKindTotal(s.id);
+          var tier = getTier(total);
+          return /* @__PURE__ */ React.createElement(React.Fragment, null, total > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: gold } }, "$", total.toLocaleString()), tier && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: "1px solid " + tier.border, borderRadius: 20, padding: "1px 8px" } }, tier.name));
         })())
       );
-    })), selected && /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e8e0d5", borderRadius: 12, padding: "20px 22px", alignSelf: "start", position: "sticky", top: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#2a2a2a", lineHeight: 1.3, flex: 1, paddingRight: 8 } }, selected["Business Name"]), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+    })), selected && /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", border: "0.5px solid #e8e0d5", borderRadius: 12, padding: "20px 22px", alignSelf: "start", position: "sticky", top: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#2a2a2a", lineHeight: 1.3, flex: 1, paddingRight: 8 } }, selected["Business Name"]), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center" } }, /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setEditSponsorForm({ "Business Name": selected["Business Name"] || "", "Main Contact": selected["Main Contact"] || "", "Donation": selected["Donation"] || "", "Fair Market Value": selected["Fair Market Value"] || "", "Area Supported": selected["Area Supported"] || "", "NSH Contact": selected["NSH Contact"] || "", "Phone Number": selected["Phone Number"] || "", "Email Address": selected["Email Address"] || "", "Mailing Address": selected["Mailing Address"] || "", "Date Recieved": selected["Date Recieved"] || "", "Notes": selected["Notes"] || "" });
+      setEditing(true);
+    }, style: { background: "none", border: "0.5px solid #e0d8cc", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "#888", cursor: "pointer" } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
       setSelected(null);
-    }, style: { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#bbb", lineHeight: 1, flexShrink: 0 } }, "\xD7")), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#aaa", fontWeight: 600, marginBottom: 8 } }, "Logo"), selected.logo_url ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("img", { src: selected.logo_url, alt: "logo", onError: function(e) {
+      setEditing(false);
+    }, style: { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#bbb", lineHeight: 1 } }, "\xD7"))), editing && /* @__PURE__ */ React.createElement("div", { style: { background: "#faf8f5", borderRadius: 10, padding: "14px 16px", marginBottom: 16, border: "0.5px solid #e8e0d5" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#2a2a2a", marginBottom: 12 } }, "Edit Sponsor"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 } }, [["Business Name", "Business Name"], ["Main Contact", "Main Contact"], ["Donation", "Donation"], ["Fair Market Value", "Fair Market Value"], ["Area Supported", "Area Supported"], ["NSH Contact", "NSH Contact"], ["Phone Number", "Phone"], ["Email Address", "Email"], ["Mailing Address", "Address"], ["Date Recieved", "Date Received"]].map(function(pair) {
+      return /* @__PURE__ */ React.createElement("div", { key: pair[0] }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#888", marginBottom: 3 } }, pair[1]), /* @__PURE__ */ React.createElement("input", { value: editSponsorForm[pair[0]] || "", onChange: function(e) {
+        var k = pair[0];
+        var v = e.target.value;
+        setEditSponsorForm(function(f) {
+          return Object.assign({}, f, { [k]: v });
+        });
+      }, style: inpStyle }));
+    })), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#888", marginBottom: 3 } }, "Notes"), /* @__PURE__ */ React.createElement("textarea", { value: editSponsorForm["Notes"] || "", onChange: function(e) {
+      var v = e.target.value;
+      setEditSponsorForm(function(f) {
+        return Object.assign({}, f, { Notes: v });
+      });
+    }, rows: 3, style: Object.assign({}, inpStyle, { resize: "vertical" }) })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: saveEditSponsor, disabled: editSponsorSaving, style: { background: gold, color: "#fff", border: "none", borderRadius: 7, padding: "7px 16px", fontSize: 12, fontWeight: 500, cursor: "pointer", flex: 1 } }, editSponsorSaving ? "Saving\u2026" : "Save"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      setEditing(false);
+    }, style: { background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 7, padding: "7px 16px", fontSize: 12, color: "#888", cursor: "pointer" } }, "Cancel"))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#aaa", fontWeight: 600, marginBottom: 8 } }, "Logo"), selected.logo_url ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("img", { src: selected.logo_url, alt: "logo", onError: function(e) {
       e.currentTarget.style.display = "none";
       e.currentTarget.nextSibling.style.display = "block";
     }, style: { maxHeight: 60, maxWidth: 160, objectFit: "contain", border: "0.5px solid #e8e0d5", borderRadius: 6, padding: 4 } }), /* @__PURE__ */ React.createElement("button", { onClick: function() {

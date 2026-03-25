@@ -3798,6 +3798,9 @@ function SponsorsView() {
   var [inkind, setInkind] = useState([]);
   var [inkindForm, setInkindForm] = useState({ description: '', date: new Date().toISOString().slice(0,10), value: '' });
   var [inkindSaving, setInkindSaving] = useState(false);
+  var [editing, setEditing] = useState(false);
+  var [editSponsorForm, setEditSponsorForm] = useState({});
+  var [editSponsorSaving, setEditSponsorSaving] = useState(false);
 
   useEffect(function() {
     cachedFetchAll('Sponsors').then(function(rows) {
@@ -3936,6 +3939,23 @@ function SponsorsView() {
     }).then(function() { setAcks(function(prev) { return prev.filter(function(a) { return a.id !== id; }); }); });
   }
 
+  function saveEditSponsor() {
+    if (!selected) return;
+    setEditSponsorSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?id=eq.' + selected.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(editSponsorForm)
+    }).then(function() {
+      var updated = Object.assign({}, selected, editSponsorForm);
+      setSelected(updated);
+      setSponsors(function(prev) { return prev.map(function(s) { return s.id === selected.id ? updated : s; }); });
+      clearCache('Sponsors');
+      setEditing(false);
+      setEditSponsorSaving(false);
+    }).catch(function() { setEditSponsorSaving(false); });
+  }
+
   function InfoRow({ label, value, link }) {
     if (!value) return null;
     return (
@@ -3981,10 +4001,15 @@ function SponsorsView() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                  {s['Fair Market Value'] && <div style={{ fontSize: 13, fontWeight: 600, color: gold }}>{s['Fair Market Value']}</div>}
                   {(function() {
-                    var tier = getTier(sponsorInKindTotal(s.id));
-                    return tier ? <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '1px 8px' }}>{tier.name}</span> : null;
+                    var total = sponsorInKindTotal(s.id);
+                    var tier = getTier(total);
+                    return (
+                      <>
+                        {total > 0 && <div style={{ fontSize: 13, fontWeight: 600, color: gold }}>${total.toLocaleString()}</div>}
+                        {tier && <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '1px 8px' }}>{tier.name}</span>}
+                      </>
+                    );
                   })()}
                 </div>
               </div>
@@ -3997,8 +4022,34 @@ function SponsorsView() {
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', lineHeight: 1.3, flex: 1, paddingRight: 8 }}>{selected['Business Name']}</div>
-              <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb', lineHeight: 1, flexShrink: 0 }}>×</button>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <button onClick={function() { setEditSponsorForm({ 'Business Name': selected['Business Name'] || '', 'Main Contact': selected['Main Contact'] || '', 'Donation': selected['Donation'] || '', 'Fair Market Value': selected['Fair Market Value'] || '', 'Area Supported': selected['Area Supported'] || '', 'NSH Contact': selected['NSH Contact'] || '', 'Phone Number': selected['Phone Number'] || '', 'Email Address': selected['Email Address'] || '', 'Mailing Address': selected['Mailing Address'] || '', 'Date Recieved': selected['Date Recieved'] || '', 'Notes': selected['Notes'] || '' }); setEditing(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#888', cursor: 'pointer' }}>Edit</button>
+                <button onClick={function() { setSelected(null); setEditing(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
+              </div>
             </div>
+            {editing && (
+              <div style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 16, border: '0.5px solid #e8e0d5' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 12 }}>Edit Sponsor</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  {[['Business Name','Business Name'],['Main Contact','Main Contact'],['Donation','Donation'],['Fair Market Value','Fair Market Value'],['Area Supported','Area Supported'],['NSH Contact','NSH Contact'],['Phone Number','Phone'],['Email Address','Email'],['Mailing Address','Address'],['Date Recieved','Date Received']].map(function(pair) {
+                    return (
+                      <div key={pair[0]}>
+                        <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>{pair[1]}</div>
+                        <input value={editSponsorForm[pair[0]] || ''} onChange={function(e) { var k = pair[0]; var v = e.target.value; setEditSponsorForm(function(f) { return Object.assign({}, f, { [k]: v }); }); }} style={inpStyle} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Notes</div>
+                  <textarea value={editSponsorForm['Notes'] || ''} onChange={function(e) { var v = e.target.value; setEditSponsorForm(function(f) { return Object.assign({}, f, { Notes: v }); }); }} rows={3} style={Object.assign({}, inpStyle, { resize: 'vertical' })} />
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={saveEditSponsor} disabled={editSponsorSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', flex: 1 }}>{editSponsorSaving ? 'Saving…' : 'Save'}</button>
+                  <button onClick={function() { setEditing(false); }} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 7, padding: '7px 16px', fontSize: 12, color: '#888', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+            )}
 
             {/* Logo */}
             <div style={{ marginBottom: 18 }}>
