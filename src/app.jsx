@@ -12,6 +12,7 @@ function sbFetch(table, columns) {
   }).then(r => r.json());
 }
 
+var CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 var _cache = {};
 var LS_PREFIX = 'nsh3_';
 function lsGet(key) {
@@ -19,38 +20,48 @@ function lsGet(key) {
     var r = localStorage.getItem(LS_PREFIX + key);
     if (!r) return null;
     var parsed = JSON.parse(r);
-    // guard against old {ts, data} format
-    if (parsed && !Array.isArray(parsed) && typeof parsed === 'object' && parsed.data !== undefined) return parsed.data;
-    return parsed;
+    if (parsed && !Array.isArray(parsed) && typeof parsed === 'object' && parsed.ts !== undefined) {
+      if (Date.now() - parsed.ts > CACHE_TTL) { localStorage.removeItem(LS_PREFIX + key); return null; }
+      return parsed.data;
+    }
+    // legacy plain-array format — treat as expired so it gets replaced
+    return null;
   } catch(e) { return null; }
 }
 function lsSet(key, data) {
-  try { localStorage.setItem(LS_PREFIX + key, JSON.stringify(data)); } catch(e) {}
+  try { localStorage.setItem(LS_PREFIX + key, JSON.stringify({ ts: Date.now(), data: data })); } catch(e) {}
 }
+function _cacheGet(key) {
+  var entry = _cache[key];
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL) { delete _cache[key]; return null; }
+  return entry.data;
+}
+function _cacheSet(key, data) { _cache[key] = { ts: Date.now(), data: data }; }
 function cachedSbFetch(table, columns) {
   var key = table + ':' + columns.slice().sort().join(',');
-  if (_cache[key]) return Promise.resolve(_cache[key]);
-  var ls = lsGet(key); if (ls) { _cache[key] = ls; return Promise.resolve(ls); }
+  var mem = _cacheGet(key); if (mem) return Promise.resolve(mem);
+  var ls = lsGet(key); if (ls) { _cacheSet(key, ls); return Promise.resolve(ls); }
   return sbFetch(table, columns).then(function(data) {
-    if (Array.isArray(data)) { _cache[key] = data; lsSet(key, data); }
+    if (Array.isArray(data)) { _cacheSet(key, data); lsSet(key, data); }
     return data;
   });
 }
 function cachedFetchAll(table) {
   var key = table + ':*';
-  if (_cache[key]) return Promise.resolve(_cache[key]);
-  var ls = lsGet(key); if (ls) { _cache[key] = ls; return Promise.resolve(ls); }
+  var mem = _cacheGet(key); if (mem) return Promise.resolve(mem);
+  var ls = lsGet(key); if (ls) { _cacheSet(key, ls); return Promise.resolve(ls); }
   var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table) + '?select=*';
   return fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
     .then(function(r) { return r.json(); })
-    .then(function(data) { if (Array.isArray(data)) { _cache[key] = data; lsSet(key, data); } return data; });
+    .then(function(data) { if (Array.isArray(data)) { _cacheSet(key, data); lsSet(key, data); } return data; });
 }
 function cachedFetch(url) {
-  if (_cache[url]) return Promise.resolve(_cache[url]);
-  var ls = lsGet(url); if (ls) { _cache[url] = ls; return Promise.resolve(ls); }
+  var mem = _cacheGet(url); if (mem) return Promise.resolve(mem);
+  var ls = lsGet(url); if (ls) { _cacheSet(url, ls); return Promise.resolve(ls); }
   return fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
     .then(function(r) { return r.json(); })
-    .then(function(data) { if (Array.isArray(data)) { _cache[url] = data; lsSet(url, data); } return data; });
+    .then(function(data) { if (Array.isArray(data)) { _cacheSet(url, data); lsSet(url, data); } return data; });
 }
 function clearCache(table) {
   var enc = encodeURIComponent(table);
