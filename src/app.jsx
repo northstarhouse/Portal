@@ -2139,16 +2139,22 @@ function BoardView() {
   }
 
   function fetchVotesForItems(itemsData) {
-    var ids = itemsData.map(function(i) { return i.id; }).filter(function(id) { return id != null; });
-    if (ids.length === 0) return Promise.resolve([]);
-    var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Board-Votes') + '?select=*&topicId=in.(' + ids.join(',') + ')';
-    return fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); });
+    var idSet = new Set(itemsData.map(function(i) { return String(i.id); }).filter(function(id) { return id !== 'null' && id !== 'undefined'; }));
+    var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Board-Votes') + '?select=*';
+    return fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!Array.isArray(data)) return data;
+        if (idSet.size === 0) return [];
+        return data.filter(function(v) { return idSet.has(String(v.topicId)); });
+      });
   }
 
   function load() {
     setLoading(true);
     setLoadError(null);
     clearCache('Board-Votes');
+    clearCache('Board Voting Items');
     cachedFetchAll('Board Voting Items').then(function(itemsData) {
       if (!Array.isArray(itemsData)) {
         setLoadError('Board Voting Items: ' + ((itemsData && itemsData.message) ? itemsData.message : JSON.stringify(itemsData)));
