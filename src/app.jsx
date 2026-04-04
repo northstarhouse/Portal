@@ -2279,8 +2279,9 @@ function BoardView() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {(function() {
-          var openItems = items.filter(function(i) { return !isRevealed(i); });
-          var closedItems = items.filter(function(i) { return isRevealed(i); });
+          var byNewest = function(a, b) { return new Date(b.created_at) - new Date(a.created_at); };
+          var openItems = items.filter(function(i) { return !isRevealed(i); }).sort(byNewest);
+          var closedItems = items.filter(function(i) { return isRevealed(i); }).sort(byNewest);
           var allItems = openItems.concat(closedItems);
           return allItems.map(function(item, idx) {
           var iv = itemVotes(item);

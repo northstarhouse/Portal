@@ -2154,12 +2154,15 @@ function BoardView() {
   return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, "Voting Topics"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#aaa", marginTop: 2 } }, items.length, " topic", items.length !== 1 ? "s" : "")), /* @__PURE__ */ React.createElement("button", { onClick: function() {
     setShowAdd(true);
   }, style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 12, fontWeight: 500, cursor: "pointer" } }, "+ Add Topic")), items.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { color: "#777", fontSize: 12, textAlign: "center", padding: 40 } }, "No voting items yet."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, (function() {
+    var byNewest = function(a, b) {
+      return new Date(b.created_at) - new Date(a.created_at);
+    };
     var openItems = items.filter(function(i) {
       return !isRevealed(i);
-    });
+    }).sort(byNewest);
     var closedItems = items.filter(function(i) {
       return isRevealed(i);
-    });
+    }).sort(byNewest);
     var allItems = openItems.concat(closedItems);
     return allItems.map(function(item, idx) {
       var iv = itemVotes(item);
