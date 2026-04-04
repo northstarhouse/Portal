@@ -2213,7 +2213,6 @@ function BoardView() {
     var today = new Date().toDateString();
     var isInMeeting = selected.meeting_date && new Date(selected.meeting_date + 'T12:00:00').toDateString() === today;
     var payload = { topicId: selected.title, voter: voteForm.voter, choice: voteForm.choice, note: voteForm.note || null };
-    alert('DEBUG — topicId will be: ' + selected.title + '\nAll keys: ' + Object.keys(selected).join(', '));
     if (existing) {
       var fullPayload = Object.assign({}, payload, { changed_in_meeting: isInMeeting ? true : (existing.changed_in_meeting || false) });
       sbPatchById('Board-Votes', existing.id, fullPayload).then(function() {
