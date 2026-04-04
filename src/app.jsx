@@ -2152,8 +2152,10 @@ function BoardView() {
       console.log('Board Voting Items:', itemsData);
       console.log('Board-Votes:', votesData);
       var sorted = itemsData.sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+      var validIds = new Set(itemsData.map(function(i) { return i.id; }));
+      var filteredVotes = votesData.filter(function(v) { return validIds.has(v.topicId); });
       setItems(sorted);
-      setVotes(votesData);
+      setVotes(filteredVotes);
       setLoading(false);
     }).catch(function(err) { setLoadError(err.message); setLoading(false); });
   }
@@ -2185,7 +2187,7 @@ function BoardView() {
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Board-Votes') + '?select=*', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(data) {
-      if (Array.isArray(data)) { setVotes(data); clearCache('Board-Votes'); }
+      if (Array.isArray(data)) { var vids = new Set(items.map(function(i) { return i.id; })); setVotes(data.filter(function(v) { return vids.has(v.topicId); })); clearCache('Board-Votes'); }
     });
   }
 
