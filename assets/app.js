@@ -1969,10 +1969,10 @@ function BoardView() {
       headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
       body: file
     }).then(function(r) {
-      return r.json().then(function(res) {
+      return r.text().then(function(text) {
         setAttachUploading(false);
-        if (res.error || res.message) {
-          alert("Upload failed: " + (res.message || res.error));
+        if (!r.ok) {
+          alert("Upload failed (" + r.status + "): " + text);
           return;
         }
         var url = SUPABASE_URL + "/storage/v1/object/public/board-attachments/" + path;
