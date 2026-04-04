@@ -1988,7 +1988,7 @@ function BoardView() {
   }
   function fetchVotesForItems(itemsData) {
     var idSet = new Set(itemsData.map(function(i) {
-      return String(i.id);
+      return String(i.topicID);
     }).filter(function(id) {
       return id !== "null" && id !== "undefined";
     }));
@@ -2041,7 +2041,7 @@ function BoardView() {
   }, []);
   function itemVotes(item) {
     return votes.filter(function(v) {
-      return v.topicId == item.id;
+      return String(v.topicId) === String(item.topicID);
     });
   }
   function isRevealed(item) {
@@ -2084,11 +2084,11 @@ function BoardView() {
     if (!voteForm.voter || !voteForm.choice) return;
     setVoteSaving(true);
     var existing = votes.find(function(v) {
-      return v.topicId == selected.id && v.voter === voteForm.voter;
+      return String(v.topicId) === String(selected.topicID) && v.voter === voteForm.voter;
     });
     var today = (/* @__PURE__ */ new Date()).toDateString();
     var isInMeeting = selected.meeting_date && (/* @__PURE__ */ new Date(selected.meeting_date + "T12:00:00")).toDateString() === today;
-    var payload = { topicId: selected.id, voter: voteForm.voter, choice: voteForm.choice, note: voteForm.note || null };
+    var payload = { topicId: selected.topicID, voter: voteForm.voter, choice: voteForm.choice, note: voteForm.note || null };
     if (existing) {
       var fullPayload = Object.assign({}, payload, { changed_in_meeting: isInMeeting ? true : existing.changed_in_meeting || false });
       sbPatchById("Board-Votes", existing.id, fullPayload).then(function() {
@@ -2166,10 +2166,10 @@ function BoardView() {
       var revealed = isRevealed(item);
       var t = tally(item);
       var showDivider = idx === openItems.length && closedItems.length > 0 && openItems.length > 0;
-      return /* @__PURE__ */ React.createElement(React.Fragment, { key: item.id }, showDivider && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, margin: "6px 0" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: "0.5px", background: "#e0d8cc" } }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 } }, "Closed"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: "0.5px", background: "#e0d8cc" } })), /* @__PURE__ */ React.createElement(
+      return /* @__PURE__ */ React.createElement(React.Fragment, { key: item.topicID }, showDivider && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, margin: "6px 0" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: "0.5px", background: "#e0d8cc" } }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 } }, "Closed"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: "0.5px", background: "#e0d8cc" } })), /* @__PURE__ */ React.createElement(
         "div",
         {
-          key: item.id,
+          key: item.topicID,
           onClick: function() {
             setSelected(item);
             setVoteForm({ voter: "", choice: "", note: "" });

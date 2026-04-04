@@ -2139,7 +2139,7 @@ function BoardView() {
   }
 
   function fetchVotesForItems(itemsData) {
-    var idSet = new Set(itemsData.map(function(i) { return String(i.id); }).filter(function(id) { return id !== 'null' && id !== 'undefined'; }));
+    var idSet = new Set(itemsData.map(function(i) { return String(i.topicID); }).filter(function(id) { return id !== 'null' && id !== 'undefined'; }));
     var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Board-Votes') + '?select=*';
     return fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
       .then(function(r) { return r.json(); })
@@ -2179,7 +2179,7 @@ function BoardView() {
   React.useEffect(function() { load(); }, []);
 
   function itemVotes(item) {
-    return votes.filter(function(v) { return v.topicId == item.id; });
+    return votes.filter(function(v) { return String(v.topicId) === String(item.topicID); });
   }
 
   function isRevealed(item) {
@@ -2209,10 +2209,10 @@ function BoardView() {
     if (e && e.preventDefault) e.preventDefault();
     if (!voteForm.voter || !voteForm.choice) return;
     setVoteSaving(true);
-    var existing = votes.find(function(v) { return v.topicId == selected.id && v.voter === voteForm.voter; });
+    var existing = votes.find(function(v) { return String(v.topicId) === String(selected.topicID) && v.voter === voteForm.voter; });
     var today = new Date().toDateString();
     var isInMeeting = selected.meeting_date && new Date(selected.meeting_date + 'T12:00:00').toDateString() === today;
-    var payload = { topicId: selected.id, voter: voteForm.voter, choice: voteForm.choice, note: voteForm.note || null };
+    var payload = { topicId: selected.topicID, voter: voteForm.voter, choice: voteForm.choice, note: voteForm.note || null };
     if (existing) {
       var fullPayload = Object.assign({}, payload, { changed_in_meeting: isInMeeting ? true : (existing.changed_in_meeting || false) });
       sbPatchById('Board-Votes', existing.id, fullPayload).then(function() {
@@ -2288,7 +2288,7 @@ function BoardView() {
           var t = tally(item);
           var showDivider = idx === openItems.length && closedItems.length > 0 && openItems.length > 0;
           return (
-            <React.Fragment key={item.id}>
+            <React.Fragment key={item.topicID}>
               {showDivider && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '6px 0' }}>
                   <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
@@ -2297,7 +2297,7 @@ function BoardView() {
                 </div>
               )}
             <div
-              key={item.id}
+              key={item.topicID}
               onClick={function() { setSelected(item); setVoteForm({ voter: '', choice: '', note: '' }); }}
               style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '16px 20px', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
               onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.07)'; }}
