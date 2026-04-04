@@ -2082,6 +2082,7 @@ function BoardView() {
   function handleVoteSubmit(e) {
     if (e && e.preventDefault) e.preventDefault();
     if (!voteForm.voter || !voteForm.choice) return;
+    console.log("selected item keys:", Object.keys(selected), "selected:", selected);
     setVoteSaving(true);
     var existing = votes.find(function(v) {
       return String(v.topicId) === String(selected.topicId) && v.voter === voteForm.voter;
