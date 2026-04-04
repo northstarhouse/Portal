@@ -1988,9 +1988,9 @@ function BoardView() {
   }
   function fetchVotesForItems(itemsData) {
     var idSet = new Set(itemsData.map(function(i) {
-      return String(i.id);
-    }).filter(function(id) {
-      return id !== "null" && id !== "undefined";
+      return i.title;
+    }).filter(function(t) {
+      return t;
     }));
     var url = SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Board-Votes") + "?select=*";
     return fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } }).then(function(r) {
@@ -2041,7 +2041,7 @@ function BoardView() {
   }, []);
   function itemVotes(item) {
     return votes.filter(function(v) {
-      return String(v.topicId) === String(item.id);
+      return v.topicId === item.title;
     });
   }
   function isRevealed(item) {
@@ -2084,11 +2084,11 @@ function BoardView() {
     if (!voteForm.voter || !voteForm.choice) return;
     setVoteSaving(true);
     var existing = votes.find(function(v) {
-      return String(v.topicId) === String(selected.id) && v.voter === voteForm.voter;
+      return v.topicId === selected.title && v.voter === voteForm.voter;
     });
     var today = (/* @__PURE__ */ new Date()).toDateString();
     var isInMeeting = selected.meeting_date && (/* @__PURE__ */ new Date(selected.meeting_date + "T12:00:00")).toDateString() === today;
-    var payload = { topicId: selected.id, voter: voteForm.voter, choice: voteForm.choice, note: voteForm.note || null };
+    var payload = { topicId: selected.title, voter: voteForm.voter, choice: voteForm.choice, note: voteForm.note || null };
     if (existing) {
       var fullPayload = Object.assign({}, payload, { changed_in_meeting: isInMeeting ? true : existing.changed_in_meeting || false });
       sbPatchById("Board-Votes", existing.id, fullPayload).then(function() {
