@@ -2122,15 +2122,18 @@ function BoardView() {
     setAttachFileName(file.name);
     setAttachUploading(true);
     var path = Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    fetch(SUPABASE_URL + '/storage/v1/object/board-attachments/' + encodeURIComponent(path), {
+    fetch(SUPABASE_URL + '/storage/v1/object/board-attachments/' + path, {
       method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream' },
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true' },
       body: file
-    }).then(function(r) { return r.json(); }).then(function(res) {
-      setAttachUploading(false);
-      var url = SUPABASE_URL + '/storage/v1/object/public/board-attachments/' + encodeURIComponent(path);
-      setTopicForm(function(f) { return Object.assign({}, f, { attachment_url: url }); });
-    }).catch(function() { setAttachUploading(false); });
+    }).then(function(r) {
+      return r.json().then(function(res) {
+        setAttachUploading(false);
+        if (res.error || res.message) { alert('Upload failed: ' + (res.message || res.error)); return; }
+        var url = SUPABASE_URL + '/storage/v1/object/public/board-attachments/' + path;
+        setTopicForm(function(f) { return Object.assign({}, f, { attachment_url: url }); });
+      });
+    }).catch(function(err) { setAttachUploading(false); alert('Upload error: ' + err.message); });
   }
 
   function sbFetchAll(table) {
