@@ -2584,7 +2584,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
       body: JSON.stringify(payload)
     });
     reflectionFetch.then(function(r) {
-      return r.json ? r.json() : r;
+      return r.status === 204 ? null : r.json();
     }).then(function() {
       var goalsPayload = { area, quarter: nq.q, year: nq.yr, primary_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3 };
       return Promise.all([

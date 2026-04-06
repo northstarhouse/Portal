@@ -2790,7 +2790,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
           headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
           body: JSON.stringify(payload)
         });
-    reflectionFetch.then(function(r) { return r.json ? r.json() : r; }).then(function() {
+    reflectionFetch.then(function(r) { return r.status === 204 ? null : r.json(); }).then(function() {
       var goalsPayload = { area: area, quarter: nq.q, year: nq.yr, primary_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3 };
       return Promise.all([
         fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals'), {
