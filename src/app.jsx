@@ -3031,6 +3031,11 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [resourceSaving, setResourceSaving] = useState(false);
   var resourceFileRef = React.useRef(null);
   var [showSponsorForm, setShowSponsorForm] = useState(false);
+  var [showTodo, setShowTodo] = useState(false);
+  var [todoItems, setTodoItems] = useState([]);
+  var [todoLoading, setTodoLoading] = useState(false);
+  var [todoInput, setTodoInput] = useState('');
+  var [todoSaving, setTodoSaving] = useState(false);
   var emptySponsorForm = { 'Business Name': '', 'Main Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Donation': '', 'Fair Market Value': '', 'Area Supported': area, 'Date Recieved': '', 'NSH Contact': '' };
   var [sponsorForm, setSponsorForm] = useState(emptySponsorForm);
   var [sponsorSaving, setSponsorSaving] = useState(false);
@@ -3193,6 +3198,49 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     }).then(function() {
       clearCache('Op Budget');
       setBudget(function(prev) { return prev.filter(function(b) { return b.id !== id; }); });
+    });
+  }
+
+  function loadTodo() {
+    setTodoLoading(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?select=*&order=date_submitted.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setTodoItems(rows);
+      setTodoLoading(false);
+    }).catch(function() { setTodoLoading(false); });
+  }
+
+  function addTodoItem(e) {
+    e.preventDefault();
+    if (!todoInput.trim()) return;
+    setTodoSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ item: todoInput.trim(), date_submitted: new Date().toISOString(), done: false, date_done: null })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows) && rows[0]) setTodoItems(function(p) { return [rows[0]].concat(p); });
+      setTodoInput('');
+      setTodoSaving(false);
+    }).catch(function() { setTodoSaving(false); });
+  }
+
+  function toggleTodoItem(id, currentDone) {
+    var nowDone = !currentDone;
+    var patch = { done: nowDone, date_done: nowDone ? new Date().toISOString() : null };
+    setTodoItems(function(p) { return p.map(function(t) { return t.id === id ? Object.assign({}, t, patch) : t; }); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    });
+  }
+
+  function deleteTodoItem(id) {
+    setTodoItems(function(p) { return p.filter(function(t) { return t.id !== id; }); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?id=eq.' + id, {
+      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     });
   }
 
@@ -3463,7 +3511,12 @@ function OperationalView({ opArea, navigateToQuarterly }) {
 
 
         <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 12 }}>Area Resources</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>Area Resources</div>
+            {area === 'Marketing' && (
+              <button onClick={function() { setShowTodo(true); loadTodo(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#ddd', padding: '0 2px', lineHeight: 1 }}>★</button>
+            )}
+          </div>
           {resources.length === 0
             ? <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic', marginBottom: 12 }}>No resources added yet.</div>
             : resources.map(function(r) {
@@ -3823,6 +3876,41 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+      {showTodo && (
+        <div onClick={function() { setShowTodo(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 480, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
+            <div style={{ padding: '18px 22px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>★ Marketing To-Do</div>
+              <button onClick={function() { setShowTodo(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: '#666', cursor: 'pointer' }}>Close</button>
+            </div>
+            <form onSubmit={addTodoItem} style={{ padding: '14px 22px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', gap: 8 }}>
+              <input value={todoInput} onChange={function(e) { setTodoInput(e.target.value); }} placeholder="Add a to-do item…" style={{ flex: 1, padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, fontFamily: 'system-ui, sans-serif' }} />
+              <button type="submit" disabled={todoSaving || !todoInput.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (todoSaving || !todoInput.trim()) ? 0.6 : 1 }}>Add</button>
+            </form>
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {todoLoading ? (
+                <div style={{ padding: 24, textAlign: 'center', color: '#aaa', fontSize: 13 }}>Loading…</div>
+              ) : todoItems.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', color: '#ccc', fontSize: 13 }}>No to-do items yet.</div>
+              ) : todoItems.map(function(t) {
+                return (
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 22px', borderBottom: '0.5px solid #f9f6f2', background: t.done ? '#fafaf9' : '#fff' }}>
+                    <input type="checkbox" checked={!!t.done} onChange={function() { toggleTodoItem(t.id, t.done); }} style={{ marginTop: 3, accentColor: gold, cursor: 'pointer', flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, color: t.done ? '#aaa' : '#2a2a2a', textDecoration: t.done ? 'line-through' : 'none' }}>{t.item}</div>
+                      <div style={{ fontSize: 11, color: '#bbb', marginTop: 3 }}>
+                        Added {new Date(t.date_submitted).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {t.done && t.date_done && <span> · Done {new Date(t.date_done).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                      </div>
+                    </div>
+                    <button onClick={function() { deleteTodoItem(t.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

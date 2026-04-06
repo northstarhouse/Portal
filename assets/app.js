@@ -2726,6 +2726,11 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [resourceSaving, setResourceSaving] = useState2(false);
   var resourceFileRef = React.useRef(null);
   var [showSponsorForm, setShowSponsorForm] = useState2(false);
+  var [showTodo, setShowTodo] = useState2(false);
+  var [todoItems, setTodoItems] = useState2([]);
+  var [todoLoading, setTodoLoading] = useState2(false);
+  var [todoInput, setTodoInput] = useState2("");
+  var [todoSaving, setTodoSaving] = useState2(false);
   var emptySponsorForm = { "Business Name": "", "Main Contact": "", "Phone Number": "", "Email Address": "", "Mailing Address": "", "Donation": "", "Fair Market Value": "", "Area Supported": area, "Date Recieved": "", "NSH Contact": "" };
   var [sponsorForm, setSponsorForm] = useState2(emptySponsorForm);
   var [sponsorSaving, setSponsorSaving] = useState2(false);
@@ -2920,6 +2925,64 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           return b.id !== id;
         });
       });
+    });
+  }
+  function loadTodo() {
+    setTodoLoading(true);
+    fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Marketing Todo") + "?select=*&order=date_submitted.desc", {
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+    }).then(function(r) {
+      return r.json();
+    }).then(function(rows) {
+      if (Array.isArray(rows)) setTodoItems(rows);
+      setTodoLoading(false);
+    }).catch(function() {
+      setTodoLoading(false);
+    });
+  }
+  function addTodoItem(e) {
+    e.preventDefault();
+    if (!todoInput.trim()) return;
+    setTodoSaving(true);
+    fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Marketing Todo"), {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({ item: todoInput.trim(), date_submitted: (/* @__PURE__ */ new Date()).toISOString(), done: false, date_done: null })
+    }).then(function(r) {
+      return r.json();
+    }).then(function(rows) {
+      if (Array.isArray(rows) && rows[0]) setTodoItems(function(p) {
+        return [rows[0]].concat(p);
+      });
+      setTodoInput("");
+      setTodoSaving(false);
+    }).catch(function() {
+      setTodoSaving(false);
+    });
+  }
+  function toggleTodoItem(id, currentDone) {
+    var nowDone = !currentDone;
+    var patch = { done: nowDone, date_done: nowDone ? (/* @__PURE__ */ new Date()).toISOString() : null };
+    setTodoItems(function(p) {
+      return p.map(function(t) {
+        return t.id === id ? Object.assign({}, t, patch) : t;
+      });
+    });
+    fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Marketing Todo") + "?id=eq." + id, {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(patch)
+    });
+  }
+  function deleteTodoItem(id) {
+    setTodoItems(function(p) {
+      return p.filter(function(t) {
+        return t.id !== id;
+      });
+    });
+    fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Marketing Todo") + "?id=eq." + id, {
+      method: "DELETE",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
     });
   }
   function handleReceiptSelect(e) {
@@ -3132,7 +3195,10 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#aaa", fontWeight: 600 } }, "Support Needed"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#2a2a2a", marginTop: 4, lineHeight: 1.6, fontWeight: 600 } }, checked.join(" | ")), quarterUpdate.support_details && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#555", marginTop: 6, lineHeight: 1.5 } }, quarterUpdate.support_details));
     })(), quarterUpdate && quarterUpdate.other_notes && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#aaa", fontWeight: 600 } }, "Other Notes"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#2a2a2a", marginTop: 3, lineHeight: 1.6 } }, quarterUpdate.other_notes)), quarterUpdate && quarterUpdate.date_submitted && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#bbb", marginTop: 4 } }, "Submitted ", quarterUpdate.date_submitted)) : /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ccc", fontStyle: "italic" } }, "No reflection submitted yet."));
     return cardFlipped ? backCard : frontCard;
-  })(), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 12, padding: "18px 24px", border: "0.5px solid #e8e0d5" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: gold, fontWeight: 600, marginBottom: 12 } }, "Area Resources"), resources.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ccc", fontStyle: "italic", marginBottom: 12 } }, "No resources added yet.") : resources.map(function(r) {
+  })(), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 12, padding: "18px 24px", border: "0.5px solid #e8e0d5" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: gold, fontWeight: 600 } }, "Area Resources"), area === "Marketing" && /* @__PURE__ */ React.createElement("button", { onClick: function() {
+    setShowTodo(true);
+    loadTodo();
+  }, style: { background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#ddd", padding: "0 2px", lineHeight: 1 } }, "\u2605")), resources.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ccc", fontStyle: "italic", marginBottom: 12 } }, "No resources added yet.") : resources.map(function(r) {
     return /* @__PURE__ */ React.createElement(
       "a",
       {
@@ -3383,7 +3449,21 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       setNoteEdit(v.id);
       setNoteVal(v.Notes || "");
     }, style: { flexShrink: 0, fontSize: 11, color: gold, background: "none", border: "none", cursor: "pointer", fontWeight: 500 } }, "Edit note")));
-  }))));
+  }))), showTodo && /* @__PURE__ */ React.createElement("div", { onClick: function() {
+    setShowTodo(false);
+  }, style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2e3, padding: 20 } }, /* @__PURE__ */ React.createElement("div", { onClick: function(e) {
+    e.stopPropagation();
+  }, style: { background: "#fff", borderRadius: 14, width: "100%", maxWidth: 480, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 12px 48px rgba(0,0,0,0.18)", overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { padding: "18px 22px", borderBottom: "0.5px solid #f0ece6", display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#2a2a2a", fontFamily: "'Cardo', serif" } }, "\u2605 Marketing To-Do"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+    setShowTodo(false);
+  }, style: { background: "#f0ece6", border: "none", borderRadius: 8, padding: "5px 12px", fontSize: 12, color: "#666", cursor: "pointer" } }, "Close")), /* @__PURE__ */ React.createElement("form", { onSubmit: addTodoItem, style: { padding: "14px 22px", borderBottom: "0.5px solid #f5f1eb", display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("input", { value: todoInput, onChange: function(e) {
+    setTodoInput(e.target.value);
+  }, placeholder: "Add a to-do item\u2026", style: { flex: 1, padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 7, fontSize: 13, fontFamily: "system-ui, sans-serif" } }), /* @__PURE__ */ React.createElement("button", { type: "submit", disabled: todoSaving || !todoInput.trim(), style: { background: gold, color: "#fff", border: "none", borderRadius: 7, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: todoSaving || !todoInput.trim() ? 0.6 : 1 } }, "Add")), /* @__PURE__ */ React.createElement("div", { style: { overflowY: "auto", flex: 1 } }, todoLoading ? /* @__PURE__ */ React.createElement("div", { style: { padding: 24, textAlign: "center", color: "#aaa", fontSize: 13 } }, "Loading\u2026") : todoItems.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { padding: 24, textAlign: "center", color: "#ccc", fontSize: 13 } }, "No to-do items yet.") : todoItems.map(function(t) {
+    return /* @__PURE__ */ React.createElement("div", { key: t.id, style: { display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 22px", borderBottom: "0.5px solid #f9f6f2", background: t.done ? "#fafaf9" : "#fff" } }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: !!t.done, onChange: function() {
+      toggleTodoItem(t.id, t.done);
+    }, style: { marginTop: 3, accentColor: gold, cursor: "pointer", flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: t.done ? "#aaa" : "#2a2a2a", textDecoration: t.done ? "line-through" : "none" } }, t.item), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#bbb", marginTop: 3 } }, "Added ", new Date(t.date_submitted).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), t.done && t.date_done && /* @__PURE__ */ React.createElement("span", null, " \xB7 Done ", new Date(t.date_done).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })))), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+      deleteTodoItem(t.id);
+    }, style: { background: "none", border: "none", cursor: "pointer", color: "#ddd", fontSize: 14, padding: "2px 4px", flexShrink: 0 } }, "\xD7"));
+  })))));
 }
 function SponsorsView() {
   var { useState: useState2, useEffect: useEffect2, useRef } = React;
