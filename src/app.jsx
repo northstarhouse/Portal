@@ -2733,10 +2733,33 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
   useEffect(function() {
     if (!area) return;
     setExistingReflection(null);
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(quarter) + '&year=eq.' + year + '&select=id&order=date_submitted.desc&limit=1', {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(quarter) + '&year=eq.' + year + '&select=*&order=date_submitted.desc&limit=1', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
-      if (Array.isArray(rows) && rows[0]) setExistingReflection(rows[0]);
+      if (Array.isArray(rows) && rows[0]) {
+        var r = rows[0];
+        setExistingReflection(r);
+        setForm(function(f) {
+          return Object.assign({}, f, {
+            what_went_well: r.successes || '',
+            goal_1_status: r.goal_1_status || 'On Track',
+            goal_1_summary: r.goal_1_summary || '',
+            goal_2_status: r.goal_2_status || 'On Track',
+            goal_2_summary: r.goal_2_summary || '',
+            goal_3_status: r.goal_3_status || 'On Track',
+            goal_3_summary: r.goal_3_summary || '',
+            challenges: r.challenges || [],
+            challenges_details: r.challenges_details || '',
+            support_needed: r.support_needed || [],
+            support_details: r.support_details || '',
+            other_notes: r.other_notes || '',
+            next_focus: r.next_focus || '',
+            goal_1: r.goal_1 || '',
+            goal_2: r.goal_2 || '',
+            goal_3: r.goal_3 || '',
+          });
+        });
+      }
     });
   }, [area, quarter, year]);
 
