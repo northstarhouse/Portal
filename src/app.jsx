@@ -2728,6 +2728,17 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
   var [form, setForm] = useState(emptyForm);
   var [saving, setSaving] = useState(false);
   var [saved, setSaved] = useState(false);
+  var [existingReflection, setExistingReflection] = useState(null);
+
+  useEffect(function() {
+    if (!area) return;
+    setExistingReflection(null);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(quarter) + '&year=eq.' + year + '&select=id&order=date_submitted.desc&limit=1', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows) && rows[0]) setExistingReflection(rows[0]);
+    });
+  }, [area, quarter, year]);
 
   useEffect(function() {
     if (!area) return;
@@ -2768,11 +2779,18 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary })
     }) : Promise.resolve();
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates'), {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify(payload)
-    }).then(function(r) { return r.json(); }).then(function() {
+    var reflectionFetch = existingReflection
+      ? fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?id=eq.' + existingReflection.id, {
+          method: 'PATCH',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.assign({}, payload, { date_submitted: new Date().toISOString().slice(0,10) }))
+        })
+      : fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates'), {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+          body: JSON.stringify(payload)
+        });
+    reflectionFetch.then(function(r) { return r.json ? r.json() : r; }).then(function() {
       var goalsPayload = { area: area, quarter: nq.q, year: nq.yr, primary_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3 };
       return Promise.all([
         fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals'), {
