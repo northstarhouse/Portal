@@ -4415,6 +4415,9 @@ function IdeasView() {
   var [showBudgetForm, setShowBudgetForm] = useState2(false);
   var [budgetSaving, setBudgetSaving] = useState2(false);
   var receiptRef = useRef(null);
+  var [editingBudgetId, setEditingBudgetId] = useState2(null);
+  var [editBudgetForm, setEditBudgetForm] = useState2({});
+  var [editBudgetSaving, setEditBudgetSaving] = useState2(false);
   var [volunteers, setVolunteers] = useState2([]);
   var inpSt = { width: "100%", padding: "8px 10px", border: "0.5px solid #e0d8cc", borderRadius: 7, fontSize: 13, background: "#fff", boxSizing: "border-box", fontFamily: "system-ui, sans-serif" };
   var lb = { fontSize: 11, color: "#888", fontWeight: 500, display: "block", marginBottom: 4 };
@@ -4599,6 +4602,28 @@ function IdeasView() {
       });
     });
   }
+  function updateBudgetItem(e) {
+    e.preventDefault();
+    setEditBudgetSaving(true);
+    var isInKind = editBudgetForm.expense_type === "In-Kind";
+    var needsReimb = editBudgetForm.expense_type === "Reimbursement";
+    var patch = { description: editBudgetForm.description, amount: parseFloat(editBudgetForm.amount), date: editBudgetForm.date, type: isInKind ? "In-Kind" : "Purchase", needs_reimbursement: needsReimb };
+    fetch(SUPABASE_URL + "/rest/v1/" + encodeURIComponent("Op Budget") + "?id=eq." + editingBudgetId, {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(patch)
+    }).then(function() {
+      setBudgetItems(function(p) {
+        return p.map(function(b) {
+          return b.id === editingBudgetId ? Object.assign({}, b, patch) : b;
+        });
+      });
+      setEditingBudgetId(null);
+      setEditBudgetSaving(false);
+    }).catch(function() {
+      setEditBudgetSaving(false);
+    });
+  }
   function fmtMoney(n) {
     return "$" + parseFloat(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
@@ -4711,7 +4736,32 @@ function IdeasView() {
         return Object.assign({}, f, { expense_type: e.target.value });
       });
     }, style: inpSt }, /* @__PURE__ */ React.createElement("option", { value: "Purchase" }, "Purchase"), /* @__PURE__ */ React.createElement("option", { value: "Reimbursement" }, "Reimbursement"), /* @__PURE__ */ React.createElement("option", { value: "In-Kind" }, "In-Kind")))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 } }, /* @__PURE__ */ React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: gold, fontWeight: 500 } }, /* @__PURE__ */ React.createElement("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" })), "Attach receipt", /* @__PURE__ */ React.createElement("input", { ref: receiptRef, type: "file", accept: "image/*,.pdf", style: { display: "none" } })), /* @__PURE__ */ React.createElement("button", { type: "submit", disabled: budgetSaving, style: { background: gold, color: "#fff", border: "none", borderRadius: 8, padding: "7px 18px", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: budgetSaving ? 0.7 : 1 } }, budgetSaving ? "Saving\u2026" : "Save"))), budgetLoading ? /* @__PURE__ */ React.createElement("div", { style: { padding: "20px", fontSize: 12, color: "#ccc", textAlign: "center" } }, "Loading\u2026") : budgetItems.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { padding: "20px", fontSize: 12, color: "#ccc", textAlign: "center" } }, "No expenses logged yet.") : budgetItems.map(function(b) {
+      var isEditingThis = editingBudgetId === b.id;
+      if (isEditingThis) {
+        return /* @__PURE__ */ React.createElement("form", { key: b.id, onSubmit: updateBudgetItem, style: { padding: "12px 18px", borderBottom: "0.5px solid #f9f6f2", background: "#fdfcfb", display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ React.createElement("input", { value: editBudgetForm.description, onChange: function(e) {
+          setEditBudgetForm(function(f) {
+            return Object.assign({}, f, { description: e.target.value });
+          });
+        }, placeholder: "Description", required: true, style: inpSt }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.01", value: editBudgetForm.amount, onChange: function(e) {
+          setEditBudgetForm(function(f) {
+            return Object.assign({}, f, { amount: e.target.value });
+          });
+        }, placeholder: "Amount", required: true, style: Object.assign({}, inpSt, { flex: 1 }) }), /* @__PURE__ */ React.createElement("input", { type: "date", value: editBudgetForm.date, onChange: function(e) {
+          setEditBudgetForm(function(f) {
+            return Object.assign({}, f, { date: e.target.value });
+          });
+        }, required: true, style: Object.assign({}, inpSt, { flex: 1 }) })), /* @__PURE__ */ React.createElement("select", { value: editBudgetForm.expense_type, onChange: function(e) {
+          setEditBudgetForm(function(f) {
+            return Object.assign({}, f, { expense_type: e.target.value });
+          });
+        }, style: inpSt }, /* @__PURE__ */ React.createElement("option", { value: "Purchase" }, "Purchase"), /* @__PURE__ */ React.createElement("option", { value: "Reimbursement" }, "Reimbursement"), /* @__PURE__ */ React.createElement("option", { value: "In-Kind" }, "In-Kind")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { type: "submit", disabled: editBudgetSaving, style: { background: gold, color: "#fff", border: "none", borderRadius: 7, padding: "6px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer" } }, editBudgetSaving ? "Saving\u2026" : "Save"), /* @__PURE__ */ React.createElement("button", { type: "button", onClick: function() {
+          setEditingBudgetId(null);
+        }, style: { background: "#f0ece6", color: "#666", border: "none", borderRadius: 7, padding: "6px 14px", fontSize: 12, cursor: "pointer" } }, "Cancel")));
+      }
       return /* @__PURE__ */ React.createElement("div", { key: b.id, style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 18px", borderBottom: "0.5px solid #f9f6f2" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#2a2a2a" } }, b.description), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#aaa", marginTop: 2 } }, b.date)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: b.type === "In-Kind" ? "#2e7d32" : b.needs_reimbursement ? "#b45309" : "#2a2a2a", flexShrink: 0 } }, fmtMoney(b.amount)), b.type === "In-Kind" && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, background: "#e8f5e9", color: "#2e7d32", padding: "2px 6px", borderRadius: 10, fontWeight: 600, flexShrink: 0 } }, "In-Kind"), b.needs_reimbursement && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, background: "#fef3c7", color: "#b45309", padding: "2px 6px", borderRadius: 10, fontWeight: 600, flexShrink: 0 } }, "$ Reimb."), b.receipt_url && /* @__PURE__ */ React.createElement("a", { href: b.receipt_url, target: "_blank", rel: "noopener noreferrer", title: "View attachment", style: { color: gold, textDecoration: "none", flexShrink: 0, display: "flex", alignItems: "center" } }, /* @__PURE__ */ React.createElement("svg", { width: "13", height: "13", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" }))), /* @__PURE__ */ React.createElement("button", { onClick: function() {
+        setEditingBudgetId(b.id);
+        setEditBudgetForm({ description: b.description, amount: b.amount, date: b.date, expense_type: b.needs_reimbursement ? "Reimbursement" : b.type === "In-Kind" ? "In-Kind" : "Purchase" });
+      }, style: { background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: 11, padding: "2px 4px", flexShrink: 0 } }, "Edit"), /* @__PURE__ */ React.createElement("button", { onClick: function() {
         deleteBudgetItem(b.id);
       }, style: { background: "none", border: "none", cursor: "pointer", color: "#ddd", fontSize: 14, padding: "2px 4px", flexShrink: 0 } }, "\xD7"));
     })));

@@ -5047,6 +5047,9 @@ function IdeasView() {
   var [showBudgetForm, setShowBudgetForm] = useState(false);
   var [budgetSaving, setBudgetSaving] = useState(false);
   var receiptRef = useRef(null);
+  var [editingBudgetId, setEditingBudgetId] = useState(null);
+  var [editBudgetForm, setEditBudgetForm] = useState({});
+  var [editBudgetSaving, setEditBudgetSaving] = useState(false);
   var [volunteers, setVolunteers] = useState([]);
 
   var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
@@ -5168,6 +5171,21 @@ function IdeasView() {
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
       method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function() { setBudgetItems(function(p) { return p.filter(function(b) { return b.id !== id; }); }); });
+  }
+
+  function updateBudgetItem(e) {
+    e.preventDefault();
+    setEditBudgetSaving(true);
+    var isInKind = editBudgetForm.expense_type === 'In-Kind';
+    var needsReimb = editBudgetForm.expense_type === 'Reimbursement';
+    var patch = { description: editBudgetForm.description, amount: parseFloat(editBudgetForm.amount), date: editBudgetForm.date, type: isInKind ? 'In-Kind' : 'Purchase', needs_reimbursement: needsReimb };
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + editingBudgetId, {
+      method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
+    }).then(function() {
+      setBudgetItems(function(p) { return p.map(function(b) { return b.id === editingBudgetId ? Object.assign({}, b, patch) : b; }); });
+      setEditingBudgetId(null);
+      setEditBudgetSaving(false);
+    }).catch(function() { setEditBudgetSaving(false); });
   }
 
   function fmtMoney(n) { return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -5349,6 +5367,27 @@ function IdeasView() {
                     ) : budgetItems.length === 0 ? (
                       <div style={{ padding: '20px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No expenses logged yet.</div>
                     ) : budgetItems.map(function(b) {
+                      var isEditingThis = editingBudgetId === b.id;
+                      if (isEditingThis) {
+                        return (
+                          <form key={b.id} onSubmit={updateBudgetItem} style={{ padding: '12px 18px', borderBottom: '0.5px solid #f9f6f2', background: '#fdfcfb', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <input value={editBudgetForm.description} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} placeholder="Description" required style={inpSt} />
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <input type="number" step="0.01" value={editBudgetForm.amount} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} placeholder="Amount" required style={Object.assign({}, inpSt, { flex: 1 })} />
+                              <input type="date" value={editBudgetForm.date} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} required style={Object.assign({}, inpSt, { flex: 1 })} />
+                            </div>
+                            <select value={editBudgetForm.expense_type} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { expense_type: e.target.value }); }); }} style={inpSt}>
+                              <option value="Purchase">Purchase</option>
+                              <option value="Reimbursement">Reimbursement</option>
+                              <option value="In-Kind">In-Kind</option>
+                            </select>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button type="submit" disabled={editBudgetSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '6px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{editBudgetSaving ? 'Saving…' : 'Save'}</button>
+                              <button type="button" onClick={function() { setEditingBudgetId(null); }} style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+                            </div>
+                          </form>
+                        );
+                      }
                       return (
                         <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
                           <div style={{ flex: 1 }}>
@@ -5359,6 +5398,7 @@ function IdeasView() {
                           {b.type === 'In-Kind' && <span style={{ fontSize: 10, background: '#e8f5e9', color: '#2e7d32', padding: '2px 6px', borderRadius: 10, fontWeight: 600, flexShrink: 0 }}>In-Kind</span>}
                           {b.needs_reimbursement && <span style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 10, fontWeight: 600, flexShrink: 0 }}>$ Reimb.</span>}
                           {b.receipt_url && <a href={b.receipt_url} target="_blank" rel="noopener noreferrer" title="View attachment" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></a>}
+                          <button onClick={function() { setEditingBudgetId(b.id); setEditBudgetForm({ description: b.description, amount: b.amount, date: b.date, expense_type: b.needs_reimbursement ? 'Reimbursement' : b.type === 'In-Kind' ? 'In-Kind' : 'Purchase' }); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: 11, padding: '2px 4px', flexShrink: 0 }}>Edit</button>
                           <button onClick={function() { deleteBudgetItem(b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                         </div>
                       );
