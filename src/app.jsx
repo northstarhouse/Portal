@@ -2815,14 +2815,21 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
         });
     reflectionFetch.then(function(r) { return r.status === 204 ? null : r.json(); }).then(function() {
       var goalsPayload = { area: area, quarter: nq.q, year: nq.yr, primary_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3 };
-      return Promise.all([
-        fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals'), {
-          method: 'POST',
-          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
-          body: JSON.stringify(goalsPayload)
-        }),
-        currentGoalsUpdate
-      ]);
+      var headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+      var nextGoalsSave = fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(nq.q) + '&year=eq.' + nq.yr, { headers: headers })
+        .then(function(r) { return r.json(); })
+        .then(function(rows) {
+          if (Array.isArray(rows) && rows[0]) {
+            return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?id=eq.' + rows[0].id, {
+              method: 'PATCH', headers: Object.assign({}, headers, { 'Content-Type': 'application/json' }), body: JSON.stringify(goalsPayload)
+            });
+          } else {
+            return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals'), {
+              method: 'POST', headers: Object.assign({}, headers, { 'Content-Type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify(goalsPayload)
+            });
+          }
+        });
+      return Promise.all([nextGoalsSave, currentGoalsUpdate]);
     }).then(function() {
       clearCache('Op Quarter Goals');
       clearCache('Op Quarterly Updates');
