@@ -2360,8 +2360,9 @@ function BoardView() {
             )}
 
             {selected.attachment_url && (
-              <div style={{ marginBottom: 16 }}>
-                <a href={selected.attachment_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: gold, textDecoration: 'none' }}>📎 View Attachment</a>
+              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 18, color: gold, fontWeight: 700, lineHeight: 1 }}>→</span>
+                <a href={selected.attachment_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: gold, textDecoration: 'none', border: '2px solid ' + gold, borderRadius: '999px', padding: '6px 16px', background: '#fffdf7' }}>📎 View Attachment</a>
               </div>
             )}
 
