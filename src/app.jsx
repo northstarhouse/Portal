@@ -3514,7 +3514,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>Area Resources</div>
             {area === 'Marketing' && (
-              <button onClick={function() { setShowTodo(true); loadTodo(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#ddd', padding: '0 2px', lineHeight: 1 }}>★</button>
+              <button onClick={function() { setShowTodo(true); loadTodo(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: gold, padding: '0 2px', lineHeight: 1, opacity: 0.7 }}>★</button>
             )}
           </div>
           {resources.length === 0

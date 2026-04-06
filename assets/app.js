@@ -3198,7 +3198,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   })(), /* @__PURE__ */ React.createElement("div", { style: { background: "#fff", borderRadius: 12, padding: "18px 24px", border: "0.5px solid #e8e0d5" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, textTransform: "uppercase", letterSpacing: 1.2, color: gold, fontWeight: 600 } }, "Area Resources"), area === "Marketing" && /* @__PURE__ */ React.createElement("button", { onClick: function() {
     setShowTodo(true);
     loadTodo();
-  }, style: { background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#ddd", padding: "0 2px", lineHeight: 1 } }, "\u2605")), resources.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ccc", fontStyle: "italic", marginBottom: 12 } }, "No resources added yet.") : resources.map(function(r) {
+  }, style: { background: "none", border: "none", cursor: "pointer", fontSize: 16, color: gold, padding: "0 2px", lineHeight: 1, opacity: 0.7 } }, "\u2605")), resources.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ccc", fontStyle: "italic", marginBottom: 12 } }, "No resources added yet.") : resources.map(function(r) {
     return /* @__PURE__ */ React.createElement(
       "a",
       {
