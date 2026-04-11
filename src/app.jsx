@@ -903,11 +903,13 @@ function VolunteersView() {
       fetch(SUPABASE_URL + '/rest/v1/volunteer_hours?select=*', {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
       }).then(function(r) { return r.json(); }).then(function(rows) {
-        if (!Array.isArray(rows)) return;
+        console.log('[hours] fetch result:', rows);
+        if (!Array.isArray(rows)) { console.warn('[hours] unexpected response:', rows); return; }
         var parsed = hoursRowsToMap(rows);
+        console.log('[hours] parsed map:', parsed);
         setHoursData(parsed);
         lsSet('hours_summary', parsed);
-      }).catch(function() {});
+      }).catch(function(e) { console.error('[hours] fetch error:', e); });
     }
 
     Promise.all([
@@ -1310,7 +1312,12 @@ function VolunteersView() {
               )}
               {(function() {
                 var data = getVolHours(selected);
-                if (!data || data.total === 0) return null;
+                if (!data || data.total === 0) return (
+                  <div style={{ marginBottom: 4 }}>
+                    <span style={volSecLabel}>Volunteer Hours</span>
+                    <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No hours recorded</div>
+                  </div>
+                );
                 var activeMonths = HOUR_MONTHS.filter(function(m) { return data.months[m] > 0; }).reverse();
                 var yr = new Date().getFullYear();
                 return (
