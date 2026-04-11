@@ -791,6 +791,24 @@ function doGet(e) {
         .createTextOutput(JSON.stringify({ success: true, purchases: purchases }))
         .setMimeType(ContentService.MimeType.JSON);
     }
+    if (action === 'getHours') {
+      var ss = SpreadsheetApp.openById(HOURS_SHEET_ID);
+      var sheet = ss.getSheetByName(HOURS_SHEET_NAME);
+      var data = sheet.getDataRange().getValues();
+      var months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+      var rows = [];
+      for (var i = 1; i < data.length; i++) {
+        var row = data[i];
+        var name = String(row[0] || '').trim();
+        if (!name) continue;
+        var entry = { name: name, total_hours: parseFloat(row[1]) || 0 };
+        months.forEach(function(m, idx) { entry[m] = parseFloat(row[2 + idx]) || 0; });
+        rows.push(entry);
+      }
+      return ContentService
+        .createTextOutput(JSON.stringify({ success: true, hours: rows }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     if (action === 'getVolunteers') {
       const sheet = getSheetById(VOLUNTEERS_SHEET_ID, VOLUNTEERS_SHEET_NAME);
       const lastRow = sheet.getLastRow();

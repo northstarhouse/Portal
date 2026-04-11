@@ -900,16 +900,13 @@ function VolunteersView() {
     var cachedHours = lsGet('hours_summary');
     if (cachedHours) { setHoursData(cachedHours); }
     else {
-      fetch(SUPABASE_URL + '/rest/v1/volunteer_hours?select=*', {
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-      }).then(function(r) { return r.json(); }).then(function(rows) {
-        console.log('[hours] fetch result:', rows);
-        if (!Array.isArray(rows)) { console.warn('[hours] unexpected response:', rows); return; }
-        var parsed = hoursRowsToMap(rows);
-        console.log('[hours] parsed map:', parsed);
-        setHoursData(parsed);
-        lsSet('hours_summary', parsed);
-      }).catch(function(e) { console.error('[hours] fetch error:', e); });
+      fetch('https://script.google.com/macros/s/AKfycbwbVk0SB6geUv4xcbxkps06qXwkggMfrD59GMlC_0gRRjQ8p4rr4FNCqgEeY04RrAU_/exec?action=getHours')
+        .then(function(r) { return r.json(); }).then(function(res) {
+          if (!res.success || !Array.isArray(res.hours)) return;
+          var parsed = hoursRowsToMap(res.hours);
+          setHoursData(parsed);
+          lsSet('hours_summary', parsed);
+        }).catch(function() {});
     }
 
     Promise.all([
