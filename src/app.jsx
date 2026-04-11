@@ -79,7 +79,7 @@ const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthsta
 
 // Kick off critical fetches immediately so data is ready when views mount
 (function prefetch() {
-  cachedSbFetch('2026 Volunteers', ['First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day']);
+  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day']);
   cachedSbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes']);
   cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes']);
   cachedFetchAll('Board Voting Items');
@@ -890,7 +890,7 @@ function VolunteersView() {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(function() {
-    cachedSbFetch('2026 Volunteers', ['First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day'])
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day'])
       .then(function(data) {
         if (Array.isArray(data)) setVolunteers(data);
         else setError(JSON.stringify(data));
