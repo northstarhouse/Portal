@@ -4384,16 +4384,21 @@ function ReviewsView() {
   function doPrint(quarter) {
     setPrinting(true);
     var headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    var nq = nextQ(quarter, year);
     Promise.all([
       fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?quarter=eq.' + encodeURIComponent(quarter) + '&year=eq.' + year + '&select=*', { headers: headers }).then(function(r) { return r.json(); }),
-      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?quarter=eq.' + encodeURIComponent(quarter) + '&year=eq.' + year + '&select=*&order=date_submitted.desc', { headers: headers }).then(function(r) { return r.json(); })
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?quarter=eq.' + encodeURIComponent(quarter) + '&year=eq.' + year + '&select=*&order=date_submitted.desc', { headers: headers }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?quarter=eq.' + encodeURIComponent(nq.q) + '&year=eq.' + nq.yr + '&select=*', { headers: headers }).then(function(r) { return r.json(); })
     ]).then(function(results) {
       var goals = Array.isArray(results[0]) ? results[0] : [];
       var updates = Array.isArray(results[1]) ? results[1] : [];
+      var nextGoals = Array.isArray(results[2]) ? results[2] : [];
       var goalsMap = {};
       goals.forEach(function(g) { goalsMap[g.area] = g; });
       var updatesMap = {};
       updates.forEach(function(u) { if (!updatesMap[u.area]) updatesMap[u.area] = u; });
+      var nextGoalsMap = {};
+      nextGoals.forEach(function(g) { nextGoalsMap[g.area] = g; });
 
       var line = '<hr style="border:none;border-top:1px solid #ccc;margin:14px 0">';
       var label = function(t) { return '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:600;margin-bottom:6px;margin-top:16px">' + t + '</div>'; };
@@ -4419,9 +4424,11 @@ function ReviewsView() {
         }).join('') + '</div>';
       };
 
+      var nqLabel = nq.q + ' ' + nq.yr;
       var pages = OPERATIONAL_AREAS.map(function(area, idx) {
         var g = goalsMap[area] || {};
         var u = updatesMap[area];
+        var ng = nextGoalsMap[area] || {};
         var pageBreak = idx > 0 ? 'page-break-before:always;' : '';
         var html = '<div style="' + pageBreak + 'padding:32px 40px;font-family:Georgia,serif;max-width:700px;margin:0 auto">';
         html += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">';
@@ -4465,6 +4472,23 @@ function ReviewsView() {
           html += label('Support Needed') + checkboxList(['Staff or volunteer help','Marketing or communications','Board guidance or decision','Funding or fundraising support','Facilities or logistics','Other'], []);
           html += label('Other Notes') + field(null, 2);
           html += label('Next Quarter Focus') + field(null, 2);
+        }
+
+        html += line;
+
+        // Next Quarter Goals
+        html += '<div style="font-size:14px;font-weight:700;color:#2a2a2a;margin-bottom:2px">Next Quarter Goals (' + nqLabel + ')</div>';
+        if (ng.primary_focus || ng.goal_1 || ng.goal_2 || ng.goal_3) {
+          if (ng.primary_focus) html += label('Primary Focus') + field(ng.primary_focus, 1);
+          ['1','2','3'].forEach(function(n) {
+            var gval = ng['goal_' + n];
+            if (gval) { html += label('Goal ' + n) + field(gval, 1); }
+            else { html += label('Goal ' + n) + field(null, 1); }
+          });
+        } else {
+          html += '<div style="font-size:12px;color:#aaa;font-style:italic;margin-bottom:8px">No goals submitted yet for ' + nqLabel + '.</div>';
+          html += label('Primary Focus') + field(null, 1);
+          ['1','2','3'].forEach(function(n) { html += label('Goal ' + n) + field(null, 1); });
         }
 
         html += line;
