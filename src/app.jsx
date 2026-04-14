@@ -2168,7 +2168,12 @@ function BoardView() {
         setLoading(false);
         return;
       }
-      var sorted = itemsData.sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+      var sorted = itemsData.sort(function(a, b) {
+        var da = a.created_at ? new Date(a.created_at).getTime() : 0;
+        var db = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (db !== da) return db - da;
+        return (b.id || 0) - (a.id || 0);
+      });
       setItems(sorted);
       setVotes([]);
       fetchVotesForItems(itemsData).then(function(votesData) {
@@ -2286,7 +2291,12 @@ function BoardView() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {(function() {
-          var byNewest = function(a, b) { return new Date(b.created_at) - new Date(a.created_at); };
+          var byNewest = function(a, b) {
+            var da = a.created_at ? new Date(a.created_at).getTime() : 0;
+            var db = b.created_at ? new Date(b.created_at).getTime() : 0;
+            if (db !== da) return db - da;
+            return (b.id || 0) - (a.id || 0);
+          };
           var openItems = items.filter(function(i) { return !isRevealed(i); }).sort(byNewest);
           var closedItems = items.filter(function(i) { return isRevealed(i); }).sort(byNewest);
           var allItems = openItems.concat(closedItems);
@@ -5194,7 +5204,7 @@ function IdeasView() {
   var [loading, setLoading] = useState(true);
   var [selected, setSelected] = useState(null);
   var [mainTab, setMainTab] = useState('initiatives');
-  var [filterStatus, setFilterStatus] = useState('All');
+  var [filterStatus, setFilterStatus] = useState('Active');
   var [showAdd, setShowAdd] = useState(false);
   var [editing, setEditing] = useState(false);
   var emptyForm = { title: '', status: 'Exploring', submitted_by: '', notes: '', blockers: '', gaps: '', budget: '', updates: '' };
@@ -5269,7 +5279,7 @@ function IdeasView() {
         setForm(emptyForm); setShowAdd(false);
         var newStatus = payload.status;
         setMainTab(['Active','On Hold','Completed','Declined'].includes(newStatus) ? 'initiatives' : 'ideas');
-        setFilterStatus('All');
+        setFilterStatus(newStatus || 'Active');
         loadIdeas(function(allRows) {
           var match = allRows.find(function(x) { return rows && rows[0] ? x.id === rows[0].id : x.title === payload.title; });
           if (match) setSelected(match);
@@ -5382,7 +5392,7 @@ function IdeasView() {
       </div>
       {mainTab === 'initiatives' && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-          {['All', 'Active', 'On Hold', 'Completed'].map(function(s) {
+          {['Active', 'On Hold', 'Completed', 'All'].map(function(s) {
             var sc = STATUS_COLORS[s] || { bg: '#f5f0ea', color: '#888' };
             var isOn = filterStatus === s;
             return (
