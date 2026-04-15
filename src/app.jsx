@@ -3997,6 +3997,10 @@ function SponsorsView() {
   var [editing, setEditing] = useState(false);
   var [editSponsorForm, setEditSponsorForm] = useState({});
   var [editSponsorSaving, setEditSponsorSaving] = useState(false);
+  var emptyAddForm = { 'Business Name': '', 'Main Contact': '', 'Donation': '', 'Fair Market Value': '', 'Area Supported': '', 'NSH Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Date Recieved': '', 'Notes': '' };
+  var [showAdd, setShowAdd] = useState(false);
+  var [addForm, setAddForm] = useState(emptyAddForm);
+  var [addSaving, setAddSaving] = useState(false);
 
   useEffect(function() {
     cachedFetchAll('Sponsors').then(function(rows) {
@@ -4152,6 +4156,29 @@ function SponsorsView() {
     }).catch(function() { setEditSponsorSaving(false); });
   }
 
+  function submitAddSponsor(e) {
+    e.preventDefault();
+    if (!addForm['Business Name']) return;
+    setAddSaving(true);
+    var row = {};
+    Object.keys(addForm).forEach(function(k) { if (addForm[k]) row[k] = addForm[k]; });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(row)
+    }).then(function(r) { return r.ok ? r.json() : r.json().then(function(err) { throw new Error(err.message || r.status); }); })
+      .then(function(rows) {
+        setAddSaving(false);
+        if (!Array.isArray(rows) || !rows[0]) { alert('Save failed: ' + JSON.stringify(rows)); return; }
+        var newSponsor = rows[0];
+        clearCache('Sponsors');
+        setSponsors(function(prev) { return (prev || []).concat([newSponsor]); });
+        setShowAdd(false);
+        setAddForm(emptyAddForm);
+        setSelected(newSponsor);
+      }).catch(function(err) { alert('Error adding sponsor: ' + err.message); setAddSaving(false); });
+  }
+
   function InfoRow({ label, value, link }) {
     if (!value) return null;
     return (
@@ -4172,6 +4199,11 @@ function SponsorsView() {
         <StatCard label="Total Sponsors" value={sponsors === null ? '...' : sponsors.length} />
         <StatCard label="Total In-Kind" value={allInKind.length === 0 && sponsors !== null ? '$0' : ('$' + allInKind.reduce(function(s,e){return s+(parseFloat(e.value)||0);},0).toLocaleString())} />
         <StatCard label="Tiered Sponsors" value={sponsors === null ? '...' : sponsors.filter(function(s){return getTier(sponsorInKindTotal(s.id));}).length} />
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ fontSize: 13, color: '#aaa' }}>{sponsors !== null ? sponsors.length + ' sponsor' + (sponsors.length !== 1 ? 's' : '') : ''}</div>
+        <button onClick={function() { setAddForm(emptyAddForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add New Sponsor</button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: (selected && !isMobile) ? '240px 1fr' : '1fr', gap: 16 }}>
@@ -4378,6 +4410,37 @@ function SponsorsView() {
           </div>
         )}
       </div>
+
+      {showAdd && (
+        <div onClick={function() { setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>New Sponsor</div>
+              <button onClick={function() { setShowAdd(false); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb' }}>×</button>
+            </div>
+            <form onSubmit={submitAddSponsor}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                {[['Business Name','Business Name *',true],['Main Contact','Main Contact',false],['Donation','Donation',false],['Fair Market Value','Fair Market Value',false],['Area Supported','Area Supported',false],['NSH Contact','NSH Contact',false],['Phone Number','Phone',false],['Email Address','Email',false],['Mailing Address','Address',false],['Date Recieved','Date Received',false]].map(function(pair) {
+                  return (
+                    <div key={pair[0]}>
+                      <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>{pair[1]}</label>
+                      <input required={pair[2]} value={addForm[pair[0]] || ''} onChange={function(e) { var k = pair[0]; var v = e.target.value; setAddForm(function(f) { return Object.assign({}, f, { [k]: v }); }); }} style={inpStyle} placeholder={pair[1].replace(' *','')} />
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Notes</label>
+                <textarea value={addForm['Notes'] || ''} onChange={function(e) { var v = e.target.value; setAddForm(function(f) { return Object.assign({}, f, { Notes: v }); }); }} rows={3} style={Object.assign({}, inpStyle, { resize: 'vertical' })} placeholder="Any additional notes…" />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" disabled={addSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: addSaving ? 0.7 : 1 }}>{addSaving ? 'Saving…' : 'Add Sponsor'}</button>
+                <button type="button" onClick={function() { setShowAdd(false); }} style={{ padding: '9px 18px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
