@@ -157,6 +157,7 @@ const modules = [
   { id: "operational", label: "Operational Areas", hidden: true },
   { id: "financials", label: "Financials", hidden: true },
   { id: "reviews", label: "Reviews", hidden: true },
+  { id: "admin", label: "Admin", hidden: true },
 ];
 
 const mockData = {
@@ -5706,6 +5707,62 @@ function DonorsGate({ onUnlock }) {
   );
 }
 
+var ADMIN_TOOLS = [
+  {
+    label: "Voicemails",
+    url: "https://docs.google.com/spreadsheets/d/1kqVXngOaf_X1lrB6Nbi5U_3NJ4_P_fGMqxhyqdfuDT0/edit?gid=0#gid=0",
+    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.36 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.11 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 5.61 5.61l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
+  },
+  {
+    label: "Accounting Info",
+    url: "https://docs.google.com/spreadsheets/d/1VcV4DksZpcZX6SxTteYJDvbaOB2qSBDDzDALiynWdgM/edit?gid=433669438#gid=433669438",
+    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg>,
+  },
+  {
+    label: "Archives",
+    url: "https://northstarhouse.github.io/north-star-archives/",
+    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+  },
+  {
+    label: "Kiosk",
+    url: "https://northstarhouse.github.io/northstar-kiosk/",
+    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
+  },
+  {
+    label: "Event Planning",
+    url: "https://northstarhouse.github.io/nsh-events-committee/",
+    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  },
+];
+
+function AdminView() {
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Tools</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {ADMIN_TOOLS.map(function(tool) {
+          return (
+            <a key={tool.label} href={tool.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10,
+                padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s',
+                color: '#3a3226', fontSize: 13, fontWeight: 500,
+              }}
+                onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+                onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+              >
+                <span style={{ color: '#b5a185', flexShrink: 0 }}>{tool.icon}</span>
+                {tool.label}
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
   events: EventsView,
@@ -5720,6 +5777,7 @@ const views = {
   operational: OperationalView,
   financials: FinancialsView,
   reviews: ReviewsView,
+  admin: AdminView,
 };
 
 var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];
@@ -5837,6 +5895,17 @@ var AREA_DEFAULTS = {
               }}>
               Reviews
             </button>
+            <button onClick={function() { setActive("admin"); }}
+              style={{
+                display: "block", width: "100%", padding: "9px 16px",
+                background: active === "admin" ? "rgba(181,161,133,0.15)" : "transparent",
+                border: "none", cursor: "pointer", textAlign: "left",
+                color: active === "admin" ? "#b5a185" : "rgba(255,255,255,0.45)",
+                fontSize: 13, fontWeight: active === "admin" ? 600 : 400,
+                transition: "all 0.15s"
+              }}>
+              Admin
+            </button>
           </div>
         </div>
       </div>
@@ -5881,6 +5950,7 @@ var AREA_DEFAULTS = {
                 <div style={{ borderTop: '0.5px solid rgba(255,255,255,0.08)', margin: '8px 4px' }} />
                 <button onClick={function() { setActive('financials'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'financials' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financials' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financials' ? 600 : 400, marginBottom: 2 }}>Financials</button>
                 <button onClick={function() { setActive('reviews'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'reviews' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'reviews' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'reviews' ? 600 : 400, marginBottom: 2 }}>Reviews</button>
+                <button onClick={function() { setActive('admin'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'admin' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'admin' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'admin' ? 600 : 400, marginBottom: 2 }}>Admin</button>
               </div>
             </div>
           </div>
@@ -5895,7 +5965,7 @@ var AREA_DEFAULTS = {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Financials" : active === "reviews" ? "Reviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Financials" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); setActive("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
