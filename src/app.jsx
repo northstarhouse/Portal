@@ -5707,6 +5707,18 @@ function DonorsGate({ onUnlock }) {
   );
 }
 
+var ADMIN_FORMS = [
+  { label: "In-Kind Documentation Form", url: "https://drive.google.com/file/d/1cNGysqW__wS2IEKDaNzG1MPo-5JCE-ay/view" },
+  { label: "Reimbursement Form", url: "https://drive.google.com/file/d/1Vkfh6Z5eM1RPUtw6j8mQjqKM71-YFPrW/view" },
+  { label: "Board Submission Form", url: "https://drive.google.com/file/d/1_-AcaquXeK-O1x9AOubbQNCwoLWzu3f_/view" },
+  { label: "Incident & Injury Form", url: "https://drive.google.com/file/d/1UNzWO6b_-YbKd_rYUxC5GkA2dRQVfcg-/view" },
+  { label: "Brick Form", url: "https://drive.google.com/file/d/128gaSH9S_JtsjmxPd5Fq_ugumetBTiwt/view" },
+  { label: "Thank You Notes", url: "https://drive.google.com/drive/folders/1Mi8nNZzNWx1fz7CQ11XiW8SHPqQnBAgR?usp=sharing" },
+  { label: "2026 Pricing Guide", url: "https://drive.google.com/drive/folders/1Mi8nNZzNWx1fz7CQ11XiW8SHPqQnBAgR" },
+  { label: "Creative Rental Form", url: "https://drive.google.com/file/d/1Lp3WDaYukjmZ4lB_iS4sJj9PC6fjzz6I/view" },
+  { label: "Creative Rental Contract", url: "https://docs.google.com/document/d/1hKb9QK7MmrNpbmQcONyqNFbffEYGqJm5/edit?rtpof=true&sd=true#heading=h.3ff89qn2162x" },
+];
+
 var ADMIN_TOOLS = [
   {
     label: "Voicemails",
@@ -5735,28 +5747,43 @@ var ADMIN_TOOLS = [
   },
 ];
 
+var docIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>;
+
+function AdminToolCard(props) {
+  var tool = props.tool;
+  var card = (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      background: tool.url ? '#fff' : '#faf8f5',
+      border: '0.5px solid #e0d8cc', borderRadius: 10,
+      padding: '13px 16px', cursor: tool.url ? 'pointer' : 'default',
+      transition: 'border-color 0.15s, box-shadow 0.15s',
+      color: tool.url ? '#3a3226' : '#aaa', fontSize: 13, fontWeight: 500,
+    }}
+      onMouseEnter={tool.url ? function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; } : undefined}
+      onMouseLeave={tool.url ? function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; } : undefined}
+    >
+      <span style={{ color: tool.url ? '#b5a185' : '#ccc', flexShrink: 0 }}>{props.icon}</span>
+      {tool.label}
+    </div>
+  );
+  if (!tool.url) return card;
+  return <a href={tool.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>{card}</a>;
+}
+
 function AdminView() {
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Tools</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 28 }}>
         {ADMIN_TOOLS.map(function(tool) {
-          return (
-            <a key={tool.label} href={tool.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10,
-                padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s',
-                color: '#3a3226', fontSize: 13, fontWeight: 500,
-              }}
-                onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
-                onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
-              >
-                <span style={{ color: '#b5a185', flexShrink: 0 }}>{tool.icon}</span>
-                {tool.label}
-              </div>
-            </a>
-          );
+          return <AdminToolCard key={tool.label} tool={tool} icon={tool.icon} />;
+        })}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Resources</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {ADMIN_FORMS.map(function(form) {
+          return <AdminToolCard key={form.label} tool={form} icon={docIcon} />;
         })}
       </div>
     </div>
