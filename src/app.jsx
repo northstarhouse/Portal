@@ -4041,7 +4041,7 @@ function SponsorsView() {
       benefits: ['Believer benefits, plus:', 'Named Solo Sponsor of one NSHC event (name/logo in materials, event signage, recognized from stage)', 'A 4"×8" commemorative brick placed as part of the brick terrace capital project', 'Personal VIP tour of the upstairs construction project!'] },
     { name: 'Believer', min: 1000, color: '#2e7d32', bg: '#e8f5e9', border: '#a5d6a7', range: '$1,000–$2,499',
       benefits: ['Company name/logo listed as a Sponsor in event programs, newsletters, website and yearly Sponsorship Banner', 'Invitation to State of the Star membership celebration', 'Two complimentary tickets to a NSHC event', 'Custom made plaque with yearly stars', 'Sponsor Spotlight on our social media platforms'] },
-    { name: 'Friends of the North Star House', min: 250, color: '#b45309', bg: '#fffbeb', border: '#fcd34d', range: '$250–$999',
+    { name: 'Friend of NSH', min: 250, color: '#b45309', bg: '#fffbeb', border: '#fcd34d', range: '$250–$999',
       benefits: ['Business name listed as a Friend in event programs, newsletters, and website', 'Invitation to State of the Star membership celebration'] },
   ];
 
