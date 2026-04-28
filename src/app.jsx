@@ -4003,6 +4003,7 @@ function SponsorsView() {
   var [showAdd, setShowAdd] = useState(false);
   var [addForm, setAddForm] = useState(emptyAddForm);
   var [addSaving, setAddSaving] = useState(false);
+  var [tab, setTab] = useState('current');
 
   useEffect(function() {
     cachedFetchAll('Sponsors').then(function(rows) {
@@ -4040,6 +4041,8 @@ function SponsorsView() {
       benefits: ['Believer benefits, plus:', 'Named Solo Sponsor of one NSHC event (name/logo in materials, event signage, recognized from stage)', 'A 4"×8" commemorative brick placed as part of the brick terrace capital project', 'Personal VIP tour of the upstairs construction project!'] },
     { name: 'Believer', min: 1000, color: '#2e7d32', bg: '#e8f5e9', border: '#a5d6a7', range: '$1,000–$2,499',
       benefits: ['Company name/logo listed as a Sponsor in event programs, newsletters, website and yearly Sponsorship Banner', 'Invitation to State of the Star membership celebration', 'Two complimentary tickets to a NSHC event', 'Custom made plaque with yearly stars', 'Sponsor Spotlight on our social media platforms'] },
+    { name: 'Friends of the North Star House', min: 250, color: '#b45309', bg: '#fffbeb', border: '#fcd34d', range: '$250–$999',
+      benefits: ['Business name listed as a Friend in event programs, newsletters, and website', 'Invitation to State of the Star membership celebration'] },
   ];
 
   function getTier(total) {
@@ -4195,24 +4198,58 @@ function SponsorsView() {
 
   var inpStyle = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, background: '#fff', boxSizing: 'border-box' };
 
+  function resolvedTab(s) {
+    if (s.sponsor_status) return s.sponsor_status;
+    return 'current';
+  }
+
+  function setStatus(s, status) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?id=eq.' + s.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sponsor_status: status })
+    }).then(function() {
+      clearCache('Sponsors');
+      setSponsors(function(prev) { return prev.map(function(sp) { return sp.id === s.id ? Object.assign({}, sp, { sponsor_status: status }) : sp; }); });
+      setSelected(function(prev) { return prev && prev.id === s.id ? Object.assign({}, prev, { sponsor_status: status }) : prev; });
+    });
+  }
+
+  var currentSponsors = sponsors ? sponsors.filter(function(s) { return resolvedTab(s) === 'current'; }) : [];
+  var pastSponsors = sponsors ? sponsors.filter(function(s) { return resolvedTab(s) === 'past'; }) : [];
+  var potentialSponsors = sponsors ? sponsors.filter(function(s) { return resolvedTab(s) === 'potential'; }) : [];
+  var visibleSponsors = tab === 'current' ? currentSponsors : tab === 'past' ? pastSponsors : potentialSponsors;
+
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
-        <StatCard label="Total Sponsors" value={sponsors === null ? '...' : sponsors.length} />
-        <StatCard label="Total In-Kind" value={allInKind.length === 0 && sponsors !== null ? '$0' : ('$' + allInKind.reduce(function(s,e){return s+(parseFloat(e.value)||0);},0).toLocaleString())} />
-        <StatCard label="Tiered Sponsors" value={sponsors === null ? '...' : sponsors.filter(function(s){return getTier(sponsorInKindTotal(s.id));}).length} />
+        <StatCard label="Current" value={sponsors === null ? '...' : currentSponsors.length} />
+        <StatCard label="Past" value={sponsors === null ? '...' : pastSponsors.length} />
+        <StatCard label="Potential" value={sponsors === null ? '...' : potentialSponsors.length} />
+      </div>
+
+      <div style={{ display: 'flex', gap: 2, marginBottom: 16, background: '#f5f0ea', borderRadius: 10, padding: 4 }}>
+        {[['current','Current'],['past','Past'],['potential','Potential']].map(function(pair) {
+          var active = tab === pair[0];
+          return (
+            <button key={pair[0]} onClick={function() { setTab(pair[0]); setSelected(null); }}
+              style={{ flex: 1, padding: '7px 12px', borderRadius: 7, border: 'none', fontSize: 13, fontWeight: active ? 600 : 400, background: active ? '#fff' : 'transparent', color: active ? '#2a2a2a' : '#888', cursor: 'pointer', boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}>
+              {pair[1]}
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <div style={{ fontSize: 13, color: '#aaa' }}>{sponsors !== null ? sponsors.length + ' sponsor' + (sponsors.length !== 1 ? 's' : '') : ''}</div>
-        <button onClick={function() { setAddForm(emptyAddForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add New Sponsor</button>
+        <div style={{ fontSize: 13, color: '#aaa' }}>{sponsors !== null ? visibleSponsors.length + ' sponsor' + (visibleSponsors.length !== 1 ? 's' : '') : ''}</div>
+        <button onClick={function() { setAddForm(Object.assign({}, emptyAddForm, { sponsor_status: tab === 'current' ? null : tab })); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add New Sponsor</button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: (selected && !isMobile) ? '240px 1fr' : '1fr', gap: 16 }}>
         <div>
           {sponsors === null && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>Loading…</div>}
-          {sponsors !== null && sponsors.length === 0 && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>No sponsors yet.</div>}
-          {sponsors !== null && sponsors.map(function(s) {
+          {sponsors !== null && visibleSponsors.length === 0 && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>No {tab} sponsors yet.</div>}
+          {sponsors !== null && visibleSponsors.map(function(s) {
             var isSelected = selected && selected.id === s.id;
             return (
               <div key={s.id} onClick={function() { selectSponsor(isSelected ? null : s); }}
@@ -4251,7 +4288,21 @@ function SponsorsView() {
           <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '20px 22px', alignSelf: 'start', position: 'sticky', top: 20 }}>
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', lineHeight: 1.3, flex: 1, paddingRight: 8 }}>{selected['Business Name']}</div>
+              <div style={{ flex: 1, paddingRight: 8 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', lineHeight: 1.3, marginBottom: 6 }}>{selected['Business Name']}</div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {[['current','Current'],['past','Past'],['potential','Potential']].map(function(pair) {
+                    var active = resolvedTab(selected) === pair[0];
+                    return (
+                      <button key={pair[0]} onClick={function() { setStatus(selected, pair[0]); }}
+                        style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, border: '1px solid ' + (active ? gold : '#e0d8cc'), background: active ? '#faf5ee' : 'transparent', color: active ? gold : '#aaa', fontWeight: active ? 600 : 400, cursor: active ? 'default' : 'pointer' }}
+                        disabled={active}>
+                        {pair[1]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <button onClick={function() { setEditSponsorForm({ 'Business Name': selected['Business Name'] || '', 'Main Contact': selected['Main Contact'] || '', 'Donation': selected['Donation'] || '', 'Fair Market Value': selected['Fair Market Value'] || '', 'Area Supported': selected['Area Supported'] || '', 'NSH Contact': selected['NSH Contact'] || '', 'Phone Number': selected['Phone Number'] || '', 'Email Address': selected['Email Address'] || '', 'Mailing Address': selected['Mailing Address'] || '', 'Date Recieved': selected['Date Recieved'] || '', 'Notes': selected['Notes'] || '' }); setEditing(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#888', cursor: 'pointer' }}>Edit</button>
                 <button onClick={function() { setSelected(null); setEditing(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
