@@ -80,6 +80,11 @@ function AppGate({ children }) {
       if (!res.ok) { setErr('Something went wrong. Try again.'); setBusy(false); return; }
       if (!res.data) { setErr('Wrong password.'); setBusy(false); setPwd(''); return; }
       try { localStorage.setItem(APP_TOKEN_KEY, res.data); } catch (e) {}
+      // Clear stale data cache from before the gate landed — pre-token requests
+      // would have returned [] (RLS denial) and gotten cached as empty.
+      try {
+        Object.keys(localStorage).filter(function(k) { return k.indexOf('nsh3_') === 0; }).forEach(function(k) { localStorage.removeItem(k); });
+      } catch (e) {}
       setHasToken(true); setPwd(''); setBusy(false); setExpired(false);
     }).catch(function() {
       setErr('Network error. Try again.'); setBusy(false);
