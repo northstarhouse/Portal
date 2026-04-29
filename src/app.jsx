@@ -1,8 +1,114 @@
 const { useState, useEffect } = React;
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
-const DONORS_PASSWORD = 'NSH';
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
+
+const APP_TOKEN_KEY = 'nsh-app-token';
+
+(function installFetchGate() {
+  if (window.__nshFetchGated) return;
+  window.__nshFetchGated = true;
+  var origFetch = window.fetch.bind(window);
+  window.fetch = function(input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (url.indexOf(SUPABASE_URL) === 0) {
+      var token = null;
+      try { token = localStorage.getItem(APP_TOKEN_KEY); } catch (e) {}
+      if (token) {
+        init = init || {};
+        var headers = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined));
+        headers.set('x-app-token', token);
+        init.headers = headers;
+      }
+      return origFetch(input, init).then(function(res) {
+        if (res && res.status === 401) {
+          try { localStorage.removeItem(APP_TOKEN_KEY); } catch (e) {}
+          window.dispatchEvent(new Event('nsh:token-invalid'));
+        }
+        return res;
+      });
+    }
+    return origFetch(input, init);
+  };
+})();
+
+function AppGate({ children }) {
+  var [hasToken, setHasToken] = useState(function() {
+    try { return !!localStorage.getItem(APP_TOKEN_KEY); } catch (e) { return false; }
+  });
+  var [pwd, setPwd] = useState('');
+  var [busy, setBusy] = useState(false);
+  var [err, setErr] = useState('');
+  var [expired, setExpired] = useState(false);
+
+  useEffect(function() {
+    function onInvalid() { setHasToken(false); setExpired(true); }
+    window.addEventListener('nsh:token-invalid', onInvalid);
+    return function() { window.removeEventListener('nsh:token-invalid', onInvalid); };
+  }, []);
+
+  // Validate token on mount — RLS returns [] on bad token (not 401), so the
+  // global fetch wrapper's 401 handler doesn't catch expiry. Probe explicitly.
+  useEffect(function() {
+    if (!hasToken) return;
+    var cancelled = false;
+    fetch(SUPABASE_URL + '/rest/v1/rpc/has_valid_app_session', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: '{}'
+    }).then(function(r) { return r.json(); }).then(function(valid) {
+      if (cancelled) return;
+      if (valid !== true) {
+        try { localStorage.removeItem(APP_TOKEN_KEY); } catch (e) {}
+        setHasToken(false); setExpired(true);
+      }
+    }).catch(function() { /* network error — leave hasToken alone */ });
+    return function() { cancelled = true; };
+  }, []);
+
+  function attempt(e) {
+    e.preventDefault();
+    if (!pwd || busy) return;
+    setBusy(true); setErr('');
+    fetch(SUPABASE_URL + '/rest/v1/rpc/verify_app_password', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_password: pwd, p_user_agent: (navigator.userAgent || '').slice(0, 200) })
+    }).then(function(r) {
+      return r.json().then(function(data) { return { ok: r.ok, data: data }; });
+    }).then(function(res) {
+      if (!res.ok) { setErr('Something went wrong. Try again.'); setBusy(false); return; }
+      if (!res.data) { setErr('Wrong password.'); setBusy(false); setPwd(''); return; }
+      try { localStorage.setItem(APP_TOKEN_KEY, res.data); } catch (e) {}
+      setHasToken(true); setPwd(''); setBusy(false); setExpired(false);
+    }).catch(function() {
+      setErr('Network error. Try again.'); setBusy(false);
+    });
+  }
+
+  if (hasToken) return children;
+
+  return React.createElement('div', {
+    style: { position: 'fixed', inset: 0, background: '#f7f3ec', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16, fontFamily: "'Calibri', 'Segoe UI', sans-serif" }
+  },
+    React.createElement('form', { onSubmit: attempt, style: { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 16, padding: '40px 36px', width: '100%', maxWidth: 360, boxShadow: '0 2px 16px rgba(0,0,0,0.06)', textAlign: 'center' } },
+      React.createElement('div', { style: { fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 8 } }, 'North Star House'),
+      React.createElement('div', { style: { fontSize: 13, color: '#888', marginBottom: 28 } }, expired ? 'Session expired — please re-enter the password.' : 'Enter the password to view portal data.'),
+      React.createElement('input', {
+        autoFocus: true, type: 'password', value: pwd, disabled: busy,
+        onChange: function(e) { setPwd(e.target.value); setErr(''); },
+        placeholder: 'Password',
+        style: { width: '100%', padding: '10px 14px', border: '0.5px solid ' + (err ? '#e05050' : '#e0d8cc'), borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: err ? 6 : 16, outline: 'none', textAlign: 'center', letterSpacing: 2 }
+      }),
+      err && React.createElement('div', { style: { fontSize: 12, color: '#e05050', marginBottom: 12 } }, err),
+      React.createElement('button', {
+        type: 'submit', disabled: busy || !pwd,
+        style: { width: '100%', padding: '11px', background: '#b5a185', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: busy || !pwd ? 'not-allowed' : 'pointer', opacity: busy || !pwd ? 0.6 : 1 }
+      }, busy ? 'Checking…' : 'Sign in'),
+      React.createElement('div', { style: { fontSize: 11, color: '#bbb', marginTop: 24 } }, 'Need access? Ask Haley.')
+    )
+  );
+}
 
 function sbFetch(table, columns) {
   const cols = columns.map(c => encodeURIComponent(c)).join(",");
@@ -5728,37 +5834,6 @@ function IdeasView() {
   );
 }
 
-function DonorsGate({ onUnlock }) {
-  var { useState } = React;
-  var [val, setVal] = useState('');
-  var [err, setErr] = useState(false);
-  function attempt(e) {
-    e.preventDefault();
-    if (val === DONORS_PASSWORD) { onUnlock(); }
-    else { setErr(true); setVal(''); }
-  }
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
-      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 16, padding: '40px 36px', width: '100%', maxWidth: 340, textAlign: 'center', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
-        <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 6 }}>Donations</div>
-        <div style={{ fontSize: 13, color: '#aaa', marginBottom: 28 }}>Enter password to continue</div>
-        <form onSubmit={attempt}>
-          <input
-            autoFocus
-            type="password"
-            value={val}
-            onChange={function(e) { setVal(e.target.value); setErr(false); }}
-            placeholder="Password"
-            style={{ width: '100%', padding: '10px 14px', border: '0.5px solid ' + (err ? '#e05050' : '#e0d8cc'), borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: err ? 6 : 16, outline: 'none', textAlign: 'center', letterSpacing: 2 }}
-          />
-          {err && <div style={{ fontSize: 12, color: '#e05050', marginBottom: 12 }}>Incorrect password</div>}
-          <button type="submit" style={{ width: '100%', padding: '10px', background: '#b5a185', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Unlock</button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 var ADMIN_FORMS = [
   { label: "In-Kind Documentation Form", url: "https://drive.google.com/file/d/1cNGysqW__wS2IEKDaNzG1MPo-5JCE-ay/view" },
   { label: "Reimbursement Form", url: "https://drive.google.com/file/d/1Vkfh6Z5eM1RPUtw6j8mQjqKM71-YFPrW/view" },
@@ -5876,7 +5951,6 @@ var AREA_DEFAULTS = {
   const [quarterlyArea, setQuarterlyArea] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [donorsUnlocked, setDonorsUnlocked] = useState(() => sessionStorage.getItem('nsh_donors') === '1');
   const View = views[active];
   const mod = modules.find(m => m.id === active);
 
@@ -6054,11 +6128,7 @@ var AREA_DEFAULTS = {
         </div>
         <div style={{ flex: 1, padding: isMobile ? "16px 14px" : "28px 32px", paddingBottom: isMobile ? 20 : undefined }}>
           <div style={{ maxWidth: 900 }}>
-            {active === 'donors' && !donorsUnlocked ? (
-              <DonorsGate onUnlock={function() { sessionStorage.setItem('nsh_donors', '1'); setDonorsUnlocked(true); }} />
-            ) : (
-              <View navigate={setActive} opArea={opArea} navigateOp={function(a) { setOpArea(a); setActive('operational'); }} quarterlyArea={quarterlyArea} navigateToQuarterly={function(a) { setQuarterlyArea(a); setActive('quarterly'); }} />
-            )}
+            <View navigate={setActive} opArea={opArea} navigateOp={function(a) { setOpArea(a); setActive('operational'); }} quarterlyArea={quarterlyArea} navigateToQuarterly={function(a) { setQuarterlyArea(a); setActive('quarterly'); }} />
           </div>
         </div>
       </div>
@@ -6068,4 +6138,4 @@ var AREA_DEFAULTS = {
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(React.createElement(Dashboard));
+root.render(React.createElement(AppGate, null, React.createElement(Dashboard)));
