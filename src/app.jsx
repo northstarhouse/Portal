@@ -1716,6 +1716,7 @@ function DonorsView() {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filterType, setFilterType] = useState('All');
+  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
   const [editDon, setEditDon] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
@@ -1800,10 +1801,18 @@ function DonorsView() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  var totalRaised = donations.reduce(function(s, r) { return s + parseAmount(r['Amount']); }, 0);
-  var totalDonors = donations.length;
-  var memberships = donations.filter(function(r) { return (r['Donation Type'] || '').includes('Membership'); }).length;
-  var acknowledged = donations.filter(function(r) { return r['Acknowledged'] === true || String(r['Acknowledged']).toUpperCase() === 'TRUE'; }).length;
+  var availableYears = (function() {
+    var years = {};
+    donations.forEach(function(d) { if (d['Close Date']) years[(d['Close Date']).slice(0, 4)] = true; });
+    return Object.keys(years).sort(function(a, b) { return b - a; });
+  })();
+
+  var yearDonations = yearFilter === 'All' ? donations : donations.filter(function(d) { return (d['Close Date'] || '').startsWith(yearFilter); });
+
+  var totalRaised = yearDonations.reduce(function(s, r) { return s + parseAmount(r['Amount']); }, 0);
+  var totalDonors = yearDonations.length;
+  var memberships = yearDonations.filter(function(r) { return (r['Donation Type'] || '').includes('Membership'); }).length;
+  var acknowledged = yearDonations.filter(function(r) { return r['Acknowledged'] === true || String(r['Acknowledged']).toUpperCase() === 'TRUE'; }).length;
   var unacknowledged = totalDonors - acknowledged;
 
   function deleteDonation(d) {
@@ -1977,7 +1986,7 @@ function DonorsView() {
   }
 
   var donorYTD = {};
-  donations.forEach(function(d) {
+  yearDonations.forEach(function(d) {
     var n = d['Donor Name'];
     if (!donorYTD[n]) donorYTD[n] = 0;
     donorYTD[n] += parseAmount(d['Amount']);
@@ -2000,20 +2009,31 @@ function DonorsView() {
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <StatCard label="Total Raised" value={loading ? '...' : '$' + totalRaised.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub="2026 YTD" />
+        <StatCard label="Total Raised" value={loading ? '...' : '$' + totalRaised.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub={yearFilter === 'All' ? 'All Years' : yearFilter + ' YTD'} />
         <StatCard label="Donations" value={loading ? '...' : totalDonors} />
         <StatCard label="Memberships" value={loading ? '...' : memberships} />
         <StatCard label="Need Thank You" value={loading ? '...' : unacknowledged} sub={unacknowledged > 0 ? '' : 'all clear'} />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: '#888' }}>{loading ? 'Loading...' : totalDonors + ' donation' + (totalDonors !== 1 ? 's' : '')}</div>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+          {['All'].concat(availableYears).map(function(y) {
+            var active = yearFilter === y;
+            return (
+              <button key={y} onClick={function() { setYearFilter(y); setFilterType('All'); }}
+                style={{ padding: '4px 12px', borderRadius: 5, border: '1.5px solid ' + (active ? gold : '#e0d8cc'), background: active ? gold : '#fff', color: active ? '#fff' : '#888', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}>
+                {y}
+              </button>
+            );
+          })}
+        </div>
         <button onClick={function() { setForm(emptyDonForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Donation</button>
       </div>
 
       {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#c0392b' }}>Error: {error}</div>}
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: '#aaa', alignSelf: 'center', marginRight: 4 }}>{loading ? '' : totalDonors + ' donation' + (totalDonors !== 1 ? 's' : '')}</div>
         {['All'].concat(DONATION_TYPES).map(function(t) {
           var active = filterType === t;
           var tc = typeColors[t] || { bg: '#f5f0ea', color: '#888' };
@@ -2035,7 +2055,7 @@ function DonorsView() {
               return <div key={h} style={{ fontSize: 12, color: '#777', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>{h}</div>;
             })}
           </div>
-          {donations.filter(function(d) { return filterType === 'All' || d['Donation Type'] === filterType; }).map(function(d, i) {
+          {yearDonations.filter(function(d) { return filterType === 'All' || d['Donation Type'] === filterType; }).map(function(d, i) {
             var tc = typeColors[d['Donation Type']] || { bg: '#f3f3f3', color: '#555' };
             var acked = d['Acknowledged'] === true || String(d['Acknowledged']).toUpperCase() === 'TRUE';
             return (
