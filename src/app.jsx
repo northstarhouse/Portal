@@ -3285,12 +3285,14 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [earningsForm, setEarningsForm] = useState(emptyEarningsForm);
   var [earningsSaving, setEarningsSaving] = useState(false);
   var today = new Date().toISOString().slice(0, 10);
-  var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false });
+  var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' });
   var [budgetSaving, setBudgetSaving] = useState(false);
   var [uploadingId, setUploadingId] = useState(null);
   var fileInputRef = React.useRef(null);
   var [budgetReceiptFile, setBudgetReceiptFile] = useState(null);
   var budgetReceiptRef = React.useRef(null);
+  var [reimburseVolQuery, setReimburseVolQuery] = useState('');
+  var [showReimburseVolDrop, setShowReimburseVolDrop] = useState(false);
   var [noteEdit, setNoteEdit] = useState(null);
   var [noteVal, setNoteVal] = useState('');
   var [noteSaving, setNoteSaving] = useState(null);
@@ -3424,7 +3426,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     setBudgetSaving(true);
     var file = budgetReceiptFile;
     var payload = { area: area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null };
-    if (budgetForm.needs_reimbursement) payload.needs_reimbursement = true;
+    if (budgetForm.needs_reimbursement) { payload.needs_reimbursement = true; payload.volunteer_name = budgetForm.volunteer_name || null; }
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -3437,7 +3439,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         clearCache('Op Budget');
         setBudgetSaving(false);
         setBudget(function(prev) { return [newRow].concat(prev); });
-        setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false });
+        setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' }); setReimburseVolQuery('');
         setBudgetReceiptFile(null);
         return;
       }
@@ -3457,7 +3459,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           clearCache('Op Budget');
           setBudgetSaving(false);
           setBudget(function(prev) { return [Object.assign({}, newRow, { receipt_url: url })].concat(prev); });
-          setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false });
+          setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' }); setReimburseVolQuery('');
           setBudgetReceiptFile(null);
           if (budgetReceiptRef.current) budgetReceiptRef.current.value = '';
         });
@@ -3988,11 +3990,51 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: budgetForm.needs_reimbursement ? '#b45309' : '#555' }}>
-                    <input type="checkbox" checked={budgetForm.needs_reimbursement} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { needs_reimbursement: e.target.checked }); }); }} style={{ width: 15, height: 15, accentColor: gold, cursor: 'pointer' }} />
+                    <input type="checkbox" checked={budgetForm.needs_reimbursement} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { needs_reimbursement: e.target.checked, volunteer_name: '' }); }); setReimburseVolQuery(''); }} style={{ width: 15, height: 15, accentColor: gold, cursor: 'pointer' }} />
                     Needs reimbursement?
                     {budgetForm.needs_reimbursement && <span style={{ fontSize: 11, background: '#fef3c7', color: '#b45309', padding: '2px 7px', borderRadius: 10, fontWeight: 500 }}>Will appear in Financials</span>}
                   </label>
                 </div>
+                {budgetForm.needs_reimbursement && (function() {
+                  var allVols = vols.filter(function(v) { return v['Status'] === 'Active' || v['Status'] === 'active'; });
+                  if (!allVols.length) allVols = vols;
+                  var filtered = reimburseVolQuery ? allVols.filter(function(v) {
+                    var name = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim().toLowerCase();
+                    return name.includes(reimburseVolQuery.toLowerCase());
+                  }) : [];
+                  return (
+                    <div style={{ marginBottom: 12, position: 'relative' }}>
+                      <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Reimburse To *</div>
+                      <input
+                        value={reimburseVolQuery}
+                        onChange={function(e) { setReimburseVolQuery(e.target.value); setBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: '' }); }); setShowReimburseVolDrop(true); }}
+                        onFocus={function() { setShowReimburseVolDrop(true); }}
+                        onBlur={function() { setTimeout(function() { setShowReimburseVolDrop(false); }, 150); }}
+                        placeholder="Type a volunteer name…"
+                        style={{ width: '100%', padding: '7px 10px', border: '0.5px solid ' + (budgetForm.volunteer_name ? '#22c55e' : '#e0d8cc'), borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box' }}
+                      />
+                      {budgetForm.volunteer_name && (
+                        <div style={{ fontSize: 11, color: '#2e7d32', marginTop: 3 }}>✓ {budgetForm.volunteer_name}</div>
+                      )}
+                      {showReimburseVolDrop && filtered.length > 0 && (
+                        <div style={{ position: 'absolute', zIndex: 99, left: 0, right: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', maxHeight: 180, overflowY: 'auto' }}>
+                          {filtered.map(function(v) {
+                            var fullName = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim();
+                            return (
+                              <div key={v.id} onMouseDown={function() { setBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName }); }); setReimburseVolQuery(fullName); setShowReimburseVolDrop(false); }}
+                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '0.5px solid #f5f0ea', background: '#fff' }}
+                                onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
+                                onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}>
+                                <div style={{ fontWeight: 500, color: '#2a2a2a' }}>{fullName}</div>
+                                {v['Address'] && <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{v['Address']}</div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Date</div>
