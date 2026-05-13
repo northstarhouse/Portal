@@ -6191,19 +6191,20 @@ function BirthdaysView({ navigate }) {
   var isMobile = React.useContext(MobileCtx);
   var gold = '#b5a185';
   const [vols, setVols] = useState(null);
+  const [allActive, setAllActive] = useState(null);
 
   useEffect(function() {
     cachedSbFetch('2026 Volunteers', ['First Name', 'Last Name', 'Birthday', 'Picture URL', 'Status']).then(function(rows) {
-      if (!Array.isArray(rows)) { setVols([]); return; }
+      if (!Array.isArray(rows)) { setVols([]); setAllActive([]); return; }
+      var active = rows.filter(function(r) { return r['Status'] === 'Active'; });
+      setAllActive(active);
       var today = new Date();
-      var withBday = rows.filter(function(r) { return r['Birthday'] && r['Status'] === 'Active'; }).map(function(r) {
+      var withBday = active.filter(function(r) { return r['Birthday']; }).map(function(r) {
         var raw = r['Birthday'];
         var mo = null, dy = null;
-        // Try YYYY-MM-DD
         var iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
         if (iso) { mo = parseInt(iso[2]) - 1; dy = parseInt(iso[3]); }
         else {
-          // Try MM/DD/YYYY or MM/DD
           var slash = raw.match(/^(\d{1,2})\/(\d{1,2})/);
           if (slash) { mo = parseInt(slash[1]) - 1; dy = parseInt(slash[2]); }
         }
@@ -6224,6 +6225,9 @@ function BirthdaysView({ navigate }) {
     });
   }
   var months = Object.keys(byMonth).map(Number).sort(function(a, b) { return a - b; });
+
+  var missingBday = allActive ? allActive.filter(function(r) { return !r['Birthday']; }).sort(function(a, b) { return (a['First Name'] || '').localeCompare(b['First Name'] || ''); }) : [];
+  var missingPic  = allActive ? allActive.filter(function(r) { return !r['Picture URL']; }).sort(function(a, b) { return (a['First Name'] || '').localeCompare(b['First Name'] || ''); }) : [];
 
   return (
     <div>
@@ -6264,6 +6268,49 @@ function BirthdaysView({ navigate }) {
           </div>
         );
       })}
+
+      {allActive !== null && (missingBday.length > 0 || missingPic.length > 0) && (
+        <div style={{ marginTop: 16, borderTop: '0.5px solid #e0d8cc', paddingTop: 24, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 24 }}>
+          {missingBday.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#e07070', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+                Missing Birthday ({missingBday.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {missingBday.map(function(v, i) {
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#fff5f5', border: '0.5px solid #fdd', borderRadius: 7 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#fde8e8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: '#c07070', flexShrink: 0 }}>
+                        {(v['First Name'] || '?')[0]}
+                      </div>
+                      <span style={{ fontSize: 13, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {missingPic.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#e07070', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+                Missing Picture ({missingPic.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {missingPic.map(function(v, i) {
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#fff5f5', border: '0.5px solid #fdd', borderRadius: 7 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#fde8e8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: '#c07070', flexShrink: 0 }}>
+                        {(v['First Name'] || '?')[0]}
+                      </div>
+                      <span style={{ fontSize: 13, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
