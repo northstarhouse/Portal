@@ -1726,12 +1726,13 @@ function DonorsView() {
   var ACCOUNT_TYPES = ['Individual','Family','Household','Foundation','Corporate','Organization'];
 
   var emptyDonForm = {
-    'Donor Name': '', 'Last Name': '', 'Informal Names': '',
+    'Donor Name': '', 'Informal Names': '',
     'Amount': '', 'Close Date': '', 'Donation Type': 'Donation',
     'Payment Type': 'Website', 'Account Type': 'Individual',
-    'Acknowledged': false, 'Salesforce': false,
-    'Email': '', 'Phone Number': '', 'Address': '',
-    'Benefits': '', 'Donation Notes': '', 'Donor Notes': '', 'Notes': ''
+    'Acknowledged': false,
+    'Email': '', 'Phone Number': '', 'Employer': '', 'Address': '',
+    'Benefits': '', 'Donation Notes': '',
+    'Background': '', 'First Connected': '', 'NSH Contact': '', 'Donor Notes': ''
   };
   const [form, setForm] = useState(emptyDonForm);
 
@@ -1741,7 +1742,6 @@ function DonorsView() {
       id: row.id,
       donor_id: row.donor_id,
       'Donor Name': donor.formal_name || '',
-      'Last Name': '',
       'Informal Names': donor.informal_first_name || '',
       'Amount': String(row.amount || 0),
       'Close Date': row.date || '',
@@ -1751,11 +1751,14 @@ function DonorsView() {
       'Acknowledged': row.acknowledged || false,
       'Email': donor.email || '',
       'Phone Number': donor.phone || '',
+      'Employer': donor.employer || '',
       'Address': donor.address || '',
       'Benefits': row.benefits || '',
       'Donation Notes': row.donation_notes || '',
+      'Background': donor.background || '',
+      'First Connected': donor.first_connected || '',
+      'NSH Contact': donor.nsh_contact || '',
       'Donor Notes': donor.donor_notes || '',
-      'Notes': '',
     };
   }
 
@@ -1828,7 +1831,11 @@ function DonorsView() {
       account_type: editForm['Account Type'] || null,
       email: editForm['Email'] || null,
       phone: editForm['Phone Number'] || null,
+      employer: editForm['Employer'] || null,
       address: editForm['Address'] || null,
+      background: editForm['Background'] || null,
+      first_connected: editForm['First Connected'] || null,
+      nsh_contact: editForm['NSH Contact'] || null,
       donor_notes: editForm['Donor Notes'] || null,
     };
     var donationPatch = {
@@ -1887,8 +1894,8 @@ function DonorsView() {
             account_type: form['Account Type'] || null,
             email: form['Email'] || null,
             phone: form['Phone Number'] || null,
+            employer: form['Employer'] || null,
             address: form['Address'] || null,
-            donor_notes: form['Donor Notes'] || null,
           })
         }).then(function(r) { return r.json(); }).then(function(rows) { return rows[0].id; });
       })
@@ -2101,8 +2108,10 @@ function DonorsView() {
                 </div>
                 <div>
                   {selected['Donation Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Donation Notes</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Donation Notes']}</div></div>}
-                  {selected['Donor Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Donor Notes</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Donor Notes']}</div></div>}
-                  {selected['Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Notes</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Notes']}</div></div>}
+                  {selected['Background'] && <div style={{ marginBottom: 12 }}><span style={sec}>Background</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Background']}</div></div>}
+                  {selected['First Connected'] && <div style={{ marginBottom: 12 }}><span style={sec}>What Ties Them to NSH</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['First Connected']}</div></div>}
+                  {selected['NSH Contact'] && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>NSH Contact</span>{selected['NSH Contact']}</div>}
+                  {selected['Donor Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>More Donor Notes</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Donor Notes']}</div></div>}
                 </div>
               </div>
               {(function() {
@@ -2145,11 +2154,8 @@ function DonorsView() {
             <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>Edit Donation</div>
             <form onSubmit={saveEditDonation}>
               <span style={sec}>Donor</span>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                <div><label style={lStyle}>First / Full Name *</label><input required name="Donor Name" value={editForm['Donor Name'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
-                <div><label style={lStyle}>Last Name</label><input name="Last Name" value={editForm['Last Name'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
-              </div>
-              <div style={grp}><label style={lStyle}>Goes By (Informal)</label><input name="Informal Names" value={editForm['Informal Names'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Formal Name *</label><input required name="Donor Name" value={editForm['Donor Name'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Informal First Name</label><input name="Informal Names" value={editForm['Informal Names'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
               <div style={grp}><label style={lStyle}>Account Type</label>
                 <select name="Account Type" value={editForm['Account Type'] || ''} onChange={handleEditFormChange} style={iStyle}>
                   {ACCOUNT_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
@@ -2171,18 +2177,20 @@ function DonorsView() {
                 </select>
               </div>
               <div style={grp}><label style={lStyle}>Benefits</label><input name="Benefits" value={editForm['Benefits'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
-              <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
+              <div style={grp}><label style={lStyle}>Donation Notes</label><textarea name="Donation Notes" value={editForm['Donation Notes'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <div style={{ marginBottom: 14 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Acknowledged" checked={!!editForm['Acknowledged']} onChange={handleEditFormChange} /> Acknowledged / Thanked</label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Salesforce" checked={!!editForm['Salesforce']} onChange={handleEditFormChange} /> In Salesforce</label>
               </div>
               <span style={sec}>Contact</span>
               <div style={grp}><label style={lStyle}>Email</label><input name="Email" type="email" value={editForm['Email'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
               <div style={grp}><label style={lStyle}>Phone Number</label><input name="Phone Number" value={editForm['Phone Number'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Employer</label><input name="Employer" value={editForm['Employer'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
               <div style={grp}><label style={lStyle}>Address</label><textarea name="Address" value={editForm['Address'] || ''} onChange={handleEditFormChange} rows={3} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
-              <span style={sec}>Notes</span>
-              <div style={grp}><label style={lStyle}>Donation Notes</label><textarea name="Donation Notes" value={editForm['Donation Notes'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
-              <div style={grp}><label style={lStyle}>Donor Notes</label><textarea name="Donor Notes" value={editForm['Donor Notes'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
-              <div style={grp}><label style={lStyle}>Notes</label><textarea name="Notes" value={editForm['Notes'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <span style={sec}>Profile</span>
+              <div style={grp}><label style={lStyle}>Background</label><textarea name="Background" value={editForm['Background'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <div style={grp}><label style={lStyle}>What Ties Them to North Star House</label><textarea name="First Connected" value={editForm['First Connected'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <div style={grp}><label style={lStyle}>Main NSH Contact</label><input name="NSH Contact" value={editForm['NSH Contact'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>More Donor Notes</label><textarea name="Donor Notes" value={editForm['Donor Notes'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                 <button type="submit" disabled={editSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: editSaving ? 0.7 : 1 }}>{editSaving ? 'Saving...' : 'Save Changes'}</button>
                 <button type="button" onClick={function() { setEditDon(null); }} style={{ padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
@@ -2199,16 +2207,18 @@ function DonorsView() {
             <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>Add Donation</div>
             <form onSubmit={handleDonSubmit}>
               <span style={sec}>Donor</span>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                <div><label style={lStyle}>First / Full Name *</label><input required name="Donor Name" value={form['Donor Name']} onChange={handleDonFormChange} style={iStyle} /></div>
-                <div><label style={lStyle}>Last Name</label><input name="Last Name" value={form['Last Name']} onChange={handleDonFormChange} style={iStyle} /></div>
-              </div>
-              <div style={grp}><label style={lStyle}>Goes By (Informal)</label><input name="Informal Names" value={form['Informal Names']} onChange={handleDonFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Formal Name *</label><input required name="Donor Name" value={form['Donor Name']} onChange={handleDonFormChange} style={iStyle} placeholder="e.g. Mr. and Mrs. John Smith" /></div>
+              <div style={grp}><label style={lStyle}>Informal First Name</label><input name="Informal Names" value={form['Informal Names']} onChange={handleDonFormChange} style={iStyle} placeholder="e.g. John" /></div>
               <div style={grp}><label style={lStyle}>Account Type</label>
                 <select name="Account Type" value={form['Account Type']} onChange={handleDonFormChange} style={iStyle}>
                   {ACCOUNT_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
                 </select>
               </div>
+              <span style={sec}>Contact</span>
+              <div style={grp}><label style={lStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={handleDonFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={handleDonFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Employer</label><input name="Employer" value={form['Employer']} onChange={handleDonFormChange} style={iStyle} /></div>
+              <div style={grp}><label style={lStyle}>Address</label><textarea name="Address" value={form['Address']} onChange={handleDonFormChange} rows={3} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
               <span style={sec}>Donation</span>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
                 <div><label style={lStyle}>Amount *</label><input required name="Amount" value={form['Amount']} onChange={handleDonFormChange} style={iStyle} placeholder="$0.00" /></div>
@@ -2225,18 +2235,10 @@ function DonorsView() {
                 </select>
               </div>
               <div style={grp}><label style={lStyle}>Benefits</label><input name="Benefits" value={form['Benefits']} onChange={handleDonFormChange} style={iStyle} /></div>
-              <div style={{ display: 'flex', gap: 20, marginBottom: 14 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Acknowledged" checked={form['Acknowledged']} onChange={handleDonFormChange} /> Acknowledged / Thanked</label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Salesforce" checked={form['Salesforce']} onChange={handleDonFormChange} /> In Salesforce</label>
-              </div>
-              <span style={sec}>Contact</span>
-              <div style={grp}><label style={lStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={handleDonFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={handleDonFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>Address</label><textarea name="Address" value={form['Address']} onChange={handleDonFormChange} rows={3} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
-              <span style={sec}>Notes</span>
               <div style={grp}><label style={lStyle}>Donation Notes</label><textarea name="Donation Notes" value={form['Donation Notes']} onChange={handleDonFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
-              <div style={grp}><label style={lStyle}>Donor Notes</label><textarea name="Donor Notes" value={form['Donor Notes']} onChange={handleDonFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
-              <div style={grp}><label style={lStyle}>Notes</label><textarea name="Notes" value={form['Notes']} onChange={handleDonFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Acknowledged" checked={form['Acknowledged']} onChange={handleDonFormChange} /> Acknowledged / Thanked</label>
+              </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                 <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : 'Save Donation'}</button>
                 <button type="button" onClick={function() { setShowAdd(false); }} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
