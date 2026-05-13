@@ -420,6 +420,7 @@ const typeColors = {
   const [activeVols, setActiveVols] = useState(null);
   const [calEvents, setCalEvents] = useState(null);
   const [birthdays, setBirthdays] = useState(null);
+  const [ootNotices, setOotNotices] = useState(null);
   const [sponsors, setSponsors] = useState(null);
   const [inHouseEvents, setInHouseEvents] = useState([]);
   const [iheForm, setIheForm] = useState({ name: '', date: '', cost: '', link: '' });
@@ -464,6 +465,18 @@ const typeColors = {
       }).sort(function(a, b) { return a._bday - b._bday; });
       setBirthdays(upcoming);
     });
+    (function() {
+      var today = new Date(); today.setHours(0,0,0,0);
+      var future = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
+      var todayStr = today.toISOString().slice(0, 10);
+      var futureStr = future.toISOString().slice(0, 10);
+      fetch(SUPABASE_URL + '/rest/v1/oot_notices?select=*&end_date=gte.' + todayStr + '&start_date=lte.' + futureStr + '&order=start_date.asc', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        if (Array.isArray(rows)) setOotNotices(rows);
+        else setOotNotices([]);
+      }).catch(function() { setOotNotices([]); });
+    })();
     fetchCalendarEvents().then(function(events) {
       var now = new Date();
       var windowEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
@@ -595,6 +608,36 @@ const typeColors = {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v['First Name']} {v['Last Name']}</div>
                   <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{dayStr}{isToday ? ' 🎂' : ''}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Out of Town */}
+        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Out of Town
+          </div>
+          {ootNotices === null && <div style={{ fontSize: 12, color: '#aaa' }}>Loading…</div>}
+          {ootNotices !== null && ootNotices.length === 0 && <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No one out of town in the next 60 days.</div>}
+          {ootNotices !== null && ootNotices.map(function(entry, i) {
+            var today = new Date(); today.setHours(0,0,0,0);
+            var start = new Date(entry.start_date + 'T12:00:00');
+            var end = new Date(entry.end_date + 'T12:00:00');
+            var isActive = start <= today && end >= today;
+            var startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            var endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, background: isActive ? '#fffbf0' : 'transparent', border: isActive ? '0.5px solid #e8d9b0' : 'none', borderRadius: isActive ? 8 : 0, padding: isActive ? '8px 10px' : '2px 0' }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#f0ebe2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 600, color: gold, flexShrink: 0 }}>
+                  {(entry.name || '?')[0].toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.name}</div>
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{startStr} – {endStr}{isActive ? ' ✈️' : ''}</div>
+                  {entry.notes && <div style={{ fontSize: 11, color: '#aaa', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.notes}</div>}
                 </div>
               </div>
             );
