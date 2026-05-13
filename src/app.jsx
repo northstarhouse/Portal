@@ -587,9 +587,10 @@ const typeColors = {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={function() { navigate('birthdays'); }}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             Upcoming Birthdays
+            <span style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.6 }}>See all →</span>
           </div>
           {birthdays === null && <div style={{ fontSize: 12, color: '#aaa' }}>Loading…</div>}
           {birthdays !== null && birthdays.length === 0 && <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No birthdays in the next 30 days.</div>}
@@ -6184,8 +6185,92 @@ function AdminView() {
   );
 }
 
+var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function BirthdaysView({ navigate }) {
+  var isMobile = React.useContext(MobileCtx);
+  var gold = '#b5a185';
+  const [vols, setVols] = useState(null);
+
+  useEffect(function() {
+    cachedSbFetch('2026 Volunteers', ['First Name', 'Last Name', 'Birthday', 'Picture URL', 'Status']).then(function(rows) {
+      if (!Array.isArray(rows)) { setVols([]); return; }
+      var today = new Date();
+      var withBday = rows.filter(function(r) { return r['Birthday'] && r['Status'] === 'Active'; }).map(function(r) {
+        var raw = r['Birthday'];
+        var mo = null, dy = null;
+        // Try YYYY-MM-DD
+        var iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (iso) { mo = parseInt(iso[2]) - 1; dy = parseInt(iso[3]); }
+        else {
+          // Try MM/DD/YYYY or MM/DD
+          var slash = raw.match(/^(\d{1,2})\/(\d{1,2})/);
+          if (slash) { mo = parseInt(slash[1]) - 1; dy = parseInt(slash[2]); }
+        }
+        if (mo === null || dy === null) return null;
+        var thisYear = new Date(today.getFullYear(), mo, dy);
+        var isToday = thisYear.toDateString() === today.toDateString();
+        return Object.assign({}, r, { _mo: mo, _dy: dy, _isToday: isToday });
+      }).filter(Boolean).sort(function(a, b) { return a._mo !== b._mo ? a._mo - b._mo : a._dy - b._dy; });
+      setVols(withBday);
+    });
+  }, []);
+
+  var byMonth = {};
+  if (vols) {
+    vols.forEach(function(v) {
+      if (!byMonth[v._mo]) byMonth[v._mo] = [];
+      byMonth[v._mo].push(v);
+    });
+  }
+  var months = Object.keys(byMonth).map(Number).sort(function(a, b) { return a - b; });
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <button onClick={function() { navigate('home'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+          ← Back
+        </button>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: 'Georgia, serif' }}>Volunteer Birthdays</h2>
+      </div>
+      {vols === null && <div style={{ fontSize: 13, color: '#aaa' }}>Loading…</div>}
+      {vols !== null && vols.length === 0 && <div style={{ fontSize: 13, color: '#aaa', fontStyle: 'italic' }}>No birthdays found.</div>}
+      {months.map(function(mo) {
+        return (
+          <div key={mo} style={{ marginBottom: 28 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: gold, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, paddingBottom: 6, borderBottom: '0.5px solid #e0d8cc' }}>
+              {MONTH_NAMES[mo]}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {byMonth[mo].map(function(v, i) {
+                var dayStr = (v._mo + 1) + '/' + v._dy;
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: v._isToday ? '#fffbf0' : '#fff', border: v._isToday ? '0.5px solid #e8d9b0' : '0.5px solid #f0ebe2', borderRadius: 8, padding: '8px 12px' }}>
+                    {v['Picture URL'] ? (
+                      <img src={driveImg(v['Picture URL'])} alt={v['First Name']} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#f0ebe2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, color: gold, flexShrink: 0 }}>
+                        {(v['First Name'] || '?')[0]}
+                      </div>
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</div>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#888', flexShrink: 0 }}>{dayStr}{v._isToday ? ' 🎂' : ''}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
+  birthdays: BirthdaysView,
   events: EventsView,
   quarterly: QuarterlyView,
   volunteers: VolunteersView,
