@@ -1735,10 +1735,37 @@ function DonorsView() {
   };
   const [form, setForm] = useState(emptyDonForm);
 
+  function normalizeDonation(row) {
+    var donor = row.donors || {};
+    return {
+      id: row.id,
+      donor_id: row.donor_id,
+      'Donor Name': donor.formal_name || '',
+      'Last Name': '',
+      'Informal Names': donor.informal_first_name || '',
+      'Amount': String(row.amount || 0),
+      'Close Date': row.date || '',
+      'Donation Type': row.type || 'Donation',
+      'Payment Type': row.payment_type || '',
+      'Account Type': donor.account_type || '',
+      'Acknowledged': row.acknowledged || false,
+      'Email': donor.email || '',
+      'Phone Number': donor.phone || '',
+      'Address': donor.address || '',
+      'Benefits': row.benefits || '',
+      'Donation Notes': row.donation_notes || '',
+      'Donor Notes': donor.donor_notes || '',
+      'Notes': '',
+    };
+  }
+
   useEffect(function() {
-    cachedSbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes'])
+    fetch(SUPABASE_URL + '/rest/v1/donations?select=*,donors(*)&order=date.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    })
+      .then(function(r) { return r.json(); })
       .then(function(data) {
-        if (Array.isArray(data)) setDonations(data.sort(function(a, b) { return new Date(b['Close Date']) - new Date(a['Close Date']); }));
+        if (Array.isArray(data)) setDonations(data.map(normalizeDonation));
         else setError(JSON.stringify(data));
         setLoading(false);
       })
@@ -1778,18 +1805,12 @@ function DonorsView() {
 
   function deleteDonation(d) {
     if (!window.confirm('Delete this donation from ' + d['Donor Name'] + '? This cannot be undone.')) return;
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Donations') + '?id=eq.' + d.id, {
+    fetch(SUPABASE_URL + '/rest/v1/donations?id=eq.' + d.id, {
       method: 'DELETE',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function() {
-      clearCache('2026 Donations');
       setDonations(function(prev) { return prev.filter(function(x) { return x.id !== d.id; }); });
       setSelected(null);
-    });
-    fetch('https://script.google.com/macros/s/AKfycbxknvigF90NbBe86zrXT6JvRlaDQmvsuYuRYCfOOLISwtzDO3X7hH5TIDH7ALemwCWy/exec', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'delete', sheet: '2026 Donations', 'Donor Name': d['Donor Name'], 'Close Date': d['Close Date'] })
     });
   }
 
@@ -1801,16 +1822,38 @@ function DonorsView() {
   function saveEditDonation(e) {
     e.preventDefault();
     setEditSaving(true);
-    var patch = Object.assign({}, editForm);
-    delete patch.id;
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Donations') + '?id=eq.' + editDon.id, {
-      method: 'PATCH',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify(patch)
-    }).then(function(r) { return r.json(); }).then(function(rows) {
+    var donorPatch = {
+      formal_name: editForm['Donor Name'],
+      informal_first_name: editForm['Informal Names'] || null,
+      account_type: editForm['Account Type'] || null,
+      email: editForm['Email'] || null,
+      phone: editForm['Phone Number'] || null,
+      address: editForm['Address'] || null,
+      donor_notes: editForm['Donor Notes'] || null,
+    };
+    var donationPatch = {
+      amount: parseAmount(editForm['Amount']),
+      date: editForm['Close Date'],
+      type: editForm['Donation Type'],
+      payment_type: editForm['Payment Type'] || null,
+      benefits: editForm['Benefits'] || null,
+      acknowledged: !!editForm['Acknowledged'],
+      donation_notes: editForm['Donation Notes'] || null,
+    };
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/donors?id=eq.' + editDon.donor_id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(donorPatch)
+      }),
+      fetch(SUPABASE_URL + '/rest/v1/donations?id=eq.' + editDon.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(donationPatch)
+      })
+    ]).then(function() {
       setEditSaving(false);
-      clearCache('2026 Donations');
-      var updated = rows && rows[0] ? rows[0] : Object.assign({}, editDon, patch);
+      var updated = Object.assign({}, editDon, editForm);
       setDonations(function(prev) { return prev.map(function(x) { return x.id === editDon.id ? updated : x; }); });
       setEditDon(null);
       setSelected(null);
@@ -1826,24 +1869,58 @@ function DonorsView() {
   function handleDonSubmit(e) {
     e.preventDefault();
     setSaving(true);
-    var row = {};
-    Object.keys(form).forEach(function(k) {
-      if (form[k] !== '') row[k] = form[k] === true ? 'TRUE' : form[k] === false ? 'FALSE' : form[k];
-    });
-    sbInsert('2026 Donations', row).then(function(res) {
-      setSaving(false);
-      clearCache('2026 Donations');
-      var inserted = Array.isArray(res) ? res[0] : res;
-      if (inserted && inserted['Donor Name']) setDonations(function(p) { return p.concat([inserted]); });
-      setShowAdd(false);
-      setForm(emptyDonForm);
-      // Sync to Google Sheets → triggers thank you letter generation
-      fetch('https://script.google.com/macros/s/AKfycbxknvigF90NbBe86zrXT6JvRlaDQmvsuYuRYCfOOLISwtzDO3X7hH5TIDH7ALemwCWy/exec', {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ sheet: '2026 Donations', row: row })
-      });
-    }).catch(function() { setSaving(false); });
+    var formalName = form['Donor Name'];
+    fetch(SUPABASE_URL + '/rest/v1/donors?formal_name=ilike.' + encodeURIComponent(formalName) + '&limit=1&select=id', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(existingDonors) {
+        if (Array.isArray(existingDonors) && existingDonors.length > 0) {
+          return existingDonors[0].id;
+        }
+        return fetch(SUPABASE_URL + '/rest/v1/donors', {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+          body: JSON.stringify({
+            formal_name: formalName,
+            informal_first_name: form['Informal Names'] || null,
+            account_type: form['Account Type'] || null,
+            email: form['Email'] || null,
+            phone: form['Phone Number'] || null,
+            address: form['Address'] || null,
+            donor_notes: form['Donor Notes'] || null,
+          })
+        }).then(function(r) { return r.json(); }).then(function(rows) { return rows[0].id; });
+      })
+      .then(function(donorId) {
+        return fetch(SUPABASE_URL + '/rest/v1/donations', {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+          body: JSON.stringify({
+            donor_id: donorId,
+            amount: parseAmount(form['Amount']),
+            date: form['Close Date'],
+            type: form['Donation Type'],
+            payment_type: form['Payment Type'] || null,
+            benefits: form['Benefits'] || null,
+            acknowledged: !!form['Acknowledged'],
+            donation_notes: form['Donation Notes'] || null,
+          })
+        }).then(function(r) { return r.json(); }).then(function(rows) {
+          return fetch(SUPABASE_URL + '/rest/v1/donations?id=eq.' + rows[0].id + '&select=*,donors(*)', {
+            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+          }).then(function(r) { return r.json(); });
+        });
+      })
+      .then(function(rows) {
+        setSaving(false);
+        if (Array.isArray(rows) && rows[0]) {
+          setDonations(function(p) { return [normalizeDonation(rows[0])].concat(p); });
+        }
+        setShowAdd(false);
+        setForm(emptyDonForm);
+      })
+      .catch(function() { setSaving(false); });
   }
 
   var DONOR_TIERS = [
