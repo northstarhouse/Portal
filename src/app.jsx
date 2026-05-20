@@ -1756,11 +1756,12 @@ function DonorsView() {
   const [donations, setDonations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selected, setSelected] = useState(null);
+  const [selectedDonor, setSelectedDonor] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filterType, setFilterType] = useState('All');
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
+  const [search, setSearch] = useState('');
   const [editDon, setEditDon] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
@@ -1821,13 +1822,13 @@ function DonorsView() {
   }, []);
 
   useEffect(function() {
-    if (!selected) { setDonorBenefits([]); return; }
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Donor Benefits') + '?donor_name=eq.' + encodeURIComponent(selected['Donor Name']) + '&select=*', {
+    if (!selectedDonor) { setDonorBenefits([]); return; }
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Donor Benefits') + '?donor_name=eq.' + encodeURIComponent(selectedDonor.name) + '&select=*', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
       setDonorBenefits(Array.isArray(rows) ? rows.map(function(r) { return r.benefit; }) : []);
     });
-  }, [selected]);
+  }, [selectedDonor]);
 
   function parseAmount(val) {
     return parseFloat((val || '0').replace(/[^\d.]/g, '') || 0);
@@ -1866,7 +1867,7 @@ function DonorsView() {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function() {
       setDonations(function(prev) { return prev.filter(function(x) { return x.id !== d.id; }); });
-      setSelected(null);
+      setSelectedDonor(null);
     });
   }
 
@@ -1916,7 +1917,7 @@ function DonorsView() {
       var updated = Object.assign({}, editDon, editForm);
       setDonations(function(prev) { return prev.map(function(x) { return x.id === editDon.id ? updated : x; }); });
       setEditDon(null);
-      setSelected(null);
+      setSelectedDonor(null);
     });
   }
 
@@ -2014,9 +2015,10 @@ function DonorsView() {
   }
 
   function toggleBenefit(benefit) {
+    if (!selectedDonor) return;
     var checked = donorBenefits.indexOf(benefit) !== -1;
     if (checked) {
-      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Donor Benefits') + '?donor_name=eq.' + encodeURIComponent(selected['Donor Name']) + '&benefit=eq.' + encodeURIComponent(benefit), {
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Donor Benefits') + '?donor_name=eq.' + encodeURIComponent(selectedDonor.name) + '&benefit=eq.' + encodeURIComponent(benefit), {
         method: 'DELETE',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
       }).then(function() { setDonorBenefits(function(prev) { return prev.filter(function(b) { return b !== benefit; }); }); });
@@ -2024,7 +2026,7 @@ function DonorsView() {
       fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Donor Benefits'), {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ donor_name: selected['Donor Name'], benefit: benefit })
+        body: JSON.stringify({ donor_name: selectedDonor.name, benefit: benefit })
       }).then(function() { setDonorBenefits(function(prev) { return prev.concat([benefit]); }); });
     }
   }
@@ -2035,6 +2037,49 @@ function DonorsView() {
     if (!donorYTD[n]) donorYTD[n] = 0;
     donorYTD[n] += parseAmount(d['Amount']);
   });
+
+  var donorGroups = {};
+  yearDonations
+    .filter(function(d) { return filterType === 'All' || d['Donation Type'] === filterType; })
+    .forEach(function(d) {
+      var key = d.donor_id || d['Donor Name'];
+      if (!donorGroups[key]) {
+        donorGroups[key] = {
+          donor_id: d.donor_id,
+          name: d['Donor Name'],
+          accountType: d['Account Type'],
+          email: d['Email'],
+          phone: d['Phone Number'],
+          address: d['Address'],
+          background: d['Background'],
+          firstConnected: d['First Connected'],
+          nshContact: d['NSH Contact'],
+          donorNotes: d['Donor Notes'],
+          informalNames: d['Informal Names'],
+          total: 0,
+          donations: [],
+          lastGiftDate: null,
+          hasPending: false,
+        };
+      }
+      var rec = donorGroups[key];
+      rec.total += parseAmount(d['Amount']);
+      rec.donations.push(d);
+      if (!rec.lastGiftDate || d['Close Date'] > rec.lastGiftDate) rec.lastGiftDate = d['Close Date'];
+      var acked = d['Acknowledged'] === true || String(d['Acknowledged']).toUpperCase() === 'TRUE';
+      if (!acked) rec.hasPending = true;
+    });
+
+  var donorList = Object.values(donorGroups).sort(function(a, b) { return b.total - a.total; });
+  var searchedDonors = search
+    ? donorList.filter(function(d) { return d.name.toLowerCase().includes(search.toLowerCase()) || (d.email || '').toLowerCase().includes(search.toLowerCase()); })
+    : donorList;
+
+  var filteredTotal = searchedDonors.reduce(function(s, d) { return s + d.total; }, 0);
+  var filteredMemberships = searchedDonors.filter(function(d) {
+    return d.donations.some(function(don) { return (don['Donation Type'] || '').includes('Membership'); });
+  }).length;
+  var filteredPending = searchedDonors.filter(function(d) { return d.hasPending; }).length;
 
   var iStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
   var lStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
@@ -2052,150 +2097,133 @@ function DonorsView() {
 
   return (
     <div>
+      {/* Stats cards — update with filters */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <StatCard label="Total Raised" value={loading ? '...' : '$' + totalRaised.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub={yearFilter === 'All' ? 'All Years' : yearFilter + ' YTD'} />
-        <StatCard label="Donations" value={loading ? '...' : totalDonors} />
-        <StatCard label="Memberships" value={loading ? '...' : memberships} />
-        <StatCard label="Need Thank You" value={loading ? '...' : unacknowledged} sub={unacknowledged > 0 ? '' : 'all clear'} />
+        <StatCard label="Total Raised" value={loading ? '...' : '$' + filteredTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub={yearFilter === 'All' ? 'All Years' : yearFilter + ' YTD'} />
+        <StatCard label="Donors" value={loading ? '...' : searchedDonors.length} sub="in view" />
+        <StatCard label="Memberships" value={loading ? '...' : filteredMemberships} />
+        <StatCard label="Need Thank You" value={loading ? '...' : filteredPending} sub={filteredPending > 0 ? '' : 'all clear'} />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+      {/* Controls */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
+          <input value={search} onChange={function(e) { setSearch(e.target.value); }} placeholder="Search donors..."
+            style={{ padding: '6px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, width: 180, background: '#fff' }} />
           {['All'].concat(availableYears).map(function(y) {
             var active = yearFilter === y;
             return (
-              <button key={y} onClick={function() { setYearFilter(y); setFilterType('All'); }}
-                style={{ padding: '4px 12px', borderRadius: 5, border: '1.5px solid ' + (active ? gold : '#e0d8cc'), background: active ? gold : '#fff', color: active ? '#fff' : '#888', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}>
+              <button key={y} onClick={function() { setYearFilter(y); setFilterType('All'); setSearch(''); }}
+                style={{ padding: '4px 12px', borderRadius: 5, border: '1.5px solid ' + (active ? gold : '#e0d8cc'), background: active ? gold : '#fff', color: active ? '#fff' : '#888', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer' }}>
                 {y}
               </button>
             );
           })}
+          <select value={filterType} onChange={function(e) { setFilterType(e.target.value); }}
+            style={{ padding: '5px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, background: '#fff', color: filterType === 'All' ? '#888' : '#333' }}>
+            <option value="All">All Types</option>
+            {DONATION_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+          </select>
         </div>
-        <button onClick={function() { setForm(emptyDonForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Donation</button>
+        <button onClick={function() { setForm(emptyDonForm); setShowAdd(true); }}
+          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          + Add Donation
+        </button>
       </div>
 
       {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#c0392b' }}>Error: {error}</div>}
 
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: '#aaa', alignSelf: 'center', marginRight: 4 }}>{loading ? '' : totalDonors + ' donation' + (totalDonors !== 1 ? 's' : '')}</div>
-        {['All'].concat(DONATION_TYPES).map(function(t) {
-          var active = filterType === t;
-          var tc = typeColors[t] || { bg: '#f5f0ea', color: '#888' };
-          return (
-            <button key={t} onClick={function() { setFilterType(t); }}
-              style={{ padding: '5px 14px', borderRadius: 5, border: '1.5px solid ' + (active ? tc.color : '#e0d8cc'), background: active ? tc.bg : '#fff', color: active ? tc.color : '#888', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer', transition: 'all 0.15s' }}>
-              {t}
-            </button>
-          );
-        })}
-      </div>
-
+      {/* Donor list */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#777', fontSize: 12 }}>Loading donations...</div>
+        <div style={{ textAlign: 'center', padding: 40, color: '#777', fontSize: 12 }}>Loading donors...</div>
       ) : (
         <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 0, padding: '8px 16px', borderBottom: '0.5px solid #e8e0d4', background: '#faf8f4' }}>
-            {['Donor', 'Type', 'Amount', 'Date'].map(function(h) {
-              return <div key={h} style={{ fontSize: 12, color: '#777', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>{h}</div>;
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 0.8fr 1fr', gap: 0, padding: '8px 16px', borderBottom: '0.5px solid #e8e0d4', background: '#faf8f4' }}>
+            {['Donor', 'Tier', 'Total', 'Gifts', 'Last Gift'].map(function(h) {
+              return <div key={h} style={{ fontSize: 11, color: '#777', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>{h}</div>;
             })}
           </div>
-          {yearDonations.filter(function(d) { return filterType === 'All' || d['Donation Type'] === filterType; }).map(function(d, i) {
-            var tc = typeColors[d['Donation Type']] || { bg: '#f3f3f3', color: '#555' };
-            var acked = d['Acknowledged'] === true || String(d['Acknowledged']).toUpperCase() === 'TRUE';
+          {searchedDonors.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 32, color: '#aaa', fontSize: 12 }}>No donors found</div>
+          ) : searchedDonors.map(function(d, i) {
+            var tier = getDonorTier(d.total);
             return (
-              <div
-                key={i}
-                onClick={function() { setSelected(d); }}
+              <div key={d.donor_id || i}
+                onClick={function() { setSelectedDonor(d); }}
                 onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
                 onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}
-                style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 0, padding: '11px 16px', borderBottom: '0.5px solid #f0ebe2', cursor: 'pointer', background: '#fff', alignItems: 'center', transition: 'background 0.12s' }}
-              >
+                style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 0.8fr 1fr', gap: 0, padding: '11px 16px', borderBottom: '0.5px solid #f0ebe2', cursor: 'pointer', background: '#fff', alignItems: 'center', transition: 'background 0.12s' }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {(function() {
-                      var tier = getDonorTier(donorYTD[d['Donor Name']] || 0);
-                      return tier ? <span style={{ fontSize: 13, color: tier.color, lineHeight: 1 }} title={tier.name}>✦</span> : null;
-                    })()}
-                    <span style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a' }}>{d['Donor Name']}</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#999', marginTop: 1 }}>{d['Account Type']}</div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a' }}>{d.name}</div>
+                  {d.accountType && <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{d.accountType}</div>}
                 </div>
                 <div>
-                  <span style={{ background: tc.bg, color: tc.color, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>{d['Donation Type']}</span>
+                  {tier
+                    ? <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '2px 8px', whiteSpace: 'nowrap' }}>✦ {tier.name.split(' ').slice(0,2).join(' ')}</span>
+                    : <span style={{ fontSize: 11, color: '#ddd' }}>—</span>}
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{fmtAmount(d['Amount'])}</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 12, color: '#888' }}>{fmtDate(d['Close Date'])}</span>
-                  <span style={{ fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: acked ? '#e8f5e9' : '#fff8e1', color: acked ? '#2e7d32' : '#8a6200' }}>{acked ? 'Thanked' : 'Pending'}</span>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>${d.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 12, color: '#666' }}>{d.donations.length}</span>
+                  {d.hasPending && <span style={{ fontSize: 10, background: '#fff8e1', color: '#8a6200', padding: '1px 5px', borderRadius: 20, fontWeight: 500 }}>!</span>}
                 </div>
+                <div style={{ fontSize: 12, color: '#888' }}>{fmtDate(d.lastGiftDate)}</div>
               </div>
             );
           })}
         </div>
       )}
 
-      {selected && (
-        <div onClick={function() { setSelected(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 540, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Donor detail modal */}
+      {selectedDonor && (
+        <div onClick={function() { setSelectedDonor(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 580, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ background: 'linear-gradient(135deg, #f8f4ec 0%, #f0e8dc 100%)', padding: '24px 28px 18px', borderBottom: '0.5px solid #e8dece', position: 'relative', borderRadius: '16px 16px 0 0' }}>
-              <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 4 }}>{selected['Donor Name']}</div>
+              <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 2 }}>{selectedDonor.name}</div>
+              {selectedDonor.informalNames && <div style={{ fontSize: 12, color: '#888', marginBottom: 6 }}>Goes by {selectedDonor.informalNames}</div>}
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                {(function() { var tc = typeColors[selected['Donation Type']] || { bg: '#f3f3f3', color: '#555' }; return <span style={{ background: tc.bg, color: tc.color, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20 }}>{selected['Donation Type']}</span>; })()}
-                <span style={{ fontSize: 12, color: '#777' }}>{fmtDate(selected['Close Date'])}</span>
                 {(function() {
-                  var ytd = donorYTD[selected['Donor Name']] || 0;
-                  var tier = getDonorTier(ytd);
+                  var tier = getDonorTier(selectedDonor.total);
                   return tier ? <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '2px 10px' }}>✦ {tier.name}</span> : null;
                 })()}
+                {selectedDonor.accountType && <span style={{ fontSize: 11, color: '#888', background: '#f5f0ea', border: '0.5px solid #e0d8cc', borderRadius: 20, padding: '2px 8px' }}>{selectedDonor.accountType}</span>}
+                <span style={{ fontSize: 12, fontWeight: 600, color: gold }}>${selectedDonor.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {yearFilter !== 'All' ? yearFilter : ''} total</span>
               </div>
-              <button onClick={function() { setSelected(null); }} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: '#666' }}>×</button>
+              <button onClick={function() { setSelectedDonor(null); }} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: '#666' }}>×</button>
             </div>
             <div style={{ padding: '20px 28px 24px', overflowY: 'auto', flex: 1 }}>
-              <div style={{ marginBottom: 20 }}><span style={{ fontSize: 12, color: '#777', marginRight: 8 }}>Amount</span><span style={{ fontSize: 16, fontWeight: 600, color: gold }}>{fmtAmount(selected['Amount'])}</span></div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px' }}>
+              {/* Contact info */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px', marginBottom: 16 }}>
                 <div>
-                  <span style={sec}>Donor Info</span>
-                  {selected['Informal Names'] && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Goes by</span>{selected['Informal Names']}</div>}
-                  {selected['Account Type'] && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Type</span>{selected['Account Type']}</div>}
-                  {selected['Email'] && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Email</span><a href={'mailto:' + selected['Email']} style={{ color: gold, textDecoration: 'none' }}>{selected['Email']}</a></div>}
-                  {selected['Phone Number'] && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Phone</span>{selected['Phone Number']}</div>}
-                  {selected['Address'] && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Address</span><span style={{ whiteSpace: 'pre-line' }}>{selected['Address']}</span></div>}
-                  <span style={sec}>Payment</span>
-                  {selected['Payment Type'] && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Method</span>{selected['Payment Type']}</div>}
-                  {selected['Benefits'] && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Benefits</span>{selected['Benefits']}</div>}
-                  <div style={{ fontSize: 12, marginBottom: 8 }}>
-                    <span style={{ color: '#777', marginRight: 8 }}>Acknowledged</span>
-                    <span style={{ fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: (selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? '#e8f5e9' : '#fff8e1', color: (selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? '#2e7d32' : '#8a6200' }}>
-                      {(selected['Acknowledged'] === true || String(selected['Acknowledged']).toUpperCase() === 'TRUE') ? 'Thanked' : 'Pending'}
-                    </span>
-                  </div>
+                  {selectedDonor.email && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Email</span><a href={'mailto:' + selectedDonor.email} style={{ color: gold, textDecoration: 'none' }}>{selectedDonor.email}</a></div>}
+                  {selectedDonor.phone && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Phone</span>{selectedDonor.phone}</div>}
+                  {selectedDonor.address && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Address</span><span style={{ whiteSpace: 'pre-line' }}>{selectedDonor.address}</span></div>}
+                  {selectedDonor.nshContact && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>NSH Contact</span>{selectedDonor.nshContact}</div>}
                 </div>
                 <div>
-                  {selected['Donation Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>Donation Notes</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Donation Notes']}</div></div>}
-                  {selected['Background'] && <div style={{ marginBottom: 12 }}><span style={sec}>Background</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Background']}</div></div>}
-                  {selected['First Connected'] && <div style={{ marginBottom: 12 }}><span style={sec}>What Ties Them to NSH</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['First Connected']}</div></div>}
-                  {selected['NSH Contact'] && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>NSH Contact</span>{selected['NSH Contact']}</div>}
-                  {selected['Donor Notes'] && <div style={{ marginBottom: 12 }}><span style={sec}>More Donor Notes</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '10px 14px', color: '#444', lineHeight: 1.6 }}>{selected['Donor Notes']}</div></div>}
+                  {selectedDonor.background && <div style={{ marginBottom: 10 }}><span style={sec}>Background</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.6 }}>{selectedDonor.background}</div></div>}
+                  {selectedDonor.firstConnected && <div style={{ marginBottom: 10 }}><span style={sec}>What Ties Them to NSH</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.6 }}>{selectedDonor.firstConnected}</div></div>}
+                  {selectedDonor.donorNotes && <div style={{ marginBottom: 10 }}><span style={sec}>Donor Notes</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.6 }}>{selectedDonor.donorNotes}</div></div>}
                 </div>
               </div>
+              {/* Tier benefits */}
               {(function() {
-                var ytd = donorYTD[selected['Donor Name']] || 0;
-                var tier = getDonorTier(ytd);
+                var tier = getDonorTier(selectedDonor.total);
                 if (!tier) return null;
                 var benefits = getAllBenefits(tier);
                 return (
-                  <div style={{ marginTop: 20, padding: '14px 16px', background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <div style={{ marginBottom: 16, padding: '12px 14px', background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                       <span style={{ fontSize: 12, fontWeight: 700, color: tier.color }}>✦ {tier.name}</span>
-                      <span style={{ fontSize: 11, color: tier.color, opacity: 0.7 }}>{tier.range} · YTD ${ytd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span style={{ fontSize: 11, color: tier.color, opacity: 0.7 }}>{tier.range}</span>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                       {benefits.map(function(b) {
                         var checked = donorBenefits.indexOf(b) !== -1;
                         return (
                           <label key={b} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
                             <input type="checkbox" checked={checked} onChange={function() { toggleBenefit(b); }} style={{ marginTop: 2, accentColor: tier.color, flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, color: tier.color, opacity: checked ? 1 : 0.7, textDecoration: checked ? 'none' : 'none', fontWeight: checked ? 600 : 400, lineHeight: 1.4 }}>{b}</span>
+                            <span style={{ fontSize: 12, color: tier.color, fontWeight: checked ? 600 : 400, lineHeight: 1.4 }}>{b}</span>
                           </label>
                         );
                       })}
@@ -2203,10 +2231,29 @@ function DonorsView() {
                   </div>
                 );
               })()}
-              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                <button onClick={function() { setSelected(null); }} style={{ flex: 1, padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#999', fontWeight: 500 }}>Close</button>
-                <button onClick={function() { setEditDon(selected); setEditForm(Object.assign({}, selected)); }} style={{ padding: '9px 20px', background: gold, border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#fff', fontWeight: 500 }}>Edit</button>
+              {/* Donation history */}
+              <span style={sec}>Donation History</span>
+              <div style={{ border: '0.5px solid #e0d8cc', borderRadius: 8, overflow: 'hidden' }}>
+                {selectedDonor.donations.sort(function(a, b) { return b['Close Date'] > a['Close Date'] ? 1 : -1; }).map(function(don, i) {
+                  var tc = typeColors[don['Donation Type']] || { bg: '#f3f3f3', color: '#555' };
+                  var acked = don['Acknowledged'] === true || String(don['Acknowledged']).toUpperCase() === 'TRUE';
+                  return (
+                    <div key={don.id || i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderBottom: i < selectedDonor.donations.length - 1 ? '0.5px solid #f0ebe2' : 'none', background: '#fff' }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
+                        <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 20, whiteSpace: 'nowrap' }}>{don['Donation Type']}</span>
+                        <span style={{ fontSize: 12, color: '#888' }}>{fmtDate(don['Close Date'])}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{fmtAmount(don['Amount'])}</span>
+                        <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 20, background: acked ? '#e8f5e9' : '#fff8e1', color: acked ? '#2e7d32' : '#8a6200' }}>{acked ? 'Thanked' : 'Pending'}</span>
+                      </div>
+                      <button onClick={function(e) { e.stopPropagation(); setEditDon(don); setEditForm(Object.assign({}, don)); }}
+                        style={{ fontSize: 11, color: '#888', background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', cursor: 'pointer' }}>
+                        Edit
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
+              <button onClick={function() { setSelectedDonor(null); }} style={{ width: '100%', marginTop: 16, padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#999', fontWeight: 500 }}>Close</button>
             </div>
           </div>
         </div>
