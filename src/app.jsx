@@ -2842,6 +2842,45 @@ function StrategyView() {
   const [editForm, setEditForm] = useS({});
   const [saving, setSaving] = useS(false);
   const [showUpdatesFor, setShowUpdatesFor] = useS(null);
+  const [slides, setSlides] = useS({});
+  const [uploadingQ, setUploadingQ] = useS(null);
+
+  var SLIDE_YEAR = new Date().getFullYear();
+  var SLIDE_QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'];
+  var SLIDE_BUCKET = 'strategic-plan-slides';
+
+  useE(function() {
+    var loaded = {};
+    var checks = SLIDE_QUARTERS.map(function(q) {
+      var url = SUPABASE_URL + '/storage/v1/object/public/' + SLIDE_BUCKET + '/' + SLIDE_YEAR + '/' + q + '.pdf';
+      return fetch(url, { method: 'HEAD' }).then(function(r) {
+        if (r.ok) loaded[q] = url;
+      }).catch(function() {});
+    });
+    Promise.all(checks).then(function() { setSlides(Object.assign({}, loaded)); });
+  }, []);
+
+  function uploadSlide(q, file) {
+    if (!file) return;
+    setUploadingQ(q);
+    var path = SLIDE_YEAR + '/' + q + '.pdf';
+    var url = SUPABASE_URL + '/storage/v1/object/' + SLIDE_BUCKET + '/' + path;
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/pdf',
+        'x-upsert': 'true',
+      },
+      body: file,
+    }).then(function(r) {
+      if (!r.ok) { r.text().then(function(t) { alert('Upload failed: ' + t); }); setUploadingQ(null); return; }
+      var publicUrl = SUPABASE_URL + '/storage/v1/object/public/' + SLIDE_BUCKET + '/' + path + '?t=' + Date.now();
+      setSlides(function(prev) { return Object.assign({}, prev, { [q]: publicUrl }); });
+      setUploadingQ(null);
+    }).catch(function(e) { alert('Upload error: ' + e.message); setUploadingQ(null); });
+  }
 
   function load(bustCache) {
     if (bustCache) clearCache('Strategic Goals');
@@ -2909,6 +2948,43 @@ function StrategyView() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 20 }}>
             {CATEGORY_ORDER.map(function(cat) { return CatBox(cat); })}
+          </div>
+
+          {/* Quarterly Plan Slides */}
+          <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
+            <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #f0ece6' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>Quarterly Plan Slides</div>
+              <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{SLIDE_YEAR} — upload a PDF slide deck for each quarter</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', borderTop: 'none' }}>
+              {SLIDE_QUARTERS.map(function(q, i) {
+                var url = slides[q];
+                var busy = uploadingQ === q;
+                var inputId = 'slide-upload-' + q;
+                return (
+                  <div key={q} style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, borderLeft: i > 0 ? '0.5px solid #f0ece6' : 'none' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#555' }}>{q}</div>
+                    <div style={{ width: 40, height: 40, borderRadius: 8, background: url ? '#fdecea' : '#faf8f5', border: url ? '0.5px solid #f5c6c2' : '1.5px dashed #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={url ? '#e57373' : '#ccc'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>
+                      </svg>
+                    </div>
+                    {url ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                        <a href={url.split('?')[0]} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 600, color: gold, textDecoration: 'underline' }}>View PDF</a>
+                        <label htmlFor={inputId} style={{ fontSize: 11, color: '#bbb', cursor: 'pointer', textDecoration: 'underline' }}>Replace</label>
+                      </div>
+                    ) : (
+                      <label htmlFor={inputId} style={{ fontSize: 11, fontWeight: 600, padding: '5px 12px', border: '0.5px solid #e0d8cc', borderRadius: 20, color: busy ? '#aaa' : '#666', cursor: busy ? 'default' : 'pointer', background: '#faf8f5' }}>
+                        {busy ? 'Uploading…' : 'Upload PDF'}
+                      </label>
+                    )}
+                    <input id={inputId} type="file" accept="application/pdf" style={{ display: 'none' }}
+                      onChange={function(e) { var f = e.target.files && e.target.files[0]; if (f) uploadSlide(q, f); e.target.value = ''; }} />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       ) : (
