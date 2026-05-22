@@ -1,4 +1,4 @@
-const { useState, useEffect } = React;
+﻿const { useState, useEffect } = React;
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
@@ -125,7 +125,7 @@ function sbFetch(table, columns) {
 
 var CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 var _cache = {};
-var LS_PREFIX = 'nsh3_';
+var LS_PREFIX = 'nsh4_';
 function lsGet(key) {
   try {
     var r = localStorage.getItem(LS_PREFIX + key);
@@ -1752,607 +1752,550 @@ function VolunteersView() {
   );
 }
 
+var DONOR_TIERS_NSH = [
+  { tier: 'blue_giant',    min: 2500, label: 'Blue Giant Star Sponsor', color: '#1565c0', bg: '#dbeafe', border: '#93c5fd' },
+  { tier: 'red_giant',     min: 1000, label: 'Red Giant Star Sponsor',  color: '#b91c1c', bg: '#fee2e2', border: '#fca5a5' },
+  { tier: 'evening_star',  min: 500,  label: 'Evening Star',            color: '#7c3aed', bg: '#ede9fe', border: '#c4b5fd' },
+  { tier: 'morning_star',  min: 250,  label: 'Morning Star',            color: '#d97706', bg: '#fef3c7', border: '#fcd34d' },
+  { tier: 'rising_star',   min: 100,  label: 'Rising Star',             color: '#059669', bg: '#d1fae5', border: '#6ee7b7' },
+  { tier: 'shooting_star', min: 50,   label: 'Shooting Star',           color: '#0284c7', bg: '#e0f2fe', border: '#7dd3fc' },
+  { tier: 'none',          min: 0,    label: 'Non-member',              color: '#9ca3af', bg: '#f9fafb', border: '#e5e7eb' },
+];
+function nshGetTier(cyTotal) { return DONOR_TIERS_NSH.find(function(t){return cyTotal>=t.min;})||DONOR_TIERS_NSH[DONOR_TIERS_NSH.length-1]; }
+function nshGetStatus(lastGiftDate) {
+  if(!lastGiftDate) return 'non_donor';
+  var yr=new Date(lastGiftDate).getFullYear(), now=new Date().getFullYear();
+  if(yr===now) return 'current';
+  if(yr===now-1) return 'recently_lapsed';
+  return 'long_lapsed';
+}
+var NSH_STATUS_PILLS={current:{background:'#d1fae5',color:'#065f46'},recently_lapsed:{background:'#fef9c3',color:'#713f12'},long_lapsed:{background:'#ffedd5',color:'#7c2d12'},non_donor:{background:'#f3f4f6',color:'#6b7280'}};
+var NSH_STATUS_LABELS={current:'Current',recently_lapsed:'Lapsed',long_lapsed:'Long Lapsed',non_donor:'Non-donor'};
+var NSH_TYPE_COLORS={'Donation':{bg:'#dbeafe',color:'#1d4ed8'},'Membership':{bg:'#d1fae5',color:'#065f46'},'Restricted':{bg:'#fce7f3',color:'#831843'},'Membership, Donation':{bg:'#ede9fe',color:'#5b21b6'},'Brick Purchase':{bg:'#fee2e2',color:'#7f1d1d'},'Tribute':{bg:'#fef9c3',color:'#713f12'}};
+
 function DonorsView() {
-  const [donations, setDonations] = useState([]);
+  var THIS_YEAR = new Date().getFullYear();
+  var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
+  var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
+  var ACCOUNT_TYPES = ['Individual','Family','Household','Foundation','Corporate','Organization'];
+  var emptyAddForm = {formal_name:'',informal_first_name:'',account_type:'Individual',email:'',phone:'',address:'',amount:'',date:'',type:'Donation',payment_type:'Website',acknowledged:false,donation_notes:''};
+  var emptyGiftForm = {amount:'',date:'',type:'Donation',payment_type:'Website',acknowledged:false,donation_notes:''};
+
+  const [donors, setDonors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedDonor, setSelectedDonor] = useState(null);
+  const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [filterType, setFilterType] = useState('All');
-  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
-  const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState({});
+  const [filters, setFilters] = useState({search:'',status:'current',tier:'all',donationType:'all',year:'all',hasAddress:'all'});
+  const [sortKey, setSortKey] = useState('last_gift_date');
+  const [sortDir, setSortDir] = useState('desc');
   const [editDon, setEditDon] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
-  const [donorBenefits, setDonorBenefits] = useState([]);
+  const [addGiftForm, setAddGiftForm] = useState(emptyGiftForm);
+  const [addingGift, setAddingGift] = useState(false);
+  const [addForm, setAddForm] = useState(emptyAddForm);
 
   var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
   var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
   var ACCOUNT_TYPES = ['Individual','Family','Household','Foundation','Corporate','Organization'];
 
-  var emptyDonForm = {
-    'Donor Name': '', 'Informal Names': '',
-    'Amount': '', 'Close Date': '', 'Donation Type': 'Donation',
-    'Payment Type': 'Website', 'Account Type': 'Individual',
-    'Acknowledged': false,
-    'Email': '', 'Phone Number': '', 'Employer': '', 'Address': '',
-    'Benefits': '', 'Donation Notes': '',
-    'Background': '', 'First Connected': '', 'NSH Contact': '', 'Donor Notes': ''
-  };
-  const [form, setForm] = useState(emptyDonForm);
-
-  function normalizeDonation(row) {
-    var donor = row.donors || {};
-    return {
-      id: row.id,
-      donor_id: row.donor_id,
-      'Donor Name': donor.formal_name || '',
-      'Informal Names': donor.informal_first_name || '',
-      'Amount': String(row.amount || 0),
-      'Close Date': row.date || '',
-      'Donation Type': row.type || 'Donation',
-      'Payment Type': row.payment_type || '',
-      'Account Type': donor.account_type || '',
-      'Acknowledged': row.acknowledged || false,
-      'Email': donor.email || '',
-      'Phone Number': donor.phone || '',
-      'Employer': donor.employer || '',
-      'Address': donor.address || '',
-      'Benefits': row.benefits || '',
-      'Donation Notes': row.donation_notes || '',
-      'Background': donor.background || '',
-      'First Connected': donor.first_connected || '',
-      'NSH Contact': donor.nsh_contact || '',
-      'Donor Notes': donor.donor_notes || '',
-    };
+  function buildDonor(donorRow, dons) {
+    var cyTotal = dons.filter(function(d){return d.date&&new Date(d.date).getFullYear()===THIS_YEAR;}).reduce(function(s,d){return s+d.amount;},0);
+    var lifeCalc = dons.reduce(function(s,d){return s+d.amount;},0);
+    var lifetimeTotal = Math.max(lifeCalc, donorRow.historical_lifetime_giving||0);
+    var sorted = dons.slice().sort(function(a,b){return b.date>a.date?1:-1;});
+    var lastGift = sorted[0]||null;
+    return Object.assign({},donorRow,{
+      donations: dons,
+      current_year_total: cyTotal,
+      lifetime_total: lifetimeTotal,
+      last_gift_date: lastGift?lastGift.date:null,
+      last_gift_amount: lastGift?lastGift.amount:null,
+      status: nshGetStatus(lastGift?lastGift.date:null),
+      tier: nshGetTier(cyTotal).tier,
+    });
   }
 
+
   useEffect(function() {
-    fetch(SUPABASE_URL + '/rest/v1/donations?select=*,donors(*)&order=date.desc', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (Array.isArray(data)) setDonations(data.map(normalizeDonation));
-        else setError(JSON.stringify(data));
-        setLoading(false);
-      })
-      .catch(function(err) { setError(err.message); setLoading(false); });
+    Promise.all([
+      fetch(SUPABASE_URL+'/rest/v1/donors?select=*&order=formal_name',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
+      fetch(SUPABASE_URL+'/rest/v1/donations?select=*',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();})
+    ]).then(function(results) {
+      var donorRows=results[0], donationRows=results[1];
+      if(!Array.isArray(donorRows)||!Array.isArray(donationRows)){setError('Failed to load');setLoading(false);return;}
+      var byDonor={};
+      donationRows.forEach(function(d){if(!byDonor[d.donor_id])byDonor[d.donor_id]=[];byDonor[d.donor_id].push(d);});
+      setDonors(donorRows.map(function(d){return buildDonor(d,byDonor[d.id]||[]);}));
+      setLoading(false);
+    }).catch(function(err){setError(err.message);setLoading(false);});
   }, []);
 
-  useEffect(function() {
-    if (!selectedDonor) { setDonorBenefits([]); return; }
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Donor Benefits') + '?donor_name=eq.' + encodeURIComponent(selectedDonor.name) + '&select=*', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      setDonorBenefits(Array.isArray(rows) ? rows.map(function(r) { return r.benefit; }) : []);
-    });
-  }, [selectedDonor]);
+  // Derived data
+  var availableYears = (function(){var y={};donors.forEach(function(d){(d.donations||[]).forEach(function(don){if(don.date)y[don.date.slice(0,4)]=true;});});return Object.keys(y).sort(function(a,b){return b-a;});})();
+  var availableTypes = (function(){var t={};donors.forEach(function(d){(d.donations||[]).forEach(function(don){if(don.type)t[don.type]=true;});});return Object.keys(t).sort();})();
 
-  function parseAmount(val) {
-    return parseFloat((val || '0').replace(/[^\d.]/g, '') || 0);
-  }
-
-  function fmtAmount(val) {
-    var n = parseAmount(val);
-    return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  function fmtDate(val) {
-    if (!val) return '';
-    var d = new Date(val + 'T00:00:00');
-    if (isNaN(d)) return val;
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  }
-
-  var availableYears = (function() {
-    var years = {};
-    donations.forEach(function(d) { if (d['Close Date']) years[(d['Close Date']).slice(0, 4)] = true; });
-    return Object.keys(years).sort(function(a, b) { return b - a; });
-  })();
-
-  var yearDonations = yearFilter === 'All' ? donations : donations.filter(function(d) { return (d['Close Date'] || '').startsWith(yearFilter); });
-
-  var totalRaised = yearDonations.reduce(function(s, r) { return s + parseAmount(r['Amount']); }, 0);
-  var totalDonors = yearDonations.length;
-  var memberships = yearDonations.filter(function(r) { return (r['Donation Type'] || '').includes('Membership'); }).length;
-  var acknowledged = yearDonations.filter(function(r) { return r['Acknowledged'] === true || String(r['Acknowledged']).toUpperCase() === 'TRUE'; }).length;
-  var unacknowledged = totalDonors - acknowledged;
-
-  function deleteDonation(d) {
-    if (!window.confirm('Delete this donation from ' + d['Donor Name'] + '? This cannot be undone.')) return;
-    fetch(SUPABASE_URL + '/rest/v1/donations?id=eq.' + d.id, {
-      method: 'DELETE',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function() {
-      setDonations(function(prev) { return prev.filter(function(x) { return x.id !== d.id; }); });
-      setSelectedDonor(null);
-    });
-  }
-
-  function handleEditFormChange(e) {
-    var { name, value, type, checked } = e.target;
-    setEditForm(function(f) { return Object.assign({}, f, { [name]: type === 'checkbox' ? checked : value }); });
-  }
-
-  function saveEditDonation(e) {
-    e.preventDefault();
-    setEditSaving(true);
-    var donorPatch = {
-      formal_name: editForm['Donor Name'],
-      informal_first_name: editForm['Informal Names'] || null,
-      account_type: editForm['Account Type'] || null,
-      email: editForm['Email'] || null,
-      phone: editForm['Phone Number'] || null,
-      employer: editForm['Employer'] || null,
-      address: editForm['Address'] || null,
-      background: editForm['Background'] || null,
-      first_connected: editForm['First Connected'] || null,
-      nsh_contact: editForm['NSH Contact'] || null,
-      donor_notes: editForm['Donor Notes'] || null,
-    };
-    var donationPatch = {
-      amount: parseAmount(editForm['Amount']),
-      date: editForm['Close Date'],
-      type: editForm['Donation Type'],
-      payment_type: editForm['Payment Type'] || null,
-      benefits: editForm['Benefits'] || null,
-      acknowledged: !!editForm['Acknowledged'],
-      donation_notes: editForm['Donation Notes'] || null,
-    };
-    Promise.all([
-      fetch(SUPABASE_URL + '/rest/v1/donors?id=eq.' + editDon.donor_id, {
-        method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify(donorPatch)
-      }),
-      fetch(SUPABASE_URL + '/rest/v1/donations?id=eq.' + editDon.id, {
-        method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify(donationPatch)
-      })
-    ]).then(function() {
-      setEditSaving(false);
-      var updated = Object.assign({}, editDon, editForm);
-      setDonations(function(prev) { return prev.map(function(x) { return x.id === editDon.id ? updated : x; }); });
-      setEditDon(null);
-      setSelectedDonor(null);
-    });
-  }
-
-  function handleDonFormChange(e) {
-    var key = e.target.name;
-    var val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setForm(function(prev) { var n = Object.assign({}, prev); n[key] = val; return n; });
-  }
-
-  function handleDonSubmit(e) {
-    e.preventDefault();
-    setSaving(true);
-    var formalName = form['Donor Name'];
-    fetch(SUPABASE_URL + '/rest/v1/donors?formal_name=ilike.' + encodeURIComponent(formalName) + '&limit=1&select=id', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    })
-      .then(function(r) { return r.json(); })
-      .then(function(existingDonors) {
-        if (Array.isArray(existingDonors) && existingDonors.length > 0) {
-          return existingDonors[0].id;
-        }
-        return fetch(SUPABASE_URL + '/rest/v1/donors', {
-          method: 'POST',
-          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-          body: JSON.stringify({
-            formal_name: formalName,
-            informal_first_name: form['Informal Names'] || null,
-            account_type: form['Account Type'] || null,
-            email: form['Email'] || null,
-            phone: form['Phone Number'] || null,
-            employer: form['Employer'] || null,
-            address: form['Address'] || null,
-          })
-        }).then(function(r) { return r.json(); }).then(function(rows) { return rows[0].id; });
-      })
-      .then(function(donorId) {
-        return fetch(SUPABASE_URL + '/rest/v1/donations', {
-          method: 'POST',
-          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-          body: JSON.stringify({
-            donor_id: donorId,
-            amount: parseAmount(form['Amount']),
-            date: form['Close Date'],
-            type: form['Donation Type'],
-            payment_type: form['Payment Type'] || null,
-            benefits: form['Benefits'] || null,
-            acknowledged: !!form['Acknowledged'],
-            donation_notes: form['Donation Notes'] || null,
-          })
-        }).then(function(r) { return r.json(); }).then(function(rows) {
-          return fetch(SUPABASE_URL + '/rest/v1/donations?id=eq.' + rows[0].id + '&select=*,donors(*)', {
-            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-          }).then(function(r) { return r.json(); });
-        });
-      })
-      .then(function(rows) {
-        setSaving(false);
-        if (Array.isArray(rows) && rows[0]) {
-          setDonations(function(p) { return [normalizeDonation(rows[0])].concat(p); });
-        }
-        setShowAdd(false);
-        setForm(emptyDonForm);
-      })
-      .catch(function() { setSaving(false); });
-  }
-
-  var DONOR_TIERS = [
-    { name: 'Blue Giant Star Sponsor', min: 2500, range: '$2,500–$4,999', color: '#1565c0', bg: '#dbeafe', border: '#93c5fd',
-      ownBenefits: ['Private docent-led tour with complimentary refreshments for up to 12 guests', '4 Complimentary Event Tickets'] },
-    { name: 'Red Giant Star Sponsor', min: 1000, range: '$1,000–$2,499', color: '#b91c1c', bg: '#fee2e2', border: '#fca5a5',
-      ownBenefits: ['Custom engraved plaque with annual "stars"'] },
-    { name: 'Evening Star', min: 500, range: '$500–$999', color: '#c2410c', bg: '#ffedd5', border: '#fdba74',
-      ownBenefits: ['2 Complimentary Tickets to a North Star House event'] },
-    { name: 'Morning Star', min: 250, range: '$250–$499', color: '#7c3aed', bg: '#ede9fe', border: '#c4b5fd',
-      ownBenefits: ['Recognition in our printed and digital event programs'] },
-    { name: 'Rising Star', min: 100, range: '$100–$249', color: '#15803d', bg: '#dcfce7', border: '#86efac',
-      ownBenefits: [] },
-    { name: 'Shooting Star', min: 50, range: '$50–$99', color: '#b45309', bg: '#fef9c3', border: '#fde047',
-      ownBenefits: ['Access to our Online Loyalty Program & Newsletter subscription', 'Invitation to our State of the Star Membership Celebration'] },
-  ];
-
-  function getDonorTier(total) {
-    return DONOR_TIERS.find(function(t) { return total >= t.min; }) || null;
-  }
-
-  function getAllBenefits(tier) {
-    if (!tier) return [];
-    var tiersAsc = DONOR_TIERS.slice().reverse();
-    var result = [];
-    for (var i = 0; i < tiersAsc.length; i++) {
-      result = result.concat(tiersAsc[i].ownBenefits);
-      if (tiersAsc[i].name === tier.name) break;
+  var filteredDonors = donors.filter(function(d) {
+    if(filters.search){var s=filters.search.toLowerCase();if(!(d.formal_name||'').toLowerCase().includes(s)&&!(d.email||'').toLowerCase().includes(s))return false;}
+    if(filters.status!=='all'&&d.status!==filters.status)return false;
+    if(filters.tier!=='all'&&d.tier!==filters.tier)return false;
+    if(filters.hasAddress==='yes'&&!(d.address||'').trim())return false;
+    if(filters.hasAddress==='no'&&(d.address||'').trim())return false;
+    if(filters.donationType!=='all'||filters.year!=='all'){
+      var hasDon=(d.donations||[]).some(function(don){
+        var tm=filters.donationType==='all'||don.type===filters.donationType;
+        var ym=filters.year==='all'||(don.date||'').startsWith(filters.year);
+        return tm&&ym;
+      });
+      if(!hasDon)return false;
     }
-    return result;
-  }
-
-  function toggleBenefit(benefit) {
-    if (!selectedDonor) return;
-    var checked = donorBenefits.indexOf(benefit) !== -1;
-    if (checked) {
-      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Donor Benefits') + '?donor_name=eq.' + encodeURIComponent(selectedDonor.name) + '&benefit=eq.' + encodeURIComponent(benefit), {
-        method: 'DELETE',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-      }).then(function() { setDonorBenefits(function(prev) { return prev.filter(function(b) { return b !== benefit; }); }); });
-    } else {
-      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Donor Benefits'), {
-        method: 'POST',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ donor_name: selectedDonor.name, benefit: benefit })
-      }).then(function() { setDonorBenefits(function(prev) { return prev.concat([benefit]); }); });
-    }
-  }
-
-  var donorYTD = {};
-  yearDonations.forEach(function(d) {
-    var n = d['Donor Name'];
-    if (!donorYTD[n]) donorYTD[n] = 0;
-    donorYTD[n] += parseAmount(d['Amount']);
+    return true;
   });
 
-  var donorGroups = {};
-  yearDonations
-    .filter(function(d) { return filterType === 'All' || d['Donation Type'] === filterType; })
-    .forEach(function(d) {
-      var key = d.donor_id || d['Donor Name'];
-      if (!donorGroups[key]) {
-        donorGroups[key] = {
-          donor_id: d.donor_id,
-          name: d['Donor Name'],
-          accountType: d['Account Type'],
-          email: d['Email'],
-          phone: d['Phone Number'],
-          address: d['Address'],
-          background: d['Background'],
-          firstConnected: d['First Connected'],
-          nshContact: d['NSH Contact'],
-          donorNotes: d['Donor Notes'],
-          informalNames: d['Informal Names'],
-          total: 0,
-          donations: [],
-          lastGiftDate: null,
-          hasPending: false,
-        };
-      }
-      var rec = donorGroups[key];
-      rec.total += parseAmount(d['Amount']);
-      rec.donations.push(d);
-      if (!rec.lastGiftDate || d['Close Date'] > rec.lastGiftDate) rec.lastGiftDate = d['Close Date'];
-      var acked = d['Acknowledged'] === true || String(d['Acknowledged']).toUpperCase() === 'TRUE';
-      if (!acked) rec.hasPending = true;
-    });
+  var totalRaised = filteredDonors.reduce(function(s,d){
+    return s+(d.donations||[]).filter(function(don){
+      var tm=filters.donationType==='all'||don.type===filters.donationType;
+      var ym=filters.year==='all'||(don.date||'').startsWith(filters.year);
+      return tm&&ym;
+    }).reduce(function(ss,don){return ss+don.amount;},0);
+  },0);
+  var membersCount = filteredDonors.filter(function(d){return(d.donations||[]).some(function(don){return(don.type||'').includes('Membership');});}).length;
 
-  var donorList = Object.values(donorGroups).sort(function(a, b) { return b.total - a.total; });
-  var searchedDonors = search
-    ? donorList.filter(function(d) { return d.name.toLowerCase().includes(search.toLowerCase()) || (d.email || '').toLowerCase().includes(search.toLowerCase()); })
-    : donorList;
+  var TIER_ORD={blue_giant:6,red_giant:5,evening_star:4,morning_star:3,rising_star:2,shooting_star:1,none:0};
+  var STATUS_ORD={current:3,recently_lapsed:2,long_lapsed:1,non_donor:0};
+  var sortedDonors = filteredDonors.slice().sort(function(a,b){
+    var cmp=0;
+    if(sortKey==='formal_name')cmp=(a.formal_name||'').localeCompare(b.formal_name||'');
+    else if(sortKey==='status')cmp=(STATUS_ORD[a.status]||0)-(STATUS_ORD[b.status]||0);
+    else if(sortKey==='tier')cmp=(TIER_ORD[a.tier]||0)-(TIER_ORD[b.tier]||0);
+    else if(sortKey==='current_year_total')cmp=a.current_year_total-b.current_year_total;
+    else if(sortKey==='lifetime_total')cmp=a.lifetime_total-b.lifetime_total;
+    else if(sortKey==='last_gift_date')cmp=new Date(a.last_gift_date||'1900').getTime()-new Date(b.last_gift_date||'1900').getTime();
+    return sortDir==='asc'?cmp:-cmp;
+  });
 
-  var filteredTotal = searchedDonors.reduce(function(s, d) { return s + d.total; }, 0);
-  var filteredMemberships = searchedDonors.filter(function(d) {
-    return d.donations.some(function(don) { return (don['Donation Type'] || '').includes('Membership'); });
-  }).length;
-  var filteredPending = searchedDonors.filter(function(d) { return d.hasPending; }).length;
+  var allVisibleIds=sortedDonors.map(function(d){return d.id;});
+  var allChecked=allVisibleIds.length>0&&allVisibleIds.every(function(id){return!!selectedIds[id];});
+  var someChecked=allVisibleIds.some(function(id){return!!selectedIds[id];});
 
-  var iStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
-  var lStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
-  var grp = { marginBottom: 14 };
-  var sec = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
+  function handleSort(key){if(sortKey===key)setSortDir(function(d){return d==='asc'?'desc':'asc';});else{setSortKey(key);setSortDir('desc');}}
+  function toggleAll(){if(allChecked){setSelectedIds({});}else{var n={};allVisibleIds.forEach(function(id){n[id]=true;});setSelectedIds(n);}}
+  function toggleOne(id){setSelectedIds(function(prev){var n=Object.assign({},prev);if(n[id])delete n[id];else n[id]=true;return n;});}
 
-  var typeColors = {
-    'Donation':            { bg: '#e3f2fd', color: '#1565c0' },
-    'Membership':          { bg: '#e8f5e9', color: '#2e7d32' },
-    'Restricted':          { bg: '#fce4ec', color: '#880e4f' },
-    'Membership, Donation':{ bg: '#f3e5f5', color: '#6a1b9a' },
-    'Brick Purchase':      { bg: '#fbe9e7', color: '#8d3d2b' },
-    'Tribute':             { bg: '#fff8e1', color: '#8a6200' },
-  };
+  function fmtAmt(n){return(n||0).toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});}
+  function fmtAmtFull(n){return(n||0).toLocaleString('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2});}
+  function fmtDate(d){if(!d)return '—';return new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+
+  function exportCSV(){
+    var headers=['Name','Status','Tier','This Year','Lifetime','Last Gift','Email','Phone','Address'];
+    var rows=sortedDonors.map(function(d){return [d.formal_name,d.status,d.tier,d.current_year_total,d.lifetime_total,d.last_gift_date||'',d.email||'',d.phone||'','"'+(d.address||'').replace(/"/g,"'")+'"'].join(',');});
+    var csv=[headers.join(',')].concat(rows).join('\n');
+    var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='donors.csv';a.click();URL.revokeObjectURL(url);
+  }
+
+  function updateDonorInState(donorId, updater) {
+    setDonors(function(prev){return prev.map(function(d){if(d.id!==donorId)return d;var newD=updater(d);return buildDonor(Object.assign({},d),newD.donations);});});
+    setSelected(function(prev){if(!prev||prev.id!==donorId)return prev;var newD=updater(prev);return buildDonor(Object.assign({},prev),newD.donations);});
+  }
+
+  function deleteDonation(don){
+    if(!window.confirm('Delete this donation? This cannot be undone.'))return;
+    fetch(SUPABASE_URL+'/rest/v1/donations?id=eq.'+don.id,{method:'DELETE',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}})
+      .then(function(){
+        if(selected)updateDonorInState(selected.id,function(d){return{donations:d.donations.filter(function(x){return x.id!==don.id;})};});
+        setEditDon(null);
+      });
+  }
+
+  function saveEditDonation(e){
+    e.preventDefault();setEditSaving(true);
+    var patch={amount:parseFloat(String(editForm.amount||0).replace(/[^\d.]/g,'')||0),date:editForm.date,type:editForm.type,payment_type:editForm.payment_type||null,acknowledged:!!editForm.acknowledged,donation_notes:editForm.donation_notes||null};
+    fetch(SUPABASE_URL+'/rest/v1/donations?id=eq.'+editDon.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(patch)})
+      .then(function(r){return r.json();}).then(function(rows){
+        setEditSaving(false);
+        var updated=Array.isArray(rows)?rows[0]:rows;
+        if(selected)updateDonorInState(selected.id,function(d){return{donations:d.donations.map(function(x){return x.id===editDon.id?Object.assign({},x,updated):x;})};});
+        setEditDon(null);
+      }).catch(function(){setEditSaving(false);});
+  }
+
+  function submitAddGift(e){
+    e.preventDefault();setAddingGift(true);
+    if(!selected)return;
+    fetch(SUPABASE_URL+'/rest/v1/donations',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},
+      body:JSON.stringify({donor_id:selected.id,amount:parseFloat(String(addGiftForm.amount||0).replace(/[^\d.]/g,'')||0),date:addGiftForm.date,type:addGiftForm.type,payment_type:addGiftForm.payment_type||null,acknowledged:!!addGiftForm.acknowledged,donation_notes:addGiftForm.donation_notes||null})})
+      .then(function(r){return r.json();}).then(function(rows){
+        setAddingGift(false);
+        var newDon=Array.isArray(rows)?rows[0]:rows;
+        updateDonorInState(selected.id,function(d){return{donations:d.donations.concat([newDon])};});
+        setAddGiftForm(emptyGiftForm);
+      }).catch(function(){setAddingGift(false);});
+  }
+
+  function handleAddSubmit(e){
+    e.preventDefault();setSaving(true);
+    fetch(SUPABASE_URL+'/rest/v1/donors?formal_name=ilike.'+encodeURIComponent(addForm.formal_name)+'&limit=1&select=id',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}})
+      .then(function(r){return r.json();}).then(function(existing){
+        if(Array.isArray(existing)&&existing.length>0)return existing[0].id;
+        return fetch(SUPABASE_URL+'/rest/v1/donors',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},
+          body:JSON.stringify({formal_name:addForm.formal_name,informal_first_name:addForm.informal_first_name||null,account_type:addForm.account_type||null,email:addForm.email||null,phone:addForm.phone||null,address:addForm.address||null,historical_lifetime_giving:0,historical_donation_count:0})})
+          .then(function(r){return r.json();}).then(function(rows){return rows[0].id;});
+      }).then(function(donorId){
+        return fetch(SUPABASE_URL+'/rest/v1/donations',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},
+          body:JSON.stringify({donor_id:donorId,amount:parseFloat(String(addForm.amount||0).replace(/[^\d.]/g,'')||0),date:addForm.date,type:addForm.type,payment_type:addForm.payment_type||null,acknowledged:!!addForm.acknowledged,donation_notes:addForm.donation_notes||null})})
+          .then(function(r){return r.json();}).then(function(donRows){
+            var newDon=Array.isArray(donRows)?donRows[0]:donRows;
+            return fetch(SUPABASE_URL+'/rest/v1/donors?id=eq.'+donorId+'&select=*',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}})
+              .then(function(r){return r.json();}).then(function(dr){return{donor:Array.isArray(dr)?dr[0]:dr,donation:newDon};});
+          });
+      }).then(function(result){
+        setSaving(false);
+        var d=result.donor,don=result.donation;
+        var newDonorObj=buildDonor(d,[don]);
+        setDonors(function(prev){
+          var exists=prev.some(function(x){return x.id===d.id;});
+          if(exists){return prev.map(function(x){if(x.id!==d.id)return x;return buildDonor(Object.assign({},x),x.donations.concat([don]));});}
+          return [newDonorObj].concat(prev);
+        });
+        setShowAdd(false);setAddForm(emptyAddForm);
+      }).catch(function(){setSaving(false);});
+  }
+
+  var iStyle={width:'100%',padding:'8px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,marginTop:4,boxSizing:'border-box',fontFamily:'system-ui, sans-serif',background:'#fff'};
+  var lStyle={fontSize:12,color:'#666',fontWeight:500};
+  var sec={fontSize:11,textTransform:'uppercase',letterSpacing:1.2,color:'#888',fontWeight:600,marginBottom:6,marginTop:16,display:'block'};
+
+  function getDonsByYear(dons){
+    var byY={};
+    (dons||[]).forEach(function(d){var yr=d.date?d.date.slice(0,4):'?';if(!byY[yr])byY[yr]=[];byY[yr].push(d);});
+    return Object.keys(byY).sort(function(a,b){return b-a;}).map(function(yr){return{year:yr,dons:byY[yr]};});
+  }
 
   return (
-    <div>
-      {/* Stats cards — update with filters */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <StatCard label="Total Raised" value={loading ? '...' : '$' + filteredTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} sub={yearFilter === 'All' ? 'All Years' : yearFilter + ' YTD'} />
-        <StatCard label="Donors" value={loading ? '...' : searchedDonors.length} sub="in view" />
-        <StatCard label="Memberships" value={loading ? '...' : filteredMemberships} />
-        <StatCard label="Need Thank You" value={loading ? '...' : filteredPending} sub={filteredPending > 0 ? '' : 'all clear'} />
+    <div style={{position:'relative'}}>
+      {/* Filter bar */}
+      <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8,marginBottom:14}}>
+        <div style={{position:'relative',flex:'1 1 160px',minWidth:160}}>
+          <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'#aaa',fontSize:12,pointerEvents:'none'}}>🔍</span>
+          <input type="text" placeholder="Search donors..." value={filters.search}
+            onChange={function(e){setFilters(function(f){return Object.assign({},f,{search:e.target.value});});}}
+            style={{width:'100%',padding:'7px 12px 7px 30px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff',boxSizing:'border-box'}} />
+        </div>
+        <select value={filters.status} onChange={function(e){setFilters(function(f){return Object.assign({},f,{status:e.target.value});});}}
+          style={{padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff'}}>
+          <option value="all">All Statuses</option>
+          <option value="current">Current</option>
+          <option value="recently_lapsed">Recently Lapsed</option>
+          <option value="long_lapsed">Long Lapsed</option>
+          <option value="non_donor">Non-Donor</option>
+        </select>
+        <select value={filters.tier} onChange={function(e){setFilters(function(f){return Object.assign({},f,{tier:e.target.value});});}}
+          style={{padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff'}}>
+          <option value="all">All Tiers</option>
+          {DONOR_TIERS_NSH.filter(function(t){return t.tier!=='none';}).map(function(t){return <option key={t.tier} value={t.tier}>{t.label}</option>;})}
+        </select>
+        <select value={filters.donationType} onChange={function(e){setFilters(function(f){return Object.assign({},f,{donationType:e.target.value});});}}
+          style={{padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff'}}>
+          <option value="all">All Types</option>
+          {availableTypes.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+        </select>
+        <select value={filters.year} onChange={function(e){setFilters(function(f){return Object.assign({},f,{year:e.target.value});});}}
+          style={{padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff'}}>
+          <option value="all">All Years</option>
+          {availableYears.map(function(y){return <option key={y} value={y}>{y}</option>;})}
+        </select>
+        <select value={filters.hasAddress} onChange={function(e){setFilters(function(f){return Object.assign({},f,{hasAddress:e.target.value});});}}
+          style={{padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff'}}>
+          <option value="all">All</option>
+          <option value="yes">Has Address</option>
+          <option value="no">No Address</option>
+        </select>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginLeft:'auto'}}>
+          <span style={{fontSize:11,color:'#aaa'}}>{filteredDonors.length} donor{filteredDonors.length!==1?'s':''}</span>
+          <button onClick={exportCSV} style={{padding:'7px 14px',background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>↓ Export CSV</button>
+          <button onClick={function(){setAddForm(emptyAddForm);setShowAdd(true);}} style={{padding:'7px 14px',background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>+ Add Donation</button>
+        </div>
       </div>
 
-      {/* Controls */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
-          <input value={search} onChange={function(e) { setSearch(e.target.value); }} placeholder="Search donors..."
-            style={{ padding: '6px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, width: 180, background: '#fff' }} />
-          {['All'].concat(availableYears).map(function(y) {
-            var active = yearFilter === y;
-            return (
-              <button key={y} onClick={function() { setYearFilter(y); setFilterType('All'); setSearch(''); }}
-                style={{ padding: '4px 12px', borderRadius: 5, border: '1.5px solid ' + (active ? gold : '#e0d8cc'), background: active ? gold : '#fff', color: active ? '#fff' : '#888', fontSize: 12, fontWeight: active ? 600 : 400, cursor: 'pointer' }}>
-                {y}
-              </button>
-            );
-          })}
-          <select value={filterType} onChange={function(e) { setFilterType(e.target.value); }}
-            style={{ padding: '5px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, background: '#fff', color: filterType === 'All' ? '#888' : '#333' }}>
-            <option value="All">All Types</option>
-            {DONATION_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
-          </select>
-        </div>
-        <button onClick={function() { setForm(emptyDonForm); setShowAdd(true); }}
-          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-          + Add Donation
-        </button>
+      {/* Stat cards */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12,marginBottom:20}}>
+        <StatCard label="Total Raised" value={loading?'...':fmtAmtFull(totalRaised)} sub={filters.year==='all'?'All Years':filters.year+' YTD'} />
+        <StatCard label="Donors in View" value={loading?'...':filteredDonors.length} sub="in view" />
+        <StatCard label="Members" value={loading?'...':membersCount} />
+        <StatCard label="Total Records" value={loading?'...':donors.length} />
       </div>
 
-      {error && <div style={{ background: '#fce4e4', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#c0392b' }}>Error: {error}</div>}
+      {error && <div style={{background:'#fce4e4',borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:12,color:'#c0392b'}}>Error: {error}</div>}
 
-      {/* Donor list */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#777', fontSize: 12 }}>Loading donors...</div>
-      ) : (
-        <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 0.8fr 1fr', gap: 0, padding: '8px 16px', borderBottom: '0.5px solid #e8e0d4', background: '#faf8f4' }}>
-            {['Donor', 'Tier', 'Total', 'Gifts', 'Last Gift'].map(function(h) {
-              return <div key={h} style={{ fontSize: 11, color: '#777', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>{h}</div>;
-            })}
-          </div>
-          {searchedDonors.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 32, color: '#aaa', fontSize: 12 }}>No donors found</div>
-          ) : searchedDonors.map(function(d, i) {
-            var tier = getDonorTier(d.total);
-            return (
-              <div key={d.donor_id || i}
-                onClick={function() { setSelectedDonor(d); }}
-                onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
-                onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}
-                style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 0.8fr 1fr', gap: 0, padding: '11px 16px', borderBottom: '0.5px solid #f0ebe2', cursor: 'pointer', background: '#fff', alignItems: 'center', transition: 'background 0.12s' }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a' }}>{d.name}</div>
-                  {d.accountType && <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{d.accountType}</div>}
-                </div>
-                <div>
-                  {tier
-                    ? <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '2px 8px', whiteSpace: 'nowrap' }}>✦ {tier.name.split(' ').slice(0,2).join(' ')}</span>
-                    : <span style={{ fontSize: 11, color: '#ddd' }}>—</span>}
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>${d.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontSize: 12, color: '#666' }}>{d.donations.length}</span>
-                  {d.hasPending && <span style={{ fontSize: 10, background: '#fff8e1', color: '#8a6200', padding: '1px 5px', borderRadius: 20, fontWeight: 500 }}>!</span>}
-                </div>
-                <div style={{ fontSize: 12, color: '#888' }}>{fmtDate(d.lastGiftDate)}</div>
+      {/* Table + panel layout */}
+      <div style={{display:'flex',gap:0,position:'relative'}}>
+        <div style={{flex:1,minWidth:0,background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:10,overflow:'hidden',marginRight:selected?428:0,transition:'margin-right 0.2s'}}>
+          {loading ? (
+            <div style={{textAlign:'center',padding:40,color:'#777',fontSize:12}}>Loading donors...</div>
+          ) : (
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead>
+                  <tr style={{borderBottom:'0.5px solid #e0d8cc',background:'#faf8f4'}}>
+                    <th style={{width:36,paddingLeft:14,paddingRight:6,paddingTop:10,paddingBottom:10}}>
+                      <input type="checkbox" checked={allChecked}
+                        ref={function(el){if(el)el.indeterminate=someChecked&&!allChecked;}}
+                        onChange={toggleAll} style={{accentColor:gold,cursor:'pointer'}} />
+                    </th>
+                    {[
+                      {label:'Donor',k:'formal_name',align:'left'},
+                      {label:'Status',k:'status',align:'left'},
+                      {label:'Tier',k:'tier',align:'left'},
+                      {label:'This Year',k:'current_year_total',align:'right'},
+                      {label:'Lifetime',k:'lifetime_total',align:'right'},
+                      {label:'Last Gift',k:'last_gift_date',align:'right'},
+                    ].map(function(h){
+                      var active=sortKey===h.k;
+                      return (
+                        <th key={h.k} onClick={function(){handleSort(h.k);}}
+                          style={{padding:'10px 14px',textAlign:h.align,fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:0.8,color:active?'#555':'#999',cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>
+                          {h.label}{active?(sortDir==='asc'?' ↑':' ↓'):' ⇅'}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedDonors.length===0 ? (
+                    <tr><td colSpan={7} style={{textAlign:'center',padding:40,color:'#aaa',fontSize:12}}>No donors match your filters.</td></tr>
+                  ) : sortedDonors.map(function(d){
+                    var tierInfo=nshGetTier(d.current_year_total);
+                    var isSelected=selected&&selected.id===d.id;
+                    var isChecked=!!selectedIds[d.id];
+                    return (
+                      <tr key={d.id} onClick={function(){setSelected(d);setEditDon(null);}}
+                        style={{borderBottom:'0.5px solid #f0ebe2',cursor:'pointer',background:isChecked?'#fef9ec':(isSelected?'#faf4e8':'#fff'),transition:'background 0.1s',opacity:d.deceased?0.55:1}}>
+                        <td style={{paddingLeft:14,paddingRight:6,paddingTop:10,paddingBottom:10}}
+                          onClick={function(e){e.stopPropagation();toggleOne(d.id);}}>
+                          <input type="checkbox" checked={isChecked} onChange={function(){toggleOne(d.id);}} onClick={function(e){e.stopPropagation();}} style={{accentColor:gold,cursor:'pointer'}} />
+                        </td>
+                        <td style={{padding:'10px 14px'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:6}}>
+                            <div>
+                              <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+                                <span style={{fontWeight:500,color:'#2a2a2a'}}>{d.formal_name}</span>
+                                {d.starred && <span style={{color:'#b5a185',fontSize:12}}>★</span>}
+                                {d.deceased && <span style={{fontSize:9,fontWeight:600,padding:'1px 5px',borderRadius:20,background:'#e5e7eb',color:'#6b7280'}}>Deceased</span>}
+                              </div>
+                              {d.informal_first_name && <div style={{fontSize:11,color:'#999',marginTop:1}}>{d.informal_first_name}</div>}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{padding:'10px 14px'}}>
+                          <span style={{display:'inline-flex',padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,...(NSH_STATUS_PILLS[d.status]||{background:'#f3f4f6',color:'#6b7280'})}}>
+                            {NSH_STATUS_LABELS[d.status]||d.status}
+                          </span>
+                        </td>
+                        <td style={{padding:'10px 14px'}}>
+                          {d.tier==='none'
+                            ? <span style={{color:'#ccc',fontSize:11}}>—</span>
+                            : <span style={{display:'inline-flex',padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,background:tierInfo.bg,color:tierInfo.color,border:'1px solid '+tierInfo.border}}>{tierInfo.label}</span>}
+                        </td>
+                        <td style={{padding:'10px 14px',textAlign:'right',fontWeight:500,color:'#2a2a2a'}}>
+                          {d.current_year_total>0?fmtAmt(d.current_year_total):<span style={{color:'#ccc'}}>—</span>}
+                        </td>
+                        <td style={{padding:'10px 14px',textAlign:'right',color:'#555'}}>
+                          {fmtAmt(d.lifetime_total)}
+                        </td>
+                        <td style={{padding:'10px 14px',textAlign:'right',color:'#888',fontSize:11}}>
+                          {fmtDate(d.last_gift_date)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div style={{padding:'10px 14px',fontSize:11,color:'#aaa',borderTop:'0.5px solid #f0ebe2'}}>
+                {sortedDonors.length} donor{sortedDonors.length!==1?'s':''}
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Donor detail modal */}
-      {selectedDonor && (
-        <div onClick={function() { setSelectedDonor(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 580, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ background: 'linear-gradient(135deg, #f8f4ec 0%, #f0e8dc 100%)', padding: '24px 28px 18px', borderBottom: '0.5px solid #e8dece', position: 'relative', borderRadius: '16px 16px 0 0' }}>
-              <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 2 }}>{selectedDonor.name}</div>
-              {selectedDonor.informalNames && <div style={{ fontSize: 12, color: '#888', marginBottom: 6 }}>Goes by {selectedDonor.informalNames}</div>}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                {(function() {
-                  var tier = getDonorTier(selectedDonor.total);
-                  return tier ? <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '2px 10px' }}>✦ {tier.name}</span> : null;
-                })()}
-                {selectedDonor.accountType && <span style={{ fontSize: 11, color: '#888', background: '#f5f0ea', border: '0.5px solid #e0d8cc', borderRadius: 20, padding: '2px 8px' }}>{selectedDonor.accountType}</span>}
-                <span style={{ fontSize: 12, fontWeight: 600, color: gold }}>${selectedDonor.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {yearFilter !== 'All' ? yearFilter : ''} total</span>
-              </div>
-              <button onClick={function() { setSelectedDonor(null); }} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 16, color: '#666' }}>×</button>
             </div>
-            <div style={{ padding: '20px 28px 24px', overflowY: 'auto', flex: 1 }}>
-              {/* Contact info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 32px', marginBottom: 16 }}>
-                <div>
-                  {selectedDonor.email && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Email</span><a href={'mailto:' + selectedDonor.email} style={{ color: gold, textDecoration: 'none' }}>{selectedDonor.email}</a></div>}
-                  {selectedDonor.phone && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Phone</span>{selectedDonor.phone}</div>}
-                  {selectedDonor.address && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>Address</span><span style={{ whiteSpace: 'pre-line' }}>{selectedDonor.address}</span></div>}
-                  {selectedDonor.nshContact && <div style={{ fontSize: 12, marginBottom: 8 }}><span style={{ color: '#777', marginRight: 8 }}>NSH Contact</span>{selectedDonor.nshContact}</div>}
-                </div>
-                <div>
-                  {selectedDonor.background && <div style={{ marginBottom: 10 }}><span style={sec}>Background</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.6 }}>{selectedDonor.background}</div></div>}
-                  {selectedDonor.firstConnected && <div style={{ marginBottom: 10 }}><span style={sec}>What Ties Them to NSH</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.6 }}>{selectedDonor.firstConnected}</div></div>}
-                  {selectedDonor.donorNotes && <div style={{ marginBottom: 10 }}><span style={sec}>Donor Notes</span><div style={{ fontSize: 12, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', color: '#444', lineHeight: 1.6 }}>{selectedDonor.donorNotes}</div></div>}
-                </div>
+          )}
+        </div>
+      </div>
+
+      {/* Right-side slide panel */}
+      {selected && (
+        <div style={{position:'fixed',top:0,right:0,width:420,height:'100vh',background:'#fff',boxShadow:'-4px 0 24px rgba(0,0,0,0.12)',zIndex:500,display:'flex',flexDirection:'column',overflowY:'hidden'}}>
+          {/* Panel header */}
+          <div style={{background:'linear-gradient(135deg,#f8f4ec 0%,#f0e8dc 100%)',padding:'20px 24px 16px',borderBottom:'0.5px solid #e8dece',flexShrink:0}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:16,fontWeight:600,color:'#1e1a16',marginBottom:2,lineHeight:1.3}}>{selected.formal_name}</div>
+                {selected.informal_first_name && <div style={{fontSize:11,color:'#888',marginBottom:4}}>Goes by {selected.informal_first_name}</div>}
               </div>
-              {/* Tier benefits */}
-              {(function() {
-                var tier = getDonorTier(selectedDonor.total);
-                if (!tier) return null;
-                var benefits = getAllBenefits(tier);
-                return (
-                  <div style={{ marginBottom: 16, padding: '12px 14px', background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: tier.color }}>✦ {tier.name}</span>
-                      <span style={{ fontSize: 11, color: tier.color, opacity: 0.7 }}>{tier.range}</span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      {benefits.map(function(b) {
-                        var checked = donorBenefits.indexOf(b) !== -1;
-                        return (
-                          <label key={b} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
-                            <input type="checkbox" checked={checked} onChange={function() { toggleBenefit(b); }} style={{ marginTop: 2, accentColor: tier.color, flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, color: tier.color, fontWeight: checked ? 600 : 400, lineHeight: 1.4 }}>{b}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
+              <button onClick={function(){setSelected(null);setEditDon(null);}}
+                style={{background:'rgba(0,0,0,0.06)',border:'none',borderRadius:'50%',width:28,height:28,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:16,color:'#666',flexShrink:0,marginLeft:8}}>×</button>
+            </div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
+              {(function(){var ti=nshGetTier(selected.current_year_total);return ti.tier!=='none'?<span style={{fontSize:11,fontWeight:600,color:ti.color,background:ti.bg,border:'1px solid '+ti.border,borderRadius:20,padding:'2px 10px'}}>✦ {ti.label}</span>:null;})()}
+              <span style={{fontSize:11,borderRadius:20,padding:'2px 8px',fontWeight:500,...(NSH_STATUS_PILLS[selected.status]||{background:'#f3f4f6',color:'#6b7280'})}}>
+                {NSH_STATUS_LABELS[selected.status]||selected.status}
+              </span>
+            </div>
+            {/* Giving summary */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+              {[
+                {label:'This Year',val:fmtAmt(selected.current_year_total)},
+                {label:'Lifetime',val:fmtAmt(selected.lifetime_total)},
+                {label:'Gifts',val:(selected.donations||[]).length},
+              ].map(function(s){return (
+                <div key={s.label} style={{background:'rgba(255,255,255,0.6)',borderRadius:8,padding:'7px 10px',textAlign:'center'}}>
+                  <div style={{fontSize:13,fontWeight:600,color:'#2a2a2a'}}>{s.val}</div>
+                  <div style={{fontSize:10,color:'#888',marginTop:1}}>{s.label}</div>
+                </div>
+              );})}
+            </div>
+          </div>
+
+          {/* Panel body */}
+          <div style={{overflowY:'auto',flex:1,padding:'14px 24px 24px'}}>
+            {/* Contact */}
+            <span style={sec}>Contact</span>
+            <div style={{fontSize:12,lineHeight:1.7,marginBottom:8}}>
+              {selected.email && <div><span style={{color:'#777'}}>Email </span><a href={'mailto:'+selected.email} style={{color:gold,textDecoration:'none'}}>{selected.email}</a></div>}
+              {selected.phone && <div><span style={{color:'#777'}}>Phone </span>{selected.phone}</div>}
+              {selected.employer && <div><span style={{color:'#777'}}>Employer </span>{selected.employer}</div>}
+              {selected.nsh_contact && <div><span style={{color:'#777'}}>NSH Contact </span>{selected.nsh_contact}</div>}
+              {selected.address && <div><span style={{color:'#777'}}>Address </span><span style={{whiteSpace:'pre-line'}}>{selected.address}</span></div>}
+            </div>
+
+            {selected.background && <div style={{marginBottom:10}}><span style={sec}>Background</span><div style={{fontSize:12,background:'#faf8f4',borderRadius:8,padding:'8px 12px',color:'#444',lineHeight:1.6}}>{selected.background}</div></div>}
+            {selected.first_connected && <div style={{marginBottom:10}}><span style={sec}>What Ties Them to NSH</span><div style={{fontSize:12,background:'#faf8f4',borderRadius:8,padding:'8px 12px',color:'#444',lineHeight:1.6}}>{selected.first_connected}</div></div>}
+            {selected.donor_notes && <div style={{marginBottom:10}}><span style={sec}>Donor Notes</span><div style={{fontSize:12,background:'#faf8f4',borderRadius:8,padding:'8px 12px',color:'#444',lineHeight:1.6}}>{selected.donor_notes}</div></div>}
+
+            {/* Donation history by year */}
+            <span style={sec}>Donation History</span>
+            {(selected.donations||[]).length===0 && <div style={{fontSize:12,color:'#aaa',marginBottom:10}}>No donations on record.</div>}
+            {getDonsByYear(selected.donations).map(function(grp){
+              var yrTotal=grp.dons.reduce(function(s,d){return s+d.amount;},0);
+              return (
+                <div key={grp.year} style={{marginBottom:12}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                    <span style={{fontSize:11,fontWeight:600,color:'#555'}}>{grp.year}</span>
+                    <span style={{fontSize:11,color:'#888'}}>{fmtAmtFull(yrTotal)}</span>
                   </div>
-                );
-              })()}
-              {/* Donation history */}
-              <span style={sec}>Donation History</span>
-              <div style={{ border: '0.5px solid #e0d8cc', borderRadius: 8, overflow: 'hidden' }}>
-                {selectedDonor.donations.sort(function(a, b) { return b['Close Date'] > a['Close Date'] ? 1 : -1; }).map(function(don, i) {
-                  var tc = typeColors[don['Donation Type']] || { bg: '#f3f3f3', color: '#555' };
-                  var acked = don['Acknowledged'] === true || String(don['Acknowledged']).toUpperCase() === 'TRUE';
-                  return (
-                    <div key={don.id || i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderBottom: i < selectedDonor.donations.length - 1 ? '0.5px solid #f0ebe2' : 'none', background: '#fff' }}>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
-                        <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 20, whiteSpace: 'nowrap' }}>{don['Donation Type']}</span>
-                        <span style={{ fontSize: 12, color: '#888' }}>{fmtDate(don['Close Date'])}</span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{fmtAmount(don['Amount'])}</span>
-                        <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 7px', borderRadius: 20, background: acked ? '#e8f5e9' : '#fff8e1', color: acked ? '#2e7d32' : '#8a6200' }}>{acked ? 'Thanked' : 'Pending'}</span>
-                      </div>
-                      <button onClick={function(e) { e.stopPropagation(); setEditDon(don); setEditForm(Object.assign({}, don)); }}
-                        style={{ fontSize: 11, color: '#888', background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', cursor: 'pointer' }}>
-                        Edit
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-              <button onClick={function() { setSelectedDonor(null); }} style={{ width: '100%', marginTop: 16, padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#999', fontWeight: 500 }}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
+                  <div style={{border:'0.5px solid #e0d8cc',borderRadius:8,overflow:'hidden'}}>
+                    {grp.dons.slice().sort(function(a,b){return b.date>a.date?1:-1;}).map(function(don,i){
+                      var tc=NSH_TYPE_COLORS[don.type]||{bg:'#f3f3f3',color:'#555'};
+                      var acked=don.acknowledged===true||String(don.acknowledged).toUpperCase()==='TRUE';
+                      var isEditing=editDon&&editDon.id===don.id;
+                      return (
+                        <div key={don.id||i} style={{borderBottom:i<grp.dons.length-1?'0.5px solid #f0ebe2':'none',background:'#fff'}}>
+                          {isEditing ? (
+                            <form onSubmit={saveEditDonation} style={{padding:'10px 12px'}}>
+                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                                <div><label style={lStyle}>Amount</label><input required value={editForm.amount||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} /></div>
+                                <div><label style={lStyle}>Date</label><input type="date" value={editForm.date||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
+                              </div>
+                              <div style={{marginBottom:8}}><label style={lStyle}>Type</label>
+                                <select value={editForm.type||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
+                                  {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                                </select>
+                              </div>
+                              <div style={{marginBottom:8}}><label style={lStyle}>Payment Type</label>
+                                <select value={editForm.payment_type||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{payment_type:e.target.value});});}} style={iStyle}>
+                                  {PAYMENT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                                </select>
+                              </div>
+                              <div style={{marginBottom:8}}><label style={lStyle}>Notes</label><textarea value={editForm.donation_notes||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{donation_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                              <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,marginBottom:10,cursor:'pointer'}}><input type="checkbox" checked={!!editForm.acknowledged} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{acknowledged:e.target.checked});});}} /> Acknowledged</label>
+                              <div style={{display:'flex',gap:8}}>
+                                <button type="submit" disabled={editSaving} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:6,padding:'7px',fontSize:12,fontWeight:500,cursor:'pointer',opacity:editSaving?0.7:1}}>{editSaving?'Saving...':'Save'}</button>
+                                <button type="button" onClick={function(){setEditDon(null);}} style={{padding:'7px 12px',background:'#f5f0ea',border:'none',borderRadius:6,fontSize:12,color:'#666',cursor:'pointer'}}>Cancel</button>
+                                <button type="button" onClick={function(){deleteDonation(don);}} style={{padding:'7px 12px',background:'transparent',border:'0.5px solid #e8a0a0',borderRadius:6,cursor:'pointer',fontSize:12,color:'#c0392b'}}>Delete</button>
+                              </div>
+                            </form>
+                          ) : (
+                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 12px'}}>
+                              <div style={{display:'flex',gap:6,alignItems:'center',flex:1,flexWrap:'wrap'}}>
+                                <span style={{background:tc.bg,color:tc.color,fontSize:11,fontWeight:500,padding:'2px 7px',borderRadius:20,whiteSpace:'nowrap'}}>{don.type}</span>
+                                <span style={{fontSize:12,color:'#888'}}>{fmtDate(don.date)}</span>
+                                <span style={{fontSize:12,fontWeight:600,color:'#2a2a2a'}}>{fmtAmtFull(don.amount)}</span>
+                                <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,background:acked?'#e8f5e9':'#fff8e1',color:acked?'#2e7d32':'#8a6200',fontWeight:500}}>{acked?'Thanked':'Pending'}</span>
+                              </div>
+                              <button onClick={function(e){e.stopPropagation();setEditDon(don);setEditForm({amount:String(don.amount),date:don.date||'',type:don.type||'Donation',payment_type:don.payment_type||'',acknowledged:don.acknowledged===true||String(don.acknowledged).toUpperCase()==='TRUE',donation_notes:don.donation_notes||''});}}
+                                style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'3px 10px',cursor:'pointer',flexShrink:0,marginLeft:6}}>Edit</button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
 
-      {editDon && (
-        <div onClick={function() { setEditDon(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>Edit Donation</div>
-            <form onSubmit={saveEditDonation}>
-              <span style={sec}>Donor</span>
-              <div style={grp}><label style={lStyle}>Formal Name *</label><input required name="Donor Name" value={editForm['Donor Name'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>Informal First Name</label><input name="Informal Names" value={editForm['Informal Names'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>Account Type</label>
-                <select name="Account Type" value={editForm['Account Type'] || ''} onChange={handleEditFormChange} style={iStyle}>
-                  {ACCOUNT_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+            {/* Add Gift */}
+            <span style={sec}>Add Gift</span>
+            <form onSubmit={submitAddGift} style={{background:'#faf8f4',borderRadius:8,padding:'12px 14px',border:'0.5px solid #e0d8cc'}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                <div><label style={lStyle}>Amount *</label><input required value={addGiftForm.amount} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
+                <div><label style={lStyle}>Date *</label><input required type="date" value={addGiftForm.date} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
+              </div>
+              <div style={{marginBottom:8}}><label style={lStyle}>Type</label>
+                <select value={addGiftForm.type} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
+                  {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
                 </select>
               </div>
-              <span style={sec}>Donation</span>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                <div><label style={lStyle}>Amount *</label><input required name="Amount" value={editForm['Amount'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
-                <div><label style={lStyle}>Close Date</label><input name="Close Date" type="date" value={editForm['Close Date'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
-              </div>
-              <div style={grp}><label style={lStyle}>Donation Type</label>
-                <select name="Donation Type" value={editForm['Donation Type'] || ''} onChange={handleEditFormChange} style={iStyle}>
-                  {DONATION_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+              <div style={{marginBottom:8}}><label style={lStyle}>Payment Type</label>
+                <select value={addGiftForm.payment_type} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{payment_type:e.target.value});});}} style={iStyle}>
+                  {PAYMENT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
                 </select>
               </div>
-              <div style={grp}><label style={lStyle}>Payment Type</label>
-                <select name="Payment Type" value={editForm['Payment Type'] || ''} onChange={handleEditFormChange} style={iStyle}>
-                  {PAYMENT_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
-                </select>
-              </div>
-              <div style={grp}><label style={lStyle}>Benefits</label><input name="Benefits" value={editForm['Benefits'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>Donation Notes</label><textarea name="Donation Notes" value={editForm['Donation Notes'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Acknowledged" checked={!!editForm['Acknowledged']} onChange={handleEditFormChange} /> Acknowledged / Thanked</label>
-              </div>
-              <span style={sec}>Contact</span>
-              <div style={grp}><label style={lStyle}>Email</label><input name="Email" type="email" value={editForm['Email'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>Phone Number</label><input name="Phone Number" value={editForm['Phone Number'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>Employer</label><input name="Employer" value={editForm['Employer'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>Address</label><textarea name="Address" value={editForm['Address'] || ''} onChange={handleEditFormChange} rows={3} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
-              <span style={sec}>Profile</span>
-              <div style={grp}><label style={lStyle}>Background</label><textarea name="Background" value={editForm['Background'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
-              <div style={grp}><label style={lStyle}>What Ties Them to North Star House</label><textarea name="First Connected" value={editForm['First Connected'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
-              <div style={grp}><label style={lStyle}>Main NSH Contact</label><input name="NSH Contact" value={editForm['NSH Contact'] || ''} onChange={handleEditFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>More Donor Notes</label><textarea name="Donor Notes" value={editForm['Donor Notes'] || ''} onChange={handleEditFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
-              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <button type="submit" disabled={editSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: editSaving ? 0.7 : 1 }}>{editSaving ? 'Saving...' : 'Save Changes'}</button>
-                <button type="button" onClick={function() { setEditDon(null); }} style={{ padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
-                <button type="button" onClick={function() { deleteDonation(editDon); setEditDon(null); }} style={{ padding: '10px 16px', background: 'transparent', border: '0.5px solid #e8a0a0', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#c0392b', fontWeight: 500 }}>Delete</button>
-              </div>
+              <div style={{marginBottom:8}}><label style={lStyle}>Notes</label><textarea value={addGiftForm.donation_notes} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{donation_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+              <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,marginBottom:10,cursor:'pointer'}}><input type="checkbox" checked={addGiftForm.acknowledged} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{acknowledged:e.target.checked});});}} /> Acknowledged / Thanked</label>
+              <button type="submit" disabled={addingGift} style={{width:'100%',background:gold,color:'#fff',border:'none',borderRadius:8,padding:'8px',fontSize:12,fontWeight:500,cursor:'pointer',opacity:addingGift?0.7:1}}>{addingGift?'Saving...':'Add Gift'}</button>
             </form>
           </div>
         </div>
       )}
 
+      {/* Add Donation modal */}
       {showAdd && (
-        <div onClick={function() { setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>Add Donation</div>
-            <form onSubmit={handleDonSubmit}>
-              <span style={sec}>Donor</span>
-              <div style={grp}><label style={lStyle}>Formal Name *</label><input required name="Donor Name" value={form['Donor Name']} onChange={handleDonFormChange} style={iStyle} placeholder="e.g. Mr. and Mrs. John Smith" /></div>
-              <div style={grp}><label style={lStyle}>Informal First Name</label><input name="Informal Names" value={form['Informal Names']} onChange={handleDonFormChange} style={iStyle} placeholder="e.g. John" /></div>
-              <div style={grp}><label style={lStyle}>Account Type</label>
-                <select name="Account Type" value={form['Account Type']} onChange={handleDonFormChange} style={iStyle}>
-                  {ACCOUNT_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+        <div onClick={function(){setShowAdd(false);}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.32)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:20}}>
+          <div onClick={function(e){e.stopPropagation();}} style={{background:'#fff',borderRadius:16,padding:28,maxWidth:640,width:'100%',boxShadow:'0 8px 40px rgba(0,0,0,0.18)',maxHeight:'90vh',overflowY:'auto'}}>
+            <div style={{fontSize:17,fontWeight:600,color:'#2a2a2a',marginBottom:20}}>Add Donation</div>
+            <form onSubmit={handleAddSubmit}>
+              <span style={{...sec,marginTop:0}}>Donor</span>
+              <div style={{marginBottom:14}}><label style={lStyle}>Formal Name *</label><input required value={addForm.formal_name} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{formal_name:e.target.value});});}} style={iStyle} placeholder="e.g. Mr. and Mrs. John Smith" /></div>
+              <div style={{marginBottom:14}}><label style={lStyle}>Informal First Name</label><input value={addForm.informal_first_name} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{informal_first_name:e.target.value});});}} style={iStyle} placeholder="e.g. John" /></div>
+              <div style={{marginBottom:14}}><label style={lStyle}>Account Type</label>
+                <select value={addForm.account_type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{account_type:e.target.value});});}} style={iStyle}>
+                  {ACCOUNT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
                 </select>
               </div>
               <span style={sec}>Contact</span>
-              <div style={grp}><label style={lStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={handleDonFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={handleDonFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>Employer</label><input name="Employer" value={form['Employer']} onChange={handleDonFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>Address</label><textarea name="Address" value={form['Address']} onChange={handleDonFormChange} rows={3} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
+              <div style={{marginBottom:14}}><label style={lStyle}>Email</label><input type="email" value={addForm.email} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{email:e.target.value});});}} style={iStyle} /></div>
+              <div style={{marginBottom:14}}><label style={lStyle}>Phone</label><input value={addForm.phone} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{phone:e.target.value});});}} style={iStyle} /></div>
+              <div style={{marginBottom:14}}><label style={lStyle}>Address</label><textarea value={addForm.address} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{address:e.target.value});});}} rows={3} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
               <span style={sec}>Donation</span>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                <div><label style={lStyle}>Amount *</label><input required name="Amount" value={form['Amount']} onChange={handleDonFormChange} style={iStyle} placeholder="$0.00" /></div>
-                <div><label style={lStyle}>Close Date</label><input name="Close Date" type="date" value={form['Close Date']} onChange={handleDonFormChange} style={iStyle} /></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+                <div><label style={lStyle}>Amount *</label><input required value={addForm.amount} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
+                <div><label style={lStyle}>Date</label><input type="date" value={addForm.date} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
               </div>
-              <div style={grp}><label style={lStyle}>Donation Type</label>
-                <select name="Donation Type" value={form['Donation Type']} onChange={handleDonFormChange} style={iStyle}>
-                  {DONATION_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+              <div style={{marginBottom:14}}><label style={lStyle}>Donation Type</label>
+                <select value={addForm.type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
+                  {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
                 </select>
               </div>
-              <div style={grp}><label style={lStyle}>Payment Type</label>
-                <select name="Payment Type" value={form['Payment Type']} onChange={handleDonFormChange} style={iStyle}>
-                  {PAYMENT_TYPES.map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+              <div style={{marginBottom:14}}><label style={lStyle}>Payment Type</label>
+                <select value={addForm.payment_type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{payment_type:e.target.value});});}} style={iStyle}>
+                  {PAYMENT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
                 </select>
               </div>
-              <div style={grp}><label style={lStyle}>Benefits</label><input name="Benefits" value={form['Benefits']} onChange={handleDonFormChange} style={iStyle} /></div>
-              <div style={grp}><label style={lStyle}>Donation Notes</label><textarea name="Donation Notes" value={form['Donation Notes']} onChange={handleDonFormChange} rows={2} style={Object.assign({}, iStyle, { resize: 'vertical' })} /></div>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#444', cursor: 'pointer' }}><input type="checkbox" name="Acknowledged" checked={form['Acknowledged']} onChange={handleDonFormChange} /> Acknowledged / Thanked</label>
-              </div>
-              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : 'Save Donation'}</button>
-                <button type="button" onClick={function() { setShowAdd(false); }} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
+              <div style={{marginBottom:14}}><label style={lStyle}>Donation Notes</label><textarea value={addForm.donation_notes} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{donation_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+              <div style={{marginBottom:14}}><label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,cursor:'pointer'}}><input type="checkbox" checked={addForm.acknowledged} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{acknowledged:e.target.checked});});}} /> Acknowledged / Thanked</label></div>
+              <div style={{display:'flex',gap:10}}>
+                <button type="submit" disabled={saving} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer',opacity:saving?0.7:1}}>{saving?'Saving...':'Add Donation'}</button>
+                <button type="button" onClick={function(){setShowAdd(false);}} style={{flex:1,padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer',fontWeight:500}}>Cancel</button>
               </div>
             </form>
           </div>
