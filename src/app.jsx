@@ -1823,13 +1823,16 @@ function DonorsView() {
   useEffect(function() {
     Promise.all([
       fetch(SUPABASE_URL+'/rest/v1/donors?select=*&order=formal_name',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
-      fetch(SUPABASE_URL+'/rest/v1/donations?select=*',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();})
+      fetch(SUPABASE_URL+'/rest/v1/donations?select=*',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
+      fetch(SUPABASE_URL+'/rest/v1/donor_tags?select=donor_id,tags(*)',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();})
     ]).then(function(results) {
-      var donorRows=results[0], donationRows=results[1];
+      var donorRows=results[0], donationRows=results[1], tagRows=Array.isArray(results[2])?results[2]:[];
       if(!Array.isArray(donorRows)||!Array.isArray(donationRows)){setError('Failed to load');setLoading(false);return;}
       var byDonor={};
       donationRows.forEach(function(d){if(!byDonor[d.donor_id])byDonor[d.donor_id]=[];byDonor[d.donor_id].push(d);});
-      setDonors(donorRows.map(function(d){return buildDonor(d,byDonor[d.id]||[]);}));
+      var tagsByDonor={};
+      tagRows.forEach(function(r){if(!r.tags)return;if(!tagsByDonor[r.donor_id])tagsByDonor[r.donor_id]=[];tagsByDonor[r.donor_id].push(r.tags);});
+      setDonors(donorRows.map(function(d){return Object.assign(buildDonor(d,byDonor[d.id]||[]),{tags:tagsByDonor[d.id]||[]});}));
       setLoading(false);
     }).catch(function(err){setError(err.message);setLoading(false);});
   }, []);
@@ -2084,6 +2087,7 @@ function DonorsView() {
                                 <span style={{fontWeight:500,color:'#2a2a2a'}}>{d.formal_name}</span>
                                 {d.starred && <span style={{color:'#b5a185',fontSize:12}}>★</span>}
                                 {d.deceased && <span style={{fontSize:9,fontWeight:600,padding:'1px 5px',borderRadius:20,background:'#e5e7eb',color:'#6b7280'}}>Deceased</span>}
+                                {(d.tags||[]).map(function(tag){return <span key={tag.id} title={tag.name} style={{width:7,height:7,borderRadius:'50%',background:tag.color,flexShrink:0,display:'inline-block'}}/>;})}
                               </div>
                               {d.informal_first_name && <div style={{fontSize:11,color:'#999',marginTop:1}}>{d.informal_first_name}</div>}
                             </div>
@@ -2093,6 +2097,9 @@ function DonorsView() {
                           <span style={{display:'inline-flex',padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,...(NSH_STATUS_PILLS[d.status]||{background:'#f3f4f6',color:'#6b7280'})}}>
                             {NSH_STATUS_LABELS[d.status]||d.status}
                           </span>
+                          {(d.tags||[]).length>0 && <div style={{display:'flex',flexWrap:'wrap',gap:3,marginTop:4}}>
+                            {(d.tags||[]).map(function(tag){return <span key={tag.id} style={{display:'inline-flex',alignItems:'center',gap:3,padding:'1px 6px',borderRadius:20,fontSize:10,fontWeight:500,background:tag.color+'22',color:tag.color}}>{tag.name}</span>;})}
+                          </div>}
                         </td>
                         <td style={{padding:'10px 14px'}}>
                           {d.tier==='none'
@@ -2139,6 +2146,7 @@ function DonorsView() {
               <span style={{fontSize:11,borderRadius:20,padding:'2px 8px',fontWeight:500,...(NSH_STATUS_PILLS[selected.status]||{background:'#f3f4f6',color:'#6b7280'})}}>
                 {NSH_STATUS_LABELS[selected.status]||selected.status}
               </span>
+              {(selected.tags||[]).map(function(tag){return <span key={tag.id} style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,background:tag.color+'22',color:tag.color}}>{tag.name}</span>;})}
             </div>
             {/* Giving summary */}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
