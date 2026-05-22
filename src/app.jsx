@@ -439,13 +439,13 @@ const typeColors = {
     cachedSbFetch('2026 Donations', ['Amount']).then(function(rows) {
       if (!Array.isArray(rows)) return;
       var total = rows.reduce(function(s, r) {
-        return s + parseFloat((r['Amount'] || '0').replace(/[^\d.]/g, '') || 0);
+        return s + parseFloat(String(r['Amount'] || 0).replace(/[^\d.]/g, '') || 0);
       }, 0);
       setDonationTotal(total);
     });
     cachedSbFetch('2026 Volunteers', ['Status', 'First Name', 'Last Name', 'Birthday', 'Picture URL']).then(function(rows) {
       if (!Array.isArray(rows)) return;
-      setActiveVols(rows.filter(function(r) { return r['Status'] === 'Active'; }).length);
+      setActiveVols(rows.filter(function(r) { return (r['Status'] || '').trim().toLowerCase() === 'active'; }).length);
       var today = new Date(); today.setHours(0,0,0,0);
       var windowEnd = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
       var upcoming = rows.filter(function(r) {
