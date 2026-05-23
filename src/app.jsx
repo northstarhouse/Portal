@@ -436,13 +436,13 @@ const typeColors = {
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (Array.isArray(rows)) setInHouseEvents(rows);
     }).catch(function() {});
-    cachedSbFetch('2026 Donations', ['Amount']).then(function(rows) {
+    fetch(SUPABASE_URL + '/rest/v1/donations?select=amount,date', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
       if (!Array.isArray(rows)) return;
-      var total = rows.reduce(function(s, r) {
-        return s + parseFloat(String(r['Amount'] || 0).replace(/[^\d.]/g, '') || 0);
-      }, 0);
+      var total = rows.reduce(function(s, r) { return s + (r.amount || 0); }, 0);
       setDonationTotal(total);
-    });
+    }).catch(function() {});
     cachedSbFetch('2026 Volunteers', ['Status', 'First Name', 'Last Name', 'Birthday', 'Picture URL']).then(function(rows) {
       if (!Array.isArray(rows)) return;
       setActiveVols(rows.filter(function(r) { return (r['Status'] || '').trim().toLowerCase() === 'active'; }).length);
