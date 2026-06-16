@@ -2360,6 +2360,7 @@ var BOARD_MEMBERS = ['Ken', 'Rick', 'Wyn', 'Paula', 'Jeff', 'Rich'];
 var VOTE_COLORS = { 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#f3f0ff', color: '#7c3aed' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' } };
 
 function BoardView() {
+  var isMobile = React.useContext(MobileCtx);
   const [items, setItems] = React.useState([]);
   const [votes, setVotes] = React.useState([]);
   const [selected, setSelected] = React.useState(null);
@@ -2575,8 +2576,8 @@ function BoardView() {
               onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.07)'; }}
               onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>{item.title}</div>
                   <div style={{ fontSize: 12, color: '#777' }}>
                     {item.submitted_by ? <span>Submitted by {item.submitted_by}{item.due_date ? ' · ' : ''}</span> : null}
@@ -2584,10 +2585,10 @@ function BoardView() {
                     {item.meeting_date ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 16, flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                   <span style={{ fontSize: 12, color: '#777' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
                   {revealed
-                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Closed – Decision Made</span>
+                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Closed</span>
                     : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Open</span>
                   }
                 </div>
@@ -2607,12 +2608,12 @@ function BoardView() {
       </div>
 
       {selected && (
-        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 520, background: '#fff', zIndex: 1011, boxShadow: '-4px 0 32px rgba(0,0,0,0.12)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '20px 24px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: isMobile ? '100%' : 520, background: '#fff', zIndex: 1011, boxShadow: '-4px 0 32px rgba(0,0,0,0.12)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: isMobile ? '14px 16px' : '20px 24px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', color: '#888', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}>← Back</button>
             <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
           </div>
-          <div style={{ padding: '24px 28px', flex: 1 }}>
+          <div style={{ padding: isMobile ? '16px' : '24px 28px', flex: 1 }}>
             <div style={{ background: '#fff', borderRadius: 0 }}>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 22, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
@@ -2637,7 +2638,7 @@ function BoardView() {
             {isRevealed(selected) ? (
               <div>
                 <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 12 }}>Results</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
                   {(function() {
                     var t = tally(selected);
                     return [
@@ -5375,48 +5376,56 @@ function FinancialsView() {
           <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
         ) : items.length === 0 ? (
           <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No pending reimbursements.</div>
-        ) : Object.keys(byArea).sort().map(function(area) {
-          var areaItems = byArea[area];
-          var areaTotal = areaItems.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
-          return (
-            <div key={area}>
-              <div style={{ padding: '10px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{area}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309' }}>{fmt(areaTotal)}</div>
-                </div>
-              </div>
-              {areaItems.map(function(b) {
-                var isMarking = markingId === b.id;
-                var volMatch = b.volunteer_name && volList.find(function(v) { return ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim() === b.volunteer_name; });
-                var volAddress = volMatch && volMatch['Address'];
-                return (
-                  <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
-                      {b.volunteer_name && (
-                        <div style={{ fontSize: 11, color: '#2e7d32', fontWeight: 500, marginTop: 2 }}>
-                          {b.volunteer_name}{volAddress ? <span style={{ color: '#888', fontWeight: 400 }}> · {volAddress}</span> : null}
-                        </div>
-                      )}
-                      <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
-                    {b.receipt_url && (
-                      <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                      </a>
-                    )}
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: isMarking ? 'default' : 'pointer', flexShrink: 0 }}>
-                      <input type="checkbox" checked={false} disabled={isMarking} onChange={function() { markReimbursed(b.id); }} style={{ accentColor: '#059669', width: 14, height: 14 }} />
-                      <span style={{ fontSize: 11, color: '#059669', fontWeight: 500 }}>{isMarking ? '…' : 'Reimbursed'}</span>
-                    </label>
+        ) : (
+          <div>
+          {Object.keys(byArea).sort().map(function(area) {
+            var areaItems = byArea[area];
+            var areaTotal = areaItems.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+            return (
+              <div key={area}>
+                <div style={{ padding: '10px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{area}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309' }}>{fmt(areaTotal)}</div>
                   </div>
-                );
-              })}
-            </div>
-          );
-        })}
+                </div>
+                {areaItems.map(function(b) {
+                  var isMarking = markingId === b.id;
+                  var volMatch = b.volunteer_name && volList.find(function(v) { return ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim() === b.volunteer_name; });
+                  var volAddress = volMatch && volMatch['Address'];
+                  return (
+                    <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
+                        {b.volunteer_name && (
+                          <div style={{ fontSize: 11, color: '#2e7d32', fontWeight: 500, marginTop: 2 }}>
+                            {b.volunteer_name}{volAddress ? <span style={{ color: '#888', fontWeight: 400 }}> · {volAddress}</span> : null}
+                          </div>
+                        )}
+                        <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
+                      {b.receipt_url && (
+                        <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        </a>
+                      )}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: isMarking ? 'default' : 'pointer', flexShrink: 0 }}>
+                        <input type="checkbox" checked={false} disabled={isMarking} onChange={function() { markReimbursed(b.id); }} style={{ accentColor: '#059669', width: 14, height: 14 }} />
+                        <span style={{ fontSize: 11, color: '#059669', fontWeight: 500 }}>{isMarking ? '…' : 'Reimbursed'}</span>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+          <div style={{ padding: '14px 18px', borderTop: '1.5px solid #e8e0d5', background: '#fdfcfb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 12, color: '#888', fontWeight: 500 }}>{items.length} item{items.length !== 1 ? 's' : ''} · Total to reimburse</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#b45309' }}>{fmt(reimTotal)}</div>
+          </div>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -5490,8 +5499,10 @@ function FinancialsView() {
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Expenditures</div>
                 {!cashLoading && cashLog.length > 0 && (
-                  <div style={{ fontSize: 12, marginTop: 2 }}>
+                  <div style={{ fontSize: 12, marginTop: 2, display: 'flex', gap: 10 }}>
+                    {cashIn > 0 && <span style={{ color: '#059669', fontWeight: 600 }}>↑ {fmt(cashIn)}</span>}
                     <span style={{ color: '#c62828', fontWeight: 600 }}>↓ {fmt(cashOut)}</span>
+                    {cashIn > 0 && <span style={{ color: '#888', fontWeight: 500 }}>Net {fmt(cashIn - cashOut)}</span>}
                   </div>
                 )}
               </div>
