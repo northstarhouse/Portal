@@ -2608,12 +2608,19 @@ function BoardView() {
       </div>
 
       {selected && (
-        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: isMobile ? '100%' : 520, background: '#fff', zIndex: 1011, boxShadow: '-4px 0 32px rgba(0,0,0,0.12)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: isMobile ? '14px 16px' : '20px 24px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-            <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', color: '#888', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}>← Back</button>
-            <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
+        <>
+        {isMobile && <div onClick={function() { setSelected(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1010 }} />}
+        <div style={isMobile
+          ? { position: 'fixed', left: 0, right: 0, bottom: 0, height: '88vh', background: '#fff', zIndex: 1011, boxShadow: '0 -4px 32px rgba(0,0,0,0.14)', overflowY: 'auto', display: 'flex', flexDirection: 'column', borderRadius: '16px 16px 0 0' }
+          : { position: 'fixed', top: 0, right: 0, bottom: 0, width: 520, background: '#fff', zIndex: 1011, boxShadow: '-4px 0 32px rgba(0,0,0,0.12)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }
+        }>
+          {isMobile && <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}><div style={{ width: 36, height: 4, borderRadius: 2, background: '#e0d8cc' }} /></div>}
+          <div style={{ padding: isMobile ? '8px 16px 12px' : '20px 24px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            {!isMobile && <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', color: '#888', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}>← Back</button>}
+            {isMobile && <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.title}</div>}
+            <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#bbb', lineHeight: 1, flexShrink: 0 }}>×</button>
           </div>
-          <div style={{ padding: isMobile ? '16px' : '24px 28px', flex: 1 }}>
+          <div style={{ padding: isMobile ? '14px 16px' : '24px 28px', flex: 1 }}>
             <div style={{ background: '#fff', borderRadius: 0 }}>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 22, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
@@ -2738,6 +2745,7 @@ function BoardView() {
             </div>
           </div>
         </div>
+        </>
       )}
 
       {showAdd && (
