@@ -6417,8 +6417,16 @@ var AREA_DEFAULTS = {
   'Events':        { lead: 'Barb Kusha',       budget: 7500,  pic: '' },
   'Marketing':     { lead: 'Haley Wright',     budget: 1000,  pic: 'https://drive.google.com/file/d/17Tse_3jiKZwmkVTTKMtt64zDghfZ8WrV/view?usp=drive_link' },
   'Venue':         { lead: 'Staff',            budget: null,  pic: '' },
-};function Dashboard() {
-  const [active, setActive] = useState("home");
+};
+
+var validModuleIds = Object.keys(views);
+function hashToModule() {
+  var h = window.location.hash.replace(/^#/, '');
+  return validModuleIds.indexOf(h) !== -1 ? h : 'home';
+}
+
+function Dashboard() {
+  const [active, setActive] = useState(hashToModule);
   const [opOpen, setOpOpen] = useState(false);
   const [opArea, setOpArea] = useState(null);
   const [quarterlyArea, setQuarterlyArea] = useState(null);
@@ -6426,6 +6434,17 @@ var AREA_DEFAULTS = {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const View = views[active];
   const mod = modules.find(m => m.id === active);
+
+  function navigate(id) {
+    window.location.hash = id;
+    setActive(id);
+  }
+
+  React.useEffect(function() {
+    function onHashChange() { setActive(hashToModule()); }
+    window.addEventListener('hashchange', onHashChange);
+    return function() { window.removeEventListener('hashchange', onHashChange); };
+  }, []);
 
   React.useEffect(function() {
     var fn = function() { setIsMobile(window.innerWidth < 768); };
@@ -6445,7 +6464,7 @@ var AREA_DEFAULTS = {
           <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" }} />
           <nav style={{ flex: 1, padding: "0 8px" }}>
             {modules.filter(m => !m.hidden).map(m => (
-              <button key={m.id} onClick={() => { setActive(m.id); setOpOpen(false); }} style={{
+              <button key={m.id} onClick={() => { navigate(m.id); setOpOpen(false); }} style={{
                 display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px",
                 background: active === m.id ? "rgba(181,161,133,0.15)" : "transparent",
                 border: "none", borderRadius: 7, cursor: "pointer", textAlign: "left",
@@ -6486,7 +6505,7 @@ var AREA_DEFAULTS = {
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", fontWeight: 600, letterSpacing: 1.4, textTransform: "uppercase", padding: "0 16px", marginBottom: 10 }}>Areas</div>
             {OPERATIONAL_AREAS.map(function(area) {
               return (
-                <button key={area} onClick={function() { setOpArea(area); setActive("operational"); }}
+                <button key={area} onClick={function() { setOpArea(area); navigate("operational"); }}
                   style={{
                     display: "block", width: "100%", padding: "9px 16px", background: opArea === area && active === "operational" ? "rgba(181,161,133,0.15)" : "transparent",
                     border: "none", cursor: "pointer", textAlign: "left",
@@ -6499,7 +6518,7 @@ var AREA_DEFAULTS = {
               );
             })}
             <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "10px 16px 8px" }} />
-            <button onClick={function() { setActive("financials"); }}
+            <button onClick={function() { navigate("financials"); }}
               style={{
                 display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 16px",
                 background: active === "financials" ? "rgba(181,161,133,0.15)" : "transparent",
@@ -6510,7 +6529,7 @@ var AREA_DEFAULTS = {
               }}>
               Financials
             </button>
-            <button onClick={function() { setActive("reviews"); }}
+            <button onClick={function() { navigate("reviews"); }}
               style={{
                 display: "block", width: "100%", padding: "9px 16px",
                 background: active === "reviews" ? "rgba(181,161,133,0.15)" : "transparent",
@@ -6521,7 +6540,7 @@ var AREA_DEFAULTS = {
               }}>
               Reviews
             </button>
-            <button onClick={function() { setActive("admin"); }}
+            <button onClick={function() { navigate("admin"); }}
               style={{
                 display: "block", width: "100%", padding: "9px 16px",
                 background: active === "admin" ? "rgba(181,161,133,0.15)" : "transparent",
@@ -6548,7 +6567,7 @@ var AREA_DEFAULTS = {
               <nav style={{ flex: 1, padding: '8px 8px' }}>
                 {modules.filter(function(m) { return !m.hidden; }).map(function(m) {
                   return (
-                    <button key={m.id} onClick={function() { setActive(m.id); setOpOpen(false); setMobileMenuOpen(false); }} style={{
+                    <button key={m.id} onClick={function() { navigate(m.id); setOpOpen(false); setMobileMenuOpen(false); }} style={{
                       display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 12px',
                       background: active === m.id ? 'rgba(181,161,133,0.15)' : 'transparent',
                       border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
@@ -6565,7 +6584,7 @@ var AREA_DEFAULTS = {
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600, letterSpacing: 1.4, textTransform: 'uppercase', padding: '0 8px', marginBottom: 8 }}>Operational Areas</div>
                 {OPERATIONAL_AREAS.map(function(area) {
                   return (
-                    <button key={area} onClick={function() { setOpArea(area); setActive('operational'); setMobileMenuOpen(false); }} style={{
+                    <button key={area} onClick={function() { setOpArea(area); navigate('operational'); setMobileMenuOpen(false); }} style={{
                       display: 'block', width: '100%', padding: '9px 12px', background: opArea === area && active === 'operational' ? 'rgba(181,161,133,0.15)' : 'transparent',
                       border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
                       color: opArea === area && active === 'operational' ? '#b5a185' : 'rgba(255,255,255,0.45)',
@@ -6574,9 +6593,9 @@ var AREA_DEFAULTS = {
                   );
                 })}
                 <div style={{ borderTop: '0.5px solid rgba(255,255,255,0.08)', margin: '8px 4px' }} />
-                <button onClick={function() { setActive('financials'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'financials' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financials' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financials' ? 600 : 400, marginBottom: 2 }}>Financials</button>
-                <button onClick={function() { setActive('reviews'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'reviews' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'reviews' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'reviews' ? 600 : 400, marginBottom: 2 }}>Reviews</button>
-                <button onClick={function() { setActive('admin'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'admin' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'admin' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'admin' ? 600 : 400, marginBottom: 2 }}>Admin</button>
+                <button onClick={function() { navigate('financials'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'financials' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financials' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financials' ? 600 : 400, marginBottom: 2 }}>Financials</button>
+                <button onClick={function() { navigate('reviews'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'reviews' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'reviews' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'reviews' ? 600 : 400, marginBottom: 2 }}>Reviews</button>
+                <button onClick={function() { navigate('admin'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'admin' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'admin' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'admin' ? 600 : 400, marginBottom: 2 }}>Admin</button>
               </div>
             </div>
           </div>
@@ -6593,7 +6612,7 @@ var AREA_DEFAULTS = {
             </div>
             <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Financials" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
-              <button onClick={function() { setQuarterlyArea(opArea); setActive("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
               </button>
             )}
@@ -6601,7 +6620,7 @@ var AREA_DEFAULTS = {
         </div>
         <div style={{ flex: 1, padding: isMobile ? "16px 14px" : "28px 32px", paddingBottom: isMobile ? 20 : undefined }}>
           <div style={{ maxWidth: 900 }}>
-            <View navigate={setActive} opArea={opArea} navigateOp={function(a) { setOpArea(a); setActive('operational'); }} quarterlyArea={quarterlyArea} navigateToQuarterly={function(a) { setQuarterlyArea(a); setActive('quarterly'); }} />
+            <View navigate={navigate} opArea={opArea} navigateOp={function(a) { setOpArea(a); navigate('operational'); }} quarterlyArea={quarterlyArea} navigateToQuarterly={function(a) { setQuarterlyArea(a); navigate('quarterly'); }} />
           </div>
         </div>
       </div>
