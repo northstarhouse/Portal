@@ -2317,246 +2317,83 @@ function DonorsView() {
 
 function MarketingView() {
   var { useState, useEffect } = React;
-  var todayStr = new Date().toISOString().slice(0, 10);
-  var [allItems, setAllItems] = useState([]);
+  var [links, setLinks] = useState([]);
   var [loading, setLoading] = useState(true);
-  var [selectedDate, setSelectedDate] = useState(todayStr);
-  var [input, setInput] = useState('');
-  var [inputTime, setInputTime] = useState('');
+  var [showAdd, setShowAdd] = useState(false);
+  var [addLabel, setAddLabel] = useState('');
+  var [addUrl, setAddUrl] = useState('');
   var [saving, setSaving] = useState(false);
-  var [editingTimeId, setEditingTimeId] = useState(null);
-  var [editTimeVal, setEditTimeVal] = useState('');
 
   useEffect(function() {
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?select=*&order=date_submitted.asc,id.asc', {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?area=eq.Marketing-Hub&select=*&order=id.asc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
-      if (Array.isArray(rows)) setAllItems(rows);
+      if (Array.isArray(rows)) setLinks(rows);
       setLoading(false);
     }).catch(function() { setLoading(false); });
   }, []);
 
-  function getTaskDate(t) { return (t.date_submitted || '').slice(0, 10); }
-  function getTaskTime(t) {
-    var ds = t.date_submitted || '';
-    if (ds.length >= 16 && ds[10] === 'T') return ds.slice(11, 16);
-    return '';
-  }
-  function fmtTime(hhmm) {
-    if (!hhmm) return '';
-    var parts = hhmm.split(':');
-    var h = parseInt(parts[0], 10);
-    var m = parts[1];
-    var ampm = h >= 12 ? 'PM' : 'AM';
-    var h12 = h % 12 || 12;
-    return h12 + ':' + m + ' ' + ampm;
-  }
-  function buildDateSubmitted(date, time) {
-    return time ? date + 'T' + time : date;
-  }
-
-  var dayItems = allItems
-    .filter(function(t) { return getTaskDate(t) === selectedDate; })
-    .sort(function(a, b) {
-      var ta = getTaskTime(a) || '99:99';
-      var tb = getTaskTime(b) || '99:99';
-      return ta < tb ? -1 : ta > tb ? 1 : 0;
-    });
-  var activeItems = dayItems.filter(function(t) { return !t.done; });
-  var doneItems = dayItems.filter(function(t) { return t.done; });
-
-  function navigateDay(delta) {
-    var d = new Date(selectedDate + 'T12:00:00');
-    d.setDate(d.getDate() + delta);
-    setSelectedDate(d.toISOString().slice(0, 10));
-  }
-
-  function addItem(e) {
+  function addLink(e) {
     e.preventDefault();
-    if (!input.trim() || saving) return;
+    if (!addLabel.trim() || !addUrl.trim() || saving) return;
+    var url = addUrl.trim();
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
     setSaving(true);
-    var ds = buildDateSubmitted(selectedDate, inputTime);
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo'), {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ item: input.trim(), date_submitted: ds, done: false, date_done: null })
+      body: JSON.stringify({ area: 'Marketing-Hub', title: addLabel.trim(), url: url })
     }).then(function(r) { return r.json(); }).then(function(rows) {
-      if (Array.isArray(rows) && rows[0]) setAllItems(function(p) { return p.concat([rows[0]]); });
-      setInput(''); setSaving(false);
+      if (Array.isArray(rows) && rows[0]) setLinks(function(p) { return p.concat([rows[0]]); });
+      setAddLabel(''); setAddUrl(''); setShowAdd(false); setSaving(false);
     }).catch(function() { setSaving(false); });
   }
 
-  function toggleItem(id, currentDone) {
-    var nowDone = !currentDone;
-    var patch = { done: nowDone, date_done: nowDone ? new Date().toISOString() : null };
-    setAllItems(function(p) { return p.map(function(t) { return t.id === id ? Object.assign({}, t, patch) : t; }); });
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?id=eq.' + id, {
-      method: 'PATCH',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch)
-    });
-  }
-
-  function saveTime(t) {
-    var ds = buildDateSubmitted(getTaskDate(t), editTimeVal);
-    setAllItems(function(p) { return p.map(function(x) { return x.id === t.id ? Object.assign({}, x, { date_submitted: ds }) : x; }); });
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?id=eq.' + t.id, {
-      method: 'PATCH',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_submitted: ds })
-    });
-    setEditingTimeId(null);
-  }
-
-  function deleteItem(id) {
-    setAllItems(function(p) { return p.filter(function(t) { return t.id !== id; }); });
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?id=eq.' + id, {
+  function deleteLink(id) {
+    setLinks(function(p) { return p.filter(function(l) { return l.id !== id; }); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?id=eq.' + id, {
       method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     });
   }
 
-  function getWeekDays(dateStr) {
-    var d = new Date(dateStr + 'T12:00:00');
-    var day = d.getDay();
-    var mondayOffset = day === 0 ? -6 : 1 - day;
-    var mon = new Date(d);
-    mon.setDate(d.getDate() + mondayOffset);
-    var days = [];
-    for (var i = 0; i < 7; i++) {
-      var dd = new Date(mon);
-      dd.setDate(mon.getDate() + i);
-      days.push(dd.toISOString().slice(0, 10));
-    }
-    return days;
-  }
-
-  var weekDays = getWeekDays(selectedDate);
-  var DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  var isToday = selectedDate === todayStr;
-  var displayDate = new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-
   return (
-    <div style={{ maxWidth: 620 }}>
-      {/* Week strip */}
-      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '10px 12px', marginBottom: 14, display: 'flex', gap: 4 }}>
-        {weekDays.map(function(d, i) {
-          var total = allItems.filter(function(t) { return (t.date_submitted || '').slice(0, 10) === d; }).length;
-          var done = allItems.filter(function(t) { return (t.date_submitted || '').slice(0, 10) === d && t.done; }).length;
-          var isSel = d === selectedDate;
-          var isTod = d === todayStr;
-          return (
-            <button key={d} onClick={function() { setSelectedDate(d); }} style={{
-              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '7px 2px',
-              background: isSel ? gold : 'transparent', borderRadius: 8, border: 'none', cursor: 'pointer',
-              color: isSel ? '#fff' : isTod ? gold : '#888', transition: 'background 0.15s'
-            }}>
-              <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, opacity: isSel ? 0.85 : 1 }}>{DAY_LABELS[i]}</span>
-              <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1 }}>{new Date(d + 'T12:00:00').getDate()}</span>
-              <span style={{ fontSize: 10, fontWeight: 600, height: 16,
-                background: isSel ? 'rgba(255,255,255,0.25)' : total === 0 ? 'transparent' : done === total ? '#e8f5e9' : '#fef3c7',
-                color: isSel ? '#fff' : done === total && total > 0 ? '#2e7d32' : '#b45309',
-                borderRadius: 10, padding: total > 0 ? '1px 5px' : 0, display: 'flex', alignItems: 'center'
-              }}>{total > 0 ? done + '/' + total : ''}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Day navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <button onClick={function() { navigateDay(-1); }} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '7px 14px', fontSize: 14, cursor: 'pointer', color: '#666' }}>←</button>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>{displayDate}</div>
-          {isToday
-            ? <div style={{ fontSize: 11, color: gold, fontWeight: 600, marginTop: 1 }}>Today</div>
-            : <button onClick={function() { setSelectedDate(todayStr); }} style={{ fontSize: 11, color: gold, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: 0, marginTop: 1 }}>Back to today</button>
-          }
+    <div style={{ maxWidth: 680 }}>
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', letterSpacing: 0.2 }}>Quick Links</div>
+          <button onClick={function() { setShowAdd(function(v) { return !v; }); }} style={{ background: showAdd ? '#f5f0ea' : gold, color: showAdd ? '#888' : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{showAdd ? 'Cancel' : '+ Add Button'}</button>
         </div>
-        <button onClick={function() { navigateDay(1); }} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '7px 14px', fontSize: 14, cursor: 'pointer', color: '#666' }}>→</button>
-      </div>
 
-      {/* Add task */}
-      <form onSubmit={addItem} style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        <input
-          value={input} onChange={function(e) { setInput(e.target.value); }}
-          placeholder={isToday ? 'Add a task for today…' : 'Add a task for ' + displayDate + '…'}
-          style={{ flex: '1 1 180px', padding: '10px 14px', border: '0.5px solid #e0d8cc', borderRadius: 9, fontSize: 13, fontFamily: 'system-ui, sans-serif', background: '#fff' }}
-        />
-        <input type="time" value={inputTime} onChange={function(e) { setInputTime(e.target.value); }}
-          style={{ padding: '10px 10px', border: '0.5px solid #e0d8cc', borderRadius: 9, fontSize: 13, background: '#fff', color: inputTime ? '#2a2a2a' : '#bbb', width: 110, flexShrink: 0 }} />
-        <button type="submit" disabled={saving || !input.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 9, padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (saving || !input.trim()) ? 0.6 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>+ Add</button>
-      </form>
-
-      {/* Task list */}
-      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
-        {loading ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#ccc', fontSize: 13 }}>Loading…</div>
-        ) : dayItems.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center' }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>📋</div>
-            <div style={{ fontSize: 14, color: '#bbb' }}>No tasks for this day.</div>
-            <div style={{ fontSize: 12, color: '#ccc', marginTop: 4 }}>Add one above to get started.</div>
-          </div>
-        ) : (
-          <div>
-            {activeItems.length > 0 && (
-              <div>
-                <div style={{ padding: '9px 16px', fontSize: 11, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>
-                  To Do · {activeItems.length}
-                </div>
-                {activeItems.map(function(t) {
-                  var time = getTaskTime(t);
-                  var isEditingTime = editingTimeId === t.id;
-                  return (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderBottom: '0.5px solid #f9f6f2' }}>
-                      <input type="checkbox" checked={false} onChange={function() { toggleItem(t.id, false); }} style={{ accentColor: gold, width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, color: '#2a2a2a', lineHeight: 1.4 }}>{t.item}</div>
-                        {isEditingTime ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
-                            <input type="time" value={editTimeVal} onChange={function(e) { setEditTimeVal(e.target.value); }} autoFocus
-                              style={{ padding: '3px 6px', border: '0.5px solid ' + gold, borderRadius: 6, fontSize: 12, background: '#fff', color: '#2a2a2a' }} />
-                            <button onClick={function() { saveTime(t); }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>Save</button>
-                            <button onClick={function() { setEditingTimeId(null); }} style={{ fontSize: 11, background: '#f0ece6', color: '#666', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>Cancel</button>
-                          </div>
-                        ) : (
-                          <button onClick={function() { setEditingTimeId(t.id); setEditTimeVal(time); }} style={{ marginTop: 3, fontSize: 11, color: time ? gold : '#ccc', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: time ? 500 : 400 }}>
-                            {time ? '⏰ ' + fmtTime(time) : '+ set time'}
-                          </button>
-                        )}
-                      </div>
-                      <button onClick={function() { deleteItem(t.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 16, padding: '2px 4px', flexShrink: 0, lineHeight: 1 }}>×</button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {doneItems.length > 0 && (
-              <div>
-                <div style={{ padding: '9px 16px', fontSize: 11, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6', borderTop: activeItems.length > 0 ? '0.5px solid #f0ece6' : 'none' }}>
-                  Done · {doneItems.length}
-                </div>
-                {doneItems.map(function(t) {
-                  var time = getTaskTime(t);
-                  return (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderBottom: '0.5px solid #f9f6f2', background: '#fafaf9' }}>
-                      <input type="checkbox" checked={true} onChange={function() { toggleItem(t.id, true); }} style={{ accentColor: gold, width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, color: '#bbb', textDecoration: 'line-through', lineHeight: 1.4 }}>{t.item}</div>
-                        {time && <div style={{ fontSize: 11, color: '#ccc', marginTop: 2 }}>⏰ {fmtTime(time)}</div>}
-                      </div>
-                      <button onClick={function() { deleteItem(t.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 16, padding: '2px 4px', flexShrink: 0, lineHeight: 1 }}>×</button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <div style={{ padding: '10px 16px', background: '#fdfcfb', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1, height: 4, background: '#f0ece6', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ height: '100%', background: gold, width: (dayItems.length > 0 ? doneItems.length / dayItems.length * 100 : 0) + '%', borderRadius: 2, transition: 'width 0.3s' }} />
-              </div>
-              <span style={{ fontSize: 12, color: '#888', flexShrink: 0 }}>{doneItems.length} of {dayItems.length} done</span>
+        {showAdd && (
+          <form onSubmit={addLink} style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 18, border: '0.5px solid #e8e0d5' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input value={addLabel} onChange={function(e) { setAddLabel(e.target.value); }} placeholder="Button label" style={{ flex: '1 1 140px', padding: '8px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff' }} />
+              <input value={addUrl} onChange={function(e) { setAddUrl(e.target.value); }} placeholder="https://…" style={{ flex: '2 1 200px', padding: '8px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff' }} />
+              <button type="submit" disabled={saving || !addLabel.trim() || !addUrl.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (saving || !addLabel.trim() || !addUrl.trim()) ? 0.6 : 1, flexShrink: 0 }}>Save</button>
             </div>
+          </form>
+        )}
+
+        {loading ? (
+          <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
+        ) : links.length === 0 ? (
+          <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No buttons yet — add one above.</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+            {links.map(function(lnk) {
+              return (
+                <div key={lnk.id} style={{ position: 'relative' }}>
+                  <a href={lnk.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '14px 16px', background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, textDecoration: 'none', color: '#2a2a2a', fontSize: 13, fontWeight: 600, textAlign: 'center', lineHeight: 1.4, transition: 'background 0.15s, border-color 0.15s' }}
+                    onMouseEnter={function(e) { e.currentTarget.style.background = '#f5efe6'; e.currentTarget.style.borderColor = gold; }}
+                    onMouseLeave={function(e) { e.currentTarget.style.background = '#faf8f5'; e.currentTarget.style.borderColor = '#e8e0d5'; }}>
+                    {lnk.title}
+                  </a>
+                  <button onClick={function() { deleteLink(lnk.id); }} title="Remove" style={{ position: 'absolute', top: 4, right: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, lineHeight: 1, padding: '2px 4px' }}
+                    onMouseEnter={function(e) { e.currentTarget.style.color = '#e57373'; }}
+                    onMouseLeave={function(e) { e.currentTarget.style.color = '#ddd'; }}>×</button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
