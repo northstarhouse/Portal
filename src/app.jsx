@@ -3650,7 +3650,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [budgetSaving, setBudgetSaving] = useState(false);
   var [uploadingId, setUploadingId] = useState(null);
   var fileInputRef = React.useRef(null);
-  var [budgetReceiptFile, setBudgetReceiptFile] = useState(null);
+  var [budgetReceiptFiles, setBudgetReceiptFiles] = useState([]);
   var budgetReceiptRef = React.useRef(null);
   var [reimburseVolQuery, setReimburseVolQuery] = useState('');
   var [showReimburseVolDrop, setShowReimburseVolDrop] = useState(false);
@@ -3783,10 +3783,27 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     });
   }
 
+  function parseReceipts(receiptUrl) {
+    if (!receiptUrl) return [];
+    try { var p = JSON.parse(receiptUrl); if (Array.isArray(p)) return p; } catch(e) {}
+    return [receiptUrl];
+  }
+
+  function uploadFile(file, itemId) {
+    var ext = (file.name.split('.').pop() || 'bin');
+    var slug = area.toLowerCase().replace(/\s+/g, '-');
+    var filename = slug + '-' + itemId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6) + '.' + ext;
+    return fetch(SUPABASE_URL + '/storage/v1/object/receipts/' + filename, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream' },
+      body: file
+    }).then(function() { return SUPABASE_URL + '/storage/v1/object/public/receipts/' + filename; });
+  }
+
   function addBudgetItem(e) {
     e.preventDefault();
     setBudgetSaving(true);
-    var file = budgetReceiptFile;
+    var files = budgetReceiptFiles;
     var payload = { area: area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null };
     if (budgetForm.needs_reimbursement) { payload.needs_reimbursement = true; payload.volunteer_name = budgetForm.volunteer_name || null; }
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
@@ -3797,34 +3814,23 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       if (rows && rows.code) { setBudgetSaving(false); alert('Add failed: ' + (rows.message || rows.hint || rows.code)); return; }
       var newRow = rows && rows[0];
       if (!newRow) { setBudgetSaving(false); return; }
-      if (!file) {
+      function finish(finalRow) {
         clearCache('Op Budget');
         setBudgetSaving(false);
-        setBudget(function(prev) { return [newRow].concat(prev); });
-        setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' }); setReimburseVolQuery('');
-        setBudgetReceiptFile(null);
-        return;
+        setBudget(function(prev) { return [finalRow].concat(prev); });
+        setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' });
+        setReimburseVolQuery('');
+        setBudgetReceiptFiles([]);
+        if (budgetReceiptRef.current) budgetReceiptRef.current.value = '';
       }
-      var ext = file.name.split('.').pop();
-      var filename = area.toLowerCase().replace(/\s+/g, '-') + '-' + newRow.id + '-' + Date.now() + '.' + ext;
-      fetch(SUPABASE_URL + '/storage/v1/object/receipts/' + filename, {
-        method: 'POST',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
-        body: file
-      }).then(function() {
-        var url = SUPABASE_URL + '/storage/v1/object/public/receipts/' + filename;
-        return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + newRow.id, {
+      if (!files.length) { finish(newRow); return; }
+      Promise.all(files.map(function(f) { return uploadFile(f, newRow.id); })).then(function(urls) {
+        var receiptVal = urls.length === 1 ? urls[0] : JSON.stringify(urls);
+        fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + newRow.id, {
           method: 'PATCH',
           headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ receipt_url: url })
-        }).then(function() {
-          clearCache('Op Budget');
-          setBudgetSaving(false);
-          setBudget(function(prev) { return [Object.assign({}, newRow, { receipt_url: url })].concat(prev); });
-          setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' }); setReimburseVolQuery('');
-          setBudgetReceiptFile(null);
-          if (budgetReceiptRef.current) budgetReceiptRef.current.value = '';
-        });
+          body: JSON.stringify({ receipt_url: receiptVal })
+        }).then(function() { finish(Object.assign({}, newRow, { receipt_url: receiptVal })); });
       });
     });
   }
@@ -3883,24 +3889,22 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   }
 
   function handleReceiptSelect(e) {
-    var file = e.target.files[0];
-    if (!file || !uploadingId) { e.target.value = ''; return; }
+    var newFiles = Array.from(e.target.files || []);
+    if (!newFiles.length || !uploadingId) { e.target.value = ''; return; }
     var id = uploadingId;
-    var ext = file.name.split('.').pop();
-    var filename = area.toLowerCase().replace(/\s+/g, '-') + '-' + id + '-' + Date.now() + '.' + ext;
-    fetch(SUPABASE_URL + '/storage/v1/object/receipts/' + filename, {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
-      body: file
-    }).then(function() {
-      var url = SUPABASE_URL + '/storage/v1/object/public/receipts/' + filename;
+    var existingItem = budget.find(function(b) { return b.id === id; });
+    var existing = parseReceipts(existingItem && existingItem.receipt_url);
+    setUploadingId('loading-' + id);
+    Promise.all(newFiles.map(function(f) { return uploadFile(f, id); })).then(function(newUrls) {
+      var all = existing.concat(newUrls);
+      var receiptVal = all.length === 1 ? all[0] : JSON.stringify(all);
       return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
         method: 'PATCH',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ receipt_url: url })
+        body: JSON.stringify({ receipt_url: receiptVal })
       }).then(function() {
         clearCache('Op Budget');
-        setBudget(function(prev) { return prev.map(function(b) { return b.id === id ? Object.assign({}, b, { receipt_url: url }) : b; }); });
+        setBudget(function(prev) { return prev.map(function(b) { return b.id === id ? Object.assign({}, b, { receipt_url: receiptVal }) : b; }); });
         setUploadingId(null);
         e.target.value = '';
       });
@@ -4339,16 +4343,16 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                   <input value={budgetForm.description} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="What was purchased or donated..." />
                 </div>
                 <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Receipt (optional)</div>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Receipts (optional)</div>
                   <div
                     onClick={function() { budgetReceiptRef.current && budgetReceiptRef.current.click(); }}
-                    style={{ border: '0.5px dashed #e0d8cc', borderRadius: 7, padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: budgetReceiptFile ? '#2a2a2a' : '#bbb', background: '#fafaf8', display: 'flex', alignItems: 'center', gap: 8 }}
+                    style={{ border: '0.5px dashed #e0d8cc', borderRadius: 7, padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: budgetReceiptFiles.length ? '#2a2a2a' : '#bbb', background: '#fafaf8', display: 'flex', alignItems: 'center', gap: 8 }}
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                    <span>{budgetReceiptFile ? budgetReceiptFile.name : 'Attach image or PDF…'}</span>
-                    {budgetReceiptFile && <span onClick={function(ev) { ev.stopPropagation(); setBudgetReceiptFile(null); if (budgetReceiptRef.current) budgetReceiptRef.current.value = ''; }} style={{ marginLeft: 'auto', color: '#bbb', cursor: 'pointer', fontSize: 14 }}>×</span>}
+                    <span>{budgetReceiptFiles.length === 0 ? 'Attach images or PDFs…' : budgetReceiptFiles.length === 1 ? budgetReceiptFiles[0].name : budgetReceiptFiles.length + ' files attached'}</span>
+                    {budgetReceiptFiles.length > 0 && <span onClick={function(ev) { ev.stopPropagation(); setBudgetReceiptFiles([]); if (budgetReceiptRef.current) budgetReceiptRef.current.value = ''; }} style={{ marginLeft: 'auto', color: '#bbb', cursor: 'pointer', fontSize: 14 }}>×</span>}
                   </div>
-                  <input ref={budgetReceiptRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={function(e) { setBudgetReceiptFile(e.target.files[0] || null); }} />
+                  <input ref={budgetReceiptRef} type="file" accept="image/*,.pdf" multiple style={{ display: 'none' }} onChange={function(e) { setBudgetReceiptFiles(Array.from(e.target.files || [])); }} />
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: budgetForm.needs_reimbursement ? '#b45309' : '#555' }}>
@@ -4417,16 +4421,22 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</span>
                   <span style={{ fontSize: 11, color: '#bbb', flexShrink: 0 }}>{b.date}</span>
                   {b.needs_reimbursement && <span title="Needs reimbursement" style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 10, fontWeight: 600, flexShrink: 0 }}>$ Reimburse</span>}
-                  {b.receipt_url ? (
-                    <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></a>
-                  ) : (
-                    <button onClick={function() { setUploadingId(b.id); fileInputRef.current.click(); }} disabled={isUploading} title="Attach receipt" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px 4px', flexShrink: 0, opacity: isUploading ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>{isUploading ? <span style={{ fontSize: 11 }}>…</span> : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>}</button>
-                  )}
+                  {(function() {
+                    var receipts = parseReceipts(b.receipt_url);
+                    var isLoading = uploadingId === 'loading-' + b.id;
+                    if (receipts.length > 0) return (
+                      <button onClick={function() { receipts.forEach(function(u) { window.open(u, '_blank'); }); }} title={receipts.length + ' attachment' + (receipts.length > 1 ? 's' : '')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, padding: '2px 4px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        {receipts.length > 1 && <span style={{ fontSize: 10, fontWeight: 600 }}>{receipts.length}</span>}
+                      </button>
+                    );
+                    return <button onClick={function() { setUploadingId(b.id); fileInputRef.current.click(); }} disabled={isLoading} title="Attach receipt" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px 4px', flexShrink: 0, opacity: isLoading ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>{isLoading ? <span style={{ fontSize: 11 }}>…</span> : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>}</button>;
+                  })()}
                   <button onClick={function() { deleteBudgetItem(b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                 </div>
               );
             })}
-            <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleReceiptSelect} />
+            <input ref={fileInputRef} type="file" accept="image/*,.pdf" multiple style={{ display: 'none' }} onChange={handleReceiptSelect} />
           </div>
         </div>
       )}
