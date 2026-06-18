@@ -5901,7 +5901,7 @@ function FinancialsView() {
 function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSaving, volunteers }) {
   var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
   var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 };
-  var STATUS_OPTIONS = ['Exploring', 'Active', 'On Hold', 'Declined', 'Completed'];
+  var STATUS_OPTIONS = ['Exploring', 'Active', 'On Hold', 'Inactive', 'Completed'];
   return (
     <form onSubmit={onSubmit}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
@@ -5943,12 +5943,12 @@ function IdeasView() {
   var isMobile = React.useContext(MobileCtx);
   var today = new Date().toISOString().slice(0, 10);
 
-  var STATUS_OPTIONS = ['Exploring', 'Active', 'On Hold', 'Declined', 'Completed'];
+  var STATUS_OPTIONS = ['Exploring', 'Active', 'On Hold', 'Inactive', 'Completed'];
   var STATUS_COLORS = {
     'Exploring': { bg: '#e3f2fd', color: '#1565c0' },
     'Active':    { bg: '#e8f5e9', color: '#2e7d32' },
     'On Hold':   { bg: '#fff8e1', color: '#f57f17' },
-    'Declined':  { bg: '#fce4ec', color: '#c62828' },
+    'Inactive':  { bg: '#fce4ec', color: '#c62828' },
     'Completed': { bg: '#f3e5f5', color: '#6a1b9a' },
   };
 
@@ -6034,7 +6034,7 @@ function IdeasView() {
         setSaving(false);
         setForm(emptyForm); setShowAdd(false);
         var newStatus = payload.status;
-        setMainTab(['Active','On Hold','Completed','Declined'].includes(newStatus) ? 'initiatives' : 'ideas');
+        setMainTab(['Active','On Hold','Completed','Inactive'].includes(newStatus) ? 'initiatives' : 'ideas');
         setFilterStatus(newStatus || 'Active');
         loadIdeas(function(allRows) {
           var match = allRows.find(function(x) { return rows && rows[0] ? x.id === rows[0].id : x.title === payload.title; });
@@ -6058,7 +6058,7 @@ function IdeasView() {
       setEditing(false);
       setEditSaving(false);
       var newStatus = editForm.status;
-      setMainTab(['Active', 'On Hold', 'Completed', 'Declined'].includes(newStatus) ? 'initiatives' : 'ideas');
+      setMainTab(['Active', 'On Hold', 'Completed', 'Inactive'].includes(newStatus) ? 'initiatives' : 'ideas');
       setFilterStatus('All');
     }).catch(function() { setEditSaving(false); });
   }
@@ -6120,7 +6120,7 @@ function IdeasView() {
 
   function fmtMoney(n) { return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-  var INITIATIVES_STATUSES = ['Active', 'On Hold', 'Completed', 'Declined'];
+  var INITIATIVES_STATUSES = ['Active', 'On Hold', 'Completed', 'Inactive'];
   var IDEA_STATUSES = ['Exploring'];
   var tabStatuses = mainTab === 'initiatives' ? INITIATIVES_STATUSES : IDEA_STATUSES;
   var filtered = ideas.filter(function(i) {
