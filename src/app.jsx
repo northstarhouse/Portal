@@ -437,11 +437,11 @@ const typeColors = {
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (Array.isArray(rows)) setInHouseEvents(rows);
     }).catch(function() {});
-    fetch(SUPABASE_URL + '/rest/v1/donations?select=amount,date', {
+    fetch(SUPABASE_URL + '/rest/v1/donations?select=amount,date&date=gte.2026-01-01&date=lt.2027-01-01', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (!Array.isArray(rows)) return;
-      var total = rows.reduce(function(s, r) { return s + (r.amount || 0); }, 0);
+      var total = rows.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
       setDonationTotal(total);
     }).catch(function() {});
     cachedSbFetch('2026 Volunteers', ['Status', 'First Name', 'Last Name', 'Birthday', 'Picture URL']).then(function(rows) {
