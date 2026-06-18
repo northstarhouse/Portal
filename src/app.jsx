@@ -267,7 +267,6 @@ const modules = [
   { id: "board", label: "Board Voting" },
   { id: "strategy", label: "Strategic Goal Progress" },
   { id: "ideas", label: "Ideas & Initiatives" },
-  { id: "marketing", label: "Marketing" },
   { id: "operational", label: "Operational Areas", hidden: true },
   { id: "financials", label: "Financials", hidden: true },
   { id: "reviews", label: "Reviews", hidden: true },
