@@ -3635,6 +3635,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [areaInfo, setAreaInfo] = useState(null);
   var [budget, setBudget] = useState([]);
   var [vols, setVols] = useState([]);
+  var [allVolsForReimburse, setAllVolsForReimburse] = useState([]);
   var [showBudget, setShowBudget] = useState(false);
   var [showVols, setShowVols] = useState(false);
   var [editLead, setEditLead] = useState(false);
@@ -3722,6 +3723,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         var matches = areaAliases[area] || [area.toLowerCase()];
         return v.Team.split(/[,|]/).some(function(t) { return matches.indexOf(t.trim().toLowerCase()) !== -1; });
       }));
+      setAllVolsForReimburse(rows);
     });
     cachedFetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?area=eq.' + encodeURIComponent(area) + '&select=*&order=created_at.asc').then(function(rows) {
       if (Array.isArray(rows)) setResources(rows);
@@ -4356,8 +4358,8 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                   </label>
                 </div>
                 {budgetForm.needs_reimbursement && (function() {
-                  var allVols = vols.filter(function(v) { return v['Status'] === 'Active' || v['Status'] === 'active'; });
-                  if (!allVols.length) allVols = vols;
+                  var allVols = allVolsForReimburse.filter(function(v) { return v['Status'] === 'Active' || v['Status'] === 'active'; });
+                  if (!allVols.length) allVols = allVolsForReimburse;
                   var filtered = reimburseVolQuery ? allVols.filter(function(v) {
                     var name = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim().toLowerCase();
                     return name.includes(reimburseVolQuery.toLowerCase());
