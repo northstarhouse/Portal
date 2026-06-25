@@ -245,6 +245,7 @@ var NAV_ICONS = {
   financials: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
   ideas: '<path d="M9 21h6"/><path d="M9 17.5h6"/><path d="M12 2a7 7 0 0 1 4.9 11.9l-.1.1c-.4.4-.8 1-1.1 1.5H8.3c-.3-.5-.7-1.1-1.1-1.5l-.1-.1A7 7 0 0 1 12 2z"/>',
   reviews: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  marketing: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
   admin: '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M20 20c0-3-2-5.5-4-6.5"/>',
 };
 
@@ -436,13 +437,13 @@ const typeColors = {
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (Array.isArray(rows)) setInHouseEvents(rows);
     }).catch(function() {});
-    cachedSbFetch('2026 Donations', ['Amount']).then(function(rows) {
+    fetch(SUPABASE_URL + '/rest/v1/donations?select=amount,date&date=gte.2026-01-01&date=lt.2027-01-01', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
       if (!Array.isArray(rows)) return;
-      var total = rows.reduce(function(s, r) {
-        return s + parseFloat(String(r['Amount'] || 0).replace(/[^\d.]/g, '') || 0);
-      }, 0);
+      var total = rows.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
       setDonationTotal(total);
-    });
+    }).catch(function() {});
     cachedSbFetch('2026 Volunteers', ['Status', 'First Name', 'Last Name', 'Birthday', 'Picture URL']).then(function(rows) {
       if (!Array.isArray(rows)) return;
       setActiveVols(rows.filter(function(r) { return (r['Status'] || '').trim().toLowerCase() === 'active'; }).length);
@@ -1877,13 +1878,16 @@ function DonorsView() {
   useEffect(function() {
     Promise.all([
       fetch(SUPABASE_URL+'/rest/v1/donors?select=*&order=formal_name',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
-      fetch(SUPABASE_URL+'/rest/v1/donations?select=*',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();})
+      fetch(SUPABASE_URL+'/rest/v1/donations?select=*',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
+      fetch(SUPABASE_URL+'/rest/v1/donor_tags?select=donor_id,tags(*)',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();})
     ]).then(function(results) {
-      var donorRows=results[0], donationRows=results[1];
+      var donorRows=results[0], donationRows=results[1], tagRows=Array.isArray(results[2])?results[2]:[];
       if(!Array.isArray(donorRows)||!Array.isArray(donationRows)){setError('Failed to load');setLoading(false);return;}
       var byDonor={};
       donationRows.forEach(function(d){if(!byDonor[d.donor_id])byDonor[d.donor_id]=[];byDonor[d.donor_id].push(d);});
-      setDonors(donorRows.map(function(d){return buildDonor(d,byDonor[d.id]||[]);}));
+      var tagsByDonor={};
+      tagRows.forEach(function(r){if(!r.tags)return;if(!tagsByDonor[r.donor_id])tagsByDonor[r.donor_id]=[];tagsByDonor[r.donor_id].push(r.tags);});
+      setDonors(donorRows.map(function(d){return Object.assign(buildDonor(d,byDonor[d.id]||[]),{tags:tagsByDonor[d.id]||[]});}));
       setLoading(false);
     }).catch(function(err){setError(err.message);setLoading(false);});
   }, []);
@@ -2138,6 +2142,7 @@ function DonorsView() {
                                 <span style={{fontWeight:500,color:'#2a2a2a'}}>{d.formal_name}</span>
                                 {d.starred && <span style={{color:'#b5a185',fontSize:12}}>★</span>}
                                 {d.deceased && <span style={{fontSize:9,fontWeight:600,padding:'1px 5px',borderRadius:20,background:'#e5e7eb',color:'#6b7280'}}>Deceased</span>}
+                                {(d.tags||[]).map(function(tag){return <span key={tag.id} title={tag.name} style={{width:7,height:7,borderRadius:'50%',background:tag.color,flexShrink:0,display:'inline-block'}}/>;})}
                               </div>
                               {d.informal_first_name && <div style={{fontSize:11,color:'#999',marginTop:1}}>{d.informal_first_name}</div>}
                             </div>
@@ -2147,6 +2152,9 @@ function DonorsView() {
                           <span style={{display:'inline-flex',padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,...(NSH_STATUS_PILLS[d.status]||{background:'#f3f4f6',color:'#6b7280'})}}>
                             {NSH_STATUS_LABELS[d.status]||d.status}
                           </span>
+                          {(d.tags||[]).length>0 && <div style={{display:'flex',flexWrap:'wrap',gap:3,marginTop:4}}>
+                            {(d.tags||[]).map(function(tag){return <span key={tag.id} style={{display:'inline-flex',alignItems:'center',gap:3,padding:'1px 6px',borderRadius:20,fontSize:10,fontWeight:500,background:tag.color+'22',color:tag.color}}>{tag.name}</span>;})}
+                          </div>}
                         </td>
                         <td style={{padding:'10px 14px'}}>
                           {d.tier==='none'
@@ -2193,6 +2201,7 @@ function DonorsView() {
               <span style={{fontSize:11,borderRadius:20,padding:'2px 8px',fontWeight:500,...(NSH_STATUS_PILLS[selected.status]||{background:'#f3f4f6',color:'#6b7280'})}}>
                 {NSH_STATUS_LABELS[selected.status]||selected.status}
               </span>
+              {(selected.tags||[]).map(function(tag){return <span key={tag.id} style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,background:tag.color+'22',color:tag.color}}>{tag.name}</span>;})}
             </div>
             {/* Giving summary */}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
@@ -2360,19 +2369,87 @@ function DonorsView() {
 }
 
 function MarketingView() {
+  var { useState, useEffect } = React;
+  var [links, setLinks] = useState([]);
+  var [loading, setLoading] = useState(true);
+  var [showAdd, setShowAdd] = useState(false);
+  var [addLabel, setAddLabel] = useState('');
+  var [addUrl, setAddUrl] = useState('');
+  var [saving, setSaving] = useState(false);
+
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?area=eq.Marketing-Hub&select=*&order=id.asc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setLinks(rows);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }, []);
+
+  function addLink(e) {
+    e.preventDefault();
+    if (!addLabel.trim() || !addUrl.trim() || saving) return;
+    var url = addUrl.trim();
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    setSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ area: 'Marketing-Hub', title: addLabel.trim(), url: url })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows) && rows[0]) setLinks(function(p) { return p.concat([rows[0]]); });
+      setAddLabel(''); setAddUrl(''); setShowAdd(false); setSaving(false);
+    }).catch(function() { setSaving(false); });
+  }
+
+  function deleteLink(id) {
+    setLinks(function(p) { return p.filter(function(l) { return l.id !== id; }); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?id=eq.' + id, {
+      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    });
+  }
+
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <StatCard label="Posts This Month" value="5" />
-        <StatCard label="Sent" value="1" />
-        <StatCard label="Scheduled" value="1" />
-        <StatCard label="In Draft/Ideas" value="3" />
+    <div style={{ maxWidth: 680 }}>
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', letterSpacing: 0.2 }}>Quick Links</div>
+          <button onClick={function() { setShowAdd(function(v) { return !v; }); }} style={{ background: showAdd ? '#f5f0ea' : gold, color: showAdd ? '#888' : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{showAdd ? 'Cancel' : '+ Add Button'}</button>
+        </div>
+
+        {showAdd && (
+          <form onSubmit={addLink} style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 18, border: '0.5px solid #e8e0d5' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input value={addLabel} onChange={function(e) { setAddLabel(e.target.value); }} placeholder="Button label" style={{ flex: '1 1 140px', padding: '8px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff' }} />
+              <input value={addUrl} onChange={function(e) { setAddUrl(e.target.value); }} placeholder="https://…" style={{ flex: '2 1 200px', padding: '8px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff' }} />
+              <button type="submit" disabled={saving || !addLabel.trim() || !addUrl.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (saving || !addLabel.trim() || !addUrl.trim()) ? 0.6 : 1, flexShrink: 0 }}>Save</button>
+            </div>
+          </form>
+        )}
+
+        {loading ? (
+          <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
+        ) : links.length === 0 ? (
+          <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No buttons yet — add one above.</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+            {links.map(function(lnk) {
+              return (
+                <div key={lnk.id} style={{ position: 'relative' }}>
+                  <a href={lnk.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', padding: '14px 16px', background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, textDecoration: 'none', color: '#2a2a2a', fontSize: 13, fontWeight: 600, textAlign: 'center', lineHeight: 1.4, transition: 'background 0.15s, border-color 0.15s' }}
+                    onMouseEnter={function(e) { e.currentTarget.style.background = '#f5efe6'; e.currentTarget.style.borderColor = gold; }}
+                    onMouseLeave={function(e) { e.currentTarget.style.background = '#faf8f5'; e.currentTarget.style.borderColor = '#e8e0d5'; }}>
+                    {lnk.title}
+                  </a>
+                  <button onClick={function() { deleteLink(lnk.id); }} title="Remove" style={{ position: 'absolute', top: 4, right: 4, background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, lineHeight: 1, padding: '2px 4px' }}
+                    onMouseEnter={function(e) { e.currentTarget.style.color = '#e57373'; }}
+                    onMouseLeave={function(e) { e.currentTarget.style.color = '#ddd'; }}>×</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-      <Table
-        cols={["Platform", "Post", "Scheduled Date", "Lead", "Status"]}
-        rows={mockData.marketing}
-        renderRow={r => (<><Td>{r.platform}</Td><Td>{r.post}</Td><Td muted>{r.date}</Td><Td muted>{r.lead}</Td><Td><Badge status={r.status} /></Td></>)}
-      />
     </div>
   );
 }
@@ -2406,6 +2483,7 @@ var BOARD_MEMBERS = ['Ken', 'Rick', 'Wyn', 'Paula', 'Jeff', 'Rich'];
 var VOTE_COLORS = { 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#f3f0ff', color: '#7c3aed' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' } };
 
 function BoardView() {
+  var isMobile = React.useContext(MobileCtx);
   const [items, setItems] = React.useState([]);
   const [votes, setVotes] = React.useState([]);
   const [selected, setSelected] = React.useState(null);
@@ -2621,8 +2699,8 @@ function BoardView() {
               onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.07)'; }}
               onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>{item.title}</div>
                   <div style={{ fontSize: 12, color: '#777' }}>
                     {item.submitted_by ? <span>Submitted by {item.submitted_by}{item.due_date ? ' · ' : ''}</span> : null}
@@ -2630,10 +2708,10 @@ function BoardView() {
                     {item.meeting_date ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 16, flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                   <span style={{ fontSize: 12, color: '#777' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
                   {revealed
-                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Closed – Decision Made</span>
+                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Closed</span>
                     : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Open</span>
                   }
                 </div>
@@ -2653,12 +2731,19 @@ function BoardView() {
       </div>
 
       {selected && (
-        <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 520, background: '#fff', zIndex: 1011, boxShadow: '-4px 0 32px rgba(0,0,0,0.12)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '20px 24px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-            <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', color: '#888', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}>← Back</button>
-            <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
+        <>
+        {isMobile && <div onClick={function() { setSelected(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1010 }} />}
+        <div style={isMobile
+          ? { position: 'fixed', left: 0, right: 0, bottom: 0, height: '88vh', background: '#fff', zIndex: 1011, boxShadow: '0 -4px 32px rgba(0,0,0,0.14)', overflowY: 'auto', display: 'flex', flexDirection: 'column', borderRadius: '16px 16px 0 0' }
+          : { position: 'fixed', top: 0, right: 0, bottom: 0, width: 520, background: '#fff', zIndex: 1011, boxShadow: '-4px 0 32px rgba(0,0,0,0.12)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }
+        }>
+          {isMobile && <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}><div style={{ width: 36, height: 4, borderRadius: 2, background: '#e0d8cc' }} /></div>}
+          <div style={{ padding: isMobile ? '8px 16px 12px' : '20px 24px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            {!isMobile && <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', color: '#888', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}>← Back</button>}
+            {isMobile && <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.title}</div>}
+            <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#bbb', lineHeight: 1, flexShrink: 0 }}>×</button>
           </div>
-          <div style={{ padding: '24px 28px', flex: 1 }}>
+          <div style={{ padding: isMobile ? '14px 16px' : '24px 28px', flex: 1 }}>
             <div style={{ background: '#fff', borderRadius: 0 }}>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 22, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
@@ -2683,7 +2768,7 @@ function BoardView() {
             {isRevealed(selected) ? (
               <div>
                 <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 12 }}>Results</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
                   {(function() {
                     var t = tally(selected);
                     return [
@@ -2783,6 +2868,7 @@ function BoardView() {
             </div>
           </div>
         </div>
+        </>
       )}
 
       {showAdd && (
@@ -3439,6 +3525,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [areaInfo, setAreaInfo] = useState(null);
   var [budget, setBudget] = useState([]);
   var [vols, setVols] = useState([]);
+  var [allVolsForReimburse, setAllVolsForReimburse] = useState([]);
   var [showBudget, setShowBudget] = useState(false);
   var [showVols, setShowVols] = useState(false);
   var [editLead, setEditLead] = useState(false);
@@ -3453,7 +3540,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [budgetSaving, setBudgetSaving] = useState(false);
   var [uploadingId, setUploadingId] = useState(null);
   var fileInputRef = React.useRef(null);
-  var [budgetReceiptFile, setBudgetReceiptFile] = useState(null);
+  var [budgetReceiptFiles, setBudgetReceiptFiles] = useState([]);
   var budgetReceiptRef = React.useRef(null);
   var [reimburseVolQuery, setReimburseVolQuery] = useState('');
   var [showReimburseVolDrop, setShowReimburseVolDrop] = useState(false);
@@ -3476,6 +3563,11 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [todoLoading, setTodoLoading] = useState(false);
   var [todoInput, setTodoInput] = useState('');
   var [todoSaving, setTodoSaving] = useState(false);
+  var todoTodayStr = new Date().toISOString().slice(0, 10);
+  var [todoSelectedDate, setTodoSelectedDate] = useState(todoTodayStr);
+  var [todoInputTime, setTodoInputTime] = useState('');
+  var [todoEditingTimeId, setTodoEditingTimeId] = useState(null);
+  var [todoEditTimeVal, setTodoEditTimeVal] = useState('');
   var emptySponsorForm = { 'Business Name': '', 'Main Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Donation': '', 'Fair Market Value': '', 'Area Supported': area, 'Date Recieved': '', 'NSH Contact': '' };
   var [sponsorForm, setSponsorForm] = useState(emptySponsorForm);
   var [sponsorSaving, setSponsorSaving] = useState(false);
@@ -3526,6 +3618,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         var matches = areaAliases[area] || [area.toLowerCase()];
         return v.Team.split(/[,|]/).some(function(t) { return matches.indexOf(t.trim().toLowerCase()) !== -1; });
       }));
+      setAllVolsForReimburse(rows);
     });
     cachedFetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?area=eq.' + encodeURIComponent(area) + '&select=*&order=created_at.asc').then(function(rows) {
       if (Array.isArray(rows)) setResources(rows);
@@ -3585,10 +3678,27 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     });
   }
 
+  function parseReceipts(receiptUrl) {
+    if (!receiptUrl) return [];
+    try { var p = JSON.parse(receiptUrl); if (Array.isArray(p)) return p; } catch(e) {}
+    return [receiptUrl];
+  }
+
+  function uploadFile(file, itemId) {
+    var ext = (file.name.split('.').pop() || 'bin');
+    var slug = area.toLowerCase().replace(/\s+/g, '-');
+    var filename = slug + '-' + itemId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6) + '.' + ext;
+    return fetch(SUPABASE_URL + '/storage/v1/object/receipts/' + filename, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream' },
+      body: file
+    }).then(function() { return SUPABASE_URL + '/storage/v1/object/public/receipts/' + filename; });
+  }
+
   function addBudgetItem(e) {
     e.preventDefault();
     setBudgetSaving(true);
-    var file = budgetReceiptFile;
+    var files = budgetReceiptFiles;
     var payload = { area: area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null };
     if (budgetForm.needs_reimbursement) { payload.needs_reimbursement = true; payload.volunteer_name = budgetForm.volunteer_name || null; }
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
@@ -3599,34 +3709,23 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       if (rows && rows.code) { setBudgetSaving(false); alert('Add failed: ' + (rows.message || rows.hint || rows.code)); return; }
       var newRow = rows && rows[0];
       if (!newRow) { setBudgetSaving(false); return; }
-      if (!file) {
+      function finish(finalRow) {
         clearCache('Op Budget');
         setBudgetSaving(false);
-        setBudget(function(prev) { return [newRow].concat(prev); });
-        setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' }); setReimburseVolQuery('');
-        setBudgetReceiptFile(null);
-        return;
+        setBudget(function(prev) { return [finalRow].concat(prev); });
+        setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' });
+        setReimburseVolQuery('');
+        setBudgetReceiptFiles([]);
+        if (budgetReceiptRef.current) budgetReceiptRef.current.value = '';
       }
-      var ext = file.name.split('.').pop();
-      var filename = area.toLowerCase().replace(/\s+/g, '-') + '-' + newRow.id + '-' + Date.now() + '.' + ext;
-      fetch(SUPABASE_URL + '/storage/v1/object/receipts/' + filename, {
-        method: 'POST',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
-        body: file
-      }).then(function() {
-        var url = SUPABASE_URL + '/storage/v1/object/public/receipts/' + filename;
-        return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + newRow.id, {
+      if (!files.length) { finish(newRow); return; }
+      Promise.all(files.map(function(f) { return uploadFile(f, newRow.id); })).then(function(urls) {
+        var receiptVal = urls.length === 1 ? urls[0] : JSON.stringify(urls);
+        fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + newRow.id, {
           method: 'PATCH',
           headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ receipt_url: url })
-        }).then(function() {
-          clearCache('Op Budget');
-          setBudgetSaving(false);
-          setBudget(function(prev) { return [Object.assign({}, newRow, { receipt_url: url })].concat(prev); });
-          setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' }); setReimburseVolQuery('');
-          setBudgetReceiptFile(null);
-          if (budgetReceiptRef.current) budgetReceiptRef.current.value = '';
-        });
+          body: JSON.stringify({ receipt_url: receiptVal })
+        }).then(function() { finish(Object.assign({}, newRow, { receipt_url: receiptVal })); });
       });
     });
   }
@@ -3651,19 +3750,40 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     }).catch(function() { setTodoLoading(false); });
   }
 
+  function todoGetDate(t) { return (t.date_submitted || '').slice(0, 10); }
+  function todoGetTime(t) { var ds = t.date_submitted || ''; return (ds.length >= 16 && ds[10] === 'T') ? ds.slice(11, 16) : ''; }
+  function todoFmtTime(hhmm) { if (!hhmm) return ''; var p = hhmm.split(':'); var h = parseInt(p[0], 10); var ampm = h >= 12 ? 'PM' : 'AM'; return (h % 12 || 12) + ':' + p[1] + ' ' + ampm; }
+  function todoNavigateDay(delta) { var d = new Date(todoSelectedDate + 'T12:00:00'); d.setDate(d.getDate() + delta); setTodoSelectedDate(d.toISOString().slice(0, 10)); }
+  function todoGetWeekDays(dateStr) {
+    var d = new Date(dateStr + 'T12:00:00'); var day = d.getDay(); var offset = day === 0 ? -6 : 1 - day;
+    var mon = new Date(d); mon.setDate(d.getDate() + offset);
+    var days = []; for (var i = 0; i < 7; i++) { var dd = new Date(mon); dd.setDate(mon.getDate() + i); days.push(dd.toISOString().slice(0, 10)); } return days;
+  }
+
   function addTodoItem(e) {
     e.preventDefault();
     if (!todoInput.trim()) return;
     setTodoSaving(true);
+    var ds = todoInputTime ? todoSelectedDate + 'T' + todoInputTime : todoSelectedDate;
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ item: todoInput.trim(), date_submitted: new Date().toISOString(), done: false, date_done: null })
+      body: JSON.stringify({ item: todoInput.trim(), date_submitted: ds, done: false, date_done: null })
     }).then(function(r) { return r.json(); }).then(function(rows) {
-      if (Array.isArray(rows) && rows[0]) setTodoItems(function(p) { return [rows[0]].concat(p); });
-      setTodoInput('');
+      if (Array.isArray(rows) && rows[0]) setTodoItems(function(p) { return p.concat([rows[0]]); });
+      setTodoInput(''); setTodoInputTime('');
       setTodoSaving(false);
     }).catch(function() { setTodoSaving(false); });
+  }
+
+  function saveTodoTime(t) {
+    var ds = todoInputTime ? todoGetDate(t) + 'T' + todoEditTimeVal : todoGetDate(t);
+    setTodoItems(function(p) { return p.map(function(x) { return x.id === t.id ? Object.assign({}, x, { date_submitted: ds }) : x; }); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?id=eq.' + t.id, {
+      method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date_submitted: ds })
+    });
+    setTodoEditingTimeId(null);
   }
 
   function toggleTodoItem(id, currentDone) {
@@ -3685,24 +3805,22 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   }
 
   function handleReceiptSelect(e) {
-    var file = e.target.files[0];
-    if (!file || !uploadingId) { e.target.value = ''; return; }
+    var newFiles = Array.from(e.target.files || []);
+    if (!newFiles.length || !uploadingId) { e.target.value = ''; return; }
     var id = uploadingId;
-    var ext = file.name.split('.').pop();
-    var filename = area.toLowerCase().replace(/\s+/g, '-') + '-' + id + '-' + Date.now() + '.' + ext;
-    fetch(SUPABASE_URL + '/storage/v1/object/receipts/' + filename, {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
-      body: file
-    }).then(function() {
-      var url = SUPABASE_URL + '/storage/v1/object/public/receipts/' + filename;
+    var existingItem = budget.find(function(b) { return b.id === id; });
+    var existing = parseReceipts(existingItem && existingItem.receipt_url);
+    setUploadingId('loading-' + id);
+    Promise.all(newFiles.map(function(f) { return uploadFile(f, id); })).then(function(newUrls) {
+      var all = existing.concat(newUrls);
+      var receiptVal = all.length === 1 ? all[0] : JSON.stringify(all);
       return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
         method: 'PATCH',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ receipt_url: url })
+        body: JSON.stringify({ receipt_url: receiptVal })
       }).then(function() {
         clearCache('Op Budget');
-        setBudget(function(prev) { return prev.map(function(b) { return b.id === id ? Object.assign({}, b, { receipt_url: url }) : b; }); });
+        setBudget(function(prev) { return prev.map(function(b) { return b.id === id ? Object.assign({}, b, { receipt_url: receiptVal }) : b; }); });
         setUploadingId(null);
         e.target.value = '';
       });
@@ -4141,16 +4259,16 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                   <input value={budgetForm.description} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="What was purchased or donated..." />
                 </div>
                 <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Receipt (optional)</div>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Receipts (optional)</div>
                   <div
                     onClick={function() { budgetReceiptRef.current && budgetReceiptRef.current.click(); }}
-                    style={{ border: '0.5px dashed #e0d8cc', borderRadius: 7, padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: budgetReceiptFile ? '#2a2a2a' : '#bbb', background: '#fafaf8', display: 'flex', alignItems: 'center', gap: 8 }}
+                    style={{ border: '0.5px dashed #e0d8cc', borderRadius: 7, padding: '8px 12px', fontSize: 13, cursor: 'pointer', color: budgetReceiptFiles.length ? '#2a2a2a' : '#bbb', background: '#fafaf8', display: 'flex', alignItems: 'center', gap: 8 }}
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                    <span>{budgetReceiptFile ? budgetReceiptFile.name : 'Attach image or PDF…'}</span>
-                    {budgetReceiptFile && <span onClick={function(ev) { ev.stopPropagation(); setBudgetReceiptFile(null); if (budgetReceiptRef.current) budgetReceiptRef.current.value = ''; }} style={{ marginLeft: 'auto', color: '#bbb', cursor: 'pointer', fontSize: 14 }}>×</span>}
+                    <span>{budgetReceiptFiles.length === 0 ? 'Attach images or PDFs…' : budgetReceiptFiles.length === 1 ? budgetReceiptFiles[0].name : budgetReceiptFiles.length + ' files attached'}</span>
+                    {budgetReceiptFiles.length > 0 && <span onClick={function(ev) { ev.stopPropagation(); setBudgetReceiptFiles([]); if (budgetReceiptRef.current) budgetReceiptRef.current.value = ''; }} style={{ marginLeft: 'auto', color: '#bbb', cursor: 'pointer', fontSize: 14 }}>×</span>}
                   </div>
-                  <input ref={budgetReceiptRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={function(e) { setBudgetReceiptFile(e.target.files[0] || null); }} />
+                  <input ref={budgetReceiptRef} type="file" accept="image/*,.pdf" multiple style={{ display: 'none' }} onChange={function(e) { setBudgetReceiptFiles(Array.from(e.target.files || [])); }} />
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: budgetForm.needs_reimbursement ? '#b45309' : '#555' }}>
@@ -4160,8 +4278,8 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                   </label>
                 </div>
                 {budgetForm.needs_reimbursement && (function() {
-                  var allVols = vols.filter(function(v) { return v['Status'] === 'Active' || v['Status'] === 'active'; });
-                  if (!allVols.length) allVols = vols;
+                  var allVols = allVolsForReimburse.filter(function(v) { return v['Status'] === 'Active' || v['Status'] === 'active'; });
+                  if (!allVols.length) allVols = allVolsForReimburse;
                   var filtered = reimburseVolQuery ? allVols.filter(function(v) {
                     var name = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim().toLowerCase();
                     return name.includes(reimburseVolQuery.toLowerCase());
@@ -4219,16 +4337,22 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</span>
                   <span style={{ fontSize: 11, color: '#bbb', flexShrink: 0 }}>{b.date}</span>
                   {b.needs_reimbursement && <span title="Needs reimbursement" style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 10, fontWeight: 600, flexShrink: 0 }}>$ Reimburse</span>}
-                  {b.receipt_url ? (
-                    <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></a>
-                  ) : (
-                    <button onClick={function() { setUploadingId(b.id); fileInputRef.current.click(); }} disabled={isUploading} title="Attach receipt" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px 4px', flexShrink: 0, opacity: isUploading ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>{isUploading ? <span style={{ fontSize: 11 }}>…</span> : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>}</button>
-                  )}
+                  {(function() {
+                    var receipts = parseReceipts(b.receipt_url);
+                    var isLoading = uploadingId === 'loading-' + b.id;
+                    if (receipts.length > 0) return (
+                      <button onClick={function() { receipts.forEach(function(u) { window.open(u, '_blank'); }); }} title={receipts.length + ' attachment' + (receipts.length > 1 ? 's' : '')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, padding: '2px 4px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        {receipts.length > 1 && <span style={{ fontSize: 10, fontWeight: 600 }}>{receipts.length}</span>}
+                      </button>
+                    );
+                    return <button onClick={function() { setUploadingId(b.id); fileInputRef.current.click(); }} disabled={isLoading} title="Attach receipt" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px 4px', flexShrink: 0, opacity: isLoading ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>{isLoading ? <span style={{ fontSize: 11 }}>…</span> : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>}</button>;
+                  })()}
                   <button onClick={function() { deleteBudgetItem(b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                 </div>
               );
             })}
-            <input ref={fileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleReceiptSelect} />
+            <input ref={fileInputRef} type="file" accept="image/*,.pdf" multiple style={{ display: 'none' }} onChange={handleReceiptSelect} />
           </div>
         </div>
       )}
@@ -4359,41 +4483,117 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           </div>
         </div>
       )}
-      {showTodo && (
-        <div onClick={function() { setShowTodo(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 20 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 480, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
-            <div style={{ padding: '18px 22px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>★ Marketing To-Do</div>
-              <button onClick={function() { setShowTodo(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: '#666', cursor: 'pointer' }}>Close</button>
-            </div>
-            <form onSubmit={addTodoItem} style={{ padding: '14px 22px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', gap: 8 }}>
-              <input value={todoInput} onChange={function(e) { setTodoInput(e.target.value); }} placeholder="Add a to-do item…" style={{ flex: 1, padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, fontFamily: 'system-ui, sans-serif' }} />
-              <button type="submit" disabled={todoSaving || !todoInput.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (todoSaving || !todoInput.trim()) ? 0.6 : 1 }}>Add</button>
-            </form>
-            <div style={{ overflowY: 'auto', flex: 1 }}>
-              {todoLoading ? (
-                <div style={{ padding: 24, textAlign: 'center', color: '#aaa', fontSize: 13 }}>Loading…</div>
-              ) : todoItems.length === 0 ? (
-                <div style={{ padding: 24, textAlign: 'center', color: '#ccc', fontSize: 13 }}>No to-do items yet.</div>
-              ) : todoItems.map(function(t) {
-                return (
-                  <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 22px', borderBottom: '0.5px solid #f9f6f2', background: t.done ? '#fafaf9' : '#fff' }}>
-                    <input type="checkbox" checked={!!t.done} onChange={function() { toggleTodoItem(t.id, t.done); }} style={{ marginTop: 3, accentColor: gold, cursor: 'pointer', flexShrink: 0 }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: t.done ? '#aaa' : '#2a2a2a', textDecoration: t.done ? 'line-through' : 'none' }}>{t.item}</div>
-                      <div style={{ fontSize: 11, color: '#bbb', marginTop: 3 }}>
-                        Added {new Date(t.date_submitted).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        {t.done && t.date_done && <span> · Done {new Date(t.date_done).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+      {showTodo && (function() {
+        var weekDays = todoGetWeekDays(todoSelectedDate);
+        var DAY_LABELS = ['M','T','W','T','F','S','S'];
+        var dayItems = todoItems.filter(function(t) { return todoGetDate(t) === todoSelectedDate; }).sort(function(a,b) { var ta = todoGetTime(a)||'99:99'; var tb = todoGetTime(b)||'99:99'; return ta<tb?-1:ta>tb?1:0; });
+        var activeItems = dayItems.filter(function(t) { return !t.done; });
+        var doneItems = dayItems.filter(function(t) { return t.done; });
+        var isToday = todoSelectedDate === todoTodayStr;
+        var displayDate = new Date(todoSelectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        return (
+          <div onClick={function() { setShowTodo(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
+            <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 500, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
+              {/* Header */}
+              <div style={{ padding: '16px 20px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>★ Marketing To-Do</div>
+                <button onClick={function() { setShowTodo(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: '#666', cursor: 'pointer' }}>Close</button>
+              </div>
+              {/* Week strip */}
+              <div style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', gap: 3, flexShrink: 0 }}>
+                {weekDays.map(function(d, i) {
+                  var total = todoItems.filter(function(t) { return todoGetDate(t) === d; }).length;
+                  var done = todoItems.filter(function(t) { return todoGetDate(t) === d && t.done; }).length;
+                  var isSel = d === todoSelectedDate; var isTod = d === todoTodayStr;
+                  return (
+                    <button key={d} onClick={function() { setTodoSelectedDate(d); }} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '6px 2px', background: isSel ? gold : 'transparent', borderRadius: 7, border: 'none', cursor: 'pointer', color: isSel ? '#fff' : isTod ? gold : '#888' }}>
+                      <span style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{DAY_LABELS[i]}</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1 }}>{new Date(d + 'T12:00:00').getDate()}</span>
+                      <span style={{ fontSize: 9, fontWeight: 600, height: 14, background: isSel ? 'rgba(255,255,255,0.25)' : total === 0 ? 'transparent' : done === total ? '#e8f5e9' : '#fef3c7', color: isSel ? '#fff' : done === total && total > 0 ? '#2e7d32' : '#b45309', borderRadius: 10, padding: total > 0 ? '1px 4px' : 0, display: 'flex', alignItems: 'center' }}>{total > 0 ? done + '/' + total : ''}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Day nav */}
+              <div style={{ padding: '8px 14px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                <button onClick={function() { todoNavigateDay(-1); }} style={{ background: '#f5f1eb', border: 'none', borderRadius: 7, padding: '5px 12px', fontSize: 13, cursor: 'pointer', color: '#666' }}>←</button>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>{displayDate}</div>
+                  {!isToday && <button onClick={function() { setTodoSelectedDate(todoTodayStr); }} style={{ fontSize: 11, color: gold, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: 0 }}>Back to today</button>}
+                </div>
+                <button onClick={function() { todoNavigateDay(1); }} style={{ background: '#f5f1eb', border: 'none', borderRadius: 7, padding: '5px 12px', fontSize: 13, cursor: 'pointer', color: '#666' }}>→</button>
+              </div>
+              {/* Add task */}
+              <form onSubmit={addTodoItem} style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+                <input value={todoInput} onChange={function(e) { setTodoInput(e.target.value); }} placeholder={isToday ? 'Add a task for today…' : 'Add a task for ' + displayDate + '…'} style={{ flex: '1 1 150px', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, fontFamily: 'system-ui, sans-serif' }} />
+                <input type="time" value={todoInputTime} onChange={function(e) { setTodoInputTime(e.target.value); }} style={{ padding: '8px 8px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, width: 100, flexShrink: 0, color: todoInputTime ? '#2a2a2a' : '#bbb' }} />
+                <button type="submit" disabled={todoSaving || !todoInput.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (todoSaving || !todoInput.trim()) ? 0.6 : 1, flexShrink: 0 }}>Add</button>
+              </form>
+              {/* Task list */}
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                {todoLoading ? (
+                  <div style={{ padding: 24, textAlign: 'center', color: '#aaa', fontSize: 13 }}>Loading…</div>
+                ) : dayItems.length === 0 ? (
+                  <div style={{ padding: 32, textAlign: 'center', color: '#ccc', fontSize: 13 }}>No tasks for this day.</div>
+                ) : (
+                  <div>
+                    {activeItems.length > 0 && (
+                      <div>
+                        <div style={{ padding: '7px 16px', fontSize: 10, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>To Do · {activeItems.length}</div>
+                        {activeItems.map(function(t) {
+                          var time = todoGetTime(t); var isEditingTime = todoEditingTimeId === t.id;
+                          return (
+                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderBottom: '0.5px solid #f9f6f2' }}>
+                              <input type="checkbox" checked={false} onChange={function() { toggleTodoItem(t.id, false); }} style={{ accentColor: gold, width: 15, height: 15, cursor: 'pointer', flexShrink: 0 }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, color: '#2a2a2a', lineHeight: 1.4 }}>{t.item}</div>
+                                {isEditingTime ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                                    <input type="time" value={todoEditTimeVal} onChange={function(e) { setTodoEditTimeVal(e.target.value); }} autoFocus style={{ padding: '3px 6px', border: '0.5px solid ' + gold, borderRadius: 6, fontSize: 12 }} />
+                                    <button onClick={function() { saveTodoTime(t); }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>Save</button>
+                                    <button onClick={function() { setTodoEditingTimeId(null); }} style={{ fontSize: 11, background: '#f0ece6', color: '#666', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>Cancel</button>
+                                  </div>
+                                ) : (
+                                  <button onClick={function() { setTodoEditingTimeId(t.id); setTodoEditTimeVal(time); }} style={{ marginTop: 2, fontSize: 11, color: time ? gold : '#ccc', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: time ? 500 : 400 }}>{time ? '⏰ ' + todoFmtTime(time) : '+ set time'}</button>
+                                )}
+                              </div>
+                              <button onClick={function() { deleteTodoItem(t.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
+                            </div>
+                          );
+                        })}
                       </div>
+                    )}
+                    {doneItems.length > 0 && (
+                      <div>
+                        <div style={{ padding: '7px 16px', fontSize: 10, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6', borderTop: activeItems.length > 0 ? '0.5px solid #f0ece6' : 'none' }}>Done · {doneItems.length}</div>
+                        {doneItems.map(function(t) {
+                          var time = todoGetTime(t);
+                          return (
+                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderBottom: '0.5px solid #f9f6f2', background: '#fafaf9' }}>
+                              <input type="checkbox" checked={true} onChange={function() { toggleTodoItem(t.id, true); }} style={{ accentColor: gold, width: 15, height: 15, cursor: 'pointer', flexShrink: 0 }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, color: '#bbb', textDecoration: 'line-through', lineHeight: 1.4 }}>{t.item}</div>
+                                {time && <div style={{ fontSize: 11, color: '#ccc', marginTop: 2 }}>⏰ {todoFmtTime(time)}</div>}
+                              </div>
+                              <button onClick={function() { deleteTodoItem(t.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div style={{ padding: '8px 14px', background: '#fdfcfb', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1, height: 3, background: '#f0ece6', borderRadius: 2, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: gold, width: (dayItems.length > 0 ? doneItems.length / dayItems.length * 100 : 0) + '%', borderRadius: 2, transition: 'width 0.3s' }} />
+                      </div>
+                      <span style={{ fontSize: 11, color: '#888', flexShrink: 0 }}>{doneItems.length}/{dayItems.length} done</span>
                     </div>
-                    <button onClick={function() { deleteTodoItem(t.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                   </div>
-                );
-              })}
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -5421,48 +5621,56 @@ function FinancialsView() {
           <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
         ) : items.length === 0 ? (
           <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No pending reimbursements.</div>
-        ) : Object.keys(byArea).sort().map(function(area) {
-          var areaItems = byArea[area];
-          var areaTotal = areaItems.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
-          return (
-            <div key={area}>
-              <div style={{ padding: '10px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{area}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309' }}>{fmt(areaTotal)}</div>
-                </div>
-              </div>
-              {areaItems.map(function(b) {
-                var isMarking = markingId === b.id;
-                var volMatch = b.volunteer_name && volList.find(function(v) { return ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim() === b.volunteer_name; });
-                var volAddress = volMatch && volMatch['Address'];
-                return (
-                  <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
-                      {b.volunteer_name && (
-                        <div style={{ fontSize: 11, color: '#2e7d32', fontWeight: 500, marginTop: 2 }}>
-                          {b.volunteer_name}{volAddress ? <span style={{ color: '#888', fontWeight: 400 }}> · {volAddress}</span> : null}
-                        </div>
-                      )}
-                      <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
-                    {b.receipt_url && (
-                      <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                      </a>
-                    )}
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: isMarking ? 'default' : 'pointer', flexShrink: 0 }}>
-                      <input type="checkbox" checked={false} disabled={isMarking} onChange={function() { markReimbursed(b.id); }} style={{ accentColor: '#059669', width: 14, height: 14 }} />
-                      <span style={{ fontSize: 11, color: '#059669', fontWeight: 500 }}>{isMarking ? '…' : 'Reimbursed'}</span>
-                    </label>
+        ) : (
+          <div>
+          {Object.keys(byArea).sort().map(function(area) {
+            var areaItems = byArea[area];
+            var areaTotal = areaItems.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+            return (
+              <div key={area}>
+                <div style={{ padding: '10px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{area}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309' }}>{fmt(areaTotal)}</div>
                   </div>
-                );
-              })}
-            </div>
-          );
-        })}
+                </div>
+                {areaItems.map(function(b) {
+                  var isMarking = markingId === b.id;
+                  var volMatch = b.volunteer_name && volList.find(function(v) { return ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim() === b.volunteer_name; });
+                  var volAddress = volMatch && volMatch['Address'];
+                  return (
+                    <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
+                        {b.volunteer_name && (
+                          <div style={{ fontSize: 11, color: '#2e7d32', fontWeight: 500, marginTop: 2 }}>
+                            {b.volunteer_name}{volAddress ? <span style={{ color: '#888', fontWeight: 400 }}> · {volAddress}</span> : null}
+                          </div>
+                        )}
+                        <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
+                      {b.receipt_url && (
+                        <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        </a>
+                      )}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: isMarking ? 'default' : 'pointer', flexShrink: 0 }}>
+                        <input type="checkbox" checked={false} disabled={isMarking} onChange={function() { markReimbursed(b.id); }} style={{ accentColor: '#059669', width: 14, height: 14 }} />
+                        <span style={{ fontSize: 11, color: '#059669', fontWeight: 500 }}>{isMarking ? '…' : 'Reimbursed'}</span>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+          <div style={{ padding: '14px 18px', borderTop: '1.5px solid #e8e0d5', background: '#fdfcfb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 12, color: '#888', fontWeight: 500 }}>{items.length} item{items.length !== 1 ? 's' : ''} · Total to reimburse</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#b45309' }}>{fmt(reimTotal)}</div>
+          </div>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -5536,8 +5744,10 @@ function FinancialsView() {
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Expenditures</div>
                 {!cashLoading && cashLog.length > 0 && (
-                  <div style={{ fontSize: 12, marginTop: 2 }}>
+                  <div style={{ fontSize: 12, marginTop: 2, display: 'flex', gap: 10 }}>
+                    {cashIn > 0 && <span style={{ color: '#059669', fontWeight: 600 }}>↑ {fmt(cashIn)}</span>}
                     <span style={{ color: '#c62828', fontWeight: 600 }}>↓ {fmt(cashOut)}</span>
+                    {cashIn > 0 && <span style={{ color: '#888', fontWeight: 500 }}>Net {fmt(cashIn - cashOut)}</span>}
                   </div>
                 )}
               </div>
@@ -5683,7 +5893,7 @@ function FinancialsView() {
 function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSaving, volunteers }) {
   var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
   var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 };
-  var STATUS_OPTIONS = ['Exploring', 'Active', 'On Hold', 'Declined', 'Completed'];
+  var STATUS_OPTIONS = ['Exploring', 'Active', 'On Hold', 'Inactive', 'Completed'];
   return (
     <form onSubmit={onSubmit}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
@@ -5725,12 +5935,12 @@ function IdeasView() {
   var isMobile = React.useContext(MobileCtx);
   var today = new Date().toISOString().slice(0, 10);
 
-  var STATUS_OPTIONS = ['Exploring', 'Active', 'On Hold', 'Declined', 'Completed'];
+  var STATUS_OPTIONS = ['Exploring', 'Active', 'On Hold', 'Inactive', 'Completed'];
   var STATUS_COLORS = {
     'Exploring': { bg: '#e3f2fd', color: '#1565c0' },
     'Active':    { bg: '#e8f5e9', color: '#2e7d32' },
     'On Hold':   { bg: '#fff8e1', color: '#f57f17' },
-    'Declined':  { bg: '#fce4ec', color: '#c62828' },
+    'Inactive':  { bg: '#fce4ec', color: '#c62828' },
     'Completed': { bg: '#f3e5f5', color: '#6a1b9a' },
   };
 
@@ -5816,7 +6026,7 @@ function IdeasView() {
         setSaving(false);
         setForm(emptyForm); setShowAdd(false);
         var newStatus = payload.status;
-        setMainTab(['Active','On Hold','Completed','Declined'].includes(newStatus) ? 'initiatives' : 'ideas');
+        setMainTab(['Active','On Hold','Completed','Inactive'].includes(newStatus) ? 'initiatives' : 'ideas');
         setFilterStatus(newStatus || 'Active');
         loadIdeas(function(allRows) {
           var match = allRows.find(function(x) { return rows && rows[0] ? x.id === rows[0].id : x.title === payload.title; });
@@ -5840,7 +6050,7 @@ function IdeasView() {
       setEditing(false);
       setEditSaving(false);
       var newStatus = editForm.status;
-      setMainTab(['Active', 'On Hold', 'Completed', 'Declined'].includes(newStatus) ? 'initiatives' : 'ideas');
+      setMainTab(['Active', 'On Hold', 'Completed', 'Inactive'].includes(newStatus) ? 'initiatives' : 'ideas');
       setFilterStatus('All');
     }).catch(function() { setEditSaving(false); });
   }
@@ -5902,7 +6112,7 @@ function IdeasView() {
 
   function fmtMoney(n) { return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-  var INITIATIVES_STATUSES = ['Active', 'On Hold', 'Completed', 'Declined'];
+  var INITIATIVES_STATUSES = ['Active', 'On Hold', 'Completed', 'Inactive'];
   var IDEA_STATUSES = ['Exploring'];
   var tabStatuses = mainTab === 'initiatives' ? INITIATIVES_STATUSES : IDEA_STATUSES;
   var filtered = ideas.filter(function(i) {
@@ -6463,8 +6673,16 @@ var AREA_DEFAULTS = {
   'Events':        { lead: 'Barb Kusha',       budget: 7500,  pic: '' },
   'Marketing':     { lead: 'Haley Wright',     budget: 1000,  pic: 'https://drive.google.com/file/d/17Tse_3jiKZwmkVTTKMtt64zDghfZ8WrV/view?usp=drive_link' },
   'Venue':         { lead: 'Staff',            budget: null,  pic: '' },
-};function Dashboard() {
-  const [active, setActive] = useState("home");
+};
+
+var validModuleIds = Object.keys(views);
+function hashToModule() {
+  var h = window.location.hash.replace(/^#/, '');
+  return validModuleIds.indexOf(h) !== -1 ? h : 'home';
+}
+
+function Dashboard() {
+  const [active, setActive] = useState(hashToModule);
   const [opOpen, setOpOpen] = useState(false);
   const [opArea, setOpArea] = useState(null);
   const [quarterlyArea, setQuarterlyArea] = useState(null);
@@ -6472,6 +6690,17 @@ var AREA_DEFAULTS = {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const View = views[active];
   const mod = modules.find(m => m.id === active);
+
+  function navigate(id) {
+    window.location.hash = id;
+    setActive(id);
+  }
+
+  React.useEffect(function() {
+    function onHashChange() { setActive(hashToModule()); }
+    window.addEventListener('hashchange', onHashChange);
+    return function() { window.removeEventListener('hashchange', onHashChange); };
+  }, []);
 
   React.useEffect(function() {
     var fn = function() { setIsMobile(window.innerWidth < 768); };
@@ -6491,7 +6720,7 @@ var AREA_DEFAULTS = {
           <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" }} />
           <nav style={{ flex: 1, padding: "0 8px" }}>
             {modules.filter(m => !m.hidden).map(m => (
-              <button key={m.id} onClick={() => { setActive(m.id); setOpOpen(false); }} style={{
+              <button key={m.id} onClick={() => { navigate(m.id); setOpOpen(false); }} style={{
                 display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px",
                 background: active === m.id ? "rgba(181,161,133,0.15)" : "transparent",
                 border: "none", borderRadius: 7, cursor: "pointer", textAlign: "left",
@@ -6532,7 +6761,7 @@ var AREA_DEFAULTS = {
             <div style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", fontWeight: 600, letterSpacing: 1.4, textTransform: "uppercase", padding: "0 16px", marginBottom: 10 }}>Areas</div>
             {OPERATIONAL_AREAS.map(function(area) {
               return (
-                <button key={area} onClick={function() { setOpArea(area); setActive("operational"); }}
+                <button key={area} onClick={function() { setOpArea(area); navigate("operational"); }}
                   style={{
                     display: "block", width: "100%", padding: "9px 16px", background: opArea === area && active === "operational" ? "rgba(181,161,133,0.15)" : "transparent",
                     border: "none", cursor: "pointer", textAlign: "left",
@@ -6545,7 +6774,7 @@ var AREA_DEFAULTS = {
               );
             })}
             <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "10px 16px 8px" }} />
-            <button onClick={function() { setActive("financials"); }}
+            <button onClick={function() { navigate("financials"); }}
               style={{
                 display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 16px",
                 background: active === "financials" ? "rgba(181,161,133,0.15)" : "transparent",
@@ -6556,7 +6785,7 @@ var AREA_DEFAULTS = {
               }}>
               Financials
             </button>
-            <button onClick={function() { setActive("reviews"); }}
+            <button onClick={function() { navigate("reviews"); }}
               style={{
                 display: "block", width: "100%", padding: "9px 16px",
                 background: active === "reviews" ? "rgba(181,161,133,0.15)" : "transparent",
@@ -6567,7 +6796,7 @@ var AREA_DEFAULTS = {
               }}>
               Reviews
             </button>
-            <button onClick={function() { setActive("admin"); }}
+            <button onClick={function() { navigate("admin"); }}
               style={{
                 display: "block", width: "100%", padding: "9px 16px",
                 background: active === "admin" ? "rgba(181,161,133,0.15)" : "transparent",
@@ -6594,7 +6823,7 @@ var AREA_DEFAULTS = {
               <nav style={{ flex: 1, padding: '8px 8px' }}>
                 {modules.filter(function(m) { return !m.hidden; }).map(function(m) {
                   return (
-                    <button key={m.id} onClick={function() { setActive(m.id); setOpOpen(false); setMobileMenuOpen(false); }} style={{
+                    <button key={m.id} onClick={function() { navigate(m.id); setOpOpen(false); setMobileMenuOpen(false); }} style={{
                       display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 12px',
                       background: active === m.id ? 'rgba(181,161,133,0.15)' : 'transparent',
                       border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
@@ -6611,7 +6840,7 @@ var AREA_DEFAULTS = {
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600, letterSpacing: 1.4, textTransform: 'uppercase', padding: '0 8px', marginBottom: 8 }}>Operational Areas</div>
                 {OPERATIONAL_AREAS.map(function(area) {
                   return (
-                    <button key={area} onClick={function() { setOpArea(area); setActive('operational'); setMobileMenuOpen(false); }} style={{
+                    <button key={area} onClick={function() { setOpArea(area); navigate('operational'); setMobileMenuOpen(false); }} style={{
                       display: 'block', width: '100%', padding: '9px 12px', background: opArea === area && active === 'operational' ? 'rgba(181,161,133,0.15)' : 'transparent',
                       border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left',
                       color: opArea === area && active === 'operational' ? '#b5a185' : 'rgba(255,255,255,0.45)',
@@ -6620,9 +6849,9 @@ var AREA_DEFAULTS = {
                   );
                 })}
                 <div style={{ borderTop: '0.5px solid rgba(255,255,255,0.08)', margin: '8px 4px' }} />
-                <button onClick={function() { setActive('financials'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'financials' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financials' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financials' ? 600 : 400, marginBottom: 2 }}>Financials</button>
-                <button onClick={function() { setActive('reviews'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'reviews' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'reviews' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'reviews' ? 600 : 400, marginBottom: 2 }}>Reviews</button>
-                <button onClick={function() { setActive('admin'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'admin' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'admin' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'admin' ? 600 : 400, marginBottom: 2 }}>Admin</button>
+                <button onClick={function() { navigate('financials'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'financials' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financials' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financials' ? 600 : 400, marginBottom: 2 }}>Financials</button>
+                <button onClick={function() { navigate('reviews'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'reviews' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'reviews' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'reviews' ? 600 : 400, marginBottom: 2 }}>Reviews</button>
+                <button onClick={function() { navigate('admin'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'admin' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'admin' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'admin' ? 600 : 400, marginBottom: 2 }}>Admin</button>
               </div>
             </div>
           </div>
@@ -6639,7 +6868,7 @@ var AREA_DEFAULTS = {
             </div>
             <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Financials" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
-              <button onClick={function() { setQuarterlyArea(opArea); setActive("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
               </button>
             )}
@@ -6647,7 +6876,7 @@ var AREA_DEFAULTS = {
         </div>
         <div style={{ flex: 1, padding: isMobile ? "16px 14px" : "28px 32px", paddingBottom: isMobile ? 20 : undefined }}>
           <div style={{ maxWidth: 900 }}>
-            <View navigate={setActive} opArea={opArea} navigateOp={function(a) { setOpArea(a); setActive('operational'); }} quarterlyArea={quarterlyArea} navigateToQuarterly={function(a) { setQuarterlyArea(a); setActive('quarterly'); }} />
+            <View navigate={navigate} opArea={opArea} navigateOp={function(a) { setOpArea(a); navigate('operational'); }} quarterlyArea={quarterlyArea} navigateToQuarterly={function(a) { setQuarterlyArea(a); navigate('quarterly'); }} />
           </div>
         </div>
       </div>
