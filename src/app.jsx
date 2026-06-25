@@ -190,7 +190,7 @@ const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthsta
 
 // Kick off critical fetches immediately so data is ready when views mount
 (function prefetch() {
-  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day']);
+  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day']);
   cachedSbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes']);
   cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']);
   cachedFetchAll('Board Voting Items');
@@ -892,6 +892,51 @@ var volLabelStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
 var volGrp = { marginBottom: 14 };
 var volSecLabel = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10, marginTop: 20, display: 'block' };
 
+var VOL_MONTHS = [['01','January'],['02','February'],['03','March'],['04','April'],['05','May'],['06','June'],['07','July'],['08','August'],['09','September'],['10','October'],['11','November'],['12','December']];
+
+function VolDatePicker({ label, name, value, onChange, noDay }) {
+  var parts = (value || '').split('-');
+  var hasAll = parts.length === 3;
+  var yr = hasAll ? (parts[0] === '0001' ? '' : parts[0]) : '';
+  var mn = hasAll ? parts[1] : '';
+  var dy = hasAll ? String(parseInt(parts[2]) || '') : '';
+  var currentYear = new Date().getFullYear();
+
+  function notify(month, day, year) {
+    if (!month || (!year && !noDay)) { onChange({ target: { name: name, value: '' } }); return; }
+    var y = String(year || '0001').padStart(4, '0');
+    var m = String(month).padStart(2, '0');
+    var d = noDay ? '01' : (day ? String(day).padStart(2, '0') : '');
+    if (!noDay && !d) { onChange({ target: { name: name, value: '' } }); return; }
+    onChange({ target: { name: name, value: y + '-' + m + '-' + d } });
+  }
+
+  var daysInMonth = mn ? new Date(2000, parseInt(mn), 0).getDate() : 31;
+  var selStyle = Object.assign({}, volInputStyle, { flex: 1, marginTop: 0, padding: '8px 6px' });
+
+  return (
+    <div style={volGrp}>
+      <label style={volLabelStyle}>{label}</label>
+      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+        <select style={Object.assign({}, selStyle, { flex: 3 })} value={mn} onChange={function(e) { notify(e.target.value, dy, yr); }}>
+          <option value="">Month</option>
+          {VOL_MONTHS.map(function(mo) { return <option key={mo[0]} value={mo[0]}>{mo[1]}</option>; })}
+        </select>
+        {!noDay && (
+          <select style={Object.assign({}, selStyle, { flex: 2 })} value={dy} onChange={function(e) { notify(mn, e.target.value, yr); }}>
+            <option value="">Day</option>
+            {Array.from({ length: daysInMonth }, function(_, i) { return i + 1; }).map(function(n) { return <option key={n} value={n}>{n}</option>; })}
+          </select>
+        )}
+        <select style={Object.assign({}, selStyle, { flex: 2 })} value={yr} onChange={function(e) { notify(mn, dy, e.target.value); }}>
+          <option value="">Year</option>
+          {Array.from({ length: currentYear - 1929 }, function(_, i) { return currentYear - i; }).map(function(y) { return <option key={y} value={y}>{y}</option>; })}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
@@ -915,8 +960,8 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }
           <div style={volGrp}><label style={volLabelStyle}>Emergency Contact</label><input name="Emergency Contact" value={form['Emergency Contact']} onChange={onChange} style={volInputStyle} /></div>
           <span style={volSecLabel}>Volunteer Info</span>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-            <div><label style={volLabelStyle}>Birthday</label><input name="Birthday" type="date" value={form['Birthday']} onChange={onChange} style={volInputStyle} /></div>
-            <div><label style={volLabelStyle}>Anniversary</label><input name="Volunteer Anniversary" type="date" value={form['Volunteer Anniversary']} onChange={onChange} style={volInputStyle} /></div>
+            <div><VolDatePicker label="Birthday" name="Birthday" value={form['Birthday']} onChange={onChange} noDay={false} /></div>
+            <div><VolDatePicker label="Anniversary" name="Volunteer Anniversary" value={form['Volunteer Anniversary']} onChange={onChange} noDay={true} /></div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
             <div><label style={volLabelStyle}>Month</label><input name="Month" value={form['Month']} onChange={onChange} style={volInputStyle} /></div>
@@ -931,8 +976,11 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }
           <div style={volGrp}><label style={volLabelStyle}>Overview Notes</label><textarea name="Overview Notes" value={form['Overview Notes']} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Background Notes</label><textarea name="Background Notes" value={form['Background Notes']} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Notes</label><textarea name="Notes" value={form['Notes']} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
-          <span style={volSecLabel}>Goals</span>
+          <span style={volSecLabel}>Goals & About</span>
           <div style={volGrp}><label style={volLabelStyle}>What they want to see at NSH</label><textarea name="What they want to see at NSH" value={form['What they want to see at NSH']} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
+          <div style={volGrp}><label style={volLabelStyle}>NSH Future Vision</label><textarea name="NSH Future Vision" value={form['NSH Future Vision'] || ''} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
+          <div style={volGrp}><label style={volLabelStyle}>Allergies <span style={{ color: '#888', fontWeight: 400 }}>(visible to volunteers)</span></label><textarea name="Allergies" value={form['Allergies'] || ''} onChange={onChange} rows={2} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
+          <div style={volGrp}><label style={volLabelStyle}>Special Considerations <span style={{ color: '#888', fontWeight: 400 }}>(private — coordinators only)</span></label><textarea name="Special Considerations" value={form['Special Considerations'] || ''} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
           <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
             <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving...' : 'Save'}</button>
             <button type="button" onClick={onCancel} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
@@ -1041,13 +1089,13 @@ function VolunteersView() {
     'Email': '', 'Phone Number': '', 'Address': '', 'Birthday': '',
     'Volunteer Anniversary': '', 'CC': false, 'Nametag': false,
     'Overview Notes': '', 'Background Notes': '', 'Notes': '',
-    'What they want to see at NSH': '', 'Picture URL': '',
-    'Emergency Contact': '', 'Month': '', 'Day': ''
+    'What they want to see at NSH': '', 'NSH Future Vision': '', 'Allergies': '', 'Special Considerations': '',
+    'Picture URL': '', 'Emergency Contact': '', 'Month': '', 'Day': ''
   };
   const [form, setForm] = useState(emptyForm);
 
   useEffect(function() {
-    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Picture URL','Emergency Contact','Month','Day'])
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day'])
       .then(function(data) {
         if (Array.isArray(data)) setVolunteers(data);
         else setError(JSON.stringify(data));
@@ -1241,6 +1289,9 @@ function VolunteersView() {
       'Background Notes': v['Background Notes'] || '',
       'Notes': v['Notes'] || '',
       'What they want to see at NSH': v['What they want to see at NSH'] || '',
+      'NSH Future Vision': v['NSH Future Vision'] || '',
+      'Allergies': v['Allergies'] || '',
+      'Special Considerations': v['Special Considerations'] || '',
       'Picture URL': v['Picture URL'] || '',
       'Emergency Contact': v['Emergency Contact'] || '',
       'Month': v['Month'] || '',
@@ -1458,10 +1509,13 @@ function VolunteersView() {
                   <NoteBlock label="Additional" value={selected['Notes']} />
                 </div>
               )}
-              {selected['What they want to see at NSH'] && (
+              {(selected['What they want to see at NSH'] || selected['NSH Future Vision'] || selected['Allergies'] || selected['Special Considerations']) && (
                 <div style={{ marginBottom: 4 }}>
-                  <span style={volSecLabel}>Goals</span>
-                  <NoteBlock value={selected['What they want to see at NSH']} />
+                  <span style={volSecLabel}>Goals & About</span>
+                  {selected['What they want to see at NSH'] && <NoteBlock label="What they want to see at NSH" value={selected['What they want to see at NSH']} />}
+                  {selected['NSH Future Vision'] && <NoteBlock label="NSH Future Vision" value={selected['NSH Future Vision']} />}
+                  {selected['Allergies'] && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: '#c0392b', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>⚠ Allergies</div><div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{selected['Allergies']}</div></div>}
+                  {selected['Special Considerations'] && <div style={{ background: '#fafafa', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 12px' }}><div style={{ fontSize: 11, fontWeight: 600, color: '#666', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>🔒 Special Considerations</div><div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{selected['Special Considerations']}</div></div>}
                 </div>
               )}
               {(function() {
