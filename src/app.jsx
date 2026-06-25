@@ -190,7 +190,7 @@ const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthsta
 
 // Kick off critical fetches immediately so data is ready when views mount
 (function prefetch() {
-  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day']);
+  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day']);
   cachedSbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes']);
   cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']);
   cachedFetchAll('Board Voting Items');
@@ -957,6 +957,27 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }
           <span style={volSecLabel}>Contact</span>
           <div style={volGrp}><label style={volLabelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={onChange} style={volInputStyle} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={onChange} style={volInputStyle} /></div>
+          <div style={Object.assign({}, volGrp, { background: '#f7f3ec', borderRadius: 8, padding: '10px 12px' })}>
+            <label style={volLabelStyle}>Preferred Contact Method</label>
+            <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
+              {[['phone','Phone'],['email','Email']].map(function(opt) {
+                var method = opt[0], lbl = opt[1];
+                var val = form['Preferred Contact'] || '';
+                var checked = val === method || val === 'both';
+                return (
+                  <label key={method} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                    <input type="checkbox" checked={checked} style={{ accentColor: '#886c44', cursor: 'pointer' }} onChange={function() {
+                      var phoneOn = method === 'phone' ? !checked : (val === 'phone' || val === 'both');
+                      var emailOn = method === 'email' ? !checked : (val === 'email' || val === 'both');
+                      var next = phoneOn && emailOn ? 'both' : phoneOn ? 'phone' : emailOn ? 'email' : '';
+                      onChange({ target: { name: 'Preferred Contact', value: next || '' } });
+                    }} />
+                    <span style={{ color: checked ? '#886c44' : '#333', fontWeight: checked ? 600 : 400 }}>{lbl}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
           <div style={volGrp}><label style={volLabelStyle}>Address</label><input name="Address" value={form['Address']} onChange={onChange} style={volInputStyle} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Emergency Contact</label><input name="Emergency Contact" value={form['Emergency Contact']} onChange={onChange} style={volInputStyle} /></div>
           <span style={volSecLabel}>Volunteer Info</span>
@@ -1090,7 +1111,7 @@ function VolunteersView() {
     'Email': '', 'Phone Number': '', 'Address': '', 'Birthday': '',
     'Volunteer Anniversary': '', 'CC': false, 'Nametag': false,
     'Overview Notes': '', 'Background Notes': '', 'Notes': '',
-    'What they want to see at NSH': '', 'NSH Future Vision': '', 'Allergies': '', 'Special Considerations': '',
+    'Preferred Contact': '', 'What they want to see at NSH': '', 'NSH Future Vision': '', 'Allergies': '', 'Special Considerations': '',
     'Picture URL': '', 'Emergency Contact': '', 'Month': '', 'Day': ''
   };
   const [form, setForm] = useState(emptyForm);
@@ -1290,6 +1311,7 @@ function VolunteersView() {
       'Background Notes': v['Background Notes'] || '',
       'Notes': v['Notes'] || '',
       'What they want to see at NSH': v['What they want to see at NSH'] || '',
+      'Preferred Contact': v['Preferred Contact'] || '',
       'NSH Future Vision': v['NSH Future Vision'] || '',
       'Allergies': v['Allergies'] || '',
       'Special Considerations': v['Special Considerations'] || '',
@@ -1356,11 +1378,14 @@ function VolunteersView() {
       .catch(function(err) { setSaving(false); alert('Save error: ' + err.message); });
   }
 
-  function InfoRow({ label, value, link }) {
+  function InfoRow({ label, value, link, preferred }) {
     if (!value) return null;
     return (
       <div style={{ display: 'flex', gap: 0, marginBottom: 10, alignItems: 'flex-start' }}>
-        <div style={{ width: 110, fontSize: 12, color: '#777', flexShrink: 0, paddingTop: 1 }}>{label}</div>
+        <div style={{ width: 110, fontSize: 12, color: '#777', flexShrink: 0, paddingTop: 1, display: 'flex', alignItems: 'center', gap: 5 }}>
+          {label}
+          {preferred && <span style={{ fontSize: 10, fontWeight: 600, color: gold, background: '#f0ebe2', padding: '1px 6px', borderRadius: 10 }}>preferred</span>}
+        </div>
         <div style={{ fontSize: 12, color: '#2a2a2a', flex: 1, lineHeight: 1.4 }}>
           {link ? <a href={link} style={{ color: gold, textDecoration: 'none' }}>{value}</a> : value}
         </div>
@@ -1490,8 +1515,8 @@ function VolunteersView() {
               {(selected['Email'] || selected['Phone Number'] || selected['Address'] || selected['Emergency Contact']) && (
                 <div style={{ marginBottom: 4 }}>
                   <span style={volSecLabel}>Contact</span>
-                  <InfoRow label="Email" value={selected['Email']} link={'mailto:' + selected['Email']} />
-                  <InfoRow label="Phone" value={selected['Phone Number']} />
+                  <InfoRow label="Email" value={selected['Email']} link={'mailto:' + selected['Email']} preferred={selected['Preferred Contact'] === 'email' || selected['Preferred Contact'] === 'both'} />
+                  <InfoRow label="Phone" value={selected['Phone Number']} preferred={selected['Preferred Contact'] === 'phone' || selected['Preferred Contact'] === 'both'} />
                   <InfoRow label="Address" value={selected['Address']} />
                   <InfoRow label="Emergency" value={selected['Emergency Contact']} />
                 </div>
