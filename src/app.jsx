@@ -190,7 +190,7 @@ const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthsta
 
 // Kick off critical fetches immediately so data is ready when views mount
 (function prefetch() {
-  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day']);
+  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Favorite Quote','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day']);
   cachedSbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes']);
   cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']);
   cachedFetchAll('Board Voting Items');
@@ -1000,6 +1000,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }
           <div style={volGrp}><label style={volLabelStyle}>Notes</label><textarea name="Notes" value={form['Notes']} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
           <span style={volSecLabel}>Goals & About</span>
           <div style={volGrp}><label style={volLabelStyle}>What they want to see at NSH</label><textarea name="What they want to see at NSH" value={form['What they want to see at NSH']} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
+          <div style={volGrp}><label style={volLabelStyle}>Favorite Quote</label><textarea name="Favorite Quote" value={form['Favorite Quote'] || ''} onChange={onChange} rows={2} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
           <div style={volGrp}><label style={volLabelStyle}>NSH Future Vision</label><textarea name="NSH Future Vision" value={form['NSH Future Vision'] || ''} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Allergies <span style={{ color: '#888', fontWeight: 400 }}>(visible to volunteers)</span></label><textarea name="Allergies" value={form['Allergies'] || ''} onChange={onChange} rows={2} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Special Considerations <span style={{ color: '#888', fontWeight: 400 }}>(private — coordinators only)</span></label><textarea name="Special Considerations" value={form['Special Considerations'] || ''} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
@@ -1111,7 +1112,7 @@ function VolunteersView() {
     'Email': '', 'Phone Number': '', 'Address': '', 'Birthday': '',
     'Volunteer Anniversary': '', 'CC': false, 'Nametag': false,
     'Overview Notes': '', 'Background Notes': '', 'Notes': '',
-    'Preferred Contact': '', 'What they want to see at NSH': '', 'NSH Future Vision': '', 'Allergies': '', 'Special Considerations': '',
+    'Preferred Contact': '', 'What they want to see at NSH': '', 'Favorite Quote': '', 'NSH Future Vision': '', 'Allergies': '', 'Special Considerations': '',
     'Picture URL': '', 'Emergency Contact': '', 'Month': '', 'Day': ''
   };
   const [form, setForm] = useState(emptyForm);
@@ -1312,6 +1313,7 @@ function VolunteersView() {
       'Notes': v['Notes'] || '',
       'What they want to see at NSH': v['What they want to see at NSH'] || '',
       'Preferred Contact': v['Preferred Contact'] || '',
+      'Favorite Quote': v['Favorite Quote'] || '',
       'NSH Future Vision': v['NSH Future Vision'] || '',
       'Allergies': v['Allergies'] || '',
       'Special Considerations': v['Special Considerations'] || '',
@@ -1535,10 +1537,11 @@ function VolunteersView() {
                   <NoteBlock label="Additional" value={selected['Notes']} />
                 </div>
               )}
-              {(selected['What they want to see at NSH'] || selected['NSH Future Vision'] || selected['Allergies'] || selected['Special Considerations']) && (
+              {(selected['What they want to see at NSH'] || selected['Favorite Quote'] || selected['NSH Future Vision'] || selected['Allergies'] || selected['Special Considerations']) && (
                 <div style={{ marginBottom: 4 }}>
                   <span style={volSecLabel}>Goals & About</span>
                   {selected['What they want to see at NSH'] && <NoteBlock label="What they want to see at NSH" value={selected['What they want to see at NSH']} />}
+                  {selected['Favorite Quote'] && <NoteBlock label="Favorite Quote" value={selected['Favorite Quote']} />}
                   {selected['NSH Future Vision'] && <NoteBlock label="NSH Future Vision" value={selected['NSH Future Vision']} />}
                   {selected['Allergies'] && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: '#c0392b', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>⚠ Allergies</div><div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{selected['Allergies']}</div></div>}
                   {selected['Special Considerations'] && <div style={{ background: '#fafafa', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 12px' }}><div style={{ fontSize: 11, fontWeight: 600, color: '#666', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>🔒 Special Considerations</div><div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{selected['Special Considerations']}</div></div>}
