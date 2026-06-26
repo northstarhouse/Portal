@@ -1032,18 +1032,33 @@ function VolunteersView() {
   var HOUR_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const [hoursData, setHoursData] = React.useState({});
 
-  function hoursRowsToMap(rows) {
-    var result = {};
-    rows.forEach(function(row) {
-      var name = (row.name || '').trim();
+  function buildHoursMapFromLogs(logs) {
+    var byName = {};
+    logs.forEach(function(log) {
+      var name = (log.name || '').trim();
       if (!name) return;
+      if (!byName[name]) byName[name] = [];
+      byName[name].push(log);
+    });
+    var result = {};
+    Object.keys(byName).forEach(function(name) {
+      var nameLogs = byName[name];
       var key = name.toLowerCase();
       var months = {};
-      HOUR_MONTHS.forEach(function(m) {
-        var v = parseFloat(row[m.toLowerCase()]) || 0;
-        if (v > 0) months[m] = v;
-      });
-      var total = parseFloat(row.total_hours) || 0;
+      var total = 0;
+      for (var i = 0; i < nameLogs.length; i++) {
+        if (nameLogs[i].action !== 'check-in') continue;
+        var checkOut = null;
+        for (var j = i + 1; j < nameLogs.length; j++) {
+          if (nameLogs[j].action === 'check-out') { checkOut = nameLogs[j]; break; }
+        }
+        if (!checkOut) continue;
+        var hours = (new Date(checkOut.timestamp) - new Date(nameLogs[i].timestamp)) / 3600000;
+        if (hours <= 0 || hours > 24) continue;
+        var m = HOUR_MONTHS[new Date(nameLogs[i].timestamp).getMonth()];
+        months[m] = (months[m] || 0) + hours;
+        total += hours;
+      }
       if (!result[key]) { result[key] = { total: total, months: months }; }
       else {
         result[key].total += total;
@@ -1125,17 +1140,19 @@ function VolunteersView() {
         setLoading(false);
       })
       .catch(function(err) { setError(err.message); setLoading(false); });
-    var cachedHours = lsGet('hours_summary');
+    var cachedHours = lsGet('hours_summary_sb');
     if (cachedHours) { setHoursData(cachedHours); }
-    else {
-      fetch('https://script.google.com/macros/s/AKfycbwbVk0SB6geUv4xcbxkps06qXwkggMfrD59GMlC_0gRRjQ8p4rr4FNCqgEeY04RrAU_/exec?action=getHours')
-        .then(function(r) { return r.json(); }).then(function(res) {
-          if (!res.success || !Array.isArray(res.hours)) return;
-          var parsed = hoursRowsToMap(res.hours);
-          setHoursData(parsed);
-          lsSet('hours_summary', parsed);
-        }).catch(function() {});
-    }
+    (function() {
+      var year = new Date().getFullYear();
+      fetch(SUPABASE_URL + '/rest/v1/kiosk_logs?type=eq.volunteer&timestamp=gte.' + year + '-01-01T00:00:00.000Z&timestamp=lt.' + (year + 1) + '-01-01T00:00:00.000Z&order=name.asc,timestamp.asc&select=timestamp,name,action', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function(r) { return r.json(); }).then(function(logs) {
+        if (!Array.isArray(logs)) return;
+        var parsed = buildHoursMapFromLogs(logs);
+        setHoursData(parsed);
+        lsSet('hours_summary_sb', parsed);
+      }).catch(function() {});
+    })();
 
     Promise.all([
       fetch(OB_SHEET_URL).then(function(r) { return r.text(); }).catch(function() { return ''; }),
