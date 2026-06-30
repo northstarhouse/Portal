@@ -1322,6 +1322,13 @@ function VolunteersView() {
     return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   }
 
+  function fmtAnniversary(val) {
+    if (!val) return '';
+    var d = new Date(val + 'T00:00:00');
+    if (isNaN(d)) return val;
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
   function initials(v) {
     return ((v['First Name'] || '')[0] || '').toUpperCase() + ((v['Last Name'] || '')[0] || '').toUpperCase();
   }
@@ -1567,7 +1574,7 @@ function VolunteersView() {
               {(selected['Volunteer Anniversary'] || selected['Birthday']) && (
                 <div style={{ marginBottom: 4 }}>
                   <span style={volSecLabel}>Volunteer Info</span>
-                  <InfoRow label="Anniversary" value={selected['Volunteer Anniversary']} />
+                  <InfoRow label="Anniversary" value={fmtAnniversary(selected['Volunteer Anniversary'])} />
                   <InfoRow label="Birthday" value={fmtBirthday(selected['Birthday'])} />
                 </div>
               )}
