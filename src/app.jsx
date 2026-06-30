@@ -6629,7 +6629,8 @@ function AdminToolCard(props) {
   return <a href={tool.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>{card}</a>;
 }
 
-function AdminView() {
+function AdminView({ navigate }) {
+  var emailIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>;
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Tools</div>
@@ -6637,6 +6638,15 @@ function AdminView() {
         {ADMIN_TOOLS.map(function(tool) {
           return <AdminToolCard key={tool.label} tool={tool} icon={tool.icon} />;
         })}
+        <div
+          onClick={function() { navigate('vol-email-lists'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{emailIcon}</span>
+          Volunteer Email Lists
+        </div>
       </div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Resources</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -6644,6 +6654,263 @@ function AdminView() {
           return <AdminToolCard key={form.label} tool={form} icon={docIcon} />;
         })}
       </div>
+    </div>
+  );
+}
+
+function VolEmailListsView({ navigate }) {
+  var { useState: useS, useEffect: useE, useMemo } = React;
+  var [volunteers, setVolunteers] = useS(null);
+  var [logs, setLogs] = useS([]);
+  var [activeOnly, setActiveOnly] = useS(true);
+  var [expandedTeams, setExpandedTeams] = useS({});
+  var [copied, setCopied] = useS(null);
+  var [modal, setModal] = useS(null);
+  var [subject, setSubject] = useS('');
+  var [body, setBody] = useS('');
+  var [sent, setSent] = useS(false);
+  var [sending, setSending] = useS(false);
+  var [sendError, setSendError] = useS(null);
+
+  useE(function() {
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Email','Status','Team','Overview Notes','Phone Number']).then(function(data) {
+      if (Array.isArray(data)) setVolunteers(data);
+    });
+    fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=20', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (Array.isArray(data)) setLogs(data);
+    }).catch(function() {});
+  }, []);
+
+  function parseTeams(t) {
+    if (!t) return [];
+    return t.split(/[,|]/).map(function(s) { return s.replace(/\bNEW\b/g, '').trim(); }).filter(Boolean);
+  }
+
+  function isActive(v) { return (v['Status'] || '').trim().toLowerCase() === 'active'; }
+
+  var displayed = useMemo(function() {
+    if (!volunteers) return [];
+    return activeOnly ? volunteers.filter(isActive) : volunteers;
+  }, [volunteers, activeOnly]);
+
+  var groups = useMemo(function() {
+    if (!displayed.length) return [];
+    var tagMap = {};
+    displayed.forEach(function(v) {
+      parseTeams(v['Team']).forEach(function(t) {
+        if (!tagMap[t]) tagMap[t] = [];
+        tagMap[t].push(v);
+      });
+    });
+    var knownOrder = TEAM_OPTIONS;
+    var known = knownOrder.filter(function(t) { return tagMap[t]; }).map(function(t) { return { tag: t, members: tagMap[t] }; });
+    var custom = Object.keys(tagMap).filter(function(t) { return TEAM_OPTIONS.indexOf(t) === -1; }).sort().map(function(t) { return { tag: t, members: tagMap[t] }; });
+    return known.concat(custom);
+  }, [displayed]);
+
+  function toggleTeam(tag) {
+    setExpandedTeams(function(prev) { var n = Object.assign({}, prev); n[tag] = !n[tag]; return n; });
+  }
+
+  function copyEmails(members, tag) {
+    var emails = members.filter(function(v) { return v['Email'] && v['Email'].trim(); }).map(function(v) { return v['Email'].trim(); }).join(', ');
+    navigator.clipboard.writeText(emails);
+    setCopied(tag);
+    setTimeout(function() { setCopied(null); }, 2000);
+  }
+
+  function openModal(tag, members) {
+    var withEmail = members.filter(function(v) { return v['Email'] && v['Email'].trim(); });
+    setModal({ tag: tag, members: withEmail });
+    setSubject(tag + ' — ' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }));
+    setBody('');
+    setSent(false);
+    setSendError(null);
+  }
+
+  function handleSend() {
+    if (!modal) return;
+    setSending(true);
+    setSendError(null);
+    fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY },
+      body: JSON.stringify({ to: modal.members.map(function(v) { return v['Email'].trim(); }), subject: subject, body: body })
+    }).then(function(r) { return r.json().then(function(j) { return { ok: r.ok, json: j }; }); }).then(function(res) {
+      if (!res.ok) throw new Error(res.json.error || 'Send failed');
+      setSent(true);
+      return fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ sent_at: new Date().toISOString(), team_tag: modal.tag, recipient_count: modal.members.length, recipients: modal.members.map(function(v) { return (v['First Name'] || '') + ' ' + (v['Last Name'] || '') + ' <' + v['Email'] + '>'; }), subject: subject })
+      });
+    }).then(function() {
+      return fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=20', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }).then(function(data) { if (Array.isArray(data)) setLogs(data); });
+    }).catch(function(err) {
+      setSendError(err.message || 'Unknown error');
+    }).finally(function() { setSending(false); });
+  }
+
+  var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', outline: 'none', background: '#fff' };
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Volunteer Email Lists</div>
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Auto-populated from volunteer database · click a group to expand</div>
+        </div>
+        <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>
+          <input type="checkbox" checked={activeOnly} onChange={function(e) { setActiveOnly(e.target.checked); }} style={{ accentColor: gold }} />
+          Active only
+        </label>
+      </div>
+
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+        {/* Group list */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {volunteers === null ? (
+            <div style={{ textAlign: 'center', padding: 48, color: '#aaa', fontSize: 13 }}>Loading…</div>
+          ) : groups.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 48, color: '#ccc', fontSize: 13 }}>No volunteers found.</div>
+          ) : groups.map(function(g) {
+            var withEmail = g.members.filter(function(v) { return v['Email'] && v['Email'].trim(); });
+            var noEmail = g.members.filter(function(v) { return !v['Email'] || !v['Email'].trim(); });
+            var isOpen = !!expandedTeams[g.tag];
+            var tc = TEAM_COLORS[g.tag] || { bg: '#f5f5f5', color: '#555' };
+            return (
+              <div key={g.tag} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+                {/* Group header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#fdfcfb', borderBottom: isOpen ? '0.5px solid #f0ece6' : 'none' }}>
+                  <button onClick={function() { toggleTeam(g.tag); }} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{g.tag}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: tc.bg, color: tc.color }}>
+                      {withEmail.length}{withEmail.length !== g.members.length ? '/' + g.members.length : ''} with email
+                    </span>
+                    {noEmail.length > 0 && <span style={{ fontSize: 10, color: '#b45309' }}>⚠ {noEmail.length} no email</span>}
+                    <span style={{ marginLeft: 'auto', fontSize: 12, color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
+                  </button>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button onClick={function() { copyEmails(g.members, g.tag); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: '0.5px solid #e0d8cc', borderRadius: 7, background: '#fff', color: copied === g.tag ? '#2e7d32' : '#666', cursor: 'pointer' }}>
+                      {copied === g.tag ? '✓ Copied' : '⧉ Copy emails'}
+                    </button>
+                    <button onClick={function() { openModal(g.tag, g.members); }} disabled={withEmail.length === 0} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: 'none', borderRadius: 7, background: gold, color: '#fff', fontWeight: 600, cursor: withEmail.length === 0 ? 'not-allowed' : 'pointer', opacity: withEmail.length === 0 ? 0.4 : 1 }}>
+                      ✉ Email group
+                    </button>
+                  </div>
+                </div>
+                {/* Member list */}
+                {isOpen && (
+                  <div>
+                    {g.members.slice().sort(function(a, b) { return (a['Last Name'] || '').localeCompare(b['Last Name'] || ''); }).map(function(v, i) {
+                      var initials = ((v['First Name'] || '')[0] || '').toUpperCase() + ((v['Last Name'] || '')[0] || '').toUpperCase();
+                      return (
+                        <div key={v.id || i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', borderBottom: i < g.members.length - 1 ? '0.5px solid #f5f1eb' : 'none' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', background: gold, opacity: isActive(v) ? 1 : 0.4, color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{initials}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</span>
+                            {v['Overview Notes'] && <span style={{ fontSize: 11, color: '#aaa', marginLeft: 8 }}>{v['Overview Notes']}</span>}
+                            {!isActive(v) && <span style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '1px 6px', borderRadius: 10, marginLeft: 6 }}>Inactive</span>}
+                          </div>
+                          {v['Email'] && v['Email'].trim() ? (
+                            <a href={'mailto:' + v['Email'].trim()} style={{ fontSize: 11, color: '#aaa', textDecoration: 'none', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v['Email'].trim()}</a>
+                          ) : (
+                            <span style={{ fontSize: 11, color: '#ddd', fontStyle: 'italic' }}>no email</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Recent sends sidebar */}
+        {logs.length > 0 && (
+          <div style={{ width: 220, flexShrink: 0 }}>
+            <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden', position: 'sticky', top: 16 }}>
+              <div style={{ padding: '10px 14px', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Recent Sends</div>
+              </div>
+              {logs.map(function(log, i) {
+                return (
+                  <div key={i} style={{ padding: '10px 14px', borderBottom: i < logs.length - 1 ? '0.5px solid #f5f1eb' : 'none' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{log.team_tag}</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.subject}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                      <span style={{ fontSize: 10, color: '#aaa' }}>{log.recipient_count} recipients</span>
+                      <span style={{ fontSize: 10, color: '#ccc' }}>{new Date(log.sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Email modal */}
+      {modal && (
+        <div onClick={function() { if (!sending) setModal(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid #f0ece6' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>Email {modal.tag}</div>
+                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{modal.members.length} recipient{modal.members.length !== 1 ? 's' : ''} with email</div>
+              </div>
+              <button onClick={function() { setModal(null); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: '#666', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            {sent ? (
+              <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 20 }}>✓</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>Email sent!</div>
+                <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>Delivered to {modal.members.length} recipient{modal.members.length !== 1 ? 's' : ''} from info@northstarhouse.org</div>
+                <button onClick={function() { setModal(null); }} style={{ marginTop: 16, padding: '7px 20px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer' }}>Done</button>
+              </div>
+            ) : (
+              <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Recipients */}
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Recipients ({modal.members.length})</div>
+                  <div style={{ background: '#faf8f4', borderRadius: 8, padding: '8px 10px', maxHeight: 120, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {modal.members.map(function(v) {
+                      return (
+                        <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a', flexShrink: 0 }}>{v['First Name']} {v['Last Name']}</span>
+                          <span style={{ fontSize: 11, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v['Email']}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Subject</label>
+                  <input value={subject} onChange={function(e) { setSubject(e.target.value); }} placeholder="Subject line…" style={inpSt} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Message</label>
+                  <textarea value={body} onChange={function(e) { setBody(e.target.value); }} placeholder="Email body…" rows={5} style={Object.assign({}, inpSt, { resize: 'vertical', background: '#faf8f4' })} />
+                </div>
+                {sendError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{sendError}</div>}
+                <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+                  <button onClick={handleSend} disabled={!subject.trim() || sending} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (!subject.trim() || sending) ? 'not-allowed' : 'pointer', opacity: (!subject.trim() || sending) ? 0.5 : 1 }}>
+                    ✉ {sending ? 'Sending…' : 'Send Email'}
+                  </button>
+                  <button onClick={function() { setModal(null); }} disabled={sending} style={{ padding: '9px 16px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                </div>
+                <div style={{ fontSize: 10, color: '#ccc', textAlign: 'center' }}>Sends from info@northstarhouse.org</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -6794,6 +7061,7 @@ const views = {
   financials: FinancialsView,
   reviews: ReviewsView,
   admin: AdminView,
+  'vol-email-lists': VolEmailListsView,
 };
 
 var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];
