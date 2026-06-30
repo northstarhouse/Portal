@@ -6575,6 +6575,7 @@ var ADMIN_FORMS = [
   { label: "2026 Pricing Guide", url: "https://drive.google.com/drive/folders/1Mi8nNZzNWx1fz7CQ11XiW8SHPqQnBAgR" },
   { label: "Creative Rental Form", url: "https://drive.google.com/file/d/1Lp3WDaYukjmZ4lB_iS4sJj9PC6fjzz6I/view" },
   { label: "Creative Rental Contract", url: "https://docs.google.com/document/d/1hKb9QK7MmrNpbmQcONyqNFbffEYGqJm5/edit?rtpof=true&sd=true#heading=h.3ff89qn2162x" },
+  { label: "NSH Forms", url: "https://northstarhouse.github.io/NSH-forms/" },
 ];
 
 var ADMIN_TOOLS = [
@@ -6648,7 +6649,7 @@ function AdminView({ navigate }) {
           Volunteer Email Lists
         </div>
       </div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Resources</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Outreach</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {ADMIN_FORMS.map(function(form) {
           return <AdminToolCard key={form.label} tool={form} icon={docIcon} />;
