@@ -809,12 +809,13 @@ function getAreaColor(aoi) {
 }
 var TEAM_OPTIONS = Object.keys(TEAM_COLORS).filter(function(k) { return ['Events','Docents','Restoration','General','Other'].indexOf(k) === -1; });
 
-function TeamPicker({ value, onChange }) {
+function TeamPicker({ value, onChange, extraTeams }) {
   const { useState: useS } = React;
   const [open, setOpen] = useS(false);
   const [search, setSearch] = useS('');
   const [newTag, setNewTag] = useS('');
   var selected = value ? value.split('|').map(function(t) { return t.trim(); }).filter(Boolean) : [];
+  var allOptions = TEAM_OPTIONS.concat((extraTeams || []).filter(function(t) { return TEAM_OPTIONS.indexOf(t) === -1; }));
 
   function toggle(opt) {
     var next;
@@ -871,7 +872,7 @@ function TeamPicker({ value, onChange }) {
             />
           </div>
           <div style={{ maxHeight: 180, overflowY: 'auto', padding: '4px 0' }}>
-            {TEAM_OPTIONS.filter(function(opt) { return opt.toLowerCase().indexOf(search.toLowerCase()) !== -1; }).map(function(opt) {
+            {allOptions.filter(function(opt) { return opt.toLowerCase().indexOf(search.toLowerCase()) !== -1; }).map(function(opt) {
               var isOn = selected.indexOf(opt) !== -1;
               return (
                 <div
@@ -953,7 +954,7 @@ function VolDatePicker({ label, name, value, onChange, noDay }) {
   );
 }
 
-function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }) {
+function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete, extraTeams }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -968,7 +969,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }
             <div><label style={volLabelStyle}>Last Name *</label><input required name="Last Name" value={form['Last Name']} onChange={onChange} style={volInputStyle} /></div>
           </div>
           <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="On-Call Supporter">On-Call Supporter</option><option value="Inactive">Inactive</option></select></div>
-          <div style={volGrp}><label style={volLabelStyle}>Team</label><div style={{ marginTop: 4 }}><TeamPicker value={form['Team']} onChange={onChange} /></div></div>
+          <div style={volGrp}><label style={volLabelStyle}>Team</label><div style={{ marginTop: 4 }}><TeamPicker value={form['Team']} onChange={onChange} extraTeams={extraTeams || []} /></div></div>
           <span style={volSecLabel}>Contact</span>
           <div style={volGrp}><label style={volLabelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={onChange} style={volInputStyle} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={onChange} style={volInputStyle} /></div>
@@ -1293,6 +1294,12 @@ function VolunteersView() {
     if (tab === 'active') return v['Status'] === 'Active';
     if (tab === 'oncall') return v['Status'] === 'On-Call Supporter';
     return v['Status'] === 'Inactive';
+  });
+  var customTeams = [];
+  volunteers.forEach(function(v) {
+    (v['Team'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).forEach(function(t) {
+      if (TEAM_OPTIONS.indexOf(t) === -1 && customTeams.indexOf(t) === -1) customTeams.push(t);
+    });
   });
   var teamSet = ['All'].concat(TEAM_OPTIONS.filter(function(t) {
     return tabList.some(function(v) { return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(t) !== -1; });
@@ -1637,6 +1644,7 @@ function VolunteersView() {
           onSubmit={handleEditSubmit}
           onCancel={function() { setEditing(false); }}
           onDelete={handleDeleteVolunteer}
+          extraTeams={customTeams}
         />
       )}
 
@@ -1877,6 +1885,7 @@ function VolunteersView() {
           title="Add Volunteer"
           onSubmit={handleAddSubmit}
           onCancel={function() { setShowAdd(false); }}
+          extraTeams={customTeams}
         />
       )}
     </div>
