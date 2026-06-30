@@ -1301,7 +1301,8 @@ function VolunteersView() {
       if (TEAM_OPTIONS.indexOf(t) === -1 && customTeams.indexOf(t) === -1) customTeams.push(t);
     });
   });
-  var teamSet = ['All'].concat(TEAM_OPTIONS.filter(function(t) {
+  var allTeamOptions = TEAM_OPTIONS.concat(customTeams);
+  var teamSet = ['All'].concat(allTeamOptions.filter(function(t) {
     return tabList.some(function(v) { return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(t) !== -1; });
   }));
   var teams = teamSet.length - 1;
