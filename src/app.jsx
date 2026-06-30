@@ -831,9 +831,7 @@ function TeamPicker({ value, onChange }) {
     onChange({ target: { name: 'Team', value: next.join(' | ') } });
   }
 
-  function addNewTag(e) {
-    e.preventDefault();
-    e.stopPropagation();
+  function addNewTag() {
     var trimmed = newTag.trim();
     if (!trimmed) return;
     if (selected.indexOf(trimmed) === -1) toggle(trimmed);
@@ -889,15 +887,16 @@ function TeamPicker({ value, onChange }) {
               );
             })}
           </div>
-          <form onSubmit={addNewTag} onClick={function(e) { e.stopPropagation(); }} style={{ display: 'flex', gap: 6, padding: '8px 10px', borderTop: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ display: 'flex', gap: 6, padding: '8px 10px', borderTop: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
             <input
               value={newTag}
               onChange={function(e) { setNewTag(e.target.value); }}
+              onKeyDown={function(e) { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); addNewTag(); } }}
               placeholder="New area name..."
               style={{ flex: 1, padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, outline: 'none', background: '#fff' }}
             />
-            <button type="submit" disabled={!newTag.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: newTag.trim() ? 1 : 0.4, flexShrink: 0 }}>Add</button>
-          </form>
+            <button type="button" onClick={function(e) { e.stopPropagation(); addNewTag(); }} disabled={!newTag.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: newTag.trim() ? 1 : 0.4, flexShrink: 0 }}>Add</button>
+          </div>
         </div>
       )}
     </div>
@@ -968,7 +967,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }
             <div><label style={volLabelStyle}>First Name *</label><input required name="First Name" value={form['First Name']} onChange={onChange} style={volInputStyle} /></div>
             <div><label style={volLabelStyle}>Last Name *</label><input required name="Last Name" value={form['Last Name']} onChange={onChange} style={volInputStyle} /></div>
           </div>
-          <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+          <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="On-Call Supporter">On-Call Supporter</option><option value="Inactive">Inactive</option></select></div>
           <div style={volGrp}><label style={volLabelStyle}>Team</label><div style={{ marginTop: 4 }}><TeamPicker value={form['Team']} onChange={onChange} /></div></div>
           <span style={volSecLabel}>Contact</span>
           <div style={volGrp}><label style={volLabelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={onChange} style={volInputStyle} /></div>
@@ -1289,7 +1288,12 @@ function VolunteersView() {
 
   var active = volunteers.filter(function(v) { return v['Status'] === 'Active'; }).length;
   var inactive = volunteers.filter(function(v) { return v['Status'] === 'Inactive'; }).length;
-  var tabList = volunteers.filter(function(v) { return tab === 'active' ? v['Status'] === 'Active' : v['Status'] === 'Inactive'; });
+  var oncall = volunteers.filter(function(v) { return v['Status'] === 'On-Call Supporter'; }).length;
+  var tabList = volunteers.filter(function(v) {
+    if (tab === 'active') return v['Status'] === 'Active';
+    if (tab === 'oncall') return v['Status'] === 'On-Call Supporter';
+    return v['Status'] === 'Inactive';
+  });
   var teamSet = ['All'].concat(TEAM_OPTIONS.filter(function(t) {
     return tabList.some(function(v) { return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(t) !== -1; });
   }));
@@ -1457,6 +1461,10 @@ function VolunteersView() {
             onClick={function() { setTab('active'); setFilterTeam('All'); }}
             style={{ border: 'none', borderRadius: 8, padding: '6px 18px', fontSize: 12, fontWeight: tab === 'active' ? 600 : 400, cursor: 'pointer', background: tab === 'active' ? '#fff' : 'transparent', color: tab === 'active' ? '#2a2a2a' : '#999', boxShadow: tab === 'active' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
           >Active <span style={{ fontSize: 12, color: tab === 'active' ? gold : '#bbb', fontWeight: 500 }}>{active}</span></button>
+          <button
+            onClick={function() { setTab('oncall'); setFilterTeam('All'); }}
+            style={{ border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: tab === 'oncall' ? 600 : 400, cursor: 'pointer', background: tab === 'oncall' ? '#fff' : 'transparent', color: tab === 'oncall' ? '#2a2a2a' : '#999', boxShadow: tab === 'oncall' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
+          >On-Call <span style={{ fontSize: 12, color: tab === 'oncall' ? gold : '#bbb', fontWeight: 500 }}>{oncall}</span></button>
           <button
             onClick={function() { setTab('inactive'); setFilterTeam('All'); }}
             style={{ border: 'none', borderRadius: 8, padding: '6px 18px', fontSize: 12, fontWeight: tab === 'inactive' ? 600 : 400, cursor: 'pointer', background: tab === 'inactive' ? '#fff' : 'transparent', color: tab === 'inactive' ? '#2a2a2a' : '#999', boxShadow: tab === 'inactive' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
