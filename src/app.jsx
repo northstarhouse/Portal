@@ -6575,7 +6575,7 @@ var ADMIN_FORMS = [
   { label: "2026 Pricing Guide", url: "https://drive.google.com/drive/folders/1Mi8nNZzNWx1fz7CQ11XiW8SHPqQnBAgR" },
   { label: "Creative Rental Form", url: "https://drive.google.com/file/d/1Lp3WDaYukjmZ4lB_iS4sJj9PC6fjzz6I/view" },
   { label: "Creative Rental Contract", url: "https://docs.google.com/document/d/1hKb9QK7MmrNpbmQcONyqNFbffEYGqJm5/edit?rtpof=true&sd=true#heading=h.3ff89qn2162x" },
-  { label: "NSH Forms", url: "https://northstarhouse.github.io/NSH-forms/" },
+  { label: "Form Builder", url: "https://northstarhouse.github.io/NSH-forms/" },
 ];
 
 var ADMIN_TOOLS = [
