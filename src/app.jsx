@@ -795,9 +795,6 @@ var TEAM_COLORS = {
   'Venue':        { bg: '#ede7f6', color: '#4527a0' },
   'Marketing':    { bg: '#fce4ec', color: '#c2185b' },
   'Restoration':  { bg: '#fff3e0', color: '#e65100' },
-  'Garden and Landscaping': { bg: '#e8f5e9', color: '#2e7d32' },
-  'Landscaping':  { bg: '#e8f5e9', color: '#2e7d32' },
-  'Garden':       { bg: '#e8f5e9', color: '#2e7d32' },
   'General':      { bg: '#f5f5f5', color: '#555' },
   'Other':        { bg: '#f5f5f5', color: '#777' },
 };
@@ -816,6 +813,7 @@ function TeamPicker({ value, onChange }) {
   const { useState: useS } = React;
   const [open, setOpen] = useS(false);
   const [search, setSearch] = useS('');
+  const [newTag, setNewTag] = useS('');
   var selected = value ? value.split('|').map(function(t) { return t.trim(); }).filter(Boolean) : [];
 
   function toggle(opt) {
@@ -831,6 +829,15 @@ function TeamPicker({ value, onChange }) {
   function remove(opt) {
     var next = selected.filter(function(t) { return t !== opt; });
     onChange({ target: { name: 'Team', value: next.join(' | ') } });
+  }
+
+  function addNewTag(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var trimmed = newTag.trim();
+    if (!trimmed) return;
+    if (selected.indexOf(trimmed) === -1) toggle(trimmed);
+    setNewTag('');
   }
 
   return (
@@ -861,11 +868,11 @@ function TeamPicker({ value, onChange }) {
               value={search}
               onChange={function(e) { setSearch(e.target.value); }}
               onClick={function(e) { e.stopPropagation(); }}
-              placeholder="Search teams..."
+              placeholder="Search areas..."
               style={{ width: '100%', padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', outline: 'none' }}
             />
           </div>
-          <div style={{ maxHeight: 200, overflowY: 'auto', padding: '4px 0' }}>
+          <div style={{ maxHeight: 180, overflowY: 'auto', padding: '4px 0' }}>
             {TEAM_OPTIONS.filter(function(opt) { return opt.toLowerCase().indexOf(search.toLowerCase()) !== -1; }).map(function(opt) {
               var isOn = selected.indexOf(opt) !== -1;
               return (
@@ -882,6 +889,15 @@ function TeamPicker({ value, onChange }) {
               );
             })}
           </div>
+          <form onSubmit={addNewTag} onClick={function(e) { e.stopPropagation(); }} style={{ display: 'flex', gap: 6, padding: '8px 10px', borderTop: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+            <input
+              value={newTag}
+              onChange={function(e) { setNewTag(e.target.value); }}
+              placeholder="New area name..."
+              style={{ flex: 1, padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, outline: 'none', background: '#fff' }}
+            />
+            <button type="submit" disabled={!newTag.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: newTag.trim() ? 1 : 0.4, flexShrink: 0 }}>Add</button>
+          </form>
         </div>
       )}
     </div>
@@ -3611,8 +3627,11 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var todoTodayStr = new Date().toISOString().slice(0, 10);
   var [todoSelectedDate, setTodoSelectedDate] = useState(todoTodayStr);
   var [todoInputTime, setTodoInputTime] = useState('');
+  var [todoInputHours, setTodoInputHours] = useState('');
   var [todoEditingTimeId, setTodoEditingTimeId] = useState(null);
   var [todoEditTimeVal, setTodoEditTimeVal] = useState('');
+  var [todoEditingHoursId, setTodoEditingHoursId] = useState(null);
+  var [todoEditHoursVal, setTodoEditHoursVal] = useState('');
   var emptySponsorForm = { 'Business Name': '', 'Main Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Donation': '', 'Fair Market Value': '', 'Area Supported': area, 'Date Recieved': '', 'NSH Contact': '' };
   var [sponsorForm, setSponsorForm] = useState(emptySponsorForm);
   var [sponsorSaving, setSponsorSaving] = useState(false);
@@ -3785,9 +3804,11 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     });
   }
 
+  function todoNowTime() { var n = new Date(); return n.toTimeString().slice(0, 5); }
+
   function loadTodo() {
     setTodoLoading(true);
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?select=*&order=date_submitted.desc', {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?select=*&order=date_submitted.asc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (Array.isArray(rows)) setTodoItems(rows);
@@ -3809,26 +3830,44 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     e.preventDefault();
     if (!todoInput.trim()) return;
     setTodoSaving(true);
-    var ds = todoInputTime ? todoSelectedDate + 'T' + todoInputTime : todoSelectedDate;
+    var timeToUse = todoInputTime || todoNowTime();
+    var ds = todoSelectedDate + 'T' + timeToUse;
+    var hrs = todoInputHours ? parseFloat(todoInputHours) : null;
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ item: todoInput.trim(), date_submitted: ds, done: false, date_done: null })
+      body: JSON.stringify({ item: todoInput.trim(), date_submitted: ds, done: false, date_done: null, hours: hrs })
     }).then(function(r) { return r.json(); }).then(function(rows) {
-      if (Array.isArray(rows) && rows[0]) setTodoItems(function(p) { return p.concat([rows[0]]); });
-      setTodoInput(''); setTodoInputTime('');
+      if (Array.isArray(rows) && rows[0]) setTodoItems(function(p) {
+        var next = p.concat([rows[0]]);
+        return next.sort(function(a, b) { return (a.date_submitted || '') < (b.date_submitted || '') ? -1 : 1; });
+      });
+      setTodoInput(''); setTodoInputTime(todoNowTime()); setTodoInputHours('');
       setTodoSaving(false);
     }).catch(function() { setTodoSaving(false); });
   }
 
   function saveTodoTime(t) {
-    var ds = todoInputTime ? todoGetDate(t) + 'T' + todoEditTimeVal : todoGetDate(t);
-    setTodoItems(function(p) { return p.map(function(x) { return x.id === t.id ? Object.assign({}, x, { date_submitted: ds }) : x; }); });
+    var ds = todoEditTimeVal ? todoGetDate(t) + 'T' + todoEditTimeVal : todoGetDate(t);
+    setTodoItems(function(p) {
+      var next = p.map(function(x) { return x.id === t.id ? Object.assign({}, x, { date_submitted: ds }) : x; });
+      return next.sort(function(a, b) { return (a.date_submitted || '') < (b.date_submitted || '') ? -1 : 1; });
+    });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?id=eq.' + t.id, {
       method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ date_submitted: ds })
     });
     setTodoEditingTimeId(null);
+  }
+
+  function saveTodoHours(t) {
+    var hrs = todoEditHoursVal !== '' ? parseFloat(todoEditHoursVal) : null;
+    setTodoItems(function(p) { return p.map(function(x) { return x.id === t.id ? Object.assign({}, x, { hours: hrs }) : x; }); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?id=eq.' + t.id, {
+      method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hours: hrs })
+    });
+    setTodoEditingHoursId(null);
   }
 
   function toggleTodoItem(id, currentDone) {
@@ -4117,7 +4156,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>Area Resources</div>
             {area === 'Marketing' && (
-              <button onClick={function() { setShowTodo(true); loadTodo(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: gold, padding: '0 2px', lineHeight: 1, opacity: 0.7 }}>★</button>
+              <button onClick={function() { setTodoInputTime(todoNowTime()); setShowTodo(true); loadTodo(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: gold, padding: '0 2px', lineHeight: 1, opacity: 0.7 }}>★</button>
             )}
           </div>
           {resources.length === 0
@@ -4531,30 +4570,35 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       {showTodo && (function() {
         var weekDays = todoGetWeekDays(todoSelectedDate);
         var DAY_LABELS = ['M','T','W','T','F','S','S'];
-        var dayItems = todoItems.filter(function(t) { return todoGetDate(t) === todoSelectedDate; }).sort(function(a,b) { var ta = todoGetTime(a)||'99:99'; var tb = todoGetTime(b)||'99:99'; return ta<tb?-1:ta>tb?1:0; });
+        var dayItems = todoItems.filter(function(t) { return todoGetDate(t) === todoSelectedDate; });
         var activeItems = dayItems.filter(function(t) { return !t.done; });
         var doneItems = dayItems.filter(function(t) { return t.done; });
         var isToday = todoSelectedDate === todoTodayStr;
         var displayDate = new Date(todoSelectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        var dayTotalHours = dayItems.reduce(function(s, t) { return s + (t.hours || 0); }, 0);
+        var fmtHours = function(h) { return h % 1 === 0 ? h + 'h' : h.toFixed(1) + 'h'; };
         return (
           <div onClick={function() { setShowTodo(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
-            <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 500, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
+            <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
               {/* Header */}
               <div style={{ padding: '16px 20px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>★ Marketing To-Do</div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>★ Marketing Work Log</div>
+                  {dayTotalHours > 0 && <div style={{ fontSize: 11, color: gold, fontWeight: 600, marginTop: 1 }}>{fmtHours(dayTotalHours)} logged today</div>}
+                </div>
                 <button onClick={function() { setShowTodo(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: '#666', cursor: 'pointer' }}>Close</button>
               </div>
               {/* Week strip */}
               <div style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', gap: 3, flexShrink: 0 }}>
                 {weekDays.map(function(d, i) {
-                  var total = todoItems.filter(function(t) { return todoGetDate(t) === d; }).length;
-                  var done = todoItems.filter(function(t) { return todoGetDate(t) === d && t.done; }).length;
+                  var dayH = todoItems.filter(function(t) { return todoGetDate(t) === d; }).reduce(function(s, t) { return s + (t.hours || 0); }, 0);
+                  var cnt = todoItems.filter(function(t) { return todoGetDate(t) === d; }).length;
                   var isSel = d === todoSelectedDate; var isTod = d === todoTodayStr;
                   return (
                     <button key={d} onClick={function() { setTodoSelectedDate(d); }} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '6px 2px', background: isSel ? gold : 'transparent', borderRadius: 7, border: 'none', cursor: 'pointer', color: isSel ? '#fff' : isTod ? gold : '#888' }}>
                       <span style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{DAY_LABELS[i]}</span>
                       <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1 }}>{new Date(d + 'T12:00:00').getDate()}</span>
-                      <span style={{ fontSize: 9, fontWeight: 600, height: 14, background: isSel ? 'rgba(255,255,255,0.25)' : total === 0 ? 'transparent' : done === total ? '#e8f5e9' : '#fef3c7', color: isSel ? '#fff' : done === total && total > 0 ? '#2e7d32' : '#b45309', borderRadius: 10, padding: total > 0 ? '1px 4px' : 0, display: 'flex', alignItems: 'center' }}>{total > 0 ? done + '/' + total : ''}</span>
+                      <span style={{ fontSize: 9, fontWeight: 600, height: 14, background: isSel ? 'rgba(255,255,255,0.25)' : cnt === 0 ? 'transparent' : '#fef3c7', color: isSel ? '#fff' : '#b45309', borderRadius: 10, padding: cnt > 0 ? '1px 4px' : 0, display: 'flex', alignItems: 'center' }}>{dayH > 0 ? fmtHours(dayH) : cnt > 0 ? cnt + ' task' + (cnt > 1 ? 's' : '') : ''}</span>
                     </button>
                   );
                 })}
@@ -4568,39 +4612,55 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 </div>
                 <button onClick={function() { todoNavigateDay(1); }} style={{ background: '#f5f1eb', border: 'none', borderRadius: 7, padding: '5px 12px', fontSize: 13, cursor: 'pointer', color: '#666' }}>→</button>
               </div>
-              {/* Add task */}
-              <form onSubmit={addTodoItem} style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
-                <input value={todoInput} onChange={function(e) { setTodoInput(e.target.value); }} placeholder={isToday ? 'Add a task for today…' : 'Add a task for ' + displayDate + '…'} style={{ flex: '1 1 150px', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, fontFamily: 'system-ui, sans-serif' }} />
-                <input type="time" value={todoInputTime} onChange={function(e) { setTodoInputTime(e.target.value); }} style={{ padding: '8px 8px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, width: 100, flexShrink: 0, color: todoInputTime ? '#2a2a2a' : '#bbb' }} />
-                <button type="submit" disabled={todoSaving || !todoInput.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (todoSaving || !todoInput.trim()) ? 0.6 : 1, flexShrink: 0 }}>Add</button>
+              {/* Add entry */}
+              <form onSubmit={addTodoItem} style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', alignItems: 'center' }}>
+                <input value={todoInput} onChange={function(e) { setTodoInput(e.target.value); }} placeholder="What did you work on?" style={{ flex: '1 1 180px', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, fontFamily: 'system-ui, sans-serif' }} />
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+                  <input type="time" value={todoInputTime} onChange={function(e) { setTodoInputTime(e.target.value); }} style={{ padding: '8px 6px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, width: 96 }} />
+                  <button type="button" onClick={function() { setTodoInputTime(todoNowTime()); }} title="Use current time" style={{ background: '#f5f1eb', border: 'none', borderRadius: 7, padding: '8px 8px', fontSize: 12, color: gold, cursor: 'pointer', fontWeight: 700, flexShrink: 0 }}>Now</button>
+                </div>
+                <input type="number" value={todoInputHours} onChange={function(e) { setTodoInputHours(e.target.value); }} placeholder="hrs" min="0" max="24" step="0.25" style={{ padding: '8px 8px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, width: 58, flexShrink: 0 }} />
+                <button type="submit" disabled={todoSaving || !todoInput.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (todoSaving || !todoInput.trim()) ? 0.6 : 1, flexShrink: 0 }}>Log</button>
               </form>
-              {/* Task list */}
+              {/* Entry list */}
               <div style={{ overflowY: 'auto', flex: 1 }}>
                 {todoLoading ? (
                   <div style={{ padding: 24, textAlign: 'center', color: '#aaa', fontSize: 13 }}>Loading…</div>
                 ) : dayItems.length === 0 ? (
-                  <div style={{ padding: 32, textAlign: 'center', color: '#ccc', fontSize: 13 }}>No tasks for this day.</div>
+                  <div style={{ padding: 32, textAlign: 'center', color: '#ccc', fontSize: 13 }}>Nothing logged for this day.</div>
                 ) : (
                   <div>
                     {activeItems.length > 0 && (
                       <div>
-                        <div style={{ padding: '7px 16px', fontSize: 10, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>To Do · {activeItems.length}</div>
+                        <div style={{ padding: '7px 16px', fontSize: 10, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Active · {activeItems.length}</div>
                         {activeItems.map(function(t) {
-                          var time = todoGetTime(t); var isEditingTime = todoEditingTimeId === t.id;
+                          var time = todoGetTime(t); var isEditingTime = todoEditingTimeId === t.id; var isEditingHours = todoEditingHoursId === t.id;
                           return (
-                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderBottom: '0.5px solid #f9f6f2' }}>
-                              <input type="checkbox" checked={false} onChange={function() { toggleTodoItem(t.id, false); }} style={{ accentColor: gold, width: 15, height: 15, cursor: 'pointer', flexShrink: 0 }} />
+                            <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 16px', borderBottom: '0.5px solid #f9f6f2' }}>
+                              <input type="checkbox" checked={false} onChange={function() { toggleTodoItem(t.id, false); }} style={{ accentColor: gold, width: 15, height: 15, cursor: 'pointer', flexShrink: 0, marginTop: 2 }} />
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, color: '#2a2a2a', lineHeight: 1.4 }}>{t.item}</div>
-                                {isEditingTime ? (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
-                                    <input type="time" value={todoEditTimeVal} onChange={function(e) { setTodoEditTimeVal(e.target.value); }} autoFocus style={{ padding: '3px 6px', border: '0.5px solid ' + gold, borderRadius: 6, fontSize: 12 }} />
-                                    <button onClick={function() { saveTodoTime(t); }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>Save</button>
-                                    <button onClick={function() { setTodoEditingTimeId(null); }} style={{ fontSize: 11, background: '#f0ece6', color: '#666', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>Cancel</button>
-                                  </div>
-                                ) : (
-                                  <button onClick={function() { setTodoEditingTimeId(t.id); setTodoEditTimeVal(time); }} style={{ marginTop: 2, fontSize: 11, color: time ? gold : '#ccc', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: time ? 500 : 400 }}>{time ? '⏰ ' + todoFmtTime(time) : '+ set time'}</button>
-                                )}
+                                <div style={{ display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                                  {isEditingTime ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                      <input type="time" value={todoEditTimeVal} onChange={function(e) { setTodoEditTimeVal(e.target.value); }} autoFocus style={{ padding: '3px 6px', border: '0.5px solid ' + gold, borderRadius: 6, fontSize: 12 }} />
+                                      <button onClick={function() { saveTodoTime(t); }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>Save</button>
+                                      <button onClick={function() { setTodoEditingTimeId(null); }} style={{ fontSize: 11, background: '#f0ece6', color: '#666', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>Cancel</button>
+                                    </div>
+                                  ) : (
+                                    <button onClick={function() { setTodoEditingTimeId(t.id); setTodoEditTimeVal(time); }} style={{ fontSize: 11, color: time ? gold : '#ccc', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: time ? 500 : 400 }}>⏰ {time ? todoFmtTime(time) : '+ set time'}</button>
+                                  )}
+                                  {isEditingHours ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                      <input type="number" value={todoEditHoursVal} onChange={function(e) { setTodoEditHoursVal(e.target.value); }} autoFocus min="0" max="24" step="0.25" style={{ padding: '3px 6px', border: '0.5px solid ' + gold, borderRadius: 6, fontSize: 12, width: 58 }} />
+                                      <span style={{ fontSize: 11, color: '#888' }}>hrs</span>
+                                      <button onClick={function() { saveTodoHours(t); }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>Save</button>
+                                      <button onClick={function() { setTodoEditingHoursId(null); }} style={{ fontSize: 11, background: '#f0ece6', color: '#666', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>Cancel</button>
+                                    </div>
+                                  ) : (
+                                    <button onClick={function() { setTodoEditingHoursId(t.id); setTodoEditHoursVal(t.hours != null ? String(t.hours) : ''); }} style={{ fontSize: 11, color: t.hours ? '#2a2a2a' : '#ccc', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>{t.hours ? '⏱ ' + fmtHours(t.hours) : '+ hours'}</button>
+                                  )}
+                                </div>
                               </div>
                               <button onClick={function() { deleteTodoItem(t.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                             </div>
@@ -4614,11 +4674,14 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                         {doneItems.map(function(t) {
                           var time = todoGetTime(t);
                           return (
-                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderBottom: '0.5px solid #f9f6f2', background: '#fafaf9' }}>
-                              <input type="checkbox" checked={true} onChange={function() { toggleTodoItem(t.id, true); }} style={{ accentColor: gold, width: 15, height: 15, cursor: 'pointer', flexShrink: 0 }} />
+                            <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 16px', borderBottom: '0.5px solid #f9f6f2', background: '#fafaf9' }}>
+                              <input type="checkbox" checked={true} onChange={function() { toggleTodoItem(t.id, true); }} style={{ accentColor: gold, width: 15, height: 15, cursor: 'pointer', flexShrink: 0, marginTop: 2 }} />
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, color: '#bbb', textDecoration: 'line-through', lineHeight: 1.4 }}>{t.item}</div>
-                                {time && <div style={{ fontSize: 11, color: '#ccc', marginTop: 2 }}>⏰ {todoFmtTime(time)}</div>}
+                                <div style={{ display: 'flex', gap: 10, marginTop: 3, flexWrap: 'wrap' }}>
+                                  {time && <span style={{ fontSize: 11, color: '#ccc' }}>⏰ {todoFmtTime(time)}</span>}
+                                  {t.hours && <span style={{ fontSize: 11, color: '#ccc' }}>⏱ {fmtHours(t.hours)}</span>}
+                                </div>
                               </div>
                               <button onClick={function() { deleteTodoItem(t.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                             </div>
@@ -4626,12 +4689,12 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                         })}
                       </div>
                     )}
-                    <div style={{ padding: '8px 14px', background: '#fdfcfb', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ flex: 1, height: 3, background: '#f0ece6', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', background: gold, width: (dayItems.length > 0 ? doneItems.length / dayItems.length * 100 : 0) + '%', borderRadius: 2, transition: 'width 0.3s' }} />
+                    {dayTotalHours > 0 && (
+                      <div style={{ padding: '10px 16px', background: '#fdfcfb', borderTop: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 11, color: '#888' }}>{dayItems.length} {dayItems.length === 1 ? 'entry' : 'entries'}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: gold }}>Total: {fmtHours(dayTotalHours)}</span>
                       </div>
-                      <span style={{ fontSize: 11, color: '#888', flexShrink: 0 }}>{doneItems.length}/{dayItems.length} done</span>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
