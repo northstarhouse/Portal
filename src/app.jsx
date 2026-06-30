@@ -6671,6 +6671,9 @@ function VolEmailListsView({ navigate }) {
   var [sent, setSent] = useS(false);
   var [sending, setSending] = useS(false);
   var [sendError, setSendError] = useS(null);
+  var [scheduled, setScheduled] = useS(false);
+  var [scheduleAt, setScheduleAt] = useS('');
+  var editorRef = React.useRef(null);
 
   useE(function() {
     cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Email','Status','Team','Overview Notes','Phone Number']).then(function(data) {
@@ -6728,16 +6731,40 @@ function VolEmailListsView({ navigate }) {
     setBody('');
     setSent(false);
     setSendError(null);
+    setScheduled(false);
+    setScheduleAt('');
+    setTimeout(function() { if (editorRef.current) editorRef.current.innerHTML = ''; }, 0);
+  }
+
+  function fmt(cmd, val) {
+    if (editorRef.current) editorRef.current.focus();
+    document.execCommand(cmd, false, val || null);
   }
 
   function handleSend() {
     if (!modal) return;
+    var htmlBody = editorRef.current ? editorRef.current.innerHTML : body;
     setSending(true);
     setSendError(null);
+
+    if (scheduled && scheduleAt) {
+      fetch(SUPABASE_URL + '/rest/v1/scheduled_volunteer_emails', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ send_at: new Date(scheduleAt).toISOString(), team_tag: modal.tag, recipient_count: modal.members.length, recipients: modal.members.map(function(v) { return v['Email'].trim(); }), subject: subject, body: htmlBody, status: 'pending' })
+      }).then(function(r) {
+        if (!r.ok) return r.json().then(function(j) { throw new Error(j.message || j.error || 'Failed to schedule'); });
+        setSent(true);
+      }).catch(function(err) {
+        setSendError(err.message || 'Unknown error');
+      }).finally(function() { setSending(false); });
+      return;
+    }
+
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY },
-      body: JSON.stringify({ to: modal.members.map(function(v) { return v['Email'].trim(); }), subject: subject, body: body })
+      body: JSON.stringify({ to: modal.members.map(function(v) { return v['Email'].trim(); }), subject: subject, body: htmlBody })
     }).then(function(r) { return r.json().then(function(j) { return { ok: r.ok, json: j }; }); }).then(function(res) {
       if (!res.ok) throw new Error(res.json.error || 'Send failed');
       setSent(true);
@@ -6869,9 +6896,13 @@ function VolEmailListsView({ navigate }) {
 
             {sent ? (
               <div style={{ padding: '32px 20px', textAlign: 'center' }}>
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 20 }}>✓</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>Email sent!</div>
-                <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>Delivered to {modal.members.length} recipient{modal.members.length !== 1 ? 's' : ''} from info@northstarhouse.org</div>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: scheduled ? '#e0f2fe' : '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 20 }}>{scheduled ? '🕐' : '✓'}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{scheduled ? 'Email scheduled!' : 'Email sent!'}</div>
+                <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>
+                  {scheduled
+                    ? 'Queued for ' + new Date(scheduleAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' · ' + modal.members.length + ' recipient' + (modal.members.length !== 1 ? 's' : '')
+                    : 'Delivered to ' + modal.members.length + ' recipient' + (modal.members.length !== 1 ? 's' : '') + ' from info@northstarhouse.org'}
+                </div>
                 <button onClick={function() { setModal(null); }} style={{ marginTop: 16, padding: '7px 20px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer' }}>Done</button>
               </div>
             ) : (
@@ -6879,7 +6910,7 @@ function VolEmailListsView({ navigate }) {
                 {/* Recipients */}
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Recipients ({modal.members.length})</div>
-                  <div style={{ background: '#faf8f4', borderRadius: 8, padding: '8px 10px', maxHeight: 120, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ background: '#faf8f4', borderRadius: 8, padding: '8px 10px', maxHeight: 90, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {modal.members.map(function(v) {
                       return (
                         <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
@@ -6894,18 +6925,70 @@ function VolEmailListsView({ navigate }) {
                   <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Subject</label>
                   <input value={subject} onChange={function(e) { setSubject(e.target.value); }} placeholder="Subject line…" style={inpSt} />
                 </div>
+                {/* Formatting toolbar + editor */}
                 <div>
                   <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Message</label>
-                  <textarea value={body} onChange={function(e) { setBody(e.target.value); }} placeholder="Email body…" rows={5} style={Object.assign({}, inpSt, { resize: 'vertical', background: '#faf8f4' })} />
+                  <div style={{ border: '0.5px solid #e0d8cc', borderRadius: 8, overflow: 'hidden' }}>
+                    {/* Toolbar */}
+                    <div style={{ display: 'flex', gap: 2, padding: '6px 8px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb', flexWrap: 'wrap' }}>
+                      {[
+                        { label: 'B', cmd: 'bold', style: { fontWeight: 700 }, title: 'Bold' },
+                        { label: 'I', cmd: 'italic', style: { fontStyle: 'italic' }, title: 'Italic' },
+                        { label: 'U', cmd: 'underline', style: { textDecoration: 'underline' }, title: 'Underline' },
+                      ].map(function(b) {
+                        return (
+                          <button key={b.cmd} onMouseDown={function(e) { e.preventDefault(); fmt(b.cmd); }} title={b.title}
+                            style={Object.assign({ padding: '3px 8px', border: '0.5px solid #e0d8cc', borderRadius: 5, background: '#fff', fontSize: 12, cursor: 'pointer', color: '#444', lineHeight: 1.4 }, b.style)}>
+                            {b.label}
+                          </button>
+                        );
+                      })}
+                      <div style={{ width: 1, background: '#e0d8cc', margin: '2px 4px', alignSelf: 'stretch' }} />
+                      <button onMouseDown={function(e) { e.preventDefault(); fmt('insertUnorderedList'); }} title="Bullet list"
+                        style={{ padding: '3px 8px', border: '0.5px solid #e0d8cc', borderRadius: 5, background: '#fff', fontSize: 12, cursor: 'pointer', color: '#444' }}>• List</button>
+                      <button onMouseDown={function(e) { e.preventDefault(); fmt('insertOrderedList'); }} title="Numbered list"
+                        style={{ padding: '3px 8px', border: '0.5px solid #e0d8cc', borderRadius: 5, background: '#fff', fontSize: 12, cursor: 'pointer', color: '#444' }}>1. List</button>
+                      <div style={{ width: 1, background: '#e0d8cc', margin: '2px 4px', alignSelf: 'stretch' }} />
+                      <button onMouseDown={function(e) { e.preventDefault(); fmt('removeFormat'); }} title="Clear formatting"
+                        style={{ padding: '3px 8px', border: '0.5px solid #e0d8cc', borderRadius: 5, background: '#fff', fontSize: 11, cursor: 'pointer', color: '#aaa' }}>Clear</button>
+                    </div>
+                    {/* Editor */}
+                    <div
+                      ref={editorRef}
+                      contentEditable={true}
+                      suppressContentEditableWarning={true}
+                      className="nsh-editor"
+                      data-placeholder="Email body…"
+                      onInput={function(e) { setBody(e.currentTarget.innerHTML); }}
+                      style={{ minHeight: 120, padding: '10px 12px', fontSize: 13, color: '#2a2a2a', outline: 'none', background: '#faf8f4', lineHeight: 1.6, fontFamily: 'system-ui, sans-serif' }}
+                    />
+                  </div>
+                  <style>{'.nsh-editor[contenteditable]:empty:before{content:attr(data-placeholder);color:#bbb;pointer-events:none;}'}</style>
+                </div>
+                {/* Scheduling */}
+                <div style={{ background: '#fdfcfb', border: '0.5px solid #f0ece6', borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: scheduled ? 10 : 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>🕐 Schedule for later</span>
+                    <button onClick={function() { setScheduled(function(s) { return !s; }); }} style={{ background: scheduled ? gold : '#e0d8cc', border: 'none', borderRadius: 20, width: 36, height: 20, cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                      <span style={{ position: 'absolute', top: 2, left: scheduled ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }} />
+                    </button>
+                  </div>
+                  {scheduled && (
+                    <div>
+                      <label style={{ fontSize: 10, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Send at</label>
+                      <input type="datetime-local" value={scheduleAt} onChange={function(e) { setScheduleAt(e.target.value); }} min={new Date().toISOString().slice(0,16)} style={Object.assign({}, inpSt, { width: '100%' })} />
+                      <div style={{ fontSize: 10, color: '#aaa', marginTop: 5 }}>Saved to queue — requires a Supabase scheduled trigger to send.</div>
+                    </div>
+                  )}
                 </div>
                 {sendError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{sendError}</div>}
                 <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
-                  <button onClick={handleSend} disabled={!subject.trim() || sending} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (!subject.trim() || sending) ? 'not-allowed' : 'pointer', opacity: (!subject.trim() || sending) ? 0.5 : 1 }}>
-                    ✉ {sending ? 'Sending…' : 'Send Email'}
+                  <button onClick={handleSend} disabled={!subject.trim() || sending || (scheduled && !scheduleAt)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!subject.trim() || sending || (scheduled && !scheduleAt)) ? 0.5 : 1 }}>
+                    {sending ? 'Saving…' : scheduled ? '🕐 Schedule Email' : '✉ Send Email'}
                   </button>
                   <button onClick={function() { setModal(null); }} disabled={sending} style={{ padding: '9px 16px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
                 </div>
-                <div style={{ fontSize: 10, color: '#ccc', textAlign: 'center' }}>Sends from info@northstarhouse.org</div>
+                <div style={{ fontSize: 10, color: '#ccc', textAlign: 'center' }}>{scheduled ? 'Will send from info@northstarhouse.org at scheduled time' : 'Sends from info@northstarhouse.org'}</div>
               </div>
             )}
           </div>
