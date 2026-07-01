@@ -4131,15 +4131,15 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
                         {goalRows.map(function(keys, i) {
                           var g = quarterGoals[keys[0]]; if (!g) return null;
-                          var st = quarterGoals[keys[1]];
-                          var sm = quarterGoals[keys[2]];
+                          var st = (quarterUpdate && quarterUpdate[keys[1]]) || quarterGoals[keys[1]];
+                          var sm = (quarterUpdate && quarterUpdate[keys[2]]) || quarterGoals[keys[2]];
                           var sc = st && stColors[st] ? stColors[st] : null;
                           return (
                             <div key={i} style={{ background: sc ? sc.bg : '#faf8f5', borderRadius: 8, padding: '8px 12px', border: '0.5px solid ' + (sc ? sc.color + '33' : '#e8e0d5') }}>
                               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                                 <div style={{ flex: 1 }}>
                                   <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Goal {i+1} — <span style={{ color: '#555', fontWeight: 600 }}>{g}</span></div>
-                                  {sm && <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{sm}</div>}
+                                  {sm && <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5, marginTop: 3 }}>{sm}</div>}
                                 </div>
                                 {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: '#fff', color: sc.color, flexShrink: 0 }}>{st}</span>}
                               </div>
