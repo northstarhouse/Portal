@@ -5334,16 +5334,20 @@ function QuarterWorkspaceView({ navigate }) {
               {g.primary_focus && <div style={{ marginBottom: 6 }}><div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>Primary Focus</div><div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{g.primary_focus}</div></div>}
               {['1','2','3'].map(function(n) {
                 if (!g['goal_' + n]) return null;
+                var st = (u && u['goal_' + n + '_status']) || g['goal_' + n + '_status'];
+                var sm = (u && u['goal_' + n + '_summary']) || g['goal_' + n + '_summary'];
+                var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
+                var sc = st && stColors[st] ? stColors[st] : null;
                 return (
-                  <div key={n} style={{ marginBottom: 6 }}>
-                    <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>Goal {n}</div>
-                    <div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5, marginBottom: 2 }}>{g['goal_' + n]}</div>
-                    {(g['goal_' + n + '_status'] || g['goal_' + n + '_summary']) && (
-                      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#888' }}>
-                        {g['goal_' + n + '_status'] && <span>Status: <strong style={{ color: '#555' }}>{g['goal_' + n + '_status']}</strong></span>}
-                        {g['goal_' + n + '_summary'] && <span>· {g['goal_' + n + '_summary']}</span>}
+                  <div key={n} style={{ marginBottom: 6, background: sc ? sc.bg : '#faf8f5', borderRadius: 7, padding: '7px 10px', border: '0.5px solid ' + (sc ? sc.color + '33' : '#e8e0d5') }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, color: '#999', marginBottom: 2 }}>Goal {n}</div>
+                        <div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{g['goal_' + n]}</div>
+                        {sm && <div style={{ fontSize: 11, color: '#555', lineHeight: 1.5, marginTop: 3 }}>{sm}</div>}
                       </div>
-                    )}
+                      {sc && <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: '#fff', color: sc.color, flexShrink: 0, whiteSpace: 'nowrap' }}>{st}</span>}
+                    </div>
                   </div>
                 );
               })}
