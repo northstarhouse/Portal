@@ -5247,7 +5247,207 @@ function SponsorsView() {
   );
 }
 
-function ReviewsView() {
+function QuarterWorkspaceView({ navigate }) {
+  var { useState: useS, useEffect: useE, useRef } = React;
+  var year = new Date().getFullYear();
+  var quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+  var m = new Date().getMonth();
+  var defaultQ = m < 3 ? 'Q1' : m < 6 ? 'Q2' : m < 9 ? 'Q3' : 'Q4';
+  var [wsQ, setWsQ] = useS(defaultQ);
+  var [goals, setGoals] = useS({});
+  var [updates, setUpdates] = useS({});
+  var [notes, setNotes] = useS({});
+  var [loading, setLoading] = useS(true);
+  var [saving, setSaving] = useS({});
+  var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+
+  useE(function() {
+    setLoading(true);
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?quarter=eq.' + encodeURIComponent(wsQ) + '&year=eq.' + year + '&select=*', { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?quarter=eq.' + encodeURIComponent(wsQ) + '&year=eq.' + year + '&select=*&order=date_submitted.desc', { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/quarterly_notes?quarter=eq.' + encodeURIComponent(wsQ) + '&year=eq.' + year + '&select=*', { headers: hdrs }).then(function(r) { return r.json(); })
+    ]).then(function(res) {
+      var gm = {}; (Array.isArray(res[0]) ? res[0] : []).forEach(function(g) { gm[g.area] = g; });
+      var um = {}; (Array.isArray(res[1]) ? res[1] : []).forEach(function(u) { if (!um[u.area]) um[u.area] = u; });
+      var nm = {}; (Array.isArray(res[2]) ? res[2] : []).forEach(function(n) { nm[n.area] = n; });
+      setGoals(gm); setUpdates(um); setNotes(nm);
+      setLoading(false);
+    });
+  }, [wsQ]);
+
+  function saveNote(area, field, val) {
+    var key = area;
+    setSaving(function(s) { return Object.assign({}, s, { [area + '.' + field]: true }); });
+    var existing = notes[key];
+    var payload = { area: area, quarter: wsQ, year: year, [field]: val || null, updated_at: new Date().toISOString() };
+    var req = existing
+      ? fetch(SUPABASE_URL + '/rest/v1/quarterly_notes?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(wsQ) + '&year=eq.' + year, { method: 'PATCH', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify({ [field]: val || null, updated_at: new Date().toISOString() }) })
+      : fetch(SUPABASE_URL + '/rest/v1/quarterly_notes', { method: 'POST', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify(payload) });
+    req.then(function(r) { return r.json(); }).then(function(rows) {
+      var saved = Array.isArray(rows) ? rows[0] : rows;
+      if (saved) setNotes(function(prev) { return Object.assign({}, prev, { [area]: saved }); });
+      setSaving(function(s) { var next = Object.assign({}, s); delete next[area + '.' + field]; return next; });
+    }).catch(function() {
+      setSaving(function(s) { var next = Object.assign({}, s); delete next[area + '.' + field]; return next; });
+    });
+  }
+
+  var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, background: '#fdfcfb', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', resize: 'vertical', lineHeight: 1.55 };
+  var secHd = { fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6 };
+  var noteHd = { fontSize: 10, fontWeight: 700, color: gold, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
+  var chip = function(text, bg, color) { return React.createElement('span', { style: { fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: bg, color: color } }, text); };
+
+  function AreaCard(props) {
+    var area = props.area;
+    var g = goals[area] || {};
+    var u = updates[area];
+    var n = notes[area] || {};
+    var [localNotes, setLocalNotes] = useS({ goals_notes: n.goals_notes || '', reflection_notes: n.reflection_notes || '', next_quarter_notes: n.next_quarter_notes || '' });
+    useE(function() { setLocalNotes({ goals_notes: n.goals_notes || '', reflection_notes: n.reflection_notes || '', next_quarter_notes: n.next_quarter_notes || '' }); }, [n.goals_notes, n.reflection_notes, n.next_quarter_notes]);
+
+    var statusColors = { 'On track': { bg: '#e8f5e9', color: '#2e7d32' }, 'Minor adjustments needed': { bg: '#fff3e0', color: '#e65100' }, 'Off track - intervention required': { bg: '#ffebee', color: '#c62828' } };
+    var hasSubmission = !!u;
+    var hasGoals = !!(g.goal_1 || g.primary_focus);
+
+    return (
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, marginBottom: 14, overflow: 'hidden' }}>
+        <div style={{ padding: '11px 18px', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flex: 1 }}>{area}</div>
+          {hasSubmission ? chip('Reflection submitted', '#e8f5e9', '#2e7d32') : chip('No reflection', '#f5f0ea', '#aaa')}
+          {!hasGoals && chip('No goals set', '#fce4e4', '#c62828')}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+          {/* Left: review content */}
+          <div style={{ padding: '14px 16px', borderRight: '0.5px solid #f0ece6' }}>
+
+            {/* Goals */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={secHd}>Quarterly Goals</div>
+              {g.primary_focus && <div style={{ marginBottom: 6 }}><div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>Primary Focus</div><div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{g.primary_focus}</div></div>}
+              {['1','2','3'].map(function(n) {
+                if (!g['goal_' + n]) return null;
+                return (
+                  <div key={n} style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>Goal {n}</div>
+                    <div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5, marginBottom: 2 }}>{g['goal_' + n]}</div>
+                    {(g['goal_' + n + '_status'] || g['goal_' + n + '_summary']) && (
+                      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#888' }}>
+                        {g['goal_' + n + '_status'] && <span>Status: <strong style={{ color: '#555' }}>{g['goal_' + n + '_status']}</strong></span>}
+                        {g['goal_' + n + '_summary'] && <span>· {g['goal_' + n + '_summary']}</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {!hasGoals && <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>No goals submitted.</div>}
+            </div>
+
+            {/* Reflection */}
+            <div style={{ borderTop: '0.5px solid #f5f1eb', paddingTop: 12, marginBottom: 14 }}>
+              <div style={secHd}>Quarterly Reflection</div>
+              {u ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {u.what_went_well || u.successes ? <div><div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>What Went Well</div><div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{u.what_went_well || u.successes}</div></div> : null}
+                  {u.challenges && u.challenges.length > 0 ? <div><div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>Challenges</div><div style={{ fontSize: 12, color: '#555' }}>{(Array.isArray(u.challenges) ? u.challenges : [u.challenges]).join(' · ')}</div>{u.challenges_details && <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{u.challenges_details}</div>}</div> : null}
+                  {u.support_needed && u.support_needed.length > 0 ? <div><div style={{ fontSize: 10, color: '#e65100', marginBottom: 2, fontWeight: 600 }}>Support Needed</div><div style={{ fontSize: 12, color: '#555' }}>{(Array.isArray(u.support_needed) ? u.support_needed : [u.support_needed]).join(' · ')}</div>{u.support_details && <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{u.support_details}</div>}</div> : null}
+                  {u.other_notes ? <div><div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>Other Notes</div><div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{u.other_notes}</div></div> : null}
+                  {u.next_focus ? <div><div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>Next Quarter Focus</div><div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{u.next_focus}</div></div> : null}
+                </div>
+              ) : <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>No reflection submitted yet.</div>}
+            </div>
+
+            {/* Next Q goals preview */}
+            {(g.goal_1 || g.goal_2 || g.goal_3) && (
+              <div style={{ borderTop: '0.5px solid #f5f1eb', paddingTop: 12 }}>
+                <div style={secHd}>Next Quarter Focus</div>
+                {u && u.next_focus ? <div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{u.next_focus}</div> : <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>Not provided.</div>}
+              </div>
+            )}
+          </div>
+
+          {/* Right: notes */}
+          <div style={{ padding: '14px 16px', background: '#fefcf8' }}>
+            <div style={{ marginBottom: 14 }}>
+              <div style={noteHd}>
+                <span>Goals Notes</span>
+                {saving[area + '.goals_notes'] && <span style={{ fontSize: 9, color: '#bbb', fontWeight: 400 }}>saving…</span>}
+              </div>
+              <textarea
+                value={localNotes.goals_notes}
+                onChange={function(e) { setLocalNotes(function(l) { return Object.assign({}, l, { goals_notes: e.target.value }); }); }}
+                onBlur={function(e) { if (e.target.value !== (n.goals_notes || '')) saveNote(area, 'goals_notes', e.target.value); }}
+                placeholder="Notes on goals & progress…"
+                rows={4}
+                style={inpSt}
+              />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={noteHd}>
+                <span>Reflection Notes</span>
+                {saving[area + '.reflection_notes'] && <span style={{ fontSize: 9, color: '#bbb', fontWeight: 400 }}>saving…</span>}
+              </div>
+              <textarea
+                value={localNotes.reflection_notes}
+                onChange={function(e) { setLocalNotes(function(l) { return Object.assign({}, l, { reflection_notes: e.target.value }); }); }}
+                onBlur={function(e) { if (e.target.value !== (n.reflection_notes || '')) saveNote(area, 'reflection_notes', e.target.value); }}
+                placeholder="Discussion points, board focus areas, action items…"
+                rows={5}
+                style={inpSt}
+              />
+            </div>
+            <div>
+              <div style={noteHd}>
+                <span>Next Quarter Notes</span>
+                {saving[area + '.next_quarter_notes'] && <span style={{ fontSize: 9, color: '#bbb', fontWeight: 400 }}>saving…</span>}
+              </div>
+              <textarea
+                value={localNotes.next_quarter_notes}
+                onChange={function(e) { setLocalNotes(function(l) { return Object.assign({}, l, { next_quarter_notes: e.target.value }); }); }}
+                onBlur={function(e) { if (e.target.value !== (n.next_quarter_notes || '')) saveNote(area, 'next_quarter_notes', e.target.value); }}
+                placeholder="Priorities, recommendations for next quarter…"
+                rows={3}
+                style={inpSt}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <button onClick={function() { navigate('reviews'); }} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#aaa', fontSize: 13, cursor: 'pointer', padding: 0 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Reviews
+        </button>
+        <div style={{ fontSize: 12, color: '#ccc' }}>/</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>Review Workspace</div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          {quarters.map(function(q) {
+            return (
+              <button key={q} onClick={function() { setWsQ(q); }}
+                style={{ padding: '5px 14px', borderRadius: 7, border: '0.5px solid ' + (wsQ === q ? gold : '#e0d8cc'), background: wsQ === q ? '#fef9f0' : '#fff', color: wsQ === q ? gold : '#888', fontSize: 12, fontWeight: wsQ === q ? 700 : 400, cursor: 'pointer' }}>
+                {q}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: '#aaa' }}>{wsQ} {year} — Notes auto-save when you leave each field.</div>
+      </div>
+      {loading
+        ? <div style={{ padding: 32, textAlign: 'center', color: '#bbb', fontSize: 13 }}>Loading…</div>
+        : OPERATIONAL_AREAS.map(function(area) { return React.createElement(AreaCard, { key: area, area: area }); })
+      }
+    </div>
+  );
+}
+
+function ReviewsView({ navigate }) {
   var { useState, useEffect } = React;
   var year = new Date().getFullYear();
   var quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
@@ -5450,10 +5650,16 @@ function ReviewsView() {
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', marginBottom: 24, overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600 }}>Quarterly Updates — {year}</div>
-          <button onClick={function() { setPrintQ('Q1'); }} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontWeight: 500 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Print Packet
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={function() { navigate('quarter-workspace'); }} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#555', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontWeight: 500 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Review &amp; Add Notes
+            </button>
+            <button onClick={function() { setPrintQ('Q1'); }} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontWeight: 500 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              Print Packet
+            </button>
+          </div>
         </div>
         <div className="nsh-reviews-scroll" style={{ padding: '0 20px' }}>
           <div style={{ minWidth: 400 }}>
@@ -7144,6 +7350,7 @@ const views = {
   operational: OperationalView,
   financials: FinancialsView,
   reviews: ReviewsView,
+  'quarter-workspace': QuarterWorkspaceView,
   admin: AdminView,
   'vol-email-lists': VolEmailListsView,
 };
