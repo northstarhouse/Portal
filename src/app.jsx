@@ -83,7 +83,7 @@ function AppGate({ children }) {
       // Clear stale data cache from before the gate landed — pre-token requests
       // would have returned [] (RLS denial) and gotten cached as empty.
       try {
-        Object.keys(localStorage).filter(function(k) { return k.indexOf('nsh3_') === 0; }).forEach(function(k) { localStorage.removeItem(k); });
+        Object.keys(localStorage).filter(function(k) { return k.indexOf('nsh4_') === 0; }).forEach(function(k) { localStorage.removeItem(k); });
       } catch (e) {}
       setHasToken(true); setPwd(''); setBusy(false); setExpired(false);
     }).catch(function() {
@@ -4105,8 +4105,15 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                     <button onClick={function(e) { e.stopPropagation(); setCardFlipped(true); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontWeight: 500 }}>View Full Reflection →</button>
                   </div>
                 </div>
+              ) : quarterUpdate ? (
+                <div>
+                  <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic', marginBottom: 12 }}>No goals set for {selectedQ} yet.</div>
+                  <div style={{ textAlign: 'right' }}>
+                    <button onClick={function(e) { e.stopPropagation(); setCardFlipped(true); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontWeight: 500 }}>View Full Reflection →</button>
+                  </div>
+                </div>
               ) : (
-                <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No goals set for {cq} yet.</div>
+                <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No goals set for {selectedQ} yet.</div>
               )}
             </div>
           );
