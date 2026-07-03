@@ -3009,7 +3009,7 @@ function BoardView() {
               {items.length === 0
                 ? <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: 32 }}>No voting items.</div>
                 : (function() {
-                    var byNewest = function(a, b) { var da = a.created_at ? new Date(a.created_at).getTime() : 0; var db = b.created_at ? new Date(b.created_at).getTime() : 0; return db - da; };
+                    var byNewest = function(a, b) { var da = a.created_at ? new Date(a.created_at).getTime() : 0; var db = b.created_at ? new Date(b.created_at).getTime() : 0; if (db !== da) return db - da; return (b.id || 0) - (a.id || 0); };
                     var openItems = items.filter(function(i) { return !isRevealed(i); }).sort(byNewest);
                     var closedItems = items.filter(function(i) { return isRevealed(i); }).sort(byNewest);
                     return (
