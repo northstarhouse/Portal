@@ -2996,13 +2996,13 @@ function BoardView() {
                   type="password"
                   value={adminPwInput}
                   onChange={function(e) { setAdminPwInput(e.target.value); setAdminPwError(false); }}
-                  onKeyDown={function(e) { if (e.key === 'Enter') { if (adminPwInput === 'JM1905') { setAdminAuthed(true); setAdminPwInput(''); } else { setAdminPwError(true); } } }}
+                  onKeyDown={function(e) { if (e.key === 'Enter') { if (adminPwInput.trim() === 'JM1905') { setAdminAuthed(true); setAdminPwInput(''); } else { setAdminPwError(true); } } }}
                   placeholder="Password"
                   style={{ border: '0.5px solid ' + (adminPwError ? '#c62828' : '#d0c8bc'), borderRadius: 8, padding: '9px 14px', fontSize: 13, width: 220, outline: 'none' }}
                   autoFocus
                 />
                 {adminPwError && <div style={{ fontSize: 11, color: '#c62828' }}>Incorrect password</div>}
-                <button onClick={function() { if (adminPwInput === 'JM1905') { setAdminAuthed(true); setAdminPwInput(''); } else { setAdminPwError(true); } }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Unlock</button>
+                <button onClick={function() { if (adminPwInput.trim() === 'JM1905') { setAdminAuthed(true); setAdminPwInput(''); } else { setAdminPwError(true); } }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Unlock</button>
               </div>
             ) : (
             <div style={{ padding: '16px 24px' }}>
