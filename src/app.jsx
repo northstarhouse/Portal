@@ -2641,7 +2641,7 @@ function BoardView() {
         var da = a.created_at ? new Date(a.created_at).getTime() : 0;
         var db = b.created_at ? new Date(b.created_at).getTime() : 0;
         if (db !== da) return db - da;
-        return (b.id || 0) - (a.id || 0);
+        return (b.row_id || 0) - (a.row_id || 0);
       });
       setItems(sorted);
       setVotes([]);
@@ -2672,9 +2672,13 @@ function BoardView() {
   }
 
   function closeVote(item) {
-    setClosingId(item.id);
-    sbPatchById('Board Voting Items', item.id, { status: 'Closed' }).then(function() {
-      setItems(function(prev) { return prev.map(function(i) { return i.id === item.id ? Object.assign({}, i, { status: 'Closed' }) : i; }); });
+    setClosingId(item.row_id);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Board Voting Items') + '?row_id=eq.' + encodeURIComponent(item.row_id), {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ status: 'Closed' })
+    }).then(function(r) { return r.json(); }).then(function() {
+      setItems(function(prev) { return prev.map(function(i) { return i.row_id === item.row_id ? Object.assign({}, i, { status: 'Closed' }) : i; }); });
       setClosingId(null);
     }).catch(function() { setClosingId(null); });
   }
@@ -2784,7 +2788,7 @@ function BoardView() {
             var da = a.created_at ? new Date(a.created_at).getTime() : 0;
             var db = b.created_at ? new Date(b.created_at).getTime() : 0;
             if (db !== da) return db - da;
-            return (b.id || 0) - (a.id || 0);
+            return (b.row_id || 0) - (a.row_id || 0);
           };
           var openItems = items.filter(function(i) { return !isRevealed(i); }).sort(byNewest);
           var closedItems = items.filter(function(i) { return isRevealed(i); }).sort(byNewest);
@@ -3009,7 +3013,7 @@ function BoardView() {
               {items.length === 0
                 ? <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: 32 }}>No voting items.</div>
                 : (function() {
-                    var byNewest = function(a, b) { var da = a.created_at ? new Date(a.created_at).getTime() : 0; var db = b.created_at ? new Date(b.created_at).getTime() : 0; if (db !== da) return db - da; return (b.id || 0) - (a.id || 0); };
+                    var byNewest = function(a, b) { var da = a.created_at ? new Date(a.created_at).getTime() : 0; var db = b.created_at ? new Date(b.created_at).getTime() : 0; if (db !== da) return db - da; return (b.row_id || 0) - (a.row_id || 0); };
                     var openItems = items.filter(function(i) { return !isRevealed(i); }).sort(byNewest);
                     var closedItems = items.filter(function(i) { return isRevealed(i); }).sort(byNewest);
                     return (
@@ -3019,7 +3023,7 @@ function BoardView() {
                           var t = tally(item);
                           var iv = itemVotes(item);
                           var won = isWon(item);
-                          var isClosing = closingId === item.id;
+                          var isClosing = closingId === item.row_id;
                           return (
                             <div key={item.id} style={{ background: won ? '#f0faf0' : '#faf8f5', border: '0.5px solid ' + (won ? '#a5d6a7' : '#e8e0d5'), borderRadius: 10, padding: '14px 16px' }}>
                               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
