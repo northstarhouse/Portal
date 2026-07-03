@@ -2584,6 +2584,9 @@ function BoardView() {
   const [attachUploading, setAttachUploading] = React.useState(false);
   const [attachFileName, setAttachFileName] = React.useState('');
   const [showAdmin, setShowAdmin] = React.useState(false);
+  const [adminAuthed, setAdminAuthed] = React.useState(false);
+  const [adminPwInput, setAdminPwInput] = React.useState('');
+  const [adminPwError, setAdminPwError] = React.useState(false);
   const [closingId, setClosingId] = React.useState(null);
 
   function handleAttachUpload(e) {
@@ -2980,12 +2983,28 @@ function BoardView() {
       )}
 
       {showAdmin && (
-        <div onClick={function() { setShowAdmin(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div onClick={function() { setShowAdmin(false); setAdminAuthed(false); setAdminPwInput(''); setAdminPwError(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
             <div style={{ padding: '20px 24px', borderBottom: '0.5px solid #f0ece6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a' }}>Vote Admin</div>
-              <button onClick={function() { setShowAdmin(false); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb' }}>×</button>
+              <button onClick={function() { setShowAdmin(false); setAdminAuthed(false); setAdminPwInput(''); setAdminPwError(false); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb' }}>×</button>
             </div>
+            {!adminAuthed ? (
+              <div style={{ padding: '40px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+                <div style={{ fontSize: 13, color: '#555' }}>Enter admin password to continue</div>
+                <input
+                  type="password"
+                  value={adminPwInput}
+                  onChange={function(e) { setAdminPwInput(e.target.value); setAdminPwError(false); }}
+                  onKeyDown={function(e) { if (e.key === 'Enter') { if (adminPwInput === 'nsh-admin-2026') { setAdminAuthed(true); setAdminPwInput(''); } else { setAdminPwError(true); } } }}
+                  placeholder="Password"
+                  style={{ border: '0.5px solid ' + (adminPwError ? '#c62828' : '#d0c8bc'), borderRadius: 8, padding: '9px 14px', fontSize: 13, width: 220, outline: 'none' }}
+                  autoFocus
+                />
+                {adminPwError && <div style={{ fontSize: 11, color: '#c62828' }}>Incorrect password</div>}
+                <button onClick={function() { if (adminPwInput === 'nsh-admin-2026') { setAdminAuthed(true); setAdminPwInput(''); } else { setAdminPwError(true); } }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Unlock</button>
+              </div>
+            ) : (
             <div style={{ padding: '16px 24px' }}>
               {items.length === 0
                 ? <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: 32 }}>No voting items.</div>
@@ -3081,6 +3100,7 @@ function BoardView() {
                   })()
               }
             </div>
+            )}
           </div>
         </div>
       )}
