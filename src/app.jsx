@@ -2583,6 +2583,8 @@ function BoardView() {
   const [topicSaving, setTopicSaving] = React.useState(false);
   const [attachUploading, setAttachUploading] = React.useState(false);
   const [attachFileName, setAttachFileName] = React.useState('');
+  const [showAdmin, setShowAdmin] = React.useState(false);
+  const [closingId, setClosingId] = React.useState(null);
 
   function handleAttachUpload(e) {
     var file = e.target.files[0];
@@ -2659,10 +2661,24 @@ function BoardView() {
   }
 
   function isRevealed(item) {
+    if (item.status === 'Closed') return true;
     var iv = itemVotes(item);
     var allVoted = BOARD_MEMBERS.every(function(m) { return iv.some(function(v) { return v.voter === m; }); });
     var pastDue = item.due_date && item.due_date <= new Date().toISOString().slice(0, 10);
     return allVoted || pastDue;
+  }
+
+  function closeVote(item) {
+    setClosingId(item.id);
+    sbPatchById('Board Voting Items', item.id, { status: 'Closed' }).then(function() {
+      setItems(function(prev) { return prev.map(function(i) { return i.id === item.id ? Object.assign({}, i, { status: 'Closed' }) : i; }); });
+      setClosingId(null);
+    }).catch(function() { setClosingId(null); });
+  }
+
+  function isWon(item) {
+    var t = tally(item);
+    return t.yes > t.no && t.yes > 0;
   }
 
   function tally(item) {
@@ -2748,7 +2764,13 @@ function BoardView() {
           <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Voting Topics</div>
           <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{items.length} topic{items.length !== 1 ? 's' : ''}</div>
         </div>
-        <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Topic</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={function() { setShowAdmin(true); }} style={{ background: '#fff', color: '#555', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+            Admin
+          </button>
+          <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Topic</button>
+        </div>
       </div>
 
       {items.length === 0 && <div style={{ color: '#777', fontSize: 12, textAlign: 'center', padding: 40 }}>No voting items yet.</div>}
@@ -2955,6 +2977,112 @@ function BoardView() {
           </div>
         </div>
         </>
+      )}
+
+      {showAdmin && (
+        <div onClick={function() { setShowAdmin(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '0.5px solid #f0ece6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a' }}>Vote Admin</div>
+              <button onClick={function() { setShowAdmin(false); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb' }}>×</button>
+            </div>
+            <div style={{ padding: '16px 24px' }}>
+              {items.length === 0
+                ? <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: 32 }}>No voting items.</div>
+                : (function() {
+                    var byNewest = function(a, b) { var da = a.created_at ? new Date(a.created_at).getTime() : 0; var db = b.created_at ? new Date(b.created_at).getTime() : 0; return db - da; };
+                    var openItems = items.filter(function(i) { return !isRevealed(i); }).sort(byNewest);
+                    var closedItems = items.filter(function(i) { return isRevealed(i); }).sort(byNewest);
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {openItems.length > 0 && <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 2 }}>Open</div>}
+                        {openItems.map(function(item) {
+                          var t = tally(item);
+                          var iv = itemVotes(item);
+                          var won = isWon(item);
+                          var isClosing = closingId === item.id;
+                          return (
+                            <div key={item.id} style={{ background: won ? '#f0faf0' : '#faf8f5', border: '0.5px solid ' + (won ? '#a5d6a7' : '#e8e0d5'), borderRadius: 10, padding: '14px 16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{item.title}</div>
+                                    {won && <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', padding: '2px 8px', borderRadius: 20 }}>Majority Yes</span>}
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 14, fontSize: 12, marginBottom: 8 }}>
+                                    <span style={{ color: '#2e7d32', fontWeight: 600 }}>{t.yes} Yes</span>
+                                    <span style={{ color: '#c62828', fontWeight: 600 }}>{t.no} No</span>
+                                    <span style={{ color: '#7c3aed', fontWeight: 600 }}>{t.abstain + t.absent} Abstain</span>
+                                    <span style={{ color: '#888' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                    {BOARD_MEMBERS.map(function(m) {
+                                      var mv = iv.find(function(v) { return v.voter === m; });
+                                      var vc = mv ? (VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' }) : null;
+                                      return (
+                                        <span key={m} title={mv ? m + ': ' + mv.choice : m + ': No vote'} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: vc ? vc.bg : '#f0ece6', color: vc ? vc.color : '#bbb', fontWeight: vc ? 600 : 400 }}>
+                                          {m.split(' ')[0]}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={function() { closeVote(item); }}
+                                  disabled={isClosing}
+                                  style={{ background: won ? '#2e7d32' : '#fff', color: won ? '#fff' : '#555', border: '0.5px solid ' + (won ? '#2e7d32' : '#e0d8cc'), borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0, opacity: isClosing ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                                  {isClosing ? 'Closing…' : 'Close Vote'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {closedItems.length > 0 && (
+                          <div style={{ marginTop: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 10px' }}>
+                              <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
+                              <span style={{ fontSize: 10, color: '#888', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2 }}>Closed</span>
+                              <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {closedItems.map(function(item) {
+                                var t = tally(item);
+                                var iv = itemVotes(item);
+                                var passed = isWon(item);
+                                return (
+                                  <div key={item.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '12px 16px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{item.title}</div>
+                                          {passed
+                                            ? <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', padding: '2px 8px', borderRadius: 20 }}>Passed</span>
+                                            : t.no > t.yes
+                                              ? <span style={{ fontSize: 10, fontWeight: 700, background: '#ffebee', color: '#c62828', padding: '2px 8px', borderRadius: 20 }}>Failed</span>
+                                              : <span style={{ fontSize: 10, fontWeight: 700, background: '#f5f0ea', color: '#888', padding: '2px 8px', borderRadius: 20 }}>Tied</span>
+                                          }
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 14, fontSize: 12 }}>
+                                          <span style={{ color: '#2e7d32', fontWeight: 600 }}>{t.yes} Yes</span>
+                                          <span style={{ color: '#c62828', fontWeight: 600 }}>{t.no} No</span>
+                                          <span style={{ color: '#7c3aed', fontWeight: 600 }}>{t.abstain + t.absent} Abstain</span>
+                                          <span style={{ color: '#888' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+              }
+            </div>
+          </div>
+        </div>
       )}
 
       {showAdd && (
