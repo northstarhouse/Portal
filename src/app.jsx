@@ -3152,6 +3152,260 @@ var GOAL_STATUS_COLORS = {
 var GOAL_TYPE_LABELS = { annual: 'This Year', future: 'Future Goals', three_year_vision: '3-Year Vision' };
 var CATEGORY_ORDER = ['Fund Development', 'House and Grounds Development', 'Programs and Events', 'Organizational Development'];
 
+function BoardSlidesModal({ onClose }) {
+  const { useState: useS, useEffect: useE } = React;
+  var yr = new Date().getFullYear();
+  var cq = 'Q' + Math.ceil((new Date().getMonth() + 1) / 3);
+  const [selQ, setSelQ] = useS(cq);
+  const [selYear, setSelYear] = useS(yr);
+  const [opGoals, setOpGoals] = useS([]);
+  const [opUpdates, setOpUpdates] = useS([]);
+  const [champReviews, setChampReviews] = useS([]);
+  const [boardData, setBoardData] = useS([]);
+  const [loading, setLoading] = useS(true);
+  const [editingArea, setEditingArea] = useS(null);
+  const [editForm, setEditForm] = useS({});
+  const [saving, setSaving] = useS(false);
+  const [activeArea, setActiveArea] = useS(OPERATIONAL_AREAS[0]);
+
+  function fetchAll(q, y) {
+    setLoading(true);
+    var base = SUPABASE_URL + '/rest/v1/';
+    var qs = '?quarter=eq.' + q + '&year=eq.' + y + '&select=*';
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    Promise.all([
+      fetch(base + encodeURIComponent('Op Quarter Goals') + qs, { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(base + encodeURIComponent('Op Quarterly Updates') + qs, { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(base + encodeURIComponent('Op Co-Champion Reviews') + qs, { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(base + 'board_presentation' + qs, { headers: hdrs }).then(function(r) { return r.json(); }),
+    ]).then(function(results) {
+      setOpGoals(Array.isArray(results[0]) ? results[0] : []);
+      setOpUpdates(Array.isArray(results[1]) ? results[1] : []);
+      setChampReviews(Array.isArray(results[2]) ? results[2] : []);
+      setBoardData(Array.isArray(results[3]) ? results[3] : []);
+      setLoading(false);
+    });
+  }
+
+  useE(function() { fetchAll(selQ, selYear); }, [selQ, selYear]);
+
+  function forArea(arr, area) { return arr.find(function(r) { return r.area === area; }) || {}; }
+
+  function openEdit(area) {
+    var bd = forArea(boardData, area);
+    setEditForm({ solution: bd.solution || '', further_details: bd.further_details || '', primary_focus_override: bd.primary_focus_override || '', board_notes: bd.board_notes || '' });
+    setEditingArea(area);
+  }
+
+  function saveEdit(area) {
+    setSaving(true);
+    var bd = forArea(boardData, area);
+    var method = bd.id ? 'PATCH' : 'POST';
+    var url = SUPABASE_URL + '/rest/v1/board_presentation' + (bd.id ? '?id=eq.' + bd.id : '');
+    var payload = Object.assign({ area: area, quarter: selQ, year: selYear }, editForm);
+    fetch(url, {
+      method: method,
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(res) {
+      var row = Array.isArray(res) ? res[0] : res;
+      setBoardData(function(prev) {
+        var next = prev.filter(function(r) { return r.area !== area; });
+        if (row && row.id) next.push(row);
+        return next;
+      });
+      setSaving(false);
+      setEditingArea(null);
+    }).catch(function() { setSaving(false); });
+  }
+
+  var slideCardStyle = { background: '#fff', border: '1px solid #d4c9b5', borderRadius: 4, overflow: 'hidden', marginBottom: 24, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', fontFamily: "'Calibri', 'Segoe UI', sans-serif" };
+  var slideTitleStyle = { background: '#4a3f2f', color: '#fff', padding: '12px 20px', fontSize: 18, fontWeight: 700, fontFamily: "'Georgia', serif" };
+  var slideBodyStyle = { padding: '16px 20px' };
+  var sectionLabelStyle = { fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 6 };
+  var bulletStyle = { fontSize: 13, color: '#333', marginLeft: 16, lineHeight: 1.8 };
+  var boxStyle = { border: '1px solid #888', borderRadius: 2, padding: '10px 14px', marginTop: 12, fontSize: 13, color: '#333', lineHeight: 1.7 };
+  var labelInBoxStyle = { fontWeight: 700, color: '#2a2a2a' };
+  var sidebarStyle = { background: '#4a3f2f', color: '#fff', padding: '12px 14px', borderRadius: 3, minWidth: 180, maxWidth: 200, flexShrink: 0, fontSize: 12, lineHeight: 1.6 };
+
+  function NeedsSlide(area) {
+    var u = forArea(opUpdates, area);
+    var bd = forArea(boardData, area);
+    var isEditing = editingArea === area + '_needs';
+    var challenges = (u.challenges_details || u.challenges || '').split('\n').filter(Boolean);
+    var support = (u.support_details || u.support_needed || '').split('\n').filter(Boolean);
+    var leadNotes = u.other_notes || '';
+    var solution = isEditing ? editForm.solution : (bd.solution || '');
+    var further = isEditing ? editForm.further_details : (bd.further_details || '');
+    return (
+      <div style={slideCardStyle}>
+        <div style={slideTitleStyle}>{area} Needs</div>
+        <div style={slideBodyStyle}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 14 }}>
+            <div>
+              <div style={sectionLabelStyle}>Challenges:</div>
+              {challenges.length > 0
+                ? <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>{challenges.map(function(c, i) { return <li key={i} style={bulletStyle}>• {c}</li>; })}</ul>
+                : <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>None submitted</div>}
+            </div>
+            <div>
+              <div style={sectionLabelStyle}>Support Needed:</div>
+              {support.length > 0
+                ? <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>{support.map(function(s, i) { return <li key={i} style={bulletStyle}>• {s}</li>; })}</ul>
+                : <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>None submitted</div>}
+            </div>
+          </div>
+          {leadNotes && <div style={{ marginBottom: 14 }}><span style={sectionLabelStyle}>Lead Notes: </span><span style={{ fontSize: 13, color: '#333', lineHeight: 1.7 }}>{leadNotes}</span></div>}
+          {(solution || further || isEditing) && (
+            <div style={boxStyle}>
+              {isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#555', marginBottom: 4 }}>SOLUTION</div>
+                    <textarea value={editForm.solution} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { solution: e.target.value }); }); }} style={{ width: '100%', border: '0.5px solid #d0c8bc', borderRadius: 4, padding: '6px 8px', fontSize: 13, minHeight: 60, resize: 'vertical', boxSizing: 'border-box' }} placeholder="Solution…" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#555', marginBottom: 4 }}>FURTHER DETAILS</div>
+                    <textarea value={editForm.further_details} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { further_details: e.target.value }); }); }} style={{ width: '100%', border: '0.5px solid #d0c8bc', borderRadius: 4, padding: '6px 8px', fontSize: 13, minHeight: 60, resize: 'vertical', boxSizing: 'border-box' }} placeholder="Further details…" />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  {solution && <div><span style={labelInBoxStyle}>Solution: </span>{solution}</div>}
+                  {further && <div style={{ marginTop: solution ? 8 : 0 }}><span style={labelInBoxStyle}>Further Details: </span>{further}</div>}
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            {isEditing ? (
+              <>
+                <button onClick={function() { setEditingArea(null); }} style={{ fontSize: 11, background: 'none', border: '0.5px solid #ccc', borderRadius: 5, padding: '4px 12px', cursor: 'pointer', color: '#666' }}>Cancel</button>
+                <button onClick={function() { saveEdit(area); }} disabled={saving} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 5, padding: '4px 14px', cursor: 'pointer', fontWeight: 600 }}>{saving ? 'Saving…' : 'Save'}</button>
+              </>
+            ) : (
+              <button onClick={function() { openEdit(area + '_needs'); setEditForm(function(f) { var bd = forArea(boardData, area); return { solution: bd.solution || '', further_details: bd.further_details || '', primary_focus_override: bd.primary_focus_override || '', board_notes: bd.board_notes || '' }; }); setEditingArea(area + '_needs'); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 5, padding: '4px 12px', cursor: 'pointer' }}>Edit Slide</button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function GoalsSlide(area) {
+    var g = forArea(opGoals, area);
+    var u = forArea(opUpdates, area);
+    var cr = forArea(champReviews, area);
+    var bd = forArea(boardData, area);
+    var isEditing = editingArea === area + '_goals';
+    var primaryFocus = (isEditing ? editForm.primary_focus_override : (bd.primary_focus_override || '')) || g.primary_focus || '';
+    var boardNotes = isEditing ? editForm.board_notes : (bd.board_notes || '');
+    var goals = [g.goal_1, g.goal_2, g.goal_3].filter(Boolean);
+    var statuses = [
+      { status: (u.goal_1_status || g.goal_1_status), summary: (u.goal_1_summary || g.goal_1_summary) },
+      { status: (u.goal_2_status || g.goal_2_status), summary: (u.goal_2_summary || g.goal_2_summary) },
+      { status: (u.goal_3_status || g.goal_3_status), summary: (u.goal_3_summary || g.goal_3_summary) },
+    ];
+    var stColors = { 'On Track': '#2e7d32', 'Behind': '#c07040', 'Complete': '#2e7d32', 'At Risk': '#c62828' };
+    return (
+      <div style={slideCardStyle}>
+        <div style={{ display: 'flex' }}>
+          <div style={{ flex: 1 }}>
+            <div style={slideTitleStyle}>{selQ} Goals: {area}</div>
+            <div style={slideBodyStyle}>
+              {primaryFocus && <div style={Object.assign({}, boxStyle, { marginTop: 0, marginBottom: 14 })}><span style={labelInBoxStyle}>Primary Focus: </span>{primaryFocus}</div>}
+              {goals.length === 0 && <div style={{ fontSize: 13, color: '#bbb', fontStyle: 'italic' }}>No goals submitted for this quarter.</div>}
+              {goals.map(function(goal, i) {
+                var st = statuses[i];
+                var stColor = st.status && stColors[st.status] ? stColors[st.status] : null;
+                return (
+                  <div key={i} style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 13, lineHeight: 1.6, color: '#2a2a2a' }}>
+                      <span style={{ fontWeight: 700 }}>Goal {i + 1}:</span> {goal}
+                      {st.status && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: stColor || '#888', background: '#f5f0ea', padding: '1px 7px', borderRadius: 20 }}>{st.status}</span>}
+                    </div>
+                    {st.summary && <div style={{ fontSize: 12, color: '#666', marginLeft: 16, marginTop: 2 }}>{st.summary}</div>}
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                {isEditing ? (
+                  <>
+                    <button onClick={function() { setEditingArea(null); }} style={{ fontSize: 11, background: 'none', border: '0.5px solid #ccc', borderRadius: 5, padding: '4px 12px', cursor: 'pointer', color: '#666' }}>Cancel</button>
+                    <button onClick={function() { saveEdit(area); }} disabled={saving} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 5, padding: '4px 14px', cursor: 'pointer', fontWeight: 600 }}>{saving ? 'Saving…' : 'Save'}</button>
+                  </>
+                ) : (
+                  <button onClick={function() { var bd = forArea(boardData, area); setEditForm({ solution: bd.solution || '', further_details: bd.further_details || '', primary_focus_override: bd.primary_focus_override || '', board_notes: bd.board_notes || '' }); setEditingArea(area + '_goals'); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 5, padding: '4px 12px', cursor: 'pointer' }}>Edit Slide</button>
+                )}
+              </div>
+            </div>
+          </div>
+          <div style={sidebarStyle}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '0.5px solid rgba(255,255,255,0.3)', paddingBottom: 6, marginBottom: 8 }}>Co-Champion Notes</div>
+            {cr.discussion_focus && <div style={{ marginBottom: 8 }}><span style={{ fontWeight: 700 }}>Focus: </span>{cr.discussion_focus}</div>}
+            {cr.potential_actions && <div style={{ marginBottom: 8 }}><span style={{ fontWeight: 700 }}>Actions: </span>{cr.potential_actions}</div>}
+            {!cr.discussion_focus && !cr.potential_actions && <div style={{ opacity: 0.6, fontStyle: 'italic' }}>No review yet</div>}
+            {isEditing && (
+              <div style={{ marginTop: 12, borderTop: '0.5px solid rgba(255,255,255,0.3)', paddingTop: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>PRIMARY FOCUS OVERRIDE</div>
+                <textarea value={editForm.primary_focus_override} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { primary_focus_override: e.target.value }); }); }} style={{ width: '100%', border: 'none', borderRadius: 3, padding: '5px 7px', fontSize: 11, minHeight: 50, resize: 'vertical', boxSizing: 'border-box', color: '#2a2a2a' }} placeholder="Override primary focus…" />
+                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4, marginTop: 8 }}>BOARD NOTES</div>
+                <textarea value={editForm.board_notes} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { board_notes: e.target.value }); }); }} style={{ width: '100%', border: 'none', borderRadius: 3, padding: '5px 7px', fontSize: 11, minHeight: 60, resize: 'vertical', boxSizing: 'border-box', color: '#2a2a2a' }} placeholder="Board notes…" />
+              </div>
+            )}
+            {!isEditing && boardNotes && (
+              <div style={{ marginTop: 10, borderTop: '0.5px solid rgba(255,255,255,0.3)', paddingTop: 8 }}>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>Board Notes:</div>
+                <div>{boardNotes}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div onClick={function() { onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px 12px', overflowY: 'auto' }}>
+      <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#f7f3ec', borderRadius: 10, width: '100%', maxWidth: 820, minHeight: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.22)' }}>
+        {/* Header */}
+        <div style={{ padding: '16px 24px', background: '#fff', borderBottom: '0.5px solid #e8e0d5', borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Editable Board Slides</div>
+            <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Populates from quarterly submissions + co-champion reviews</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <select value={selQ} onChange={function(e) { setSelQ(e.target.value); }} style={{ fontSize: 12, border: '0.5px solid #d0c8bc', borderRadius: 6, padding: '5px 8px', background: '#fff', color: '#2a2a2a' }}>
+              {['Q1','Q2','Q3','Q4'].map(function(q) { return <option key={q}>{q}</option>; })}
+            </select>
+            <select value={selYear} onChange={function(e) { setSelYear(Number(e.target.value)); }} style={{ fontSize: 12, border: '0.5px solid #d0c8bc', borderRadius: 6, padding: '5px 8px', background: '#fff', color: '#2a2a2a' }}>
+              {[yr-1, yr, yr+1].map(function(y) { return <option key={y}>{y}</option>; })}
+            </select>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
+          </div>
+        </div>
+        {/* Area nav */}
+        <div style={{ padding: '10px 24px', background: '#fff', borderBottom: '0.5px solid #f0ece6', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {OPERATIONAL_AREAS.map(function(a) {
+            return <button key={a} onClick={function() { setActiveArea(a); setEditingArea(null); }} style={{ fontSize: 11, fontWeight: 500, padding: '4px 12px', borderRadius: 20, border: '0.5px solid ' + (activeArea === a ? gold : '#d0c8bc'), background: activeArea === a ? gold : '#fff', color: activeArea === a ? '#fff' : '#555', cursor: 'pointer' }}>{a}</button>;
+          })}
+        </div>
+        {/* Slides */}
+        <div style={{ padding: '24px' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 60, color: '#aaa', fontSize: 13 }}>Loading…</div>
+          ) : (
+            <div>
+              {NeedsSlide(activeArea)}
+              {GoalsSlide(activeArea)}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StrategyView() {
   const { useState: useS, useEffect: useE } = React;
   var isMobile = React.useContext(MobileCtx);
@@ -3165,6 +3419,7 @@ function StrategyView() {
   const [showUpdatesFor, setShowUpdatesFor] = useS(null);
   const [slides, setSlides] = useS({});
   const [uploadingQ, setUploadingQ] = useS(null);
+  const [showBoardSlides, setShowBoardSlides] = useS(false);
 
   var SLIDE_YEAR = new Date().getFullYear();
   var SLIDE_QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'];
@@ -3262,10 +3517,17 @@ function StrategyView() {
 
   return (
     <div>
+      {showBoardSlides && <BoardSlidesModal onClose={function() { setShowBoardSlides(false); }} />}
       {!activeCat ? (
         <div>
-          <div style={{ fontSize: 13, color: '#888', marginBottom: 16, lineHeight: 1.6 }}>
-            View progress across strategic goals at a glance. Click any progress line to see more details for that focus area.
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: '#888', lineHeight: 1.6 }}>
+              View progress across strategic goals at a glance. Click any progress line to see more details for that focus area.
+            </div>
+            <button onClick={function() { setShowBoardSlides(true); }} style={{ flexShrink: 0, marginLeft: 16, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              Editable Slides
+            </button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 20 }}>
             {CATEGORY_ORDER.map(function(cat) { return CatBox(cat); })}
