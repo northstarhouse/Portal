@@ -83,7 +83,7 @@ function AppGate({ children }) {
       // Clear stale data cache from before the gate landed — pre-token requests
       // would have returned [] (RLS denial) and gotten cached as empty.
       try {
-        Object.keys(localStorage).filter(function(k) { return k.indexOf('nsh4_') === 0; }).forEach(function(k) { localStorage.removeItem(k); });
+        Object.keys(sessionStorage).filter(function(k) { return k.indexOf('nsh4_') === 0; }).forEach(function(k) { sessionStorage.removeItem(k); });
       } catch (e) {}
       setHasToken(true); setPwd(''); setBusy(false); setExpired(false);
     }).catch(function() {
@@ -123,24 +123,23 @@ function sbFetch(table, columns) {
   }).then(r => r.json());
 }
 
-var CACHE_TTL = 0; // no cache — always fetch fresh
+var CACHE_TTL = 5 * 60 * 1000; // 5 min within a session; sessionStorage clears on new visit
 var _cache = {};
 var LS_PREFIX = 'nsh4_';
 function lsGet(key) {
   try {
-    var r = localStorage.getItem(LS_PREFIX + key);
+    var r = sessionStorage.getItem(LS_PREFIX + key);
     if (!r) return null;
     var parsed = JSON.parse(r);
     if (parsed && !Array.isArray(parsed) && typeof parsed === 'object' && parsed.ts !== undefined) {
-      if (Date.now() - parsed.ts > CACHE_TTL) { localStorage.removeItem(LS_PREFIX + key); return null; }
+      if (Date.now() - parsed.ts > CACHE_TTL) { sessionStorage.removeItem(LS_PREFIX + key); return null; }
       return parsed.data;
     }
-    // legacy plain-array format — treat as expired so it gets replaced
     return null;
   } catch(e) { return null; }
 }
 function lsSet(key, data) {
-  try { localStorage.setItem(LS_PREFIX + key, JSON.stringify({ ts: Date.now(), data: data })); } catch(e) {}
+  try { sessionStorage.setItem(LS_PREFIX + key, JSON.stringify({ ts: Date.now(), data: data })); } catch(e) {}
 }
 function _cacheGet(key) {
   var entry = _cache[key];
@@ -179,10 +178,10 @@ function clearCache(table) {
   Object.keys(_cache).forEach(function(k) {
     if (k.indexOf(table + ':') === 0 || k.indexOf('/' + enc + '?') !== -1) delete _cache[k];
   });
-  Object.keys(localStorage).forEach(function(k) {
+  Object.keys(sessionStorage).forEach(function(k) {
     if (!k.startsWith(LS_PREFIX)) return;
     var inner = k.slice(LS_PREFIX.length);
-    if (inner.indexOf(table + ':') === 0 || inner.indexOf('/' + enc + '?') !== -1) localStorage.removeItem(k);
+    if (inner.indexOf(table + ':') === 0 || inner.indexOf('/' + enc + '?') !== -1) sessionStorage.removeItem(k);
   });
 }
 
