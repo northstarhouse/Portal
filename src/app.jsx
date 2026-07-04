@@ -123,7 +123,7 @@ function sbFetch(table, columns) {
   }).then(r => r.json());
 }
 
-var CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+var CACHE_TTL = 0; // no cache — always fetch fresh
 var _cache = {};
 var LS_PREFIX = 'nsh4_';
 function lsGet(key) {
