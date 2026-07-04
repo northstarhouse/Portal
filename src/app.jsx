@@ -20,10 +20,19 @@ const APP_TOKEN_KEY = 'nsh-app-token';
         headers.set('x-app-token', token);
         init.headers = headers;
       }
+      var method = (init && init.method && init.method.toUpperCase()) || 'GET';
       return origFetch(input, init).then(function(res) {
         if (res && res.status === 401) {
           try { localStorage.removeItem(APP_TOKEN_KEY); } catch (e) {}
           window.dispatchEvent(new Event('nsh:token-invalid'));
+        }
+        // After any write, clear the cache for that table so next read is fresh
+        if (res && res.ok && (method === 'PATCH' || method === 'POST' || method === 'DELETE')) {
+          var m = url.match(/\/rest\/v1\/([^?#]+)/);
+          if (m) {
+            var tableName = decodeURIComponent(m[1]);
+            window.__nshClearCache && window.__nshClearCache(tableName);
+          }
         }
         return res;
       });
@@ -184,6 +193,7 @@ function clearCache(table) {
     if (inner.indexOf(table + ':') === 0 || inner.indexOf('/' + enc + '?') !== -1) sessionStorage.removeItem(k);
   });
 }
+window.__nshClearCache = clearCache;
 
 const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthstarhouse%40gmail.com/private-06287b2ca0d9ee6acd4f49f9d4d0d2da/basic.ics";
 
