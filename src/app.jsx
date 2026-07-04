@@ -7931,12 +7931,12 @@ function VenueRentalsView() {
                     onChange={function(e) { setEditingField(function(ef) { return Object.assign({}, ef, { val: e.target.value }); }); }}
                     onKeyDown={function(e) { if (e.key === 'Enter') { handlePhotogChange(w.uid, w.title, w.date, editingField.val); setEditingField(null); } if (e.key === 'Escape') setEditingField(null); }}
                     onBlur={function() { handlePhotogChange(w.uid, w.title, w.date, editingField.val); setEditingField(null); }}
-                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, fontWeight: 600, color: '#c13584', width: 120 }} />
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, fontWeight: 600, color: '#c13584', width: 160 }} />
                 </div>
               ) : t.photographer_link ? (
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <a href={'https://instagram.com/' + t.photographer_link.replace(/^@/, '')} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#fce4f3', border: '0.5px solid #e8b4d8', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: '#c13584', textDecoration: 'none' }}>
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#fce4f3', border: '0.5px solid #e8b4d8', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: '#c13584', textDecoration: 'none', whiteSpace: 'nowrap' }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
                     {t.photographer_link.startsWith('@') ? t.photographer_link : '@' + t.photographer_link}
                   </a>
