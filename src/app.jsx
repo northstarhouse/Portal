@@ -3220,20 +3220,21 @@ function BoardSlidesModal({ onClose }) {
   }
 
   var slideCardStyle = { background: '#fff', border: '1px solid #d4c9b5', borderRadius: 4, overflow: 'hidden', marginBottom: 24, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', fontFamily: "'Calibri', 'Segoe UI', sans-serif" };
-  var slideTitleStyle = { background: '#4a3f2f', color: '#fff', padding: '12px 20px', fontSize: 18, fontWeight: 700, fontFamily: "'Georgia', serif" };
+  var slideTitleStyle = { background: gold, color: '#fff', padding: '12px 20px', fontSize: 18, fontWeight: 700, fontFamily: "'Georgia', serif" };
   var slideBodyStyle = { padding: '16px 20px' };
   var sectionLabelStyle = { fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 6 };
   var bulletStyle = { fontSize: 13, color: '#333', marginLeft: 16, lineHeight: 1.8 };
-  var boxStyle = { border: '1px solid #888', borderRadius: 2, padding: '10px 14px', marginTop: 12, fontSize: 13, color: '#333', lineHeight: 1.7 };
+  var boxStyle = { border: '1px solid #bbb', borderRadius: 2, padding: '10px 14px', marginTop: 12, fontSize: 13, color: '#333', lineHeight: 1.7 };
   var labelInBoxStyle = { fontWeight: 700, color: '#2a2a2a' };
-  var sidebarStyle = { background: '#4a3f2f', color: '#fff', padding: '12px 14px', borderRadius: 3, minWidth: 180, maxWidth: 200, flexShrink: 0, fontSize: 12, lineHeight: 1.6 };
+  var sidebarStyle = { background: gold, color: '#fff', padding: '12px 14px', borderRadius: 3, minWidth: 180, maxWidth: 200, flexShrink: 0, fontSize: 12, lineHeight: 1.6 };
 
   function NeedsSlide(area) {
     var u = forArea(opUpdates, area);
     var bd = forArea(boardData, area);
     var isEditing = editingArea === area + '_needs';
-    var challenges = (u.challenges_details || u.challenges || '').split('\n').filter(Boolean);
-    var support = (u.support_details || u.support_needed || '').split('\n').filter(Boolean);
+    var toList = function(v) { if (Array.isArray(v)) return v.filter(Boolean); if (v && typeof v === 'string') return v.split('\n').filter(Boolean); return []; };
+    var challenges = toList(u.challenges_details) .length ? toList(u.challenges_details) : toList(u.challenges);
+    var support = toList(u.support_details).length ? toList(u.support_details) : toList(u.support_needed);
     var leadNotes = u.other_notes || '';
     var solution = isEditing ? editForm.solution : (bd.solution || '');
     var further = isEditing ? editForm.further_details : (bd.further_details || '');
