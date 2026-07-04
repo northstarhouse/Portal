@@ -7801,7 +7801,7 @@ function VenueRentalsView() {
       }).map(function(e) {
         var dt = parseIcalDate(e['DTSTART'] || e['DTSTART;VALUE=DATE'] || '');
         return { uid: e.UID || (e.SUMMARY + '_' + e.DTSTART), title: e.SUMMARY || 'Untitled', date: dt };
-      }).filter(function(w) { return w.date; })
+      }).filter(function(w) { return w.date && w.date.getFullYear() >= 2026; })
         .sort(function(a, b) { return a.date - b.date; });
       setWeddings(weds);
       var map = {};
