@@ -7859,9 +7859,31 @@ function VenueRentalsView() {
     );
   }
 
+  function dismissWedding(w) {
+    var existing = tracking[w.uid];
+    var dateStr = w.date ? w.date.toISOString().slice(0, 10) : null;
+    setTracking(function(prev) { return Object.assign({}, prev, { [w.uid]: Object.assign({}, prev[w.uid] || {}, { hidden: true }) }); });
+    if (existing && existing.id) {
+      fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking?id=eq.' + existing.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hidden: true })
+      });
+    } else {
+      fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_uid: w.uid, event_title: w.title, event_date: dateStr, hidden: true })
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        if (Array.isArray(rows) && rows[0]) setTracking(function(prev) { return Object.assign({}, prev, { [w.uid]: rows[0] }); });
+      });
+    }
+  }
+
   var now = new Date();
-  var past = weddings.filter(function(w) { return w.date < now; });
-  var upcoming = weddings.filter(function(w) { return w.date >= now; });
+  var visible = weddings.filter(function(w) { return !getTrack(w.uid).hidden; });
+  var past = visible.filter(function(w) { return w.date < now; });
+  var upcoming = visible.filter(function(w) { return w.date >= now; });
 
   function WeddingCard(w) {
     var t = getTrack(w.uid);
@@ -7882,6 +7904,7 @@ function VenueRentalsView() {
               <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{w.title}</div>
               {allDone && <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', padding: '1px 8px', borderRadius: 20 }}>Complete</span>}
               {isSaving && <span style={{ fontSize: 10, color: '#bbb' }}>saving…</span>}
+              <button onClick={function() { if (window.confirm('Remove "' + w.title + '" from this list?')) dismissWedding(w); }} title="Remove duplicate" style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 16, lineHeight: 1, padding: '0 2px' }}>×</button>
             </div>
             <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>{dateStr}</div>
             <input
