@@ -243,6 +243,7 @@ var NAV_ICONS = {
   operational: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   sponsors: '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>',
   financials: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  venue: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/><path d="M9 2v4"/><path d="M15 2v4"/>',
   ideas: '<path d="M9 21h6"/><path d="M9 17.5h6"/><path d="M12 2a7 7 0 0 1 4.9 11.9l-.1.1c-.4.4-.8 1-1.1 1.5H8.3c-.3-.5-.7-1.1-1.1-1.5l-.1-.1A7 7 0 0 1 12 2z"/>',
   reviews: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
   marketing: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
@@ -266,6 +267,7 @@ const modules = [
   { id: "sponsors", label: "Sponsors" },
   { id: "board", label: "Board Voting" },
   { id: "strategy", label: "Strategic Goal Progress" },
+  { id: "venue", label: "Venue Rentals" },
   { id: "ideas", label: "Ideas & Initiatives" },
   { id: "operational", label: "Operational Areas", hidden: true },
   { id: "financials", label: "Financials", hidden: true },
@@ -7761,6 +7763,22 @@ function BirthdaysView({ navigate }) {
   );
 }
 
+function VenueRentalsView() {
+  return (
+    <div>
+      <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 6 }}>Venue Rentals</div>
+      <div style={{ fontSize: 13, color: '#aaa', marginBottom: 32 }}>Rental inquiries, bookings, and event management</div>
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb' }}>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d0c8bc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 14 }}>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        <div style={{ fontSize: 14, color: '#aaa', marginBottom: 6 }}>Venue Rentals coming soon</div>
+        <div style={{ fontSize: 12, color: '#ccc' }}>This section is under construction. Check back soon.</div>
+      </div>
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
   birthdays: BirthdaysView,
@@ -7772,6 +7790,7 @@ const views = {
   board: BoardView,
   sponsors: SponsorsView,
   strategy: StrategyView,
+  venue: VenueRentalsView,
   ideas: IdeasView,
   operational: OperationalView,
   financials: FinancialsView,
