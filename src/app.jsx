@@ -7871,7 +7871,8 @@ function VenueRentalsView() {
     var overdue = noneChecked && w.date < oneMonthAgo;
     var isSaving = savingUid === w.uid;
     var dateStr = w.date.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
-    var borderColor = allDone ? '#c8e6c9' : overdue ? '#e57373' : '#e8e0d5';
+    var anyChecked = t.pictures_done || t.blog_done || t.socials_done;
+    var borderColor = allDone ? '#c8e6c9' : anyChecked ? '#ffb74d' : overdue ? '#e57373' : '#e8e0d5';
     var bgColor = '#fff';
     return (
       <div key={w.uid} style={{ background: bgColor, border: '0.5px solid ' + borderColor, borderRadius: 10, padding: '14px 18px', transition: 'border-color 0.2s' }}>
