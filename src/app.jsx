@@ -7923,38 +7923,36 @@ function VenueRentalsView() {
             </div>
             <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>{dateStr}</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
-              {t.photographer_link ? (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <a href={'https://instagram.com/' + t.photographer_link.replace(/^@/, '')} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#fce4f3', border: '0.5px solid #e8b4d8', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: '#c13584', textDecoration: 'none' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', background: t.photographer_link ? '#fce4f3' : '#fafafa', border: '0.5px solid ' + (t.photographer_link ? '#e8b4d8' : '#e0d8d0'), borderRadius: 20, padding: '3px 10px 3px 10px', gap: 5 }}>
+                {t.photographer_link ? (
+                  <a href={'https://instagram.com/' + t.photographer_link.replace(/^@/, '')} target="_blank" rel="noopener noreferrer" title="Open Instagram" style={{ display: 'flex', alignItems: 'center', color: '#c13584', flexShrink: 0 }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
-                    {t.photographer_link.startsWith('@') ? t.photographer_link : '@' + t.photographer_link}
                   </a>
-                  <button onClick={function() { var v = window.prompt('Instagram @tag', t.photographer_link || ''); if (v !== null) handlePhotogChange(w.uid, w.title, w.date, v); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 12, padding: '0 2px', lineHeight: 1 }}>✎</button>
-                </div>
-              ) : (
-                <button onClick={function() { var v = window.prompt('Instagram @tag'); if (v) handlePhotogChange(w.uid, w.title, w.date, v); }}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: '0.5px dashed #d0c8bc', borderRadius: 20, padding: '4px 12px', fontSize: 12, color: '#bbb', cursor: 'pointer' }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
-                  @photographer
-                </button>
-              )}
-              {t.photo_album_link ? (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <a href={t.photo_album_link.startsWith('http') ? t.photo_album_link : 'https://' + t.photo_album_link} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#f5f0e8', border: '0.5px solid #d4c4a0', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: gold, textDecoration: 'none' }}>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#ccc" stroke="none"/></svg>
+                )}
+                <input
+                  value={t.photographer_link || ''}
+                  onChange={function(e) { handlePhotogChange(w.uid, w.title, w.date, e.target.value); }}
+                  placeholder="@photographer"
+                  style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, fontWeight: t.photographer_link ? 600 : 400, color: t.photographer_link ? '#c13584' : '#aaa', width: 110, minWidth: 0 }}
+                />
+              </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', background: t.photo_album_link ? '#f5f0e8' : '#fafafa', border: '0.5px solid ' + (t.photo_album_link ? '#d4c4a0' : '#e0d8d0'), borderRadius: 20, padding: '3px 10px 3px 10px', gap: 5 }}>
+                {t.photo_album_link ? (
+                  <a href={t.photo_album_link.startsWith('http') ? t.photo_album_link : 'https://' + t.photo_album_link} target="_blank" rel="noopener noreferrer" title="Open album" style={{ display: 'flex', alignItems: 'center', color: gold, flexShrink: 0 }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                    Photo Album
                   </a>
-                  <button onClick={function() { var v = window.prompt('Photo album link', t.photo_album_link || ''); if (v !== null) handleAlbumChange(w.uid, w.title, w.date, v); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 12, padding: '0 2px', lineHeight: 1 }}>✎</button>
-                </div>
-              ) : (
-                <button onClick={function() { var v = window.prompt('Photo album link (URL)'); if (v) handleAlbumChange(w.uid, w.title, w.date, v); }}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: '0.5px dashed #d0c8bc', borderRadius: 20, padding: '4px 12px', fontSize: 12, color: '#bbb', cursor: 'pointer' }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  Photo Album
-                </button>
-              )}
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                )}
+                <input
+                  value={t.photo_album_link || ''}
+                  onChange={function(e) { handleAlbumChange(w.uid, w.title, w.date, e.target.value); }}
+                  placeholder="Photo album URL"
+                  style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, fontWeight: t.photo_album_link ? 600 : 400, color: t.photo_album_link ? gold : '#aaa', width: 120, minWidth: 0 }}
+                />
+              </div>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 2 }}>
