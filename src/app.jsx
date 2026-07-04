@@ -7812,7 +7812,7 @@ function VenueRentalsView() {
   }, []);
 
   function getTrack(uid) {
-    return tracking[uid] || { pictures_done: false, blog_done: false, socials_done: false, photographer_link: '' };
+    return tracking[uid] || { pictures_done: false, blog_done: false, socials_done: false, photographer_link: '', photo_album_link: '' };
   }
 
   function saveTrack(uid, title, date, patch) {
@@ -7834,7 +7834,7 @@ function VenueRentalsView() {
       fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking', {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-        body: JSON.stringify({ event_uid: uid, event_title: title, event_date: dateStr, pictures_done: merged.pictures_done, blog_done: merged.blog_done, socials_done: merged.socials_done, photographer_link: merged.photographer_link || null })
+        body: JSON.stringify({ event_uid: uid, event_title: title, event_date: dateStr, pictures_done: merged.pictures_done, blog_done: merged.blog_done, socials_done: merged.socials_done, photographer_link: merged.photographer_link || null, photo_album_link: merged.photo_album_link || null })
       }).then(function(r) { return r.json(); }).then(function(rows) {
         if (Array.isArray(rows) && rows[0]) setTracking(function(prev) { return Object.assign({}, prev, { [uid]: rows[0] }); });
         setSavingUid(null);
@@ -7844,8 +7844,14 @@ function VenueRentalsView() {
 
   function handlePhotogChange(uid, title, date, val) {
     setTracking(function(prev) { return Object.assign({}, prev, { [uid]: Object.assign({}, prev[uid] || {}, { photographer_link: val }) }); });
-    clearTimeout(debounceTimers.current[uid]);
-    debounceTimers.current[uid] = setTimeout(function() { saveTrack(uid, title, date, { photographer_link: val || null }); }, 700);
+    clearTimeout(debounceTimers.current[uid + '_ig']);
+    debounceTimers.current[uid + '_ig'] = setTimeout(function() { saveTrack(uid, title, date, { photographer_link: val || null }); }, 700);
+  }
+
+  function handleAlbumChange(uid, title, date, val) {
+    setTracking(function(prev) { return Object.assign({}, prev, { [uid]: Object.assign({}, prev[uid] || {}, { photo_album_link: val }) }); });
+    clearTimeout(debounceTimers.current[uid + '_album']);
+    debounceTimers.current[uid + '_album'] = setTimeout(function() { saveTrack(uid, title, date, { photo_album_link: val || null }); }, 700);
   }
 
   function Checkbox({ checked, onChange, label, color }) {
@@ -7907,13 +7913,36 @@ function VenueRentalsView() {
               <button onClick={function() { if (window.confirm('Remove "' + w.title + '" from this list?')) dismissWedding(w); }} title="Remove duplicate" style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 16, lineHeight: 1, padding: '0 2px' }}>×</button>
             </div>
             <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>{dateStr}</div>
-            <input
-              type="text"
-              value={t.photographer_link || ''}
-              onChange={function(e) { handlePhotogChange(w.uid, w.title, w.date, e.target.value); }}
-              placeholder="Photographer @tag or link…"
-              style={{ fontSize: 12, border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', width: '100%', maxWidth: 280, boxSizing: 'border-box', outline: 'none', color: '#555', background: '#faf8f5' }}
-            />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: '1 1 160px', minWidth: 140 }}>
+                <input
+                  type="text"
+                  value={t.photographer_link || ''}
+                  onChange={function(e) { handlePhotogChange(w.uid, w.title, w.date, e.target.value); }}
+                  placeholder="@photographer"
+                  style={{ fontSize: 12, border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', paddingRight: t.photographer_link ? 28 : 10, width: '100%', boxSizing: 'border-box', outline: 'none', color: '#555', background: '#faf8f5' }}
+                />
+                {t.photographer_link && (
+                  <a href={'https://instagram.com/' + t.photographer_link.replace(/^@/, '')} target="_blank" rel="noopener noreferrer" title="Open Instagram" style={{ position: 'absolute', right: 7, top: '50%', transform: 'translateY(-50%)', color: '#c13584', lineHeight: 1 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+                  </a>
+                )}
+              </div>
+              <div style={{ position: 'relative', flex: '1 1 160px', minWidth: 140 }}>
+                <input
+                  type="text"
+                  value={t.photo_album_link || ''}
+                  onChange={function(e) { handleAlbumChange(w.uid, w.title, w.date, e.target.value); }}
+                  placeholder="Photo album link…"
+                  style={{ fontSize: 12, border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', paddingRight: t.photo_album_link ? 28 : 10, width: '100%', boxSizing: 'border-box', outline: 'none', color: '#555', background: '#faf8f5' }}
+                />
+                {t.photo_album_link && (
+                  <a href={t.photo_album_link.startsWith('http') ? t.photo_album_link : 'https://' + t.photo_album_link} target="_blank" rel="noopener noreferrer" title="Open album" style={{ position: 'absolute', right: 7, top: '50%', transform: 'translateY(-50%)', color: gold, lineHeight: 1 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  </a>
+                )}
+              </div>
+            </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 2 }}>
             <Checkbox checked={!!t.pictures_done} label="Pictures" color="#7c3aed"
