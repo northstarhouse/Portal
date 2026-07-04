@@ -7866,10 +7866,15 @@ function VenueRentalsView() {
   function WeddingCard(w) {
     var t = getTrack(w.uid);
     var allDone = t.pictures_done && t.blog_done && t.socials_done;
+    var noneChecked = !t.pictures_done && !t.blog_done && !t.socials_done;
+    var oneMonthAgo = new Date(now); oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    var overdue = noneChecked && w.date < oneMonthAgo;
     var isSaving = savingUid === w.uid;
     var dateStr = w.date.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+    var borderColor = allDone ? '#c8e6c9' : overdue ? '#e57373' : '#e8e0d5';
+    var bgColor = '#fff';
     return (
-      <div key={w.uid} style={{ background: '#fff', border: '0.5px solid ' + (allDone ? '#c8e6c9' : '#e8e0d5'), borderRadius: 10, padding: '14px 18px', transition: 'border-color 0.2s' }}>
+      <div key={w.uid} style={{ background: bgColor, border: '0.5px solid ' + borderColor, borderRadius: 10, padding: '14px 18px', transition: 'border-color 0.2s' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
