@@ -7764,17 +7764,168 @@ function BirthdaysView({ navigate }) {
 }
 
 function VenueRentalsView() {
+  const { useState: useS, useEffect: useE, useRef: useR } = React;
+  const [weddings, setWeddings] = useS([]);
+  const [tracking, setTracking] = useS({});
+  const [loading, setLoading] = useS(true);
+  const [calError, setCalError] = useS(null);
+  const [savingUid, setSavingUid] = useS(null);
+  const debounceTimers = useR({});
+
+  useE(function() {
+    // Fetch calendar + tracking in parallel
+    var proxy = 'https://corsproxy.io/?' + encodeURIComponent(CALENDAR_ICAL_URL);
+    var calPromise = fetch(proxy).then(function(r) { return r.text(); }).then(function(text) {
+      text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n[ \t]/g, '');
+      var events = [], current = null;
+      text.split('\n').forEach(function(line) {
+        if (line === 'BEGIN:VEVENT') { current = {}; }
+        else if (line === 'END:VEVENT') { if (current) events.push(current); current = null; }
+        else if (current) {
+          var ci = line.indexOf(':');
+          if (ci !== -1) { var k = line.slice(0, ci).split(';')[0]; current[k] = line.slice(ci + 1); }
+        }
+      });
+      return events;
+    });
+    var trackPromise = fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking?select=*&order=event_date.asc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); });
+
+    Promise.all([calPromise, trackPromise]).then(function(results) {
+      var events = results[0];
+      var trackRows = Array.isArray(results[1]) ? results[1] : [];
+      // Filter weddings — any event with "wedding" in summary
+      var weds = events.filter(function(e) {
+        return e.SUMMARY && e.SUMMARY.toLowerCase().indexOf('wedding') !== -1;
+      }).map(function(e) {
+        var dt = parseIcalDate(e['DTSTART'] || e['DTSTART;VALUE=DATE'] || '');
+        return { uid: e.UID || (e.SUMMARY + '_' + e.DTSTART), title: e.SUMMARY || 'Untitled', date: dt };
+      }).filter(function(w) { return w.date; })
+        .sort(function(a, b) { return a.date - b.date; });
+      setWeddings(weds);
+      var map = {};
+      trackRows.forEach(function(r) { map[r.event_uid] = r; });
+      setTracking(map);
+      setLoading(false);
+    }).catch(function(err) { setCalError(err.message); setLoading(false); });
+  }, []);
+
+  function getTrack(uid) {
+    return tracking[uid] || { pictures_done: false, blog_done: false, socials_done: false, photographer_link: '' };
+  }
+
+  function saveTrack(uid, title, date, patch) {
+    var existing = tracking[uid];
+    var merged = Object.assign({}, getTrack(uid), patch);
+    setTracking(function(prev) { return Object.assign({}, prev, { [uid]: Object.assign({}, prev[uid] || {}, patch) }); });
+    setSavingUid(uid);
+    var dateStr = date ? date.toISOString().slice(0, 10) : null;
+    if (existing && existing.id) {
+      fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking?id=eq.' + existing.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify(patch)
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        if (Array.isArray(rows) && rows[0]) setTracking(function(prev) { return Object.assign({}, prev, { [uid]: rows[0] }); });
+        setSavingUid(null);
+      }).catch(function() { setSavingUid(null); });
+    } else {
+      fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ event_uid: uid, event_title: title, event_date: dateStr, pictures_done: merged.pictures_done, blog_done: merged.blog_done, socials_done: merged.socials_done, photographer_link: merged.photographer_link || null })
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        if (Array.isArray(rows) && rows[0]) setTracking(function(prev) { return Object.assign({}, prev, { [uid]: rows[0] }); });
+        setSavingUid(null);
+      }).catch(function() { setSavingUid(null); });
+    }
+  }
+
+  function handlePhotogChange(uid, title, date, val) {
+    setTracking(function(prev) { return Object.assign({}, prev, { [uid]: Object.assign({}, prev[uid] || {}, { photographer_link: val }) }); });
+    clearTimeout(debounceTimers.current[uid]);
+    debounceTimers.current[uid] = setTimeout(function() { saveTrack(uid, title, date, { photographer_link: val || null }); }, 700);
+  }
+
+  function Checkbox({ checked, onChange, label, color }) {
+    return (
+      <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none' }}>
+        <div onClick={onChange} style={{ width: 18, height: 18, borderRadius: 4, border: '1.5px solid ' + (checked ? color : '#d0c8bc'), background: checked ? color : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s', cursor: 'pointer' }}>
+          {checked && <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="2 6 5 9 10 3"/></svg>}
+        </div>
+        <span style={{ fontSize: 12, color: checked ? color : '#999', fontWeight: checked ? 600 : 400 }}>{label}</span>
+      </label>
+    );
+  }
+
+  var now = new Date();
+  var past = weddings.filter(function(w) { return w.date < now; });
+  var upcoming = weddings.filter(function(w) { return w.date >= now; });
+
+  function WeddingCard(w) {
+    var t = getTrack(w.uid);
+    var allDone = t.pictures_done && t.blog_done && t.socials_done;
+    var isSaving = savingUid === w.uid;
+    var dateStr = w.date.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+    return (
+      <div key={w.uid} style={{ background: '#fff', border: '0.5px solid ' + (allDone ? '#c8e6c9' : '#e8e0d5'), borderRadius: 10, padding: '14px 18px', transition: 'border-color 0.2s' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{w.title}</div>
+              {allDone && <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', padding: '1px 8px', borderRadius: 20 }}>Complete</span>}
+              {isSaving && <span style={{ fontSize: 10, color: '#bbb' }}>saving…</span>}
+            </div>
+            <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>{dateStr}</div>
+            <input
+              type="text"
+              value={t.photographer_link || ''}
+              onChange={function(e) { handlePhotogChange(w.uid, w.title, w.date, e.target.value); }}
+              placeholder="Photographer @tag or link…"
+              style={{ fontSize: 12, border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', width: '100%', maxWidth: 280, boxSizing: 'border-box', outline: 'none', color: '#555', background: '#faf8f5' }}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 2 }}>
+            <Checkbox checked={!!t.pictures_done} label="Pictures" color="#7c3aed"
+              onChange={function() { saveTrack(w.uid, w.title, w.date, { pictures_done: !t.pictures_done }); }} />
+            <Checkbox checked={!!t.blog_done} label="Blog" color={gold}
+              onChange={function() { saveTrack(w.uid, w.title, w.date, { blog_done: !t.blog_done }); }} />
+            <Checkbox checked={!!t.socials_done} label="Socials" color="#e91e8c"
+              onChange={function() { saveTrack(w.uid, w.title, w.date, { socials_done: !t.socials_done }); }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 6 }}>Venue Rentals</div>
-      <div style={{ fontSize: 13, color: '#aaa', marginBottom: 32 }}>Rental inquiries, bookings, and event management</div>
-      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb' }}>
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d0c8bc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 14 }}>
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-        </svg>
-        <div style={{ fontSize: 14, color: '#aaa', marginBottom: 6 }}>Venue Rentals coming soon</div>
-        <div style={{ fontSize: 12, color: '#ccc' }}>This section is under construction. Check back soon.</div>
-      </div>
+      <div style={{ fontSize: 13, color: '#aaa', marginBottom: 24 }}>Wedding tracking and post-event checklist</div>
+
+      {loading && <div style={{ color: '#aaa', fontSize: 13, padding: 40, textAlign: 'center' }}>Loading calendar…</div>}
+      {calError && <div style={{ color: '#c62828', fontSize: 12, background: '#ffebee', borderRadius: 8, padding: 16 }}>Could not load calendar: {calError}</div>}
+
+      {!loading && !calError && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {upcoming.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', marginBottom: 10 }}>Upcoming Weddings ({upcoming.length})</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{upcoming.map(WeddingCard)}</div>
+            </div>
+          )}
+          {past.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', marginBottom: 10 }}>Past Weddings ({past.length})</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{past.sort(function(a,b){return b.date-a.date;}).map(WeddingCard)}</div>
+            </div>
+          )}
+          {weddings.length === 0 && (
+            <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>No weddings found in the calendar.</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
