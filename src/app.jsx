@@ -2,6 +2,7 @@
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
+const WIX_FORMS_URL = "https://script.google.com/macros/s/AKfycbzY3c6_xF2ucrZrQnZLa1bcU2TIcFadBH9UEeIbJYMKumvxygql8ulN-67q1Vu_WM4h/exec";
 
 const APP_TOKEN_KEY = 'nsh-app-token';
 
@@ -7275,6 +7276,7 @@ function AdminToolCard(props) {
 
 function AdminView({ navigate }) {
   var emailIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/><polyline points="2,18 8,13"/><polyline points="22,18 16,13"/></svg>;
+  var checkIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Tools</div>
@@ -7290,6 +7292,15 @@ function AdminView({ navigate }) {
         >
           <span style={{ color: '#b5a185', flexShrink: 0 }}>{emailIcon}</span>
           Volunteer Email Lists
+        </div>
+        <div
+          onClick={function() { navigate('wix-forms'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{checkIcon}</span>
+          Form Submissions
         </div>
       </div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Outreach</div>
@@ -7637,6 +7648,221 @@ function VolEmailListsView({ navigate }) {
             )}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Form Submissions — auto-populated from Wix, notes + handled checkmarks ── */
+function WixFormsView({ navigate }) {
+  const { useState: useS, useEffect: useE, useRef: useR } = React;
+  const [data, setData] = useS(null); // { submissions: [...] } | null while loading
+  const [selected, setSelected] = useS(null);
+  const [activeForm, setActiveForm] = useS(null);
+  const [notesDraft, setNotesDraft] = useS('');
+  const [notesSaving, setNotesSaving] = useS(false);
+  const [handlingId, setHandlingId] = useS(null);
+  const cacheKey = 'wixforms:v1';
+
+  useE(function() {
+    var cancelled = false;
+    var cached = lsGet(cacheKey);
+    if (cached) setData({ submissions: cached });
+
+    fetch(WIX_FORMS_URL).then(function(r) { return r.json(); }).then(function(json) {
+      var rawForms = (json.forms && json.forms.submissions) || [];
+      var ids = rawForms.map(function(s) { return s.id; });
+      var overridesPromise = ids.length > 0
+        ? fetch(SUPABASE_URL + '/rest/v1/data_wix_forms?select=id,internal_notes,status&id=in.(' + ids.map(encodeURIComponent).join(',') + ')', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); })
+        : Promise.resolve([]);
+      return overridesPromise.then(function(overrides) {
+        var overrideMap = {};
+        (Array.isArray(overrides) ? overrides : []).forEach(function(row) { overrideMap[row.id] = row; });
+        var merged = rawForms.map(function(sub) {
+          var ov = overrideMap[sub.id];
+          return Object.assign({}, sub, {
+            internal_notes: ov && ov.internal_notes != null ? ov.internal_notes : (sub.internal_notes || null),
+            status: ov && ov.status != null ? ov.status : sub.status,
+          });
+        });
+        if (cancelled) return;
+        setData({ submissions: merged });
+        lsSet(cacheKey, merged);
+      });
+    }).catch(function() {
+      if (!cancelled && !cached) setData({ submissions: [] });
+    });
+
+    return function() { cancelled = true; };
+  }, []);
+
+  useE(function() { setNotesDraft(selected ? (selected.internal_notes || '') : ''); }, [selected]);
+
+  var rows = (data && data.submissions ? data.submissions : []).filter(function(r) { return (r.form_name || '').trim().toLowerCase() !== 'other form'; });
+  var formNames = Array.from(new Set(rows.map(function(r) { return r.form_name; }))).sort();
+  var grouped = formNames.map(function(name) { return { name: name, items: rows.filter(function(r) { return r.form_name === name; }) }; });
+  var activeFormName = activeForm && formNames.indexOf(activeForm) !== -1 ? activeForm : (formNames[0] || null);
+  var activeGroup = grouped.filter(function(g) { return g.name === activeFormName; })[0] || null;
+
+  function fmtTs(ts) { return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+
+  function upsertOverride(sub, patch) {
+    return fetch(SUPABASE_URL + '/rest/v1/data_wix_forms', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(Object.assign({
+        id: sub.id, form_id: sub.form_id, form_name: (sub.form_name || '').trim(),
+        status: sub.status || '', created_at: sub.created_at, fields: sub.fields,
+        internal_notes: sub.internal_notes || null,
+      }, patch))
+    });
+  }
+
+  function saveNotes() {
+    if (!selected) return;
+    setNotesSaving(true);
+    var noteValue = notesDraft.trim() || null;
+    upsertOverride(selected, { internal_notes: noteValue }).then(function(r) {
+      if (r.ok) {
+        setSelected(function(prev) { return prev ? Object.assign({}, prev, { internal_notes: noteValue }) : prev; });
+        setData(function(prev) { return prev ? { submissions: prev.submissions.map(function(s) { return s.id === selected.id ? Object.assign({}, s, { internal_notes: noteValue }) : s; }) } : prev; });
+      }
+    }).finally(function() { setNotesSaving(false); });
+  }
+
+  function toggleHandled(sub) {
+    if (handlingId === sub.id) return;
+    setHandlingId(sub.id);
+    var newStatus = sub.status === 'handled' ? '' : 'handled';
+    upsertOverride(sub, { status: newStatus }).then(function(r) {
+      if (r.ok) {
+        setData(function(prev) { return prev ? { submissions: prev.submissions.map(function(s) { return s.id === sub.id ? Object.assign({}, s, { status: newStatus }) : s; }) } : prev; });
+        setSelected(function(prev) { return prev && prev.id === sub.id ? Object.assign({}, prev, { status: newStatus }) : prev; });
+      }
+    }).finally(function() { setHandlingId(null); });
+  }
+
+  var notesInputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', outline: 'none', background: '#fff', resize: 'none' };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Form Submissions</div>
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Live from Wix · check off once handled, add internal notes</div>
+        </div>
+      </div>
+
+      {data === null ? (
+        <div style={{ textAlign: 'center', padding: 48, color: '#aaa', fontSize: 13 }}>Loading…</div>
+      ) : rows.length === 0 ? (
+        <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>No form submissions found.</div>
+      ) : (
+        <React.Fragment>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10, marginBottom: 16 }}>
+            {grouped.map(function(g) {
+              var isActive = g.name === activeFormName;
+              var latest = g.items[0];
+              return (
+                <button key={g.name} onClick={function() { setActiveForm(g.name); setSelected(null); }}
+                  style={{ textAlign: 'left', background: isActive ? '#fdf8ee' : '#fff', border: isActive ? '0.5px solid #dcc9a0' : '0.5px solid #e0d8cc', borderRadius: 10, padding: 14, cursor: 'pointer' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: isActive ? gold : '#aaa', marginBottom: 6 }}>Wix Form</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', lineHeight: 1.3 }}>{g.name}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 8 }}>{g.items.length}</div>
+                  <div style={{ fontSize: 11, color: '#aaa' }}>submission{g.items.length !== 1 ? 's' : ''}</div>
+                  <div style={{ fontSize: 10, color: '#ccc', marginTop: 6 }}>{latest ? 'Latest: ' + fmtTs(latest.created_at) : 'No submissions yet'}</div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {activeGroup && (
+                <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ padding: '12px 16px', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gold, marginBottom: 2 }}>Selected Form</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{activeGroup.name}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      {activeGroup.items.filter(function(s) { return s.status === 'handled'; }).length > 0 && (
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#2e7d32' }}>{activeGroup.items.filter(function(s) { return s.status === 'handled'; }).length} handled</div>
+                      )}
+                      <div style={{ fontSize: 11, color: '#aaa' }}>{activeGroup.items.length} submission{activeGroup.items.length !== 1 ? 's' : ''}</div>
+                    </div>
+                  </div>
+                  <div>
+                    {activeGroup.items.map(function(sub, i) {
+                      var fields = sub.fields || {};
+                      var first = fields['First Name'] || '';
+                      var last = fields['Last Name'] || '';
+                      var email = fields['Email'] || fields['Email Address'] || '';
+                      var preview = [first, last].filter(Boolean).join(' ') || email || (Object.values(fields).filter(Boolean)[0]) || '';
+                      var isHandled = sub.status === 'handled';
+                      return (
+                        <div key={sub.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: i < activeGroup.items.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
+                          <input type="checkbox" title="Mark as handled" checked={isHandled} disabled={handlingId === sub.id}
+                            onChange={function() { toggleHandled(sub); }}
+                            style={{ marginTop: 3, width: 15, height: 15, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0, opacity: handlingId === sub.id ? 0.5 : 1 }} />
+                          <button onClick={function() { setSelected(function(prev) { return prev && prev.id === sub.id ? null : sub; }); }}
+                            style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                              <div style={{ minWidth: 0 }}>
+                                {sub.internal_notes && <div style={{ fontSize: 11, color: '#8a6d3b', background: '#fdf3d9', borderRadius: 6, padding: '3px 8px', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.internal_notes}</div>}
+                                {preview && <div style={{ fontSize: 13, color: isHandled ? '#aaa' : '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preview}</div>}
+                                {email && email !== preview && <div style={{ fontSize: 11, color: '#aaa', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</div>}
+                              </div>
+                              <div style={{ fontSize: 11, color: '#bbb', flexShrink: 0, whiteSpace: 'nowrap' }}>{fmtTs(sub.created_at)}</div>
+                            </div>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: '#ccc' }}>{rows.length} submission{rows.length !== 1 ? 's' : ''} across {formNames.length} form{formNames.length !== 1 ? 's' : ''}</div>
+            </div>
+
+            {selected && (
+              <div style={{ width: 340, flexShrink: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 20, position: 'sticky', top: 16, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                  <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 16 }}>✕</button>
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gold, marginBottom: 3 }}>{selected.form_name}</div>
+                  <div style={{ fontSize: 11, color: '#aaa' }}>{fmtTs(selected.created_at)}</div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Internal Notes</label>
+                  <textarea rows={4} value={notesDraft} onChange={function(e) { setNotesDraft(e.target.value); }} disabled={notesSaving}
+                    placeholder="Add internal notes for this submission" style={notesInputStyle} />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <button onClick={saveNotes} disabled={notesSaving} style={{ padding: '7px 16px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: notesSaving ? 'not-allowed' : 'pointer', opacity: notesSaving ? 0.6 : 1 }}>
+                      {notesSaving ? 'Saving…' : 'Save Notes'}
+                    </button>
+                  </div>
+                </div>
+                {Object.keys(selected.fields || {}).length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {Object.entries(selected.fields).map(function(entry) {
+                      return (
+                        <div key={entry[0]}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>{entry[0]}</div>
+                          <div style={{ fontSize: 13, color: '#2a2a2a', whiteSpace: 'pre-wrap' }}>{entry[1]}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: '#ccc', fontStyle: 'italic' }}>No field data captured.</div>
+                )}
+              </div>
+            )}
+          </div>
+        </React.Fragment>
       )}
     </div>
   );
@@ -8039,6 +8265,7 @@ const views = {
   'quarter-workspace': QuarterWorkspaceView,
   admin: AdminView,
   'vol-email-lists': VolEmailListsView,
+  'wix-forms': WixFormsView,
 };
 
 var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];
