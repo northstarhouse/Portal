@@ -4118,8 +4118,11 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [earningsForm, setEarningsForm] = useState(emptyEarningsForm);
   var [earningsSaving, setEarningsSaving] = useState(false);
   var today = new Date().toISOString().slice(0, 10);
-  var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' });
+  var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '', purchased_by: '', event_name: '' });
   var [budgetSaving, setBudgetSaving] = useState(false);
+  var [editingBudgetId, setEditingBudgetId] = useState(null);
+  var [editBudgetForm, setEditBudgetForm] = useState(null);
+  var [editBudgetSaving, setEditBudgetSaving] = useState(false);
   var [uploadingId, setUploadingId] = useState(null);
   var fileInputRef = React.useRef(null);
   var [budgetReceiptFiles, setBudgetReceiptFiles] = useState([]);
@@ -4284,7 +4287,8 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     e.preventDefault();
     setBudgetSaving(true);
     var files = budgetReceiptFiles;
-    var payload = { area: area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null };
+    var payload = { area: area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null, purchased_by: budgetForm.purchased_by || null };
+    if (area === 'Events') payload.event_name = budgetForm.event_name || null;
     if (budgetForm.needs_reimbursement) { payload.needs_reimbursement = true; payload.volunteer_name = budgetForm.volunteer_name || null; }
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
       method: 'POST',
@@ -4298,7 +4302,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         clearCache('Op Budget');
         setBudgetSaving(false);
         setBudget(function(prev) { return [finalRow].concat(prev); });
-        setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' });
+        setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '', purchased_by: '', event_name: '' });
         setReimburseVolQuery('');
         setBudgetReceiptFiles([]);
         if (budgetReceiptRef.current) budgetReceiptRef.current.value = '';
@@ -4323,6 +4327,35 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       clearCache('Op Budget');
       setBudget(function(prev) { return prev.filter(function(b) { return b.id !== id; }); });
     });
+  }
+
+  function startEditBudget(b) {
+    setEditingBudgetId(b.id);
+    setEditBudgetForm({ type: b.type || 'Purchase', description: b.description || '', amount: b.amount != null ? String(b.amount) : '', date: b.date || today, needs_reimbursement: !!b.needs_reimbursement, volunteer_name: b.volunteer_name || '', purchased_by: b.purchased_by || '', event_name: b.event_name || '' });
+  }
+
+  function cancelEditBudget() {
+    setEditingBudgetId(null);
+    setEditBudgetForm(null);
+  }
+
+  function saveEditBudget() {
+    if (!editBudgetForm) return;
+    setEditBudgetSaving(true);
+    var patch = { type: editBudgetForm.type, description: editBudgetForm.description, amount: parseFloat(editBudgetForm.amount) || 0, date: editBudgetForm.date || null, purchased_by: editBudgetForm.purchased_by || null, needs_reimbursement: !!editBudgetForm.needs_reimbursement, volunteer_name: editBudgetForm.needs_reimbursement ? (editBudgetForm.volunteer_name || null) : null };
+    if (area === 'Events') patch.event_name = editBudgetForm.event_name || null;
+    var id = editingBudgetId;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }
+    , body: JSON.stringify(patch)
+    }).then(function() {
+      clearCache('Op Budget');
+      setBudget(function(prev) { return prev.map(function(b) { return b.id === id ? Object.assign({}, b, patch) : b; }); });
+      setEditingBudgetId(null);
+      setEditBudgetForm(null);
+      setEditBudgetSaving(false);
+    }).catch(function() { setEditBudgetSaving(false); });
   }
 
   function todoNowTime() { var n = new Date(); return n.toTimeString().slice(0, 5); }
@@ -4864,6 +4897,16 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                   <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Description</div>
                   <input value={budgetForm.description} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="What was purchased or donated..." />
                 </div>
+                {area === 'Events' && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Event Name</div>
+                    <input value={budgetForm.event_name} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="Which event was this for..." />
+                  </div>
+                )}
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Purchased By</div>
+                  <input value={budgetForm.purchased_by} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { purchased_by: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="Who made this purchase..." />
+                </div>
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Receipts (optional)</div>
                   <div
@@ -4935,11 +4978,51 @@ function OperationalView({ opArea, navigateToQuarterly }) {
             {budget.length === 0 ? (
               <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No entries yet.</div>
             ) : budget.map(function(b) {
-              var isUploading = uploadingId === b.id;
+              if (editingBudgetId === b.id && editBudgetForm) {
+                return (
+                  <div key={b.id} style={{ padding: '12px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                      <select value={editBudgetForm.type} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { type: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, background: '#fff' }}>
+                        <option>Purchase</option>
+                        <option>In-Kind</option>
+                      </select>
+                      <input type="number" step="0.01" min="0" value={editBudgetForm.amount} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12 }} placeholder="Amount" />
+                    </div>
+                    <input value={editBudgetForm.description} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} placeholder="Description" />
+                    {area === 'Events' && (
+                      <input value={editBudgetForm.event_name} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} placeholder="Event name" />
+                    )}
+                    <input value={editBudgetForm.purchased_by} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { purchased_by: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} placeholder="Purchased by" />
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                      <input type="date" value={editBudgetForm.date} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12 }} />
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={editBudgetForm.needs_reimbursement} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { needs_reimbursement: e.target.checked }); }); }} style={{ width: 14, height: 14, accentColor: gold, cursor: 'pointer' }} />
+                        Needs reimbursement
+                      </label>
+                    </div>
+                    {editBudgetForm.needs_reimbursement && (
+                      <input value={editBudgetForm.volunteer_name} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} placeholder="Reimburse to" />
+                    )}
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <button onClick={cancelEditBudget} style={{ fontSize: 12, background: 'none', border: '0.5px solid #ccc', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', color: '#666' }}>Cancel</button>
+                      <button onClick={saveEditBudget} disabled={editBudgetSaving} style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 14px', cursor: 'pointer', fontWeight: 600, opacity: editBudgetSaving ? 0.7 : 1 }}>{editBudgetSaving ? 'Saving…' : 'Save'}</button>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
                   <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, fontWeight: 500, background: b.type === 'Purchase' ? '#fef0e6' : '#eaf3ea', color: b.type === 'Purchase' ? '#c07040' : '#5a8a5a', flexShrink: 0 }}>{b.type}</span>
-                  <span style={{ flex: 1, fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</span>
+                  <span style={{ flex: 1, fontSize: 13, color: '#2a2a2a', minWidth: 0 }}>
+                    {b.description || '—'}
+                    {(b.event_name || b.purchased_by) && (
+                      <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>
+                        {b.event_name && <span>{b.event_name}</span>}
+                        {b.event_name && b.purchased_by && <span> · </span>}
+                        {b.purchased_by && <span>Purchased by {b.purchased_by}</span>}
+                      </div>
+                    )}
+                  </span>
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</span>
                   <span style={{ fontSize: 11, color: '#bbb', flexShrink: 0 }}>{b.date}</span>
                   {b.needs_reimbursement && <span title="Needs reimbursement" style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 10, fontWeight: 600, flexShrink: 0 }}>$ Reimburse</span>}
@@ -4954,6 +5037,9 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                     );
                     return <button onClick={function() { setUploadingId(b.id); fileInputRef.current.click(); }} disabled={isLoading} title="Attach receipt" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px 4px', flexShrink: 0, opacity: isLoading ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>{isLoading ? <span style={{ fontSize: 11 }}>…</span> : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>}</button>;
                   })()}
+                  <button onClick={function() { startEditBudget(b); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px 4px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
                   <button onClick={function() { deleteBudgetItem(b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                 </div>
               );
