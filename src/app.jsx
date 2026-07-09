@@ -1950,6 +1950,9 @@ function DonorsView() {
   const [addGiftForm, setAddGiftForm] = useState(emptyGiftForm);
   const [addingGift, setAddingGift] = useState(false);
   const [addForm, setAddForm] = useState(emptyAddForm);
+  const [addMode, setAddMode] = useState('search');
+  const [addSearchQuery, setAddSearchQuery] = useState('');
+  const [addExistingDonor, setAddExistingDonor] = useState(null);
 
   var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
   var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
@@ -2091,6 +2094,20 @@ function DonorsView() {
       }).catch(function(){setAddingGift(false);});
   }
 
+  function submitGiftForExisting(e){
+    e.preventDefault();
+    if(!addExistingDonor)return;
+    setSaving(true);
+    fetch(SUPABASE_URL+'/rest/v1/donations',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},
+      body:JSON.stringify({donor_id:addExistingDonor.id,amount:parseFloat(String(addGiftForm.amount||0).replace(/[^\d.]/g,'')||0),date:addGiftForm.date,type:addGiftForm.type,payment_type:addGiftForm.payment_type||null,acknowledged:!!addGiftForm.acknowledged,donation_notes:addGiftForm.donation_notes||null})})
+      .then(function(r){return r.json();}).then(function(rows){
+        setSaving(false);
+        var newDon=Array.isArray(rows)?rows[0]:rows;
+        updateDonorInState(addExistingDonor.id,function(d){return{donations:d.donations.concat([newDon])};});
+        setShowAdd(false);setAddGiftForm(emptyGiftForm);setAddExistingDonor(null);setAddMode('search');setAddSearchQuery('');
+      }).catch(function(){setSaving(false);});
+  }
+
   function handleAddSubmit(e){
     e.preventDefault();setSaving(true);
     fetch(SUPABASE_URL+'/rest/v1/donors?formal_name=ilike.'+encodeURIComponent(addForm.formal_name)+'&limit=1&select=id',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}})
@@ -2116,7 +2133,7 @@ function DonorsView() {
           if(exists){return prev.map(function(x){if(x.id!==d.id)return x;return buildDonor(Object.assign({},x),x.donations.concat([don]));});}
           return [newDonorObj].concat(prev);
         });
-        setShowAdd(false);setAddForm(emptyAddForm);
+        setShowAdd(false);setAddForm(emptyAddForm);setAddMode('search');setAddSearchQuery('');
       }).catch(function(){setSaving(false);});
   }
 
@@ -2172,7 +2189,7 @@ function DonorsView() {
         <div style={{display:'flex',alignItems:'center',gap:8,marginLeft:'auto'}}>
           <span style={{fontSize:11,color:'#aaa'}}>{filteredDonors.length} donor{filteredDonors.length!==1?'s':''}</span>
           <button onClick={exportCSV} style={{padding:'7px 14px',background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>↓ Export CSV</button>
-          <button onClick={function(){setAddForm(emptyAddForm);setShowAdd(true);}} style={{padding:'7px 14px',background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>+ Add Donation</button>
+          <button onClick={function(){setAddForm(emptyAddForm);setAddGiftForm(emptyGiftForm);setAddExistingDonor(null);setAddSearchQuery('');setAddMode('search');setShowAdd(true);}} style={{padding:'7px 14px',background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>+ Add Donation</button>
         </div>
       </div>
 
@@ -2423,42 +2440,113 @@ function DonorsView() {
       {showAdd && (
         <div onClick={function(){setShowAdd(false);}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.32)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:20}}>
           <div onClick={function(e){e.stopPropagation();}} style={{background:'#fff',borderRadius:16,padding:28,maxWidth:640,width:'100%',boxShadow:'0 8px 40px rgba(0,0,0,0.18)',maxHeight:'90vh',overflowY:'auto'}}>
-            <div style={{fontSize:17,fontWeight:600,color:'#2a2a2a',marginBottom:20}}>Add Donation</div>
-            <form onSubmit={handleAddSubmit}>
-              <span style={{...sec,marginTop:0}}>Donor</span>
-              <div style={{marginBottom:14}}><label style={lStyle}>Formal Name *</label><input required value={addForm.formal_name} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{formal_name:e.target.value});});}} style={iStyle} placeholder="e.g. Mr. and Mrs. John Smith" /></div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Informal First Name</label><input value={addForm.informal_first_name} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{informal_first_name:e.target.value});});}} style={iStyle} placeholder="e.g. John" /></div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Account Type</label>
-                <select value={addForm.account_type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{account_type:e.target.value});});}} style={iStyle}>
-                  {ACCOUNT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
-                </select>
-              </div>
-              <span style={sec}>Contact</span>
-              <div style={{marginBottom:14}}><label style={lStyle}>Email</label><input type="email" value={addForm.email} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{email:e.target.value});});}} style={iStyle} /></div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Phone</label><input value={addForm.phone} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{phone:e.target.value});});}} style={iStyle} /></div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Address</label><textarea value={addForm.address} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{address:e.target.value});});}} rows={3} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
-              <span style={sec}>Donation</span>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
-                <div><label style={lStyle}>Amount *</label><input required value={addForm.amount} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
-                <div><label style={lStyle}>Date</label><input type="date" value={addForm.date} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
-              </div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Donation Type</label>
-                <select value={addForm.type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
-                  {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
-                </select>
-              </div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Payment Type</label>
-                <select value={addForm.payment_type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{payment_type:e.target.value});});}} style={iStyle}>
-                  {PAYMENT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
-                </select>
-              </div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Donation Notes</label><textarea value={addForm.donation_notes} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{donation_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
-              <div style={{marginBottom:14}}><label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,cursor:'pointer'}}><input type="checkbox" checked={addForm.acknowledged} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{acknowledged:e.target.checked});});}} /> Acknowledged / Thanked</label></div>
-              <div style={{display:'flex',gap:10}}>
-                <button type="submit" disabled={saving} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer',opacity:saving?0.7:1}}>{saving?'Saving...':'Add Donation'}</button>
-                <button type="button" onClick={function(){setShowAdd(false);}} style={{flex:1,padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer',fontWeight:500}}>Cancel</button>
-              </div>
-            </form>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:20}}>
+              {addMode!=='search' && (
+                <button onClick={function(){setAddMode('search');setAddExistingDonor(null);}} style={{background:'none',border:'none',fontSize:16,cursor:'pointer',color:'#aaa',padding:0}}>←</button>
+              )}
+              <div style={{fontSize:17,fontWeight:600,color:'#2a2a2a',flex:1}}>{addMode==='existing'?'Gift for '+(addExistingDonor&&addExistingDonor.formal_name):addMode==='new'?'New Donor':'Add Donation'}</div>
+              <button onClick={function(){setShowAdd(false);}} style={{background:'none',border:'none',fontSize:18,cursor:'pointer',color:'#bbb'}}>×</button>
+            </div>
+
+            {addMode==='search' && (function(){
+              var q=addSearchQuery.trim();
+              var results=q?donors.filter(function(d){var s=q.toLowerCase();return (d.formal_name||'').toLowerCase().includes(s)||(d.informal_first_name||'').toLowerCase().includes(s)||(d.email||'').toLowerCase().includes(s);}).slice(0,8):[];
+              return (
+                <div>
+                  <label style={lStyle}>Search for an existing donor</label>
+                  <input autoFocus value={addSearchQuery} onChange={function(e){setAddSearchQuery(e.target.value);}} placeholder="Type a name…" style={Object.assign({},iStyle,{marginTop:4})} />
+                  {q && (
+                    <div style={{marginTop:6,border:'0.5px solid #e0d8cc',borderRadius:8,overflow:'hidden',maxHeight:220,overflowY:'auto'}}>
+                      {results.length===0 ? (
+                        <div style={{padding:'10px 12px',fontSize:12,color:'#bbb'}}>No matches found</div>
+                      ) : results.map(function(d){
+                        return (
+                          <div key={d.id} onClick={function(){setAddExistingDonor(d);setAddGiftForm(emptyGiftForm);setAddMode('existing');}}
+                            style={{padding:'9px 12px',cursor:'pointer',borderBottom:'0.5px solid #f5f0ea',background:'#fff'}}
+                            onMouseEnter={function(e){e.currentTarget.style.background='#faf8f4';}}
+                            onMouseLeave={function(e){e.currentTarget.style.background='#fff';}}>
+                            <div style={{fontSize:13,fontWeight:500,color:'#2a2a2a'}}>{d.formal_name}</div>
+                            {(d.informal_first_name||d.email) && <div style={{fontSize:11,color:'#aaa',marginTop:1}}>{[d.informal_first_name,d.email].filter(Boolean).join(' · ')}</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div style={{display:'flex',alignItems:'center',gap:10,margin:'18px 0'}}>
+                    <div style={{flex:1,height:1,background:'#f0ece6'}} />
+                    <span style={{fontSize:11,color:'#bbb'}}>or</span>
+                    <div style={{flex:1,height:1,background:'#f0ece6'}} />
+                  </div>
+                  <button type="button" onClick={function(){setAddForm(emptyAddForm);setAddMode('new');}} style={{width:'100%',padding:'10px',border:'1px dashed #e0d8cc',borderRadius:8,fontSize:13,color:'#999',background:'none',cursor:'pointer'}}>+ Create new donor profile</button>
+                </div>
+              );
+            })()}
+
+            {addMode==='existing' && (
+              <form onSubmit={submitGiftForExisting}>
+                <span style={{...sec,marginTop:0}}>Gift Details</span>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+                  <div><label style={lStyle}>Amount *</label><input required value={addGiftForm.amount} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
+                  <div><label style={lStyle}>Date *</label><input required type="date" value={addGiftForm.date} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+                  <div><label style={lStyle}>Donation Type</label>
+                    <select value={addGiftForm.type} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
+                      {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                    </select>
+                  </div>
+                  <div><label style={lStyle}>Payment Type</label>
+                    <select value={addGiftForm.payment_type} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{payment_type:e.target.value});});}} style={iStyle}>
+                      {PAYMENT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                    </select>
+                  </div>
+                </div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Donation Notes</label><textarea value={addGiftForm.donation_notes} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{donation_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                <div style={{marginBottom:14}}><label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,cursor:'pointer'}}><input type="checkbox" checked={addGiftForm.acknowledged} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{acknowledged:e.target.checked});});}} /> Acknowledged / Thanked</label></div>
+                <div style={{display:'flex',gap:10}}>
+                  <button type="submit" disabled={saving} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer',opacity:saving?0.7:1}}>{saving?'Saving...':'Add Gift'}</button>
+                  <button type="button" onClick={function(){setShowAdd(false);}} style={{flex:1,padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer',fontWeight:500}}>Cancel</button>
+                </div>
+              </form>
+            )}
+
+            {addMode==='new' && (
+              <form onSubmit={handleAddSubmit}>
+                <span style={{...sec,marginTop:0}}>Donor</span>
+                <div style={{marginBottom:14}}><label style={lStyle}>Formal Name *</label><input required value={addForm.formal_name} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{formal_name:e.target.value});});}} style={iStyle} placeholder="e.g. Mr. and Mrs. John Smith" /></div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Informal First Name</label><input value={addForm.informal_first_name} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{informal_first_name:e.target.value});});}} style={iStyle} placeholder="e.g. John" /></div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Account Type</label>
+                  <select value={addForm.account_type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{account_type:e.target.value});});}} style={iStyle}>
+                    {ACCOUNT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                  </select>
+                </div>
+                <span style={sec}>Contact</span>
+                <div style={{marginBottom:14}}><label style={lStyle}>Email</label><input type="email" value={addForm.email} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{email:e.target.value});});}} style={iStyle} /></div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Phone</label><input value={addForm.phone} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{phone:e.target.value});});}} style={iStyle} /></div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Address</label><textarea value={addForm.address} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{address:e.target.value});});}} rows={3} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                <span style={sec}>Donation</span>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+                  <div><label style={lStyle}>Amount *</label><input required value={addForm.amount} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
+                  <div><label style={lStyle}>Date</label><input type="date" value={addForm.date} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
+                </div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Donation Type</label>
+                  <select value={addForm.type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
+                    {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                  </select>
+                </div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Payment Type</label>
+                  <select value={addForm.payment_type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{payment_type:e.target.value});});}} style={iStyle}>
+                    {PAYMENT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                  </select>
+                </div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Donation Notes</label><textarea value={addForm.donation_notes} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{donation_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                <div style={{marginBottom:14}}><label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,cursor:'pointer'}}><input type="checkbox" checked={addForm.acknowledged} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{acknowledged:e.target.checked});});}} /> Acknowledged / Thanked</label></div>
+                <div style={{display:'flex',gap:10}}>
+                  <button type="submit" disabled={saving} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer',opacity:saving?0.7:1}}>{saving?'Saving...':'Add Donation'}</button>
+                  <button type="button" onClick={function(){setShowAdd(false);}} style={{flex:1,padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer',fontWeight:500}}>Cancel</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
