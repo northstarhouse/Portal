@@ -3313,12 +3313,7 @@ function BoardSlidesModal({ onClose }) {
     var isEditing = editingArea === area + '_goals';
     var primaryFocus = (isEditing ? editForm.primary_focus_override : (bd.primary_focus_override || '')) || g.primary_focus || '';
     var boardNotes = isEditing ? editForm.board_notes : (bd.board_notes || '');
-    var goals = [g.goal_1, g.goal_2, g.goal_3].filter(Boolean);
-    var statuses = [
-      { status: (u.goal_1_status || g.goal_1_status), summary: (u.goal_1_summary || g.goal_1_summary) },
-      { status: (u.goal_2_status || g.goal_2_status), summary: (u.goal_2_summary || g.goal_2_summary) },
-      { status: (u.goal_3_status || g.goal_3_status), summary: (u.goal_3_summary || g.goal_3_summary) },
-    ];
+    var goals = goalEntries(g, u);
     var stColors = { 'On Track': '#2e7d32', 'Behind': '#c07040', 'Complete': '#2e7d32', 'At Risk': '#c62828' };
     return (
       <div style={slideCardStyle}>
@@ -3328,16 +3323,15 @@ function BoardSlidesModal({ onClose }) {
             <div style={slideBodyStyle}>
               {primaryFocus && <div style={Object.assign({}, boxStyle, { marginTop: 0, marginBottom: 14 })}><span style={labelInBoxStyle}>Primary Focus: </span>{primaryFocus}</div>}
               {goals.length === 0 && <div style={{ fontSize: 13, color: '#bbb', fontStyle: 'italic' }}>No goals submitted for this quarter.</div>}
-              {goals.map(function(goal, i) {
-                var st = statuses[i];
-                var stColor = st.status && stColors[st.status] ? stColors[st.status] : null;
+              {goals.map(function(entry, i) {
+                var stColor = entry.status && stColors[entry.status] ? stColors[entry.status] : null;
                 return (
                   <div key={i} style={{ marginBottom: 10 }}>
                     <div style={{ fontSize: 13, lineHeight: 1.6, color: '#2a2a2a' }}>
-                      <span style={{ fontWeight: 700 }}>Goal {i + 1}:</span> {goal}
-                      {st.status && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: stColor || '#888', background: '#f5f0ea', padding: '1px 7px', borderRadius: 20 }}>{st.status}</span>}
+                      <span style={{ fontWeight: 700 }}>Goal {i + 1}:</span> {entry.text}
+                      {entry.status && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: stColor || '#888', background: '#f5f0ea', padding: '1px 7px', borderRadius: 20 }}>{entry.status}</span>}
                     </div>
-                    {st.summary && <div style={{ fontSize: 12, color: '#666', marginLeft: 16, marginTop: 2 }}>{st.summary}</div>}
+                    {entry.summary && <div style={{ fontSize: 12, color: '#666', marginLeft: 16, marginTop: 2 }}>{entry.summary}</div>}
                   </div>
                 );
               })}
@@ -3703,6 +3697,24 @@ function nextUpcomingDue() {
   return candidates.find(function(c) { return c.date >= now; }) || candidates[0];
 }
 function nextQ(q, yr) { return q === 'Q1' ? {q:'Q2',yr:yr} : q === 'Q2' ? {q:'Q3',yr:yr} : q === 'Q3' ? {q:'Q4',yr:yr} : {q:'Q1',yr:yr+1}; }
+// Builds the full list of goals (fixed goal_1..3 plus any extra_goals) for a quarter, merging in-progress update fields (u) over the stored goal-row fields (g).
+function goalEntries(g, u) {
+  g = g || {}; u = u || {};
+  var out = [];
+  ['1','2','3'].forEach(function(n) {
+    var text = g['goal_' + n];
+    if (!text) return;
+    out.push({ text: text, status: u['goal_' + n + '_status'] || g['goal_' + n + '_status'], summary: u['goal_' + n + '_summary'] || g['goal_' + n + '_summary'] });
+  });
+  var extra = Array.isArray(g.extra_goals) ? g.extra_goals : [];
+  extra.forEach(function(text, i) {
+    if (!text) return;
+    var status = (Array.isArray(u.extra_goals_status) && u.extra_goals_status[i]) || (Array.isArray(g.extra_goals_status) && g.extra_goals_status[i]);
+    var summary = (Array.isArray(u.extra_goals_summary) && u.extra_goals_summary[i]) || (Array.isArray(g.extra_goals_summary) && g.extra_goals_summary[i]);
+    out.push({ text: text, status: status, summary: summary, extraIndex: i });
+  });
+  return out;
+}
 
 function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
   var { useState, useEffect } = React;
@@ -3713,7 +3725,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
   var [quarter, setQuarter] = useState(cq);
   var [year, setYear] = useState(cy);
   var [currentGoals, setCurrentGoals] = useState(null);
-  var emptyForm = { what_went_well: '', goal_1_status: 'On Track', goal_1_summary: '', goal_2_status: 'On Track', goal_2_summary: '', goal_3_status: 'On Track', goal_3_summary: '', challenges: [], challenges_details: '', support_needed: [], support_details: '', other_notes: '', next_focus: '', goal_1: '', goal_2: '', goal_3: '' };
+  var emptyForm = { what_went_well: '', goal_1_status: 'On Track', goal_1_summary: '', goal_2_status: 'On Track', goal_2_summary: '', goal_3_status: 'On Track', goal_3_summary: '', challenges: [], challenges_details: '', support_needed: [], support_details: '', other_notes: '', next_focus: '', goal_1: '', goal_2: '', goal_3: '', extra_goals: [], extra_goals_status: [], extra_goals_summary: [] };
   var [form, setForm] = useState(emptyForm);
   var [saving, setSaving] = useState(false);
   var [saved, setSaved] = useState(false);
@@ -3746,6 +3758,9 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
             goal_1: r.goal_1 || '',
             goal_2: r.goal_2 || '',
             goal_3: r.goal_3 || '',
+            extra_goals: r.extra_goals || [],
+            extra_goals_status: r.extra_goals_status || [],
+            extra_goals_summary: r.extra_goals_summary || [],
           });
         });
       }
@@ -3765,7 +3780,9 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
             goal_2_status: rows[0].goal_2_status || 'On Track',
             goal_2_summary: rows[0].goal_2_summary || '',
             goal_3_status: rows[0].goal_3_status || 'On Track',
-            goal_3_summary: rows[0].goal_3_summary || ''
+            goal_3_summary: rows[0].goal_3_summary || '',
+            extra_goals_status: rows[0].extra_goals_status || [],
+            extra_goals_summary: rows[0].extra_goals_summary || []
           });
         });
       }
@@ -3781,15 +3798,32 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
     });
   }
 
+  function setArrayAt(field, i, val) {
+    setForm(function(f) {
+      var arr = f[field].slice();
+      arr[i] = val;
+      var patch = {}; patch[field] = arr;
+      return Object.assign({}, f, patch);
+    });
+  }
+
+  function addExtraGoal() {
+    setForm(function(f) { return Object.assign({}, f, { extra_goals: f.extra_goals.concat(['']) }); });
+  }
+
+  function removeExtraGoal(i) {
+    setForm(function(f) { return Object.assign({}, f, { extra_goals: f.extra_goals.filter(function(_, idx) { return idx !== i; }) }); });
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
     var nq = nextQ(quarter, year);
-    var payload = { area: area, quarter: quarter, year: year, date_submitted: new Date().toISOString().slice(0,10), successes: form.what_went_well, goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary, challenges: form.challenges, challenges_details: form.challenges_details, support_needed: form.support_needed, support_details: form.support_details, other_notes: form.other_notes, next_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3 };
+    var payload = { area: area, quarter: quarter, year: year, date_submitted: new Date().toISOString().slice(0,10), successes: form.what_went_well, goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary, extra_goals_status: form.extra_goals_status, extra_goals_summary: form.extra_goals_summary, challenges: form.challenges, challenges_details: form.challenges_details, support_needed: form.support_needed, support_details: form.support_details, other_notes: form.other_notes, next_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3, extra_goals: form.extra_goals };
     var currentGoalsUpdate = currentGoals ? fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?id=eq.' + currentGoals.id, {
       method: 'PATCH',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary })
+      body: JSON.stringify({ goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary, extra_goals_status: form.extra_goals_status, extra_goals_summary: form.extra_goals_summary })
     }) : Promise.resolve();
     var reflectionFetch = existingReflection
       ? fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?id=eq.' + existingReflection.id, {
@@ -3803,7 +3837,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
           body: JSON.stringify(payload)
         });
     reflectionFetch.then(function(r) { return r.status === 204 ? null : r.json(); }).then(function() {
-      var goalsPayload = { area: area, quarter: nq.q, year: nq.yr, primary_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3 };
+      var goalsPayload = { area: area, quarter: nq.q, year: nq.yr, primary_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3, extra_goals: form.extra_goals.filter(Boolean) };
       var headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
       var nextGoalsSave = fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(nq.q) + '&year=eq.' + nq.yr, { headers: headers })
         .then(function(r) { return r.json(); })
@@ -3948,6 +3982,29 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
           ) : (
             <div style={{ fontSize: 13, color: '#bbb', fontStyle: 'italic' }}>Select an area and quarter to update goal statuses.</div>
           )}
+          {currentGoals && Array.isArray(currentGoals.extra_goals) && currentGoals.extra_goals.map(function(goalText, i) {
+            if (!goalText) return null;
+            var statusColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
+            var st = form.extra_goals_status[i] || 'On Track';
+            var sc = statusColors[st] || statusColors['On Track'];
+            return (
+              <div key={'extra_' + i} style={{ borderTop: '0.5px solid #f0ece6', paddingTop: 14, marginTop: 14 }}>
+                <div style={{ fontSize: 14, color: '#2a2a2a', fontWeight: 500, marginBottom: 8 }}>{4 + i}. {goalText}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 10 }}>
+                  <div>
+                    <label style={lbl}>Status</label>
+                    <select value={st} onChange={function(e) { setArrayAt('extra_goals_status', i, e.target.value); }} style={Object.assign({}, inpStyle, { background: sc.bg, color: sc.color, fontWeight: 600 })}>
+                      <option>On Track</option><option>Behind</option><option>At Risk</option><option>Complete</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={lbl}>Progress Summary</label>
+                    <input value={form.extra_goals_summary[i] || ''} onChange={function(e) { setArrayAt('extra_goals_summary', i, e.target.value); }} style={inpStyle} placeholder="Brief update on this goal..." />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div style={card}>
@@ -4020,6 +4077,18 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
               </div>
             );
           })}
+          {form.extra_goals.map(function(text, i) {
+            return (
+              <div key={'extra_' + i} style={grp}>
+                <label style={lbl}>{4 + i}.</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input value={text} onChange={function(e) { setArrayAt('extra_goals', i, e.target.value); }} style={inpStyle} placeholder={'Goal ' + (4 + i) + '...'} />
+                  <button type="button" onClick={function() { removeExtraGoal(i); }} style={{ background: 'none', border: '0.5px solid #ddd', color: '#aaa', borderRadius: 6, padding: '9px 12px', fontSize: 13, cursor: 'pointer', flexShrink: 0 }}>Remove</button>
+                </div>
+              </div>
+            );
+          })}
+          <button type="button" onClick={addExtraGoal} style={{ background: 'none', border: '1px dashed ' + gold, color: gold, borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>+ Add a goal</button>
         </div>
 
         <button type="submit" disabled={saving || !area} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '12px 32px', fontSize: 14, fontWeight: 600, cursor: saving || !area ? 'not-allowed' : 'pointer', opacity: (saving || !area) ? 0.6 : 1, width: '100%', marginBottom: 8 }}>
@@ -4492,7 +4561,6 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         {/* Goals card — full card flip */}
         {(function() {
           var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
-          var goalRows = [['goal_1','goal_1_status','goal_1_summary'],['goal_2','goal_2_status','goal_2_summary'],['goal_3','goal_3_status','goal_3_summary']];
           var frontCard = (
             <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -4511,18 +4579,16 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 <div>
                   {quarterGoals.primary_focus && <div style={{ marginBottom: 12 }}><span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Primary Focus</span><div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginTop: 3, lineHeight: 1.5 }}>{quarterGoals.primary_focus}</div></div>}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {goalRows.map(function(keys, i) {
-                      var g = quarterGoals[keys[0]]; if (!g) return null;
-                      var st = quarterGoals[keys[1]];
-                      var sc = st && stColors[st] ? stColors[st] : null;
+                    {goalEntries(quarterGoals).map(function(entry, i) {
+                      var sc = entry.status && stColors[entry.status] ? stColors[entry.status] : null;
                       return (
                         <div key={i} style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 12px', border: '0.5px solid #e8e0d5' }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                             <div>
                               <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Goal {i+1}</span>
-                              <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 2, lineHeight: 1.5 }}>{g}</div>
+                              <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 2, lineHeight: 1.5 }}>{entry.text}</div>
                             </div>
-                            {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: sc.bg, color: sc.color, flexShrink: 0 }}>{st}</span>}
+                            {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: sc.bg, color: sc.color, flexShrink: 0 }}>{entry.status}</span>}
                           </div>
                         </div>
                       );
@@ -4556,19 +4622,16 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                     <div>
                       <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Goal Progress</span>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
-                        {goalRows.map(function(keys, i) {
-                          var g = quarterGoals[keys[0]]; if (!g) return null;
-                          var st = (quarterUpdate && quarterUpdate[keys[1]]) || quarterGoals[keys[1]];
-                          var sm = (quarterUpdate && quarterUpdate[keys[2]]) || quarterGoals[keys[2]];
-                          var sc = st && stColors[st] ? stColors[st] : null;
+                        {goalEntries(quarterGoals, quarterUpdate).map(function(entry, i) {
+                          var sc = entry.status && stColors[entry.status] ? stColors[entry.status] : null;
                           return (
                             <div key={i} style={{ background: sc ? sc.bg : '#faf8f5', borderRadius: 8, padding: '8px 12px', border: '0.5px solid ' + (sc ? sc.color + '33' : '#e8e0d5') }}>
                               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                                 <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Goal {i+1} — <span style={{ color: '#555', fontWeight: 600 }}>{g}</span></div>
-                                  {sm && <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5, marginTop: 3 }}>{sm}</div>}
+                                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Goal {i+1} — <span style={{ color: '#555', fontWeight: 600 }}>{entry.text}</span></div>
+                                  {entry.summary && <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5, marginTop: 3 }}>{entry.summary}</div>}
                                 </div>
-                                {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: '#fff', color: sc.color, flexShrink: 0 }}>{st}</span>}
+                                {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: '#fff', color: sc.color, flexShrink: 0 }}>{entry.status}</span>}
                               </div>
                             </div>
                           );
@@ -5759,21 +5822,18 @@ function QuarterWorkspaceView({ navigate }) {
             <div style={{ marginBottom: 14 }}>
               <div style={secHd}>Quarterly Goals</div>
               {g.primary_focus && <div style={{ marginBottom: 6 }}><div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>Primary Focus</div><div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{g.primary_focus}</div></div>}
-              {['1','2','3'].map(function(n) {
-                if (!g['goal_' + n]) return null;
-                var st = (u && u['goal_' + n + '_status']) || g['goal_' + n + '_status'];
-                var sm = (u && u['goal_' + n + '_summary']) || g['goal_' + n + '_summary'];
+              {goalEntries(g, u).map(function(entry, idx) {
                 var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
-                var sc = st && stColors[st] ? stColors[st] : null;
+                var sc = entry.status && stColors[entry.status] ? stColors[entry.status] : null;
                 return (
-                  <div key={n} style={{ marginBottom: 6, background: sc ? sc.bg : '#faf8f5', borderRadius: 7, padding: '7px 10px', border: '0.5px solid ' + (sc ? sc.color + '33' : '#e8e0d5') }}>
+                  <div key={idx} style={{ marginBottom: 6, background: sc ? sc.bg : '#faf8f5', borderRadius: 7, padding: '7px 10px', border: '0.5px solid ' + (sc ? sc.color + '33' : '#e8e0d5') }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 10, color: '#999', marginBottom: 2 }}>Goal {n}</div>
-                        <div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{g['goal_' + n]}</div>
-                        {sm && <div style={{ fontSize: 11, color: '#555', lineHeight: 1.5, marginTop: 3 }}>{sm}</div>}
+                        <div style={{ fontSize: 10, color: '#999', marginBottom: 2 }}>Goal {idx + 1}</div>
+                        <div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{entry.text}</div>
+                        {entry.summary && <div style={{ fontSize: 11, color: '#555', lineHeight: 1.5, marginTop: 3 }}>{entry.summary}</div>}
                       </div>
-                      {sc && <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: '#fff', color: sc.color, flexShrink: 0, whiteSpace: 'nowrap' }}>{st}</span>}
+                      {sc && <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: '#fff', color: sc.color, flexShrink: 0, whiteSpace: 'nowrap' }}>{entry.status}</span>}
                     </div>
                   </div>
                 );
@@ -5958,15 +6018,12 @@ function ReviewsView({ navigate }) {
         if (g.primary_focus || !u) {
           html += label('Primary Focus') + field(g.primary_focus, 1);
         }
-        ['1','2','3'].forEach(function(n) {
-          var gval = g['goal_' + n];
-          var st = g['goal_' + n + '_status'];
-          var sm = g['goal_' + n + '_summary'];
-          html += label('Goal ' + n);
-          html += '<div style="margin-bottom:4px">' + field(gval, 1) + '</div>';
+        goalEntries(g, u).forEach(function(entry, i) {
+          html += label('Goal ' + (i + 1));
+          html += '<div style="margin-bottom:4px">' + field(entry.text, 1) + '</div>';
           html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
-          html += '<div>' + label('Status') + field(st, 1) + '</div>';
-          html += '<div>' + label('Summary') + field(sm, 1) + '</div>';
+          html += '<div>' + label('Status') + field(entry.status, 1) + '</div>';
+          html += '<div>' + label('Summary') + field(entry.summary, 1) + '</div>';
           html += '</div>';
         });
 
@@ -5995,13 +6052,15 @@ function ReviewsView({ navigate }) {
 
         // Next Quarter Goals
         html += '<div style="font-size:14px;font-weight:700;color:#2a2a2a;margin-bottom:2px">Next Quarter Goals (' + nqLabel + ')</div>';
-        if (ng.primary_focus || ng.goal_1 || ng.goal_2 || ng.goal_3) {
+        var ngExtra = Array.isArray(ng.extra_goals) ? ng.extra_goals.filter(Boolean) : [];
+        if (ng.primary_focus || ng.goal_1 || ng.goal_2 || ng.goal_3 || ngExtra.length) {
           if (ng.primary_focus) html += label('Primary Focus') + field(ng.primary_focus, 1);
           ['1','2','3'].forEach(function(n) {
             var gval = ng['goal_' + n];
             if (gval) { html += label('Goal ' + n) + field(gval, 1); }
             else { html += label('Goal ' + n) + field(null, 1); }
           });
+          ngExtra.forEach(function(gval, i) { html += label('Goal ' + (4 + i)) + field(gval, 1); });
         } else {
           html += '<div style="font-size:12px;color:#aaa;font-style:italic;margin-bottom:8px">No goals submitted yet for ' + nqLabel + '.</div>';
           html += label('Primary Focus') + field(null, 1);
