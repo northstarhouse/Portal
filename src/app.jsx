@@ -4188,6 +4188,89 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
   );
 }
 
+function EventsProfitLossModal({ onClose }) {
+  var { useState, useEffect } = React;
+  var [loading, setLoading] = useState(true);
+  var [rows, setRows] = useState([]);
+
+  useEffect(function() {
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?area=eq.Events&select=*', { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?area=eq.Events&select=*', { headers: hdrs }).then(function(r) { return r.json(); })
+    ]).then(function(res) {
+      var budgetRows = Array.isArray(res[0]) ? res[0] : [];
+      var earningsRows = Array.isArray(res[1]) ? res[1] : [];
+      var byEvent = {};
+      function bucket(name) {
+        var key = (name || '').trim() || 'Uncategorized';
+        if (!byEvent[key]) byEvent[key] = { event: key, earnings: 0, costs: 0 };
+        return byEvent[key];
+      }
+      earningsRows.forEach(function(e) { bucket(e.event).earnings += parseFloat(e.amount) || 0; });
+      budgetRows.forEach(function(b) { if (b.type === 'Purchase' || b.type === 'In-Kind') bucket(b.event_name).costs += parseFloat(b.amount) || 0; });
+      var list = Object.keys(byEvent).map(function(k) { var r = byEvent[k]; return Object.assign({}, r, { net: r.earnings - r.costs }); });
+      list.sort(function(a, b) { return b.net - a.net; });
+      setRows(list);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }, []);
+
+  function fmt(n) { return '$' + Math.round(n || 0).toLocaleString('en-US'); }
+  var totalEarnings = rows.reduce(function(s, r) { return s + r.earnings; }, 0);
+  var totalCosts = rows.reduce(function(s, r) { return s + r.costs; }, 0);
+  var totalNet = totalEarnings - totalCosts;
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+      <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 600, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Events — Profit / Loss</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>×</button>
+        </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 30, color: '#aaa', fontSize: 13 }}>Loading…</div>
+        ) : rows.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 30, color: '#bbb', fontSize: 13 }}>No earnings or expenses recorded yet.</div>
+        ) : (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
+              <div style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Earnings</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#5a8a5a', marginTop: 4 }}>{fmt(totalEarnings)}</div>
+              </div>
+              <div style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Costs</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#c07040', marginTop: 4 }}>{fmt(totalCosts)}</div>
+              </div>
+              <div style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Net</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: totalNet >= 0 ? '#2e7d32' : '#c62828', marginTop: 4 }}>{totalNet >= 0 ? '' : '-'}{fmt(Math.abs(totalNet))}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, padding: '0 0 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, borderBottom: '0.5px solid #f0ece6' }}>
+              <span style={{ flex: 1 }}>Event</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Earnings</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Costs</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Net</span>
+            </div>
+            {rows.map(function(r) {
+              return (
+                <div key={r.event} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{r.event}</span>
+                  <span style={{ fontSize: 12, color: '#5a8a5a', width: 90, textAlign: 'right' }}>{fmt(r.earnings)}</span>
+                  <span style={{ fontSize: 12, color: '#c07040', width: 90, textAlign: 'right' }}>-{fmt(r.costs)}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, width: 90, textAlign: 'right', color: r.net >= 0 ? '#2e7d32' : '#c62828' }}>{r.net >= 0 ? '' : '-'}{fmt(Math.abs(r.net))}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OperationalView({ opArea, navigateToQuarterly }) {
   var { useState, useEffect } = React;
   var isMobile = React.useContext(MobileCtx);
@@ -4201,6 +4284,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [editLead, setEditLead] = useState(false);
   var [leadInput, setLeadInput] = useState('');
   var [showEarnings, setShowEarnings] = useState(false);
+  var [showPnl, setShowPnl] = useState(false);
   var [earnings, setEarnings] = useState([]);
   var emptyEarningsForm = { event: '', earning_source: '', amount: '', notes: '', date: today };
   var [earningsForm, setEarningsForm] = useState(emptyEarningsForm);
@@ -4804,7 +4888,16 @@ function OperationalView({ opArea, navigateToQuarterly }) {
               <button onClick={function() { setTodoInputTime(todoNowTime()); setShowTodo(true); loadTodo(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: gold, padding: '0 2px', lineHeight: 1, opacity: 0.7 }}>★</button>
             )}
           </div>
-          {resources.length === 0
+          {area === 'Events' && (
+            <div onClick={function() { setShowPnl(true); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 6, background: '#faf8f5', borderRadius: 8, border: '0.5px solid #e8e0d5', cursor: 'pointer' }}
+              onMouseEnter={function(e) { e.currentTarget.style.background = '#f5f0e8'; }}
+              onMouseLeave={function(e) { e.currentTarget.style.background = '#faf8f5'; }}>
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+              <span style={{ fontSize: 13, fontWeight: 500, color: gold, flex: 1 }}>Profit / Loss by Event</span>
+              <span style={{ fontSize: 11, color: '#aaa' }}>Earnings vs. costs</span>
+            </div>
+          )}
+          {resources.length === 0 && area !== 'Events'
             ? <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic', marginBottom: 12 }}>No resources added yet.</div>
             : resources.map(function(r) {
                 return (
@@ -5201,6 +5294,8 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           </div>
         </div>
       )}
+
+      {showPnl && <EventsProfitLossModal onClose={function() { setShowPnl(false); }} />}
 
       {showVols && (
         <div onClick={function() { setShowVols(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
@@ -6518,6 +6613,7 @@ function FinancialsView() {
   var [resourceUrl, setResourceUrl] = useState('');
   var [resourceSaving, setResourceSaving] = useState(false);
   var resourceFileRef = useRef(null);
+  var [showPnl, setShowPnl] = useState(false);
 
 
   function loadReimbursements() {
@@ -6620,6 +6716,10 @@ function FinancialsView() {
 
   return (
     <div>
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+      <button onClick={function() { setShowPnl(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Events Profit / Loss</button>
+    </div>
+    {showPnl && <EventsProfitLossModal onClose={function() { setShowPnl(false); }} />}
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
 
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
