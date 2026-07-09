@@ -4590,6 +4590,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     });
   }
 
+  var eventNameOptions = area === 'Events' ? Array.from(new Set(budget.concat(earnings).map(function(b) { return (b.event_name || b.event || '').trim(); }).filter(Boolean))).sort() : [];
   var totalPurchases = budget.filter(function(b) { return b.type === 'Purchase'; }).reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
   var totalInKind = budget.filter(function(b) { return b.type === 'In-Kind'; }).reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
   var totalSpent = totalPurchases + totalInKind;
@@ -4601,6 +4602,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
 
   return (
     <div>
+      {area === 'Events' && <datalist id="event-name-options">{eventNameOptions.map(function(n) { return <option key={n} value={n} />; })}</datalist>}
       <div style={{ background: '#fff', borderRadius: 12, padding: '14px 20px', border: '0.5px solid #e8e0d5', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
           <div>
@@ -4988,7 +4990,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 {area === 'Events' && (
                   <div style={{ marginBottom: 10 }}>
                     <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Event Name</div>
-                    <input value={budgetForm.event_name} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="Which event was this for..." />
+                    <input value={budgetForm.event_name} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} list="event-name-options" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="Which event was this for..." />
                   </div>
                 )}
                 <div style={{ marginBottom: 10 }}>
@@ -5078,7 +5080,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                     </div>
                     <input value={editBudgetForm.description} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} placeholder="Description" />
                     {area === 'Events' && (
-                      <input value={editBudgetForm.event_name} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} placeholder="Event name" />
+                      <input value={editBudgetForm.event_name} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} list="event-name-options" style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} placeholder="Event name" />
                     )}
                     <input value={editBudgetForm.purchased_by} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { purchased_by: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} placeholder="Purchased by" />
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
@@ -5154,7 +5156,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                   <div>
                     <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Event</div>
-                    <input value={earningsForm.event} onChange={function(e) { setEarningsForm(function(f) { return Object.assign({}, f, { event: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="e.g. Spring Gala" />
+                    <input value={earningsForm.event} onChange={function(e) { setEarningsForm(function(f) { return Object.assign({}, f, { event: e.target.value }); }); }} list="event-name-options" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="e.g. Spring Gala" />
                   </div>
                   <div>
                     <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Earning Source</div>
