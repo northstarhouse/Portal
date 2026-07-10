@@ -1053,6 +1053,7 @@ function VolunteersView() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filterTeam, setFilterTeam] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [tab, setTab] = useState('active');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboarding, setOnboarding] = useState([]);
@@ -1334,6 +1335,13 @@ function VolunteersView() {
     : tabList.filter(function(v) {
         return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(filterTeam) !== -1;
       });
+  if (searchQuery.trim()) {
+    var sq = searchQuery.trim().toLowerCase();
+    filtered = filtered.filter(function(v) {
+      var name = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).toLowerCase();
+      return name.includes(sq) || (v['Email'] || '').toLowerCase().includes(sq) || (v['Phone Number'] || '').toLowerCase().includes(sq) || (v['Team'] || '').toLowerCase().includes(sq);
+    });
+  }
 
   function fmtBirthday(val) {
     if (!val) return '';
@@ -1500,6 +1508,20 @@ function VolunteersView() {
         <button onClick={function() { setForm(emptyForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Volunteer</button>
       </div>
 
+      <div style={{ position: 'relative', marginBottom: 16 }}>
+        <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#aaa', fontSize: 12, pointerEvents: 'none' }}>🔍</span>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={function(e) { setSearchQuery(e.target.value); }}
+          placeholder="Search volunteers by name, email, phone, or team..."
+          style={{ width: '100%', padding: '8px 12px 8px 30px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff', boxSizing: 'border-box' }}
+        />
+        {searchQuery && (
+          <button onClick={function() { setSearchQuery(''); }} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#bbb', fontSize: 15, cursor: 'pointer', padding: 4, lineHeight: 1 }}>×</button>
+        )}
+      </div>
+
       {!loading && teamSet.length > 2 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
           {teamSet.map(function(t) {
@@ -1530,6 +1552,8 @@ function VolunteersView() {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#777', fontSize: 12 }}>Loading volunteers...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#bbb', fontSize: 13, fontStyle: 'italic' }}>No volunteers match your search.</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 14 }}>
           {filtered.map(function(v, i) {
@@ -1556,7 +1580,7 @@ function VolunteersView() {
       )}
 
       {selected && !editing && (
-        <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setSelected(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 18, maxWidth: 620, width: '100%', boxShadow: '0 12px 48px rgba(0,0,0,0.22)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
 
             {/* Header band */}
@@ -1852,7 +1876,7 @@ function VolunteersView() {
         var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 3 };
         var grp = { marginBottom: 12 };
         return (
-          <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setObEditId(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
             <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 520, width: '100%', boxShadow: '0 12px 48px rgba(0,0,0,0.2)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '20px 24px 16px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: tc.bg, borderRadius: '16px 16px 0 0' }}>
                 <div>
@@ -2947,7 +2971,7 @@ function BoardView() {
 
       {selected && (
         <>
-        {isMobile && <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setSelected(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1010 }} />}
+        {isMobile && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1010 }} />}
         <div style={isMobile
           ? { position: 'fixed', left: 0, right: 0, bottom: 0, height: '88vh', background: '#fff', zIndex: 1011, boxShadow: '0 -4px 32px rgba(0,0,0,0.14)', overflowY: 'auto', display: 'flex', flexDirection: 'column', borderRadius: '16px 16px 0 0' }
           : { position: 'fixed', top: 0, right: 0, bottom: 0, width: 520, background: '#fff', zIndex: 1011, boxShadow: '-4px 0 32px rgba(0,0,0,0.12)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }
@@ -3087,7 +3111,7 @@ function BoardView() {
       )}
 
       {showAdmin && (
-        <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setShowAdmin(false); setAdminAuthed(false); setAdminPwInput(''); setAdminPwError(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
             <div style={{ padding: '20px 24px', borderBottom: '0.5px solid #f0ece6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a' }}>Vote Admin</div>
@@ -3210,7 +3234,7 @@ function BoardView() {
       )}
 
       {showAdd && (
-        <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 4, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>New Voting Topic</div>
             <form onSubmit={handleTopicSubmit}>
@@ -3461,7 +3485,7 @@ function BoardSlidesModal({ onClose }) {
   }
 
   return (
-    <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px 12px', overflowY: 'auto' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px 12px', overflowY: 'auto' }}>
       <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#f7f3ec', borderRadius: 10, width: '100%', maxWidth: 820, minHeight: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.22)' }}>
         {/* Header */}
         <div style={{ padding: '16px 24px', background: '#fff', borderBottom: '0.5px solid #e8e0d5', borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
@@ -4222,7 +4246,7 @@ function EventsProfitLossModal({ onClose }) {
   var totalNet = totalEarnings - totalCosts;
 
   return (
-    <div onMouseDown={function(e) { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
       <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 600, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Events — Profit / Loss</div>
@@ -5004,7 +5028,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           }).catch(function() { setSponsorSaving(false); });
         }
         return (
-          <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setShowSponsorForm(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
             <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <div>
@@ -5044,7 +5068,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       })()}
 
       {showBudget && (
-        <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setShowBudget(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>{area} — Budget</div>
@@ -5233,7 +5257,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       )}
 
       {showEarnings && (
-        <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setShowEarnings(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Events — Earnings</div>
@@ -5298,7 +5322,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       {showPnl && <EventsProfitLossModal onClose={function() { setShowPnl(false); }} />}
 
       {showVols && (
-        <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setShowVols(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 500, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>{area} Volunteers ({vols.length})</div>
@@ -5371,7 +5395,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         var dayTotalHours = dayItems.reduce(function(s, t) { return s + (t.hours || 0); }, 0);
         var fmtHours = function(h) { return h % 1 === 0 ? h + 'h' : h.toFixed(1) + 'h'; };
         return (
-          <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setShowTodo(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
             <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
               {/* Header */}
               <div style={{ padding: '16px 20px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -5982,7 +6006,7 @@ function SponsorsView() {
       </div>
 
       {showAdd && (
-        <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>New Sponsor</div>
@@ -6481,7 +6505,7 @@ function ReviewsView({ navigate }) {
       </div>
 
       {printQ && (
-        <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setPrintQ(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, padding: 28, maxWidth: 340, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', marginBottom: 6, fontFamily: "'Cardo', serif" }}>Print Review Packet</div>
             <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>Select a quarter to print goals, reflections, and blank co-champion review forms for all areas.</div>
@@ -6506,7 +6530,7 @@ function ReviewsView({ navigate }) {
       )}
 
       {activeCell && (
-        <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setActiveCell(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 500, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
@@ -7518,7 +7542,7 @@ function IdeasView() {
       )}
 
       {editing && selected && (
-        <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setEditing(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 540, width: '100%', boxShadow: '0 12px 48px rgba(0,0,0,0.2)', maxHeight: '92vh', overflowY: 'auto', padding: 28 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>Edit Idea</div>
@@ -7530,7 +7554,7 @@ function IdeasView() {
       )}
 
       {showAdd && (
-        <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 540, width: '100%', boxShadow: '0 12px 48px rgba(0,0,0,0.2)', maxHeight: '92vh', overflowY: 'auto', padding: 28 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>New Idea</div>
@@ -7874,7 +7898,7 @@ function VolEmailListsView({ navigate }) {
 
       {/* Email modal */}
       {modal && (
-        <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; if (!sending) setModal(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid #f0ece6' }}>
               <div>
@@ -8754,7 +8778,7 @@ function Dashboard() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {/* Mobile menu overlay */}
         {isMobile && mobileMenuOpen && (
-          <div onMouseDown={function(e) { if (e.target !== e.currentTarget) return; setMobileMenuOpen(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200 }}>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200 }}>
             <div onClick={function(e) { e.stopPropagation(); }} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 260, background: '#2a2a2e', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '20px 16px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
                 <img src="assets/logo.png" alt="NSH" style={{ height: 32 }} />
