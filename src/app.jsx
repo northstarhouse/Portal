@@ -743,6 +743,13 @@ const typeColors = {
   var [earningsRows, setEarningsRows] = useState([]);
   var [inHouse, setInHouse] = useState([]);
   var [expanded, setExpanded] = useState(null);
+  var todayStr = new Date().toISOString().slice(0, 10);
+  var [showAddEarning, setShowAddEarning] = useState(false);
+  var [earningForm, setEarningForm] = useState({ event: '', earning_source: '', amount: '', notes: '', date: todayStr });
+  var [savingEarning, setSavingEarning] = useState(false);
+  var [showAddExpense, setShowAddExpense] = useState(false);
+  var [expenseForm, setExpenseForm] = useState({ event_name: '', type: 'Purchase', description: '', amount: '', date: todayStr, purchased_by: '' });
+  var [savingExpense, setSavingExpense] = useState(false);
 
   useEffect(function() {
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
@@ -793,16 +800,124 @@ const typeColors = {
 
   var totalEarnings = groups.reduce(function(s, r) { return s + r.earnings; }, 0);
   var totalCosts = groups.reduce(function(s, r) { return s + r.costs; }, 0);
+  var eventNameOptions = groups.map(function(g) { return g.event; }).filter(function(n) { return n && n !== 'Uncategorized'; });
+
+  function addEarning(e) {
+    e.preventDefault();
+    setSavingEarning(true);
+    var payload = { area: 'Events', event: earningForm.event, earning_source: earningForm.earning_source || null, amount: parseFloat(earningForm.amount) || 0, notes: earningForm.notes || null, date: earningForm.date || null };
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setSavingEarning(false);
+      if (rows && rows.code) { alert('Add failed: ' + (rows.message || rows.code)); return; }
+      clearCache('Op Earnings');
+      if (rows && rows[0]) setEarningsRows(function(prev) { return [rows[0]].concat(prev); });
+      setEarningForm({ event: '', earning_source: '', amount: '', notes: '', date: todayStr });
+      setShowAddEarning(false);
+    }).catch(function() { setSavingEarning(false); });
+  }
+
+  function addExpense(e) {
+    e.preventDefault();
+    setSavingExpense(true);
+    var payload = { area: 'Events', type: expenseForm.type, description: expenseForm.description, amount: parseFloat(expenseForm.amount) || 0, date: expenseForm.date || null, purchased_by: expenseForm.purchased_by || null, event_name: expenseForm.event_name || null };
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setSavingExpense(false);
+      if (rows && rows.code) { alert('Add failed: ' + (rows.message || rows.hint || rows.code)); return; }
+      clearCache('Op Budget');
+      if (rows && rows[0]) setBudgetRows(function(prev) { return [rows[0]].concat(prev); });
+      setExpenseForm({ event_name: '', type: 'Purchase', description: '', amount: '', date: todayStr, purchased_by: '' });
+      setShowAddExpense(false);
+    }).catch(function() { setSavingExpense(false); });
+  }
+
+  var fieldSt = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' };
+  var fieldLbl = { fontSize: 11, color: '#888', marginBottom: 4, display: 'block' };
 
   return (
     <div>
+      <datalist id="events-hub-event-options">
+        {eventNameOptions.map(function(n) { return <option key={n} value={n} />; })}
+      </datalist>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
-        <div>
+        <div style={{ flex: 1 }}>
           <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Events</div>
           <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Earnings & expenses by event, pulled from the Events operational area</div>
         </div>
+        <button onClick={function() { setShowAddEarning(function(s) { return !s; }); setShowAddExpense(false); }} style={{ fontSize: 12, background: showAddEarning ? '#f5f0ea' : gold, color: showAddEarning ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddEarning ? 'Cancel' : '+ Log Earning'}</button>
+        <button onClick={function() { setShowAddExpense(function(s) { return !s; }); setShowAddEarning(false); }} style={{ fontSize: 12, background: showAddExpense ? '#f5f0ea' : gold, color: showAddExpense ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddExpense ? 'Cancel' : '+ Log Expense'}</button>
       </div>
+
+      {showAddEarning && (
+        <form onSubmit={addEarning} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={fieldLbl}>Event</label>
+              <input required value={earningForm.event} onChange={function(e) { setEarningForm(function(f) { return Object.assign({}, f, { event: e.target.value }); }); }} list="events-hub-event-options" style={fieldSt} placeholder="e.g. Spring Gala" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Source</label>
+              <input value={earningForm.earning_source} onChange={function(e) { setEarningForm(function(f) { return Object.assign({}, f, { earning_source: e.target.value }); }); }} style={fieldSt} placeholder="e.g. Ticket sales" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Amount</label>
+              <input required type="number" step="0.01" min="0" value={earningForm.amount} onChange={function(e) { setEarningForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} style={fieldSt} placeholder="0.00" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Date</label>
+              <input type="date" value={earningForm.date} onChange={function(e) { setEarningForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={fieldSt} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={fieldLbl}>Notes</label>
+            <input value={earningForm.notes} onChange={function(e) { setEarningForm(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} style={fieldSt} placeholder="Optional notes…" />
+          </div>
+          <button type="submit" disabled={savingEarning} style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 600, opacity: savingEarning ? 0.5 : 1 }}>{savingEarning ? 'Saving…' : 'Add Earning'}</button>
+        </form>
+      )}
+
+      {showAddExpense && (
+        <form onSubmit={addExpense} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={fieldLbl}>Event</label>
+              <input required value={expenseForm.event_name} onChange={function(e) { setExpenseForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} list="events-hub-event-options" style={fieldSt} placeholder="e.g. Spring Gala" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Type</label>
+              <select value={expenseForm.type} onChange={function(e) { setExpenseForm(function(f) { return Object.assign({}, f, { type: e.target.value }); }); }} style={fieldSt}>
+                <option value="Purchase">Purchase</option>
+                <option value="In-Kind">In-Kind</option>
+              </select>
+            </div>
+            <div>
+              <label style={fieldLbl}>Amount</label>
+              <input required type="number" step="0.01" min="0" value={expenseForm.amount} onChange={function(e) { setExpenseForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} style={fieldSt} placeholder="0.00" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Date</label>
+              <input type="date" value={expenseForm.date} onChange={function(e) { setExpenseForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={fieldSt} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={fieldLbl}>Description</label>
+            <input required value={expenseForm.description} onChange={function(e) { setExpenseForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} style={fieldSt} placeholder="What was this for…" />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={fieldLbl}>Purchased By</label>
+            <input value={expenseForm.purchased_by} onChange={function(e) { setExpenseForm(function(f) { return Object.assign({}, f, { purchased_by: e.target.value }); }); }} style={fieldSt} placeholder="Optional" />
+          </div>
+          <button type="submit" disabled={savingExpense} style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 600, opacity: savingExpense ? 0.5 : 1 }}>{savingExpense ? 'Saving…' : 'Add Expense'}</button>
+        </form>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
         <StatCard label="Earnings" value={fmt(totalEarnings)} />
