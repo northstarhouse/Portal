@@ -1269,7 +1269,7 @@ const typeColors = {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{f.name || 'Anonymous'}{f.role ? ' - ' + f.role : ''}</div>
                         {(f.event_name || f.source) && (
-                          <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>
+                          <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>
                             {f.event_name}{f.event_name && f.source ? ' · ' : ''}{f.source}
                           </div>
                         )}
