@@ -784,9 +784,9 @@ const typeColors = {
       var name = (ev.name || '').trim();
       if (!name) return;
       var match = Object.keys(byEvent).find(function(k) { return k.toLowerCase() === name.toLowerCase(); });
-      var b = match ? byEvent[match] : bucket(name);
-      b.date = ev.date || b.date;
-      b.link = ev.link || b.link;
+      if (!match) return;
+      byEvent[match].date = ev.date || byEvent[match].date;
+      byEvent[match].link = ev.link || byEvent[match].link;
     });
     var list = Object.keys(byEvent).map(function(k) { var r = byEvent[k]; return Object.assign({}, r, { net: r.earnings - r.costs }); });
     list.sort(function(a, b) {
