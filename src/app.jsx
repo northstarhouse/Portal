@@ -7753,6 +7753,12 @@ function VolEmailListsView({ navigate }) {
   var [newListSelected, setNewListSelected] = useS({});
   var [creatingList, setCreatingList] = useS(false);
   var [createListError, setCreateListError] = useS(null);
+  var [editingTag, setEditingTag] = useS(null);
+  var [editTagName, setEditTagName] = useS('');
+  var [editSelected, setEditSelected] = useS({});
+  var [editSearch, setEditSearch] = useS('');
+  var [savingEdit, setSavingEdit] = useS(false);
+  var [editError, setEditError] = useS(null);
 
   useE(function() {
     cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Email','Status','Team','Event Tags','Overview Notes','Phone Number']).then(function(data) {
@@ -7846,6 +7852,72 @@ function VolEmailListsView({ navigate }) {
     });
   }
 
+  function startEditGroup(tag) {
+    var sel = {};
+    (volunteers || []).forEach(function(v) {
+      if (parseTeams(v['Event Tags']).indexOf(tag) !== -1) sel[String(v.id)] = true;
+    });
+    setEditingTag(tag);
+    setEditTagName(tag.replace(/^volunteered for:\s*/i, ''));
+    setEditSelected(sel);
+    setEditSearch('');
+    setEditError(null);
+  }
+
+  function toggleEditSelected(id) {
+    setEditSelected(function(prev) { var n = Object.assign({}, prev); n[id] = !n[id]; return n; });
+  }
+
+  function applyTagChange(oldTag, newTag, selectedIds) {
+    setSavingEdit(true);
+    setEditError(null);
+    var affected = {};
+    selectedIds.forEach(function(id) { affected[id] = true; });
+    (volunteers || []).forEach(function(v) {
+      if (parseTeams(v['Event Tags']).indexOf(oldTag) !== -1) affected[String(v.id)] = true;
+    });
+    var ids = Object.keys(affected);
+    Promise.all(ids.map(function(id) {
+      var v = volunteers.find(function(x) { return String(x.id) === id; });
+      if (!v) return Promise.resolve();
+      var tags = parseTeams(v['Event Tags']).filter(function(t) { return t !== oldTag; });
+      var shouldHave = newTag && selectedIds.indexOf(id) !== -1;
+      if (shouldHave && tags.indexOf(newTag) === -1) tags.push(newTag);
+      var nextVal = tags.join(' | ');
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?id=eq.' + v.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 'Event Tags': nextVal })
+      }).then(function(r) {
+        if (!r.ok) throw new Error('Failed to update ' + v['First Name'] + ' ' + v['Last Name']);
+        return { id: v.id, val: nextVal };
+      });
+    })).then(function(results) {
+      var updates = {};
+      results.forEach(function(r) { if (r) updates[r.id] = r.val; });
+      setVolunteers(function(prev) { return prev.map(function(v) { return updates[v.id] !== undefined ? Object.assign({}, v, { 'Event Tags': updates[v.id] }) : v; }); });
+      clearCache('2026 Volunteers');
+      setSavingEdit(false);
+      setEditingTag(null);
+    }).catch(function(err) {
+      setSavingEdit(false);
+      setEditError(err.message || 'Failed to save changes');
+    });
+  }
+
+  function saveEditGroup() {
+    var name = editTagName.trim();
+    if (!name) return;
+    var newTag = /^volunteered for:/i.test(name) ? name : 'Volunteered for: ' + name;
+    var selectedIds = Object.keys(editSelected).filter(function(id) { return editSelected[id]; });
+    applyTagChange(editingTag, newTag, selectedIds);
+  }
+
+  function deleteTagList(tag) {
+    if (!window.confirm('Delete the "' + tag + '" list? This removes the tag from every volunteer who has it.')) return;
+    applyTagChange(tag, null, []);
+  }
+
   function toggleTeam(tag) {
     setExpandedTeams(function(prev) { var n = Object.assign({}, prev); n[tag] = !n[tag]; return n; });
   }
@@ -7874,15 +7946,16 @@ function VolEmailListsView({ navigate }) {
     document.execCommand(cmd, false, val || null);
   }
 
-  function renderGroupCard(g, colorFn) {
+  function renderGroupCard(g, colorFn, editable) {
     var withEmail = g.members.filter(function(v) { return v['Email'] && v['Email'].trim(); });
     var noEmail = g.members.filter(function(v) { return !v['Email'] || !v['Email'].trim(); });
     var isOpen = !!expandedTeams[g.tag];
+    var isEditing = editable && editingTag === g.tag;
     var tc = colorFn(g.tag);
     return (
       <div key={g.tag} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
         {/* Group header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#fdfcfb', borderBottom: isOpen ? '0.5px solid #f0ece6' : 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#fdfcfb', borderBottom: (isOpen || isEditing) ? '0.5px solid #f0ece6' : 'none' }}>
           <button onClick={function() { toggleTeam(g.tag); }} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{g.tag}</span>
             <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: tc.bg, color: tc.color }}>
@@ -7892,6 +7965,11 @@ function VolEmailListsView({ navigate }) {
             <span style={{ marginLeft: 'auto', fontSize: 12, color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
           </button>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            {editable && (
+              <button onClick={function() { isEditing ? setEditingTag(null) : startEditGroup(g.tag); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: '0.5px solid #e0d8cc', borderRadius: 7, background: isEditing ? '#f0ece6' : '#fff', color: '#666', cursor: 'pointer' }}>
+                {isEditing ? 'Cancel edit' : '✎ Edit list'}
+              </button>
+            )}
             <button onClick={function() { copyEmails(g.members, g.tag); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: '0.5px solid #e0d8cc', borderRadius: 7, background: '#fff', color: copied === g.tag ? '#2e7d32' : '#666', cursor: 'pointer' }}>
               {copied === g.tag ? '✓ Copied' : '⧉ Copy emails'}
             </button>
@@ -7900,8 +7978,44 @@ function VolEmailListsView({ navigate }) {
             </button>
           </div>
         </div>
+        {/* Edit panel */}
+        {isEditing && (
+          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Event name</label>
+              <input value={editTagName} onChange={function(e) { setEditTagName(e.target.value); }} style={Object.assign({}, volInputStyle, { marginTop: 0 })} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Volunteers ({Object.keys(editSelected).filter(function(id) { return editSelected[id]; }).length} selected)</label>
+              <input value={editSearch} onChange={function(e) { setEditSearch(e.target.value); }} placeholder="Search volunteers…" style={Object.assign({}, volInputStyle, { marginTop: 0, marginBottom: 8 })} />
+              <div style={{ background: '#faf8f4', borderRadius: 8, padding: '6px 10px', maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                {(volunteers || [])
+                  .filter(function(v) { return !editSearch.trim() || ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).toLowerCase().indexOf(editSearch.trim().toLowerCase()) !== -1; })
+                  .sort(function(a, b) { return (a['Last Name'] || '').localeCompare(b['Last Name'] || ''); })
+                  .map(function(v) {
+                    var checked = !!editSelected[String(v.id)];
+                    return (
+                      <label key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 4px', fontSize: 12, color: '#2a2a2a', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={checked} onChange={function() { toggleEditSelected(String(v.id)); }} style={{ accentColor: gold }} />
+                        {v['First Name']} {v['Last Name']}
+                        {!v['Email'] && <span style={{ fontSize: 10, color: '#ddd', fontStyle: 'italic' }}>no email</span>}
+                      </label>
+                    );
+                  })}
+              </div>
+            </div>
+            {editError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{editError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={saveEditGroup} disabled={!editTagName.trim() || savingEdit} style={{ flex: 1, padding: '8px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (!editTagName.trim() || savingEdit) ? 0.5 : 1 }}>
+                {savingEdit ? 'Saving…' : 'Save changes'}
+              </button>
+              <button onClick={function() { deleteTagList(g.tag); }} disabled={savingEdit} style={{ padding: '8px 14px', background: '#fce4e4', border: 'none', borderRadius: 8, fontSize: 12, color: '#c0392b', cursor: 'pointer', fontWeight: 500 }}>Delete list</button>
+              <button onClick={function() { setEditingTag(null); }} disabled={savingEdit} style={{ padding: '8px 14px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+            </div>
+          </div>
+        )}
         {/* Member list */}
-        {isOpen && (
+        {isOpen && !isEditing && (
           <div>
             {g.members.slice().sort(function(a, b) { return (a['Last Name'] || '').localeCompare(b['Last Name'] || ''); }).map(function(v, i) {
               var initials = ((v['First Name'] || '')[0] || '').toUpperCase() + ((v['Last Name'] || '')[0] || '').toUpperCase();
@@ -8024,7 +8138,7 @@ function VolEmailListsView({ navigate }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {volunteers === null ? null : eventGroups.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 32, color: '#ccc', fontSize: 13, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12 }}>No event tags yet — create one below.</div>
-          ) : eventGroups.map(function(g) { return renderGroupCard(g, function() { return { bg: '#e8f4fd', color: '#0d6eab' }; }); })}
+          ) : eventGroups.map(function(g) { return renderGroupCard(g, function() { return { bg: '#e8f4fd', color: '#0d6eab' }; }, true); })}
         </div>
       </div>
 
