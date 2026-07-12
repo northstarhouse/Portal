@@ -200,7 +200,7 @@ const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthsta
 
 // Kick off critical fetches immediately so data is ready when views mount
 (function prefetch() {
-  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Favorite Quote','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day']);
+  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Favorite Quote','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day']);
   cachedSbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes']);
   cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']);
   cachedFetchAll('Board Voting Items');
@@ -916,6 +916,53 @@ function TeamPicker({ value, onChange, extraTeams }) {
   );
 }
 
+function EventTagPicker({ value, onChange }) {
+  const { useState: useS } = React;
+  const [newTag, setNewTag] = useS('');
+  var selected = value ? value.split('|').map(function(t) { return t.trim(); }).filter(Boolean) : [];
+
+  function addTag() {
+    var trimmed = newTag.trim();
+    if (!trimmed) return;
+    var tag = /^volunteered for:/i.test(trimmed) ? trimmed : 'Volunteered for: ' + trimmed;
+    if (selected.indexOf(tag) === -1) {
+      onChange({ target: { name: 'Event Tags', value: selected.concat([tag]).join(' | ') } });
+    }
+    setNewTag('');
+  }
+
+  function remove(tag) {
+    onChange({ target: { name: 'Event Tags', value: selected.filter(function(t) { return t !== tag; }).join(' | ') } });
+  }
+
+  return (
+    <div>
+      {selected.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
+          {selected.map(function(t) {
+            return (
+              <span key={t} style={{ background: '#e8f4fd', color: '#0d6eab', fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+                {t}
+                <span onClick={function() { remove(t); }} style={{ cursor: 'pointer', opacity: 0.6, fontSize: 12, lineHeight: 1, marginLeft: 2 }}>×</span>
+              </span>
+            );
+          })}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          value={newTag}
+          onChange={function(e) { setNewTag(e.target.value); }}
+          onKeyDown={function(e) { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+          placeholder="Event name…"
+          style={Object.assign({}, volInputStyle, { marginTop: 0, flex: 1 })}
+        />
+        <button type="button" onClick={addTag} disabled={!newTag.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: newTag.trim() ? 1 : 0.4, flexShrink: 0 }}>Add</button>
+      </div>
+    </div>
+  );
+}
+
 var volInputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
 var volLabelStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
 var volGrp = { marginBottom: 14 };
@@ -982,6 +1029,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete, 
           </div>
           <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="On-Call Supporter">On-Call Supporter</option><option value="Inactive">Inactive</option></select></div>
           <div style={volGrp}><label style={volLabelStyle}>Team</label><div style={{ marginTop: 4 }}><TeamPicker value={form['Team']} onChange={onChange} extraTeams={extraTeams || []} /></div></div>
+          <div style={volGrp}><label style={volLabelStyle}>Event Tags</label><div style={{ marginTop: 4 }}><EventTagPicker value={form['Event Tags']} onChange={onChange} /></div></div>
           <span style={volSecLabel}>Contact</span>
           <div style={volGrp}><label style={volLabelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={onChange} style={volInputStyle} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={onChange} style={volInputStyle} /></div>
@@ -1152,7 +1200,7 @@ function VolunteersView() {
   const [obEditSaving, setObEditSaving] = useState(false);
 
   var emptyForm = {
-    'First Name': '', 'Last Name': '', 'Team': '', 'Status': 'Active',
+    'First Name': '', 'Last Name': '', 'Team': '', 'Event Tags': '', 'Status': 'Active',
     'Email': '', 'Phone Number': '', 'Address': '', 'Birthday': '',
     'Volunteer Anniversary': '', 'CC': false, 'Nametag': false,
     'Overview Notes': '', 'Background Notes': '', 'Notes': '',
@@ -1162,7 +1210,7 @@ function VolunteersView() {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(function() {
-    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day'])
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day'])
       .then(function(data) {
         if (Array.isArray(data)) setVolunteers(data);
         else setError(JSON.stringify(data));
@@ -1372,6 +1420,7 @@ function VolunteersView() {
       'First Name': v['First Name'] || '',
       'Last Name': v['Last Name'] || '',
       'Team': v['Team'] || '',
+      'Event Tags': v['Event Tags'] || '',
       'Status': v['Status'] || 'Active',
       'Email': v['Email'] || '',
       'Phone Number': v['Phone Number'] || '',
@@ -1571,6 +1620,9 @@ function VolunteersView() {
                 <div style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a', marginBottom: 3, lineHeight: 1.3 }}>{v['First Name']} {v['Last Name']}</div>
                 {v['Team'] && <div style={{ fontSize: 12, color: '#777', marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v['Team'] || '').split('|')[0].trim()}</div>}
                 <Badge status={v['Status'] || 'Active'} />
+                {(v['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).length > 0 && (
+                  <div style={{ fontSize: 10, color: '#0d6eab', marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🏷 {(v['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).length}</div>
+                )}
               </div>
             );
           })}
@@ -1595,6 +1647,13 @@ function VolunteersView() {
                   <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 3, lineHeight: 1.2 }}>{selected['First Name']} {selected['Last Name']}</div>
                   {selected['Team'] && <div style={{ fontSize: 12, color: '#9a7f5a', marginBottom: 6, fontWeight: 500 }}>{selected['Team']}</div>}
                   <Badge status={selected['Status'] || 'Active'} />
+                  {(selected['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+                      {(selected['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).map(function(t) {
+                        return <span key={t} style={{ background: '#e8f4fd', color: '#0d6eab', fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>{t}</span>;
+                      })}
+                    </div>
+                  )}
                   {selected['Overview Notes'] && <div style={{ fontSize: 12, color: '#7a6a55', marginTop: 8, lineHeight: 1.5, fontStyle: 'italic' }}>{selected['Overview Notes']}</div>}
                 </div>
               </div>
@@ -7688,9 +7747,15 @@ function VolEmailListsView({ navigate }) {
   var [scheduled, setScheduled] = useS(false);
   var [scheduleAt, setScheduleAt] = useS('');
   var editorRef = React.useRef(null);
+  var [showCreateList, setShowCreateList] = useS(false);
+  var [newListName, setNewListName] = useS('');
+  var [newListSearch, setNewListSearch] = useS('');
+  var [newListSelected, setNewListSelected] = useS({});
+  var [creatingList, setCreatingList] = useS(false);
+  var [createListError, setCreateListError] = useS(null);
 
   useE(function() {
-    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Email','Status','Team','Overview Notes','Phone Number']).then(function(data) {
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Email','Status','Team','Event Tags','Overview Notes','Phone Number']).then(function(data) {
       if (Array.isArray(data)) setVolunteers(data);
     });
     fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=20', {
@@ -7727,6 +7792,60 @@ function VolEmailListsView({ navigate }) {
     return known.concat(custom);
   }, [displayed]);
 
+  var eventGroups = useMemo(function() {
+    if (!displayed.length) return [];
+    var tagMap = {};
+    displayed.forEach(function(v) {
+      parseTeams(v['Event Tags']).forEach(function(t) {
+        if (!tagMap[t]) tagMap[t] = [];
+        tagMap[t].push(v);
+      });
+    });
+    return Object.keys(tagMap).sort().map(function(t) { return { tag: t, members: tagMap[t] }; });
+  }, [displayed]);
+
+  function toggleNewListSelected(id) {
+    setNewListSelected(function(prev) { var n = Object.assign({}, prev); n[id] = !n[id]; return n; });
+  }
+
+  function createTagList() {
+    var name = newListName.trim();
+    if (!name) return;
+    var tag = /^volunteered for:/i.test(name) ? name : 'Volunteered for: ' + name;
+    var ids = Object.keys(newListSelected).filter(function(id) { return newListSelected[id]; });
+    if (!ids.length) return;
+    setCreatingList(true);
+    setCreateListError(null);
+    Promise.all(ids.map(function(id) {
+      var v = volunteers.find(function(x) { return String(x.id) === id; });
+      if (!v) return Promise.resolve();
+      var existing = parseTeams(v['Event Tags']);
+      if (existing.indexOf(tag) !== -1) return Promise.resolve();
+      var nextVal = existing.concat([tag]).join(' | ');
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?id=eq.' + v.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 'Event Tags': nextVal })
+      }).then(function(r) {
+        if (!r.ok) throw new Error('Failed to tag ' + v['First Name'] + ' ' + v['Last Name']);
+        return { id: v.id, val: nextVal };
+      });
+    })).then(function(results) {
+      var updates = {};
+      results.forEach(function(r) { if (r) updates[r.id] = r.val; });
+      setVolunteers(function(prev) { return prev.map(function(v) { return updates[v.id] !== undefined ? Object.assign({}, v, { 'Event Tags': updates[v.id] }) : v; }); });
+      clearCache('2026 Volunteers');
+      setCreatingList(false);
+      setShowCreateList(false);
+      setNewListName('');
+      setNewListSearch('');
+      setNewListSelected({});
+    }).catch(function(err) {
+      setCreatingList(false);
+      setCreateListError(err.message || 'Failed to create tag list');
+    });
+  }
+
   function toggleTeam(tag) {
     setExpandedTeams(function(prev) { var n = Object.assign({}, prev); n[tag] = !n[tag]; return n; });
   }
@@ -7753,6 +7872,59 @@ function VolEmailListsView({ navigate }) {
   function fmt(cmd, val) {
     if (editorRef.current) editorRef.current.focus();
     document.execCommand(cmd, false, val || null);
+  }
+
+  function renderGroupCard(g, colorFn) {
+    var withEmail = g.members.filter(function(v) { return v['Email'] && v['Email'].trim(); });
+    var noEmail = g.members.filter(function(v) { return !v['Email'] || !v['Email'].trim(); });
+    var isOpen = !!expandedTeams[g.tag];
+    var tc = colorFn(g.tag);
+    return (
+      <div key={g.tag} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+        {/* Group header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#fdfcfb', borderBottom: isOpen ? '0.5px solid #f0ece6' : 'none' }}>
+          <button onClick={function() { toggleTeam(g.tag); }} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{g.tag}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: tc.bg, color: tc.color }}>
+              {withEmail.length}{withEmail.length !== g.members.length ? '/' + g.members.length : ''} with email
+            </span>
+            {noEmail.length > 0 && <span style={{ fontSize: 10, color: '#b45309' }}>⚠ {noEmail.length} no email</span>}
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
+          </button>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button onClick={function() { copyEmails(g.members, g.tag); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: '0.5px solid #e0d8cc', borderRadius: 7, background: '#fff', color: copied === g.tag ? '#2e7d32' : '#666', cursor: 'pointer' }}>
+              {copied === g.tag ? '✓ Copied' : '⧉ Copy emails'}
+            </button>
+            <button onClick={function() { openModal(g.tag, g.members); }} disabled={withEmail.length === 0} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: 'none', borderRadius: 7, background: gold, color: '#fff', fontWeight: 600, cursor: withEmail.length === 0 ? 'not-allowed' : 'pointer', opacity: withEmail.length === 0 ? 0.4 : 1 }}>
+              ✉ Email group
+            </button>
+          </div>
+        </div>
+        {/* Member list */}
+        {isOpen && (
+          <div>
+            {g.members.slice().sort(function(a, b) { return (a['Last Name'] || '').localeCompare(b['Last Name'] || ''); }).map(function(v, i) {
+              var initials = ((v['First Name'] || '')[0] || '').toUpperCase() + ((v['Last Name'] || '')[0] || '').toUpperCase();
+              return (
+                <div key={v.id || i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', borderBottom: i < g.members.length - 1 ? '0.5px solid #f5f1eb' : 'none' }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: gold, opacity: isActive(v) ? 1 : 0.4, color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{initials}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</span>
+                    {v['Overview Notes'] && <span style={{ fontSize: 11, color: '#aaa', marginLeft: 8 }}>{v['Overview Notes']}</span>}
+                    {!isActive(v) && <span style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '1px 6px', borderRadius: 10, marginLeft: 6 }}>Inactive</span>}
+                  </div>
+                  {v['Email'] && v['Email'].trim() ? (
+                    <a href={'mailto:' + v['Email'].trim()} style={{ fontSize: 11, color: '#aaa', textDecoration: 'none', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v['Email'].trim()}</a>
+                  ) : (
+                    <span style={{ fontSize: 11, color: '#ddd', fontStyle: 'italic' }}>no email</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
   }
 
   function handleSend() {
@@ -7818,58 +7990,7 @@ function VolEmailListsView({ navigate }) {
             <div style={{ textAlign: 'center', padding: 48, color: '#aaa', fontSize: 13 }}>Loading…</div>
           ) : groups.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 48, color: '#ccc', fontSize: 13 }}>No volunteers found.</div>
-          ) : groups.map(function(g) {
-            var withEmail = g.members.filter(function(v) { return v['Email'] && v['Email'].trim(); });
-            var noEmail = g.members.filter(function(v) { return !v['Email'] || !v['Email'].trim(); });
-            var isOpen = !!expandedTeams[g.tag];
-            var tc = TEAM_COLORS[g.tag] || { bg: '#f5f5f5', color: '#555' };
-            return (
-              <div key={g.tag} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
-                {/* Group header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#fdfcfb', borderBottom: isOpen ? '0.5px solid #f0ece6' : 'none' }}>
-                  <button onClick={function() { toggleTeam(g.tag); }} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{g.tag}</span>
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: tc.bg, color: tc.color }}>
-                      {withEmail.length}{withEmail.length !== g.members.length ? '/' + g.members.length : ''} with email
-                    </span>
-                    {noEmail.length > 0 && <span style={{ fontSize: 10, color: '#b45309' }}>⚠ {noEmail.length} no email</span>}
-                    <span style={{ marginLeft: 'auto', fontSize: 12, color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
-                  </button>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button onClick={function() { copyEmails(g.members, g.tag); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: '0.5px solid #e0d8cc', borderRadius: 7, background: '#fff', color: copied === g.tag ? '#2e7d32' : '#666', cursor: 'pointer' }}>
-                      {copied === g.tag ? '✓ Copied' : '⧉ Copy emails'}
-                    </button>
-                    <button onClick={function() { openModal(g.tag, g.members); }} disabled={withEmail.length === 0} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: 'none', borderRadius: 7, background: gold, color: '#fff', fontWeight: 600, cursor: withEmail.length === 0 ? 'not-allowed' : 'pointer', opacity: withEmail.length === 0 ? 0.4 : 1 }}>
-                      ✉ Email group
-                    </button>
-                  </div>
-                </div>
-                {/* Member list */}
-                {isOpen && (
-                  <div>
-                    {g.members.slice().sort(function(a, b) { return (a['Last Name'] || '').localeCompare(b['Last Name'] || ''); }).map(function(v, i) {
-                      var initials = ((v['First Name'] || '')[0] || '').toUpperCase() + ((v['Last Name'] || '')[0] || '').toUpperCase();
-                      return (
-                        <div key={v.id || i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', borderBottom: i < g.members.length - 1 ? '0.5px solid #f5f1eb' : 'none' }}>
-                          <div style={{ width: 28, height: 28, borderRadius: '50%', background: gold, opacity: isActive(v) ? 1 : 0.4, color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{initials}</div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <span style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</span>
-                            {v['Overview Notes'] && <span style={{ fontSize: 11, color: '#aaa', marginLeft: 8 }}>{v['Overview Notes']}</span>}
-                            {!isActive(v) && <span style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '1px 6px', borderRadius: 10, marginLeft: 6 }}>Inactive</span>}
-                          </div>
-                          {v['Email'] && v['Email'].trim() ? (
-                            <a href={'mailto:' + v['Email'].trim()} style={{ fontSize: 11, color: '#aaa', textDecoration: 'none', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v['Email'].trim()}</a>
-                          ) : (
-                            <span style={{ fontSize: 11, color: '#ddd', fontStyle: 'italic' }}>no email</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          ) : groups.map(function(g) { return renderGroupCard(g, function(tag) { return TEAM_COLORS[tag] || { bg: '#f5f5f5', color: '#555' }; }); })}
         </div>
 
         {/* Recent sends sidebar */}
@@ -7891,6 +8012,62 @@ function VolEmailListsView({ navigate }) {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Event tag lists */}
+      <div style={{ marginTop: 28 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Event Tags</div>
+        <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Volunteers tagged for a specific event (e.g. "Volunteered for: Fall Gala")</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {volunteers === null ? null : eventGroups.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 32, color: '#ccc', fontSize: 13, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12 }}>No event tags yet — create one below.</div>
+          ) : eventGroups.map(function(g) { return renderGroupCard(g, function() { return { bg: '#e8f4fd', color: '#0d6eab' }; }); })}
+        </div>
+      </div>
+
+      {/* Create a new volunteer tag list */}
+      <div style={{ marginTop: 20, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+        <button onClick={function() { setShowCreateList(function(s) { return !s; }); }} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#fdfcfb', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>+ Create a new volunteer tag list</span>
+          <span style={{ fontSize: 12, color: '#ccc' }}>{showCreateList ? '▲' : '▼'}</span>
+        </button>
+        {showCreateList && (
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Event name</label>
+              <input value={newListName} onChange={function(e) { setNewListName(e.target.value); }} placeholder="e.g. Fall Gala" style={inpSt} />
+              <div style={{ fontSize: 10, color: '#aaa', marginTop: 4 }}>Will be saved as "{newListName.trim() ? (/^volunteered for:/i.test(newListName.trim()) ? newListName.trim() : 'Volunteered for: ' + newListName.trim()) : 'Volunteered for: …'}"</div>
+            </div>
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Select volunteers ({Object.keys(newListSelected).filter(function(id) { return newListSelected[id]; }).length} selected)</label>
+              <input value={newListSearch} onChange={function(e) { setNewListSearch(e.target.value); }} placeholder="Search volunteers…" style={Object.assign({}, inpSt, { marginBottom: 8 })} />
+              <div style={{ background: '#faf8f4', borderRadius: 8, padding: '6px 10px', maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                {(volunteers || [])
+                  .filter(function(v) { return !newListSearch.trim() || ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).toLowerCase().indexOf(newListSearch.trim().toLowerCase()) !== -1; })
+                  .sort(function(a, b) { return (a['Last Name'] || '').localeCompare(b['Last Name'] || ''); })
+                  .map(function(v) {
+                    var checked = !!newListSelected[String(v.id)];
+                    return (
+                      <label key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 4px', fontSize: 12, color: '#2a2a2a', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={checked} onChange={function() { toggleNewListSelected(String(v.id)); }} style={{ accentColor: gold }} />
+                        {v['First Name']} {v['Last Name']}
+                        {!v['Email'] && <span style={{ fontSize: 10, color: '#ddd', fontStyle: 'italic' }}>no email</span>}
+                      </label>
+                    );
+                  })}
+              </div>
+            </div>
+            {createListError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{createListError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={createTagList}
+                disabled={!newListName.trim() || !Object.keys(newListSelected).some(function(id) { return newListSelected[id]; }) || creatingList}
+                style={{ flex: 1, padding: '9px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!newListName.trim() || !Object.keys(newListSelected).some(function(id) { return newListSelected[id]; }) || creatingList) ? 0.5 : 1 }}
+              >{creatingList ? 'Creating…' : 'Create tag list'}</button>
+              <button onClick={function() { setShowCreateList(false); setNewListName(''); setNewListSearch(''); setNewListSelected({}); setCreateListError(null); }} disabled={creatingList} style={{ padding: '9px 16px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>
         )}
