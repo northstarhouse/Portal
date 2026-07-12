@@ -750,6 +750,12 @@ const typeColors = {
   var [showAddExpense, setShowAddExpense] = useState(false);
   var [expenseForm, setExpenseForm] = useState({ event_name: '', type: 'Purchase', description: '', amount: '', date: todayStr, purchased_by: '' });
   var [savingExpense, setSavingExpense] = useState(false);
+  var [editingEarningId, setEditingEarningId] = useState(null);
+  var [editEarningForm, setEditEarningForm] = useState(null);
+  var [savingEarningEdit, setSavingEarningEdit] = useState(false);
+  var [editingExpenseId, setEditingExpenseId] = useState(null);
+  var [editExpenseForm, setEditExpenseForm] = useState(null);
+  var [savingExpenseEdit, setSavingExpenseEdit] = useState(false);
 
   useEffect(function() {
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
@@ -836,6 +842,74 @@ const typeColors = {
       setExpenseForm({ event_name: '', type: 'Purchase', description: '', amount: '', date: todayStr, purchased_by: '' });
       setShowAddExpense(false);
     }).catch(function() { setSavingExpense(false); });
+  }
+
+  function startEditEarning(e) {
+    setEditingEarningId(e.id);
+    setEditEarningForm({ event: e.event || '', earning_source: e.earning_source || '', amount: e.amount != null ? String(e.amount) : '', notes: e.notes || '', date: e.date || todayStr });
+  }
+
+  function saveEditEarning() {
+    if (!editEarningForm) return;
+    setSavingEarningEdit(true);
+    var patch = { event: editEarningForm.event, earning_source: editEarningForm.earning_source || null, amount: parseFloat(editEarningForm.amount) || 0, notes: editEarningForm.notes || null, date: editEarningForm.date || null };
+    var id = editingEarningId;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    }).then(function(r) {
+      if (!r.ok) throw new Error('Failed to save');
+      setSavingEarningEdit(false);
+      clearCache('Op Earnings');
+      setEarningsRows(function(prev) { return prev.map(function(e) { return e.id === id ? Object.assign({}, e, patch) : e; }); });
+      setEditingEarningId(null);
+      setEditEarningForm(null);
+    }).catch(function() { setSavingEarningEdit(false); alert('Failed to save changes'); });
+  }
+
+  function deleteEarning(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      clearCache('Op Earnings');
+      setEarningsRows(function(prev) { return prev.filter(function(e) { return e.id !== id; }); });
+    });
+  }
+
+  function startEditExpense(b) {
+    setEditingExpenseId(b.id);
+    setEditExpenseForm({ event_name: b.event_name || '', type: b.type || 'Purchase', description: b.description || '', amount: b.amount != null ? String(b.amount) : '', date: b.date || todayStr, purchased_by: b.purchased_by || '' });
+  }
+
+  function saveEditExpense() {
+    if (!editExpenseForm) return;
+    setSavingExpenseEdit(true);
+    var patch = { event_name: editExpenseForm.event_name || null, type: editExpenseForm.type, description: editExpenseForm.description, amount: parseFloat(editExpenseForm.amount) || 0, date: editExpenseForm.date || null, purchased_by: editExpenseForm.purchased_by || null };
+    var id = editingExpenseId;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    }).then(function(r) {
+      if (!r.ok) throw new Error('Failed to save');
+      setSavingExpenseEdit(false);
+      clearCache('Op Budget');
+      setBudgetRows(function(prev) { return prev.map(function(b) { return b.id === id ? Object.assign({}, b, patch) : b; }); });
+      setEditingExpenseId(null);
+      setEditExpenseForm(null);
+    }).catch(function() { setSavingExpenseEdit(false); alert('Failed to save changes'); });
+  }
+
+  function deleteExpense(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      clearCache('Op Budget');
+      setBudgetRows(function(prev) { return prev.filter(function(b) { return b.id !== id; }); });
+    });
   }
 
   var fieldSt = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' };
@@ -952,10 +1026,33 @@ const typeColors = {
                       <div style={{ marginTop: 10 }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Earnings</div>
                         {g.earningsRows.map(function(e, i) {
+                          if (editingEarningId === e.id && editEarningForm) {
+                            return (
+                              <div key={i} style={{ padding: '8px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                                  <input value={editEarningForm.event} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { event: ev.target.value }); }); }} list="events-hub-event-options" style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Event" />
+                                  <input value={editEarningForm.earning_source} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { earning_source: ev.target.value }); }); }} style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Source" />
+                                  <input type="number" step="0.01" min="0" value={editEarningForm.amount} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { amount: ev.target.value }); }); }} style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Amount" />
+                                  <input type="date" value={editEarningForm.date} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { date: ev.target.value }); }); }} style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
+                                </div>
+                                <input value={editEarningForm.notes} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { notes: ev.target.value }); }); }} style={{ width: '100%', padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }} placeholder="Notes" />
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button onClick={saveEditEarning} disabled={savingEarningEdit} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: savingEarningEdit ? 0.6 : 1 }}>{savingEarningEdit ? 'Saving…' : 'Save'}</button>
+                                  <button onClick={function() { setEditingEarningId(null); setEditEarningForm(null); }} disabled={savingEarningEdit} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 11, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                                </div>
+                              </div>
+                            );
+                          }
                           return (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid #f5f1eb' }}>
                               <span style={{ color: '#555' }}>{e.earning_source || 'Earning'}{e.notes ? ' — ' + e.notes : ''}</span>
-                              <span style={{ color: '#5a8a5a', fontWeight: 600, flexShrink: 0 }}>{fmt(e.amount)}</span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                <span style={{ color: '#5a8a5a', fontWeight: 600 }}>{fmt(e.amount)}</span>
+                                <button onClick={function() { startEditEarning(e); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                                <button onClick={function() { deleteEarning(e.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 13, padding: '0 2px' }}>×</button>
+                              </span>
                             </div>
                           );
                         })}
@@ -965,10 +1062,37 @@ const typeColors = {
                       <div style={{ marginTop: 10 }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Expenses</div>
                         {g.expenseRows.map(function(b, i) {
+                          if (editingExpenseId === b.id && editExpenseForm) {
+                            return (
+                              <div key={i} style={{ padding: '8px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                                  <input value={editExpenseForm.event_name} onChange={function(ev) { setEditExpenseForm(function(f) { return Object.assign({}, f, { event_name: ev.target.value }); }); }} list="events-hub-event-options" style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Event" />
+                                  <select value={editExpenseForm.type} onChange={function(ev) { setEditExpenseForm(function(f) { return Object.assign({}, f, { type: ev.target.value }); }); }} style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }}>
+                                    <option value="Purchase">Purchase</option>
+                                    <option value="In-Kind">In-Kind</option>
+                                  </select>
+                                  <input type="number" step="0.01" min="0" value={editExpenseForm.amount} onChange={function(ev) { setEditExpenseForm(function(f) { return Object.assign({}, f, { amount: ev.target.value }); }); }} style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Amount" />
+                                  <input type="date" value={editExpenseForm.date} onChange={function(ev) { setEditExpenseForm(function(f) { return Object.assign({}, f, { date: ev.target.value }); }); }} style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
+                                </div>
+                                <input value={editExpenseForm.description} onChange={function(ev) { setEditExpenseForm(function(f) { return Object.assign({}, f, { description: ev.target.value }); }); }} style={{ width: '100%', padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }} placeholder="Description" />
+                                <input value={editExpenseForm.purchased_by} onChange={function(ev) { setEditExpenseForm(function(f) { return Object.assign({}, f, { purchased_by: ev.target.value }); }); }} style={{ width: '100%', padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }} placeholder="Purchased by" />
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button onClick={saveEditExpense} disabled={savingExpenseEdit} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: savingExpenseEdit ? 0.6 : 1 }}>{savingExpenseEdit ? 'Saving…' : 'Save'}</button>
+                                  <button onClick={function() { setEditingExpenseId(null); setEditExpenseForm(null); }} disabled={savingExpenseEdit} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 11, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                                </div>
+                              </div>
+                            );
+                          }
                           return (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid #f5f1eb' }}>
                               <span style={{ color: '#555' }}>{b.description}{b.type ? ' (' + b.type + ')' : ''}</span>
-                              <span style={{ color: '#c07040', fontWeight: 600, flexShrink: 0 }}>{fmt(b.amount)}</span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                <span style={{ color: '#c07040', fontWeight: 600 }}>{fmt(b.amount)}</span>
+                                <button onClick={function() { startEditExpense(b); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                                <button onClick={function() { deleteExpense(b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 13, padding: '0 2px' }}>×</button>
+                              </span>
                             </div>
                           );
                         })}
@@ -4610,6 +4734,9 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var emptyEarningsForm = { event: '', earning_source: '', amount: '', notes: '', date: today };
   var [earningsForm, setEarningsForm] = useState(emptyEarningsForm);
   var [earningsSaving, setEarningsSaving] = useState(false);
+  var [editingEarningId, setEditingEarningId] = useState(null);
+  var [editEarningForm, setEditEarningForm] = useState(null);
+  var [editEarningSaving, setEditEarningSaving] = useState(false);
   var today = new Date().toISOString().slice(0, 10);
   var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '', purchased_by: '', event_name: '' });
   var [budgetSaving, setBudgetSaving] = useState(false);
@@ -4757,6 +4884,35 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       clearCache('Op Earnings');
       setEarnings(function(prev) { return prev.filter(function(e) { return e.id !== id; }); });
     });
+  }
+
+  function startEditEarning(e) {
+    setEditingEarningId(e.id);
+    setEditEarningForm({ event: e.event || '', earning_source: e.earning_source || '', amount: e.amount != null ? String(e.amount) : '', notes: e.notes || '', date: e.date || today });
+  }
+
+  function cancelEditEarning() {
+    setEditingEarningId(null);
+    setEditEarningForm(null);
+  }
+
+  function saveEditEarning() {
+    if (!editEarningForm) return;
+    setEditEarningSaving(true);
+    var patch = { event: editEarningForm.event, earning_source: editEarningForm.earning_source || null, amount: parseFloat(editEarningForm.amount) || 0, notes: editEarningForm.notes || null, date: editEarningForm.date || null };
+    var id = editingEarningId;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    }).then(function(r) {
+      if (!r.ok) throw new Error('Failed to save');
+      setEditEarningSaving(false);
+      clearCache('Op Earnings');
+      setEarnings(function(prev) { return prev.map(function(e) { return e.id === id ? Object.assign({}, e, patch) : e; }); });
+      setEditingEarningId(null);
+      setEditEarningForm(null);
+    }).catch(function() { setEditEarningSaving(false); alert('Failed to save changes'); });
   }
 
   function parseReceipts(receiptUrl) {
@@ -5597,6 +5753,23 @@ function OperationalView({ opArea, navigateToQuarterly }) {
             {earnings.length === 0 ? (
               <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No entries yet.</div>
             ) : earnings.map(function(e) {
+              if (editingEarningId === e.id && editEarningForm) {
+                return (
+                  <div key={e.id} style={{ padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                      <input value={editEarningForm.event} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { event: ev.target.value }); }); }} list="event-name-options" style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Event" />
+                      <input value={editEarningForm.earning_source} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { earning_source: ev.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Source" />
+                      <input type="number" step="0.01" min="0" value={editEarningForm.amount} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { amount: ev.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Amount" />
+                      <input type="date" value={editEarningForm.date} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { date: ev.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
+                    </div>
+                    <input value={editEarningForm.notes} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { notes: ev.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 8 }} placeholder="Notes" />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={saveEditEarning} disabled={editEarningSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: editEarningSaving ? 0.6 : 1 }}>{editEarningSaving ? 'Saving…' : 'Save'}</button>
+                      <button onClick={cancelEditEarning} disabled={editEarningSaving} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={e.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
                   <div style={{ flex: 1 }}>
@@ -5608,6 +5781,9 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                     {e.notes && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{e.notes}</div>}
                     {e.date && <div style={{ fontSize: 11, color: '#bbb', marginTop: 2 }}>{e.date}</div>}
                   </div>
+                  <button onClick={function() { startEditEarning(e); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px 4px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
                   <button onClick={function() { deleteEarningItem(e.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                 </div>
               );
