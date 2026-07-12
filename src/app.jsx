@@ -748,7 +748,7 @@ const typeColors = {
   var [feedback, setFeedback] = useState([]);
   var [feedbackLoading, setFeedbackLoading] = useState(true);
   var [showAddFeedback, setShowAddFeedback] = useState(false);
-  var [feedbackForm, setFeedbackForm] = useState({ event_name: '', source: '', name: '', feedback: '', date: todayStr });
+  var [feedbackForm, setFeedbackForm] = useState({ event_name: '', source: '', name: '', role: '', feedback: '', date: todayStr });
   var [savingFeedback, setSavingFeedback] = useState(false);
   var [editingFeedbackId, setEditingFeedbackId] = useState(null);
   var [editFeedbackForm, setEditFeedbackForm] = useState(null);
@@ -930,7 +930,7 @@ const typeColors = {
   function addFeedback(e) {
     e.preventDefault();
     setSavingFeedback(true);
-    var payload = { event_name: feedbackForm.event_name || null, source: feedbackForm.source || null, name: feedbackForm.name || null, feedback: feedbackForm.feedback, date: feedbackForm.date || null };
+    var payload = { event_name: feedbackForm.event_name || null, source: feedbackForm.source || null, name: feedbackForm.name || null, role: feedbackForm.role || null, feedback: feedbackForm.feedback, date: feedbackForm.date || null };
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Event Feedback'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -940,20 +940,20 @@ const typeColors = {
       if (rows && rows.code) { alert('Add failed: ' + (rows.message || rows.code)); return; }
       clearCache('Event Feedback');
       if (rows && rows[0]) setFeedback(function(prev) { return [rows[0]].concat(prev); });
-      setFeedbackForm({ event_name: '', source: '', name: '', feedback: '', date: todayStr });
+      setFeedbackForm({ event_name: '', source: '', name: '', role: '', feedback: '', date: todayStr });
       setShowAddFeedback(false);
     }).catch(function() { setSavingFeedback(false); });
   }
 
   function startEditFeedback(f) {
     setEditingFeedbackId(f.id);
-    setEditFeedbackForm({ event_name: f.event_name || '', source: f.source || '', name: f.name || '', feedback: f.feedback || '', date: f.date || todayStr });
+    setEditFeedbackForm({ event_name: f.event_name || '', source: f.source || '', name: f.name || '', role: f.role || '', feedback: f.feedback || '', date: f.date || todayStr });
   }
 
   function saveEditFeedback() {
     if (!editFeedbackForm) return;
     setSavingFeedbackEdit(true);
-    var patch = { event_name: editFeedbackForm.event_name || null, source: editFeedbackForm.source || null, name: editFeedbackForm.name || null, feedback: editFeedbackForm.feedback, date: editFeedbackForm.date || null };
+    var patch = { event_name: editFeedbackForm.event_name || null, source: editFeedbackForm.source || null, name: editFeedbackForm.name || null, role: editFeedbackForm.role || null, feedback: editFeedbackForm.feedback, date: editFeedbackForm.date || null };
     var id = editingFeedbackId;
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Event Feedback') + '?id=eq.' + id, {
       method: 'PATCH',
@@ -1216,6 +1216,10 @@ const typeColors = {
               <input value={feedbackForm.name} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { name: e.target.value }); }); }} style={fieldSt} placeholder="Who left this feedback (optional)" />
             </div>
             <div>
+              <label style={fieldLbl}>Role</label>
+              <input value={feedbackForm.role} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { role: e.target.value }); }); }} style={fieldSt} placeholder="e.g. Guest, Vendor, Volunteer…" />
+            </div>
+            <div>
               <label style={fieldLbl}>Date</label>
               <input type="date" value={feedbackForm.date} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={fieldSt} />
             </div>
@@ -1246,6 +1250,7 @@ const typeColors = {
                       </select>
                       <input value={editFeedbackForm.source} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { source: e.target.value }); }); }} list="events-hub-feedback-source-options" style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Source" />
                       <input value={editFeedbackForm.name} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { name: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Name" />
+                      <input value={editFeedbackForm.role} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { role: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Role" />
                       <input type="date" value={editFeedbackForm.date} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { date: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
                     </div>
                     <textarea value={editFeedbackForm.feedback} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { feedback: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', minHeight: 60, resize: 'vertical', fontFamily: 'inherit', marginBottom: 8 }} />
@@ -1260,12 +1265,17 @@ const typeColors = {
               return (
                 <div key={f.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px' }}>
-                    <button onClick={function() { toggleFeedback(f.id); }} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{f.name || 'Anonymous'}</span>
-                      {f.event_name && <span style={{ fontSize: 11, color: '#888' }}>{f.event_name}</span>}
-                      {f.source && <span style={{ fontSize: 11, color: '#aaa' }}>· {f.source}</span>}
-                      {f.date && <span style={{ fontSize: 11, color: '#ccc', marginLeft: 'auto' }}>{new Date(f.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
-                      <span style={{ fontSize: 12, color: '#ccc' }}>{isFeedbackOpen ? '▲' : '▼'}</span>
+                    <button onClick={function() { toggleFeedback(f.id); }} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, minWidth: 0 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{f.name || 'Anonymous'}{f.role ? ' - ' + f.role : ''}</div>
+                        {(f.event_name || f.source) && (
+                          <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>
+                            {f.event_name}{f.event_name && f.source ? ' · ' : ''}{f.source}
+                          </div>
+                        )}
+                      </div>
+                      {f.date && <span style={{ fontSize: 11, color: '#ccc', flexShrink: 0 }}>{new Date(f.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                      <span style={{ fontSize: 12, color: '#ccc', flexShrink: 0 }}>{isFeedbackOpen ? '▲' : '▼'}</span>
                     </button>
                     <button onClick={function() { startEditFeedback(f); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
