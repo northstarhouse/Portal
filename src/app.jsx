@@ -1263,7 +1263,7 @@ const typeColors = {
                     </button>
                     <button onClick={function() { deleteFeedback(f.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '0 2px' }}>×</button>
                   </div>
-                  <div style={{ fontSize: 13, color: '#555', lineHeight: 1.5 }}>{f.feedback}</div>
+                  <div style={{ fontSize: 13, color: '#555', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{f.feedback}</div>
                 </div>
               );
             })}
