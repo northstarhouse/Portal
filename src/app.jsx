@@ -820,6 +820,7 @@ const typeColors = {
   var totalEarnings = groups.reduce(function(s, r) { return s + r.earnings; }, 0);
   var totalCosts = groups.reduce(function(s, r) { return s + r.costs; }, 0);
   var eventNameOptions = groups.map(function(g) { return g.event; }).filter(function(n) { return n && n !== 'Uncategorized'; });
+  var feedbackSourceOptions = Array.from(new Set(feedback.map(function(f) { return (f.source || '').trim(); }).filter(Boolean))).sort();
 
   function addEarning(e) {
     e.preventDefault();
@@ -984,6 +985,9 @@ const typeColors = {
     <div>
       <datalist id="events-hub-event-options">
         {eventNameOptions.map(function(n) { return <option key={n} value={n} />; })}
+      </datalist>
+      <datalist id="events-hub-feedback-source-options">
+        {feedbackSourceOptions.map(function(n) { return <option key={n} value={n} />; })}
       </datalist>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
@@ -1200,7 +1204,7 @@ const typeColors = {
             </div>
             <div>
               <label style={fieldLbl}>Source</label>
-              <input value={feedbackForm.source} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { source: e.target.value }); }); }} style={fieldSt} placeholder="e.g. Google review, comment card…" />
+              <input value={feedbackForm.source} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { source: e.target.value }); }); }} list="events-hub-feedback-source-options" style={fieldSt} placeholder="e.g. Google review, comment card…" />
             </div>
             <div>
               <label style={fieldLbl}>Name</label>
@@ -1235,7 +1239,7 @@ const typeColors = {
                         <option value="">Select an event…</option>
                         {eventNameOptions.map(function(n) { return <option key={n} value={n}>{n}</option>; })}
                       </select>
-                      <input value={editFeedbackForm.source} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { source: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Source" />
+                      <input value={editFeedbackForm.source} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { source: e.target.value }); }); }} list="events-hub-feedback-source-options" style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Source" />
                       <input value={editFeedbackForm.name} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { name: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Name" />
                       <input type="date" value={editFeedbackForm.date} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { date: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
                     </div>
