@@ -738,12 +738,21 @@ const typeColors = {
   );
 }function EventsView({ navigate }) {
   var { useState, useEffect, useMemo } = React;
+  var [tab, setTab] = useState('pnl');
   var [loading, setLoading] = useState(true);
   var [budgetRows, setBudgetRows] = useState([]);
   var [earningsRows, setEarningsRows] = useState([]);
   var [inHouse, setInHouse] = useState([]);
   var [expanded, setExpanded] = useState(null);
   var todayStr = new Date().toISOString().slice(0, 10);
+  var [feedback, setFeedback] = useState([]);
+  var [feedbackLoading, setFeedbackLoading] = useState(true);
+  var [showAddFeedback, setShowAddFeedback] = useState(false);
+  var [feedbackForm, setFeedbackForm] = useState({ event_name: '', source: '', name: '', feedback: '', date: todayStr });
+  var [savingFeedback, setSavingFeedback] = useState(false);
+  var [editingFeedbackId, setEditingFeedbackId] = useState(null);
+  var [editFeedbackForm, setEditFeedbackForm] = useState(null);
+  var [savingFeedbackEdit, setSavingFeedbackEdit] = useState(false);
   var [showAddEarning, setShowAddEarning] = useState(false);
   var [earningForm, setEarningForm] = useState({ event: '', earning_source: '', amount: '', notes: '', date: todayStr });
   var [savingEarning, setSavingEarning] = useState(false);
@@ -769,6 +778,10 @@ const typeColors = {
       setInHouse(Array.isArray(res[2]) ? res[2] : []);
       setLoading(false);
     }).catch(function() { setLoading(false); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Event Feedback') + '?select=*&order=date.desc,id.desc', { headers: hdrs }).then(function(r) { return r.json(); }).then(function(rows) {
+      setFeedback(Array.isArray(rows) ? rows : []);
+      setFeedbackLoading(false);
+    }).catch(function() { setFeedbackLoading(false); });
   }, []);
 
   function fmt(n) { return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -912,6 +925,58 @@ const typeColors = {
     });
   }
 
+  function addFeedback(e) {
+    e.preventDefault();
+    setSavingFeedback(true);
+    var payload = { event_name: feedbackForm.event_name || null, source: feedbackForm.source || null, name: feedbackForm.name || null, feedback: feedbackForm.feedback, date: feedbackForm.date || null };
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Event Feedback'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setSavingFeedback(false);
+      if (rows && rows.code) { alert('Add failed: ' + (rows.message || rows.code)); return; }
+      clearCache('Event Feedback');
+      if (rows && rows[0]) setFeedback(function(prev) { return [rows[0]].concat(prev); });
+      setFeedbackForm({ event_name: '', source: '', name: '', feedback: '', date: todayStr });
+      setShowAddFeedback(false);
+    }).catch(function() { setSavingFeedback(false); });
+  }
+
+  function startEditFeedback(f) {
+    setEditingFeedbackId(f.id);
+    setEditFeedbackForm({ event_name: f.event_name || '', source: f.source || '', name: f.name || '', feedback: f.feedback || '', date: f.date || todayStr });
+  }
+
+  function saveEditFeedback() {
+    if (!editFeedbackForm) return;
+    setSavingFeedbackEdit(true);
+    var patch = { event_name: editFeedbackForm.event_name || null, source: editFeedbackForm.source || null, name: editFeedbackForm.name || null, feedback: editFeedbackForm.feedback, date: editFeedbackForm.date || null };
+    var id = editingFeedbackId;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Event Feedback') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    }).then(function(r) {
+      if (!r.ok) throw new Error('Failed to save');
+      setSavingFeedbackEdit(false);
+      clearCache('Event Feedback');
+      setFeedback(function(prev) { return prev.map(function(f) { return f.id === id ? Object.assign({}, f, patch) : f; }); });
+      setEditingFeedbackId(null);
+      setEditFeedbackForm(null);
+    }).catch(function() { setSavingFeedbackEdit(false); alert('Failed to save changes'); });
+  }
+
+  function deleteFeedback(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Event Feedback') + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      clearCache('Event Feedback');
+      setFeedback(function(prev) { return prev.filter(function(f) { return f.id !== id; }); });
+    });
+  }
+
   var fieldSt = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' };
   var fieldLbl = { fontSize: 11, color: '#888', marginBottom: 4, display: 'block' };
 
@@ -926,11 +991,23 @@ const typeColors = {
           <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Events</div>
           <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Earnings & expenses by event, pulled from the Events operational area</div>
         </div>
-        <button onClick={function() { setShowAddEarning(function(s) { return !s; }); setShowAddExpense(false); }} style={{ fontSize: 12, background: showAddEarning ? '#f5f0ea' : gold, color: showAddEarning ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddEarning ? 'Cancel' : '+ Log Earning'}</button>
-        <button onClick={function() { setShowAddExpense(function(s) { return !s; }); setShowAddEarning(false); }} style={{ fontSize: 12, background: showAddExpense ? '#f5f0ea' : gold, color: showAddExpense ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddExpense ? 'Cancel' : '+ Log Expense'}</button>
+        {tab === 'pnl' && (
+          <button onClick={function() { setShowAddEarning(function(s) { return !s; }); setShowAddExpense(false); }} style={{ fontSize: 12, background: showAddEarning ? '#f5f0ea' : gold, color: showAddEarning ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddEarning ? 'Cancel' : '+ Log Earning'}</button>
+        )}
+        {tab === 'pnl' && (
+          <button onClick={function() { setShowAddExpense(function(s) { return !s; }); setShowAddEarning(false); }} style={{ fontSize: 12, background: showAddExpense ? '#f5f0ea' : gold, color: showAddExpense ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddExpense ? 'Cancel' : '+ Log Expense'}</button>
+        )}
+        {tab === 'feedback' && (
+          <button onClick={function() { setShowAddFeedback(function(s) { return !s; }); }} style={{ fontSize: 12, background: showAddFeedback ? '#f5f0ea' : gold, color: showAddFeedback ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddFeedback ? 'Cancel' : '+ Add Feedback'}</button>
+        )}
       </div>
 
-      {showAddEarning && (
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '0.5px solid #e8dece' }}>
+        <button onClick={function() { setTab('pnl'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'pnl' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, fontSize: 13, fontWeight: tab === 'pnl' ? 600 : 400, color: tab === 'pnl' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Profit & Loss</button>
+        <button onClick={function() { setTab('feedback'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'feedback' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, marginLeft: 16, fontSize: 13, fontWeight: tab === 'feedback' ? 600 : 400, color: tab === 'feedback' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Reviews & Feedback{feedback.length > 0 ? ' (' + feedback.length + ')' : ''}</button>
+      </div>
+
+      {tab === 'pnl' && showAddEarning && (
         <form onSubmit={addEarning} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, marginBottom: 20 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
@@ -958,7 +1035,7 @@ const typeColors = {
         </form>
       )}
 
-      {showAddExpense && (
+      {tab === 'pnl' && showAddExpense && (
         <form onSubmit={addExpense} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, marginBottom: 20 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
@@ -993,13 +1070,15 @@ const typeColors = {
         </form>
       )}
 
+      {tab === 'pnl' && (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
         <StatCard label="Earnings" value={fmt(totalEarnings)} />
         <StatCard label="Costs" value={fmt(totalCosts)} />
         <StatCard label="Net" value={fmt(totalEarnings - totalCosts)} />
       </div>
+      )}
 
-      {loading ? (
+      {tab === 'pnl' && (loading ? (
         <div style={{ textAlign: 'center', padding: 48, color: '#aaa', fontSize: 13 }}>Loading…</div>
       ) : groups.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 48, color: '#ccc', fontSize: 13 }}>No events tracked yet — add earnings or expenses under Operational Areas → Events.</div>
@@ -1107,6 +1186,85 @@ const typeColors = {
             );
           })}
         </div>
+      ))}
+
+      {tab === 'feedback' && showAddFeedback && (
+        <form onSubmit={addFeedback} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={fieldLbl}>Event Name</label>
+              <select required value={feedbackForm.event_name} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} style={fieldSt}>
+                <option value="">Select an event…</option>
+                {eventNameOptions.map(function(n) { return <option key={n} value={n}>{n}</option>; })}
+              </select>
+            </div>
+            <div>
+              <label style={fieldLbl}>Source</label>
+              <input value={feedbackForm.source} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { source: e.target.value }); }); }} style={fieldSt} placeholder="e.g. Google review, comment card…" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Name</label>
+              <input value={feedbackForm.name} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { name: e.target.value }); }); }} style={fieldSt} placeholder="Who left this feedback (optional)" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Date</label>
+              <input type="date" value={feedbackForm.date} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={fieldSt} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={fieldLbl}>Feedback</label>
+            <textarea required value={feedbackForm.feedback} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { feedback: e.target.value }); }); }} style={Object.assign({}, fieldSt, { minHeight: 70, resize: 'vertical', fontFamily: 'inherit' })} placeholder="What did they say…" />
+          </div>
+          <button type="submit" disabled={savingFeedback} style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 600, opacity: savingFeedback ? 0.5 : 1 }}>{savingFeedback ? 'Saving…' : 'Add Feedback'}</button>
+        </form>
+      )}
+
+      {tab === 'feedback' && (
+        feedbackLoading ? (
+          <div style={{ textAlign: 'center', padding: 48, color: '#aaa', fontSize: 13 }}>Loading…</div>
+        ) : feedback.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 48, color: '#ccc', fontSize: 13 }}>No feedback recorded yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {feedback.map(function(f) {
+              if (editingFeedbackId === f.id && editFeedbackForm) {
+                return (
+                  <div key={f.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 14 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                      <select value={editFeedbackForm.event_name} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { event_name: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }}>
+                        <option value="">Select an event…</option>
+                        {eventNameOptions.map(function(n) { return <option key={n} value={n}>{n}</option>; })}
+                      </select>
+                      <input value={editFeedbackForm.source} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { source: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Source" />
+                      <input value={editFeedbackForm.name} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { name: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Name" />
+                      <input type="date" value={editFeedbackForm.date} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { date: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
+                    </div>
+                    <textarea value={editFeedbackForm.feedback} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { feedback: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', minHeight: 60, resize: 'vertical', fontFamily: 'inherit', marginBottom: 8 }} />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={saveEditFeedback} disabled={savingFeedbackEdit} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: savingFeedbackEdit ? 0.6 : 1 }}>{savingFeedbackEdit ? 'Saving…' : 'Save'}</button>
+                      <button onClick={function() { setEditingFeedbackId(null); setEditFeedbackForm(null); }} disabled={savingFeedbackEdit} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div key={f.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '12px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {f.event_name && <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{f.event_name}</span>}
+                    {f.source && <span style={{ fontSize: 11, color: '#888' }}>{f.source}</span>}
+                    {f.name && <span style={{ fontSize: 11, color: '#aaa' }}>· {f.name}</span>}
+                    {f.date && <span style={{ fontSize: 11, color: '#ccc', marginLeft: 'auto' }}>{new Date(f.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                    <button onClick={function() { startEditFeedback(f); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button onClick={function() { deleteFeedback(f.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '0 2px' }}>×</button>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#555', lineHeight: 1.5 }}>{f.feedback}</div>
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
     </div>
   );
