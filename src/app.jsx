@@ -1463,9 +1463,8 @@ function EventTagPicker({ value, onChange }) {
   var selected = value ? value.split('|').map(function(t) { return t.trim(); }).filter(Boolean) : [];
 
   function addTag() {
-    var trimmed = newTag.trim();
-    if (!trimmed) return;
-    var tag = /^volunteered for:/i.test(trimmed) ? trimmed : 'Volunteered for: ' + trimmed;
+    var tag = newTag.trim();
+    if (!tag) return;
     if (selected.indexOf(tag) === -1) {
       onChange({ target: { name: 'Event Tags', value: selected.concat([tag]).join(' | ') } });
     }
@@ -1495,7 +1494,7 @@ function EventTagPicker({ value, onChange }) {
           value={newTag}
           onChange={function(e) { setNewTag(e.target.value); }}
           onKeyDown={function(e) { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
-          placeholder="Event name…"
+          placeholder="List name…"
           style={Object.assign({}, volInputStyle, { marginTop: 0, flex: 1 })}
         />
         <button type="button" onClick={addTag} disabled={!newTag.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: newTag.trim() ? 1 : 0.4, flexShrink: 0 }}>Add</button>
@@ -1574,7 +1573,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete, 
           </div>
           <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="On-Call Supporter">On-Call Supporter</option><option value="Inactive">Inactive</option></select></div>
           <div style={volGrp}><label style={volLabelStyle}>Team</label><div style={{ marginTop: 4 }}><TeamPicker value={form['Team']} onChange={onChange} extraTeams={extraTeams || []} /></div></div>
-          <div style={volGrp}><label style={volLabelStyle}>Event Tags</label><div style={{ marginTop: 4 }}><EventTagPicker value={form['Event Tags']} onChange={onChange} /></div></div>
+          <div style={volGrp}><label style={volLabelStyle}>Custom Lists</label><div style={{ marginTop: 4 }}><EventTagPicker value={form['Event Tags']} onChange={onChange} /></div></div>
           <span style={volSecLabel}>Contact</span>
           <div style={volGrp}><label style={volLabelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={onChange} style={volInputStyle} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={onChange} style={volInputStyle} /></div>
@@ -8426,9 +8425,8 @@ function VolEmailListsView({ navigate }) {
   }
 
   function createTagList() {
-    var name = newListName.trim();
-    if (!name) return;
-    var tag = /^volunteered for:/i.test(name) ? name : 'Volunteered for: ' + name;
+    var tag = newListName.trim();
+    if (!tag) return;
     var ids = Object.keys(newListSelected).filter(function(id) { return newListSelected[id]; });
     if (!ids.length) return;
     setCreatingList(true);
@@ -8517,9 +8515,8 @@ function VolEmailListsView({ navigate }) {
   }
 
   function saveEditGroup() {
-    var name = editTagName.trim();
-    if (!name) return;
-    var newTag = /^volunteered for:/i.test(name) ? name : 'Volunteered for: ' + name;
+    var newTag = editTagName.trim();
+    if (!newTag) return;
     var selectedIds = Object.keys(editSelected).filter(function(id) { return editSelected[id]; });
     applyTagChange(editingTag, newTag, selectedIds);
   }
@@ -8593,7 +8590,7 @@ function VolEmailListsView({ navigate }) {
         {isEditing && (
           <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Event name</label>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>List name</label>
               <input value={editTagName} onChange={function(e) { setEditTagName(e.target.value); }} style={Object.assign({}, volInputStyle, { marginTop: 0 })} />
             </div>
             <div>
@@ -8742,29 +8739,28 @@ function VolEmailListsView({ navigate }) {
         )}
       </div>
 
-      {/* Event tag lists */}
+      {/* Custom / one-off lists */}
       <div style={{ marginTop: 28 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Event Tags</div>
-        <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Volunteers tagged for a specific event (e.g. "Volunteered for: Fall Gala")</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Custom Lists</div>
+        <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Any one-off group of volunteers — an event, an outreach group, anything you need to email as a batch</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {volunteers === null ? null : eventGroups.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 32, color: '#ccc', fontSize: 13, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12 }}>No event tags yet — create one below.</div>
+            <div style={{ textAlign: 'center', padding: 32, color: '#ccc', fontSize: 13, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12 }}>No custom lists yet — create one below.</div>
           ) : eventGroups.map(function(g) { return renderGroupCard(g, function() { return { bg: '#e8f4fd', color: '#0d6eab' }; }, true); })}
         </div>
       </div>
 
-      {/* Create a new volunteer tag list */}
+      {/* Create a new volunteer list */}
       <div style={{ marginTop: 20, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
         <button onClick={function() { setShowCreateList(function(s) { return !s; }); }} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#fdfcfb', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>+ Create a new volunteer tag list</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>+ Create a new list</span>
           <span style={{ fontSize: 12, color: '#ccc' }}>{showCreateList ? '▲' : '▼'}</span>
         </button>
         {showCreateList && (
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Event name</label>
-              <input value={newListName} onChange={function(e) { setNewListName(e.target.value); }} placeholder="e.g. Fall Gala" style={inpSt} />
-              <div style={{ fontSize: 10, color: '#aaa', marginTop: 4 }}>Will be saved as "{newListName.trim() ? (/^volunteered for:/i.test(newListName.trim()) ? newListName.trim() : 'Volunteered for: ' + newListName.trim()) : 'Volunteered for: …'}"</div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>List name</label>
+              <input value={newListName} onChange={function(e) { setNewListName(e.target.value); }} placeholder="e.g. Fall Gala, Newsletter Signups…" style={inpSt} />
             </div>
             <div>
               <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Select volunteers ({Object.keys(newListSelected).filter(function(id) { return newListSelected[id]; }).length} selected)</label>
@@ -8791,7 +8787,7 @@ function VolEmailListsView({ navigate }) {
                 onClick={createTagList}
                 disabled={!newListName.trim() || !Object.keys(newListSelected).some(function(id) { return newListSelected[id]; }) || creatingList}
                 style={{ flex: 1, padding: '9px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!newListName.trim() || !Object.keys(newListSelected).some(function(id) { return newListSelected[id]; }) || creatingList) ? 0.5 : 1 }}
-              >{creatingList ? 'Creating…' : 'Create tag list'}</button>
+              >{creatingList ? 'Creating…' : 'Create list'}</button>
               <button onClick={function() { setShowCreateList(false); setNewListName(''); setNewListSearch(''); setNewListSelected({}); setCreateListError(null); }} disabled={creatingList} style={{ padding: '9px 16px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
             </div>
           </div>
