@@ -771,7 +771,7 @@ const typeColors = {
     }).catch(function() { setLoading(false); });
   }, []);
 
-  function fmt(n) { return '$' + Math.round(n || 0).toLocaleString('en-US'); }
+  function fmt(n) { return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
   var groups = useMemo(function() {
     var byEvent = {};
@@ -4661,7 +4661,7 @@ function EventsProfitLossModal({ onClose }) {
     }).catch(function() { setLoading(false); });
   }, []);
 
-  function fmt(n) { return '$' + Math.round(n || 0).toLocaleString('en-US'); }
+  function fmt(n) { return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   var totalEarnings = rows.reduce(function(s, r) { return s + r.earnings; }, 0);
   var totalCosts = rows.reduce(function(s, r) { return s + r.costs; }, 0);
   var totalNet = totalEarnings - totalCosts;
