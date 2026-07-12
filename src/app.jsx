@@ -736,20 +736,139 @@ const typeColors = {
 
     </div>
   );
-}function EventsView() {
+}function EventsView({ navigate }) {
+  var { useState, useEffect, useMemo } = React;
+  var [loading, setLoading] = useState(true);
+  var [budgetRows, setBudgetRows] = useState([]);
+  var [earningsRows, setEarningsRows] = useState([]);
+  var [inHouse, setInHouse] = useState([]);
+  var [expanded, setExpanded] = useState(null);
+
+  useEffect(function() {
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?area=eq.Events&select=*', { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?area=eq.Events&select=*', { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('In-House Events') + '?select=*&order=date.asc', { headers: hdrs }).then(function(r) { return r.json(); })
+    ]).then(function(res) {
+      setBudgetRows(Array.isArray(res[0]) ? res[0] : []);
+      setEarningsRows(Array.isArray(res[1]) ? res[1] : []);
+      setInHouse(Array.isArray(res[2]) ? res[2] : []);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }, []);
+
+  function fmt(n) { return '$' + Math.round(n || 0).toLocaleString('en-US'); }
+
+  var groups = useMemo(function() {
+    var byEvent = {};
+    function bucket(name) {
+      var key = (name || '').trim() || 'Uncategorized';
+      if (!byEvent[key]) byEvent[key] = { event: key, earnings: 0, costs: 0, earningsRows: [], expenseRows: [], date: null, link: null };
+      return byEvent[key];
+    }
+    earningsRows.forEach(function(e) { var b = bucket(e.event); b.earnings += parseFloat(e.amount) || 0; b.earningsRows.push(e); });
+    budgetRows.forEach(function(b0) {
+      var b = bucket(b0.event_name);
+      b.expenseRows.push(b0);
+      if (b0.type === 'Purchase' || b0.type === 'In-Kind') b.costs += parseFloat(b0.amount) || 0;
+    });
+    inHouse.forEach(function(ev) {
+      var name = (ev.name || '').trim();
+      if (!name) return;
+      var match = Object.keys(byEvent).find(function(k) { return k.toLowerCase() === name.toLowerCase(); });
+      var b = match ? byEvent[match] : bucket(name);
+      b.date = ev.date || b.date;
+      b.link = ev.link || b.link;
+    });
+    var list = Object.keys(byEvent).map(function(k) { var r = byEvent[k]; return Object.assign({}, r, { net: r.earnings - r.costs }); });
+    list.sort(function(a, b) {
+      if (a.date && b.date) return new Date(b.date) - new Date(a.date);
+      if (a.date) return -1;
+      if (b.date) return 1;
+      return b.net - a.net;
+    });
+    return list;
+  }, [budgetRows, earningsRows, inHouse]);
+
+  var totalEarnings = groups.reduce(function(s, r) { return s + r.earnings; }, 0);
+  var totalCosts = groups.reduce(function(s, r) { return s + r.costs; }, 0);
+
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <StatCard label="Total Events" value="5" sub="next 90 days" />
-        <StatCard label="Confirmed" value="3" />
-        <StatCard label="Est. Revenue" value="$6,600" sub="confirmed only" />
-        <StatCard label="Est. Guests" value="395" sub="across all events" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Events</div>
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Earnings & expenses by event, pulled from the Events operational area</div>
+        </div>
       </div>
-      <Table
-        cols={["Event", "Date", "Status", "Est. Guests", "Revenue"]}
-        rows={mockData.events}
-        renderRow={r => (<><Td>{r.name}</Td><Td muted>{r.date}</Td><Td><Badge status={r.status} /></Td><Td muted>{r.guests}</Td><Td>{r.revenue}</Td></>)}
-      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+        <StatCard label="Earnings" value={fmt(totalEarnings)} />
+        <StatCard label="Costs" value={fmt(totalCosts)} />
+        <StatCard label="Net" value={fmt(totalEarnings - totalCosts)} />
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 48, color: '#aaa', fontSize: 13 }}>Loading…</div>
+      ) : groups.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 48, color: '#ccc', fontSize: 13 }}>No events tracked yet — add earnings or expenses under Operational Areas → Events.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {groups.map(function(g) {
+            var isOpen = expanded === g.event;
+            return (
+              <div key={g.event} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+                <button onClick={function() { setExpanded(isOpen ? null : g.event); }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#fdfcfb', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{g.event}</div>
+                    {g.date && <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{new Date(g.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>}
+                  </div>
+                  <span style={{ fontSize: 12, color: '#5a8a5a', fontWeight: 600, minWidth: 70, textAlign: 'right' }}>{fmt(g.earnings)}</span>
+                  <span style={{ fontSize: 12, color: '#c07040', fontWeight: 600, minWidth: 70, textAlign: 'right' }}>-{fmt(g.costs)}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: g.net >= 0 ? '#2e7d32' : '#c62828', minWidth: 80, textAlign: 'right' }}>{g.net >= 0 ? '' : '-'}{fmt(Math.abs(g.net))}</span>
+                  <span style={{ fontSize: 12, color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
+                </button>
+                {isOpen && (
+                  <div style={{ padding: '4px 16px 14px' }}>
+                    {g.link && <a href={g.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: gold, textDecoration: 'none' }}>Event details ↗</a>}
+                    {g.earningsRows.length > 0 && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Earnings</div>
+                        {g.earningsRows.map(function(e, i) {
+                          return (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                              <span style={{ color: '#555' }}>{e.earning_source || 'Earning'}{e.notes ? ' — ' + e.notes : ''}</span>
+                              <span style={{ color: '#5a8a5a', fontWeight: 600, flexShrink: 0 }}>{fmt(e.amount)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {g.expenseRows.length > 0 && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Expenses</div>
+                        {g.expenseRows.map(function(b, i) {
+                          return (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                              <span style={{ color: '#555' }}>{b.description}{b.type ? ' (' + b.type + ')' : ''}</span>
+                              <span style={{ color: '#c07040', fontWeight: 600, flexShrink: 0 }}>{fmt(b.amount)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {g.earningsRows.length === 0 && g.expenseRows.length === 0 && (
+                      <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic', marginTop: 8 }}>No financial entries recorded for this event yet.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -7641,7 +7760,6 @@ var ADMIN_FORMS = [
   { label: "2026 Pricing Guide", url: "https://drive.google.com/drive/folders/1Mi8nNZzNWx1fz7CQ11XiW8SHPqQnBAgR" },
   { label: "Creative Rental Form", url: "https://drive.google.com/file/d/1Lp3WDaYukjmZ4lB_iS4sJj9PC6fjzz6I/view" },
   { label: "Creative Rental Contract", url: "https://docs.google.com/document/d/1hKb9QK7MmrNpbmQcONyqNFbffEYGqJm5/edit?rtpof=true&sd=true#heading=h.3ff89qn2162x" },
-  { label: "Form Builder", url: "https://northstarhouse.github.io/NSH-forms/" },
 ];
 
 var ADMIN_TOOLS = [
@@ -7669,6 +7787,11 @@ var ADMIN_TOOLS = [
     label: "Event Planning",
     url: "https://northstarhouse.github.io/nsh-events-committee/",
     icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  },
+  {
+    label: "Form Builder",
+    url: "https://northstarhouse.github.io/NSH-forms/",
+    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
   },
 ];
 
@@ -7699,6 +7822,7 @@ function AdminToolCard(props) {
 function AdminView({ navigate }) {
   var emailIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/><polyline points="2,18 8,13"/><polyline points="22,18 16,13"/></svg>;
   var checkIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
+  var eventsIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Tools</div>
@@ -7723,6 +7847,15 @@ function AdminView({ navigate }) {
         >
           <span style={{ color: '#b5a185', flexShrink: 0 }}>{checkIcon}</span>
           Form Submissions
+        </div>
+        <div
+          onClick={function() { navigate('events'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{eventsIcon}</span>
+          Events
         </div>
       </div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Outreach</div>
