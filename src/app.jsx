@@ -971,14 +971,18 @@ var volSecLabel = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2
 var VOL_MONTHS = [['01','January'],['02','February'],['03','March'],['04','April'],['05','May'],['06','June'],['07','July'],['08','August'],['09','September'],['10','October'],['11','November'],['12','December']];
 
 function VolDatePicker({ label, name, value, onChange, noDay }) {
-  var parts = (value || '').split('-');
-  var hasAll = parts.length === 3;
-  var yr = hasAll ? (parts[0] === '0001' ? '' : parts[0]) : '';
-  var mn = hasAll ? parts[1] : '';
-  var dy = hasAll ? String(parseInt(parts[2]) || '') : '';
+  const { useState: useS } = React;
+  function parseVal(v) {
+    var parts = (v || '').split('-');
+    if (parts.length !== 3) return { mn: '', dy: '', yr: '' };
+    return { mn: parts[1] || '', dy: String(parseInt(parts[2]) || ''), yr: parts[0] === '0001' ? '' : parts[0] };
+  }
+  var [local, setLocal] = useS(function() { return parseVal(value); });
+  var mn = local.mn, dy = local.dy, yr = local.yr;
   var currentYear = new Date().getFullYear();
 
   function notify(month, day, year) {
+    setLocal({ mn: month, dy: day, yr: year });
     if (!month || (!year && !noDay)) { onChange({ target: { name: name, value: '' } }); return; }
     var y = String(year || '0001').padStart(4, '0');
     var m = String(month).padStart(2, '0');
