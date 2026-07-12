@@ -753,6 +753,7 @@ const typeColors = {
   var [editingFeedbackId, setEditingFeedbackId] = useState(null);
   var [editFeedbackForm, setEditFeedbackForm] = useState(null);
   var [savingFeedbackEdit, setSavingFeedbackEdit] = useState(false);
+  var [expandedFeedback, setExpandedFeedback] = useState({});
   var [showAddEarning, setShowAddEarning] = useState(false);
   var [earningForm, setEarningForm] = useState({ event: '', earning_source: '', amount: '', notes: '', date: todayStr });
   var [savingEarning, setSavingEarning] = useState(false);
@@ -976,6 +977,10 @@ const typeColors = {
       clearCache('Event Feedback');
       setFeedback(function(prev) { return prev.filter(function(f) { return f.id !== id; }); });
     });
+  }
+
+  function toggleFeedback(id) {
+    setExpandedFeedback(function(prev) { var n = Object.assign({}, prev); n[id] = !n[id]; return n; });
   }
 
   var fieldSt = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' };
@@ -1251,19 +1256,25 @@ const typeColors = {
                   </div>
                 );
               }
+              var isFeedbackOpen = !!expandedFeedback[f.id];
               return (
-                <div key={f.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                    {f.event_name && <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{f.event_name}</span>}
-                    {f.source && <span style={{ fontSize: 11, color: '#888' }}>{f.source}</span>}
-                    {f.name && <span style={{ fontSize: 11, color: '#aaa' }}>· {f.name}</span>}
-                    {f.date && <span style={{ fontSize: 11, color: '#ccc', marginLeft: 'auto' }}>{new Date(f.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
-                    <button onClick={function() { startEditFeedback(f); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                <div key={f.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px' }}>
+                    <button onClick={function() { toggleFeedback(f.id); }} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{f.name || 'Anonymous'}</span>
+                      {f.event_name && <span style={{ fontSize: 11, color: '#888' }}>{f.event_name}</span>}
+                      {f.source && <span style={{ fontSize: 11, color: '#aaa' }}>· {f.source}</span>}
+                      {f.date && <span style={{ fontSize: 11, color: '#ccc', marginLeft: 'auto' }}>{new Date(f.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                      <span style={{ fontSize: 12, color: '#ccc' }}>{isFeedbackOpen ? '▲' : '▼'}</span>
+                    </button>
+                    <button onClick={function() { startEditFeedback(f); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
-                    <button onClick={function() { deleteFeedback(f.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '0 2px' }}>×</button>
+                    <button onClick={function() { deleteFeedback(f.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '0 2px', flexShrink: 0 }}>×</button>
                   </div>
-                  <div style={{ fontSize: 13, color: '#555', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{f.feedback}</div>
+                  {isFeedbackOpen && (
+                    <div style={{ padding: '0 16px 14px', fontSize: 13, color: '#555', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{f.feedback}</div>
+                  )}
                 </div>
               );
             })}
