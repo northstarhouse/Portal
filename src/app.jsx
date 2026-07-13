@@ -1330,6 +1330,7 @@ function sbPatchById(table, id, row) {
   }).then(r => r.json());
 }
 
+var DEFAULT_LIST_COLOR = '#0d6eab';
 var TEAM_COLORS = {
   'Grounds':      { bg: '#e8f5e9', color: '#2e7d32' },
   'Construction': { bg: '#fff3e0', color: '#e65100' },
@@ -1457,7 +1458,7 @@ function TeamPicker({ value, onChange, extraTeams }) {
   );
 }
 
-function EventTagPicker({ value, onChange }) {
+function EventTagPicker({ value, onChange, colors }) {
   const { useState: useS } = React;
   const [newTag, setNewTag] = useS('');
   var selected = value ? value.split('|').map(function(t) { return t.trim(); }).filter(Boolean) : [];
@@ -1480,8 +1481,9 @@ function EventTagPicker({ value, onChange }) {
       {selected.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
           {selected.map(function(t) {
+            var c = (colors && colors[t]) || DEFAULT_LIST_COLOR;
             return (
-              <span key={t} style={{ background: '#e8f4fd', color: '#0d6eab', fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+              <span key={t} style={{ background: c + '22', color: c, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                 {t}
                 <span onClick={function() { remove(t); }} style={{ cursor: 'pointer', opacity: 0.6, fontSize: 12, lineHeight: 1, marginLeft: 2 }}>×</span>
               </span>
@@ -1557,7 +1559,7 @@ function VolDatePicker({ label, name, value, onChange, noDay }) {
   );
 }
 
-function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete, extraTeams }) {
+function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete, extraTeams, listColors }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -1573,7 +1575,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete, 
           </div>
           <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="On-Call Supporter">On-Call Supporter</option><option value="Inactive">Inactive</option></select></div>
           <div style={volGrp}><label style={volLabelStyle}>Team</label><div style={{ marginTop: 4 }}><TeamPicker value={form['Team']} onChange={onChange} extraTeams={extraTeams || []} /></div></div>
-          <div style={volGrp}><label style={volLabelStyle}>Custom Lists</label><div style={{ marginTop: 4 }}><EventTagPicker value={form['Event Tags']} onChange={onChange} /></div></div>
+          <div style={volGrp}><label style={volLabelStyle}>Custom Lists</label><div style={{ marginTop: 4 }}><EventTagPicker value={form['Event Tags']} onChange={onChange} colors={listColors} /></div></div>
           <span style={volSecLabel}>Contact</span>
           <div style={volGrp}><label style={volLabelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={onChange} style={volInputStyle} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={onChange} style={volInputStyle} /></div>
@@ -1652,6 +1654,7 @@ function VolunteersView() {
   var OB_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRvOZozfWfzXyS5GyAHDyzQbXf-A8GxNMKTTRh6BGDJCVAAdimGW7MvLdhl0Ab0PuUgmUfm8xpZRUyP/pub?gid=544068320&single=true&output=csv';
   var HOUR_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const [hoursData, setHoursData] = React.useState({});
+  const [listColors, setListColors] = useState({});
 
   function buildHoursMapFromLogs(logs) {
     var byName = {};
@@ -1761,6 +1764,14 @@ function VolunteersView() {
         setLoading(false);
       })
       .catch(function(err) { setError(err.message); setLoading(false); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('List Tag Colors') + '?select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (!Array.isArray(rows)) return;
+      var map = {};
+      rows.forEach(function(r) { map[r.tag] = r.color; });
+      setListColors(map);
+    }).catch(function() {});
     var cachedHours = lsGet('hours_summary_sb');
     if (cachedHours) { setHoursData(cachedHours); }
     (function() {
@@ -2240,7 +2251,8 @@ function VolunteersView() {
                   <span style={volSecLabel}>Custom Lists</span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                     {(selected['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).map(function(t) {
-                      return <span key={t} style={{ background: '#e8f4fd', color: '#0d6eab', fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>{t}</span>;
+                      var c = listColors[t] || DEFAULT_LIST_COLOR;
+                      return <span key={t} style={{ background: c + '22', color: c, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>{t}</span>;
                     })}
                   </div>
                 </div>
@@ -2288,6 +2300,7 @@ function VolunteersView() {
           onCancel={function() { setEditing(false); }}
           onDelete={handleDeleteVolunteer}
           extraTeams={customTeams}
+          listColors={listColors}
         />
       )}
 
@@ -2529,6 +2542,7 @@ function VolunteersView() {
           onSubmit={handleAddSubmit}
           onCancel={function() { setShowAdd(false); }}
           extraTeams={customTeams}
+          listColors={listColors}
         />
       )}
     </div>
@@ -8372,6 +8386,9 @@ function VolEmailListsView({ navigate }) {
   var [editSearch, setEditSearch] = useS('');
   var [savingEdit, setSavingEdit] = useS(false);
   var [editError, setEditError] = useS(null);
+  var [tagColors, setTagColors] = useS({});
+  var [newListColor, setNewListColor] = useS(DEFAULT_LIST_COLOR);
+  var [editTagColor, setEditTagColor] = useS(DEFAULT_LIST_COLOR);
 
   useE(function() {
     cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Email','Status','Team','Event Tags','Overview Notes','Phone Number']).then(function(data) {
@@ -8382,7 +8399,41 @@ function VolEmailListsView({ navigate }) {
     }).then(function(r) { return r.json(); }).then(function(data) {
       if (Array.isArray(data)) setLogs(data);
     }).catch(function() {});
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('List Tag Colors') + '?select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (!Array.isArray(rows)) return;
+      var map = {};
+      rows.forEach(function(r) { map[r.tag] = r.color; });
+      setTagColors(map);
+    }).catch(function() {});
   }, []);
+
+  function getTagColor(tag) { return tagColors[tag] || DEFAULT_LIST_COLOR; }
+
+  function saveTagColor(tag, color) {
+    setTagColors(function(prev) { var n = Object.assign({}, prev); n[tag] = color; return n; });
+    return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('List Tag Colors') + '?tag=eq.' + encodeURIComponent(tag), {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ color: color })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows) && rows.length > 0) return;
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('List Tag Colors'), {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: tag, color: color })
+      });
+    }).catch(function() {});
+  }
+
+  function deleteTagColor(tag) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('List Tag Colors') + '?tag=eq.' + encodeURIComponent(tag), {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).catch(function() {});
+    setTagColors(function(prev) { var n = Object.assign({}, prev); delete n[tag]; return n; });
+  }
 
   function parseTeams(t) {
     if (!t) return [];
@@ -8453,9 +8504,11 @@ function VolEmailListsView({ navigate }) {
       results.forEach(function(r) { if (r) updates[r.id] = r.val; });
       setVolunteers(function(prev) { return prev.map(function(v) { return updates[v.id] !== undefined ? Object.assign({}, v, { 'Event Tags': updates[v.id] }) : v; }); });
       clearCache('2026 Volunteers');
+      saveTagColor(tag, newListColor);
       setCreatingList(false);
       setShowCreateList(false);
       setNewListName('');
+      setNewListColor(DEFAULT_LIST_COLOR);
       setNewListSearch('');
       setNewListSelected({});
     }).catch(function(err) {
@@ -8471,6 +8524,7 @@ function VolEmailListsView({ navigate }) {
     });
     setEditingTag(tag);
     setEditTagName(tag.replace(/^volunteered for:\s*/i, ''));
+    setEditTagColor(getTagColor(tag));
     setEditSelected(sel);
     setEditSearch('');
     setEditError(null);
@@ -8520,12 +8574,16 @@ function VolEmailListsView({ navigate }) {
   function saveEditGroup() {
     var newTag = editTagName.trim();
     if (!newTag) return;
+    var oldTag = editingTag;
     var selectedIds = Object.keys(editSelected).filter(function(id) { return editSelected[id]; });
-    applyTagChange(editingTag, newTag, selectedIds);
+    saveTagColor(newTag, editTagColor);
+    if (newTag !== oldTag) deleteTagColor(oldTag);
+    applyTagChange(oldTag, newTag, selectedIds);
   }
 
   function deleteTagList(tag) {
     if (!window.confirm('Delete the "' + tag + '" list? This removes the tag from every volunteer who has it.')) return;
+    deleteTagColor(tag);
     applyTagChange(tag, null, []);
   }
 
@@ -8592,9 +8650,15 @@ function VolEmailListsView({ navigate }) {
         {/* Edit panel */}
         {isEditing && (
           <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>List name</label>
-              <input value={editTagName} onChange={function(e) { setEditTagName(e.target.value); }} style={Object.assign({}, volInputStyle, { marginTop: 0 })} />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>List name</label>
+                <input value={editTagName} onChange={function(e) { setEditTagName(e.target.value); }} style={Object.assign({}, volInputStyle, { marginTop: 0 })} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Color</label>
+                <input type="color" value={editTagColor} onChange={function(e) { setEditTagColor(e.target.value); }} style={{ width: 38, height: 34, border: '0.5px solid #e0d8cc', borderRadius: 6, padding: 2, cursor: 'pointer' }} />
+              </div>
             </div>
             <div>
               <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Volunteers ({Object.keys(editSelected).filter(function(id) { return editSelected[id]; }).length} selected)</label>
@@ -8749,7 +8813,7 @@ function VolEmailListsView({ navigate }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {volunteers === null ? null : eventGroups.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 32, color: '#ccc', fontSize: 13, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12 }}>No custom lists yet — create one below.</div>
-          ) : eventGroups.map(function(g) { return renderGroupCard(g, function() { return { bg: '#e8f4fd', color: '#0d6eab' }; }, true); })}
+          ) : eventGroups.map(function(g) { return renderGroupCard(g, function(tag) { var c = getTagColor(tag); return { bg: c + '22', color: c }; }, true); })}
         </div>
       </div>
 
@@ -8761,9 +8825,15 @@ function VolEmailListsView({ navigate }) {
         </button>
         {showCreateList && (
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>List name</label>
-              <input value={newListName} onChange={function(e) { setNewListName(e.target.value); }} placeholder="e.g. Fall Gala, Newsletter Signups…" style={inpSt} />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>List name</label>
+                <input value={newListName} onChange={function(e) { setNewListName(e.target.value); }} placeholder="e.g. Fall Gala, Newsletter Signups…" style={inpSt} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Color</label>
+                <input type="color" value={newListColor} onChange={function(e) { setNewListColor(e.target.value); }} style={{ width: 38, height: 34, border: '0.5px solid #e0d8cc', borderRadius: 6, padding: 2, cursor: 'pointer' }} />
+              </div>
             </div>
             <div>
               <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Select volunteers ({Object.keys(newListSelected).filter(function(id) { return newListSelected[id]; }).length} selected)</label>
