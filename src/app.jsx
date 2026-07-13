@@ -2191,13 +2191,6 @@ function VolunteersView() {
                   <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 3, lineHeight: 1.2 }}>{selected['First Name']} {selected['Last Name']}</div>
                   {selected['Team'] && <div style={{ fontSize: 12, color: '#9a7f5a', marginBottom: 6, fontWeight: 500 }}>{selected['Team']}</div>}
                   <Badge status={selected['Status'] || 'Active'} />
-                  {(selected['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
-                      {(selected['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).map(function(t) {
-                        return <span key={t} style={{ background: '#e8f4fd', color: '#0d6eab', fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>{t}</span>;
-                      })}
-                    </div>
-                  )}
                   {selected['Overview Notes'] && <div style={{ fontSize: 12, color: '#7a6a55', marginTop: 8, lineHeight: 1.5, fontStyle: 'italic' }}>{selected['Overview Notes']}</div>}
                 </div>
               </div>
@@ -2240,6 +2233,16 @@ function VolunteersView() {
                   {selected['NSH Future Vision'] && <NoteBlock label="NSH Future Vision" value={selected['NSH Future Vision']} />}
                   {selected['Allergies'] && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: '#c0392b', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>⚠ Allergies</div><div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{selected['Allergies']}</div></div>}
                   {selected['Special Considerations'] && <div style={{ background: '#fafafa', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 12px' }}><div style={{ fontSize: 11, fontWeight: 600, color: '#666', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>🔒 Special Considerations</div><div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{selected['Special Considerations']}</div></div>}
+                </div>
+              )}
+              {(selected['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <span style={volSecLabel}>Custom Lists</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {(selected['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).map(function(t) {
+                      return <span key={t} style={{ background: '#e8f4fd', color: '#0d6eab', fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>{t}</span>;
+                    })}
+                  </div>
                 </div>
               )}
               {(function() {
