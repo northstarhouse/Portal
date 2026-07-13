@@ -101,26 +101,32 @@ function AppGate({ children }) {
     });
   }
 
-  if (hasToken) return children;
-
-  return React.createElement('div', {
-    style: { position: 'fixed', inset: 0, background: '#f7f3ec', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16, fontFamily: "'Calibri', 'Segoe UI', sans-serif" }
-  },
-    React.createElement('form', { onSubmit: attempt, style: { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 16, padding: '40px 36px', width: '100%', maxWidth: 360, boxShadow: '0 2px 16px rgba(0,0,0,0.06)', textAlign: 'center' } },
-      React.createElement('div', { style: { fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 8 } }, 'North Star House'),
-      React.createElement('div', { style: { fontSize: 13, color: '#888', marginBottom: 28 } }, expired ? 'Session expired — please re-enter the password.' : 'Enter the password to view portal data.'),
-      React.createElement('input', {
-        autoFocus: true, type: 'password', value: pwd, disabled: busy,
-        onChange: function(e) { setPwd(e.target.value); setErr(''); },
-        placeholder: 'Password',
-        style: { width: '100%', padding: '10px 14px', border: '0.5px solid ' + (err ? '#e05050' : '#e0d8cc'), borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: err ? 6 : 16, outline: 'none', textAlign: 'center', letterSpacing: 2 }
-      }),
-      err && React.createElement('div', { style: { fontSize: 12, color: '#e05050', marginBottom: 12 } }, err),
-      React.createElement('button', {
-        type: 'submit', disabled: busy || !pwd,
-        style: { width: '100%', padding: '11px', background: '#b5a185', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: busy || !pwd ? 'not-allowed' : 'pointer', opacity: busy || !pwd ? 0.6 : 1 }
-      }, busy ? 'Checking…' : 'Sign in'),
-      React.createElement('div', { style: { fontSize: 11, color: '#bbb', marginTop: 24 } }, 'Need access? Ask Haley.')
+  // On a genuine session expiry (was authenticated, now isn't), keep
+  // `children` mounted underneath the overlay so any in-progress form
+  // (e.g. an open edit modal) survives re-login instead of being
+  // destroyed. A fresh, never-authenticated load still renders nothing
+  // underneath, so no requests go out before the first successful login.
+  return React.createElement(React.Fragment, null,
+    (hasToken || expired) && children,
+    !hasToken && React.createElement('div', {
+      style: { position: 'fixed', inset: 0, background: '#f7f3ec', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16, fontFamily: "'Calibri', 'Segoe UI', sans-serif" }
+    },
+      React.createElement('form', { onSubmit: attempt, style: { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 16, padding: '40px 36px', width: '100%', maxWidth: 360, boxShadow: '0 2px 16px rgba(0,0,0,0.06)', textAlign: 'center' } },
+        React.createElement('div', { style: { fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 8 } }, 'North Star House'),
+        React.createElement('div', { style: { fontSize: 13, color: '#888', marginBottom: 28 } }, expired ? 'Session expired — please re-enter the password. Anything you had open is still here.' : 'Enter the password to view portal data.'),
+        React.createElement('input', {
+          autoFocus: true, type: 'password', value: pwd, disabled: busy,
+          onChange: function(e) { setPwd(e.target.value); setErr(''); },
+          placeholder: 'Password',
+          style: { width: '100%', padding: '10px 14px', border: '0.5px solid ' + (err ? '#e05050' : '#e0d8cc'), borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: err ? 6 : 16, outline: 'none', textAlign: 'center', letterSpacing: 2 }
+        }),
+        err && React.createElement('div', { style: { fontSize: 12, color: '#e05050', marginBottom: 12 } }, err),
+        React.createElement('button', {
+          type: 'submit', disabled: busy || !pwd,
+          style: { width: '100%', padding: '11px', background: '#b5a185', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: busy || !pwd ? 'not-allowed' : 'pointer', opacity: busy || !pwd ? 0.6 : 1 }
+        }, busy ? 'Checking…' : 'Sign in'),
+        React.createElement('div', { style: { fontSize: 11, color: '#bbb', marginTop: 24 } }, 'Need access? Ask Haley.')
+      )
     )
   );
 }
