@@ -1458,49 +1458,93 @@ function TeamPicker({ value, onChange, extraTeams }) {
   );
 }
 
-function EventTagPicker({ value, onChange, colors }) {
+function EventTagPicker({ value, onChange, colors, options }) {
   const { useState: useS } = React;
+  const [open, setOpen] = useS(false);
+  const [search, setSearch] = useS('');
   const [newTag, setNewTag] = useS('');
   var selected = value ? value.split('|').map(function(t) { return t.trim(); }).filter(Boolean) : [];
+  var allOptions = (options || []).filter(function(t) { return selected.indexOf(t) === -1; });
 
-  function addTag() {
-    var tag = newTag.trim();
-    if (!tag) return;
-    if (selected.indexOf(tag) === -1) {
-      onChange({ target: { name: 'Event Tags', value: selected.concat([tag]).join(' | ') } });
-    }
+  function tagColor(t) { return (colors && colors[t]) || DEFAULT_LIST_COLOR; }
+
+  function toggle(t) {
+    var next = selected.indexOf(t) !== -1 ? selected.filter(function(x) { return x !== t; }) : selected.concat([t]);
+    onChange({ target: { name: 'Event Tags', value: next.join(' | ') } });
+  }
+
+  function remove(t) {
+    onChange({ target: { name: 'Event Tags', value: selected.filter(function(x) { return x !== t; }).join(' | ') } });
+  }
+
+  function addNewTag() {
+    var trimmed = newTag.trim();
+    if (!trimmed) return;
+    if (selected.indexOf(trimmed) === -1) onChange({ target: { name: 'Event Tags', value: selected.concat([trimmed]).join(' | ') } });
     setNewTag('');
   }
 
-  function remove(tag) {
-    onChange({ target: { name: 'Event Tags', value: selected.filter(function(t) { return t !== tag; }).join(' | ') } });
-  }
-
   return (
-    <div>
-      {selected.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
-          {selected.map(function(t) {
-            var c = (colors && colors[t]) || DEFAULT_LIST_COLOR;
-            return (
-              <span key={t} style={{ background: c + '22', color: c, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
-                {t}
-                <span onClick={function() { remove(t); }} style={{ cursor: 'pointer', opacity: 0.6, fontSize: 12, lineHeight: 1, marginLeft: 2 }}>×</span>
-              </span>
-            );
-          })}
+    <div style={{ position: 'relative' }}>
+      <div
+        onClick={function() { setOpen(function(o) { return !o; }); }}
+        style={{ minHeight: 38, border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', background: '#fff', display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}
+      >
+        {selected.length === 0 && <span style={{ fontSize: 12, color: '#999' }}>Select lists...</span>}
+        {selected.map(function(t) {
+          var c = tagColor(t);
+          return (
+            <span key={t} style={{ background: c + '22', color: c, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+              {t}
+              <span onClick={function(e) { e.stopPropagation(); remove(t); }} style={{ cursor: 'pointer', opacity: 0.6, fontSize: 12, lineHeight: 1, marginLeft: 2 }}>×</span>
+            </span>
+          );
+        })}
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#999', flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 100, marginTop: 4 }}>
+          <div style={{ padding: '8px 10px', borderBottom: '0.5px solid #f0ece6' }}>
+            <input
+              autoFocus
+              value={search}
+              onChange={function(e) { setSearch(e.target.value); }}
+              onClick={function(e) { e.stopPropagation(); }}
+              placeholder="Search lists..."
+              style={{ width: '100%', padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', outline: 'none' }}
+            />
+          </div>
+          <div style={{ maxHeight: 180, overflowY: 'auto', padding: '4px 0' }}>
+            {allOptions.length === 0 ? (
+              <div style={{ padding: '10px 14px', fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>No other lists yet</div>
+            ) : allOptions.filter(function(opt) { return opt.toLowerCase().indexOf(search.toLowerCase()) !== -1; }).map(function(opt) {
+              var c = tagColor(opt);
+              return (
+                <div
+                  key={opt}
+                  onClick={function() { toggle(opt); }}
+                  style={{ padding: '8px 14px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+                  onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
+                  onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                  {opt}
+                </div>
+              );
+            })}
+          </div>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ display: 'flex', gap: 6, padding: '8px 10px', borderTop: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+            <input
+              value={newTag}
+              onChange={function(e) { setNewTag(e.target.value); }}
+              onKeyDown={function(e) { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); addNewTag(); } }}
+              placeholder="New list name..."
+              style={{ flex: 1, padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, outline: 'none', background: '#fff' }}
+            />
+            <button type="button" onClick={function(e) { e.stopPropagation(); addNewTag(); }} disabled={!newTag.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: newTag.trim() ? 1 : 0.4, flexShrink: 0 }}>Add</button>
+          </div>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 6 }}>
-        <input
-          value={newTag}
-          onChange={function(e) { setNewTag(e.target.value); }}
-          onKeyDown={function(e) { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
-          placeholder="List name…"
-          style={Object.assign({}, volInputStyle, { marginTop: 0, flex: 1 })}
-        />
-        <button type="button" onClick={addTag} disabled={!newTag.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: newTag.trim() ? 1 : 0.4, flexShrink: 0 }}>Add</button>
-      </div>
     </div>
   );
 }
@@ -1559,7 +1603,7 @@ function VolDatePicker({ label, name, value, onChange, noDay }) {
   );
 }
 
-function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete, extraTeams, listColors }) {
+function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete, extraTeams, listColors, eventTagOptions }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -1575,7 +1619,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete, 
           </div>
           <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="On-Call Supporter">On-Call Supporter</option><option value="Inactive">Inactive</option></select></div>
           <div style={volGrp}><label style={volLabelStyle}>Team</label><div style={{ marginTop: 4 }}><TeamPicker value={form['Team']} onChange={onChange} extraTeams={extraTeams || []} /></div></div>
-          <div style={volGrp}><label style={volLabelStyle}>Custom Lists</label><div style={{ marginTop: 4 }}><EventTagPicker value={form['Event Tags']} onChange={onChange} colors={listColors} /></div></div>
+          <div style={volGrp}><label style={volLabelStyle}>Custom Lists</label><div style={{ marginTop: 4 }}><EventTagPicker value={form['Event Tags']} onChange={onChange} colors={listColors} options={eventTagOptions} /></div></div>
           <span style={volSecLabel}>Contact</span>
           <div style={volGrp}><label style={volLabelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={onChange} style={volInputStyle} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={onChange} style={volInputStyle} /></div>
@@ -1917,6 +1961,13 @@ function VolunteersView() {
       if (TEAM_OPTIONS.indexOf(t) === -1 && customTeams.indexOf(t) === -1) customTeams.push(t);
     });
   });
+  var allEventTags = [];
+  volunteers.forEach(function(v) {
+    (v['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).forEach(function(t) {
+      if (allEventTags.indexOf(t) === -1) allEventTags.push(t);
+    });
+  });
+  allEventTags.sort();
   var allTeamOptions = TEAM_OPTIONS.concat(customTeams);
   var teamSet = ['All'].concat(allTeamOptions.filter(function(t) {
     return tabList.some(function(v) { return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(t) !== -1; });
@@ -2301,6 +2352,7 @@ function VolunteersView() {
           onDelete={handleDeleteVolunteer}
           extraTeams={customTeams}
           listColors={listColors}
+          eventTagOptions={allEventTags}
         />
       )}
 
@@ -2543,6 +2595,7 @@ function VolunteersView() {
           onCancel={function() { setShowAdd(false); }}
           extraTeams={customTeams}
           listColors={listColors}
+          eventTagOptions={allEventTags}
         />
       )}
     </div>
