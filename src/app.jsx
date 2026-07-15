@@ -7567,7 +7567,7 @@ function FinancialsView() {
       <button onClick={function() { setShowPnl(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Events Profit / Loss</button>
     </div>
     {showPnl && <EventsProfitLossModal onClose={function() { setShowPnl(false); }} />}
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
         <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
@@ -7701,7 +7701,9 @@ function FinancialsView() {
         )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#2a2a2a', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>Office Cash Flow</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
         <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
           <div>
@@ -7828,9 +7830,10 @@ function FinancialsView() {
           </div>
         );
       })()}
+        </div>
       </div>
 
-      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden', gridColumn: 1 }}>
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
       <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Resources</div>
       </div>
