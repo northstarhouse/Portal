@@ -3586,6 +3586,7 @@ function BoardView() {
     }).then(function(rows) {
       if (rows && rows.message) { alert('Error: ' + rows.message); setTopicSaving(false); return; }
       setTopicSaving(false);
+      logActivity('New board vote opened: ' + topicForm.title + (topicForm.submitted_by ? ' (by ' + topicForm.submitted_by + ')' : ''), 'board_vote_opened');
       setShowAdd(false);
       setTopicForm({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
       setAttachFileName(''); setAttachUploading(false);
@@ -8048,6 +8049,7 @@ function IdeasView() {
       if (!r.ok) { return r.json().then(function(e) { alert('Error: ' + (e.message || JSON.stringify(e))); setSaving(false); }); }
       return r.json().then(function(rows) {
         setSaving(false);
+        logActivity('New idea submitted: ' + payload.title + (payload.submitted_by ? ' (by ' + payload.submitted_by + ')' : ''), 'idea_submitted');
         setForm(emptyForm); setShowAdd(false);
         var newStatus = payload.status;
         setMainTab(['Active','On Hold','Completed','Inactive'].includes(newStatus) ? 'initiatives' : 'ideas');
