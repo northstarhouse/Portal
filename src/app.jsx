@@ -2107,7 +2107,10 @@ function VolunteersView() {
       setSaving(false);
       clearCache('2026 Volunteers');
       var inserted = Array.isArray(res) ? res[0] : res;
-      if (inserted && inserted['First Name']) setVolunteers(function(p) { return p.concat([inserted]); });
+      if (inserted && inserted['First Name']) {
+        setVolunteers(function(p) { return p.concat([inserted]); });
+        logActivity('New volunteer added: ' + inserted['First Name'] + ' ' + (inserted['Last Name'] || ''), 'volunteer_added');
+      }
       setShowAdd(false);
       setForm(emptyForm);
     }).catch(function() { setSaving(false); });
