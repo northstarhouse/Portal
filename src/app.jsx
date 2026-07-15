@@ -2,6 +2,7 @@
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
+const WIX_FORMS_URL = "https://script.google.com/macros/s/AKfycbzY3c6_xF2ucrZrQnZLa1bcU2TIcFadBH9UEeIbJYMKumvxygql8ulN-67q1Vu_WM4h/exec";
 
 const APP_TOKEN_KEY = 'nsh-app-token';
 
@@ -20,10 +21,19 @@ const APP_TOKEN_KEY = 'nsh-app-token';
         headers.set('x-app-token', token);
         init.headers = headers;
       }
+      var method = (init && init.method && init.method.toUpperCase()) || 'GET';
       return origFetch(input, init).then(function(res) {
         if (res && res.status === 401) {
           try { localStorage.removeItem(APP_TOKEN_KEY); } catch (e) {}
           window.dispatchEvent(new Event('nsh:token-invalid'));
+        }
+        // After any write, clear the cache for that table so next read is fresh
+        if (res && res.ok && (method === 'PATCH' || method === 'POST' || method === 'DELETE')) {
+          var m = url.match(/\/rest\/v1\/([^?#]+)/);
+          if (m) {
+            var tableName = decodeURIComponent(m[1]);
+            window.__nshClearCache && window.__nshClearCache(tableName);
+          }
         }
         return res;
       });
@@ -83,7 +93,7 @@ function AppGate({ children }) {
       // Clear stale data cache from before the gate landed — pre-token requests
       // would have returned [] (RLS denial) and gotten cached as empty.
       try {
-        Object.keys(localStorage).filter(function(k) { return k.indexOf('nsh3_') === 0; }).forEach(function(k) { localStorage.removeItem(k); });
+        Object.keys(sessionStorage).filter(function(k) { return k.indexOf('nsh4_') === 0; }).forEach(function(k) { sessionStorage.removeItem(k); });
       } catch (e) {}
       setHasToken(true); setPwd(''); setBusy(false); setExpired(false);
     }).catch(function() {
@@ -91,26 +101,32 @@ function AppGate({ children }) {
     });
   }
 
-  if (hasToken) return children;
-
-  return React.createElement('div', {
-    style: { position: 'fixed', inset: 0, background: '#f7f3ec', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16, fontFamily: "'Calibri', 'Segoe UI', sans-serif" }
-  },
-    React.createElement('form', { onSubmit: attempt, style: { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 16, padding: '40px 36px', width: '100%', maxWidth: 360, boxShadow: '0 2px 16px rgba(0,0,0,0.06)', textAlign: 'center' } },
-      React.createElement('div', { style: { fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 8 } }, 'North Star House'),
-      React.createElement('div', { style: { fontSize: 13, color: '#888', marginBottom: 28 } }, expired ? 'Session expired — please re-enter the password.' : 'Enter the password to view portal data.'),
-      React.createElement('input', {
-        autoFocus: true, type: 'password', value: pwd, disabled: busy,
-        onChange: function(e) { setPwd(e.target.value); setErr(''); },
-        placeholder: 'Password',
-        style: { width: '100%', padding: '10px 14px', border: '0.5px solid ' + (err ? '#e05050' : '#e0d8cc'), borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: err ? 6 : 16, outline: 'none', textAlign: 'center', letterSpacing: 2 }
-      }),
-      err && React.createElement('div', { style: { fontSize: 12, color: '#e05050', marginBottom: 12 } }, err),
-      React.createElement('button', {
-        type: 'submit', disabled: busy || !pwd,
-        style: { width: '100%', padding: '11px', background: '#b5a185', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: busy || !pwd ? 'not-allowed' : 'pointer', opacity: busy || !pwd ? 0.6 : 1 }
-      }, busy ? 'Checking…' : 'Sign in'),
-      React.createElement('div', { style: { fontSize: 11, color: '#bbb', marginTop: 24 } }, 'Need access? Ask Haley.')
+  // On a genuine session expiry (was authenticated, now isn't), keep
+  // `children` mounted underneath the overlay so any in-progress form
+  // (e.g. an open edit modal) survives re-login instead of being
+  // destroyed. A fresh, never-authenticated load still renders nothing
+  // underneath, so no requests go out before the first successful login.
+  return React.createElement(React.Fragment, null,
+    (hasToken || expired) && children,
+    !hasToken && React.createElement('div', {
+      style: { position: 'fixed', inset: 0, background: '#f7f3ec', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16, fontFamily: "'Calibri', 'Segoe UI', sans-serif" }
+    },
+      React.createElement('form', { onSubmit: attempt, style: { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 16, padding: '40px 36px', width: '100%', maxWidth: 360, boxShadow: '0 2px 16px rgba(0,0,0,0.06)', textAlign: 'center' } },
+        React.createElement('div', { style: { fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 8 } }, 'North Star House'),
+        React.createElement('div', { style: { fontSize: 13, color: '#888', marginBottom: 28 } }, expired ? 'Session expired — please re-enter the password. Anything you had open is still here.' : 'Enter the password to view portal data.'),
+        React.createElement('input', {
+          autoFocus: true, type: 'password', value: pwd, disabled: busy,
+          onChange: function(e) { setPwd(e.target.value); setErr(''); },
+          placeholder: 'Password',
+          style: { width: '100%', padding: '10px 14px', border: '0.5px solid ' + (err ? '#e05050' : '#e0d8cc'), borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: err ? 6 : 16, outline: 'none', textAlign: 'center', letterSpacing: 2 }
+        }),
+        err && React.createElement('div', { style: { fontSize: 12, color: '#e05050', marginBottom: 12 } }, err),
+        React.createElement('button', {
+          type: 'submit', disabled: busy || !pwd,
+          style: { width: '100%', padding: '11px', background: '#b5a185', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: busy || !pwd ? 'not-allowed' : 'pointer', opacity: busy || !pwd ? 0.6 : 1 }
+        }, busy ? 'Checking…' : 'Sign in'),
+        React.createElement('div', { style: { fontSize: 11, color: '#bbb', marginTop: 24 } }, 'Need access? Ask Haley.')
+      )
     )
   );
 }
@@ -123,24 +139,23 @@ function sbFetch(table, columns) {
   }).then(r => r.json());
 }
 
-var CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+var CACHE_TTL = 5 * 60 * 1000; // 5 min within a session; sessionStorage clears on new visit
 var _cache = {};
 var LS_PREFIX = 'nsh4_';
 function lsGet(key) {
   try {
-    var r = localStorage.getItem(LS_PREFIX + key);
+    var r = sessionStorage.getItem(LS_PREFIX + key);
     if (!r) return null;
     var parsed = JSON.parse(r);
     if (parsed && !Array.isArray(parsed) && typeof parsed === 'object' && parsed.ts !== undefined) {
-      if (Date.now() - parsed.ts > CACHE_TTL) { localStorage.removeItem(LS_PREFIX + key); return null; }
+      if (Date.now() - parsed.ts > CACHE_TTL) { sessionStorage.removeItem(LS_PREFIX + key); return null; }
       return parsed.data;
     }
-    // legacy plain-array format — treat as expired so it gets replaced
     return null;
   } catch(e) { return null; }
 }
 function lsSet(key, data) {
-  try { localStorage.setItem(LS_PREFIX + key, JSON.stringify({ ts: Date.now(), data: data })); } catch(e) {}
+  try { sessionStorage.setItem(LS_PREFIX + key, JSON.stringify({ ts: Date.now(), data: data })); } catch(e) {}
 }
 function _cacheGet(key) {
   var entry = _cache[key];
@@ -179,18 +194,19 @@ function clearCache(table) {
   Object.keys(_cache).forEach(function(k) {
     if (k.indexOf(table + ':') === 0 || k.indexOf('/' + enc + '?') !== -1) delete _cache[k];
   });
-  Object.keys(localStorage).forEach(function(k) {
+  Object.keys(sessionStorage).forEach(function(k) {
     if (!k.startsWith(LS_PREFIX)) return;
     var inner = k.slice(LS_PREFIX.length);
-    if (inner.indexOf(table + ':') === 0 || inner.indexOf('/' + enc + '?') !== -1) localStorage.removeItem(k);
+    if (inner.indexOf(table + ':') === 0 || inner.indexOf('/' + enc + '?') !== -1) sessionStorage.removeItem(k);
   });
 }
+window.__nshClearCache = clearCache;
 
 const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthstarhouse%40gmail.com/private-06287b2ca0d9ee6acd4f49f9d4d0d2da/basic.ics";
 
 // Kick off critical fetches immediately so data is ready when views mount
 (function prefetch() {
-  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Favorite Quote','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day']);
+  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Favorite Quote','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day']);
   cachedSbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes']);
   cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']);
   cachedFetchAll('Board Voting Items');
@@ -243,6 +259,7 @@ var NAV_ICONS = {
   operational: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   sponsors: '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>',
   financials: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  venue: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/><path d="M9 2v4"/><path d="M15 2v4"/>',
   ideas: '<path d="M9 21h6"/><path d="M9 17.5h6"/><path d="M12 2a7 7 0 0 1 4.9 11.9l-.1.1c-.4.4-.8 1-1.1 1.5H8.3c-.3-.5-.7-1.1-1.1-1.5l-.1-.1A7 7 0 0 1 12 2z"/>',
   reviews: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
   marketing: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
@@ -266,6 +283,7 @@ const modules = [
   { id: "sponsors", label: "Sponsors" },
   { id: "board", label: "Board Voting" },
   { id: "strategy", label: "Strategic Goal Progress" },
+  { id: "venue", label: "Venue Rentals" },
   { id: "ideas", label: "Ideas & Initiatives" },
   { id: "operational", label: "Operational Areas", hidden: true },
   { id: "financials", label: "Financials", hidden: true },
@@ -724,20 +742,561 @@ const typeColors = {
 
     </div>
   );
-}function EventsView() {
+}function EventsView({ navigate }) {
+  var { useState, useEffect, useMemo } = React;
+  var [tab, setTab] = useState('pnl');
+  var [loading, setLoading] = useState(true);
+  var [budgetRows, setBudgetRows] = useState([]);
+  var [earningsRows, setEarningsRows] = useState([]);
+  var [inHouse, setInHouse] = useState([]);
+  var [expanded, setExpanded] = useState(null);
+  var todayStr = new Date().toISOString().slice(0, 10);
+  var [feedback, setFeedback] = useState([]);
+  var [feedbackLoading, setFeedbackLoading] = useState(true);
+  var [showAddFeedback, setShowAddFeedback] = useState(false);
+  var [feedbackForm, setFeedbackForm] = useState({ event_name: '', source: '', name: '', role: '', feedback: '', date: todayStr });
+  var [savingFeedback, setSavingFeedback] = useState(false);
+  var [editingFeedbackId, setEditingFeedbackId] = useState(null);
+  var [editFeedbackForm, setEditFeedbackForm] = useState(null);
+  var [savingFeedbackEdit, setSavingFeedbackEdit] = useState(false);
+  var [expandedFeedback, setExpandedFeedback] = useState({});
+  var [showAddEarning, setShowAddEarning] = useState(false);
+  var [earningForm, setEarningForm] = useState({ event: '', earning_source: '', amount: '', notes: '', date: todayStr });
+  var [savingEarning, setSavingEarning] = useState(false);
+  var [showAddExpense, setShowAddExpense] = useState(false);
+  var [expenseForm, setExpenseForm] = useState({ event_name: '', type: 'Purchase', description: '', amount: '', date: todayStr, purchased_by: '' });
+  var [savingExpense, setSavingExpense] = useState(false);
+  var [editingEarningId, setEditingEarningId] = useState(null);
+  var [editEarningForm, setEditEarningForm] = useState(null);
+  var [savingEarningEdit, setSavingEarningEdit] = useState(false);
+  var [editingExpenseId, setEditingExpenseId] = useState(null);
+  var [editExpenseForm, setEditExpenseForm] = useState(null);
+  var [savingExpenseEdit, setSavingExpenseEdit] = useState(false);
+
+  useEffect(function() {
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?area=eq.Events&select=*', { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?area=eq.Events&select=*', { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('In-House Events') + '?select=*&order=date.asc', { headers: hdrs }).then(function(r) { return r.json(); })
+    ]).then(function(res) {
+      setBudgetRows(Array.isArray(res[0]) ? res[0] : []);
+      setEarningsRows(Array.isArray(res[1]) ? res[1] : []);
+      setInHouse(Array.isArray(res[2]) ? res[2] : []);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Event Feedback') + '?select=*&order=date.desc,id.desc', { headers: hdrs }).then(function(r) { return r.json(); }).then(function(rows) {
+      setFeedback(Array.isArray(rows) ? rows : []);
+      setFeedbackLoading(false);
+    }).catch(function() { setFeedbackLoading(false); });
+  }, []);
+
+  function fmt(n) { return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  var groups = useMemo(function() {
+    var byEvent = {};
+    function bucket(name) {
+      var key = (name || '').trim() || 'Uncategorized';
+      if (!byEvent[key]) byEvent[key] = { event: key, earnings: 0, costs: 0, earningsRows: [], expenseRows: [], date: null, link: null };
+      return byEvent[key];
+    }
+    earningsRows.forEach(function(e) { var b = bucket(e.event); b.earnings += parseFloat(e.amount) || 0; b.earningsRows.push(e); });
+    budgetRows.forEach(function(b0) {
+      var b = bucket(b0.event_name);
+      b.expenseRows.push(b0);
+      if (b0.type === 'Purchase' || b0.type === 'In-Kind') b.costs += parseFloat(b0.amount) || 0;
+    });
+    inHouse.forEach(function(ev) {
+      var name = (ev.name || '').trim();
+      if (!name) return;
+      var match = Object.keys(byEvent).find(function(k) { return k.toLowerCase() === name.toLowerCase(); });
+      if (!match) return;
+      byEvent[match].date = ev.date || byEvent[match].date;
+      byEvent[match].link = ev.link || byEvent[match].link;
+    });
+    var list = Object.keys(byEvent).map(function(k) { var r = byEvent[k]; return Object.assign({}, r, { net: r.earnings - r.costs }); });
+    list.sort(function(a, b) {
+      if (a.date && b.date) return new Date(b.date) - new Date(a.date);
+      if (a.date) return -1;
+      if (b.date) return 1;
+      return b.net - a.net;
+    });
+    return list;
+  }, [budgetRows, earningsRows, inHouse]);
+
+  var totalEarnings = groups.reduce(function(s, r) { return s + r.earnings; }, 0);
+  var totalCosts = groups.reduce(function(s, r) { return s + r.costs; }, 0);
+  var eventNameOptions = groups.map(function(g) { return g.event; }).filter(function(n) { return n && n !== 'Uncategorized'; });
+  var feedbackSourceOptions = Array.from(new Set(feedback.map(function(f) { return (f.source || '').trim(); }).filter(Boolean))).sort();
+
+  function addEarning(e) {
+    e.preventDefault();
+    setSavingEarning(true);
+    var payload = { area: 'Events', event: earningForm.event, earning_source: earningForm.earning_source || null, amount: parseFloat(earningForm.amount) || 0, notes: earningForm.notes || null, date: earningForm.date || null };
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setSavingEarning(false);
+      if (rows && rows.code) { alert('Add failed: ' + (rows.message || rows.code)); return; }
+      clearCache('Op Earnings');
+      if (rows && rows[0]) setEarningsRows(function(prev) { return [rows[0]].concat(prev); });
+      setEarningForm({ event: '', earning_source: '', amount: '', notes: '', date: todayStr });
+      setShowAddEarning(false);
+    }).catch(function() { setSavingEarning(false); });
+  }
+
+  function addExpense(e) {
+    e.preventDefault();
+    setSavingExpense(true);
+    var payload = { area: 'Events', type: expenseForm.type, description: expenseForm.description, amount: parseFloat(expenseForm.amount) || 0, date: expenseForm.date || null, purchased_by: expenseForm.purchased_by || null, event_name: expenseForm.event_name || null };
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setSavingExpense(false);
+      if (rows && rows.code) { alert('Add failed: ' + (rows.message || rows.hint || rows.code)); return; }
+      clearCache('Op Budget');
+      if (rows && rows[0]) setBudgetRows(function(prev) { return [rows[0]].concat(prev); });
+      setExpenseForm({ event_name: '', type: 'Purchase', description: '', amount: '', date: todayStr, purchased_by: '' });
+      setShowAddExpense(false);
+    }).catch(function() { setSavingExpense(false); });
+  }
+
+  function startEditEarning(e) {
+    setEditingEarningId(e.id);
+    setEditEarningForm({ event: e.event || '', earning_source: e.earning_source || '', amount: e.amount != null ? String(e.amount) : '', notes: e.notes || '', date: e.date || todayStr });
+  }
+
+  function saveEditEarning() {
+    if (!editEarningForm) return;
+    setSavingEarningEdit(true);
+    var patch = { event: editEarningForm.event, earning_source: editEarningForm.earning_source || null, amount: parseFloat(editEarningForm.amount) || 0, notes: editEarningForm.notes || null, date: editEarningForm.date || null };
+    var id = editingEarningId;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    }).then(function(r) {
+      if (!r.ok) throw new Error('Failed to save');
+      setSavingEarningEdit(false);
+      clearCache('Op Earnings');
+      setEarningsRows(function(prev) { return prev.map(function(e) { return e.id === id ? Object.assign({}, e, patch) : e; }); });
+      setEditingEarningId(null);
+      setEditEarningForm(null);
+    }).catch(function() { setSavingEarningEdit(false); alert('Failed to save changes'); });
+  }
+
+  function deleteEarning(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      clearCache('Op Earnings');
+      setEarningsRows(function(prev) { return prev.filter(function(e) { return e.id !== id; }); });
+    });
+  }
+
+  function startEditExpense(b) {
+    setEditingExpenseId(b.id);
+    setEditExpenseForm({ event_name: b.event_name || '', type: b.type || 'Purchase', description: b.description || '', amount: b.amount != null ? String(b.amount) : '', date: b.date || todayStr, purchased_by: b.purchased_by || '' });
+  }
+
+  function saveEditExpense() {
+    if (!editExpenseForm) return;
+    setSavingExpenseEdit(true);
+    var patch = { event_name: editExpenseForm.event_name || null, type: editExpenseForm.type, description: editExpenseForm.description, amount: parseFloat(editExpenseForm.amount) || 0, date: editExpenseForm.date || null, purchased_by: editExpenseForm.purchased_by || null };
+    var id = editingExpenseId;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    }).then(function(r) {
+      if (!r.ok) throw new Error('Failed to save');
+      setSavingExpenseEdit(false);
+      clearCache('Op Budget');
+      setBudgetRows(function(prev) { return prev.map(function(b) { return b.id === id ? Object.assign({}, b, patch) : b; }); });
+      setEditingExpenseId(null);
+      setEditExpenseForm(null);
+    }).catch(function() { setSavingExpenseEdit(false); alert('Failed to save changes'); });
+  }
+
+  function deleteExpense(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      clearCache('Op Budget');
+      setBudgetRows(function(prev) { return prev.filter(function(b) { return b.id !== id; }); });
+    });
+  }
+
+  function addFeedback(e) {
+    e.preventDefault();
+    setSavingFeedback(true);
+    var payload = { event_name: feedbackForm.event_name || null, source: feedbackForm.source || null, name: feedbackForm.name || null, role: feedbackForm.role || null, feedback: feedbackForm.feedback, date: feedbackForm.date || null };
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Event Feedback'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setSavingFeedback(false);
+      if (rows && rows.code) { alert('Add failed: ' + (rows.message || rows.code)); return; }
+      clearCache('Event Feedback');
+      if (rows && rows[0]) setFeedback(function(prev) { return [rows[0]].concat(prev); });
+      setFeedbackForm({ event_name: '', source: '', name: '', role: '', feedback: '', date: todayStr });
+      setShowAddFeedback(false);
+    }).catch(function() { setSavingFeedback(false); });
+  }
+
+  function startEditFeedback(f) {
+    setEditingFeedbackId(f.id);
+    setEditFeedbackForm({ event_name: f.event_name || '', source: f.source || '', name: f.name || '', role: f.role || '', feedback: f.feedback || '', date: f.date || todayStr });
+  }
+
+  function saveEditFeedback() {
+    if (!editFeedbackForm) return;
+    setSavingFeedbackEdit(true);
+    var patch = { event_name: editFeedbackForm.event_name || null, source: editFeedbackForm.source || null, name: editFeedbackForm.name || null, role: editFeedbackForm.role || null, feedback: editFeedbackForm.feedback, date: editFeedbackForm.date || null };
+    var id = editingFeedbackId;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Event Feedback') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    }).then(function(r) {
+      if (!r.ok) throw new Error('Failed to save');
+      setSavingFeedbackEdit(false);
+      clearCache('Event Feedback');
+      setFeedback(function(prev) { return prev.map(function(f) { return f.id === id ? Object.assign({}, f, patch) : f; }); });
+      setEditingFeedbackId(null);
+      setEditFeedbackForm(null);
+    }).catch(function() { setSavingFeedbackEdit(false); alert('Failed to save changes'); });
+  }
+
+  function deleteFeedback(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Event Feedback') + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      clearCache('Event Feedback');
+      setFeedback(function(prev) { return prev.filter(function(f) { return f.id !== id; }); });
+    });
+  }
+
+  function toggleFeedback(id) {
+    setExpandedFeedback(function(prev) { var n = Object.assign({}, prev); n[id] = !n[id]; return n; });
+  }
+
+  var fieldSt = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' };
+  var fieldLbl = { fontSize: 11, color: '#888', marginBottom: 4, display: 'block' };
+
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <StatCard label="Total Events" value="5" sub="next 90 days" />
-        <StatCard label="Confirmed" value="3" />
-        <StatCard label="Est. Revenue" value="$6,600" sub="confirmed only" />
-        <StatCard label="Est. Guests" value="395" sub="across all events" />
+      <datalist id="events-hub-event-options">
+        {eventNameOptions.map(function(n) { return <option key={n} value={n} />; })}
+      </datalist>
+      <datalist id="events-hub-feedback-source-options">
+        {feedbackSourceOptions.map(function(n) { return <option key={n} value={n} />; })}
+      </datalist>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Events</div>
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Earnings & expenses by event, pulled from the Events operational area</div>
+        </div>
+        {tab === 'pnl' && (
+          <button onClick={function() { setShowAddEarning(function(s) { return !s; }); setShowAddExpense(false); }} style={{ fontSize: 12, background: showAddEarning ? '#f5f0ea' : gold, color: showAddEarning ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddEarning ? 'Cancel' : '+ Log Earning'}</button>
+        )}
+        {tab === 'pnl' && (
+          <button onClick={function() { setShowAddExpense(function(s) { return !s; }); setShowAddEarning(false); }} style={{ fontSize: 12, background: showAddExpense ? '#f5f0ea' : gold, color: showAddExpense ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddExpense ? 'Cancel' : '+ Log Expense'}</button>
+        )}
+        {tab === 'feedback' && (
+          <button onClick={function() { setShowAddFeedback(function(s) { return !s; }); }} style={{ fontSize: 12, background: showAddFeedback ? '#f5f0ea' : gold, color: showAddFeedback ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddFeedback ? 'Cancel' : '+ Add Feedback'}</button>
+        )}
       </div>
-      <Table
-        cols={["Event", "Date", "Status", "Est. Guests", "Revenue"]}
-        rows={mockData.events}
-        renderRow={r => (<><Td>{r.name}</Td><Td muted>{r.date}</Td><Td><Badge status={r.status} /></Td><Td muted>{r.guests}</Td><Td>{r.revenue}</Td></>)}
-      />
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '0.5px solid #e8dece' }}>
+        <button onClick={function() { setTab('pnl'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'pnl' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, fontSize: 13, fontWeight: tab === 'pnl' ? 600 : 400, color: tab === 'pnl' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Profit & Loss</button>
+        <button onClick={function() { setTab('feedback'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'feedback' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, marginLeft: 16, fontSize: 13, fontWeight: tab === 'feedback' ? 600 : 400, color: tab === 'feedback' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Reviews & Feedback{feedback.length > 0 ? ' (' + feedback.length + ')' : ''}</button>
+      </div>
+
+      {tab === 'pnl' && showAddEarning && (
+        <form onSubmit={addEarning} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={fieldLbl}>Event</label>
+              <input required value={earningForm.event} onChange={function(e) { setEarningForm(function(f) { return Object.assign({}, f, { event: e.target.value }); }); }} list="events-hub-event-options" style={fieldSt} placeholder="e.g. Spring Gala" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Source</label>
+              <input value={earningForm.earning_source} onChange={function(e) { setEarningForm(function(f) { return Object.assign({}, f, { earning_source: e.target.value }); }); }} style={fieldSt} placeholder="e.g. Ticket sales" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Amount</label>
+              <input required type="number" step="0.01" min="0" value={earningForm.amount} onChange={function(e) { setEarningForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} style={fieldSt} placeholder="0.00" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Date</label>
+              <input type="date" value={earningForm.date} onChange={function(e) { setEarningForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={fieldSt} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={fieldLbl}>Notes</label>
+            <input value={earningForm.notes} onChange={function(e) { setEarningForm(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} style={fieldSt} placeholder="Optional notes…" />
+          </div>
+          <button type="submit" disabled={savingEarning} style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 600, opacity: savingEarning ? 0.5 : 1 }}>{savingEarning ? 'Saving…' : 'Add Earning'}</button>
+        </form>
+      )}
+
+      {tab === 'pnl' && showAddExpense && (
+        <form onSubmit={addExpense} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={fieldLbl}>Event</label>
+              <input required value={expenseForm.event_name} onChange={function(e) { setExpenseForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} list="events-hub-event-options" style={fieldSt} placeholder="e.g. Spring Gala" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Type</label>
+              <select value={expenseForm.type} onChange={function(e) { setExpenseForm(function(f) { return Object.assign({}, f, { type: e.target.value }); }); }} style={fieldSt}>
+                <option value="Purchase">Purchase</option>
+                <option value="In-Kind">In-Kind</option>
+              </select>
+            </div>
+            <div>
+              <label style={fieldLbl}>Amount</label>
+              <input required type="number" step="0.01" min="0" value={expenseForm.amount} onChange={function(e) { setExpenseForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} style={fieldSt} placeholder="0.00" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Date</label>
+              <input type="date" value={expenseForm.date} onChange={function(e) { setExpenseForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={fieldSt} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={fieldLbl}>Description</label>
+            <input required value={expenseForm.description} onChange={function(e) { setExpenseForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} style={fieldSt} placeholder="What was this for…" />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={fieldLbl}>Purchased By</label>
+            <input value={expenseForm.purchased_by} onChange={function(e) { setExpenseForm(function(f) { return Object.assign({}, f, { purchased_by: e.target.value }); }); }} style={fieldSt} placeholder="Optional" />
+          </div>
+          <button type="submit" disabled={savingExpense} style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 600, opacity: savingExpense ? 0.5 : 1 }}>{savingExpense ? 'Saving…' : 'Add Expense'}</button>
+        </form>
+      )}
+
+      {tab === 'pnl' && (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+        <StatCard label="Earnings" value={fmt(totalEarnings)} />
+        <StatCard label="Costs" value={fmt(totalCosts)} />
+        <StatCard label="Net" value={fmt(totalEarnings - totalCosts)} />
+      </div>
+      )}
+
+      {tab === 'pnl' && (loading ? (
+        <div style={{ textAlign: 'center', padding: 48, color: '#aaa', fontSize: 13 }}>Loading…</div>
+      ) : groups.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 48, color: '#ccc', fontSize: 13 }}>No events tracked yet — add earnings or expenses under Operational Areas → Events.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {groups.map(function(g) {
+            var isOpen = expanded === g.event;
+            return (
+              <div key={g.event} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+                <button onClick={function() { setExpanded(isOpen ? null : g.event); }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#fdfcfb', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{g.event}</div>
+                    {g.date && <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{new Date(g.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>}
+                  </div>
+                  <span style={{ fontSize: 12, color: '#5a8a5a', fontWeight: 600, minWidth: 70, textAlign: 'right' }}>{fmt(g.earnings)}</span>
+                  <span style={{ fontSize: 12, color: '#c07040', fontWeight: 600, minWidth: 70, textAlign: 'right' }}>-{fmt(g.costs)}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: g.net >= 0 ? '#2e7d32' : '#c62828', minWidth: 80, textAlign: 'right' }}>{g.net >= 0 ? '' : '-'}{fmt(Math.abs(g.net))}</span>
+                  <span style={{ fontSize: 12, color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
+                </button>
+                {isOpen && (
+                  <div style={{ padding: '4px 16px 14px' }}>
+                    {g.link && <a href={g.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: gold, textDecoration: 'none' }}>Event details ↗</a>}
+                    {g.earningsRows.length > 0 && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Earnings</div>
+                        {g.earningsRows.map(function(e, i) {
+                          if (editingEarningId === e.id && editEarningForm) {
+                            return (
+                              <div key={i} style={{ padding: '8px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                                  <input value={editEarningForm.event} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { event: ev.target.value }); }); }} list="events-hub-event-options" style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Event" />
+                                  <input value={editEarningForm.earning_source} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { earning_source: ev.target.value }); }); }} style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Source" />
+                                  <input type="number" step="0.01" min="0" value={editEarningForm.amount} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { amount: ev.target.value }); }); }} style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Amount" />
+                                  <input type="date" value={editEarningForm.date} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { date: ev.target.value }); }); }} style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
+                                </div>
+                                <input value={editEarningForm.notes} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { notes: ev.target.value }); }); }} style={{ width: '100%', padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }} placeholder="Notes" />
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button onClick={saveEditEarning} disabled={savingEarningEdit} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: savingEarningEdit ? 0.6 : 1 }}>{savingEarningEdit ? 'Saving…' : 'Save'}</button>
+                                  <button onClick={function() { setEditingEarningId(null); setEditEarningForm(null); }} disabled={savingEarningEdit} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 11, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                              <span style={{ color: '#555' }}>{e.earning_source || 'Earning'}{e.notes ? ' — ' + e.notes : ''}</span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                <span style={{ color: '#5a8a5a', fontWeight: 600 }}>{fmt(e.amount)}</span>
+                                <button onClick={function() { startEditEarning(e); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                                <button onClick={function() { deleteEarning(e.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 13, padding: '0 2px' }}>×</button>
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {g.expenseRows.length > 0 && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Expenses</div>
+                        {g.expenseRows.map(function(b, i) {
+                          if (editingExpenseId === b.id && editExpenseForm) {
+                            return (
+                              <div key={i} style={{ padding: '8px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+                                  <input value={editExpenseForm.event_name} onChange={function(ev) { setEditExpenseForm(function(f) { return Object.assign({}, f, { event_name: ev.target.value }); }); }} list="events-hub-event-options" style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Event" />
+                                  <select value={editExpenseForm.type} onChange={function(ev) { setEditExpenseForm(function(f) { return Object.assign({}, f, { type: ev.target.value }); }); }} style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }}>
+                                    <option value="Purchase">Purchase</option>
+                                    <option value="In-Kind">In-Kind</option>
+                                  </select>
+                                  <input type="number" step="0.01" min="0" value={editExpenseForm.amount} onChange={function(ev) { setEditExpenseForm(function(f) { return Object.assign({}, f, { amount: ev.target.value }); }); }} style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Amount" />
+                                  <input type="date" value={editExpenseForm.date} onChange={function(ev) { setEditExpenseForm(function(f) { return Object.assign({}, f, { date: ev.target.value }); }); }} style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
+                                </div>
+                                <input value={editExpenseForm.description} onChange={function(ev) { setEditExpenseForm(function(f) { return Object.assign({}, f, { description: ev.target.value }); }); }} style={{ width: '100%', padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }} placeholder="Description" />
+                                <input value={editExpenseForm.purchased_by} onChange={function(ev) { setEditExpenseForm(function(f) { return Object.assign({}, f, { purchased_by: ev.target.value }); }); }} style={{ width: '100%', padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 6 }} placeholder="Purchased by" />
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button onClick={saveEditExpense} disabled={savingExpenseEdit} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: savingExpenseEdit ? 0.6 : 1 }}>{savingExpenseEdit ? 'Saving…' : 'Save'}</button>
+                                  <button onClick={function() { setEditingExpenseId(null); setEditExpenseForm(null); }} disabled={savingExpenseEdit} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 11, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                              <span style={{ color: '#555' }}>{b.description}{b.type ? ' (' + b.type + ')' : ''}</span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                <span style={{ color: '#c07040', fontWeight: 600 }}>{fmt(b.amount)}</span>
+                                <button onClick={function() { startEditExpense(b); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                                <button onClick={function() { deleteExpense(b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 13, padding: '0 2px' }}>×</button>
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {g.earningsRows.length === 0 && g.expenseRows.length === 0 && (
+                      <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic', marginTop: 8 }}>No financial entries recorded for this event yet.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+
+      {tab === 'feedback' && showAddFeedback && (
+        <form onSubmit={addFeedback} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={fieldLbl}>Event Name</label>
+              <select required value={feedbackForm.event_name} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} style={fieldSt}>
+                <option value="">Select an event…</option>
+                {eventNameOptions.map(function(n) { return <option key={n} value={n}>{n}</option>; })}
+              </select>
+            </div>
+            <div>
+              <label style={fieldLbl}>Source</label>
+              <input value={feedbackForm.source} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { source: e.target.value }); }); }} list="events-hub-feedback-source-options" style={fieldSt} placeholder="e.g. Google review, comment card…" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Name</label>
+              <input value={feedbackForm.name} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { name: e.target.value }); }); }} style={fieldSt} placeholder="Who left this feedback (optional)" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Role</label>
+              <input value={feedbackForm.role} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { role: e.target.value }); }); }} style={fieldSt} placeholder="e.g. Guest, Vendor, Volunteer…" />
+            </div>
+            <div>
+              <label style={fieldLbl}>Date</label>
+              <input type="date" value={feedbackForm.date} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={fieldSt} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={fieldLbl}>Feedback</label>
+            <textarea required value={feedbackForm.feedback} onChange={function(e) { setFeedbackForm(function(f) { return Object.assign({}, f, { feedback: e.target.value }); }); }} style={Object.assign({}, fieldSt, { minHeight: 70, resize: 'vertical', fontFamily: 'inherit' })} placeholder="What did they say…" />
+          </div>
+          <button type="submit" disabled={savingFeedback} style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 600, opacity: savingFeedback ? 0.5 : 1 }}>{savingFeedback ? 'Saving…' : 'Add Feedback'}</button>
+        </form>
+      )}
+
+      {tab === 'feedback' && (
+        feedbackLoading ? (
+          <div style={{ textAlign: 'center', padding: 48, color: '#aaa', fontSize: 13 }}>Loading…</div>
+        ) : feedback.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 48, color: '#ccc', fontSize: 13 }}>No feedback recorded yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {feedback.map(function(f) {
+              if (editingFeedbackId === f.id && editFeedbackForm) {
+                return (
+                  <div key={f.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 14 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                      <select value={editFeedbackForm.event_name} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { event_name: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }}>
+                        <option value="">Select an event…</option>
+                        {eventNameOptions.map(function(n) { return <option key={n} value={n}>{n}</option>; })}
+                      </select>
+                      <input value={editFeedbackForm.source} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { source: e.target.value }); }); }} list="events-hub-feedback-source-options" style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Source" />
+                      <input value={editFeedbackForm.name} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { name: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Name" />
+                      <input value={editFeedbackForm.role} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { role: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Role" />
+                      <input type="date" value={editFeedbackForm.date} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { date: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
+                    </div>
+                    <textarea value={editFeedbackForm.feedback} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { feedback: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', minHeight: 60, resize: 'vertical', fontFamily: 'inherit', marginBottom: 8 }} />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={saveEditFeedback} disabled={savingFeedbackEdit} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: savingFeedbackEdit ? 0.6 : 1 }}>{savingFeedbackEdit ? 'Saving…' : 'Save'}</button>
+                      <button onClick={function() { setEditingFeedbackId(null); setEditFeedbackForm(null); }} disabled={savingFeedbackEdit} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                    </div>
+                  </div>
+                );
+              }
+              var isFeedbackOpen = !!expandedFeedback[f.id];
+              return (
+                <div key={f.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px' }}>
+                    <button onClick={function() { toggleFeedback(f.id); }} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, minWidth: 0 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{f.name || 'Anonymous'}{f.role ? ' - ' + f.role : ''}</div>
+                        {(f.event_name || f.source) && (
+                          <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>
+                            {f.event_name}{f.event_name && f.source ? ' · ' : ''}{f.source}
+                          </div>
+                        )}
+                      </div>
+                      {f.date && <span style={{ fontSize: 11, color: '#ccc', flexShrink: 0 }}>{new Date(f.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                      <span style={{ fontSize: 12, color: '#ccc', flexShrink: 0 }}>{isFeedbackOpen ? '▲' : '▼'}</span>
+                    </button>
+                    <button onClick={function() { startEditFeedback(f); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button onClick={function() { deleteFeedback(f.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '0 2px', flexShrink: 0 }}>×</button>
+                  </div>
+                  {isFeedbackOpen && (
+                    <div style={{ padding: '0 16px 14px', fontSize: 13, color: '#555', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{f.feedback}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
     </div>
   );
 }
@@ -777,6 +1336,7 @@ function sbPatchById(table, id, row) {
   }).then(r => r.json());
 }
 
+var DEFAULT_LIST_COLOR = '#0d6eab';
 var TEAM_COLORS = {
   'Grounds':      { bg: '#e8f5e9', color: '#2e7d32' },
   'Construction': { bg: '#fff3e0', color: '#e65100' },
@@ -795,9 +1355,6 @@ var TEAM_COLORS = {
   'Venue':        { bg: '#ede7f6', color: '#4527a0' },
   'Marketing':    { bg: '#fce4ec', color: '#c2185b' },
   'Restoration':  { bg: '#fff3e0', color: '#e65100' },
-  'Garden and Landscaping': { bg: '#e8f5e9', color: '#2e7d32' },
-  'Landscaping':  { bg: '#e8f5e9', color: '#2e7d32' },
-  'Garden':       { bg: '#e8f5e9', color: '#2e7d32' },
   'General':      { bg: '#f5f5f5', color: '#555' },
   'Other':        { bg: '#f5f5f5', color: '#777' },
 };
@@ -812,11 +1369,13 @@ function getAreaColor(aoi) {
 }
 var TEAM_OPTIONS = Object.keys(TEAM_COLORS).filter(function(k) { return ['Events','Docents','Restoration','General','Other'].indexOf(k) === -1; });
 
-function TeamPicker({ value, onChange }) {
+function TeamPicker({ value, onChange, extraTeams }) {
   const { useState: useS } = React;
   const [open, setOpen] = useS(false);
   const [search, setSearch] = useS('');
+  const [newTag, setNewTag] = useS('');
   var selected = value ? value.split('|').map(function(t) { return t.trim(); }).filter(Boolean) : [];
+  var allOptions = TEAM_OPTIONS.concat((extraTeams || []).filter(function(t) { return TEAM_OPTIONS.indexOf(t) === -1; }));
 
   function toggle(opt) {
     var next;
@@ -831,6 +1390,13 @@ function TeamPicker({ value, onChange }) {
   function remove(opt) {
     var next = selected.filter(function(t) { return t !== opt; });
     onChange({ target: { name: 'Team', value: next.join(' | ') } });
+  }
+
+  function addNewTag() {
+    var trimmed = newTag.trim();
+    if (!trimmed) return;
+    if (selected.indexOf(trimmed) === -1) toggle(trimmed);
+    setNewTag('');
   }
 
   return (
@@ -861,12 +1427,12 @@ function TeamPicker({ value, onChange }) {
               value={search}
               onChange={function(e) { setSearch(e.target.value); }}
               onClick={function(e) { e.stopPropagation(); }}
-              placeholder="Search teams..."
+              placeholder="Search areas..."
               style={{ width: '100%', padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', outline: 'none' }}
             />
           </div>
-          <div style={{ maxHeight: 200, overflowY: 'auto', padding: '4px 0' }}>
-            {TEAM_OPTIONS.filter(function(opt) { return opt.toLowerCase().indexOf(search.toLowerCase()) !== -1; }).map(function(opt) {
+          <div style={{ maxHeight: 180, overflowY: 'auto', padding: '4px 0' }}>
+            {allOptions.filter(function(opt) { return opt.toLowerCase().indexOf(search.toLowerCase()) !== -1; }).map(function(opt) {
               var isOn = selected.indexOf(opt) !== -1;
               return (
                 <div
@@ -882,6 +1448,107 @@ function TeamPicker({ value, onChange }) {
               );
             })}
           </div>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ display: 'flex', gap: 6, padding: '8px 10px', borderTop: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+            <input
+              value={newTag}
+              onChange={function(e) { setNewTag(e.target.value); }}
+              onKeyDown={function(e) { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); addNewTag(); } }}
+              placeholder="New area name..."
+              style={{ flex: 1, padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, outline: 'none', background: '#fff' }}
+            />
+            <button type="button" onClick={function(e) { e.stopPropagation(); addNewTag(); }} disabled={!newTag.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: newTag.trim() ? 1 : 0.4, flexShrink: 0 }}>Add</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EventTagPicker({ value, onChange, colors, options }) {
+  const { useState: useS } = React;
+  const [open, setOpen] = useS(false);
+  const [search, setSearch] = useS('');
+  const [newTag, setNewTag] = useS('');
+  var selected = value ? value.split('|').map(function(t) { return t.trim(); }).filter(Boolean) : [];
+  var allOptions = (options || []).filter(function(t) { return selected.indexOf(t) === -1; });
+
+  function tagColor(t) { return (colors && colors[t]) || DEFAULT_LIST_COLOR; }
+
+  function toggle(t) {
+    var next = selected.indexOf(t) !== -1 ? selected.filter(function(x) { return x !== t; }) : selected.concat([t]);
+    onChange({ target: { name: 'Event Tags', value: next.join(' | ') } });
+  }
+
+  function remove(t) {
+    onChange({ target: { name: 'Event Tags', value: selected.filter(function(x) { return x !== t; }).join(' | ') } });
+  }
+
+  function addNewTag() {
+    var trimmed = newTag.trim();
+    if (!trimmed) return;
+    if (selected.indexOf(trimmed) === -1) onChange({ target: { name: 'Event Tags', value: selected.concat([trimmed]).join(' | ') } });
+    setNewTag('');
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        onClick={function() { setOpen(function(o) { return !o; }); }}
+        style={{ minHeight: 38, border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', background: '#fff', display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}
+      >
+        {selected.length === 0 && <span style={{ fontSize: 12, color: '#999' }}>Select lists...</span>}
+        {selected.map(function(t) {
+          var c = tagColor(t);
+          return (
+            <span key={t} style={{ background: c + '22', color: c, fontSize: 12, fontWeight: 500, padding: '2px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+              {t}
+              <span onClick={function(e) { e.stopPropagation(); remove(t); }} style={{ cursor: 'pointer', opacity: 0.6, fontSize: 12, lineHeight: 1, marginLeft: 2 }}>×</span>
+            </span>
+          );
+        })}
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#999', flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 100, marginTop: 4 }}>
+          <div style={{ padding: '8px 10px', borderBottom: '0.5px solid #f0ece6' }}>
+            <input
+              autoFocus
+              value={search}
+              onChange={function(e) { setSearch(e.target.value); }}
+              onClick={function(e) { e.stopPropagation(); }}
+              placeholder="Search lists..."
+              style={{ width: '100%', padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', outline: 'none' }}
+            />
+          </div>
+          <div style={{ maxHeight: 180, overflowY: 'auto', padding: '4px 0' }}>
+            {allOptions.length === 0 ? (
+              <div style={{ padding: '10px 14px', fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>No other lists yet</div>
+            ) : allOptions.filter(function(opt) { return opt.toLowerCase().indexOf(search.toLowerCase()) !== -1; }).map(function(opt) {
+              var c = tagColor(opt);
+              return (
+                <div
+                  key={opt}
+                  onClick={function() { toggle(opt); }}
+                  style={{ padding: '8px 14px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+                  onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
+                  onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                  {opt}
+                </div>
+              );
+            })}
+          </div>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ display: 'flex', gap: 6, padding: '8px 10px', borderTop: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+            <input
+              value={newTag}
+              onChange={function(e) { setNewTag(e.target.value); }}
+              onKeyDown={function(e) { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); addNewTag(); } }}
+              placeholder="New list name..."
+              style={{ flex: 1, padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, outline: 'none', background: '#fff' }}
+            />
+            <button type="button" onClick={function(e) { e.stopPropagation(); addNewTag(); }} disabled={!newTag.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: newTag.trim() ? 1 : 0.4, flexShrink: 0 }}>Add</button>
+          </div>
         </div>
       )}
     </div>
@@ -896,14 +1563,18 @@ var volSecLabel = { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2
 var VOL_MONTHS = [['01','January'],['02','February'],['03','March'],['04','April'],['05','May'],['06','June'],['07','July'],['08','August'],['09','September'],['10','October'],['11','November'],['12','December']];
 
 function VolDatePicker({ label, name, value, onChange, noDay }) {
-  var parts = (value || '').split('-');
-  var hasAll = parts.length === 3;
-  var yr = hasAll ? (parts[0] === '0001' ? '' : parts[0]) : '';
-  var mn = hasAll ? parts[1] : '';
-  var dy = hasAll ? String(parseInt(parts[2]) || '') : '';
+  const { useState: useS } = React;
+  function parseVal(v) {
+    var parts = (v || '').split('-');
+    if (parts.length !== 3) return { mn: '', dy: '', yr: '' };
+    return { mn: parts[1] || '', dy: String(parseInt(parts[2]) || ''), yr: parts[0] === '0001' ? '' : parts[0] };
+  }
+  var [local, setLocal] = useS(function() { return parseVal(value); });
+  var mn = local.mn, dy = local.dy, yr = local.yr;
   var currentYear = new Date().getFullYear();
 
   function notify(month, day, year) {
+    setLocal({ mn: month, dy: day, yr: year });
     if (!month || (!year && !noDay)) { onChange({ target: { name: name, value: '' } }); return; }
     var y = String(year || '0001').padStart(4, '0');
     var m = String(month).padStart(2, '0');
@@ -938,7 +1609,7 @@ function VolDatePicker({ label, name, value, onChange, noDay }) {
   );
 }
 
-function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }) {
+function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete, extraTeams, listColors, eventTagOptions }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 700, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -952,8 +1623,9 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete }
             <div><label style={volLabelStyle}>First Name *</label><input required name="First Name" value={form['First Name']} onChange={onChange} style={volInputStyle} /></div>
             <div><label style={volLabelStyle}>Last Name *</label><input required name="Last Name" value={form['Last Name']} onChange={onChange} style={volInputStyle} /></div>
           </div>
-          <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
-          <div style={volGrp}><label style={volLabelStyle}>Team</label><div style={{ marginTop: 4 }}><TeamPicker value={form['Team']} onChange={onChange} /></div></div>
+          <div style={volGrp}><label style={volLabelStyle}>Status</label><select name="Status" value={form['Status']} onChange={onChange} style={volInputStyle}><option value="Active">Active</option><option value="On-Call Supporter">On-Call Supporter</option><option value="Inactive">Inactive</option></select></div>
+          <div style={volGrp}><label style={volLabelStyle}>Team</label><div style={{ marginTop: 4 }}><TeamPicker value={form['Team']} onChange={onChange} extraTeams={extraTeams || []} /></div></div>
+          <div style={volGrp}><label style={volLabelStyle}>Custom Lists</label><div style={{ marginTop: 4 }}><EventTagPicker value={form['Event Tags']} onChange={onChange} colors={listColors} options={eventTagOptions} /></div></div>
           <span style={volSecLabel}>Contact</span>
           <div style={volGrp}><label style={volLabelStyle}>Email</label><input name="Email" type="email" value={form['Email']} onChange={onChange} style={volInputStyle} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Phone Number</label><input name="Phone Number" value={form['Phone Number']} onChange={onChange} style={volInputStyle} /></div>
@@ -1025,12 +1697,14 @@ function VolunteersView() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filterTeam, setFilterTeam] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [tab, setTab] = useState('active');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboarding, setOnboarding] = useState([]);
   var OB_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRvOZozfWfzXyS5GyAHDyzQbXf-A8GxNMKTTRh6BGDJCVAAdimGW7MvLdhl0Ab0PuUgmUfm8xpZRUyP/pub?gid=544068320&single=true&output=csv';
   var HOUR_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const [hoursData, setHoursData] = React.useState({});
+  const [listColors, setListColors] = useState({});
 
   function buildHoursMapFromLogs(logs) {
     var byName = {};
@@ -1123,7 +1797,7 @@ function VolunteersView() {
   const [obEditSaving, setObEditSaving] = useState(false);
 
   var emptyForm = {
-    'First Name': '', 'Last Name': '', 'Team': '', 'Status': 'Active',
+    'First Name': '', 'Last Name': '', 'Team': '', 'Event Tags': '', 'Status': 'Active',
     'Email': '', 'Phone Number': '', 'Address': '', 'Birthday': '',
     'Volunteer Anniversary': '', 'CC': false, 'Nametag': false,
     'Overview Notes': '', 'Background Notes': '', 'Notes': '',
@@ -1133,13 +1807,21 @@ function VolunteersView() {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(function() {
-    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day'])
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day'])
       .then(function(data) {
         if (Array.isArray(data)) setVolunteers(data);
         else setError(JSON.stringify(data));
         setLoading(false);
       })
       .catch(function(err) { setError(err.message); setLoading(false); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('List Tag Colors') + '?select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (!Array.isArray(rows)) return;
+      var map = {};
+      rows.forEach(function(r) { map[r.tag] = r.color; });
+      setListColors(map);
+    }).catch(function() {});
     var cachedHours = lsGet('hours_summary_sb');
     if (cachedHours) { setHoursData(cachedHours); }
     (function() {
@@ -1273,8 +1955,27 @@ function VolunteersView() {
 
   var active = volunteers.filter(function(v) { return v['Status'] === 'Active'; }).length;
   var inactive = volunteers.filter(function(v) { return v['Status'] === 'Inactive'; }).length;
-  var tabList = volunteers.filter(function(v) { return tab === 'active' ? v['Status'] === 'Active' : v['Status'] === 'Inactive'; });
-  var teamSet = ['All'].concat(TEAM_OPTIONS.filter(function(t) {
+  var oncall = volunteers.filter(function(v) { return v['Status'] === 'On-Call Supporter'; }).length;
+  var tabList = volunteers.filter(function(v) {
+    if (tab === 'active') return v['Status'] === 'Active';
+    if (tab === 'oncall') return v['Status'] === 'On-Call Supporter';
+    return v['Status'] === 'Inactive';
+  });
+  var customTeams = [];
+  volunteers.forEach(function(v) {
+    (v['Team'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).forEach(function(t) {
+      if (TEAM_OPTIONS.indexOf(t) === -1 && customTeams.indexOf(t) === -1) customTeams.push(t);
+    });
+  });
+  var allEventTags = [];
+  volunteers.forEach(function(v) {
+    (v['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).forEach(function(t) {
+      if (allEventTags.indexOf(t) === -1) allEventTags.push(t);
+    });
+  });
+  allEventTags.sort();
+  var allTeamOptions = TEAM_OPTIONS.concat(customTeams);
+  var teamSet = ['All'].concat(allTeamOptions.filter(function(t) {
     return tabList.some(function(v) { return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(t) !== -1; });
   }));
   var teams = teamSet.length - 1;
@@ -1294,12 +1995,26 @@ function VolunteersView() {
     : tabList.filter(function(v) {
         return (v['Team'] || '').split('|').map(function(x) { return x.trim(); }).indexOf(filterTeam) !== -1;
       });
+  if (searchQuery.trim()) {
+    var sq = searchQuery.trim().toLowerCase();
+    filtered = filtered.filter(function(v) {
+      var name = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).toLowerCase();
+      return name.includes(sq) || (v['Email'] || '').toLowerCase().includes(sq) || (v['Phone Number'] || '').toLowerCase().includes(sq) || (v['Team'] || '').toLowerCase().includes(sq);
+    });
+  }
 
   function fmtBirthday(val) {
     if (!val) return '';
     var d = new Date(val + 'T00:00:00');
     if (isNaN(d)) return val;
     return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  }
+
+  function fmtAnniversary(val) {
+    if (!val) return '';
+    var d = new Date(val + 'T00:00:00');
+    if (isNaN(d)) return val;
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   }
 
   function initials(v) {
@@ -1317,6 +2032,7 @@ function VolunteersView() {
       'First Name': v['First Name'] || '',
       'Last Name': v['Last Name'] || '',
       'Team': v['Team'] || '',
+      'Event Tags': v['Event Tags'] || '',
       'Status': v['Status'] || 'Active',
       'Email': v['Email'] || '',
       'Phone Number': v['Phone Number'] || '',
@@ -1442,11 +2158,29 @@ function VolunteersView() {
             style={{ border: 'none', borderRadius: 8, padding: '6px 18px', fontSize: 12, fontWeight: tab === 'active' ? 600 : 400, cursor: 'pointer', background: tab === 'active' ? '#fff' : 'transparent', color: tab === 'active' ? '#2a2a2a' : '#999', boxShadow: tab === 'active' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
           >Active <span style={{ fontSize: 12, color: tab === 'active' ? gold : '#bbb', fontWeight: 500 }}>{active}</span></button>
           <button
+            onClick={function() { setTab('oncall'); setFilterTeam('All'); }}
+            style={{ border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: tab === 'oncall' ? 600 : 400, cursor: 'pointer', background: tab === 'oncall' ? '#fff' : 'transparent', color: tab === 'oncall' ? '#2a2a2a' : '#999', boxShadow: tab === 'oncall' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
+          >On-Call <span style={{ fontSize: 12, color: tab === 'oncall' ? gold : '#bbb', fontWeight: 500 }}>{oncall}</span></button>
+          <button
             onClick={function() { setTab('inactive'); setFilterTeam('All'); }}
             style={{ border: 'none', borderRadius: 8, padding: '6px 18px', fontSize: 12, fontWeight: tab === 'inactive' ? 600 : 400, cursor: 'pointer', background: tab === 'inactive' ? '#fff' : 'transparent', color: tab === 'inactive' ? '#2a2a2a' : '#999', boxShadow: tab === 'inactive' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
           >Inactive <span style={{ fontSize: 12, color: tab === 'inactive' ? gold : '#bbb', fontWeight: 500 }}>{inactive}</span></button>
         </div>
         <button onClick={function() { setForm(emptyForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Volunteer</button>
+      </div>
+
+      <div style={{ position: 'relative', marginBottom: 16 }}>
+        <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#aaa', fontSize: 12, pointerEvents: 'none' }}>🔍</span>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={function(e) { setSearchQuery(e.target.value); }}
+          placeholder="Search volunteers by name, email, phone, or team..."
+          style={{ width: '100%', padding: '8px 12px 8px 30px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff', boxSizing: 'border-box' }}
+        />
+        {searchQuery && (
+          <button onClick={function() { setSearchQuery(''); }} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#bbb', fontSize: 15, cursor: 'pointer', padding: 4, lineHeight: 1 }}>×</button>
+        )}
       </div>
 
       {!loading && teamSet.length > 2 && (
@@ -1479,6 +2213,8 @@ function VolunteersView() {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#777', fontSize: 12 }}>Loading volunteers...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#bbb', fontSize: 13, fontStyle: 'italic' }}>No volunteers match your search.</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 14 }}>
           {filtered.map(function(v, i) {
@@ -1496,6 +2232,9 @@ function VolunteersView() {
                 <div style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a', marginBottom: 3, lineHeight: 1.3 }}>{v['First Name']} {v['Last Name']}</div>
                 {v['Team'] && <div style={{ fontSize: 12, color: '#777', marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v['Team'] || '').split('|')[0].trim()}</div>}
                 <Badge status={v['Status'] || 'Active'} />
+                {(v['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).length > 0 && (
+                  <div style={{ fontSize: 10, color: '#0d6eab', marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🏷 {(v['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).length}</div>
+                )}
               </div>
             );
           })}
@@ -1505,7 +2244,7 @@ function VolunteersView() {
       )}
 
       {selected && !editing && (
-        <div onClick={function() { setSelected(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 18, maxWidth: 620, width: '100%', boxShadow: '0 12px 48px rgba(0,0,0,0.22)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
 
             {/* Header band */}
@@ -1543,7 +2282,7 @@ function VolunteersView() {
               {(selected['Volunteer Anniversary'] || selected['Birthday']) && (
                 <div style={{ marginBottom: 4 }}>
                   <span style={volSecLabel}>Volunteer Info</span>
-                  <InfoRow label="Anniversary" value={selected['Volunteer Anniversary']} />
+                  <InfoRow label="Anniversary" value={fmtAnniversary(selected['Volunteer Anniversary'])} />
                   <InfoRow label="Birthday" value={fmtBirthday(selected['Birthday'])} />
                 </div>
               )}
@@ -1562,6 +2301,17 @@ function VolunteersView() {
                   {selected['NSH Future Vision'] && <NoteBlock label="NSH Future Vision" value={selected['NSH Future Vision']} />}
                   {selected['Allergies'] && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: '#c0392b', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>⚠ Allergies</div><div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{selected['Allergies']}</div></div>}
                   {selected['Special Considerations'] && <div style={{ background: '#fafafa', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 12px' }}><div style={{ fontSize: 11, fontWeight: 600, color: '#666', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>🔒 Special Considerations</div><div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{selected['Special Considerations']}</div></div>}
+                </div>
+              )}
+              {(selected['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <span style={volSecLabel}>Custom Lists</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {(selected['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).map(function(t) {
+                      var c = listColors[t] || DEFAULT_LIST_COLOR;
+                      return <span key={t} style={{ background: c + '22', color: c, fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>{t}</span>;
+                    })}
+                  </div>
                 </div>
               )}
               {(function() {
@@ -1606,6 +2356,9 @@ function VolunteersView() {
           onSubmit={handleEditSubmit}
           onCancel={function() { setEditing(false); }}
           onDelete={handleDeleteVolunteer}
+          extraTeams={customTeams}
+          listColors={listColors}
+          eventTagOptions={allEventTags}
         />
       )}
 
@@ -1800,7 +2553,7 @@ function VolunteersView() {
         var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 3 };
         var grp = { marginBottom: 12 };
         return (
-          <div onClick={function() { setObEditId(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
             <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 520, width: '100%', boxShadow: '0 12px 48px rgba(0,0,0,0.2)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '20px 24px 16px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: tc.bg, borderRadius: '16px 16px 0 0' }}>
                 <div>
@@ -1846,6 +2599,9 @@ function VolunteersView() {
           title="Add Volunteer"
           onSubmit={handleAddSubmit}
           onCancel={function() { setShowAdd(false); }}
+          extraTeams={customTeams}
+          listColors={listColors}
+          eventTagOptions={allEventTags}
         />
       )}
     </div>
@@ -1897,6 +2653,9 @@ function DonorsView() {
   const [addGiftForm, setAddGiftForm] = useState(emptyGiftForm);
   const [addingGift, setAddingGift] = useState(false);
   const [addForm, setAddForm] = useState(emptyAddForm);
+  const [addMode, setAddMode] = useState('search');
+  const [addSearchQuery, setAddSearchQuery] = useState('');
+  const [addExistingDonor, setAddExistingDonor] = useState(null);
 
   var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
   var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
@@ -2038,6 +2797,20 @@ function DonorsView() {
       }).catch(function(){setAddingGift(false);});
   }
 
+  function submitGiftForExisting(e){
+    e.preventDefault();
+    if(!addExistingDonor)return;
+    setSaving(true);
+    fetch(SUPABASE_URL+'/rest/v1/donations',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},
+      body:JSON.stringify({donor_id:addExistingDonor.id,amount:parseFloat(String(addGiftForm.amount||0).replace(/[^\d.]/g,'')||0),date:addGiftForm.date,type:addGiftForm.type,payment_type:addGiftForm.payment_type||null,acknowledged:!!addGiftForm.acknowledged,donation_notes:addGiftForm.donation_notes||null})})
+      .then(function(r){return r.json();}).then(function(rows){
+        setSaving(false);
+        var newDon=Array.isArray(rows)?rows[0]:rows;
+        updateDonorInState(addExistingDonor.id,function(d){return{donations:d.donations.concat([newDon])};});
+        setShowAdd(false);setAddGiftForm(emptyGiftForm);setAddExistingDonor(null);setAddMode('search');setAddSearchQuery('');
+      }).catch(function(){setSaving(false);});
+  }
+
   function handleAddSubmit(e){
     e.preventDefault();setSaving(true);
     fetch(SUPABASE_URL+'/rest/v1/donors?formal_name=ilike.'+encodeURIComponent(addForm.formal_name)+'&limit=1&select=id',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}})
@@ -2063,7 +2836,7 @@ function DonorsView() {
           if(exists){return prev.map(function(x){if(x.id!==d.id)return x;return buildDonor(Object.assign({},x),x.donations.concat([don]));});}
           return [newDonorObj].concat(prev);
         });
-        setShowAdd(false);setAddForm(emptyAddForm);
+        setShowAdd(false);setAddForm(emptyAddForm);setAddMode('search');setAddSearchQuery('');
       }).catch(function(){setSaving(false);});
   }
 
@@ -2119,7 +2892,7 @@ function DonorsView() {
         <div style={{display:'flex',alignItems:'center',gap:8,marginLeft:'auto'}}>
           <span style={{fontSize:11,color:'#aaa'}}>{filteredDonors.length} donor{filteredDonors.length!==1?'s':''}</span>
           <button onClick={exportCSV} style={{padding:'7px 14px',background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>↓ Export CSV</button>
-          <button onClick={function(){setAddForm(emptyAddForm);setShowAdd(true);}} style={{padding:'7px 14px',background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>+ Add Donation</button>
+          <button onClick={function(){setAddForm(emptyAddForm);setAddGiftForm(emptyGiftForm);setAddExistingDonor(null);setAddSearchQuery('');setAddMode('search');setShowAdd(true);}} style={{padding:'7px 14px',background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>+ Add Donation</button>
         </div>
       </div>
 
@@ -2370,42 +3143,113 @@ function DonorsView() {
       {showAdd && (
         <div onClick={function(){setShowAdd(false);}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.32)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:20}}>
           <div onClick={function(e){e.stopPropagation();}} style={{background:'#fff',borderRadius:16,padding:28,maxWidth:640,width:'100%',boxShadow:'0 8px 40px rgba(0,0,0,0.18)',maxHeight:'90vh',overflowY:'auto'}}>
-            <div style={{fontSize:17,fontWeight:600,color:'#2a2a2a',marginBottom:20}}>Add Donation</div>
-            <form onSubmit={handleAddSubmit}>
-              <span style={{...sec,marginTop:0}}>Donor</span>
-              <div style={{marginBottom:14}}><label style={lStyle}>Formal Name *</label><input required value={addForm.formal_name} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{formal_name:e.target.value});});}} style={iStyle} placeholder="e.g. Mr. and Mrs. John Smith" /></div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Informal First Name</label><input value={addForm.informal_first_name} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{informal_first_name:e.target.value});});}} style={iStyle} placeholder="e.g. John" /></div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Account Type</label>
-                <select value={addForm.account_type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{account_type:e.target.value});});}} style={iStyle}>
-                  {ACCOUNT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
-                </select>
-              </div>
-              <span style={sec}>Contact</span>
-              <div style={{marginBottom:14}}><label style={lStyle}>Email</label><input type="email" value={addForm.email} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{email:e.target.value});});}} style={iStyle} /></div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Phone</label><input value={addForm.phone} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{phone:e.target.value});});}} style={iStyle} /></div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Address</label><textarea value={addForm.address} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{address:e.target.value});});}} rows={3} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
-              <span style={sec}>Donation</span>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
-                <div><label style={lStyle}>Amount *</label><input required value={addForm.amount} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
-                <div><label style={lStyle}>Date</label><input type="date" value={addForm.date} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
-              </div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Donation Type</label>
-                <select value={addForm.type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
-                  {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
-                </select>
-              </div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Payment Type</label>
-                <select value={addForm.payment_type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{payment_type:e.target.value});});}} style={iStyle}>
-                  {PAYMENT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
-                </select>
-              </div>
-              <div style={{marginBottom:14}}><label style={lStyle}>Donation Notes</label><textarea value={addForm.donation_notes} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{donation_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
-              <div style={{marginBottom:14}}><label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,cursor:'pointer'}}><input type="checkbox" checked={addForm.acknowledged} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{acknowledged:e.target.checked});});}} /> Acknowledged / Thanked</label></div>
-              <div style={{display:'flex',gap:10}}>
-                <button type="submit" disabled={saving} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer',opacity:saving?0.7:1}}>{saving?'Saving...':'Add Donation'}</button>
-                <button type="button" onClick={function(){setShowAdd(false);}} style={{flex:1,padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer',fontWeight:500}}>Cancel</button>
-              </div>
-            </form>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:20}}>
+              {addMode!=='search' && (
+                <button onClick={function(){setAddMode('search');setAddExistingDonor(null);}} style={{background:'none',border:'none',fontSize:16,cursor:'pointer',color:'#aaa',padding:0}}>←</button>
+              )}
+              <div style={{fontSize:17,fontWeight:600,color:'#2a2a2a',flex:1}}>{addMode==='existing'?'Gift for '+(addExistingDonor&&addExistingDonor.formal_name):addMode==='new'?'New Donor':'Add Donation'}</div>
+              <button onClick={function(){setShowAdd(false);}} style={{background:'none',border:'none',fontSize:18,cursor:'pointer',color:'#bbb'}}>×</button>
+            </div>
+
+            {addMode==='search' && (function(){
+              var q=addSearchQuery.trim();
+              var results=q?donors.filter(function(d){var s=q.toLowerCase();return (d.formal_name||'').toLowerCase().includes(s)||(d.informal_first_name||'').toLowerCase().includes(s)||(d.email||'').toLowerCase().includes(s);}).slice(0,8):[];
+              return (
+                <div>
+                  <label style={lStyle}>Search for an existing donor</label>
+                  <input autoFocus value={addSearchQuery} onChange={function(e){setAddSearchQuery(e.target.value);}} placeholder="Type a name…" style={Object.assign({},iStyle,{marginTop:4})} />
+                  {q && (
+                    <div style={{marginTop:6,border:'0.5px solid #e0d8cc',borderRadius:8,overflow:'hidden',maxHeight:220,overflowY:'auto'}}>
+                      {results.length===0 ? (
+                        <div style={{padding:'10px 12px',fontSize:12,color:'#bbb'}}>No matches found</div>
+                      ) : results.map(function(d){
+                        return (
+                          <div key={d.id} onClick={function(){setAddExistingDonor(d);setAddGiftForm(emptyGiftForm);setAddMode('existing');}}
+                            style={{padding:'9px 12px',cursor:'pointer',borderBottom:'0.5px solid #f5f0ea',background:'#fff'}}
+                            onMouseEnter={function(e){e.currentTarget.style.background='#faf8f4';}}
+                            onMouseLeave={function(e){e.currentTarget.style.background='#fff';}}>
+                            <div style={{fontSize:13,fontWeight:500,color:'#2a2a2a'}}>{d.formal_name}</div>
+                            {(d.informal_first_name||d.email) && <div style={{fontSize:11,color:'#aaa',marginTop:1}}>{[d.informal_first_name,d.email].filter(Boolean).join(' · ')}</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div style={{display:'flex',alignItems:'center',gap:10,margin:'18px 0'}}>
+                    <div style={{flex:1,height:1,background:'#f0ece6'}} />
+                    <span style={{fontSize:11,color:'#bbb'}}>or</span>
+                    <div style={{flex:1,height:1,background:'#f0ece6'}} />
+                  </div>
+                  <button type="button" onClick={function(){setAddForm(emptyAddForm);setAddMode('new');}} style={{width:'100%',padding:'10px',border:'1px dashed #e0d8cc',borderRadius:8,fontSize:13,color:'#999',background:'none',cursor:'pointer'}}>+ Create new donor profile</button>
+                </div>
+              );
+            })()}
+
+            {addMode==='existing' && (
+              <form onSubmit={submitGiftForExisting}>
+                <span style={{...sec,marginTop:0}}>Gift Details</span>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+                  <div><label style={lStyle}>Amount *</label><input required value={addGiftForm.amount} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
+                  <div><label style={lStyle}>Date *</label><input required type="date" value={addGiftForm.date} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+                  <div><label style={lStyle}>Donation Type</label>
+                    <select value={addGiftForm.type} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
+                      {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                    </select>
+                  </div>
+                  <div><label style={lStyle}>Payment Type</label>
+                    <select value={addGiftForm.payment_type} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{payment_type:e.target.value});});}} style={iStyle}>
+                      {PAYMENT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                    </select>
+                  </div>
+                </div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Donation Notes</label><textarea value={addGiftForm.donation_notes} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{donation_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                <div style={{marginBottom:14}}><label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,cursor:'pointer'}}><input type="checkbox" checked={addGiftForm.acknowledged} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{acknowledged:e.target.checked});});}} /> Acknowledged / Thanked</label></div>
+                <div style={{display:'flex',gap:10}}>
+                  <button type="submit" disabled={saving} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer',opacity:saving?0.7:1}}>{saving?'Saving...':'Add Gift'}</button>
+                  <button type="button" onClick={function(){setShowAdd(false);}} style={{flex:1,padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer',fontWeight:500}}>Cancel</button>
+                </div>
+              </form>
+            )}
+
+            {addMode==='new' && (
+              <form onSubmit={handleAddSubmit}>
+                <span style={{...sec,marginTop:0}}>Donor</span>
+                <div style={{marginBottom:14}}><label style={lStyle}>Formal Name *</label><input required value={addForm.formal_name} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{formal_name:e.target.value});});}} style={iStyle} placeholder="e.g. Mr. and Mrs. John Smith" /></div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Informal First Name</label><input value={addForm.informal_first_name} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{informal_first_name:e.target.value});});}} style={iStyle} placeholder="e.g. John" /></div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Account Type</label>
+                  <select value={addForm.account_type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{account_type:e.target.value});});}} style={iStyle}>
+                    {ACCOUNT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                  </select>
+                </div>
+                <span style={sec}>Contact</span>
+                <div style={{marginBottom:14}}><label style={lStyle}>Email</label><input type="email" value={addForm.email} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{email:e.target.value});});}} style={iStyle} /></div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Phone</label><input value={addForm.phone} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{phone:e.target.value});});}} style={iStyle} /></div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Address</label><textarea value={addForm.address} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{address:e.target.value});});}} rows={3} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                <span style={sec}>Donation</span>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+                  <div><label style={lStyle}>Amount *</label><input required value={addForm.amount} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
+                  <div><label style={lStyle}>Date</label><input type="date" value={addForm.date} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
+                </div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Donation Type</label>
+                  <select value={addForm.type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
+                    {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                  </select>
+                </div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Payment Type</label>
+                  <select value={addForm.payment_type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{payment_type:e.target.value});});}} style={iStyle}>
+                    {PAYMENT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                  </select>
+                </div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Donation Notes</label><textarea value={addForm.donation_notes} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{donation_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                <div style={{marginBottom:14}}><label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,cursor:'pointer'}}><input type="checkbox" checked={addForm.acknowledged} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{acknowledged:e.target.checked});});}} /> Acknowledged / Thanked</label></div>
+                <div style={{display:'flex',gap:10}}>
+                  <button type="submit" disabled={saving} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer',opacity:saving?0.7:1}}>{saving?'Saving...':'Add Donation'}</button>
+                  <button type="button" onClick={function(){setShowAdd(false);}} style={{flex:1,padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer',fontWeight:500}}>Cancel</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -2542,6 +3386,11 @@ function BoardView() {
   const [topicSaving, setTopicSaving] = React.useState(false);
   const [attachUploading, setAttachUploading] = React.useState(false);
   const [attachFileName, setAttachFileName] = React.useState('');
+  const [showAdmin, setShowAdmin] = React.useState(false);
+  const [adminAuthed, setAdminAuthed] = React.useState(false);
+  const [adminPwInput, setAdminPwInput] = React.useState('');
+  const [adminPwError, setAdminPwError] = React.useState(false);
+  const [closingId, setClosingId] = React.useState(null);
 
   function handleAttachUpload(e) {
     var file = e.target.files[0];
@@ -2595,7 +3444,7 @@ function BoardView() {
         var da = a.created_at ? new Date(a.created_at).getTime() : 0;
         var db = b.created_at ? new Date(b.created_at).getTime() : 0;
         if (db !== da) return db - da;
-        return (b.id || 0) - (a.id || 0);
+        return (b.row_id || 0) - (a.row_id || 0);
       });
       setItems(sorted);
       setVotes([]);
@@ -2618,10 +3467,28 @@ function BoardView() {
   }
 
   function isRevealed(item) {
+    if (item.status === 'Closed') return true;
     var iv = itemVotes(item);
     var allVoted = BOARD_MEMBERS.every(function(m) { return iv.some(function(v) { return v.voter === m; }); });
     var pastDue = item.due_date && item.due_date <= new Date().toISOString().slice(0, 10);
     return allVoted || pastDue;
+  }
+
+  function closeVote(item) {
+    setClosingId(item.row_id);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Board Voting Items') + '?row_id=eq.' + encodeURIComponent(item.row_id), {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ status: 'Closed' })
+    }).then(function(r) { return r.json(); }).then(function() {
+      setItems(function(prev) { return prev.map(function(i) { return i.row_id === item.row_id ? Object.assign({}, i, { status: 'Closed' }) : i; }); });
+      setClosingId(null);
+    }).catch(function() { setClosingId(null); });
+  }
+
+  function isWon(item) {
+    var t = tally(item);
+    return t.yes > t.no && t.yes > 0;
   }
 
   function tally(item) {
@@ -2707,7 +3574,13 @@ function BoardView() {
           <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Voting Topics</div>
           <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{items.length} topic{items.length !== 1 ? 's' : ''}</div>
         </div>
-        <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Topic</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={function() { setShowAdmin(true); }} style={{ background: '#fff', color: '#555', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+            Admin
+          </button>
+          <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Topic</button>
+        </div>
       </div>
 
       {items.length === 0 && <div style={{ color: '#777', fontSize: 12, textAlign: 'center', padding: 40 }}>No voting items yet.</div>}
@@ -2718,7 +3591,7 @@ function BoardView() {
             var da = a.created_at ? new Date(a.created_at).getTime() : 0;
             var db = b.created_at ? new Date(b.created_at).getTime() : 0;
             if (db !== da) return db - da;
-            return (b.id || 0) - (a.id || 0);
+            return (b.row_id || 0) - (a.row_id || 0);
           };
           var openItems = items.filter(function(i) { return !isRevealed(i); }).sort(byNewest);
           var closedItems = items.filter(function(i) { return isRevealed(i); }).sort(byNewest);
@@ -2777,7 +3650,7 @@ function BoardView() {
 
       {selected && (
         <>
-        {isMobile && <div onClick={function() { setSelected(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1010 }} />}
+        {isMobile && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1010 }} />}
         <div style={isMobile
           ? { position: 'fixed', left: 0, right: 0, bottom: 0, height: '88vh', background: '#fff', zIndex: 1011, boxShadow: '0 -4px 32px rgba(0,0,0,0.14)', overflowY: 'auto', display: 'flex', flexDirection: 'column', borderRadius: '16px 16px 0 0' }
           : { position: 'fixed', top: 0, right: 0, bottom: 0, width: 520, background: '#fff', zIndex: 1011, boxShadow: '-4px 0 32px rgba(0,0,0,0.12)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }
@@ -2916,8 +3789,131 @@ function BoardView() {
         </>
       )}
 
+      {showAdmin && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '0.5px solid #f0ece6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a' }}>Vote Admin</div>
+              <button onClick={function() { setShowAdmin(false); setAdminAuthed(false); setAdminPwInput(''); setAdminPwError(false); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb' }}>×</button>
+            </div>
+            {!adminAuthed ? (
+              <div style={{ padding: '40px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+                <div style={{ fontSize: 13, color: '#555' }}>Enter admin password to continue</div>
+                <input
+                  type="password"
+                  value={adminPwInput}
+                  onChange={function(e) { setAdminPwInput(e.target.value); setAdminPwError(false); }}
+                  onKeyDown={function(e) { if (e.key === 'Enter') { if (adminPwInput.trim() === 'JM1905') { setAdminAuthed(true); setAdminPwInput(''); } else { setAdminPwError(true); } } }}
+                  placeholder="Password"
+                  style={{ border: '0.5px solid ' + (adminPwError ? '#c62828' : '#d0c8bc'), borderRadius: 8, padding: '9px 14px', fontSize: 13, width: 220, outline: 'none' }}
+                  autoFocus
+                />
+                {adminPwError && <div style={{ fontSize: 11, color: '#c62828' }}>Incorrect password</div>}
+                <button onClick={function() { if (adminPwInput.trim() === 'JM1905') { setAdminAuthed(true); setAdminPwInput(''); } else { setAdminPwError(true); } }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Unlock</button>
+              </div>
+            ) : (
+            <div style={{ padding: '16px 24px' }}>
+              {items.length === 0
+                ? <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: 32 }}>No voting items.</div>
+                : (function() {
+                    var byNewest = function(a, b) { var da = a.created_at ? new Date(a.created_at).getTime() : 0; var db = b.created_at ? new Date(b.created_at).getTime() : 0; if (db !== da) return db - da; return (b.row_id || 0) - (a.row_id || 0); };
+                    var openItems = items.filter(function(i) { return !isRevealed(i); }).sort(byNewest);
+                    var closedItems = items.filter(function(i) { return isRevealed(i); }).sort(byNewest);
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {openItems.length > 0 && <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 2 }}>Open</div>}
+                        {openItems.map(function(item) {
+                          var t = tally(item);
+                          var iv = itemVotes(item);
+                          var won = isWon(item);
+                          var isClosing = closingId === item.row_id;
+                          return (
+                            <div key={item.id} style={{ background: won ? '#f0faf0' : '#faf8f5', border: '0.5px solid ' + (won ? '#a5d6a7' : '#e8e0d5'), borderRadius: 10, padding: '14px 16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{item.title}</div>
+                                    {won && <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', padding: '2px 8px', borderRadius: 20 }}>Majority Yes</span>}
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 14, fontSize: 12, marginBottom: 8 }}>
+                                    <span style={{ color: '#2e7d32', fontWeight: 600 }}>{t.yes} Yes</span>
+                                    <span style={{ color: '#c62828', fontWeight: 600 }}>{t.no} No</span>
+                                    <span style={{ color: '#7c3aed', fontWeight: 600 }}>{t.abstain + t.absent} Abstain</span>
+                                    <span style={{ color: '#888' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                    {BOARD_MEMBERS.map(function(m) {
+                                      var mv = iv.find(function(v) { return v.voter === m; });
+                                      var vc = mv ? (VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' }) : null;
+                                      return (
+                                        <span key={m} title={mv ? m + ': ' + mv.choice : m + ': No vote'} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: vc ? vc.bg : '#f0ece6', color: vc ? vc.color : '#bbb', fontWeight: vc ? 600 : 400 }}>
+                                          {m.split(' ')[0]}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={function() { closeVote(item); }}
+                                  disabled={isClosing}
+                                  style={{ background: won ? '#2e7d32' : '#fff', color: won ? '#fff' : '#555', border: '0.5px solid ' + (won ? '#2e7d32' : '#e0d8cc'), borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0, opacity: isClosing ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                                  {isClosing ? 'Closing…' : 'Close Vote'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {closedItems.length > 0 && (
+                          <div style={{ marginTop: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 10px' }}>
+                              <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
+                              <span style={{ fontSize: 10, color: '#888', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2 }}>Closed</span>
+                              <div style={{ flex: 1, height: '0.5px', background: '#e0d8cc' }} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {closedItems.map(function(item) {
+                                var t = tally(item);
+                                var iv = itemVotes(item);
+                                var passed = isWon(item);
+                                return (
+                                  <div key={item.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '12px 16px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{item.title}</div>
+                                          {passed
+                                            ? <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', padding: '2px 8px', borderRadius: 20 }}>Passed</span>
+                                            : t.no > t.yes
+                                              ? <span style={{ fontSize: 10, fontWeight: 700, background: '#ffebee', color: '#c62828', padding: '2px 8px', borderRadius: 20 }}>Failed</span>
+                                              : <span style={{ fontSize: 10, fontWeight: 700, background: '#f5f0ea', color: '#888', padding: '2px 8px', borderRadius: 20 }}>Tied</span>
+                                          }
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 14, fontSize: 12 }}>
+                                          <span style={{ color: '#2e7d32', fontWeight: 600 }}>{t.yes} Yes</span>
+                                          <span style={{ color: '#c62828', fontWeight: 600 }}>{t.no} No</span>
+                                          <span style={{ color: '#7c3aed', fontWeight: 600 }}>{t.abstain + t.absent} Abstain</span>
+                                          <span style={{ color: '#888' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+              }
+            </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {showAdd && (
-        <div onClick={function() { setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 4, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>New Voting Topic</div>
             <form onSubmit={handleTopicSubmit}>
@@ -2959,6 +3955,255 @@ var GOAL_STATUS_COLORS = {
 var GOAL_TYPE_LABELS = { annual: 'This Year', future: 'Future Goals', three_year_vision: '3-Year Vision' };
 var CATEGORY_ORDER = ['Fund Development', 'House and Grounds Development', 'Programs and Events', 'Organizational Development'];
 
+function BoardSlidesModal({ onClose }) {
+  const { useState: useS, useEffect: useE } = React;
+  var yr = new Date().getFullYear();
+  var cq = 'Q' + Math.ceil((new Date().getMonth() + 1) / 3);
+  const [selQ, setSelQ] = useS(cq);
+  const [selYear, setSelYear] = useS(yr);
+  const [opGoals, setOpGoals] = useS([]);
+  const [opUpdates, setOpUpdates] = useS([]);
+  const [champReviews, setChampReviews] = useS([]);
+  const [boardData, setBoardData] = useS([]);
+  const [loading, setLoading] = useS(true);
+  const [editingArea, setEditingArea] = useS(null);
+  const [editForm, setEditForm] = useS({});
+  const [saving, setSaving] = useS(false);
+  const [activeArea, setActiveArea] = useS(OPERATIONAL_AREAS[0]);
+
+  function fetchAll(q, y) {
+    setLoading(true);
+    var base = SUPABASE_URL + '/rest/v1/';
+    var qs = '?quarter=eq.' + q + '&year=eq.' + y + '&select=*';
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    Promise.all([
+      fetch(base + encodeURIComponent('Op Quarter Goals') + qs, { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(base + encodeURIComponent('Op Quarterly Updates') + qs, { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(base + encodeURIComponent('Op Co-Champion Reviews') + qs, { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(base + 'board_presentation' + qs, { headers: hdrs }).then(function(r) { return r.json(); }),
+    ]).then(function(results) {
+      setOpGoals(Array.isArray(results[0]) ? results[0] : []);
+      setOpUpdates(Array.isArray(results[1]) ? results[1] : []);
+      setChampReviews(Array.isArray(results[2]) ? results[2] : []);
+      setBoardData(Array.isArray(results[3]) ? results[3] : []);
+      setLoading(false);
+    });
+  }
+
+  useE(function() { fetchAll(selQ, selYear); }, [selQ, selYear]);
+
+  function forArea(arr, area) { return arr.find(function(r) { return r.area === area; }) || {}; }
+
+  function openEdit(area) {
+    var bd = forArea(boardData, area);
+    setEditForm({ solution: bd.solution || '', further_details: bd.further_details || '', primary_focus_override: bd.primary_focus_override || '', board_notes: bd.board_notes || '' });
+    setEditingArea(area);
+  }
+
+  function saveEdit(area) {
+    setSaving(true);
+    var bd = forArea(boardData, area);
+    var method = bd.id ? 'PATCH' : 'POST';
+    var url = SUPABASE_URL + '/rest/v1/board_presentation' + (bd.id ? '?id=eq.' + bd.id : '');
+    var payload = Object.assign({ area: area, quarter: selQ, year: selYear }, editForm);
+    fetch(url, {
+      method: method,
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(res) {
+      var row = Array.isArray(res) ? res[0] : res;
+      setBoardData(function(prev) {
+        var next = prev.filter(function(r) { return r.area !== area; });
+        if (row && row.id) next.push(row);
+        return next;
+      });
+      setSaving(false);
+      setEditingArea(null);
+    }).catch(function() { setSaving(false); });
+  }
+
+  var slideCardStyle = { background: '#fff', border: '1px solid #d4c9b5', borderRadius: 4, overflow: 'hidden', marginBottom: 24, boxShadow: '0 1px 6px rgba(0,0,0,0.07)', fontFamily: "'Calibri', 'Segoe UI', sans-serif" };
+  var slideTitleStyle = { background: gold, color: '#fff', padding: '12px 20px', fontSize: 18, fontWeight: 700, fontFamily: "'Georgia', serif" };
+  var slideBodyStyle = { padding: '16px 20px' };
+  var sectionLabelStyle = { fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 6 };
+  var bulletStyle = { fontSize: 13, color: '#333', marginLeft: 16, lineHeight: 1.8 };
+  var boxStyle = { border: '1px solid #bbb', borderRadius: 2, padding: '10px 14px', marginTop: 12, fontSize: 13, color: '#333', lineHeight: 1.7 };
+  var labelInBoxStyle = { fontWeight: 700, color: '#2a2a2a' };
+  var sidebarStyle = { background: gold, color: '#fff', padding: '12px 14px', borderRadius: 3, minWidth: 180, maxWidth: 200, flexShrink: 0, fontSize: 12, lineHeight: 1.6 };
+
+  function NeedsSlide(area) {
+    var u = forArea(opUpdates, area);
+    var bd = forArea(boardData, area);
+    var isEditing = editingArea === area + '_needs';
+    var toList = function(v) { if (Array.isArray(v)) return v.filter(Boolean); if (v && typeof v === 'string') return v.split('\n').filter(Boolean); return []; };
+    var challenges = toList(u.challenges_details) .length ? toList(u.challenges_details) : toList(u.challenges);
+    var support = toList(u.support_details).length ? toList(u.support_details) : toList(u.support_needed);
+    var leadNotes = u.other_notes || '';
+    var solution = isEditing ? editForm.solution : (bd.solution || '');
+    var further = isEditing ? editForm.further_details : (bd.further_details || '');
+    return (
+      <div style={slideCardStyle}>
+        <div style={slideTitleStyle}>{area} Needs</div>
+        <div style={slideBodyStyle}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 14 }}>
+            <div>
+              <div style={sectionLabelStyle}>Challenges:</div>
+              {challenges.length > 0
+                ? <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>{challenges.map(function(c, i) { return <li key={i} style={bulletStyle}>• {c}</li>; })}</ul>
+                : <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>None submitted</div>}
+            </div>
+            <div>
+              <div style={sectionLabelStyle}>Support Needed:</div>
+              {support.length > 0
+                ? <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>{support.map(function(s, i) { return <li key={i} style={bulletStyle}>• {s}</li>; })}</ul>
+                : <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>None submitted</div>}
+            </div>
+          </div>
+          {leadNotes && <div style={{ marginBottom: 14 }}><span style={sectionLabelStyle}>Lead Notes: </span><span style={{ fontSize: 13, color: '#333', lineHeight: 1.7 }}>{leadNotes}</span></div>}
+          {(solution || further || isEditing) && (
+            <div style={boxStyle}>
+              {isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#555', marginBottom: 4 }}>SOLUTION</div>
+                    <textarea value={editForm.solution} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { solution: e.target.value }); }); }} style={{ width: '100%', border: '0.5px solid #d0c8bc', borderRadius: 4, padding: '6px 8px', fontSize: 13, minHeight: 60, resize: 'vertical', boxSizing: 'border-box' }} placeholder="Solution…" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#555', marginBottom: 4 }}>FURTHER DETAILS</div>
+                    <textarea value={editForm.further_details} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { further_details: e.target.value }); }); }} style={{ width: '100%', border: '0.5px solid #d0c8bc', borderRadius: 4, padding: '6px 8px', fontSize: 13, minHeight: 60, resize: 'vertical', boxSizing: 'border-box' }} placeholder="Further details…" />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  {solution && <div><span style={labelInBoxStyle}>Solution: </span>{solution}</div>}
+                  {further && <div style={{ marginTop: solution ? 8 : 0 }}><span style={labelInBoxStyle}>Further Details: </span>{further}</div>}
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            {isEditing ? (
+              <>
+                <button onClick={function() { setEditingArea(null); }} style={{ fontSize: 11, background: 'none', border: '0.5px solid #ccc', borderRadius: 5, padding: '4px 12px', cursor: 'pointer', color: '#666' }}>Cancel</button>
+                <button onClick={function() { saveEdit(area); }} disabled={saving} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 5, padding: '4px 14px', cursor: 'pointer', fontWeight: 600 }}>{saving ? 'Saving…' : 'Save'}</button>
+              </>
+            ) : (
+              <button onClick={function() { openEdit(area + '_needs'); setEditForm(function(f) { var bd = forArea(boardData, area); return { solution: bd.solution || '', further_details: bd.further_details || '', primary_focus_override: bd.primary_focus_override || '', board_notes: bd.board_notes || '' }; }); setEditingArea(area + '_needs'); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 5, padding: '4px 12px', cursor: 'pointer' }}>Edit Slide</button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function GoalsSlide(area) {
+    var g = forArea(opGoals, area);
+    var u = forArea(opUpdates, area);
+    var cr = forArea(champReviews, area);
+    var bd = forArea(boardData, area);
+    var isEditing = editingArea === area + '_goals';
+    var primaryFocus = (isEditing ? editForm.primary_focus_override : (bd.primary_focus_override || '')) || g.primary_focus || '';
+    var boardNotes = isEditing ? editForm.board_notes : (bd.board_notes || '');
+    var goals = goalEntries(g, u);
+    var stColors = { 'On Track': '#2e7d32', 'Behind': '#c07040', 'Complete': '#2e7d32', 'At Risk': '#c62828' };
+    return (
+      <div style={slideCardStyle}>
+        <div style={{ display: 'flex' }}>
+          <div style={{ flex: 1 }}>
+            <div style={slideTitleStyle}>{selQ} Goals: {area}</div>
+            <div style={slideBodyStyle}>
+              {primaryFocus && <div style={Object.assign({}, boxStyle, { marginTop: 0, marginBottom: 14 })}><span style={labelInBoxStyle}>Primary Focus: </span>{primaryFocus}</div>}
+              {goals.length === 0 && <div style={{ fontSize: 13, color: '#bbb', fontStyle: 'italic' }}>No goals submitted for this quarter.</div>}
+              {goals.map(function(entry, i) {
+                var stColor = entry.status && stColors[entry.status] ? stColors[entry.status] : null;
+                return (
+                  <div key={i} style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 13, lineHeight: 1.6, color: '#2a2a2a' }}>
+                      <span style={{ fontWeight: 700 }}>Goal {i + 1}:</span> {entry.text}
+                      {entry.status && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: stColor || '#888', background: '#f5f0ea', padding: '1px 7px', borderRadius: 20 }}>{entry.status}</span>}
+                    </div>
+                    {entry.summary && <div style={{ fontSize: 12, color: '#666', marginLeft: 16, marginTop: 2 }}>{entry.summary}</div>}
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                {isEditing ? (
+                  <>
+                    <button onClick={function() { setEditingArea(null); }} style={{ fontSize: 11, background: 'none', border: '0.5px solid #ccc', borderRadius: 5, padding: '4px 12px', cursor: 'pointer', color: '#666' }}>Cancel</button>
+                    <button onClick={function() { saveEdit(area); }} disabled={saving} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 5, padding: '4px 14px', cursor: 'pointer', fontWeight: 600 }}>{saving ? 'Saving…' : 'Save'}</button>
+                  </>
+                ) : (
+                  <button onClick={function() { var bd = forArea(boardData, area); setEditForm({ solution: bd.solution || '', further_details: bd.further_details || '', primary_focus_override: bd.primary_focus_override || '', board_notes: bd.board_notes || '' }); setEditingArea(area + '_goals'); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 5, padding: '4px 12px', cursor: 'pointer' }}>Edit Slide</button>
+                )}
+              </div>
+            </div>
+          </div>
+          <div style={sidebarStyle}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '0.5px solid rgba(255,255,255,0.3)', paddingBottom: 6, marginBottom: 8 }}>Co-Champion Notes</div>
+            {cr.discussion_focus && <div style={{ marginBottom: 8 }}><span style={{ fontWeight: 700 }}>Focus: </span>{cr.discussion_focus}</div>}
+            {cr.potential_actions && <div style={{ marginBottom: 8 }}><span style={{ fontWeight: 700 }}>Actions: </span>{cr.potential_actions}</div>}
+            {!cr.discussion_focus && !cr.potential_actions && <div style={{ opacity: 0.6, fontStyle: 'italic' }}>No review yet</div>}
+            {isEditing && (
+              <div style={{ marginTop: 12, borderTop: '0.5px solid rgba(255,255,255,0.3)', paddingTop: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>PRIMARY FOCUS OVERRIDE</div>
+                <textarea value={editForm.primary_focus_override} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { primary_focus_override: e.target.value }); }); }} style={{ width: '100%', border: 'none', borderRadius: 3, padding: '5px 7px', fontSize: 11, minHeight: 50, resize: 'vertical', boxSizing: 'border-box', color: '#2a2a2a' }} placeholder="Override primary focus…" />
+                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4, marginTop: 8 }}>BOARD NOTES</div>
+                <textarea value={editForm.board_notes} onChange={function(e) { setEditForm(function(f) { return Object.assign({}, f, { board_notes: e.target.value }); }); }} style={{ width: '100%', border: 'none', borderRadius: 3, padding: '5px 7px', fontSize: 11, minHeight: 60, resize: 'vertical', boxSizing: 'border-box', color: '#2a2a2a' }} placeholder="Board notes…" />
+              </div>
+            )}
+            {!isEditing && boardNotes && (
+              <div style={{ marginTop: 10, borderTop: '0.5px solid rgba(255,255,255,0.3)', paddingTop: 8 }}>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>Board Notes:</div>
+                <div>{boardNotes}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '20px 12px', overflowY: 'auto' }}>
+      <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#f7f3ec', borderRadius: 10, width: '100%', maxWidth: 820, minHeight: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.22)' }}>
+        {/* Header */}
+        <div style={{ padding: '16px 24px', background: '#fff', borderBottom: '0.5px solid #e8e0d5', borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Editable Board Slides</div>
+            <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Populates from quarterly submissions + co-champion reviews</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <select value={selQ} onChange={function(e) { setSelQ(e.target.value); }} style={{ fontSize: 12, border: '0.5px solid #d0c8bc', borderRadius: 6, padding: '5px 8px', background: '#fff', color: '#2a2a2a' }}>
+              {['Q1','Q2','Q3','Q4'].map(function(q) { return <option key={q}>{q}</option>; })}
+            </select>
+            <select value={selYear} onChange={function(e) { setSelYear(Number(e.target.value)); }} style={{ fontSize: 12, border: '0.5px solid #d0c8bc', borderRadius: 6, padding: '5px 8px', background: '#fff', color: '#2a2a2a' }}>
+              {[yr-1, yr, yr+1].map(function(y) { return <option key={y}>{y}</option>; })}
+            </select>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
+          </div>
+        </div>
+        {/* Area nav */}
+        <div style={{ padding: '10px 24px', background: '#fff', borderBottom: '0.5px solid #f0ece6', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {OPERATIONAL_AREAS.map(function(a) {
+            return <button key={a} onClick={function() { setActiveArea(a); setEditingArea(null); }} style={{ fontSize: 11, fontWeight: 500, padding: '4px 12px', borderRadius: 20, border: '0.5px solid ' + (activeArea === a ? gold : '#d0c8bc'), background: activeArea === a ? gold : '#fff', color: activeArea === a ? '#fff' : '#555', cursor: 'pointer' }}>{a}</button>;
+          })}
+        </div>
+        {/* Slides */}
+        <div style={{ padding: '24px' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 60, color: '#aaa', fontSize: 13 }}>Loading…</div>
+          ) : (
+            <div>
+              {NeedsSlide(activeArea)}
+              {GoalsSlide(activeArea)}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StrategyView() {
   const { useState: useS, useEffect: useE } = React;
   var isMobile = React.useContext(MobileCtx);
@@ -2972,6 +4217,7 @@ function StrategyView() {
   const [showUpdatesFor, setShowUpdatesFor] = useS(null);
   const [slides, setSlides] = useS({});
   const [uploadingQ, setUploadingQ] = useS(null);
+  const [showBoardSlides, setShowBoardSlides] = useS(false);
 
   var SLIDE_YEAR = new Date().getFullYear();
   var SLIDE_QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4'];
@@ -3069,10 +4315,17 @@ function StrategyView() {
 
   return (
     <div>
+      {showBoardSlides && <BoardSlidesModal onClose={function() { setShowBoardSlides(false); }} />}
       {!activeCat ? (
         <div>
-          <div style={{ fontSize: 13, color: '#888', marginBottom: 16, lineHeight: 1.6 }}>
-            View progress across strategic goals at a glance. Click any progress line to see more details for that focus area.
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: '#888', lineHeight: 1.6 }}>
+              View progress across strategic goals at a glance. Click any progress line to see more details for that focus area.
+            </div>
+            <button onClick={function() { setShowBoardSlides(true); }} style={{ flexShrink: 0, marginLeft: 16, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              Editable Slides
+            </button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 20 }}>
             {CATEGORY_ORDER.map(function(cat) { return CatBox(cat); })}
@@ -3235,6 +4488,24 @@ function nextUpcomingDue() {
   return candidates.find(function(c) { return c.date >= now; }) || candidates[0];
 }
 function nextQ(q, yr) { return q === 'Q1' ? {q:'Q2',yr:yr} : q === 'Q2' ? {q:'Q3',yr:yr} : q === 'Q3' ? {q:'Q4',yr:yr} : {q:'Q1',yr:yr+1}; }
+// Builds the full list of goals (fixed goal_1..3 plus any extra_goals) for a quarter, merging in-progress update fields (u) over the stored goal-row fields (g).
+function goalEntries(g, u) {
+  g = g || {}; u = u || {};
+  var out = [];
+  ['1','2','3'].forEach(function(n) {
+    var text = g['goal_' + n];
+    if (!text) return;
+    out.push({ text: text, status: u['goal_' + n + '_status'] || g['goal_' + n + '_status'], summary: u['goal_' + n + '_summary'] || g['goal_' + n + '_summary'] });
+  });
+  var extra = Array.isArray(g.extra_goals) ? g.extra_goals : [];
+  extra.forEach(function(text, i) {
+    if (!text) return;
+    var status = (Array.isArray(u.extra_goals_status) && u.extra_goals_status[i]) || (Array.isArray(g.extra_goals_status) && g.extra_goals_status[i]);
+    var summary = (Array.isArray(u.extra_goals_summary) && u.extra_goals_summary[i]) || (Array.isArray(g.extra_goals_summary) && g.extra_goals_summary[i]);
+    out.push({ text: text, status: status, summary: summary, extraIndex: i });
+  });
+  return out;
+}
 
 function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
   var { useState, useEffect } = React;
@@ -3245,7 +4516,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
   var [quarter, setQuarter] = useState(cq);
   var [year, setYear] = useState(cy);
   var [currentGoals, setCurrentGoals] = useState(null);
-  var emptyForm = { what_went_well: '', goal_1_status: 'On Track', goal_1_summary: '', goal_2_status: 'On Track', goal_2_summary: '', goal_3_status: 'On Track', goal_3_summary: '', challenges: [], challenges_details: '', support_needed: [], support_details: '', other_notes: '', next_focus: '', goal_1: '', goal_2: '', goal_3: '' };
+  var emptyForm = { what_went_well: '', goal_1_status: 'On Track', goal_1_summary: '', goal_2_status: 'On Track', goal_2_summary: '', goal_3_status: 'On Track', goal_3_summary: '', challenges: [], challenges_details: '', support_needed: [], support_details: '', other_notes: '', next_focus: '', goal_1: '', goal_2: '', goal_3: '', extra_goals: [], extra_goals_status: [], extra_goals_summary: [] };
   var [form, setForm] = useState(emptyForm);
   var [saving, setSaving] = useState(false);
   var [saved, setSaved] = useState(false);
@@ -3278,6 +4549,9 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
             goal_1: r.goal_1 || '',
             goal_2: r.goal_2 || '',
             goal_3: r.goal_3 || '',
+            extra_goals: r.extra_goals || [],
+            extra_goals_status: r.extra_goals_status || [],
+            extra_goals_summary: r.extra_goals_summary || [],
           });
         });
       }
@@ -3297,7 +4571,9 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
             goal_2_status: rows[0].goal_2_status || 'On Track',
             goal_2_summary: rows[0].goal_2_summary || '',
             goal_3_status: rows[0].goal_3_status || 'On Track',
-            goal_3_summary: rows[0].goal_3_summary || ''
+            goal_3_summary: rows[0].goal_3_summary || '',
+            extra_goals_status: rows[0].extra_goals_status || [],
+            extra_goals_summary: rows[0].extra_goals_summary || []
           });
         });
       }
@@ -3313,15 +4589,32 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
     });
   }
 
+  function setArrayAt(field, i, val) {
+    setForm(function(f) {
+      var arr = f[field].slice();
+      arr[i] = val;
+      var patch = {}; patch[field] = arr;
+      return Object.assign({}, f, patch);
+    });
+  }
+
+  function addExtraGoal() {
+    setForm(function(f) { return Object.assign({}, f, { extra_goals: f.extra_goals.concat(['']) }); });
+  }
+
+  function removeExtraGoal(i) {
+    setForm(function(f) { return Object.assign({}, f, { extra_goals: f.extra_goals.filter(function(_, idx) { return idx !== i; }) }); });
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
     var nq = nextQ(quarter, year);
-    var payload = { area: area, quarter: quarter, year: year, date_submitted: new Date().toISOString().slice(0,10), successes: form.what_went_well, goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary, challenges: form.challenges, challenges_details: form.challenges_details, support_needed: form.support_needed, support_details: form.support_details, other_notes: form.other_notes, next_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3 };
+    var payload = { area: area, quarter: quarter, year: year, date_submitted: new Date().toISOString().slice(0,10), successes: form.what_went_well, goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary, extra_goals_status: form.extra_goals_status, extra_goals_summary: form.extra_goals_summary, challenges: form.challenges, challenges_details: form.challenges_details, support_needed: form.support_needed, support_details: form.support_details, other_notes: form.other_notes, next_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3, extra_goals: form.extra_goals };
     var currentGoalsUpdate = currentGoals ? fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?id=eq.' + currentGoals.id, {
       method: 'PATCH',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary })
+      body: JSON.stringify({ goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary, extra_goals_status: form.extra_goals_status, extra_goals_summary: form.extra_goals_summary })
     }) : Promise.resolve();
     var reflectionFetch = existingReflection
       ? fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?id=eq.' + existingReflection.id, {
@@ -3335,7 +4628,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
           body: JSON.stringify(payload)
         });
     reflectionFetch.then(function(r) { return r.status === 204 ? null : r.json(); }).then(function() {
-      var goalsPayload = { area: area, quarter: nq.q, year: nq.yr, primary_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3 };
+      var goalsPayload = { area: area, quarter: nq.q, year: nq.yr, primary_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3, extra_goals: form.extra_goals.filter(Boolean) };
       var headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
       var nextGoalsSave = fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(nq.q) + '&year=eq.' + nq.yr, { headers: headers })
         .then(function(r) { return r.json(); })
@@ -3480,6 +4773,29 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
           ) : (
             <div style={{ fontSize: 13, color: '#bbb', fontStyle: 'italic' }}>Select an area and quarter to update goal statuses.</div>
           )}
+          {currentGoals && Array.isArray(currentGoals.extra_goals) && currentGoals.extra_goals.map(function(goalText, i) {
+            if (!goalText) return null;
+            var statusColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
+            var st = form.extra_goals_status[i] || 'On Track';
+            var sc = statusColors[st] || statusColors['On Track'];
+            return (
+              <div key={'extra_' + i} style={{ borderTop: '0.5px solid #f0ece6', paddingTop: 14, marginTop: 14 }}>
+                <div style={{ fontSize: 14, color: '#2a2a2a', fontWeight: 500, marginBottom: 8 }}>{4 + i}. {goalText}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 10 }}>
+                  <div>
+                    <label style={lbl}>Status</label>
+                    <select value={st} onChange={function(e) { setArrayAt('extra_goals_status', i, e.target.value); }} style={Object.assign({}, inpStyle, { background: sc.bg, color: sc.color, fontWeight: 600 })}>
+                      <option>On Track</option><option>Behind</option><option>At Risk</option><option>Complete</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={lbl}>Progress Summary</label>
+                    <input value={form.extra_goals_summary[i] || ''} onChange={function(e) { setArrayAt('extra_goals_summary', i, e.target.value); }} style={inpStyle} placeholder="Brief update on this goal..." />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div style={card}>
@@ -3552,6 +4868,18 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
               </div>
             );
           })}
+          {form.extra_goals.map(function(text, i) {
+            return (
+              <div key={'extra_' + i} style={grp}>
+                <label style={lbl}>{4 + i}.</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input value={text} onChange={function(e) { setArrayAt('extra_goals', i, e.target.value); }} style={inpStyle} placeholder={'Goal ' + (4 + i) + '...'} />
+                  <button type="button" onClick={function() { removeExtraGoal(i); }} style={{ background: 'none', border: '0.5px solid #ddd', color: '#aaa', borderRadius: 6, padding: '9px 12px', fontSize: 13, cursor: 'pointer', flexShrink: 0 }}>Remove</button>
+                </div>
+              </div>
+            );
+          })}
+          <button type="button" onClick={addExtraGoal} style={{ background: 'none', border: '1px dashed ' + gold, color: gold, borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>+ Add a goal</button>
         </div>
 
         <button type="submit" disabled={saving || !area} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '12px 32px', fontSize: 14, fontWeight: 600, cursor: saving || !area ? 'not-allowed' : 'pointer', opacity: (saving || !area) ? 0.6 : 1, width: '100%', marginBottom: 8 }}>
@@ -3559,6 +4887,89 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
         </button>
         {saved && <div style={{ textAlign: 'center', color: '#2e7d32', fontSize: 13, fontWeight: 600, padding: 8 }}>Submitted! Next quarter goals saved.</div>}
       </form>
+    </div>
+  );
+}
+
+function EventsProfitLossModal({ onClose }) {
+  var { useState, useEffect } = React;
+  var [loading, setLoading] = useState(true);
+  var [rows, setRows] = useState([]);
+
+  useEffect(function() {
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?area=eq.Events&select=*', { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?area=eq.Events&select=*', { headers: hdrs }).then(function(r) { return r.json(); })
+    ]).then(function(res) {
+      var budgetRows = Array.isArray(res[0]) ? res[0] : [];
+      var earningsRows = Array.isArray(res[1]) ? res[1] : [];
+      var byEvent = {};
+      function bucket(name) {
+        var key = (name || '').trim() || 'Uncategorized';
+        if (!byEvent[key]) byEvent[key] = { event: key, earnings: 0, costs: 0 };
+        return byEvent[key];
+      }
+      earningsRows.forEach(function(e) { bucket(e.event).earnings += parseFloat(e.amount) || 0; });
+      budgetRows.forEach(function(b) { if (b.type === 'Purchase' || b.type === 'In-Kind') bucket(b.event_name).costs += parseFloat(b.amount) || 0; });
+      var list = Object.keys(byEvent).map(function(k) { var r = byEvent[k]; return Object.assign({}, r, { net: r.earnings - r.costs }); });
+      list.sort(function(a, b) { return b.net - a.net; });
+      setRows(list);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }, []);
+
+  function fmt(n) { return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  var totalEarnings = rows.reduce(function(s, r) { return s + r.earnings; }, 0);
+  var totalCosts = rows.reduce(function(s, r) { return s + r.costs; }, 0);
+  var totalNet = totalEarnings - totalCosts;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+      <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 600, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Events — Profit / Loss</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>×</button>
+        </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 30, color: '#aaa', fontSize: 13 }}>Loading…</div>
+        ) : rows.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 30, color: '#bbb', fontSize: 13 }}>No earnings or expenses recorded yet.</div>
+        ) : (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
+              <div style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Earnings</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#5a8a5a', marginTop: 4 }}>{fmt(totalEarnings)}</div>
+              </div>
+              <div style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Costs</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#c07040', marginTop: 4 }}>{fmt(totalCosts)}</div>
+              </div>
+              <div style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Net</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: totalNet >= 0 ? '#2e7d32' : '#c62828', marginTop: 4 }}>{totalNet >= 0 ? '' : '-'}{fmt(Math.abs(totalNet))}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, padding: '0 0 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, borderBottom: '0.5px solid #f0ece6' }}>
+              <span style={{ flex: 1 }}>Event</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Earnings</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Costs</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Net</span>
+            </div>
+            {rows.map(function(r) {
+              return (
+                <div key={r.event} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{r.event}</span>
+                  <span style={{ fontSize: 12, color: '#5a8a5a', width: 90, textAlign: 'right' }}>{fmt(r.earnings)}</span>
+                  <span style={{ fontSize: 12, color: '#c07040', width: 90, textAlign: 'right' }}>-{fmt(r.costs)}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, width: 90, textAlign: 'right', color: r.net >= 0 ? '#2e7d32' : '#c62828' }}>{r.net >= 0 ? '' : '-'}{fmt(Math.abs(r.net))}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -3576,13 +4987,20 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [editLead, setEditLead] = useState(false);
   var [leadInput, setLeadInput] = useState('');
   var [showEarnings, setShowEarnings] = useState(false);
+  var [showPnl, setShowPnl] = useState(false);
   var [earnings, setEarnings] = useState([]);
   var emptyEarningsForm = { event: '', earning_source: '', amount: '', notes: '', date: today };
   var [earningsForm, setEarningsForm] = useState(emptyEarningsForm);
   var [earningsSaving, setEarningsSaving] = useState(false);
+  var [editingEarningId, setEditingEarningId] = useState(null);
+  var [editEarningForm, setEditEarningForm] = useState(null);
+  var [editEarningSaving, setEditEarningSaving] = useState(false);
   var today = new Date().toISOString().slice(0, 10);
-  var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' });
+  var [budgetForm, setBudgetForm] = useState({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '', purchased_by: '', event_name: '' });
   var [budgetSaving, setBudgetSaving] = useState(false);
+  var [editingBudgetId, setEditingBudgetId] = useState(null);
+  var [editBudgetForm, setEditBudgetForm] = useState(null);
+  var [editBudgetSaving, setEditBudgetSaving] = useState(false);
   var [uploadingId, setUploadingId] = useState(null);
   var fileInputRef = React.useRef(null);
   var [budgetReceiptFiles, setBudgetReceiptFiles] = useState([]);
@@ -3611,8 +5029,11 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var todoTodayStr = new Date().toISOString().slice(0, 10);
   var [todoSelectedDate, setTodoSelectedDate] = useState(todoTodayStr);
   var [todoInputTime, setTodoInputTime] = useState('');
+  var [todoInputHours, setTodoInputHours] = useState('');
   var [todoEditingTimeId, setTodoEditingTimeId] = useState(null);
   var [todoEditTimeVal, setTodoEditTimeVal] = useState('');
+  var [todoEditingHoursId, setTodoEditingHoursId] = useState(null);
+  var [todoEditHoursVal, setTodoEditHoursVal] = useState('');
   var emptySponsorForm = { 'Business Name': '', 'Main Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Donation': '', 'Fair Market Value': '', 'Area Supported': area, 'Date Recieved': '', 'NSH Contact': '' };
   var [sponsorForm, setSponsorForm] = useState(emptySponsorForm);
   var [sponsorSaving, setSponsorSaving] = useState(false);
@@ -3723,6 +5144,35 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     });
   }
 
+  function startEditEarning(e) {
+    setEditingEarningId(e.id);
+    setEditEarningForm({ event: e.event || '', earning_source: e.earning_source || '', amount: e.amount != null ? String(e.amount) : '', notes: e.notes || '', date: e.date || today });
+  }
+
+  function cancelEditEarning() {
+    setEditingEarningId(null);
+    setEditEarningForm(null);
+  }
+
+  function saveEditEarning() {
+    if (!editEarningForm) return;
+    setEditEarningSaving(true);
+    var patch = { event: editEarningForm.event, earning_source: editEarningForm.earning_source || null, amount: parseFloat(editEarningForm.amount) || 0, notes: editEarningForm.notes || null, date: editEarningForm.date || null };
+    var id = editingEarningId;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    }).then(function(r) {
+      if (!r.ok) throw new Error('Failed to save');
+      setEditEarningSaving(false);
+      clearCache('Op Earnings');
+      setEarnings(function(prev) { return prev.map(function(e) { return e.id === id ? Object.assign({}, e, patch) : e; }); });
+      setEditingEarningId(null);
+      setEditEarningForm(null);
+    }).catch(function() { setEditEarningSaving(false); alert('Failed to save changes'); });
+  }
+
   function parseReceipts(receiptUrl) {
     if (!receiptUrl) return [];
     try { var p = JSON.parse(receiptUrl); if (Array.isArray(p)) return p; } catch(e) {}
@@ -3744,7 +5194,8 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     e.preventDefault();
     setBudgetSaving(true);
     var files = budgetReceiptFiles;
-    var payload = { area: area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null };
+    var payload = { area: area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null, purchased_by: budgetForm.purchased_by || null };
+    if (area === 'Events') payload.event_name = budgetForm.event_name || null;
     if (budgetForm.needs_reimbursement) { payload.needs_reimbursement = true; payload.volunteer_name = budgetForm.volunteer_name || null; }
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
       method: 'POST',
@@ -3758,7 +5209,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         clearCache('Op Budget');
         setBudgetSaving(false);
         setBudget(function(prev) { return [finalRow].concat(prev); });
-        setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '' });
+        setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '', purchased_by: '', event_name: '' });
         setReimburseVolQuery('');
         setBudgetReceiptFiles([]);
         if (budgetReceiptRef.current) budgetReceiptRef.current.value = '';
@@ -3785,9 +5236,40 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     });
   }
 
+  function startEditBudget(b) {
+    setEditingBudgetId(b.id);
+    setEditBudgetForm({ type: b.type || 'Purchase', description: b.description || '', amount: b.amount != null ? String(b.amount) : '', date: b.date || today, needs_reimbursement: !!b.needs_reimbursement, volunteer_name: b.volunteer_name || '', purchased_by: b.purchased_by || '', event_name: b.event_name || '' });
+  }
+
+  function cancelEditBudget() {
+    setEditingBudgetId(null);
+    setEditBudgetForm(null);
+  }
+
+  function saveEditBudget() {
+    if (!editBudgetForm) return;
+    setEditBudgetSaving(true);
+    var patch = { type: editBudgetForm.type, description: editBudgetForm.description, amount: parseFloat(editBudgetForm.amount) || 0, date: editBudgetForm.date || null, purchased_by: editBudgetForm.purchased_by || null, needs_reimbursement: !!editBudgetForm.needs_reimbursement, volunteer_name: editBudgetForm.needs_reimbursement ? (editBudgetForm.volunteer_name || null) : null };
+    if (area === 'Events') patch.event_name = editBudgetForm.event_name || null;
+    var id = editingBudgetId;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }
+    , body: JSON.stringify(patch)
+    }).then(function() {
+      clearCache('Op Budget');
+      setBudget(function(prev) { return prev.map(function(b) { return b.id === id ? Object.assign({}, b, patch) : b; }); });
+      setEditingBudgetId(null);
+      setEditBudgetForm(null);
+      setEditBudgetSaving(false);
+    }).catch(function() { setEditBudgetSaving(false); });
+  }
+
+  function todoNowTime() { var n = new Date(); return n.toTimeString().slice(0, 5); }
+
   function loadTodo() {
     setTodoLoading(true);
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?select=*&order=date_submitted.desc', {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?select=*&order=date_submitted.asc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (Array.isArray(rows)) setTodoItems(rows);
@@ -3809,26 +5291,44 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     e.preventDefault();
     if (!todoInput.trim()) return;
     setTodoSaving(true);
-    var ds = todoInputTime ? todoSelectedDate + 'T' + todoInputTime : todoSelectedDate;
+    var timeToUse = todoInputTime || todoNowTime();
+    var ds = todoSelectedDate + 'T' + timeToUse;
+    var hrs = todoInputHours ? parseFloat(todoInputHours) : null;
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ item: todoInput.trim(), date_submitted: ds, done: false, date_done: null })
+      body: JSON.stringify({ item: todoInput.trim(), date_submitted: ds, done: false, date_done: null, hours: hrs })
     }).then(function(r) { return r.json(); }).then(function(rows) {
-      if (Array.isArray(rows) && rows[0]) setTodoItems(function(p) { return p.concat([rows[0]]); });
-      setTodoInput(''); setTodoInputTime('');
+      if (Array.isArray(rows) && rows[0]) setTodoItems(function(p) {
+        var next = p.concat([rows[0]]);
+        return next.sort(function(a, b) { return (a.date_submitted || '') < (b.date_submitted || '') ? -1 : 1; });
+      });
+      setTodoInput(''); setTodoInputTime(todoNowTime()); setTodoInputHours('');
       setTodoSaving(false);
     }).catch(function() { setTodoSaving(false); });
   }
 
   function saveTodoTime(t) {
-    var ds = todoInputTime ? todoGetDate(t) + 'T' + todoEditTimeVal : todoGetDate(t);
-    setTodoItems(function(p) { return p.map(function(x) { return x.id === t.id ? Object.assign({}, x, { date_submitted: ds }) : x; }); });
+    var ds = todoEditTimeVal ? todoGetDate(t) + 'T' + todoEditTimeVal : todoGetDate(t);
+    setTodoItems(function(p) {
+      var next = p.map(function(x) { return x.id === t.id ? Object.assign({}, x, { date_submitted: ds }) : x; });
+      return next.sort(function(a, b) { return (a.date_submitted || '') < (b.date_submitted || '') ? -1 : 1; });
+    });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?id=eq.' + t.id, {
       method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ date_submitted: ds })
     });
     setTodoEditingTimeId(null);
+  }
+
+  function saveTodoHours(t) {
+    var hrs = todoEditHoursVal !== '' ? parseFloat(todoEditHoursVal) : null;
+    setTodoItems(function(p) { return p.map(function(x) { return x.id === t.id ? Object.assign({}, x, { hours: hrs }) : x; }); });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Marketing Todo') + '?id=eq.' + t.id, {
+      method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hours: hrs })
+    });
+    setTodoEditingHoursId(null);
   }
 
   function toggleTodoItem(id, currentDone) {
@@ -3909,6 +5409,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     });
   }
 
+  var eventNameOptions = area === 'Events' ? Array.from(new Set(budget.concat(earnings).map(function(b) { return (b.event_name || b.event || '').trim(); }).filter(Boolean))).sort() : [];
   var totalPurchases = budget.filter(function(b) { return b.type === 'Purchase'; }).reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
   var totalInKind = budget.filter(function(b) { return b.type === 'In-Kind'; }).reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
   var totalSpent = totalPurchases + totalInKind;
@@ -3920,6 +5421,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
 
   return (
     <div>
+      {area === 'Events' && <datalist id="event-name-options">{eventNameOptions.map(function(n) { return <option key={n} value={n} />; })}</datalist>}
       <div style={{ background: '#fff', borderRadius: 12, padding: '14px 20px', border: '0.5px solid #e8e0d5', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
           <div>
@@ -4001,7 +5503,6 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         {/* Goals card — full card flip */}
         {(function() {
           var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
-          var goalRows = [['goal_1','goal_1_status','goal_1_summary'],['goal_2','goal_2_status','goal_2_summary'],['goal_3','goal_3_status','goal_3_summary']];
           var frontCard = (
             <div style={{ background: '#fff', borderRadius: 12, padding: '18px 24px', border: '0.5px solid #e8e0d5' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -4020,18 +5521,16 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 <div>
                   {quarterGoals.primary_focus && <div style={{ marginBottom: 12 }}><span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Primary Focus</span><div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginTop: 3, lineHeight: 1.5 }}>{quarterGoals.primary_focus}</div></div>}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {goalRows.map(function(keys, i) {
-                      var g = quarterGoals[keys[0]]; if (!g) return null;
-                      var st = quarterGoals[keys[1]];
-                      var sc = st && stColors[st] ? stColors[st] : null;
+                    {goalEntries(quarterGoals).map(function(entry, i) {
+                      var sc = entry.status && stColors[entry.status] ? stColors[entry.status] : null;
                       return (
                         <div key={i} style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 12px', border: '0.5px solid #e8e0d5' }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                             <div>
                               <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Goal {i+1}</span>
-                              <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 2, lineHeight: 1.5 }}>{g}</div>
+                              <div style={{ fontSize: 13, color: '#2a2a2a', marginTop: 2, lineHeight: 1.5 }}>{entry.text}</div>
                             </div>
-                            {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: sc.bg, color: sc.color, flexShrink: 0 }}>{st}</span>}
+                            {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: sc.bg, color: sc.color, flexShrink: 0 }}>{entry.status}</span>}
                           </div>
                         </div>
                       );
@@ -4041,8 +5540,15 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                     <button onClick={function(e) { e.stopPropagation(); setCardFlipped(true); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontWeight: 500 }}>View Full Reflection →</button>
                   </div>
                 </div>
+              ) : quarterUpdate ? (
+                <div>
+                  <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic', marginBottom: 12 }}>No goals set for {selectedQ} yet.</div>
+                  <div style={{ textAlign: 'right' }}>
+                    <button onClick={function(e) { e.stopPropagation(); setCardFlipped(true); }} style={{ fontSize: 11, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontWeight: 500 }}>View Full Reflection →</button>
+                  </div>
+                </div>
               ) : (
-                <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No goals set for {cq} yet.</div>
+                <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No goals set for {selectedQ} yet.</div>
               )}
             </div>
           );
@@ -4058,19 +5564,16 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                     <div>
                       <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Goal Progress</span>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
-                        {goalRows.map(function(keys, i) {
-                          var g = quarterGoals[keys[0]]; if (!g) return null;
-                          var st = quarterGoals[keys[1]];
-                          var sm = quarterGoals[keys[2]];
-                          var sc = st && stColors[st] ? stColors[st] : null;
+                        {goalEntries(quarterGoals, quarterUpdate).map(function(entry, i) {
+                          var sc = entry.status && stColors[entry.status] ? stColors[entry.status] : null;
                           return (
                             <div key={i} style={{ background: sc ? sc.bg : '#faf8f5', borderRadius: 8, padding: '8px 12px', border: '0.5px solid ' + (sc ? sc.color + '33' : '#e8e0d5') }}>
                               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                                 <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Goal {i+1} — <span style={{ color: '#555', fontWeight: 600 }}>{g}</span></div>
-                                  {sm && <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{sm}</div>}
+                                  <div style={{ fontSize: 11, color: '#999', marginBottom: 2 }}>Goal {i+1} — <span style={{ color: '#555', fontWeight: 600 }}>{entry.text}</span></div>
+                                  {entry.summary && <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5, marginTop: 3 }}>{entry.summary}</div>}
                                 </div>
-                                {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: '#fff', color: sc.color, flexShrink: 0 }}>{st}</span>}
+                                {sc && <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: '#fff', color: sc.color, flexShrink: 0 }}>{entry.status}</span>}
                               </div>
                             </div>
                           );
@@ -4117,10 +5620,19 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: gold, fontWeight: 600 }}>Area Resources</div>
             {area === 'Marketing' && (
-              <button onClick={function() { setShowTodo(true); loadTodo(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: gold, padding: '0 2px', lineHeight: 1, opacity: 0.7 }}>★</button>
+              <button onClick={function() { setTodoInputTime(todoNowTime()); setShowTodo(true); loadTodo(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: gold, padding: '0 2px', lineHeight: 1, opacity: 0.7 }}>★</button>
             )}
           </div>
-          {resources.length === 0
+          {area === 'Events' && (
+            <div onClick={function() { setShowPnl(true); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 6, background: '#faf8f5', borderRadius: 8, border: '0.5px solid #e8e0d5', cursor: 'pointer' }}
+              onMouseEnter={function(e) { e.currentTarget.style.background = '#f5f0e8'; }}
+              onMouseLeave={function(e) { e.currentTarget.style.background = '#faf8f5'; }}>
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+              <span style={{ fontSize: 13, fontWeight: 500, color: gold, flex: 1 }}>Profit / Loss by Event</span>
+              <span style={{ fontSize: 11, color: '#aaa' }}>Earnings vs. costs</span>
+            </div>
+          )}
+          {resources.length === 0 && area !== 'Events'
             ? <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic', marginBottom: 12 }}>No resources added yet.</div>
             : resources.map(function(r) {
                 return (
@@ -4227,7 +5739,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
           }).catch(function() { setSponsorSaving(false); });
         }
         return (
-          <div onClick={function() { setShowSponsorForm(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
             <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <div>
@@ -4267,7 +5779,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       })()}
 
       {showBudget && (
-        <div onClick={function() { setShowBudget(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>{area} — Budget</div>
@@ -4302,6 +5814,16 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Description</div>
                   <input value={budgetForm.description} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="What was purchased or donated..." />
+                </div>
+                {area === 'Events' && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Event Name</div>
+                    <input value={budgetForm.event_name} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} list="event-name-options" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="Which event was this for..." />
+                  </div>
+                )}
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Purchased By</div>
+                  <input value={budgetForm.purchased_by} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { purchased_by: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="Who made this purchase..." />
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Receipts (optional)</div>
@@ -4374,11 +5896,51 @@ function OperationalView({ opArea, navigateToQuarterly }) {
             {budget.length === 0 ? (
               <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No entries yet.</div>
             ) : budget.map(function(b) {
-              var isUploading = uploadingId === b.id;
+              if (editingBudgetId === b.id && editBudgetForm) {
+                return (
+                  <div key={b.id} style={{ padding: '12px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                      <select value={editBudgetForm.type} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { type: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, background: '#fff' }}>
+                        <option>Purchase</option>
+                        <option>In-Kind</option>
+                      </select>
+                      <input type="number" step="0.01" min="0" value={editBudgetForm.amount} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12 }} placeholder="Amount" />
+                    </div>
+                    <input value={editBudgetForm.description} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} placeholder="Description" />
+                    {area === 'Events' && (
+                      <input value={editBudgetForm.event_name} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} list="event-name-options" style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} placeholder="Event name" />
+                    )}
+                    <input value={editBudgetForm.purchased_by} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { purchased_by: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} placeholder="Purchased by" />
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                      <input type="date" value={editBudgetForm.date} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12 }} />
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={editBudgetForm.needs_reimbursement} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { needs_reimbursement: e.target.checked }); }); }} style={{ width: 14, height: 14, accentColor: gold, cursor: 'pointer' }} />
+                        Needs reimbursement
+                      </label>
+                    </div>
+                    {editBudgetForm.needs_reimbursement && (
+                      <input value={editBudgetForm.volunteer_name} onChange={function(e) { setEditBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: e.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }} placeholder="Reimburse to" />
+                    )}
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <button onClick={cancelEditBudget} style={{ fontSize: 12, background: 'none', border: '0.5px solid #ccc', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', color: '#666' }}>Cancel</button>
+                      <button onClick={saveEditBudget} disabled={editBudgetSaving} style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 14px', cursor: 'pointer', fontWeight: 600, opacity: editBudgetSaving ? 0.7 : 1 }}>{editBudgetSaving ? 'Saving…' : 'Save'}</button>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
                   <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, fontWeight: 500, background: b.type === 'Purchase' ? '#fef0e6' : '#eaf3ea', color: b.type === 'Purchase' ? '#c07040' : '#5a8a5a', flexShrink: 0 }}>{b.type}</span>
-                  <span style={{ flex: 1, fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</span>
+                  <span style={{ flex: 1, fontSize: 13, color: '#2a2a2a', minWidth: 0 }}>
+                    {b.description || '—'}
+                    {(b.event_name || b.purchased_by) && (
+                      <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>
+                        {b.event_name && <span>{b.event_name}</span>}
+                        {b.event_name && b.purchased_by && <span> · </span>}
+                        {b.purchased_by && <span>Purchased by {b.purchased_by}</span>}
+                      </div>
+                    )}
+                  </span>
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</span>
                   <span style={{ fontSize: 11, color: '#bbb', flexShrink: 0 }}>{b.date}</span>
                   {b.needs_reimbursement && <span title="Needs reimbursement" style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 10, fontWeight: 600, flexShrink: 0 }}>$ Reimburse</span>}
@@ -4393,6 +5955,9 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                     );
                     return <button onClick={function() { setUploadingId(b.id); fileInputRef.current.click(); }} disabled={isLoading} title="Attach receipt" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px 4px', flexShrink: 0, opacity: isLoading ? 0.5 : 1, display: 'flex', alignItems: 'center' }}>{isLoading ? <span style={{ fontSize: 11 }}>…</span> : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>}</button>;
                   })()}
+                  <button onClick={function() { startEditBudget(b); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px 4px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
                   <button onClick={function() { deleteBudgetItem(b.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                 </div>
               );
@@ -4403,7 +5968,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       )}
 
       {showEarnings && (
-        <div onClick={function() { setShowEarnings(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Events — Earnings</div>
@@ -4419,7 +5984,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                   <div>
                     <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Event</div>
-                    <input value={earningsForm.event} onChange={function(e) { setEarningsForm(function(f) { return Object.assign({}, f, { event: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="e.g. Spring Gala" />
+                    <input value={earningsForm.event} onChange={function(e) { setEarningsForm(function(f) { return Object.assign({}, f, { event: e.target.value }); }); }} list="event-name-options" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} placeholder="e.g. Spring Gala" />
                   </div>
                   <div>
                     <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Earning Source</div>
@@ -4446,6 +6011,23 @@ function OperationalView({ opArea, navigateToQuarterly }) {
             {earnings.length === 0 ? (
               <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No entries yet.</div>
             ) : earnings.map(function(e) {
+              if (editingEarningId === e.id && editEarningForm) {
+                return (
+                  <div key={e.id} style={{ padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                      <input value={editEarningForm.event} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { event: ev.target.value }); }); }} list="event-name-options" style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Event" />
+                      <input value={editEarningForm.earning_source} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { earning_source: ev.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Source" />
+                      <input type="number" step="0.01" min="0" value={editEarningForm.amount} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { amount: ev.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} placeholder="Amount" />
+                      <input type="date" value={editEarningForm.date} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { date: ev.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }} />
+                    </div>
+                    <input value={editEarningForm.notes} onChange={function(ev) { setEditEarningForm(function(f) { return Object.assign({}, f, { notes: ev.target.value }); }); }} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', marginBottom: 8 }} placeholder="Notes" />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={saveEditEarning} disabled={editEarningSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: editEarningSaving ? 0.6 : 1 }}>{editEarningSaving ? 'Saving…' : 'Save'}</button>
+                      <button onClick={cancelEditEarning} disabled={editEarningSaving} style={{ background: '#f0ece6', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={e.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece6' }}>
                   <div style={{ flex: 1 }}>
@@ -4457,6 +6039,9 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                     {e.notes && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{e.notes}</div>}
                     {e.date && <div style={{ fontSize: 11, color: '#bbb', marginTop: 2 }}>{e.date}</div>}
                   </div>
+                  <button onClick={function() { startEditEarning(e); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px 4px', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
                   <button onClick={function() { deleteEarningItem(e.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                 </div>
               );
@@ -4465,8 +6050,10 @@ function OperationalView({ opArea, navigateToQuarterly }) {
         </div>
       )}
 
+      {showPnl && <EventsProfitLossModal onClose={function() { setShowPnl(false); }} />}
+
       {showVols && (
-        <div onClick={function() { setShowVols(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 500, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>{area} Volunteers ({vols.length})</div>
@@ -4531,30 +6118,35 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       {showTodo && (function() {
         var weekDays = todoGetWeekDays(todoSelectedDate);
         var DAY_LABELS = ['M','T','W','T','F','S','S'];
-        var dayItems = todoItems.filter(function(t) { return todoGetDate(t) === todoSelectedDate; }).sort(function(a,b) { var ta = todoGetTime(a)||'99:99'; var tb = todoGetTime(b)||'99:99'; return ta<tb?-1:ta>tb?1:0; });
+        var dayItems = todoItems.filter(function(t) { return todoGetDate(t) === todoSelectedDate; });
         var activeItems = dayItems.filter(function(t) { return !t.done; });
         var doneItems = dayItems.filter(function(t) { return t.done; });
         var isToday = todoSelectedDate === todoTodayStr;
         var displayDate = new Date(todoSelectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        var dayTotalHours = dayItems.reduce(function(s, t) { return s + (t.hours || 0); }, 0);
+        var fmtHours = function(h) { return h % 1 === 0 ? h + 'h' : h.toFixed(1) + 'h'; };
         return (
-          <div onClick={function() { setShowTodo(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
-            <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 500, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
+            <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
               {/* Header */}
               <div style={{ padding: '16px 20px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>★ Marketing To-Do</div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>★ Marketing Work Log</div>
+                  {dayTotalHours > 0 && <div style={{ fontSize: 11, color: gold, fontWeight: 600, marginTop: 1 }}>{fmtHours(dayTotalHours)} logged today</div>}
+                </div>
                 <button onClick={function() { setShowTodo(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: '#666', cursor: 'pointer' }}>Close</button>
               </div>
               {/* Week strip */}
               <div style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', gap: 3, flexShrink: 0 }}>
                 {weekDays.map(function(d, i) {
-                  var total = todoItems.filter(function(t) { return todoGetDate(t) === d; }).length;
-                  var done = todoItems.filter(function(t) { return todoGetDate(t) === d && t.done; }).length;
+                  var dayH = todoItems.filter(function(t) { return todoGetDate(t) === d; }).reduce(function(s, t) { return s + (t.hours || 0); }, 0);
+                  var cnt = todoItems.filter(function(t) { return todoGetDate(t) === d; }).length;
                   var isSel = d === todoSelectedDate; var isTod = d === todoTodayStr;
                   return (
                     <button key={d} onClick={function() { setTodoSelectedDate(d); }} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '6px 2px', background: isSel ? gold : 'transparent', borderRadius: 7, border: 'none', cursor: 'pointer', color: isSel ? '#fff' : isTod ? gold : '#888' }}>
                       <span style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{DAY_LABELS[i]}</span>
                       <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1 }}>{new Date(d + 'T12:00:00').getDate()}</span>
-                      <span style={{ fontSize: 9, fontWeight: 600, height: 14, background: isSel ? 'rgba(255,255,255,0.25)' : total === 0 ? 'transparent' : done === total ? '#e8f5e9' : '#fef3c7', color: isSel ? '#fff' : done === total && total > 0 ? '#2e7d32' : '#b45309', borderRadius: 10, padding: total > 0 ? '1px 4px' : 0, display: 'flex', alignItems: 'center' }}>{total > 0 ? done + '/' + total : ''}</span>
+                      <span style={{ fontSize: 9, fontWeight: 600, height: 14, background: isSel ? 'rgba(255,255,255,0.25)' : cnt === 0 ? 'transparent' : '#fef3c7', color: isSel ? '#fff' : '#b45309', borderRadius: 10, padding: cnt > 0 ? '1px 4px' : 0, display: 'flex', alignItems: 'center' }}>{dayH > 0 ? fmtHours(dayH) : cnt > 0 ? cnt + ' task' + (cnt > 1 ? 's' : '') : ''}</span>
                     </button>
                   );
                 })}
@@ -4568,39 +6160,55 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 </div>
                 <button onClick={function() { todoNavigateDay(1); }} style={{ background: '#f5f1eb', border: 'none', borderRadius: 7, padding: '5px 12px', fontSize: 13, cursor: 'pointer', color: '#666' }}>→</button>
               </div>
-              {/* Add task */}
-              <form onSubmit={addTodoItem} style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
-                <input value={todoInput} onChange={function(e) { setTodoInput(e.target.value); }} placeholder={isToday ? 'Add a task for today…' : 'Add a task for ' + displayDate + '…'} style={{ flex: '1 1 150px', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, fontFamily: 'system-ui, sans-serif' }} />
-                <input type="time" value={todoInputTime} onChange={function(e) { setTodoInputTime(e.target.value); }} style={{ padding: '8px 8px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, width: 100, flexShrink: 0, color: todoInputTime ? '#2a2a2a' : '#bbb' }} />
-                <button type="submit" disabled={todoSaving || !todoInput.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (todoSaving || !todoInput.trim()) ? 0.6 : 1, flexShrink: 0 }}>Add</button>
+              {/* Add entry */}
+              <form onSubmit={addTodoItem} style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb', display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', alignItems: 'center' }}>
+                <input value={todoInput} onChange={function(e) { setTodoInput(e.target.value); }} placeholder="What did you work on?" style={{ flex: '1 1 180px', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, fontFamily: 'system-ui, sans-serif' }} />
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+                  <input type="time" value={todoInputTime} onChange={function(e) { setTodoInputTime(e.target.value); }} style={{ padding: '8px 6px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, width: 96 }} />
+                  <button type="button" onClick={function() { setTodoInputTime(todoNowTime()); }} title="Use current time" style={{ background: '#f5f1eb', border: 'none', borderRadius: 7, padding: '8px 8px', fontSize: 12, color: gold, cursor: 'pointer', fontWeight: 700, flexShrink: 0 }}>Now</button>
+                </div>
+                <input type="number" value={todoInputHours} onChange={function(e) { setTodoInputHours(e.target.value); }} placeholder="hrs" min="0" max="24" step="0.25" style={{ padding: '8px 8px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, width: 58, flexShrink: 0 }} />
+                <button type="submit" disabled={todoSaving || !todoInput.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (todoSaving || !todoInput.trim()) ? 0.6 : 1, flexShrink: 0 }}>Log</button>
               </form>
-              {/* Task list */}
+              {/* Entry list */}
               <div style={{ overflowY: 'auto', flex: 1 }}>
                 {todoLoading ? (
                   <div style={{ padding: 24, textAlign: 'center', color: '#aaa', fontSize: 13 }}>Loading…</div>
                 ) : dayItems.length === 0 ? (
-                  <div style={{ padding: 32, textAlign: 'center', color: '#ccc', fontSize: 13 }}>No tasks for this day.</div>
+                  <div style={{ padding: 32, textAlign: 'center', color: '#ccc', fontSize: 13 }}>Nothing logged for this day.</div>
                 ) : (
                   <div>
                     {activeItems.length > 0 && (
                       <div>
-                        <div style={{ padding: '7px 16px', fontSize: 10, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>To Do · {activeItems.length}</div>
+                        <div style={{ padding: '7px 16px', fontSize: 10, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Active · {activeItems.length}</div>
                         {activeItems.map(function(t) {
-                          var time = todoGetTime(t); var isEditingTime = todoEditingTimeId === t.id;
+                          var time = todoGetTime(t); var isEditingTime = todoEditingTimeId === t.id; var isEditingHours = todoEditingHoursId === t.id;
                           return (
-                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderBottom: '0.5px solid #f9f6f2' }}>
-                              <input type="checkbox" checked={false} onChange={function() { toggleTodoItem(t.id, false); }} style={{ accentColor: gold, width: 15, height: 15, cursor: 'pointer', flexShrink: 0 }} />
+                            <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 16px', borderBottom: '0.5px solid #f9f6f2' }}>
+                              <input type="checkbox" checked={false} onChange={function() { toggleTodoItem(t.id, false); }} style={{ accentColor: gold, width: 15, height: 15, cursor: 'pointer', flexShrink: 0, marginTop: 2 }} />
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, color: '#2a2a2a', lineHeight: 1.4 }}>{t.item}</div>
-                                {isEditingTime ? (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
-                                    <input type="time" value={todoEditTimeVal} onChange={function(e) { setTodoEditTimeVal(e.target.value); }} autoFocus style={{ padding: '3px 6px', border: '0.5px solid ' + gold, borderRadius: 6, fontSize: 12 }} />
-                                    <button onClick={function() { saveTodoTime(t); }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>Save</button>
-                                    <button onClick={function() { setTodoEditingTimeId(null); }} style={{ fontSize: 11, background: '#f0ece6', color: '#666', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>Cancel</button>
-                                  </div>
-                                ) : (
-                                  <button onClick={function() { setTodoEditingTimeId(t.id); setTodoEditTimeVal(time); }} style={{ marginTop: 2, fontSize: 11, color: time ? gold : '#ccc', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: time ? 500 : 400 }}>{time ? '⏰ ' + todoFmtTime(time) : '+ set time'}</button>
-                                )}
+                                <div style={{ display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                                  {isEditingTime ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                      <input type="time" value={todoEditTimeVal} onChange={function(e) { setTodoEditTimeVal(e.target.value); }} autoFocus style={{ padding: '3px 6px', border: '0.5px solid ' + gold, borderRadius: 6, fontSize: 12 }} />
+                                      <button onClick={function() { saveTodoTime(t); }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>Save</button>
+                                      <button onClick={function() { setTodoEditingTimeId(null); }} style={{ fontSize: 11, background: '#f0ece6', color: '#666', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>Cancel</button>
+                                    </div>
+                                  ) : (
+                                    <button onClick={function() { setTodoEditingTimeId(t.id); setTodoEditTimeVal(time); }} style={{ fontSize: 11, color: time ? gold : '#ccc', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: time ? 500 : 400 }}>⏰ {time ? todoFmtTime(time) : '+ set time'}</button>
+                                  )}
+                                  {isEditingHours ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                      <input type="number" value={todoEditHoursVal} onChange={function(e) { setTodoEditHoursVal(e.target.value); }} autoFocus min="0" max="24" step="0.25" style={{ padding: '3px 6px', border: '0.5px solid ' + gold, borderRadius: 6, fontSize: 12, width: 58 }} />
+                                      <span style={{ fontSize: 11, color: '#888' }}>hrs</span>
+                                      <button onClick={function() { saveTodoHours(t); }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 }}>Save</button>
+                                      <button onClick={function() { setTodoEditingHoursId(null); }} style={{ fontSize: 11, background: '#f0ece6', color: '#666', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>Cancel</button>
+                                    </div>
+                                  ) : (
+                                    <button onClick={function() { setTodoEditingHoursId(t.id); setTodoEditHoursVal(t.hours != null ? String(t.hours) : ''); }} style={{ fontSize: 11, color: t.hours ? '#2a2a2a' : '#ccc', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>{t.hours ? '⏱ ' + fmtHours(t.hours) : '+ hours'}</button>
+                                  )}
+                                </div>
                               </div>
                               <button onClick={function() { deleteTodoItem(t.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                             </div>
@@ -4614,11 +6222,14 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                         {doneItems.map(function(t) {
                           var time = todoGetTime(t);
                           return (
-                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderBottom: '0.5px solid #f9f6f2', background: '#fafaf9' }}>
-                              <input type="checkbox" checked={true} onChange={function() { toggleTodoItem(t.id, true); }} style={{ accentColor: gold, width: 15, height: 15, cursor: 'pointer', flexShrink: 0 }} />
+                            <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 16px', borderBottom: '0.5px solid #f9f6f2', background: '#fafaf9' }}>
+                              <input type="checkbox" checked={true} onChange={function() { toggleTodoItem(t.id, true); }} style={{ accentColor: gold, width: 15, height: 15, cursor: 'pointer', flexShrink: 0, marginTop: 2 }} />
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, color: '#bbb', textDecoration: 'line-through', lineHeight: 1.4 }}>{t.item}</div>
-                                {time && <div style={{ fontSize: 11, color: '#ccc', marginTop: 2 }}>⏰ {todoFmtTime(time)}</div>}
+                                <div style={{ display: 'flex', gap: 10, marginTop: 3, flexWrap: 'wrap' }}>
+                                  {time && <span style={{ fontSize: 11, color: '#ccc' }}>⏰ {todoFmtTime(time)}</span>}
+                                  {t.hours && <span style={{ fontSize: 11, color: '#ccc' }}>⏱ {fmtHours(t.hours)}</span>}
+                                </div>
                               </div>
                               <button onClick={function() { deleteTodoItem(t.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
                             </div>
@@ -4626,12 +6237,12 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                         })}
                       </div>
                     )}
-                    <div style={{ padding: '8px 14px', background: '#fdfcfb', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ flex: 1, height: 3, background: '#f0ece6', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', background: gold, width: (dayItems.length > 0 ? doneItems.length / dayItems.length * 100 : 0) + '%', borderRadius: 2, transition: 'width 0.3s' }} />
+                    {dayTotalHours > 0 && (
+                      <div style={{ padding: '10px 16px', background: '#fdfcfb', borderTop: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 11, color: '#888' }}>{dayItems.length} {dayItems.length === 1 ? 'entry' : 'entries'}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: gold }}>Total: {fmtHours(dayTotalHours)}</span>
                       </div>
-                      <span style={{ fontSize: 11, color: '#888', flexShrink: 0 }}>{doneItems.length}/{dayItems.length} done</span>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -5126,7 +6737,7 @@ function SponsorsView() {
       </div>
 
       {showAdd && (
-        <div onClick={function() { setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>New Sponsor</div>
@@ -5159,7 +6770,208 @@ function SponsorsView() {
   );
 }
 
-function ReviewsView() {
+function QuarterWorkspaceView({ navigate }) {
+  var { useState: useS, useEffect: useE, useRef } = React;
+  var year = new Date().getFullYear();
+  var quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+  var m = new Date().getMonth();
+  var defaultQ = m < 3 ? 'Q1' : m < 6 ? 'Q2' : m < 9 ? 'Q3' : 'Q4';
+  var [wsQ, setWsQ] = useS(defaultQ);
+  var [goals, setGoals] = useS({});
+  var [updates, setUpdates] = useS({});
+  var [notes, setNotes] = useS({});
+  var [loading, setLoading] = useS(true);
+  var [saving, setSaving] = useS({});
+  var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+
+  useE(function() {
+    setLoading(true);
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?quarter=eq.' + encodeURIComponent(wsQ) + '&year=eq.' + year + '&select=*', { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?quarter=eq.' + encodeURIComponent(wsQ) + '&year=eq.' + year + '&select=*&order=date_submitted.desc', { headers: hdrs }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/quarterly_notes?quarter=eq.' + encodeURIComponent(wsQ) + '&year=eq.' + year + '&select=*', { headers: hdrs }).then(function(r) { return r.json(); })
+    ]).then(function(res) {
+      var gm = {}; (Array.isArray(res[0]) ? res[0] : []).forEach(function(g) { gm[g.area] = g; });
+      var um = {}; (Array.isArray(res[1]) ? res[1] : []).forEach(function(u) { if (!um[u.area]) um[u.area] = u; });
+      var nm = {}; (Array.isArray(res[2]) ? res[2] : []).forEach(function(n) { nm[n.area] = n; });
+      setGoals(gm); setUpdates(um); setNotes(nm);
+      setLoading(false);
+    });
+  }, [wsQ]);
+
+  function saveNote(area, field, val) {
+    var key = area;
+    setSaving(function(s) { return Object.assign({}, s, { [area + '.' + field]: true }); });
+    var existing = notes[key];
+    var payload = { area: area, quarter: wsQ, year: year, [field]: val || null, updated_at: new Date().toISOString() };
+    var req = existing
+      ? fetch(SUPABASE_URL + '/rest/v1/quarterly_notes?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(wsQ) + '&year=eq.' + year, { method: 'PATCH', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify({ [field]: val || null, updated_at: new Date().toISOString() }) })
+      : fetch(SUPABASE_URL + '/rest/v1/quarterly_notes', { method: 'POST', headers: Object.assign({}, hdrs, { 'Content-Type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify(payload) });
+    req.then(function(r) { return r.json(); }).then(function(rows) {
+      var saved = Array.isArray(rows) ? rows[0] : rows;
+      if (saved) setNotes(function(prev) { return Object.assign({}, prev, { [area]: saved }); });
+      setSaving(function(s) { var next = Object.assign({}, s); delete next[area + '.' + field]; return next; });
+    }).catch(function() {
+      setSaving(function(s) { var next = Object.assign({}, s); delete next[area + '.' + field]; return next; });
+    });
+  }
+
+  var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, background: '#fdfcfb', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', resize: 'vertical', lineHeight: 1.55 };
+  var secHd = { fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6 };
+  var noteHd = { fontSize: 10, fontWeight: 700, color: gold, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
+  var chip = function(text, bg, color) { return React.createElement('span', { style: { fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: bg, color: color } }, text); };
+
+  function AreaCard(props) {
+    var area = props.area;
+    var g = goals[area] || {};
+    var u = updates[area];
+    var n = notes[area] || {};
+    var [localNotes, setLocalNotes] = useS({ goals_notes: n.goals_notes || '', reflection_notes: n.reflection_notes || '', next_quarter_notes: n.next_quarter_notes || '' });
+    useE(function() { setLocalNotes({ goals_notes: n.goals_notes || '', reflection_notes: n.reflection_notes || '', next_quarter_notes: n.next_quarter_notes || '' }); }, [n.goals_notes, n.reflection_notes, n.next_quarter_notes]);
+
+    var statusColors = { 'On track': { bg: '#e8f5e9', color: '#2e7d32' }, 'Minor adjustments needed': { bg: '#fff3e0', color: '#e65100' }, 'Off track - intervention required': { bg: '#ffebee', color: '#c62828' } };
+    var hasSubmission = !!u;
+    var hasGoals = !!(g.goal_1 || g.primary_focus);
+
+    return (
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, marginBottom: 14, overflow: 'hidden' }}>
+        <div style={{ padding: '11px 18px', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flex: 1 }}>{area}</div>
+          {hasSubmission ? chip('Reflection submitted', '#e8f5e9', '#2e7d32') : chip('No reflection', '#f5f0ea', '#aaa')}
+          {!hasGoals && chip('No goals set', '#fce4e4', '#c62828')}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+          {/* Left: review content */}
+          <div style={{ padding: '14px 16px', borderRight: '0.5px solid #f0ece6' }}>
+
+            {/* Goals */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={secHd}>Quarterly Goals</div>
+              {g.primary_focus && <div style={{ marginBottom: 6 }}><div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>Primary Focus</div><div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{g.primary_focus}</div></div>}
+              {goalEntries(g, u).map(function(entry, idx) {
+                var stColors = { 'On Track': { bg: '#eaf3ea', color: '#3a7d3a' }, 'Behind': { bg: '#fff3e0', color: '#c07040' }, 'Complete': { bg: '#e8f5e9', color: '#2e7d32' }, 'At Risk': { bg: '#fdecea', color: '#c62828' } };
+                var sc = entry.status && stColors[entry.status] ? stColors[entry.status] : null;
+                return (
+                  <div key={idx} style={{ marginBottom: 6, background: sc ? sc.bg : '#faf8f5', borderRadius: 7, padding: '7px 10px', border: '0.5px solid ' + (sc ? sc.color + '33' : '#e8e0d5') }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, color: '#999', marginBottom: 2 }}>Goal {idx + 1}</div>
+                        <div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{entry.text}</div>
+                        {entry.summary && <div style={{ fontSize: 11, color: '#555', lineHeight: 1.5, marginTop: 3 }}>{entry.summary}</div>}
+                      </div>
+                      {sc && <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 20, background: '#fff', color: sc.color, flexShrink: 0, whiteSpace: 'nowrap' }}>{entry.status}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+              {!hasGoals && <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>No goals submitted.</div>}
+            </div>
+
+            {/* Reflection */}
+            <div style={{ borderTop: '0.5px solid #f5f1eb', paddingTop: 12, marginBottom: 14 }}>
+              <div style={secHd}>Quarterly Reflection</div>
+              {u ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {u.what_went_well || u.successes ? <div><div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>What Went Well</div><div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{u.what_went_well || u.successes}</div></div> : null}
+                  {u.challenges && u.challenges.length > 0 ? <div><div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>Challenges</div><div style={{ fontSize: 12, color: '#555' }}>{(Array.isArray(u.challenges) ? u.challenges : [u.challenges]).join(' · ')}</div>{u.challenges_details && <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{u.challenges_details}</div>}</div> : null}
+                  {u.support_needed && u.support_needed.length > 0 ? <div><div style={{ fontSize: 10, color: '#e65100', marginBottom: 2, fontWeight: 600 }}>Support Needed</div><div style={{ fontSize: 12, color: '#555' }}>{(Array.isArray(u.support_needed) ? u.support_needed : [u.support_needed]).join(' · ')}</div>{u.support_details && <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{u.support_details}</div>}</div> : null}
+                  {u.other_notes ? <div><div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>Other Notes</div><div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{u.other_notes}</div></div> : null}
+                  {u.next_focus ? <div><div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>Next Quarter Focus</div><div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{u.next_focus}</div></div> : null}
+                </div>
+              ) : <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>No reflection submitted yet.</div>}
+            </div>
+
+            {/* Next Q goals preview */}
+            {(g.goal_1 || g.goal_2 || g.goal_3) && (
+              <div style={{ borderTop: '0.5px solid #f5f1eb', paddingTop: 12 }}>
+                <div style={secHd}>Next Quarter Focus</div>
+                {u && u.next_focus ? <div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{u.next_focus}</div> : <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>Not provided.</div>}
+              </div>
+            )}
+          </div>
+
+          {/* Right: notes */}
+          <div style={{ padding: '14px 16px', background: '#fefcf8' }}>
+            <div style={{ marginBottom: 14 }}>
+              <div style={noteHd}>
+                <span>Goals Notes</span>
+                {saving[area + '.goals_notes'] && <span style={{ fontSize: 9, color: '#bbb', fontWeight: 400 }}>saving…</span>}
+              </div>
+              <textarea
+                value={localNotes.goals_notes}
+                onChange={function(e) { setLocalNotes(function(l) { return Object.assign({}, l, { goals_notes: e.target.value }); }); }}
+                onBlur={function(e) { if (e.target.value !== (n.goals_notes || '')) saveNote(area, 'goals_notes', e.target.value); }}
+                placeholder="Notes on goals & progress…"
+                rows={4}
+                style={inpSt}
+              />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={noteHd}>
+                <span>Reflection Notes</span>
+                {saving[area + '.reflection_notes'] && <span style={{ fontSize: 9, color: '#bbb', fontWeight: 400 }}>saving…</span>}
+              </div>
+              <textarea
+                value={localNotes.reflection_notes}
+                onChange={function(e) { setLocalNotes(function(l) { return Object.assign({}, l, { reflection_notes: e.target.value }); }); }}
+                onBlur={function(e) { if (e.target.value !== (n.reflection_notes || '')) saveNote(area, 'reflection_notes', e.target.value); }}
+                placeholder="Discussion points, board focus areas, action items…"
+                rows={5}
+                style={inpSt}
+              />
+            </div>
+            <div>
+              <div style={noteHd}>
+                <span>Next Quarter Notes</span>
+                {saving[area + '.next_quarter_notes'] && <span style={{ fontSize: 9, color: '#bbb', fontWeight: 400 }}>saving…</span>}
+              </div>
+              <textarea
+                value={localNotes.next_quarter_notes}
+                onChange={function(e) { setLocalNotes(function(l) { return Object.assign({}, l, { next_quarter_notes: e.target.value }); }); }}
+                onBlur={function(e) { if (e.target.value !== (n.next_quarter_notes || '')) saveNote(area, 'next_quarter_notes', e.target.value); }}
+                placeholder="Priorities, recommendations for next quarter…"
+                rows={3}
+                style={inpSt}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <button onClick={function() { navigate('reviews'); }} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#aaa', fontSize: 13, cursor: 'pointer', padding: 0 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Reviews
+        </button>
+        <div style={{ fontSize: 12, color: '#ccc' }}>/</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>Review Workspace</div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          {quarters.map(function(q) {
+            return (
+              <button key={q} onClick={function() { setWsQ(q); }}
+                style={{ padding: '5px 14px', borderRadius: 7, border: '0.5px solid ' + (wsQ === q ? gold : '#e0d8cc'), background: wsQ === q ? '#fef9f0' : '#fff', color: wsQ === q ? gold : '#888', fontSize: 12, fontWeight: wsQ === q ? 700 : 400, cursor: 'pointer' }}>
+                {q}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: '#aaa' }}>{wsQ} {year} — Notes auto-save when you leave each field.</div>
+      </div>
+      {loading
+        ? <div style={{ padding: 32, textAlign: 'center', color: '#bbb', fontSize: 13 }}>Loading…</div>
+        : OPERATIONAL_AREAS.map(function(area) { return React.createElement(AreaCard, { key: area, area: area }); })
+      }
+    </div>
+  );
+}
+
+function ReviewsView({ navigate }) {
   var { useState, useEffect } = React;
   var year = new Date().getFullYear();
   var quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
@@ -5232,15 +7044,12 @@ function ReviewsView() {
         if (g.primary_focus || !u) {
           html += label('Primary Focus') + field(g.primary_focus, 1);
         }
-        ['1','2','3'].forEach(function(n) {
-          var gval = g['goal_' + n];
-          var st = g['goal_' + n + '_status'];
-          var sm = g['goal_' + n + '_summary'];
-          html += label('Goal ' + n);
-          html += '<div style="margin-bottom:4px">' + field(gval, 1) + '</div>';
+        goalEntries(g, u).forEach(function(entry, i) {
+          html += label('Goal ' + (i + 1));
+          html += '<div style="margin-bottom:4px">' + field(entry.text, 1) + '</div>';
           html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
-          html += '<div>' + label('Status') + field(st, 1) + '</div>';
-          html += '<div>' + label('Summary') + field(sm, 1) + '</div>';
+          html += '<div>' + label('Status') + field(entry.status, 1) + '</div>';
+          html += '<div>' + label('Summary') + field(entry.summary, 1) + '</div>';
           html += '</div>';
         });
 
@@ -5269,13 +7078,15 @@ function ReviewsView() {
 
         // Next Quarter Goals
         html += '<div style="font-size:14px;font-weight:700;color:#2a2a2a;margin-bottom:2px">Next Quarter Goals (' + nqLabel + ')</div>';
-        if (ng.primary_focus || ng.goal_1 || ng.goal_2 || ng.goal_3) {
+        var ngExtra = Array.isArray(ng.extra_goals) ? ng.extra_goals.filter(Boolean) : [];
+        if (ng.primary_focus || ng.goal_1 || ng.goal_2 || ng.goal_3 || ngExtra.length) {
           if (ng.primary_focus) html += label('Primary Focus') + field(ng.primary_focus, 1);
           ['1','2','3'].forEach(function(n) {
             var gval = ng['goal_' + n];
             if (gval) { html += label('Goal ' + n) + field(gval, 1); }
             else { html += label('Goal ' + n) + field(null, 1); }
           });
+          ngExtra.forEach(function(gval, i) { html += label('Goal ' + (4 + i)) + field(gval, 1); });
         } else {
           html += '<div style="font-size:12px;color:#aaa;font-style:italic;margin-bottom:8px">No goals submitted yet for ' + nqLabel + '.</div>';
           html += label('Primary Focus') + field(null, 1);
@@ -5362,10 +7173,16 @@ function ReviewsView() {
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', marginBottom: 24, overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600 }}>Quarterly Updates — {year}</div>
-          <button onClick={function() { setPrintQ('Q1'); }} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontWeight: 500 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Print Packet
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={function() { navigate('quarter-workspace'); }} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#555', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontWeight: 500 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Review &amp; Add Notes
+            </button>
+            <button onClick={function() { setPrintQ('Q1'); }} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontWeight: 500 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              Print Packet
+            </button>
+          </div>
         </div>
         <div className="nsh-reviews-scroll" style={{ padding: '0 20px' }}>
           <div style={{ minWidth: 400 }}>
@@ -5419,7 +7236,7 @@ function ReviewsView() {
       </div>
 
       {printQ && (
-        <div onClick={function() { setPrintQ(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, padding: 28, maxWidth: 340, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', marginBottom: 6, fontFamily: "'Cardo', serif" }}>Print Review Packet</div>
             <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>Select a quarter to print goals, reflections, and blank co-champion review forms for all areas.</div>
@@ -5444,7 +7261,7 @@ function ReviewsView() {
       )}
 
       {activeCell && (
-        <div onClick={function() { setActiveCell(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 500, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
               <div>
@@ -5555,6 +7372,7 @@ function FinancialsView() {
   var [resourceUrl, setResourceUrl] = useState('');
   var [resourceSaving, setResourceSaving] = useState(false);
   var resourceFileRef = useRef(null);
+  var [showPnl, setShowPnl] = useState(false);
 
 
   function loadReimbursements() {
@@ -5701,6 +7519,10 @@ function FinancialsView() {
 
   return (
     <div>
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+      <button onClick={function() { setShowPnl(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Events Profit / Loss</button>
+    </div>
+    {showPnl && <EventsProfitLossModal onClose={function() { setShowPnl(false); }} />}
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
 
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
@@ -6568,7 +8390,7 @@ function IdeasView() {
       )}
 
       {editing && selected && (
-        <div onClick={function() { setEditing(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 540, width: '100%', boxShadow: '0 12px 48px rgba(0,0,0,0.2)', maxHeight: '92vh', overflowY: 'auto', padding: 28 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>Edit Idea</div>
@@ -6580,7 +8402,7 @@ function IdeasView() {
       )}
 
       {showAdd && (
-        <div onClick={function() { setShowAdd(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 24 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, maxWidth: 540, width: '100%', boxShadow: '0 12px 48px rgba(0,0,0,0.2)', maxHeight: '92vh', overflowY: 'auto', padding: 28 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a' }}>New Idea</div>
@@ -6632,6 +8454,11 @@ var ADMIN_TOOLS = [
     url: "https://northstarhouse.github.io/nsh-events-committee/",
     icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
   },
+  {
+    label: "Form Builder",
+    url: "https://northstarhouse.github.io/NSH-forms/",
+    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
+  },
 ];
 
 var docIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>;
@@ -6658,7 +8485,10 @@ function AdminToolCard(props) {
   return <a href={tool.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>{card}</a>;
 }
 
-function AdminView() {
+function AdminView({ navigate }) {
+  var emailIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/><polyline points="2,18 8,13"/><polyline points="22,18 16,13"/></svg>;
+  var checkIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
+  var eventsIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Tools</div>
@@ -6666,13 +8496,880 @@ function AdminView() {
         {ADMIN_TOOLS.map(function(tool) {
           return <AdminToolCard key={tool.label} tool={tool} icon={tool.icon} />;
         })}
+        <div
+          onClick={function() { navigate('vol-email-lists'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{emailIcon}</span>
+          Volunteer Email Lists
+        </div>
+        <div
+          onClick={function() { navigate('wix-forms'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{checkIcon}</span>
+          Form Submissions
+        </div>
+        <div
+          onClick={function() { navigate('events'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{eventsIcon}</span>
+          Events
+        </div>
       </div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Resources</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Outreach</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {ADMIN_FORMS.map(function(form) {
           return <AdminToolCard key={form.label} tool={form} icon={docIcon} />;
         })}
       </div>
+    </div>
+  );
+}
+
+function VolEmailListsView({ navigate }) {
+  var { useState: useS, useEffect: useE, useMemo } = React;
+  var [volunteers, setVolunteers] = useS(null);
+  var [logs, setLogs] = useS([]);
+  var [activeOnly, setActiveOnly] = useS(true);
+  var [expandedTeams, setExpandedTeams] = useS({});
+  var [copied, setCopied] = useS(null);
+  var [modal, setModal] = useS(null);
+  var [subject, setSubject] = useS('');
+  var [body, setBody] = useS('');
+  var [sent, setSent] = useS(false);
+  var [sending, setSending] = useS(false);
+  var [sendError, setSendError] = useS(null);
+  var [scheduled, setScheduled] = useS(false);
+  var [scheduleAt, setScheduleAt] = useS('');
+  var editorRef = React.useRef(null);
+  var [showCreateList, setShowCreateList] = useS(false);
+  var [newListName, setNewListName] = useS('');
+  var [newListSearch, setNewListSearch] = useS('');
+  var [newListSelected, setNewListSelected] = useS({});
+  var [creatingList, setCreatingList] = useS(false);
+  var [createListError, setCreateListError] = useS(null);
+  var [editingTag, setEditingTag] = useS(null);
+  var [editTagName, setEditTagName] = useS('');
+  var [editSelected, setEditSelected] = useS({});
+  var [editSearch, setEditSearch] = useS('');
+  var [savingEdit, setSavingEdit] = useS(false);
+  var [editError, setEditError] = useS(null);
+  var [tagColors, setTagColors] = useS({});
+  var [newListColor, setNewListColor] = useS(DEFAULT_LIST_COLOR);
+  var [editTagColor, setEditTagColor] = useS(DEFAULT_LIST_COLOR);
+
+  useE(function() {
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Email','Status','Team','Event Tags','Overview Notes','Phone Number']).then(function(data) {
+      if (Array.isArray(data)) setVolunteers(data);
+    });
+    fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=20', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (Array.isArray(data)) setLogs(data);
+    }).catch(function() {});
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('List Tag Colors') + '?select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (!Array.isArray(rows)) return;
+      var map = {};
+      rows.forEach(function(r) { map[r.tag] = r.color; });
+      setTagColors(map);
+    }).catch(function() {});
+  }, []);
+
+  function getTagColor(tag) { return tagColors[tag] || DEFAULT_LIST_COLOR; }
+
+  function saveTagColor(tag, color) {
+    setTagColors(function(prev) { var n = Object.assign({}, prev); n[tag] = color; return n; });
+    return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('List Tag Colors') + '?tag=eq.' + encodeURIComponent(tag), {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ color: color })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows) && rows.length > 0) return;
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('List Tag Colors'), {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: tag, color: color })
+      });
+    }).catch(function() {});
+  }
+
+  function deleteTagColor(tag) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('List Tag Colors') + '?tag=eq.' + encodeURIComponent(tag), {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).catch(function() {});
+    setTagColors(function(prev) { var n = Object.assign({}, prev); delete n[tag]; return n; });
+  }
+
+  function parseTeams(t) {
+    if (!t) return [];
+    return t.split(/[,|]/).map(function(s) { return s.replace(/\bNEW\b/g, '').trim(); }).filter(Boolean);
+  }
+
+  function isActive(v) { return (v['Status'] || '').trim().toLowerCase() === 'active'; }
+
+  var displayed = useMemo(function() {
+    if (!volunteers) return [];
+    return activeOnly ? volunteers.filter(isActive) : volunteers;
+  }, [volunteers, activeOnly]);
+
+  var groups = useMemo(function() {
+    if (!displayed.length) return [];
+    var tagMap = {};
+    displayed.forEach(function(v) {
+      parseTeams(v['Team']).forEach(function(t) {
+        if (!tagMap[t]) tagMap[t] = [];
+        tagMap[t].push(v);
+      });
+    });
+    var knownOrder = TEAM_OPTIONS;
+    var known = knownOrder.filter(function(t) { return tagMap[t]; }).map(function(t) { return { tag: t, members: tagMap[t] }; });
+    var custom = Object.keys(tagMap).filter(function(t) { return TEAM_OPTIONS.indexOf(t) === -1; }).sort().map(function(t) { return { tag: t, members: tagMap[t] }; });
+    return known.concat(custom);
+  }, [displayed]);
+
+  var eventGroups = useMemo(function() {
+    if (!displayed.length) return [];
+    var tagMap = {};
+    displayed.forEach(function(v) {
+      parseTeams(v['Event Tags']).forEach(function(t) {
+        if (!tagMap[t]) tagMap[t] = [];
+        tagMap[t].push(v);
+      });
+    });
+    return Object.keys(tagMap).sort().map(function(t) { return { tag: t, members: tagMap[t] }; });
+  }, [displayed]);
+
+  function toggleNewListSelected(id) {
+    setNewListSelected(function(prev) { var n = Object.assign({}, prev); n[id] = !n[id]; return n; });
+  }
+
+  function createTagList() {
+    var tag = newListName.trim();
+    if (!tag) return;
+    var ids = Object.keys(newListSelected).filter(function(id) { return newListSelected[id]; });
+    if (!ids.length) return;
+    setCreatingList(true);
+    setCreateListError(null);
+    Promise.all(ids.map(function(id) {
+      var v = volunteers.find(function(x) { return String(x.id) === id; });
+      if (!v) return Promise.resolve();
+      var existing = parseTeams(v['Event Tags']);
+      if (existing.indexOf(tag) !== -1) return Promise.resolve();
+      var nextVal = existing.concat([tag]).join(' | ');
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?id=eq.' + v.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 'Event Tags': nextVal })
+      }).then(function(r) {
+        if (!r.ok) throw new Error('Failed to tag ' + v['First Name'] + ' ' + v['Last Name']);
+        return { id: v.id, val: nextVal };
+      });
+    })).then(function(results) {
+      var updates = {};
+      results.forEach(function(r) { if (r) updates[r.id] = r.val; });
+      setVolunteers(function(prev) { return prev.map(function(v) { return updates[v.id] !== undefined ? Object.assign({}, v, { 'Event Tags': updates[v.id] }) : v; }); });
+      clearCache('2026 Volunteers');
+      saveTagColor(tag, newListColor);
+      setCreatingList(false);
+      setShowCreateList(false);
+      setNewListName('');
+      setNewListColor(DEFAULT_LIST_COLOR);
+      setNewListSearch('');
+      setNewListSelected({});
+    }).catch(function(err) {
+      setCreatingList(false);
+      setCreateListError(err.message || 'Failed to create tag list');
+    });
+  }
+
+  function startEditGroup(tag) {
+    var sel = {};
+    (volunteers || []).forEach(function(v) {
+      if (parseTeams(v['Event Tags']).indexOf(tag) !== -1) sel[String(v.id)] = true;
+    });
+    setEditingTag(tag);
+    setEditTagName(tag.replace(/^volunteered for:\s*/i, ''));
+    setEditTagColor(getTagColor(tag));
+    setEditSelected(sel);
+    setEditSearch('');
+    setEditError(null);
+  }
+
+  function toggleEditSelected(id) {
+    setEditSelected(function(prev) { var n = Object.assign({}, prev); n[id] = !n[id]; return n; });
+  }
+
+  function applyTagChange(oldTag, newTag, selectedIds) {
+    setSavingEdit(true);
+    setEditError(null);
+    var affected = {};
+    selectedIds.forEach(function(id) { affected[id] = true; });
+    (volunteers || []).forEach(function(v) {
+      if (parseTeams(v['Event Tags']).indexOf(oldTag) !== -1) affected[String(v.id)] = true;
+    });
+    var ids = Object.keys(affected);
+    Promise.all(ids.map(function(id) {
+      var v = volunteers.find(function(x) { return String(x.id) === id; });
+      if (!v) return Promise.resolve();
+      var tags = parseTeams(v['Event Tags']).filter(function(t) { return t !== oldTag; });
+      var shouldHave = newTag && selectedIds.indexOf(id) !== -1;
+      if (shouldHave && tags.indexOf(newTag) === -1) tags.push(newTag);
+      var nextVal = tags.join(' | ');
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?id=eq.' + v.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 'Event Tags': nextVal })
+      }).then(function(r) {
+        if (!r.ok) throw new Error('Failed to update ' + v['First Name'] + ' ' + v['Last Name']);
+        return { id: v.id, val: nextVal };
+      });
+    })).then(function(results) {
+      var updates = {};
+      results.forEach(function(r) { if (r) updates[r.id] = r.val; });
+      setVolunteers(function(prev) { return prev.map(function(v) { return updates[v.id] !== undefined ? Object.assign({}, v, { 'Event Tags': updates[v.id] }) : v; }); });
+      clearCache('2026 Volunteers');
+      setSavingEdit(false);
+      setEditingTag(null);
+    }).catch(function(err) {
+      setSavingEdit(false);
+      setEditError(err.message || 'Failed to save changes');
+    });
+  }
+
+  function saveEditGroup() {
+    var newTag = editTagName.trim();
+    if (!newTag) return;
+    var oldTag = editingTag;
+    var selectedIds = Object.keys(editSelected).filter(function(id) { return editSelected[id]; });
+    saveTagColor(newTag, editTagColor);
+    if (newTag !== oldTag) deleteTagColor(oldTag);
+    applyTagChange(oldTag, newTag, selectedIds);
+  }
+
+  function deleteTagList(tag) {
+    if (!window.confirm('Delete the "' + tag + '" list? This removes the tag from every volunteer who has it.')) return;
+    deleteTagColor(tag);
+    applyTagChange(tag, null, []);
+  }
+
+  function toggleTeam(tag) {
+    setExpandedTeams(function(prev) { var n = Object.assign({}, prev); n[tag] = !n[tag]; return n; });
+  }
+
+  function copyEmails(members, tag) {
+    var emails = members.filter(function(v) { return v['Email'] && v['Email'].trim(); }).map(function(v) { return v['Email'].trim(); }).join(', ');
+    navigator.clipboard.writeText(emails);
+    setCopied(tag);
+    setTimeout(function() { setCopied(null); }, 2000);
+  }
+
+  function openModal(tag, members) {
+    var withEmail = members.filter(function(v) { return v['Email'] && v['Email'].trim(); });
+    setModal({ tag: tag, members: withEmail });
+    setSubject(tag + ' — ' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }));
+    setBody('');
+    setSent(false);
+    setSendError(null);
+    setScheduled(false);
+    setScheduleAt('');
+    setTimeout(function() { if (editorRef.current) editorRef.current.innerHTML = ''; }, 0);
+  }
+
+  function fmt(cmd, val) {
+    if (editorRef.current) editorRef.current.focus();
+    document.execCommand(cmd, false, val || null);
+  }
+
+  function renderGroupCard(g, colorFn, editable) {
+    var withEmail = g.members.filter(function(v) { return v['Email'] && v['Email'].trim(); });
+    var noEmail = g.members.filter(function(v) { return !v['Email'] || !v['Email'].trim(); });
+    var isOpen = !!expandedTeams[g.tag];
+    var isEditing = editable && editingTag === g.tag;
+    var tc = colorFn(g.tag);
+    return (
+      <div key={g.tag} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+        {/* Group header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#fdfcfb', borderBottom: (isOpen || isEditing) ? '0.5px solid #f0ece6' : 'none' }}>
+          <button onClick={function() { toggleTeam(g.tag); }} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{g.tag}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: tc.bg, color: tc.color }}>
+              {withEmail.length}{withEmail.length !== g.members.length ? '/' + g.members.length : ''} with email
+            </span>
+            {noEmail.length > 0 && <span style={{ fontSize: 10, color: '#b45309' }}>⚠ {noEmail.length} no email</span>}
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#ccc' }}>{isOpen ? '▲' : '▼'}</span>
+          </button>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            {editable && (
+              <button onClick={function() { isEditing ? setEditingTag(null) : startEditGroup(g.tag); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: '0.5px solid #e0d8cc', borderRadius: 7, background: isEditing ? '#f0ece6' : '#fff', color: '#666', cursor: 'pointer' }}>
+                {isEditing ? 'Cancel edit' : '✎ Edit list'}
+              </button>
+            )}
+            <button onClick={function() { copyEmails(g.members, g.tag); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: '0.5px solid #e0d8cc', borderRadius: 7, background: '#fff', color: copied === g.tag ? '#2e7d32' : '#666', cursor: 'pointer' }}>
+              {copied === g.tag ? '✓ Copied' : '⧉ Copy emails'}
+            </button>
+            <button onClick={function() { openModal(g.tag, g.members); }} disabled={withEmail.length === 0} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: 'none', borderRadius: 7, background: gold, color: '#fff', fontWeight: 600, cursor: withEmail.length === 0 ? 'not-allowed' : 'pointer', opacity: withEmail.length === 0 ? 0.4 : 1 }}>
+              ✉ Email group
+            </button>
+          </div>
+        </div>
+        {/* Edit panel */}
+        {isEditing && (
+          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>List name</label>
+                <input value={editTagName} onChange={function(e) { setEditTagName(e.target.value); }} style={Object.assign({}, volInputStyle, { marginTop: 0 })} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Color</label>
+                <input type="color" value={editTagColor} onChange={function(e) { setEditTagColor(e.target.value); }} style={{ width: 38, height: 34, border: '0.5px solid #e0d8cc', borderRadius: 6, padding: 2, cursor: 'pointer' }} />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Volunteers ({Object.keys(editSelected).filter(function(id) { return editSelected[id]; }).length} selected)</label>
+              <input value={editSearch} onChange={function(e) { setEditSearch(e.target.value); }} placeholder="Search volunteers…" style={Object.assign({}, volInputStyle, { marginTop: 0, marginBottom: 8 })} />
+              <div style={{ background: '#faf8f4', borderRadius: 8, padding: '6px 10px', maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                {(volunteers || [])
+                  .filter(function(v) { return !editSearch.trim() || ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).toLowerCase().indexOf(editSearch.trim().toLowerCase()) !== -1; })
+                  .sort(function(a, b) { return (a['Last Name'] || '').localeCompare(b['Last Name'] || ''); })
+                  .map(function(v) {
+                    var checked = !!editSelected[String(v.id)];
+                    return (
+                      <label key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 4px', fontSize: 12, color: '#2a2a2a', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={checked} onChange={function() { toggleEditSelected(String(v.id)); }} style={{ accentColor: gold }} />
+                        {v['First Name']} {v['Last Name']}
+                        {!v['Email'] && <span style={{ fontSize: 10, color: '#ddd', fontStyle: 'italic' }}>no email</span>}
+                      </label>
+                    );
+                  })}
+              </div>
+            </div>
+            {editError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{editError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={saveEditGroup} disabled={!editTagName.trim() || savingEdit} style={{ flex: 1, padding: '8px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (!editTagName.trim() || savingEdit) ? 0.5 : 1 }}>
+                {savingEdit ? 'Saving…' : 'Save changes'}
+              </button>
+              <button onClick={function() { deleteTagList(g.tag); }} disabled={savingEdit} style={{ padding: '8px 14px', background: '#fce4e4', border: 'none', borderRadius: 8, fontSize: 12, color: '#c0392b', cursor: 'pointer', fontWeight: 500 }}>Delete list</button>
+              <button onClick={function() { setEditingTag(null); }} disabled={savingEdit} style={{ padding: '8px 14px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+            </div>
+          </div>
+        )}
+        {/* Member list */}
+        {isOpen && !isEditing && (
+          <div>
+            {g.members.slice().sort(function(a, b) { return (a['Last Name'] || '').localeCompare(b['Last Name'] || ''); }).map(function(v, i) {
+              var initials = ((v['First Name'] || '')[0] || '').toUpperCase() + ((v['Last Name'] || '')[0] || '').toUpperCase();
+              return (
+                <div key={v.id || i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px', borderBottom: i < g.members.length - 1 ? '0.5px solid #f5f1eb' : 'none' }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: gold, opacity: isActive(v) ? 1 : 0.4, color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{initials}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</span>
+                    {v['Overview Notes'] && <span style={{ fontSize: 11, color: '#aaa', marginLeft: 8 }}>{v['Overview Notes']}</span>}
+                    {!isActive(v) && <span style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '1px 6px', borderRadius: 10, marginLeft: 6 }}>Inactive</span>}
+                  </div>
+                  {v['Email'] && v['Email'].trim() ? (
+                    <a href={'mailto:' + v['Email'].trim()} style={{ fontSize: 11, color: '#aaa', textDecoration: 'none', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v['Email'].trim()}</a>
+                  ) : (
+                    <span style={{ fontSize: 11, color: '#ddd', fontStyle: 'italic' }}>no email</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function handleSend() {
+    if (!modal) return;
+    var htmlBody = editorRef.current ? editorRef.current.innerHTML : body;
+    setSending(true);
+    setSendError(null);
+
+    if (scheduled && scheduleAt) {
+      fetch(SUPABASE_URL + '/rest/v1/scheduled_volunteer_emails', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ send_at: new Date(scheduleAt).toISOString(), team_tag: modal.tag, recipient_count: modal.members.length, recipients: modal.members.map(function(v) { return v['Email'].trim(); }), subject: subject, body: htmlBody, status: 'pending' })
+      }).then(function(r) {
+        if (!r.ok) return r.json().then(function(j) { throw new Error(j.message || j.error || 'Failed to schedule'); });
+        setSent(true);
+      }).catch(function(err) {
+        setSendError(err.message || 'Unknown error');
+      }).finally(function() { setSending(false); });
+      return;
+    }
+
+    fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY },
+      body: JSON.stringify({ to: modal.members.map(function(v) { return v['Email'].trim(); }), subject: subject, body: htmlBody })
+    }).then(function(r) { return r.json().then(function(j) { return { ok: r.ok, json: j }; }); }).then(function(res) {
+      if (!res.ok) throw new Error(res.json.error || 'Send failed');
+      setSent(true);
+      return fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ sent_at: new Date().toISOString(), team_tag: modal.tag, recipient_count: modal.members.length, recipients: modal.members.map(function(v) { return (v['First Name'] || '') + ' ' + (v['Last Name'] || '') + ' <' + v['Email'] + '>'; }), subject: subject })
+      });
+    }).then(function() {
+      return fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=20', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }).then(function(data) { if (Array.isArray(data)) setLogs(data); });
+    }).catch(function(err) {
+      setSendError(err.message || 'Unknown error');
+    }).finally(function() { setSending(false); });
+  }
+
+  var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', outline: 'none', background: '#fff' };
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Volunteer Email Lists</div>
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Auto-populated from volunteer database · click a group to expand</div>
+        </div>
+        <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>
+          <input type="checkbox" checked={activeOnly} onChange={function(e) { setActiveOnly(e.target.checked); }} style={{ accentColor: gold }} />
+          Active only
+        </label>
+      </div>
+
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+        {/* Group list */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {volunteers === null ? (
+            <div style={{ textAlign: 'center', padding: 48, color: '#aaa', fontSize: 13 }}>Loading…</div>
+          ) : groups.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 48, color: '#ccc', fontSize: 13 }}>No volunteers found.</div>
+          ) : groups.map(function(g) { return renderGroupCard(g, function(tag) { return TEAM_COLORS[tag] || { bg: '#f5f5f5', color: '#555' }; }); })}
+        </div>
+
+        {/* Recent sends sidebar */}
+        {logs.length > 0 && (
+          <div style={{ width: 220, flexShrink: 0 }}>
+            <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden', position: 'sticky', top: 16 }}>
+              <div style={{ padding: '10px 14px', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Recent Sends</div>
+              </div>
+              {logs.map(function(log, i) {
+                return (
+                  <div key={i} style={{ padding: '10px 14px', borderBottom: i < logs.length - 1 ? '0.5px solid #f5f1eb' : 'none' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{log.team_tag}</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.subject}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                      <span style={{ fontSize: 10, color: '#aaa' }}>{log.recipient_count} recipients</span>
+                      <span style={{ fontSize: 10, color: '#ccc' }}>{new Date(log.sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Custom / one-off lists */}
+      <div style={{ marginTop: 28 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Custom Lists</div>
+        <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Any one-off group of volunteers — an event, an outreach group, anything you need to email as a batch</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {volunteers === null ? null : eventGroups.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 32, color: '#ccc', fontSize: 13, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12 }}>No custom lists yet — create one below.</div>
+          ) : eventGroups.map(function(g) { return renderGroupCard(g, function(tag) { var c = getTagColor(tag); return { bg: c + '22', color: c }; }, true); })}
+        </div>
+      </div>
+
+      {/* Create a new volunteer list */}
+      <div style={{ marginTop: 20, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+        <button onClick={function() { setShowCreateList(function(s) { return !s; }); }} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#fdfcfb', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>+ Create a new list</span>
+          <span style={{ fontSize: 12, color: '#ccc' }}>{showCreateList ? '▲' : '▼'}</span>
+        </button>
+        {showCreateList && (
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>List name</label>
+                <input value={newListName} onChange={function(e) { setNewListName(e.target.value); }} placeholder="e.g. Fall Gala, Newsletter Signups…" style={inpSt} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Color</label>
+                <input type="color" value={newListColor} onChange={function(e) { setNewListColor(e.target.value); }} style={{ width: 38, height: 34, border: '0.5px solid #e0d8cc', borderRadius: 6, padding: 2, cursor: 'pointer' }} />
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Select volunteers ({Object.keys(newListSelected).filter(function(id) { return newListSelected[id]; }).length} selected)</label>
+              <input value={newListSearch} onChange={function(e) { setNewListSearch(e.target.value); }} placeholder="Search volunteers…" style={Object.assign({}, inpSt, { marginBottom: 8 })} />
+              <div style={{ background: '#faf8f4', borderRadius: 8, padding: '6px 10px', maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                {(volunteers || [])
+                  .filter(function(v) { return !newListSearch.trim() || ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).toLowerCase().indexOf(newListSearch.trim().toLowerCase()) !== -1; })
+                  .sort(function(a, b) { return (a['Last Name'] || '').localeCompare(b['Last Name'] || ''); })
+                  .map(function(v) {
+                    var checked = !!newListSelected[String(v.id)];
+                    return (
+                      <label key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 4px', fontSize: 12, color: '#2a2a2a', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={checked} onChange={function() { toggleNewListSelected(String(v.id)); }} style={{ accentColor: gold }} />
+                        {v['First Name']} {v['Last Name']}
+                        {!v['Email'] && <span style={{ fontSize: 10, color: '#ddd', fontStyle: 'italic' }}>no email</span>}
+                      </label>
+                    );
+                  })}
+              </div>
+            </div>
+            {createListError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{createListError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={createTagList}
+                disabled={!newListName.trim() || !Object.keys(newListSelected).some(function(id) { return newListSelected[id]; }) || creatingList}
+                style={{ flex: 1, padding: '9px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!newListName.trim() || !Object.keys(newListSelected).some(function(id) { return newListSelected[id]; }) || creatingList) ? 0.5 : 1 }}
+              >{creatingList ? 'Creating…' : 'Create list'}</button>
+              <button onClick={function() { setShowCreateList(false); setNewListName(''); setNewListSearch(''); setNewListSelected({}); setCreateListError(null); }} disabled={creatingList} style={{ padding: '9px 16px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Email modal */}
+      {modal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid #f0ece6' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>Email {modal.tag}</div>
+                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{modal.members.length} recipient{modal.members.length !== 1 ? 's' : ''} with email</div>
+              </div>
+              <button onClick={function() { setModal(null); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: '#666', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            {sent ? (
+              <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: scheduled ? '#e0f2fe' : '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 20 }}>{scheduled ? '🕐' : '✓'}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{scheduled ? 'Email scheduled!' : 'Email sent!'}</div>
+                <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>
+                  {scheduled
+                    ? 'Queued for ' + new Date(scheduleAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' · ' + modal.members.length + ' recipient' + (modal.members.length !== 1 ? 's' : '')
+                    : 'Delivered to ' + modal.members.length + ' recipient' + (modal.members.length !== 1 ? 's' : '') + ' from info@northstarhouse.org'}
+                </div>
+                <button onClick={function() { setModal(null); }} style={{ marginTop: 16, padding: '7px 20px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer' }}>Done</button>
+              </div>
+            ) : (
+              <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Recipients */}
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Recipients ({modal.members.length})</div>
+                  <div style={{ background: '#faf8f4', borderRadius: 8, padding: '8px 10px', maxHeight: 90, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {modal.members.map(function(v) {
+                      return (
+                        <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a', flexShrink: 0 }}>{v['First Name']} {v['Last Name']}</span>
+                          <span style={{ fontSize: 11, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v['Email']}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Subject</label>
+                  <input value={subject} onChange={function(e) { setSubject(e.target.value); }} placeholder="Subject line…" style={inpSt} />
+                </div>
+                {/* Formatting toolbar + editor */}
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Message</label>
+                  <div style={{ border: '0.5px solid #e0d8cc', borderRadius: 8, overflow: 'hidden' }}>
+                    {/* Toolbar */}
+                    <div style={{ display: 'flex', gap: 2, padding: '6px 8px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb', flexWrap: 'wrap' }}>
+                      {[
+                        { label: 'B', cmd: 'bold', style: { fontWeight: 700 }, title: 'Bold' },
+                        { label: 'I', cmd: 'italic', style: { fontStyle: 'italic' }, title: 'Italic' },
+                        { label: 'U', cmd: 'underline', style: { textDecoration: 'underline' }, title: 'Underline' },
+                      ].map(function(b) {
+                        return (
+                          <button key={b.cmd} onMouseDown={function(e) { e.preventDefault(); fmt(b.cmd); }} title={b.title}
+                            style={Object.assign({ padding: '3px 8px', border: '0.5px solid #e0d8cc', borderRadius: 5, background: '#fff', fontSize: 12, cursor: 'pointer', color: '#444', lineHeight: 1.4 }, b.style)}>
+                            {b.label}
+                          </button>
+                        );
+                      })}
+                      <div style={{ width: 1, background: '#e0d8cc', margin: '2px 4px', alignSelf: 'stretch' }} />
+                      <button onMouseDown={function(e) { e.preventDefault(); fmt('insertUnorderedList'); }} title="Bullet list"
+                        style={{ padding: '3px 8px', border: '0.5px solid #e0d8cc', borderRadius: 5, background: '#fff', fontSize: 12, cursor: 'pointer', color: '#444' }}>• List</button>
+                      <button onMouseDown={function(e) { e.preventDefault(); fmt('insertOrderedList'); }} title="Numbered list"
+                        style={{ padding: '3px 8px', border: '0.5px solid #e0d8cc', borderRadius: 5, background: '#fff', fontSize: 12, cursor: 'pointer', color: '#444' }}>1. List</button>
+                      <div style={{ width: 1, background: '#e0d8cc', margin: '2px 4px', alignSelf: 'stretch' }} />
+                      <button onMouseDown={function(e) { e.preventDefault(); fmt('removeFormat'); }} title="Clear formatting"
+                        style={{ padding: '3px 8px', border: '0.5px solid #e0d8cc', borderRadius: 5, background: '#fff', fontSize: 11, cursor: 'pointer', color: '#aaa' }}>Clear</button>
+                    </div>
+                    {/* Editor */}
+                    <div
+                      ref={editorRef}
+                      contentEditable={true}
+                      suppressContentEditableWarning={true}
+                      className="nsh-editor"
+                      data-placeholder="Email body…"
+                      onInput={function(e) { setBody(e.currentTarget.innerHTML); }}
+                      style={{ minHeight: 120, padding: '10px 12px', fontSize: 13, color: '#2a2a2a', outline: 'none', background: '#faf8f4', lineHeight: 1.6, fontFamily: 'system-ui, sans-serif' }}
+                    />
+                  </div>
+                  <style>{'.nsh-editor[contenteditable]:empty:before{content:attr(data-placeholder);color:#bbb;pointer-events:none;}'}</style>
+                </div>
+                {/* Scheduling */}
+                <div style={{ background: '#fdfcfb', border: '0.5px solid #f0ece6', borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: scheduled ? 10 : 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#555' }}>🕐 Schedule for later</span>
+                    <button onClick={function() { setScheduled(function(s) { return !s; }); }} style={{ background: scheduled ? gold : '#e0d8cc', border: 'none', borderRadius: 20, width: 36, height: 20, cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                      <span style={{ position: 'absolute', top: 2, left: scheduled ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }} />
+                    </button>
+                  </div>
+                  {scheduled && (
+                    <div>
+                      <label style={{ fontSize: 10, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Send at</label>
+                      <input type="datetime-local" value={scheduleAt} onChange={function(e) { setScheduleAt(e.target.value); }} min={new Date().toISOString().slice(0,16)} style={Object.assign({}, inpSt, { width: '100%' })} />
+                      <div style={{ fontSize: 10, color: '#aaa', marginTop: 5 }}>Saved to queue — requires a Supabase scheduled trigger to send.</div>
+                    </div>
+                  )}
+                </div>
+                {sendError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{sendError}</div>}
+                <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+                  <button onClick={handleSend} disabled={!subject.trim() || sending || (scheduled && !scheduleAt)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!subject.trim() || sending || (scheduled && !scheduleAt)) ? 0.5 : 1 }}>
+                    {sending ? 'Saving…' : scheduled ? '🕐 Schedule Email' : '✉ Send Email'}
+                  </button>
+                  <button onClick={function() { setModal(null); }} disabled={sending} style={{ padding: '9px 16px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                </div>
+                <div style={{ fontSize: 10, color: '#ccc', textAlign: 'center' }}>{scheduled ? 'Will send from info@northstarhouse.org at scheduled time' : 'Sends from info@northstarhouse.org'}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Form Submissions — auto-populated from Wix, notes + handled checkmarks ── */
+function WixFormsView({ navigate }) {
+  const { useState: useS, useEffect: useE, useRef: useR } = React;
+  const [data, setData] = useS(null); // { submissions: [...] } | null while loading
+  const [selected, setSelected] = useS(null);
+  const [activeForm, setActiveForm] = useS(null);
+  const [notesDraft, setNotesDraft] = useS('');
+  const [notesSaving, setNotesSaving] = useS(false);
+  const [handlingId, setHandlingId] = useS(null);
+  const cacheKey = 'wixforms:v1';
+
+  useE(function() {
+    var cancelled = false;
+    var cached = lsGet(cacheKey);
+    if (cached) setData({ submissions: cached });
+
+    fetch(WIX_FORMS_URL).then(function(r) { return r.json(); }).then(function(json) {
+      var rawForms = (json.forms && json.forms.submissions) || [];
+      var ids = rawForms.map(function(s) { return s.id; });
+      var overridesPromise = ids.length > 0
+        ? fetch(SUPABASE_URL + '/rest/v1/data_wix_forms?select=id,internal_notes,status&id=in.(' + ids.map(encodeURIComponent).join(',') + ')', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); })
+        : Promise.resolve([]);
+      return overridesPromise.then(function(overrides) {
+        var overrideMap = {};
+        (Array.isArray(overrides) ? overrides : []).forEach(function(row) { overrideMap[row.id] = row; });
+        var merged = rawForms.map(function(sub) {
+          var ov = overrideMap[sub.id];
+          return Object.assign({}, sub, {
+            internal_notes: ov && ov.internal_notes != null ? ov.internal_notes : (sub.internal_notes || null),
+            status: ov && ov.status != null ? ov.status : sub.status,
+          });
+        });
+        if (cancelled) return;
+        setData({ submissions: merged });
+        lsSet(cacheKey, merged);
+      });
+    }).catch(function() {
+      if (!cancelled && !cached) setData({ submissions: [] });
+    });
+
+    return function() { cancelled = true; };
+  }, []);
+
+  useE(function() { setNotesDraft(selected ? (selected.internal_notes || '') : ''); }, [selected]);
+
+  var rows = (data && data.submissions ? data.submissions : []).filter(function(r) { return (r.form_name || '').trim().toLowerCase() !== 'other form'; });
+  var formNames = Array.from(new Set(rows.map(function(r) { return r.form_name; }))).sort();
+  var grouped = formNames.map(function(name) { return { name: name, items: rows.filter(function(r) { return r.form_name === name; }) }; });
+  var activeFormName = activeForm && formNames.indexOf(activeForm) !== -1 ? activeForm : (formNames[0] || null);
+  var activeGroup = grouped.filter(function(g) { return g.name === activeFormName; })[0] || null;
+
+  function fmtTs(ts) { return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+
+  function upsertOverride(sub, patch) {
+    return fetch(SUPABASE_URL + '/rest/v1/data_wix_forms', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(Object.assign({
+        id: sub.id, form_id: sub.form_id, form_name: (sub.form_name || '').trim(),
+        status: sub.status || '', created_at: sub.created_at, fields: sub.fields,
+        internal_notes: sub.internal_notes || null,
+      }, patch))
+    });
+  }
+
+  function saveNotes() {
+    if (!selected) return;
+    setNotesSaving(true);
+    var noteValue = notesDraft.trim() || null;
+    upsertOverride(selected, { internal_notes: noteValue }).then(function(r) {
+      if (r.ok) {
+        setSelected(function(prev) { return prev ? Object.assign({}, prev, { internal_notes: noteValue }) : prev; });
+        setData(function(prev) { return prev ? { submissions: prev.submissions.map(function(s) { return s.id === selected.id ? Object.assign({}, s, { internal_notes: noteValue }) : s; }) } : prev; });
+      }
+    }).finally(function() { setNotesSaving(false); });
+  }
+
+  function toggleHandled(sub) {
+    if (handlingId === sub.id) return;
+    setHandlingId(sub.id);
+    var newStatus = sub.status === 'handled' ? '' : 'handled';
+    upsertOverride(sub, { status: newStatus }).then(function(r) {
+      if (r.ok) {
+        setData(function(prev) { return prev ? { submissions: prev.submissions.map(function(s) { return s.id === sub.id ? Object.assign({}, s, { status: newStatus }) : s; }) } : prev; });
+        setSelected(function(prev) { return prev && prev.id === sub.id ? Object.assign({}, prev, { status: newStatus }) : prev; });
+      }
+    }).finally(function() { setHandlingId(null); });
+  }
+
+  var notesInputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', outline: 'none', background: '#fff', resize: 'none' };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Form Submissions</div>
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Live from Wix · check off once handled, add internal notes</div>
+        </div>
+      </div>
+
+      {data === null ? (
+        <div style={{ textAlign: 'center', padding: 48, color: '#aaa', fontSize: 13 }}>Loading…</div>
+      ) : rows.length === 0 ? (
+        <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>No form submissions found.</div>
+      ) : (
+        <React.Fragment>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10, marginBottom: 16 }}>
+            {grouped.map(function(g) {
+              var isActive = g.name === activeFormName;
+              var latest = g.items[0];
+              return (
+                <button key={g.name} onClick={function() { setActiveForm(g.name); setSelected(null); }}
+                  style={{ textAlign: 'left', background: isActive ? '#fdf8ee' : '#fff', border: isActive ? '0.5px solid #dcc9a0' : '0.5px solid #e0d8cc', borderRadius: 10, padding: 14, cursor: 'pointer' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: isActive ? gold : '#aaa', marginBottom: 6 }}>Wix Form</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', lineHeight: 1.3 }}>{g.name}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 8 }}>{g.items.length}</div>
+                  <div style={{ fontSize: 11, color: '#aaa' }}>submission{g.items.length !== 1 ? 's' : ''}</div>
+                  <div style={{ fontSize: 10, color: '#ccc', marginTop: 6 }}>{latest ? 'Latest: ' + fmtTs(latest.created_at) : 'No submissions yet'}</div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {activeGroup && (
+                <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ padding: '12px 16px', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gold, marginBottom: 2 }}>Selected Form</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{activeGroup.name}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      {activeGroup.items.filter(function(s) { return s.status === 'handled'; }).length > 0 && (
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#2e7d32' }}>{activeGroup.items.filter(function(s) { return s.status === 'handled'; }).length} handled</div>
+                      )}
+                      <div style={{ fontSize: 11, color: '#aaa' }}>{activeGroup.items.length} submission{activeGroup.items.length !== 1 ? 's' : ''}</div>
+                    </div>
+                  </div>
+                  <div>
+                    {activeGroup.items.map(function(sub, i) {
+                      var fields = sub.fields || {};
+                      var first = fields['First Name'] || '';
+                      var last = fields['Last Name'] || '';
+                      var email = fields['Email'] || fields['Email Address'] || '';
+                      var preview = [first, last].filter(Boolean).join(' ') || email || (Object.values(fields).filter(Boolean)[0]) || '';
+                      var isHandled = sub.status === 'handled';
+                      return (
+                        <div key={sub.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: i < activeGroup.items.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
+                          <input type="checkbox" title="Mark as handled" checked={isHandled} disabled={handlingId === sub.id}
+                            onChange={function() { toggleHandled(sub); }}
+                            style={{ marginTop: 3, width: 15, height: 15, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0, opacity: handlingId === sub.id ? 0.5 : 1 }} />
+                          <button onClick={function() { setSelected(function(prev) { return prev && prev.id === sub.id ? null : sub; }); }}
+                            style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                              <div style={{ minWidth: 0 }}>
+                                {sub.internal_notes && <div style={{ fontSize: 11, color: '#8a6d3b', background: '#fdf3d9', borderRadius: 6, padding: '3px 8px', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.internal_notes}</div>}
+                                {preview && <div style={{ fontSize: 13, color: isHandled ? '#aaa' : '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preview}</div>}
+                                {email && email !== preview && <div style={{ fontSize: 11, color: '#aaa', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</div>}
+                              </div>
+                              <div style={{ fontSize: 11, color: '#bbb', flexShrink: 0, whiteSpace: 'nowrap' }}>{fmtTs(sub.created_at)}</div>
+                            </div>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: '#ccc' }}>{rows.length} submission{rows.length !== 1 ? 's' : ''} across {formNames.length} form{formNames.length !== 1 ? 's' : ''}</div>
+            </div>
+
+            {selected && (
+              <div style={{ width: 340, flexShrink: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 20, position: 'sticky', top: 16, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                  <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 16 }}>✕</button>
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gold, marginBottom: 3 }}>{selected.form_name}</div>
+                  <div style={{ fontSize: 11, color: '#aaa' }}>{fmtTs(selected.created_at)}</div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Internal Notes</label>
+                  <textarea rows={4} value={notesDraft} onChange={function(e) { setNotesDraft(e.target.value); }} disabled={notesSaving}
+                    placeholder="Add internal notes for this submission" style={notesInputStyle} />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <button onClick={saveNotes} disabled={notesSaving} style={{ padding: '7px 16px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: notesSaving ? 'not-allowed' : 'pointer', opacity: notesSaving ? 0.6 : 1 }}>
+                      {notesSaving ? 'Saving…' : 'Save Notes'}
+                    </button>
+                  </div>
+                </div>
+                {Object.keys(selected.fields || {}).length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {Object.entries(selected.fields).map(function(entry) {
+                      return (
+                        <div key={entry[0]}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>{entry[0]}</div>
+                          <div style={{ fontSize: 13, color: '#2a2a2a', whiteSpace: 'pre-wrap' }}>{entry[1]}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: '#ccc', fontStyle: 'italic' }}>No field data captured.</div>
+                )}
+              </div>
+            )}
+          </div>
+        </React.Fragment>
+      )}
     </div>
   );
 }
@@ -6807,6 +9504,254 @@ function BirthdaysView({ navigate }) {
   );
 }
 
+function VenueRentalsView() {
+  const { useState: useS, useEffect: useE, useRef: useR } = React;
+  const [weddings, setWeddings] = useS([]);
+  const [tracking, setTracking] = useS({});
+  const [loading, setLoading] = useS(true);
+  const [calError, setCalError] = useS(null);
+  const [savingUid, setSavingUid] = useS(null);
+  const [editingField, setEditingField] = useS(null); // { uid, field: 'ig'|'album', val }
+  const debounceTimers = useR({});
+
+  useE(function() {
+    // Fetch calendar + tracking in parallel
+    var proxy = 'https://corsproxy.io/?' + encodeURIComponent(CALENDAR_ICAL_URL);
+    var calPromise = fetch(proxy).then(function(r) { return r.text(); }).then(function(text) {
+      text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n[ \t]/g, '');
+      var events = [], current = null;
+      text.split('\n').forEach(function(line) {
+        if (line === 'BEGIN:VEVENT') { current = {}; }
+        else if (line === 'END:VEVENT') { if (current) events.push(current); current = null; }
+        else if (current) {
+          var ci = line.indexOf(':');
+          if (ci !== -1) { var k = line.slice(0, ci).split(';')[0]; current[k] = line.slice(ci + 1); }
+        }
+      });
+      return events;
+    });
+    var trackPromise = fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking?select=*&order=event_date.asc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); });
+
+    Promise.all([calPromise, trackPromise]).then(function(results) {
+      var events = results[0];
+      var trackRows = Array.isArray(results[1]) ? results[1] : [];
+      // Filter weddings — any event with "wedding" in summary
+      var weds = events.filter(function(e) {
+        return e.SUMMARY && e.SUMMARY.toLowerCase().indexOf('wedding') !== -1;
+      }).map(function(e) {
+        var dt = parseIcalDate(e['DTSTART'] || e['DTSTART;VALUE=DATE'] || '');
+        return { uid: e.UID || (e.SUMMARY + '_' + e.DTSTART), title: e.SUMMARY || 'Untitled', date: dt };
+      }).filter(function(w) { return w.date && w.date.getFullYear() >= 2026; })
+        .sort(function(a, b) { return a.date - b.date; });
+      setWeddings(weds);
+      var map = {};
+      trackRows.forEach(function(r) { map[r.event_uid] = r; });
+      setTracking(map);
+      setLoading(false);
+    }).catch(function(err) { setCalError(err.message); setLoading(false); });
+  }, []);
+
+  function getTrack(uid) {
+    return tracking[uid] || { pictures_done: false, blog_done: false, socials_done: false, photographer_link: '', photo_album_link: '' };
+  }
+
+  function saveTrack(uid, title, date, patch) {
+    var existing = tracking[uid];
+    var merged = Object.assign({}, getTrack(uid), patch);
+    setTracking(function(prev) { return Object.assign({}, prev, { [uid]: Object.assign({}, prev[uid] || {}, patch) }); });
+    setSavingUid(uid);
+    var dateStr = date ? date.toISOString().slice(0, 10) : null;
+    if (existing && existing.id) {
+      fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking?id=eq.' + existing.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify(patch)
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        if (Array.isArray(rows) && rows[0]) setTracking(function(prev) { return Object.assign({}, prev, { [uid]: rows[0] }); });
+        setSavingUid(null);
+      }).catch(function() { setSavingUid(null); });
+    } else {
+      fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ event_uid: uid, event_title: title, event_date: dateStr, pictures_done: merged.pictures_done, blog_done: merged.blog_done, socials_done: merged.socials_done, photographer_link: merged.photographer_link || null, photo_album_link: merged.photo_album_link || null })
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        if (Array.isArray(rows) && rows[0]) setTracking(function(prev) { return Object.assign({}, prev, { [uid]: rows[0] }); });
+        setSavingUid(null);
+      }).catch(function() { setSavingUid(null); });
+    }
+  }
+
+  function handlePhotogChange(uid, title, date, val) {
+    setTracking(function(prev) { return Object.assign({}, prev, { [uid]: Object.assign({}, prev[uid] || {}, { photographer_link: val }) }); });
+    clearTimeout(debounceTimers.current[uid + '_ig']);
+    debounceTimers.current[uid + '_ig'] = setTimeout(function() { saveTrack(uid, title, date, { photographer_link: val || null }); }, 700);
+  }
+
+  function handleAlbumChange(uid, title, date, val) {
+    setTracking(function(prev) { return Object.assign({}, prev, { [uid]: Object.assign({}, prev[uid] || {}, { photo_album_link: val }) }); });
+    clearTimeout(debounceTimers.current[uid + '_album']);
+    debounceTimers.current[uid + '_album'] = setTimeout(function() { saveTrack(uid, title, date, { photo_album_link: val || null }); }, 700);
+  }
+
+  function Checkbox({ checked, onChange, label, color }) {
+    return (
+      <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', userSelect: 'none' }}>
+        <div onClick={onChange} style={{ width: 18, height: 18, borderRadius: 4, border: '1.5px solid ' + (checked ? color : '#d0c8bc'), background: checked ? color : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s', cursor: 'pointer' }}>
+          {checked && <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="2 6 5 9 10 3"/></svg>}
+        </div>
+        <span style={{ fontSize: 12, color: checked ? color : '#999', fontWeight: checked ? 600 : 400 }}>{label}</span>
+      </label>
+    );
+  }
+
+  function dismissWedding(w) {
+    var existing = tracking[w.uid];
+    var dateStr = w.date ? w.date.toISOString().slice(0, 10) : null;
+    setTracking(function(prev) { return Object.assign({}, prev, { [w.uid]: Object.assign({}, prev[w.uid] || {}, { hidden: true }) }); });
+    if (existing && existing.id) {
+      fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking?id=eq.' + existing.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hidden: true })
+      });
+    } else {
+      fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_uid: w.uid, event_title: w.title, event_date: dateStr, hidden: true })
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        if (Array.isArray(rows) && rows[0]) setTracking(function(prev) { return Object.assign({}, prev, { [w.uid]: rows[0] }); });
+      });
+    }
+  }
+
+  var now = new Date();
+  var visible = weddings.filter(function(w) { return !getTrack(w.uid).hidden; });
+  var past = visible.filter(function(w) { return w.date < now; });
+  var upcoming = visible.filter(function(w) { return w.date >= now; });
+
+  function WeddingCard(w) {
+    var t = getTrack(w.uid);
+    var allDone = t.pictures_done && t.blog_done && t.socials_done;
+    var noneChecked = !t.pictures_done && !t.blog_done && !t.socials_done;
+    var oneMonthAgo = new Date(now); oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    var overdue = noneChecked && w.date < oneMonthAgo;
+    var isSaving = savingUid === w.uid;
+    var dateStr = w.date.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+    var anyChecked = t.pictures_done || t.blog_done || t.socials_done;
+    var borderColor = allDone ? '#c8e6c9' : anyChecked ? '#ffb74d' : overdue ? '#e57373' : '#e8e0d5';
+    var bgColor = '#fff';
+    return (
+      <div key={w.uid} style={{ background: bgColor, border: '0.5px solid ' + borderColor, borderRadius: 10, padding: '14px 18px', transition: 'border-color 0.2s' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{w.title}</div>
+              {allDone && <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', padding: '1px 8px', borderRadius: 20 }}>Complete</span>}
+              {isSaving && <span style={{ fontSize: 10, color: '#bbb' }}>saving…</span>}
+              <button onClick={function() { if (window.confirm('Remove "' + w.title + '" from this list?')) dismissWedding(w); }} title="Remove duplicate" style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 16, lineHeight: 1, padding: '0 2px' }}>×</button>
+            </div>
+            <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>{dateStr}</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+              {(editingField && editingField.uid === w.uid && editingField.field === 'ig') ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#fce4f3', border: '0.5px solid #e8b4d8', borderRadius: 20, padding: '3px 12px' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c13584" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#c13584" stroke="none"/></svg>
+                  <input autoFocus value={editingField.val}
+                    onChange={function(e) { setEditingField(function(ef) { return Object.assign({}, ef, { val: e.target.value }); }); }}
+                    onKeyDown={function(e) { if (e.key === 'Enter') { handlePhotogChange(w.uid, w.title, w.date, editingField.val); setEditingField(null); } if (e.key === 'Escape') setEditingField(null); }}
+                    onBlur={function() { handlePhotogChange(w.uid, w.title, w.date, editingField.val); setEditingField(null); }}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, fontWeight: 600, color: '#c13584', width: 160 }} />
+                </div>
+              ) : t.photographer_link ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <a href={'https://instagram.com/' + t.photographer_link.replace(/^@/, '')} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#fce4f3', border: '0.5px solid #e8b4d8', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: '#c13584', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+                    {t.photographer_link.startsWith('@') ? t.photographer_link : '@' + t.photographer_link}
+                  </a>
+                  <button onClick={function() { setEditingField({ uid: w.uid, field: 'ig', val: t.photographer_link || '' }); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: 13, padding: '0 2px', lineHeight: 1 }}>✎</button>
+                </div>
+              ) : (
+                <button onClick={function() { setEditingField({ uid: w.uid, field: 'ig', val: '' }); }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: '0.5px dashed #d0c8bc', borderRadius: 20, padding: '4px 12px', fontSize: 12, color: '#bbb', cursor: 'pointer' }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+                  @photographer
+                </button>
+              )}
+              {(editingField && editingField.uid === w.uid && editingField.field === 'album') ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#f5f0e8', border: '0.5px solid #d4c4a0', borderRadius: 20, padding: '3px 12px' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <input autoFocus value={editingField.val}
+                    onChange={function(e) { setEditingField(function(ef) { return Object.assign({}, ef, { val: e.target.value }); }); }}
+                    onKeyDown={function(e) { if (e.key === 'Enter') { handleAlbumChange(w.uid, w.title, w.date, editingField.val); setEditingField(null); } if (e.key === 'Escape') setEditingField(null); }}
+                    onBlur={function() { handleAlbumChange(w.uid, w.title, w.date, editingField.val); setEditingField(null); }}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, fontWeight: 600, color: gold, width: 140 }} />
+                </div>
+              ) : t.photo_album_link ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <a href={t.photo_album_link.startsWith('http') ? t.photo_album_link : 'https://' + t.photo_album_link} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#f5f0e8', border: '0.5px solid #d4c4a0', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: gold, textDecoration: 'none' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    Photo Album
+                  </a>
+                  <button onClick={function() { setEditingField({ uid: w.uid, field: 'album', val: t.photo_album_link || '' }); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: 13, padding: '0 2px', lineHeight: 1 }}>✎</button>
+                </div>
+              ) : (
+                <button onClick={function() { setEditingField({ uid: w.uid, field: 'album', val: '' }); }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: '0.5px dashed #d0c8bc', borderRadius: 20, padding: '4px 12px', fontSize: 12, color: '#bbb', cursor: 'pointer' }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  Photo Album
+                </button>
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 2 }}>
+            <Checkbox checked={!!t.pictures_done} label="Pictures" color="#7c3aed"
+              onChange={function() { saveTrack(w.uid, w.title, w.date, { pictures_done: !t.pictures_done }); }} />
+            <Checkbox checked={!!t.blog_done} label="Blog" color={gold}
+              onChange={function() { saveTrack(w.uid, w.title, w.date, { blog_done: !t.blog_done }); }} />
+            <Checkbox checked={!!t.socials_done} label="Socials" color="#e91e8c"
+              onChange={function() { saveTrack(w.uid, w.title, w.date, { socials_done: !t.socials_done }); }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 6 }}>Venue Rentals</div>
+      <div style={{ fontSize: 13, color: '#aaa', marginBottom: 24 }}>Wedding tracking and post-event checklist</div>
+
+      {loading && <div style={{ color: '#aaa', fontSize: 13, padding: 40, textAlign: 'center' }}>Loading calendar…</div>}
+      {calError && <div style={{ color: '#c62828', fontSize: 12, background: '#ffebee', borderRadius: 8, padding: 16 }}>Could not load calendar: {calError}</div>}
+
+      {!loading && !calError && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {upcoming.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', marginBottom: 10 }}>Upcoming Weddings ({upcoming.length})</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{upcoming.map(WeddingCard)}</div>
+            </div>
+          )}
+          {past.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', marginBottom: 10 }}>Past Weddings ({past.length})</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{past.sort(function(a,b){return b.date-a.date;}).map(WeddingCard)}</div>
+            </div>
+          )}
+          {weddings.length === 0 && (
+            <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>No weddings found in the calendar.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
   birthdays: BirthdaysView,
@@ -6818,11 +9763,15 @@ const views = {
   board: BoardView,
   sponsors: SponsorsView,
   strategy: StrategyView,
+  venue: VenueRentalsView,
   ideas: IdeasView,
   operational: OperationalView,
   financials: FinancialsView,
   reviews: ReviewsView,
+  'quarter-workspace': QuarterWorkspaceView,
   admin: AdminView,
+  'vol-email-lists': VolEmailListsView,
+  'wix-forms': WixFormsView,
 };
 
 var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];
@@ -6976,7 +9925,7 @@ function Dashboard() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {/* Mobile menu overlay */}
         {isMobile && mobileMenuOpen && (
-          <div onClick={function() { setMobileMenuOpen(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200 }}>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200 }}>
             <div onClick={function(e) { e.stopPropagation(); }} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 260, background: '#2a2a2e', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '20px 16px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
                 <img src="assets/logo.png" alt="NSH" style={{ height: 32 }} />
