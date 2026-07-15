@@ -5521,6 +5521,10 @@ function FinancialsView() {
   var [items, setItems] = useState([]);
   var [loading, setLoading] = useState(true);
   var [markingId, setMarkingId] = useState(null);
+  var [noteBoxId, setNoteBoxId] = useState(null);
+  var [noteBoxAction, setNoteBoxAction] = useState(null);
+  var [noteDraft, setNoteDraft] = useState('');
+  var [reviewerName, setReviewerName] = useState(function() { try { return localStorage.getItem('nsh-reviewer-name') || ''; } catch (e) { return ''; } });
 
   // Earnings (Creative Rentals)
   var RENTAL_NAMES = ['Yoga with Teena Bates', 'Mahjong Group', 'Donation Box', 'Book Sales', 'Other'];
@@ -5603,6 +5607,50 @@ function FinancialsView() {
     });
   }
 
+  // Volunteer-submitted reimbursement workflow (rows with volunteer_auth_user_id set)
+  var REIM_STATUSES = ['Submitted', 'Pending Review', 'More Information Needed', 'Approved', 'Paid', 'Denied'];
+  var REIM_STATUS_COLORS = {
+    'Submitted': '#1d4ed8', 'Pending Review': '#92600c', 'More Information Needed': '#c2410c',
+    'Approved': '#15803d', 'Paid': '#15803d', 'Denied': '#c0392b'
+  };
+
+  function updateReimbursementStatus(id, status, reviewerNotes) {
+    setMarkingId(id);
+    try { localStorage.setItem('nsh-reviewer-name', reviewerName || ''); } catch (e) {}
+    var payload = { status: status, reviewed_at: new Date().toISOString(), reviewed_by: reviewerName || null };
+    if (reviewerNotes !== undefined) payload.reviewer_notes = reviewerNotes || null;
+    if (status === 'Paid' || status === 'Denied') payload.needs_reimbursement = false;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      clearCache('Op Budget');
+      setMarkingId(null);
+      setNoteBoxId(null);
+      setNoteBoxAction(null);
+      setNoteDraft('');
+      var updated = rows && rows[0];
+      if (payload.needs_reimbursement === false) {
+        setItems(function(prev) { return prev.filter(function(b) { return b.id !== id; }); });
+      } else if (updated) {
+        setItems(function(prev) { return prev.map(function(b) { return b.id === id ? updated : b; }); });
+      }
+    });
+  }
+
+  function openNoteBox(id, action) {
+    setNoteBoxId(id);
+    setNoteBoxAction(action);
+    setNoteDraft('');
+  }
+
+  function reimReceipts(receiptUrl) {
+    if (!receiptUrl) return [];
+    try { var p = JSON.parse(receiptUrl); if (Array.isArray(p)) return p; } catch (e) {}
+    return [receiptUrl];
+  }
+
   function submitRental(e) {
     e.preventDefault();
     var finalName = rentalForm.name === 'Other' ? rentalForm.custom_name : rentalForm.name;
@@ -5683,27 +5731,96 @@ function FinancialsView() {
                   var isMarking = markingId === b.id;
                   var volMatch = b.volunteer_name && volList.find(function(v) { return ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim() === b.volunteer_name; });
                   var volAddress = volMatch && volMatch['Address'];
-                  return (
-                    <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
-                        {b.volunteer_name && (
-                          <div style={{ fontSize: 11, color: '#2e7d32', fontWeight: 500, marginTop: 2 }}>
-                            {b.volunteer_name}{volAddress ? <span style={{ color: '#888', fontWeight: 400 }}> · {volAddress}</span> : null}
-                          </div>
+
+                  // Legacy Portal-logged reimbursement (no Volunteer Hub identity) — unchanged behavior.
+                  if (!b.volunteer_auth_user_id) {
+                    return (
+                      <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
+                          {b.volunteer_name && (
+                            <div style={{ fontSize: 11, color: '#2e7d32', fontWeight: 500, marginTop: 2 }}>
+                              {b.volunteer_name}{volAddress ? <span style={{ color: '#888', fontWeight: 400 }}> · {volAddress}</span> : null}
+                            </div>
+                          )}
+                          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
+                        {b.receipt_url && (
+                          <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                          </a>
                         )}
-                        <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: isMarking ? 'default' : 'pointer', flexShrink: 0 }}>
+                          <input type="checkbox" checked={false} disabled={isMarking} onChange={function() { markReimbursed(b.id); }} style={{ accentColor: '#059669', width: 14, height: 14 }} />
+                          <span style={{ fontSize: 11, color: '#059669', fontWeight: 500 }}>{isMarking ? '…' : 'Reimbursed'}</span>
+                        </label>
                       </div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
-                      {b.receipt_url && (
-                        <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                        </a>
+                    );
+                  }
+
+                  // Volunteer Hub submission — full status workflow.
+                  var receipts = reimReceipts(b.receipt_url);
+                  var statusColor = REIM_STATUS_COLORS[b.status] || '#666';
+                  var noteOpen = noteBoxId === b.id;
+                  return (
+                    <div key={b.id} style={{ padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
+                          <div style={{ fontSize: 11, color: '#2e7d32', fontWeight: 500, marginTop: 2 }}>
+                            {b.volunteer_name || 'Volunteer'}{volAddress ? <span style={{ color: '#888', fontWeight: 400 }}> · {volAddress}</span> : null}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>
+                            {b.date || ''}{b.event_name ? ' · ' + b.event_name : ''}
+                          </div>
+                          {b.notes && <div style={{ fontSize: 11, color: '#888', marginTop: 4, fontStyle: 'italic' }}>"{b.notes}"</div>}
+                          {b.reviewer_notes && (b.status === 'More Information Needed' || b.status === 'Denied') && (
+                            <div style={{ fontSize: 11, color: statusColor, marginTop: 4 }}><strong>Note sent:</strong> {b.reviewer_notes}</div>
+                          )}
+                          {receipts.length > 0 && (
+                            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                              {receipts.map(function(url, i) {
+                                return <a key={i} href={url} target="_blank" style={{ fontSize: 11, color: gold }}>Receipt{receipts.length > 1 ? ' ' + (i + 1) : ''}</a>;
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{fmt(parseFloat(b.amount) || 0)}</div>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: statusColor, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>{b.status || 'Submitted'}</div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                        {b.status === 'Submitted' && (
+                          <button disabled={isMarking} onClick={function() { updateReimbursementStatus(b.id, 'Pending Review'); }} style={{ fontSize: 11, background: '#f5f0ea', color: '#666', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>Start Review</button>
+                        )}
+                        {(b.status === 'Submitted' || b.status === 'Pending Review') && (
+                          <>
+                            <button disabled={isMarking} onClick={function() { updateReimbursementStatus(b.id, 'Approved', ''); }} style={{ fontSize: 11, background: '#e3f6ec', color: '#15803d', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>Approve</button>
+                            <button disabled={isMarking} onClick={function() { openNoteBox(b.id, 'more_info'); }} style={{ fontSize: 11, background: '#fde8e0', color: '#c2410c', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>Request Info</button>
+                            <button disabled={isMarking} onClick={function() { openNoteBox(b.id, 'deny'); }} style={{ fontSize: 11, background: '#fbe4e4', color: '#c0392b', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>Deny</button>
+                          </>
+                        )}
+                        {b.status === 'Approved' && (
+                          <button disabled={isMarking} onClick={function() { updateReimbursementStatus(b.id, 'Paid', ''); }} style={{ fontSize: 11, background: '#e3f6ec', color: '#15803d', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{isMarking ? 'Saving…' : 'Mark Paid'}</button>
+                        )}
+                        {b.status === 'More Information Needed' && (
+                          <div style={{ fontSize: 11, color: '#c2410c' }}>Waiting on volunteer to resubmit.</div>
+                        )}
+                      </div>
+
+                      {noteOpen && (
+                        <div style={{ marginTop: 8, background: '#fdfcfb', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: 10 }}>
+                          <input placeholder="Your name (shown as reviewer)" value={reviewerName} onChange={function(e) { setReviewerName(e.target.value); }} style={{ width: '100%', padding: '6px 9px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 6, boxSizing: 'border-box' }} />
+                          <textarea placeholder={noteBoxAction === 'deny' ? 'Reason for denial (sent to volunteer)' : 'What additional info is needed?'} value={noteDraft} onChange={function(e) { setNoteDraft(e.target.value); }} rows={2} style={{ width: '100%', padding: '6px 9px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', resize: 'vertical' }} />
+                          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                            <button onClick={function() { setNoteBoxId(null); setNoteBoxAction(null); }} style={{ fontSize: 11, background: '#f5f0ea', color: '#666', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}>Cancel</button>
+                            <button disabled={!noteDraft.trim()} onClick={function() { updateReimbursementStatus(b.id, noteBoxAction === 'deny' ? 'Denied' : 'More Information Needed', noteDraft.trim()); }} style={{ fontSize: 11, background: noteBoxAction === 'deny' ? '#c0392b' : '#c2410c', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', opacity: !noteDraft.trim() ? 0.6 : 1 }}>{noteBoxAction === 'deny' ? 'Confirm Deny' : 'Send Request'}</button>
+                          </div>
+                        </div>
                       )}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: isMarking ? 'default' : 'pointer', flexShrink: 0 }}>
-                        <input type="checkbox" checked={false} disabled={isMarking} onChange={function() { markReimbursed(b.id); }} style={{ accentColor: '#059669', width: 14, height: 14 }} />
-                        <span style={{ fontSize: 11, color: '#059669', fontWeight: 500 }}>{isMarking ? '…' : 'Reimbursed'}</span>
-                      </label>
                     </div>
                   );
                 })}
