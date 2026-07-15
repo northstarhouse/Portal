@@ -202,6 +202,14 @@ function clearCache(table) {
 }
 window.__nshClearCache = clearCache;
 
+function logActivity(description, action) {
+  fetch(SUPABASE_URL + '/rest/v1/activity_log', {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description: description, action: action })
+  }).catch(function() {});
+}
+
 const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthstarhouse%40gmail.com/private-06287b2ca0d9ee6acd4f49f9d4d0d2da/basic.ics";
 
 // Kick off critical fetches immediately so data is ready when views mount
@@ -2820,6 +2828,7 @@ function DonorsView() {
       .then(function(r){return r.json();}).then(function(rows){
         setAddingGift(false);
         var newDon=Array.isArray(rows)?rows[0]:rows;
+        logActivity('New donation of $'+(parseFloat(newDon.amount)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' from '+(selected.formal_name||'a donor'),'donation_added');
         updateDonorInState(selected.id,function(d){return{donations:d.donations.concat([newDon])};});
         setAddGiftForm(emptyGiftForm);
       }).catch(function(){setAddingGift(false);});
@@ -2834,6 +2843,7 @@ function DonorsView() {
       .then(function(r){return r.json();}).then(function(rows){
         setSaving(false);
         var newDon=Array.isArray(rows)?rows[0]:rows;
+        logActivity('New donation of $'+(parseFloat(newDon.amount)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' from '+(addExistingDonor.formal_name||'a donor'),'donation_added');
         updateDonorInState(addExistingDonor.id,function(d){return{donations:d.donations.concat([newDon])};});
         setShowAdd(false);setAddGiftForm(emptyGiftForm);setAddExistingDonor(null);setAddMode('search');setAddSearchQuery('');
       }).catch(function(){setSaving(false);});
@@ -2858,6 +2868,7 @@ function DonorsView() {
       }).then(function(result){
         setSaving(false);
         var d=result.donor,don=result.donation;
+        logActivity('New donation of $'+(parseFloat(don.amount)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' from '+(d.formal_name||'a donor'),'donation_added');
         var newDonorObj=buildDonor(d,[don]);
         setDonors(function(prev){
           var exists=prev.some(function(x){return x.id===d.id;});
@@ -4676,6 +4687,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
       clearCache('Op Quarter Goals');
       clearCache('Op Quarterly Updates');
       setSaving(false);
+      logActivity(area + ' submitted their ' + quarter + ' ' + year + ' quarterly review', 'quarterly_review_submitted');
       if (navigateOp && area) { navigateOp(area); } else { setSaved(true); setTimeout(function() { setSaved(false); }, 4000); }
     });
   }
@@ -9270,6 +9282,7 @@ function WixFormsView({ navigate }) {
     var newStatus = sub.status === 'handled' ? '' : 'handled';
     upsertOverride(sub, { status: newStatus }).then(function(r) {
       if (r.ok) {
+        if (newStatus === 'handled') logActivity((sub.form_name || 'A form') + ' submission was marked handled', 'form_handled');
         setData(function(prev) { return prev ? { submissions: prev.submissions.map(function(s) { return s.id === sub.id ? Object.assign({}, s, { status: newStatus }) : s; }) } : prev; });
         setSelected(function(prev) { return prev && prev.id === sub.id ? Object.assign({}, prev, { status: newStatus }) : prev; });
       }
