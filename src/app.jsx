@@ -445,6 +445,7 @@ const typeColors = {
   const [iheForm, setIheForm] = useState({ name: '', date: '', cost: '', link: '' });
   const [iheAdding, setIheAdding] = useState(false);
   const [iheSaving, setIheSaving] = useState(false);
+  const [activity, setActivity] = useState(null);
   var isMobile = React.useContext(MobileCtx);
   useEffect(function() {
     cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']).then(function(rows) {
@@ -496,6 +497,11 @@ const typeColors = {
         else setOotNotices([]);
       }).catch(function() { setOotNotices([]); });
     })();
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?select=*&order=created_at.desc&limit=15', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setActivity(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setActivity([]); });
     fetchCalendarEvents().then(function(events) {
       var now = new Date();
       var windowEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
@@ -605,6 +611,28 @@ const typeColors = {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+            Recent Activity
+          </div>
+          {activity === null && <div style={{ fontSize: 12, color: '#aaa' }}>Loading…</div>}
+          {activity !== null && activity.length === 0 && <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No recent activity from the Volunteer Hub.</div>}
+          {activity !== null && activity.map(function(a, i) {
+            var ts = a.created_at ? new Date(a.created_at) : null;
+            var mins = ts ? Math.round((Date.now() - ts.getTime()) / 60000) : null;
+            var when = mins === null ? '' : mins < 1 ? 'just now' : mins < 60 ? mins + 'm ago' : mins < 1440 ? Math.round(mins / 60) + 'h ago' : ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return (
+              <div key={a.id || i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i === activity.length - 1 ? 0 : 10 }}>
+                <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: gold, marginTop: 5, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: '#2a2a2a' }}>{a.description}</div>
+                  <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{when}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={function() { navigate('birthdays'); }}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
