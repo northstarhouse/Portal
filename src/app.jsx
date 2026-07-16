@@ -1862,10 +1862,18 @@ function VolunteersView() {
     if (cachedHours) { setHoursData(cachedHours); }
     (function() {
       var year = new Date().getFullYear();
-      fetch(SUPABASE_URL + '/rest/v1/kiosk_logs?type=eq.volunteer&timestamp=gte.' + year + '-01-01T00:00:00.000Z&timestamp=lt.' + (year + 1) + '-01-01T00:00:00.000Z&order=name.asc,timestamp.asc&select=timestamp,name,action', {
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-      }).then(function(r) { return r.json(); }).then(function(logs) {
-        if (!Array.isArray(logs)) return;
+      var pageSize = 1000;
+      function fetchPage(offset, acc) {
+        return fetch(SUPABASE_URL + '/rest/v1/kiosk_logs?type=eq.volunteer&timestamp=gte.' + year + '-01-01T00:00:00.000Z&timestamp=lt.' + (year + 1) + '-01-01T00:00:00.000Z&order=name.asc,timestamp.asc&select=timestamp,name,action&limit=' + pageSize + '&offset=' + offset, {
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+        }).then(function(r) { return r.json(); }).then(function(page) {
+          if (!Array.isArray(page)) return acc;
+          var all = acc.concat(page);
+          if (page.length < pageSize) return all;
+          return fetchPage(offset + pageSize, all);
+        });
+      }
+      fetchPage(0, []).then(function(logs) {
         var parsed = buildHoursMapFromLogs(logs);
         setHoursData(parsed);
         lsSet('hours_summary_sb', parsed);
