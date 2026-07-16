@@ -525,10 +525,16 @@ const typeColors = {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, color: "#5c3d1e", fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.8 }}>Today — {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-          <span style={{ color: '#777', fontSize: 13 }}>—</span>
-          <span style={{ fontSize: 13, color: "#888" }}>Here's your organization at a glance.</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, color: "#5c3d1e", fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.8 }}>Today — {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+            <span style={{ color: '#777', fontSize: 13 }}>—</span>
+            <span style={{ fontSize: 13, color: "#888" }}>Here's your organization at a glance.</span>
+          </div>
+          <a href="https://northstarhouse.github.io/volunteerhub/" target="_blank" rel="noreferrer"
+            style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', flexShrink: 0 }}>
+            Volunteer Hub
+          </a>
         </div>
       </div>
 

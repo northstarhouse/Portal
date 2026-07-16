@@ -1,4 +1,4 @@
-var CACHE = 'nsh-v383';
+var CACHE = 'nsh-v384';
 var STATIC = [
   '/Portal/',
   '/Portal/index.html',
