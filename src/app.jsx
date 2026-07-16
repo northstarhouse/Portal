@@ -6393,7 +6393,7 @@ function SponsorsView() {
   var logoInputRef = useRef(null);
   var [allInKind, setAllInKind] = useState([]);
   var [inkind, setInkind] = useState([]);
-  var [inkindForm, setInkindForm] = useState({ description: '', date: new Date().toISOString().slice(0,10), value: '' });
+  var [inkindForm, setInkindForm] = useState({ description: '', date: new Date().toISOString().slice(0,10), value: '', contribution_type: '' });
   var [inkindSaving, setInkindSaving] = useState(false);
   var [editingInKindId, setEditingInKindId] = useState(null);
   var [editInKindForm, setEditInKindForm] = useState({});
@@ -6460,7 +6460,7 @@ function SponsorsView() {
     e.preventDefault();
     if (!inkindForm.description || !inkindForm.date || !inkindForm.value) return;
     setInkindSaving(true);
-    var payload = { sponsor_id: selected.id, description: inkindForm.description, date: inkindForm.date, value: parseFloat(inkindForm.value) };
+    var payload = { sponsor_id: selected.id, description: inkindForm.description, date: inkindForm.date, value: parseFloat(inkindForm.value), contribution_type: inkindForm.contribution_type || null };
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -6471,7 +6471,7 @@ function SponsorsView() {
       setInkind(function(prev) { return [rows[0]].concat(prev); });
       setAllInKind(function(prev) { return prev.concat([rows[0]]); });
       clearCache('Sponsor In-Kind');
-      setInkindForm({ description: '', date: new Date().toISOString().slice(0,10), value: '' });
+      setInkindForm({ description: '', date: new Date().toISOString().slice(0,10), value: '', contribution_type: '' });
     }).catch(function(err) { alert('Error saving in-kind: ' + err.message); setInkindSaving(false); });
   }
 
@@ -6821,6 +6821,14 @@ function SponsorsView() {
                     <input type="number" min="0" step="1" value={inkindForm.value} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{value:e.target.value});});}} style={inpStyle} placeholder="e.g. 1500" required />
                   </div>
                 </div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Type</div>
+                  <select value={inkindForm.contribution_type} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{contribution_type:e.target.value});});}} style={inpStyle}>
+                    <option value="">Untagged</option>
+                    <option value="Monetary Value">Monetary Value</option>
+                    <option value="In-Kind (Work)">In-Kind (Work)</option>
+                  </select>
+                </div>
                 <button type="submit" disabled={inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: (inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value) ? 0.6 : 1, width: '100%' }}>{inkindSaving ? 'Saving…' : 'Add In-Kind Entry'}</button>
               </form>
               {inkind.length === 0
@@ -6836,8 +6844,15 @@ function SponsorsView() {
                             <input type="date" value={editInKindForm.date} onChange={function(ev){setEditInKindForm(function(f){return Object.assign({},f,{date:ev.target.value});});}} style={inpStyle} />
                             <input type="number" min="0" step="1" value={editInKindForm.value} onChange={function(ev){setEditInKindForm(function(f){return Object.assign({},f,{value:ev.target.value});});}} style={inpStyle} />
                           </div>
+                          <div style={{ marginBottom: 8 }}>
+                            <select value={editInKindForm.contribution_type || ''} onChange={function(ev){setEditInKindForm(function(f){return Object.assign({},f,{contribution_type:ev.target.value});});}} style={inpStyle}>
+                              <option value="">Untagged</option>
+                              <option value="Monetary Value">Monetary Value</option>
+                              <option value="In-Kind (Work)">In-Kind (Work)</option>
+                            </select>
+                          </div>
                           <div style={{ display: 'flex', gap: 8 }}>
-                            <button onClick={function() { updateInKind(e.id, { description: editInKindForm.description, date: editInKindForm.date, value: parseFloat(editInKindForm.value) || 0 }); }}
+                            <button onClick={function() { updateInKind(e.id, { description: editInKindForm.description, date: editInKindForm.date, value: parseFloat(editInKindForm.value) || 0, contribution_type: editInKindForm.contribution_type || null }); }}
                               disabled={isSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '7px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving…' : 'Save'}</button>
                             <button onClick={function() { setEditingInKindId(null); }} style={{ padding: '7px 12px', background: '#f5f0ea', border: 'none', borderRadius: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
                           </div>
@@ -6850,10 +6865,11 @@ function SponsorsView() {
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
                             <span style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>${(parseFloat(e.value)||0).toLocaleString()}</span>
                             <span style={{ fontSize: 11, color: '#aaa' }}>{e.date}</span>
+                            {e.contribution_type && <span style={{ fontSize: 10, fontWeight: 600, color: '#886c44', background: '#f5f0ea', padding: '2px 7px', borderRadius: 10 }}>{e.contribution_type}</span>}
                           </div>
                           <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{e.description}</div>
                         </div>
-                        <button onClick={function() { setEditingInKindId(e.id); setEditInKindForm({ description: e.description || '', date: e.date || '', value: e.value != null ? String(e.value) : '' }); }}
+                        <button onClick={function() { setEditingInKindId(e.id); setEditInKindForm({ description: e.description || '', date: e.date || '', value: e.value != null ? String(e.value) : '', contribution_type: e.contribution_type || '' }); }}
                           style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer', flexShrink: 0 }}>Edit</button>
                         <button onClick={function() { deleteInKind(e.id); }} style={{ background: 'none', border: 'none', color: '#ddd', fontSize: 14, cursor: 'pointer', flexShrink: 0, padding: '2px 4px' }}>×</button>
                       </div>
@@ -7515,7 +7531,7 @@ function fetchAllPages(url, headers) {
   return go(0, []);
 }
 
-function FinancialOverviewView() {
+function FinancialOverviewView({ navigate }) {
   var { useState, useEffect, useMemo } = React;
   var thisYear = new Date().getFullYear();
   var [year, setYear] = useState(thisYear);
@@ -7526,9 +7542,7 @@ function FinancialOverviewView() {
   var [earnings, setEarnings] = useState([]);
   var [cashLog, setCashLog] = useState([]);
   var [rentals, setRentals] = useState([]);
-  var [sponsorEdits, setSponsorEdits] = useState({});
-  var [savingSponsorId, setSavingSponsorId] = useState(null);
-  var [editingSponsorId, setEditingSponsorId] = useState(null);
+  var [sponsorInKindEntries, setSponsorInKindEntries] = useState([]);
 
   useEffect(function() {
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
@@ -7539,63 +7553,18 @@ function FinancialOverviewView() {
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?select=area,event,amount,date', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=amount,date,direction', hdrs),
-      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=amount,date', hdrs)
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=amount,date', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?select=*', hdrs)
     ]).then(function(res) {
       setDonations(res[0]); setSponsors(res[1]); setBudget(res[2]);
       setEarnings(res[3]); setCashLog(res[4]); setRentals(res[5]);
+      setSponsorInKindEntries(res[6]);
       setLoading(false);
     }).catch(function() { setLoading(false); });
   }, []);
 
   function inYear(dateStr) { return dateStr && dateStr.slice(0, 4) === String(year); }
   function money(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-  function parseMoneyText(s) {
-    if (!s) return 0;
-    var m = String(s).match(/[\d,]+(\.\d+)?/);
-    if (!m) return 0;
-    var n = parseFloat(m[0].replace(/,/g, ''));
-    return isNaN(n) ? 0 : n;
-  }
-
-  function sponsorField(sp, field) {
-    var edit = sponsorEdits[sp.id];
-    return edit && edit[field] !== undefined ? edit[field] : sp[field];
-  }
-
-  function editSponsor(id, field, value) {
-    setSponsorEdits(function(prev) {
-      var next = {};
-      next[field] = value;
-      return Object.assign({}, prev, { [id]: Object.assign({}, prev[id], next) });
-    });
-  }
-
-  function saveSponsor(sp) {
-    var edit = sponsorEdits[sp.id];
-    if (!edit) return;
-    var payload = {};
-    if (edit['Fair Market Value'] !== undefined) payload['Fair Market Value'] = edit['Fair Market Value'];
-    if (edit['sponsor_type'] !== undefined) payload['sponsor_type'] = edit['sponsor_type'] || null;
-    setSavingSponsorId(sp.id);
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?id=eq.' + sp.id, {
-      method: 'PATCH',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify(payload)
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      setSavingSponsorId(null);
-      var updated = rows && rows[0];
-      if (updated) {
-        setSponsors(function(prev) { return prev.map(function(s) { return s.id === sp.id ? updated : s; }); });
-        setSponsorEdits(function(prev) { var next = Object.assign({}, prev); delete next[sp.id]; return next; });
-        setEditingSponsorId(null);
-      }
-    }).catch(function() { setSavingSponsorId(null); });
-  }
-
-  function cancelEditSponsor(id) {
-    setSponsorEdits(function(prev) { var next = Object.assign({}, prev); delete next[id]; return next; });
-    setEditingSponsorId(null);
-  }
 
   var stats = useMemo(function() {
     var yearDonations = donations.filter(function(d) { return inYear(d.date); });
@@ -7607,9 +7576,16 @@ function FinancialOverviewView() {
     });
 
     var currentSponsors = sponsors.filter(function(s) { return (s['sponsor_status'] || 'current') === 'current'; });
-    var sponsorCash = currentSponsors.reduce(function(s, sp) { return s + (sp['sponsor_type'] === 'Monetary Value' ? parseMoneyText(sp['Fair Market Value']) : 0); }, 0);
-    var sponsorInKind = currentSponsors.reduce(function(s, sp) { return s + (sp['sponsor_type'] === 'In-Kind (Work)' ? parseMoneyText(sp['Fair Market Value']) : 0); }, 0);
-    var sponsorUntagged = currentSponsors.reduce(function(s, sp) { return s + (sp['sponsor_type'] ? 0 : parseMoneyText(sp['Fair Market Value'])); }, 0);
+    var currentSponsorIds = new Set(currentSponsors.map(function(s) { return s.id; }));
+    var currentEntries = sponsorInKindEntries.filter(function(e) { return currentSponsorIds.has(e.sponsor_id); });
+    var sponsorCash = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'Monetary Value' ? (parseFloat(e.value) || 0) : 0); }, 0);
+    var sponsorInKind = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'In-Kind (Work)' ? (parseFloat(e.value) || 0) : 0); }, 0);
+    var sponsorUntagged = currentEntries.reduce(function(s, e) { return s + (e.contribution_type ? 0 : (parseFloat(e.value) || 0)); }, 0);
+    var sponsorEntriesBySponsor = {};
+    currentEntries.forEach(function(e) {
+      if (!sponsorEntriesBySponsor[e.sponsor_id]) sponsorEntriesBySponsor[e.sponsor_id] = [];
+      sponsorEntriesBySponsor[e.sponsor_id].push(e);
+    });
 
     var yearBudget = budget.filter(function(b) { return inYear(b.date); });
     var yearEarnings = earnings.filter(function(e) { return inYear(e.date); });
@@ -7648,12 +7624,12 @@ function FinancialOverviewView() {
 
     return {
       donationTotal: donationTotal, donationsByType: donationsByType,
-      currentSponsors: currentSponsors, sponsorCash: sponsorCash, sponsorInKind: sponsorInKind, sponsorUntagged: sponsorUntagged,
+      currentSponsors: currentSponsors, sponsorCash: sponsorCash, sponsorInKind: sponsorInKind, sponsorUntagged: sponsorUntagged, sponsorEntriesBySponsor: sponsorEntriesBySponsor,
       areaRows: areaRows, totalPurchases: totalPurchases, totalInKind: totalInKind, totalEarnings: totalEarnings,
       pendingReimb: pendingReimb, cashIn: cashIn, cashOut: cashOut, rentalTotal: rentalTotal,
       totalIncome: totalIncome, totalOutflow: totalOutflow, net: totalIncome - totalOutflow
     };
-  }, [donations, sponsors, budget, earnings, cashLog, rentals, year]);
+  }, [donations, sponsors, budget, earnings, cashLog, rentals, sponsorInKindEntries, year]);
 
   var card = { background: '#faf8f5', borderRadius: 10, padding: '14px 16px' };
   var cardLabel = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 };
@@ -7697,8 +7673,11 @@ function FinancialOverviewView() {
           </div>
 
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>In-Kind Sponsorships</div>
-            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Current sponsors only (not year-filtered — sponsorships often span multiple years)</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>In-Kind Sponsorships</div>
+              <button onClick={function() { navigate('sponsors'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>Edit on Sponsors page</button>
+            </div>
+            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Current sponsors only, summed from each sponsor's tagged contributions (not year-filtered — sponsorships often span multiple years)</div>
             <div style={{ display: 'flex', gap: 24, marginBottom: 14 }}>
               <div><div style={cardLabel}>Current Sponsors</div><div style={{ ...cardValue, fontSize: 16 }}>{stats.currentSponsors.length}</div></div>
               <div><div style={cardLabel}>Monetary Value</div><div style={{ ...cardValue, fontSize: 16, color: '#2e7d32' }}>{money(stats.sponsorCash)}</div></div>
@@ -7711,43 +7690,15 @@ function FinancialOverviewView() {
               <div>
                 <div style={{ display: 'flex', gap: 10, padding: '0 0 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, borderBottom: '0.5px solid #f0ece6' }}>
                   <span style={{ flex: 1 }}>Business</span>
-                  <span style={{ width: 130 }}>Type</span>
-                  <span style={{ width: 110, textAlign: 'right' }}>Fair Market Value</span>
-                  <span style={{ width: 60 }}></span>
+                  <span style={{ width: 110, textAlign: 'right' }}>Total Value</span>
                 </div>
                 {stats.currentSponsors.map(function(sp) {
-                  var dirty = !!sponsorEdits[sp.id];
-                  var saving = savingSponsorId === sp.id;
-                  var isEditing = editingSponsorId === sp.id;
+                  var entries = stats.sponsorEntriesBySponsor[sp.id] || [];
+                  var total = entries.reduce(function(s, e) { return s + (parseFloat(e.value) || 0); }, 0);
                   return (
                     <div key={sp.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid #f9f6f2' }}>
                       <span style={{ flex: 1, fontSize: 12, color: '#2a2a2a', fontWeight: 500 }}>{sp['Business Name'] || '—'}</span>
-                      {isEditing ? (
-                        <select value={sponsorField(sp, 'sponsor_type') || ''} onChange={function(e) { editSponsor(sp.id, 'sponsor_type', e.target.value); }}
-                          style={{ width: 130, padding: '5px 6px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 11, background: '#fff' }}>
-                          <option value="">Untagged</option>
-                          <option value="Monetary Value">Monetary Value</option>
-                          <option value="In-Kind (Work)">In-Kind (Work)</option>
-                        </select>
-                      ) : (
-                        <span style={{ width: 130, fontSize: 11, color: sp['sponsor_type'] ? '#555' : '#bbb' }}>{sp['sponsor_type'] || 'Untagged'}</span>
-                      )}
-                      {isEditing ? (
-                        <input value={sponsorField(sp, 'Fair Market Value') || ''} onChange={function(e) { editSponsor(sp.id, 'Fair Market Value', e.target.value); }}
-                          placeholder="e.g. $500" style={{ width: 110, padding: '5px 6px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 11, textAlign: 'right' }} />
-                      ) : (
-                        <span style={{ width: 110, textAlign: 'right', fontSize: 11, color: '#555' }}>{sp['Fair Market Value'] || '—'}</span>
-                      )}
-                      <span style={{ width: isEditing ? 120 : 50, textAlign: 'right', flexShrink: 0 }}>
-                        {isEditing ? (
-                          <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                            {dirty && <button onClick={function() { saveSponsor(sp); }} disabled={saving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 8px', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{saving ? '…' : 'Save'}</button>}
-                            <button onClick={function() { cancelEditSponsor(sp.id); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 8px', fontSize: 10, fontWeight: 600, color: '#888', cursor: 'pointer' }}>Cancel</button>
-                          </span>
-                        ) : (
-                          <button onClick={function() { setEditingSponsorId(sp.id); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 10, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>Edit</button>
-                        )}
-                      </span>
+                      <span style={{ width: 110, textAlign: 'right', fontSize: 12, fontWeight: 600, color: '#555' }}>{entries.length ? money(total) : '—'}</span>
                     </div>
                   );
                 })}
