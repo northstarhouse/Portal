@@ -7492,7 +7492,9 @@ function FinancialOverviewView() {
   function money(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function parseMoneyText(s) {
     if (!s) return 0;
-    var n = parseFloat(String(s).replace(/[^0-9.]/g, ''));
+    var m = String(s).match(/[\d,]+(\.\d+)?/);
+    if (!m) return 0;
+    var n = parseFloat(m[0].replace(/,/g, ''));
     return isNaN(n) ? 0 : n;
   }
 
@@ -7506,21 +7508,22 @@ function FinancialOverviewView() {
     });
 
     var currentSponsors = sponsors.filter(function(s) { return s['sponsor_status'] === 'current'; });
-    var sponsorCash = sponsors.reduce(function(s, sp) { return s + parseMoneyText(sp['Donation']); }, 0);
-    var sponsorInKind = sponsors.reduce(function(s, sp) { return s + parseMoneyText(sp['Fair Market Value']); }, 0);
+    var sponsorCash = currentSponsors.reduce(function(s, sp) { return s + parseMoneyText(sp['Donation']); }, 0);
+    var sponsorInKind = currentSponsors.reduce(function(s, sp) { return s + parseMoneyText(sp['Fair Market Value']); }, 0);
 
     var yearBudget = budget.filter(function(b) { return inYear(b.date); });
     var yearEarnings = earnings.filter(function(e) { return inYear(e.date); });
     var byArea = {};
     function areaBucket(a) {
       var key = a || 'Unassigned';
-      if (!byArea[key]) byArea[key] = { area: key, purchases: 0, inKind: 0, earnings: 0 };
+      if (!byArea[key]) byArea[key] = { area: key, purchases: 0, inKind: 0, earnings: 0, budget: 0 };
       return byArea[key];
     }
     yearBudget.forEach(function(b) {
       var amt = parseFloat(b.amount) || 0;
       if (b.type === 'In-Kind') areaBucket(b.area).inKind += amt;
       else areaBucket(b.area).purchases += amt;
+      areaBucket(b.area).budget += amt;
     });
     yearEarnings.forEach(function(e) { areaBucket(e.area).earnings += parseFloat(e.amount) || 0; });
     var areaRows = Object.keys(byArea).map(function(k) { return byArea[k]; }).sort(function(a, b) { return (b.earnings - b.purchases) - (a.earnings - a.purchases); });
@@ -7531,13 +7534,16 @@ function FinancialOverviewView() {
     var pendingReimb = yearBudget.filter(function(b) { return b.needs_reimbursement; }).reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
 
     var yearCash = cashLog.filter(function(c) { return inYear(c.date); });
-    var cashIn = yearCash.reduce(function(s, c) { return s + (c.direction === 'In' ? (parseFloat(c.amount) || 0) : 0); }, 0);
+    var cashLogIn = yearCash.reduce(function(s, c) { return s + (c.direction === 'In' ? (parseFloat(c.amount) || 0) : 0); }, 0);
     var cashOut = yearCash.reduce(function(s, c) { return s + (c.direction === 'Out' ? (parseFloat(c.amount) || 0) : 0); }, 0);
 
     var yearRentals = rentals.filter(function(r) { return inYear(r.date); });
     var rentalTotal = yearRentals.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
 
-    var totalIncome = donationTotal + totalEarnings + rentalTotal + cashIn + sponsorCash;
+    // "Office Cash Flow" = Creative Rentals (earnings) + Cash Log, matching the Financials page's own grouping.
+    var cashIn = cashLogIn + rentalTotal;
+
+    var totalIncome = donationTotal + totalEarnings + cashIn + sponsorCash;
     var totalOutflow = totalPurchases + cashOut;
 
     return {
@@ -7592,7 +7598,7 @@ function FinancialOverviewView() {
 
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>In-Kind Sponsorships</div>
-            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>All recorded sponsors (not year-filtered — sponsorships often span multiple years)</div>
+            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Current sponsors only (not year-filtered — sponsorships often span multiple years)</div>
             <div style={{ display: 'flex', gap: 24, marginBottom: 4 }}>
               <div><div style={cardLabel}>Current Sponsors</div><div style={{ ...cardValue, fontSize: 16 }}>{stats.currentSponsors.length}</div></div>
               <div><div style={cardLabel}>Cash Donations</div><div style={{ ...cardValue, fontSize: 16, color: '#2e7d32' }}>{money(stats.sponsorCash)}</div></div>
@@ -7604,6 +7610,7 @@ function FinancialOverviewView() {
             <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Operational Areas — {year}</div>
             <div style={{ display: 'flex', gap: 10, padding: '8px 18px 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>
               <span style={{ flex: 1 }}>Area</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Budget</span>
               <span style={{ width: 90, textAlign: 'right' }}>Expenses</span>
               <span style={{ width: 90, textAlign: 'right' }}>In-Kind</span>
               <span style={{ width: 90, textAlign: 'right' }}>Earnings</span>
@@ -7616,6 +7623,7 @@ function FinancialOverviewView() {
               return (
                 <div key={r.area} style={{ display: 'flex', gap: 10, padding: '9px 18px', borderBottom: '0.5px solid #f9f6f2', fontSize: 12 }}>
                   <span style={{ flex: 1, fontWeight: 500, color: '#2a2a2a' }}>{r.area}</span>
+                  <span style={{ width: 90, textAlign: 'right', fontWeight: 600, color: '#2a2a2a' }}>{r.budget ? money(r.budget) : '—'}</span>
                   <span style={{ width: 90, textAlign: 'right', color: '#c07040' }}>{r.purchases ? money(r.purchases) : '—'}</span>
                   <span style={{ width: 90, textAlign: 'right', color: '#886c44' }}>{r.inKind ? money(r.inKind) : '—'}</span>
                   <span style={{ width: 90, textAlign: 'right', color: '#5a8a5a' }}>{r.earnings ? money(r.earnings) : '—'}</span>
@@ -7628,7 +7636,6 @@ function FinancialOverviewView() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
             <div style={card}><div style={cardLabel}>Office Cash In</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(stats.cashIn)}</div></div>
             <div style={card}><div style={cardLabel}>Office Cash Out</div><div style={{ ...cardValue, color: '#c07040' }}>{money(stats.cashOut)}</div></div>
-            <div style={card}><div style={cardLabel}>Creative Rentals</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(stats.rentalTotal)}</div></div>
             <div style={card}><div style={cardLabel}>Pending Reimbursements</div><div style={{ ...cardValue, color: '#b45309' }}>{money(stats.pendingReimb)}</div></div>
           </div>
 
