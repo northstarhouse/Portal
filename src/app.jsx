@@ -7487,6 +7487,7 @@ function FinancialOverviewView() {
   var [rentals, setRentals] = useState([]);
   var [sponsorEdits, setSponsorEdits] = useState({});
   var [savingSponsorId, setSavingSponsorId] = useState(null);
+  var [editingSponsorId, setEditingSponsorId] = useState(null);
 
   useEffect(function() {
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
@@ -7545,8 +7546,14 @@ function FinancialOverviewView() {
       if (updated) {
         setSponsors(function(prev) { return prev.map(function(s) { return s.id === sp.id ? updated : s; }); });
         setSponsorEdits(function(prev) { var next = Object.assign({}, prev); delete next[sp.id]; return next; });
+        setEditingSponsorId(null);
       }
     }).catch(function() { setSavingSponsorId(null); });
+  }
+
+  function cancelEditSponsor(id) {
+    setSponsorEdits(function(prev) { var next = Object.assign({}, prev); delete next[id]; return next; });
+    setEditingSponsorId(null);
   }
 
   var stats = useMemo(function() {
@@ -7670,19 +7677,35 @@ function FinancialOverviewView() {
                 {stats.currentSponsors.map(function(sp) {
                   var dirty = !!sponsorEdits[sp.id];
                   var saving = savingSponsorId === sp.id;
+                  var isEditing = editingSponsorId === sp.id;
                   return (
                     <div key={sp.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid #f9f6f2' }}>
                       <span style={{ flex: 1, fontSize: 12, color: '#2a2a2a', fontWeight: 500 }}>{sp['Business Name'] || '—'}</span>
-                      <select value={sponsorField(sp, 'sponsor_type') || ''} onChange={function(e) { editSponsor(sp.id, 'sponsor_type', e.target.value); }}
-                        style={{ width: 130, padding: '5px 6px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 11, background: '#fff' }}>
-                        <option value="">Untagged</option>
-                        <option value="Monetary Value">Monetary Value</option>
-                        <option value="In-Kind (Work)">In-Kind (Work)</option>
-                      </select>
-                      <input value={sponsorField(sp, 'Fair Market Value') || ''} onChange={function(e) { editSponsor(sp.id, 'Fair Market Value', e.target.value); }}
-                        placeholder="e.g. $500" style={{ width: 110, padding: '5px 6px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 11, textAlign: 'right' }} />
-                      <span style={{ width: 60, textAlign: 'right' }}>
-                        {dirty && <button onClick={function() { saveSponsor(sp); }} disabled={saving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{saving ? '…' : 'Save'}</button>}
+                      {isEditing ? (
+                        <select value={sponsorField(sp, 'sponsor_type') || ''} onChange={function(e) { editSponsor(sp.id, 'sponsor_type', e.target.value); }}
+                          style={{ width: 130, padding: '5px 6px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 11, background: '#fff' }}>
+                          <option value="">Untagged</option>
+                          <option value="Monetary Value">Monetary Value</option>
+                          <option value="In-Kind (Work)">In-Kind (Work)</option>
+                        </select>
+                      ) : (
+                        <span style={{ width: 130, fontSize: 11, color: sp['sponsor_type'] ? '#555' : '#bbb' }}>{sp['sponsor_type'] || 'Untagged'}</span>
+                      )}
+                      {isEditing ? (
+                        <input value={sponsorField(sp, 'Fair Market Value') || ''} onChange={function(e) { editSponsor(sp.id, 'Fair Market Value', e.target.value); }}
+                          placeholder="e.g. $500" style={{ width: 110, padding: '5px 6px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 11, textAlign: 'right' }} />
+                      ) : (
+                        <span style={{ width: 110, textAlign: 'right', fontSize: 11, color: '#555' }}>{sp['Fair Market Value'] || '—'}</span>
+                      )}
+                      <span style={{ width: isEditing ? 120 : 50, textAlign: 'right', flexShrink: 0 }}>
+                        {isEditing ? (
+                          <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                            {dirty && <button onClick={function() { saveSponsor(sp); }} disabled={saving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 8px', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{saving ? '…' : 'Save'}</button>}
+                            <button onClick={function() { cancelEditSponsor(sp.id); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 8px', fontSize: 10, fontWeight: 600, color: '#888', cursor: 'pointer' }}>Cancel</button>
+                          </span>
+                        ) : (
+                          <button onClick={function() { setEditingSponsorId(sp.id); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 10, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>Edit</button>
+                        )}
                       </span>
                     </div>
                   );
