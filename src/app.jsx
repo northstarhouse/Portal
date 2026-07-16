@@ -6395,6 +6395,9 @@ function SponsorsView() {
   var [inkind, setInkind] = useState([]);
   var [inkindForm, setInkindForm] = useState({ description: '', date: new Date().toISOString().slice(0,10), value: '' });
   var [inkindSaving, setInkindSaving] = useState(false);
+  var [editingInKindId, setEditingInKindId] = useState(null);
+  var [editInKindForm, setEditInKindForm] = useState({});
+  var [inkindSavingId, setInkindSavingId] = useState(null);
   var [editing, setEditing] = useState(false);
   var [editSponsorForm, setEditSponsorForm] = useState({});
   var [editSponsorSaving, setEditSponsorSaving] = useState(false);
@@ -6480,6 +6483,24 @@ function SponsorsView() {
       setInkind(function(prev) { return prev.filter(function(e) { return e.id !== id; }); });
       setAllInKind(function(prev) { return prev.filter(function(e) { return e.id !== id; }); });
     });
+  }
+
+  function updateInKind(id, patch) {
+    setInkindSavingId(id);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(patch)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setInkindSavingId(null);
+      var updated = rows && rows[0];
+      if (updated) {
+        setInkind(function(prev) { return prev.map(function(e) { return e.id === id ? updated : e; }); });
+        setAllInKind(function(prev) { return prev.map(function(e) { return e.id === id ? updated : e; }); });
+        clearCache('Sponsor In-Kind');
+        setEditingInKindId(null);
+      }
+    }).catch(function() { setInkindSavingId(null); });
   }
 
   function handleLogoUpload(e) {
@@ -6805,6 +6826,24 @@ function SponsorsView() {
               {inkind.length === 0
                 ? <div style={{ fontSize: 12, color: '#ccc', fontStyle: 'italic' }}>No in-kind entries yet.</div>
                 : inkind.map(function(e) {
+                    var isEditing = editingInKindId === e.id;
+                    var isSaving = inkindSavingId === e.id;
+                    if (isEditing) {
+                      return (
+                        <div key={e.id} style={{ padding: '10px 0', borderBottom: '0.5px solid #f5f0ea', background: '#faf8f5' }}>
+                          <textarea value={editInKindForm.description} onChange={function(ev){setEditInKindForm(function(f){return Object.assign({},f,{description:ev.target.value});});}} rows={2} style={Object.assign({}, inpStyle, { resize: 'vertical', marginBottom: 8 })} />
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                            <input type="date" value={editInKindForm.date} onChange={function(ev){setEditInKindForm(function(f){return Object.assign({},f,{date:ev.target.value});});}} style={inpStyle} />
+                            <input type="number" min="0" step="1" value={editInKindForm.value} onChange={function(ev){setEditInKindForm(function(f){return Object.assign({},f,{value:ev.target.value});});}} style={inpStyle} />
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={function() { updateInKind(e.id, { description: editInKindForm.description, date: editInKindForm.date, value: parseFloat(editInKindForm.value) || 0 }); }}
+                              disabled={isSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '7px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving…' : 'Save'}</button>
+                            <button onClick={function() { setEditingInKindId(null); }} style={{ padding: '7px 12px', background: '#f5f0ea', border: 'none', borderRadius: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                          </div>
+                        </div>
+                      );
+                    }
                     return (
                       <div key={e.id} style={{ padding: '8px 0', borderBottom: '0.5px solid #f5f0ea', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                         <div style={{ flex: 1 }}>
@@ -6814,6 +6853,8 @@ function SponsorsView() {
                           </div>
                           <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{e.description}</div>
                         </div>
+                        <button onClick={function() { setEditingInKindId(e.id); setEditInKindForm({ description: e.description || '', date: e.date || '', value: e.value != null ? String(e.value) : '' }); }}
+                          style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer', flexShrink: 0 }}>Edit</button>
                         <button onClick={function() { deleteInKind(e.id); }} style={{ background: 'none', border: 'none', color: '#ddd', fontSize: 14, cursor: 'pointer', flexShrink: 0, padding: '2px 4px' }}>×</button>
                       </div>
                     );
