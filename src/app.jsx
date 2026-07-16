@@ -457,7 +457,7 @@ const typeColors = {
   var isMobile = React.useContext(MobileCtx);
   useEffect(function() {
     cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']).then(function(rows) {
-      if (Array.isArray(rows)) setSponsors(rows.filter(function(r) { return r['sponsor_status'] === 'current'; }));
+      if (Array.isArray(rows)) setSponsors(rows.filter(function(r) { return (r['sponsor_status'] || 'current') === 'current'; }));
     });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('In-House Events') + '?select=*&order=date.asc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -7476,6 +7476,8 @@ function FinancialOverviewView() {
   var [earnings, setEarnings] = useState([]);
   var [cashLog, setCashLog] = useState([]);
   var [rentals, setRentals] = useState([]);
+  var [sponsorEdits, setSponsorEdits] = useState({});
+  var [savingSponsorId, setSavingSponsorId] = useState(null);
 
   useEffect(function() {
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
@@ -7504,6 +7506,40 @@ function FinancialOverviewView() {
     return isNaN(n) ? 0 : n;
   }
 
+  function sponsorField(sp, field) {
+    var edit = sponsorEdits[sp.id];
+    return edit && edit[field] !== undefined ? edit[field] : sp[field];
+  }
+
+  function editSponsor(id, field, value) {
+    setSponsorEdits(function(prev) {
+      var next = {};
+      next[field] = value;
+      return Object.assign({}, prev, { [id]: Object.assign({}, prev[id], next) });
+    });
+  }
+
+  function saveSponsor(sp) {
+    var edit = sponsorEdits[sp.id];
+    if (!edit) return;
+    var payload = {};
+    if (edit['Fair Market Value'] !== undefined) payload['Fair Market Value'] = edit['Fair Market Value'];
+    if (edit['sponsor_type'] !== undefined) payload['sponsor_type'] = edit['sponsor_type'] || null;
+    setSavingSponsorId(sp.id);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?id=eq.' + sp.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setSavingSponsorId(null);
+      var updated = rows && rows[0];
+      if (updated) {
+        setSponsors(function(prev) { return prev.map(function(s) { return s.id === sp.id ? updated : s; }); });
+        setSponsorEdits(function(prev) { var next = Object.assign({}, prev); delete next[sp.id]; return next; });
+      }
+    }).catch(function() { setSavingSponsorId(null); });
+  }
+
   var stats = useMemo(function() {
     var yearDonations = donations.filter(function(d) { return inYear(d.date); });
     var donationTotal = yearDonations.reduce(function(s, d) { return s + (parseFloat(d.amount) || 0); }, 0);
@@ -7513,9 +7549,10 @@ function FinancialOverviewView() {
       donationsByType[t] = (donationsByType[t] || 0) + (parseFloat(d.amount) || 0);
     });
 
-    var currentSponsors = sponsors.filter(function(s) { return s['sponsor_status'] === 'current'; });
-    var sponsorCash = currentSponsors.reduce(function(s, sp) { return s + parseMoneyText(sp['Donation']); }, 0);
-    var sponsorInKind = currentSponsors.reduce(function(s, sp) { return s + parseMoneyText(sp['Fair Market Value']); }, 0);
+    var currentSponsors = sponsors.filter(function(s) { return (s['sponsor_status'] || 'current') === 'current'; });
+    var sponsorCash = currentSponsors.reduce(function(s, sp) { return s + (sp['sponsor_type'] === 'Monetary Value' ? parseMoneyText(sp['Fair Market Value']) : 0); }, 0);
+    var sponsorInKind = currentSponsors.reduce(function(s, sp) { return s + (sp['sponsor_type'] === 'In-Kind (Work)' ? parseMoneyText(sp['Fair Market Value']) : 0); }, 0);
+    var sponsorUntagged = currentSponsors.reduce(function(s, sp) { return s + (sp['sponsor_type'] ? 0 : parseMoneyText(sp['Fair Market Value'])); }, 0);
 
     var yearBudget = budget.filter(function(b) { return inYear(b.date); });
     var yearEarnings = earnings.filter(function(e) { return inYear(e.date); });
@@ -7554,7 +7591,7 @@ function FinancialOverviewView() {
 
     return {
       donationTotal: donationTotal, donationsByType: donationsByType,
-      currentSponsors: currentSponsors, sponsorCash: sponsorCash, sponsorInKind: sponsorInKind,
+      currentSponsors: currentSponsors, sponsorCash: sponsorCash, sponsorInKind: sponsorInKind, sponsorUntagged: sponsorUntagged,
       areaRows: areaRows, totalPurchases: totalPurchases, totalInKind: totalInKind, totalEarnings: totalEarnings,
       pendingReimb: pendingReimb, cashIn: cashIn, cashOut: cashOut, rentalTotal: rentalTotal,
       totalIncome: totalIncome, totalOutflow: totalOutflow, net: totalIncome - totalOutflow
@@ -7605,11 +7642,44 @@ function FinancialOverviewView() {
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>In-Kind Sponsorships</div>
             <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Current sponsors only (not year-filtered — sponsorships often span multiple years)</div>
-            <div style={{ display: 'flex', gap: 24, marginBottom: 4 }}>
+            <div style={{ display: 'flex', gap: 24, marginBottom: 14 }}>
               <div><div style={cardLabel}>Current Sponsors</div><div style={{ ...cardValue, fontSize: 16 }}>{stats.currentSponsors.length}</div></div>
-              <div><div style={cardLabel}>Cash Donations</div><div style={{ ...cardValue, fontSize: 16, color: '#2e7d32' }}>{money(stats.sponsorCash)}</div></div>
-              <div><div style={cardLabel}>Est. Fair Market Value</div><div style={{ ...cardValue, fontSize: 16, color: '#886c44' }}>{money(stats.sponsorInKind)}</div></div>
+              <div><div style={cardLabel}>Monetary Value</div><div style={{ ...cardValue, fontSize: 16, color: '#2e7d32' }}>{money(stats.sponsorCash)}</div></div>
+              <div><div style={cardLabel}>In-Kind (Work)</div><div style={{ ...cardValue, fontSize: 16, color: '#886c44' }}>{money(stats.sponsorInKind)}</div></div>
+              {stats.sponsorUntagged > 0 && <div><div style={cardLabel}>Untagged</div><div style={{ ...cardValue, fontSize: 16, color: '#b45309' }}>{money(stats.sponsorUntagged)}</div></div>}
             </div>
+            {stats.currentSponsors.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#bbb' }}>No current sponsors recorded.</div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', gap: 10, padding: '0 0 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, borderBottom: '0.5px solid #f0ece6' }}>
+                  <span style={{ flex: 1 }}>Business</span>
+                  <span style={{ width: 130 }}>Type</span>
+                  <span style={{ width: 110, textAlign: 'right' }}>Fair Market Value</span>
+                  <span style={{ width: 60 }}></span>
+                </div>
+                {stats.currentSponsors.map(function(sp) {
+                  var dirty = !!sponsorEdits[sp.id];
+                  var saving = savingSponsorId === sp.id;
+                  return (
+                    <div key={sp.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid #f9f6f2' }}>
+                      <span style={{ flex: 1, fontSize: 12, color: '#2a2a2a', fontWeight: 500 }}>{sp['Business Name'] || '—'}</span>
+                      <select value={sponsorField(sp, 'sponsor_type') || ''} onChange={function(e) { editSponsor(sp.id, 'sponsor_type', e.target.value); }}
+                        style={{ width: 130, padding: '5px 6px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 11, background: '#fff' }}>
+                        <option value="">Untagged</option>
+                        <option value="Monetary Value">Monetary Value</option>
+                        <option value="In-Kind (Work)">In-Kind (Work)</option>
+                      </select>
+                      <input value={sponsorField(sp, 'Fair Market Value') || ''} onChange={function(e) { editSponsor(sp.id, 'Fair Market Value', e.target.value); }}
+                        placeholder="e.g. $500" style={{ width: 110, padding: '5px 6px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 11, textAlign: 'right' }} />
+                      <span style={{ width: 60, textAlign: 'right' }}>
+                        {dirty && <button onClick={function() { saveSponsor(sp); }} disabled={saving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>{saving ? '…' : 'Save'}</button>}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
