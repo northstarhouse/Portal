@@ -5026,6 +5026,66 @@ function EventsProfitLossModal({ onClose }) {
   );
 }
 
+function AllReimbursementsModal({ onClose }) {
+  var { useState, useEffect } = React;
+  var [loading, setLoading] = useState(true);
+  var [rows, setRows] = useState([]);
+
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?volunteer_name=not.is.null&select=*&order=date.desc,id.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      setRows(Array.isArray(data) ? data : []);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }, []);
+
+  function fmt(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  function statusBadge(b) {
+    var label = b.status || (b.needs_reimbursement ? 'Pending' : 'Reimbursed');
+    var colors = {
+      'Submitted': '#1d4ed8', 'Pending Review': '#92600c', 'More Information Needed': '#c2410c',
+      'Approved': '#15803d', 'Paid': '#15803d', 'Denied': '#c0392b', 'Pending': '#b45309', 'Reimbursed': '#15803d'
+    };
+    return <span style={{ fontSize: 10, fontWeight: 600, color: colors[label] || '#666', background: '#f5f0ea', padding: '2px 8px', borderRadius: 10, flexShrink: 0 }}>{label}</span>;
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }} onClick={onClose}>
+      <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 640, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>All Past Reimbursements</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>×</button>
+        </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 30, color: '#aaa', fontSize: 13 }}>Loading…</div>
+        ) : rows.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 30, color: '#bbb', fontSize: 13 }}>No reimbursement history yet.</div>
+        ) : (
+          <div>
+            {rows.map(function(b) {
+              return (
+                <div key={b.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
+                    <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
+                      {b.volunteer_name}{b.area ? <span style={{ color: '#aaa' }}> · {b.area}</span> : null}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
+                  </div>
+                  {statusBadge(b)}
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', flexShrink: 0, width: 80, textAlign: 'right' }}>{fmt(b.amount)}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OperationalView({ opArea, navigateToQuarterly }) {
   var { useState, useEffect } = React;
   var isMobile = React.useContext(MobileCtx);
@@ -7425,6 +7485,7 @@ function FinancialsView() {
   var [resourceSaving, setResourceSaving] = useState(false);
   var resourceFileRef = useRef(null);
   var [showPnl, setShowPnl] = useState(false);
+  var [showAllReim, setShowAllReim] = useState(false);
 
 
   function loadReimbursements() {
@@ -7583,7 +7644,9 @@ function FinancialsView() {
             <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Pending Reimbursements</div>
             {!loading && items.length > 0 && <div style={{ fontSize: 12, color: '#b45309', fontWeight: 600, marginTop: 2 }}>{fmt(reimTotal)} total · {items.length} item{items.length !== 1 ? 's' : ''}</div>}
           </div>
+          <button onClick={function() { setShowAllReim(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer', flexShrink: 0 }}>See All Past Reimbursements</button>
         </div>
+        {showAllReim && <AllReimbursementsModal onClose={function() { setShowAllReim(false); }} />}
         {loading ? (
           <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
         ) : items.length === 0 ? (
