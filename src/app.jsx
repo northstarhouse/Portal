@@ -5043,7 +5043,7 @@ function AllReimbursementsModal({ onClose }) {
   function fmt(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
   function statusBadge(b) {
-    var label = b.status || (b.needs_reimbursement ? 'Pending' : 'Reimbursed');
+    var label = b.volunteer_auth_user_id ? (b.status || 'Submitted') : (b.needs_reimbursement ? 'Pending' : 'Reimbursed');
     var colors = {
       'Submitted': '#1d4ed8', 'Pending Review': '#92600c', 'More Information Needed': '#c2410c',
       'Approved': '#15803d', 'Paid': '#15803d', 'Denied': '#c0392b', 'Pending': '#b45309', 'Reimbursed': '#15803d'
