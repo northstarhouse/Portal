@@ -7443,6 +7443,201 @@ function ReviewsView({ navigate }) {
   );
 }
 
+function fetchAllPages(url, headers) {
+  var pageSize = 1000;
+  function go(offset, acc) {
+    var sep = url.indexOf('?') === -1 ? '?' : '&';
+    return fetch(url + sep + 'limit=' + pageSize + '&offset=' + offset, { headers: headers })
+      .then(function(r) { return r.json(); })
+      .then(function(page) {
+        if (!Array.isArray(page)) return acc;
+        var all = acc.concat(page);
+        if (page.length < pageSize) return all;
+        return go(offset + pageSize, all);
+      });
+  }
+  return go(0, []);
+}
+
+function FinancialOverviewView() {
+  var { useState, useEffect, useMemo } = React;
+  var thisYear = new Date().getFullYear();
+  var [year, setYear] = useState(thisYear);
+  var [loading, setLoading] = useState(true);
+  var [donations, setDonations] = useState([]);
+  var [sponsors, setSponsors] = useState([]);
+  var [budget, setBudget] = useState([]);
+  var [earnings, setEarnings] = useState([]);
+  var [cashLog, setCashLog] = useState([]);
+  var [rentals, setRentals] = useState([]);
+
+  useEffect(function() {
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    setLoading(true);
+    Promise.all([
+      fetchAllPages(SUPABASE_URL + '/rest/v1/donations?select=amount,date,type', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?select=*', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?select=area,event,amount,date', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=amount,date,direction', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=amount,date', hdrs)
+    ]).then(function(res) {
+      setDonations(res[0]); setSponsors(res[1]); setBudget(res[2]);
+      setEarnings(res[3]); setCashLog(res[4]); setRentals(res[5]);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }, []);
+
+  function inYear(dateStr) { return dateStr && dateStr.slice(0, 4) === String(year); }
+  function money(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function parseMoneyText(s) {
+    if (!s) return 0;
+    var n = parseFloat(String(s).replace(/[^0-9.]/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+
+  var stats = useMemo(function() {
+    var yearDonations = donations.filter(function(d) { return inYear(d.date); });
+    var donationTotal = yearDonations.reduce(function(s, d) { return s + (parseFloat(d.amount) || 0); }, 0);
+    var donationsByType = {};
+    yearDonations.forEach(function(d) {
+      var t = d.type || 'Other';
+      donationsByType[t] = (donationsByType[t] || 0) + (parseFloat(d.amount) || 0);
+    });
+
+    var currentSponsors = sponsors.filter(function(s) { return s['sponsor_status'] === 'current'; });
+    var sponsorCash = sponsors.reduce(function(s, sp) { return s + parseMoneyText(sp['Donation']); }, 0);
+    var sponsorInKind = sponsors.reduce(function(s, sp) { return s + parseMoneyText(sp['Fair Market Value']); }, 0);
+
+    var yearBudget = budget.filter(function(b) { return inYear(b.date); });
+    var yearEarnings = earnings.filter(function(e) { return inYear(e.date); });
+    var byArea = {};
+    function areaBucket(a) {
+      var key = a || 'Unassigned';
+      if (!byArea[key]) byArea[key] = { area: key, purchases: 0, inKind: 0, earnings: 0 };
+      return byArea[key];
+    }
+    yearBudget.forEach(function(b) {
+      var amt = parseFloat(b.amount) || 0;
+      if (b.type === 'In-Kind') areaBucket(b.area).inKind += amt;
+      else areaBucket(b.area).purchases += amt;
+    });
+    yearEarnings.forEach(function(e) { areaBucket(e.area).earnings += parseFloat(e.amount) || 0; });
+    var areaRows = Object.keys(byArea).map(function(k) { return byArea[k]; }).sort(function(a, b) { return (b.earnings - b.purchases) - (a.earnings - a.purchases); });
+
+    var totalPurchases = yearBudget.reduce(function(s, b) { return s + (b.type === 'In-Kind' ? 0 : (parseFloat(b.amount) || 0)); }, 0);
+    var totalInKind = yearBudget.reduce(function(s, b) { return s + (b.type === 'In-Kind' ? (parseFloat(b.amount) || 0) : 0); }, 0);
+    var totalEarnings = yearEarnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
+    var pendingReimb = yearBudget.filter(function(b) { return b.needs_reimbursement; }).reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+
+    var yearCash = cashLog.filter(function(c) { return inYear(c.date); });
+    var cashIn = yearCash.reduce(function(s, c) { return s + (c.direction === 'In' ? (parseFloat(c.amount) || 0) : 0); }, 0);
+    var cashOut = yearCash.reduce(function(s, c) { return s + (c.direction === 'Out' ? (parseFloat(c.amount) || 0) : 0); }, 0);
+
+    var yearRentals = rentals.filter(function(r) { return inYear(r.date); });
+    var rentalTotal = yearRentals.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
+
+    var totalIncome = donationTotal + totalEarnings + rentalTotal + cashIn + sponsorCash;
+    var totalOutflow = totalPurchases + cashOut;
+
+    return {
+      donationTotal: donationTotal, donationsByType: donationsByType,
+      currentSponsors: currentSponsors, sponsorCash: sponsorCash, sponsorInKind: sponsorInKind,
+      areaRows: areaRows, totalPurchases: totalPurchases, totalInKind: totalInKind, totalEarnings: totalEarnings,
+      pendingReimb: pendingReimb, cashIn: cashIn, cashOut: cashOut, rentalTotal: rentalTotal,
+      totalIncome: totalIncome, totalOutflow: totalOutflow, net: totalIncome - totalOutflow
+    };
+  }, [donations, sponsors, budget, earnings, cashLog, rentals, year]);
+
+  var card = { background: '#faf8f5', borderRadius: 10, padding: '14px 16px' };
+  var cardLabel = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 };
+  var cardValue = { fontSize: 19, fontWeight: 700, marginTop: 5 };
+  var yearOptions = Array.from({ length: 6 }, function(_, i) { return thisYear - i; });
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: '#888' }}>Combined view across donations, in-kind sponsorships, operational budgets, and office cash flow.</div>
+        <select value={year} onChange={function(e) { setYear(parseInt(e.target.value)); }} style={{ padding: '7px 12px', borderRadius: 8, border: '0.5px solid #e0d8cc', fontSize: 13, background: '#fff' }}>
+          {yearOptions.map(function(y) { return <option key={y} value={y}>{y}</option>; })}
+        </select>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            <div style={card}><div style={cardLabel}>Total Income</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(stats.totalIncome)}</div></div>
+            <div style={card}><div style={cardLabel}>Total Outflow</div><div style={{ ...cardValue, color: '#c07040' }}>{money(stats.totalOutflow)}</div></div>
+            <div style={card}><div style={cardLabel}>Net</div><div style={{ ...cardValue, color: stats.net >= 0 ? '#2e7d32' : '#c62828' }}>{stats.net >= 0 ? '' : '-'}{money(Math.abs(stats.net))}</div></div>
+            <div style={card}><div style={cardLabel}>In-Kind Total</div><div style={{ ...cardValue, color: '#886c44' }}>{money(stats.totalInKind + stats.sponsorInKind)}</div></div>
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 12 }}>Donations — {year}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: '#2e7d32', marginBottom: 12 }}>{money(stats.donationTotal)}</div>
+            {Object.keys(stats.donationsByType).length === 0 ? (
+              <div style={{ fontSize: 12, color: '#bbb' }}>No donations recorded for {year}.</div>
+            ) : Object.keys(stats.donationsByType).sort(function(a, b) { return stats.donationsByType[b] - stats.donationsByType[a]; }).map(function(t) {
+              return (
+                <div key={t} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12 }}>
+                  <span style={{ color: '#555' }}>{t}</span>
+                  <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(stats.donationsByType[t])}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>In-Kind Sponsorships</div>
+            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>All recorded sponsors (not year-filtered — sponsorships often span multiple years)</div>
+            <div style={{ display: 'flex', gap: 24, marginBottom: 4 }}>
+              <div><div style={cardLabel}>Current Sponsors</div><div style={{ ...cardValue, fontSize: 16 }}>{stats.currentSponsors.length}</div></div>
+              <div><div style={cardLabel}>Cash Donations</div><div style={{ ...cardValue, fontSize: 16, color: '#2e7d32' }}>{money(stats.sponsorCash)}</div></div>
+              <div><div style={cardLabel}>Est. Fair Market Value</div><div style={{ ...cardValue, fontSize: 16, color: '#886c44' }}>{money(stats.sponsorInKind)}</div></div>
+            </div>
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Operational Areas — {year}</div>
+            <div style={{ display: 'flex', gap: 10, padding: '8px 18px 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>
+              <span style={{ flex: 1 }}>Area</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Expenses</span>
+              <span style={{ width: 90, textAlign: 'right' }}>In-Kind</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Earnings</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Net</span>
+            </div>
+            {stats.areaRows.length === 0 ? (
+              <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>No budget or earnings activity recorded for {year}.</div>
+            ) : stats.areaRows.map(function(r) {
+              var net = r.earnings - r.purchases;
+              return (
+                <div key={r.area} style={{ display: 'flex', gap: 10, padding: '9px 18px', borderBottom: '0.5px solid #f9f6f2', fontSize: 12 }}>
+                  <span style={{ flex: 1, fontWeight: 500, color: '#2a2a2a' }}>{r.area}</span>
+                  <span style={{ width: 90, textAlign: 'right', color: '#c07040' }}>{r.purchases ? money(r.purchases) : '—'}</span>
+                  <span style={{ width: 90, textAlign: 'right', color: '#886c44' }}>{r.inKind ? money(r.inKind) : '—'}</span>
+                  <span style={{ width: 90, textAlign: 'right', color: '#5a8a5a' }}>{r.earnings ? money(r.earnings) : '—'}</span>
+                  <span style={{ width: 90, textAlign: 'right', fontWeight: 700, color: net >= 0 ? '#2e7d32' : '#c62828' }}>{net >= 0 ? '' : '-'}{money(Math.abs(net))}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            <div style={card}><div style={cardLabel}>Office Cash In</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(stats.cashIn)}</div></div>
+            <div style={card}><div style={cardLabel}>Office Cash Out</div><div style={{ ...cardValue, color: '#c07040' }}>{money(stats.cashOut)}</div></div>
+            <div style={card}><div style={cardLabel}>Creative Rentals</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(stats.rentalTotal)}</div></div>
+            <div style={card}><div style={cardLabel}>Pending Reimbursements</div><div style={{ ...cardValue, color: '#b45309' }}>{money(stats.pendingReimb)}</div></div>
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FinancialsView() {
   var { useState, useEffect, useRef } = React;
 
@@ -9887,6 +10082,7 @@ const views = {
   ideas: IdeasView,
   operational: OperationalView,
   financials: FinancialsView,
+  'financial-overview': FinancialOverviewView,
   reviews: ReviewsView,
   'quarter-workspace': QuarterWorkspaceView,
   admin: AdminView,
@@ -10016,6 +10212,17 @@ function Dashboard() {
               }}>
               Financials
             </button>
+            <button onClick={function() { navigate("financial-overview"); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 16px",
+                background: active === "financial-overview" ? "rgba(181,161,133,0.15)" : "transparent",
+                border: "none", cursor: "pointer", textAlign: "left",
+                color: active === "financial-overview" ? "#b5a185" : "rgba(255,255,255,0.45)",
+                fontSize: 13, fontWeight: active === "financial-overview" ? 600 : 400,
+                transition: "all 0.15s"
+              }}>
+              Financial Overview
+            </button>
             <button onClick={function() { navigate("reviews"); }}
               style={{
                 display: "block", width: "100%", padding: "9px 16px",
@@ -10081,6 +10288,7 @@ function Dashboard() {
                 })}
                 <div style={{ borderTop: '0.5px solid rgba(255,255,255,0.08)', margin: '8px 4px' }} />
                 <button onClick={function() { navigate('financials'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'financials' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financials' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financials' ? 600 : 400, marginBottom: 2 }}>Financials</button>
+                <button onClick={function() { navigate('financial-overview'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'financial-overview' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financial-overview' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financial-overview' ? 600 : 400, marginBottom: 2 }}>Financial Overview</button>
                 <button onClick={function() { navigate('reviews'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'reviews' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'reviews' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'reviews' ? 600 : 400, marginBottom: 2 }}>Reviews</button>
                 <button onClick={function() { navigate('admin'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'admin' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'admin' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'admin' ? 600 : 400, marginBottom: 2 }}>Admin</button>
               </div>
@@ -10097,7 +10305,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Financials" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Financials" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
