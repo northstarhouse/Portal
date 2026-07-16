@@ -7638,7 +7638,7 @@ function FinancialOverviewView() {
   );
 }
 
-function FinancialsView() {
+function FinancialsView({ navigate }) {
   var { useState, useEffect, useRef } = React;
 
   // Reimbursements
@@ -7839,7 +7839,10 @@ function FinancialsView() {
             <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Pending Reimbursements</div>
             {!loading && items.length > 0 && <div style={{ fontSize: 12, color: '#b45309', fontWeight: 600, marginTop: 2 }}>{fmt(reimTotal)} total · {items.length} item{items.length !== 1 ? 's' : ''}</div>}
           </div>
-          <button onClick={function() { setShowAllReim(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer', flexShrink: 0 }}>See All Past Reimbursements</button>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button onClick={function() { setShowAllReim(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>See All Past Reimbursements</button>
+            <button onClick={function() { navigate('financial-overview'); }} style={{ background: gold, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>View All Financials</button>
+          </div>
         </div>
         {showAllReim && <AllReimbursementsModal onClose={function() { setShowAllReim(false); }} />}
         {loading ? (
