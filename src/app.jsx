@@ -3617,6 +3617,11 @@ function BoardView() {
     return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  function fmtSubmitted(ts) {
+    if (!ts) return '—';
+    return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
   var bInp = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 3, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
   var bLbl = { fontSize: 12, color: '#666', fontWeight: 500 };
   var bGrp = { marginBottom: 14 };
@@ -3683,12 +3688,15 @@ function BoardView() {
                     {item.meeting_date ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                  <span style={{ fontSize: 12, color: '#777' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
-                  {revealed
-                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Closed</span>
-                    : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Open</span>
-                  }
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                  {item.created_at && <span style={{ fontSize: 11, color: '#aaa' }}>Submitted {fmtSubmitted(item.created_at)}</span>}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: '#777' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                    {revealed
+                      ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Closed</span>
+                      : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Open</span>
+                    }
+                  </div>
                 </div>
               </div>
               {revealed && (
@@ -3723,7 +3731,8 @@ function BoardView() {
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 22, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
                 <div style={{ fontSize: 12, color: '#777' }}>
-                  {selected.submitted_by ? <span>Submitted by {selected.submitted_by}</span> : null}
+                  {selected.created_at ? <span>Submitted {fmtSubmitted(selected.created_at)}</span> : null}
+                  {selected.submitted_by ? <span> · by {selected.submitted_by}</span> : null}
                   {selected.due_date ? <span> · Due {fmtDate(selected.due_date)}</span> : null}
                   {selected.meeting_date ? <span> · Meeting {fmtDate(selected.meeting_date)}</span> : null}
                 </div>
