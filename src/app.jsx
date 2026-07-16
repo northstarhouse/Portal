@@ -6827,6 +6827,7 @@ function SponsorsView() {
                     <option value="">Untagged</option>
                     <option value="Monetary Value">Monetary Value</option>
                     <option value="In-Kind (Work)">In-Kind (Work)</option>
+                    <option value="Discount">Discount</option>
                   </select>
                 </div>
                 <button type="submit" disabled={inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: (inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value) ? 0.6 : 1, width: '100%' }}>{inkindSaving ? 'Saving…' : 'Add In-Kind Entry'}</button>
@@ -6849,6 +6850,7 @@ function SponsorsView() {
                               <option value="">Untagged</option>
                               <option value="Monetary Value">Monetary Value</option>
                               <option value="In-Kind (Work)">In-Kind (Work)</option>
+                              <option value="Discount">Discount</option>
                             </select>
                           </div>
                           <div style={{ display: 'flex', gap: 8 }}>
@@ -7580,6 +7582,7 @@ function FinancialOverviewView({ navigate }) {
     var currentEntries = sponsorInKindEntries.filter(function(e) { return currentSponsorIds.has(e.sponsor_id); });
     var sponsorCash = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'Monetary Value' ? (parseFloat(e.value) || 0) : 0); }, 0);
     var sponsorInKind = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'In-Kind (Work)' ? (parseFloat(e.value) || 0) : 0); }, 0);
+    var sponsorDiscount = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'Discount' ? (parseFloat(e.value) || 0) : 0); }, 0);
     var sponsorUntagged = currentEntries.reduce(function(s, e) { return s + (e.contribution_type ? 0 : (parseFloat(e.value) || 0)); }, 0);
     var sponsorEntriesBySponsor = {};
     currentEntries.forEach(function(e) {
@@ -7624,7 +7627,7 @@ function FinancialOverviewView({ navigate }) {
 
     return {
       donationTotal: donationTotal, donationsByType: donationsByType,
-      currentSponsors: currentSponsors, sponsorCash: sponsorCash, sponsorInKind: sponsorInKind, sponsorUntagged: sponsorUntagged, sponsorEntriesBySponsor: sponsorEntriesBySponsor,
+      currentSponsors: currentSponsors, sponsorCash: sponsorCash, sponsorInKind: sponsorInKind, sponsorDiscount: sponsorDiscount, sponsorUntagged: sponsorUntagged, sponsorEntriesBySponsor: sponsorEntriesBySponsor,
       areaRows: areaRows, totalPurchases: totalPurchases, totalInKind: totalInKind, totalEarnings: totalEarnings,
       pendingReimb: pendingReimb, cashIn: cashIn, cashOut: cashOut, rentalTotal: rentalTotal,
       totalIncome: totalIncome, totalOutflow: totalOutflow, net: totalIncome - totalOutflow
@@ -7634,7 +7637,7 @@ function FinancialOverviewView({ navigate }) {
   var card = { background: '#faf8f5', borderRadius: 10, padding: '14px 16px' };
   var cardLabel = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 };
   var cardValue = { fontSize: 19, fontWeight: 700, marginTop: 5 };
-  var yearOptions = Array.from({ length: 6 }, function(_, i) { return thisYear - i; });
+  var yearOptions = [thisYear];
 
   return (
     <div>
@@ -7682,6 +7685,7 @@ function FinancialOverviewView({ navigate }) {
               <div><div style={cardLabel}>Current Sponsors</div><div style={{ ...cardValue, fontSize: 16 }}>{stats.currentSponsors.length}</div></div>
               <div><div style={cardLabel}>Monetary Value</div><div style={{ ...cardValue, fontSize: 16, color: '#2e7d32' }}>{money(stats.sponsorCash)}</div></div>
               <div><div style={cardLabel}>In-Kind (Work)</div><div style={{ ...cardValue, fontSize: 16, color: '#886c44' }}>{money(stats.sponsorInKind)}</div></div>
+              <div><div style={cardLabel}>Discount</div><div style={{ ...cardValue, fontSize: 16, color: '#1565c0' }}>{money(stats.sponsorDiscount)}</div></div>
               {stats.sponsorUntagged > 0 && <div><div style={cardLabel}>Untagged</div><div style={{ ...cardValue, fontSize: 16, color: '#b45309' }}>{money(stats.sponsorUntagged)}</div></div>}
             </div>
             {stats.currentSponsors.length === 0 ? (
