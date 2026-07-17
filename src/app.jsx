@@ -7595,17 +7595,20 @@ function FinancialOverviewView({ navigate }) {
     var byArea = {};
     function areaBucket(a) {
       var key = a || 'Unassigned';
-      if (!byArea[key]) byArea[key] = { area: key, purchases: 0, inKind: 0, earnings: 0, budget: 0 };
+      if (!byArea[key]) byArea[key] = { area: key, purchases: 0, inKind: 0, earnings: 0, allocated: (AREA_DEFAULTS[key] && AREA_DEFAULTS[key].budget) || null };
       return byArea[key];
     }
     yearBudget.forEach(function(b) {
       var amt = parseFloat(b.amount) || 0;
       if (b.type === 'In-Kind') areaBucket(b.area).inKind += amt;
       else areaBucket(b.area).purchases += amt;
-      areaBucket(b.area).budget += amt;
     });
     yearEarnings.forEach(function(e) { areaBucket(e.area).earnings += parseFloat(e.amount) || 0; });
-    var areaRows = Object.keys(byArea).map(function(k) { return byArea[k]; }).sort(function(a, b) { return (b.earnings - b.purchases) - (a.earnings - a.purchases); });
+    var areaRows = Object.keys(byArea).map(function(k) { return byArea[k]; }).sort(function(a, b) {
+      var aRem = a.allocated != null ? a.allocated - a.purchases : Infinity;
+      var bRem = b.allocated != null ? b.allocated - b.purchases : Infinity;
+      return aRem - bRem;
+    });
 
     var totalPurchases = yearBudget.reduce(function(s, b) { return s + (b.type === 'In-Kind' ? 0 : (parseFloat(b.amount) || 0)); }, 0);
     var totalInKind = yearBudget.reduce(function(s, b) { return s + (b.type === 'In-Kind' ? (parseFloat(b.amount) || 0) : 0); }, 0);
@@ -7720,23 +7723,26 @@ function FinancialOverviewView({ navigate }) {
             <div style={{ display: 'flex', gap: 10, padding: '8px 18px 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>
               <span style={{ flex: 1 }}>Area</span>
               <span style={{ width: 90, textAlign: 'right' }}>Budget</span>
-              <span style={{ width: 90, textAlign: 'right' }}>Expenses</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Spent</span>
               <span style={{ width: 90, textAlign: 'right' }}>In-Kind</span>
               <span style={{ width: 90, textAlign: 'right' }}>Earnings</span>
-              <span style={{ width: 90, textAlign: 'right' }}>Net</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Remaining</span>
             </div>
             {stats.areaRows.length === 0 ? (
               <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>No budget or earnings activity recorded for {year}.</div>
             ) : stats.areaRows.map(function(r) {
-              var net = r.earnings - r.purchases;
+              var hasAllocated = r.allocated != null;
+              var remaining = hasAllocated ? r.allocated - r.purchases : null;
               return (
                 <div key={r.area} style={{ display: 'flex', gap: 10, padding: '9px 18px', borderBottom: '0.5px solid #f9f6f2', fontSize: 12 }}>
                   <span style={{ flex: 1, fontWeight: 500, color: '#2a2a2a' }}>{r.area}</span>
-                  <span style={{ width: 90, textAlign: 'right', fontWeight: 600, color: '#2a2a2a' }}>{r.budget ? money(r.budget) : '—'}</span>
+                  <span style={{ width: 90, textAlign: 'right', fontWeight: 600, color: '#2a2a2a' }}>{hasAllocated ? money(r.allocated) : '—'}</span>
                   <span style={{ width: 90, textAlign: 'right', color: '#c07040' }}>{r.purchases ? money(r.purchases) : '—'}</span>
                   <span style={{ width: 90, textAlign: 'right', color: '#886c44' }}>{r.inKind ? money(r.inKind) : '—'}</span>
                   <span style={{ width: 90, textAlign: 'right', color: '#5a8a5a' }}>{r.earnings ? money(r.earnings) : '—'}</span>
-                  <span style={{ width: 90, textAlign: 'right', fontWeight: 700, color: net >= 0 ? '#2e7d32' : '#c62828' }}>{net >= 0 ? '' : '-'}{money(Math.abs(net))}</span>
+                  <span style={{ width: 90, textAlign: 'right', fontWeight: 700, color: !hasAllocated ? '#bbb' : remaining >= 0 ? '#2e7d32' : '#c62828' }}>
+                    {!hasAllocated ? '—' : (remaining >= 0 ? '' : '-') + money(Math.abs(remaining))}
+                  </span>
                 </div>
               );
             })}
