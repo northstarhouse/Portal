@@ -7555,7 +7555,7 @@ function FinancialOverviewView({ navigate }) {
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?select=area,event,amount,date', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=amount,date,direction', hdrs),
-      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=amount,date', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=amount,date,name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?select=*', hdrs)
     ]).then(function(res) {
       setDonations(res[0]); setSponsors(res[1]); setBudget(res[2]);
@@ -7618,6 +7618,11 @@ function FinancialOverviewView({ navigate }) {
 
     var yearRentals = rentals.filter(function(r) { return inYear(r.date); });
     var rentalTotal = yearRentals.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
+    var earningsByCategory = {};
+    yearRentals.forEach(function(r) {
+      var cat = r.name || 'Other';
+      earningsByCategory[cat] = (earningsByCategory[cat] || 0) + (parseFloat(r.amount) || 0);
+    });
 
     // "Office Cash Flow" = Creative Rentals (earnings) + Cash Log, matching the Financials page's own grouping.
     var cashIn = cashLogIn + rentalTotal;
@@ -7629,7 +7634,7 @@ function FinancialOverviewView({ navigate }) {
       donationTotal: donationTotal, donationsByType: donationsByType,
       currentSponsors: currentSponsors, sponsorCash: sponsorCash, sponsorInKind: sponsorInKind, sponsorDiscount: sponsorDiscount, sponsorUntagged: sponsorUntagged, sponsorEntriesBySponsor: sponsorEntriesBySponsor,
       areaRows: areaRows, totalPurchases: totalPurchases, totalInKind: totalInKind, totalEarnings: totalEarnings,
-      pendingReimb: pendingReimb, cashIn: cashIn, cashOut: cashOut, rentalTotal: rentalTotal,
+      pendingReimb: pendingReimb, cashIn: cashIn, cashOut: cashOut, rentalTotal: rentalTotal, earningsByCategory: earningsByCategory,
       totalIncome: totalIncome, totalOutflow: totalOutflow, net: totalIncome - totalOutflow
     };
   }, [donations, sponsors, budget, earnings, cashLog, rentals, sponsorInKindEntries, year]);
@@ -7741,6 +7746,21 @@ function FinancialOverviewView({ navigate }) {
             <div style={card}><div style={cardLabel}>Office Cash In</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(stats.cashIn)}</div></div>
             <div style={card}><div style={cardLabel}>Office Cash Out</div><div style={{ ...cardValue, color: '#c07040' }}>{money(stats.cashOut)}</div></div>
             <div style={card}><div style={cardLabel}>Pending Reimbursements</div><div style={{ ...cardValue, color: '#b45309' }}>{money(stats.pendingReimb)}</div></div>
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Office Earnings by Category — {year}</div>
+            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Creative Rentals income, grouped by the same category picked when logging each earning</div>
+            {Object.keys(stats.earningsByCategory).length === 0 ? (
+              <div style={{ fontSize: 12, color: '#bbb' }}>No earnings recorded for {year}.</div>
+            ) : Object.keys(stats.earningsByCategory).sort(function(a, b) { return stats.earningsByCategory[b] - stats.earningsByCategory[a]; }).map(function(cat) {
+              return (
+                <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12 }}>
+                  <span style={{ color: '#555' }}>{cat}</span>
+                  <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(stats.earningsByCategory[cat])}</span>
+                </div>
+              );
+            })}
           </div>
 
         </div>
