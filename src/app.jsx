@@ -202,6 +202,14 @@ function clearCache(table) {
 }
 window.__nshClearCache = clearCache;
 
+function logActivity(description, action) {
+  fetch(SUPABASE_URL + '/rest/v1/activity_log', {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description: description, action: action })
+  }).catch(function() {});
+}
+
 const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthstarhouse%40gmail.com/private-06287b2ca0d9ee6acd4f49f9d4d0d2da/basic.ics";
 
 // Kick off critical fetches immediately so data is ready when views mount
@@ -445,10 +453,11 @@ const typeColors = {
   const [iheForm, setIheForm] = useState({ name: '', date: '', cost: '', link: '' });
   const [iheAdding, setIheAdding] = useState(false);
   const [iheSaving, setIheSaving] = useState(false);
+  const [activity, setActivity] = useState(null);
   var isMobile = React.useContext(MobileCtx);
   useEffect(function() {
     cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']).then(function(rows) {
-      if (Array.isArray(rows)) setSponsors(rows.filter(function(r) { return r['sponsor_status'] === 'current'; }));
+      if (Array.isArray(rows)) setSponsors(rows.filter(function(r) { return (r['sponsor_status'] || 'current') === 'current'; }));
     });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('In-House Events') + '?select=*&order=date.asc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -496,6 +505,11 @@ const typeColors = {
         else setOotNotices([]);
       }).catch(function() { setOotNotices([]); });
     })();
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?select=*&order=created_at.desc&limit=15', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setActivity(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setActivity([]); });
     fetchCalendarEvents().then(function(events) {
       var now = new Date();
       var windowEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
@@ -511,10 +525,16 @@ const typeColors = {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, color: "#5c3d1e", fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.8 }}>Today — {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-          <span style={{ color: '#777', fontSize: 13 }}>—</span>
-          <span style={{ fontSize: 13, color: "#888" }}>Here's your organization at a glance.</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, color: "#5c3d1e", fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.8 }}>Today — {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+            <span style={{ color: '#777', fontSize: 13 }}>—</span>
+            <span style={{ fontSize: 13, color: "#888" }}>Here's your organization at a glance.</span>
+          </div>
+          <a href="https://northstarhouse.github.io/volunteerhub/" target="_blank" rel="noreferrer"
+            style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', flexShrink: 0 }}>
+            Volunteer Hub
+          </a>
         </div>
       </div>
 
@@ -605,6 +625,28 @@ const typeColors = {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+            Recent Activity
+          </div>
+          {activity === null && <div style={{ fontSize: 12, color: '#aaa' }}>Loading…</div>}
+          {activity !== null && activity.length === 0 && <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No recent activity from the Volunteer Hub.</div>}
+          {activity !== null && activity.map(function(a, i) {
+            var ts = a.created_at ? new Date(a.created_at) : null;
+            var mins = ts ? Math.round((Date.now() - ts.getTime()) / 60000) : null;
+            var when = mins === null ? '' : mins < 1 ? 'just now' : mins < 60 ? mins + 'm ago' : mins < 1440 ? Math.round(mins / 60) + 'h ago' : ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return (
+              <div key={a.id || i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i === activity.length - 1 ? 0 : 10 }}>
+                <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: gold, marginTop: 5, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: '#2a2a2a' }}>{a.description}</div>
+                  <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{when}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={function() { navigate('birthdays'); }}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -1826,10 +1868,18 @@ function VolunteersView() {
     if (cachedHours) { setHoursData(cachedHours); }
     (function() {
       var year = new Date().getFullYear();
-      fetch(SUPABASE_URL + '/rest/v1/kiosk_logs?type=eq.volunteer&timestamp=gte.' + year + '-01-01T00:00:00.000Z&timestamp=lt.' + (year + 1) + '-01-01T00:00:00.000Z&order=name.asc,timestamp.asc&select=timestamp,name,action', {
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-      }).then(function(r) { return r.json(); }).then(function(logs) {
-        if (!Array.isArray(logs)) return;
+      var pageSize = 1000;
+      function fetchPage(offset, acc) {
+        return fetch(SUPABASE_URL + '/rest/v1/kiosk_logs?type=eq.volunteer&timestamp=gte.' + year + '-01-01T00:00:00.000Z&timestamp=lt.' + (year + 1) + '-01-01T00:00:00.000Z&order=name.asc,timestamp.asc&select=timestamp,name,action&limit=' + pageSize + '&offset=' + offset, {
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+        }).then(function(r) { return r.json(); }).then(function(page) {
+          if (!Array.isArray(page)) return acc;
+          var all = acc.concat(page);
+          if (page.length < pageSize) return all;
+          return fetchPage(offset + pageSize, all);
+        });
+      }
+      fetchPage(0, []).then(function(logs) {
         var parsed = buildHoursMapFromLogs(logs);
         setHoursData(parsed);
         lsSet('hours_summary_sb', parsed);
@@ -2071,7 +2121,10 @@ function VolunteersView() {
       setSaving(false);
       clearCache('2026 Volunteers');
       var inserted = Array.isArray(res) ? res[0] : res;
-      if (inserted && inserted['First Name']) setVolunteers(function(p) { return p.concat([inserted]); });
+      if (inserted && inserted['First Name']) {
+        setVolunteers(function(p) { return p.concat([inserted]); });
+        logActivity('New volunteer added: ' + inserted['First Name'] + ' ' + (inserted['Last Name'] || ''), 'volunteer_added');
+      }
       setShowAdd(false);
       setForm(emptyForm);
     }).catch(function() { setSaving(false); });
@@ -2792,6 +2845,7 @@ function DonorsView() {
       .then(function(r){return r.json();}).then(function(rows){
         setAddingGift(false);
         var newDon=Array.isArray(rows)?rows[0]:rows;
+        logActivity('New donation of $'+(parseFloat(newDon.amount)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' from '+(selected.formal_name||'a donor'),'donation_added');
         updateDonorInState(selected.id,function(d){return{donations:d.donations.concat([newDon])};});
         setAddGiftForm(emptyGiftForm);
       }).catch(function(){setAddingGift(false);});
@@ -2806,6 +2860,7 @@ function DonorsView() {
       .then(function(r){return r.json();}).then(function(rows){
         setSaving(false);
         var newDon=Array.isArray(rows)?rows[0]:rows;
+        logActivity('New donation of $'+(parseFloat(newDon.amount)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' from '+(addExistingDonor.formal_name||'a donor'),'donation_added');
         updateDonorInState(addExistingDonor.id,function(d){return{donations:d.donations.concat([newDon])};});
         setShowAdd(false);setAddGiftForm(emptyGiftForm);setAddExistingDonor(null);setAddMode('search');setAddSearchQuery('');
       }).catch(function(){setSaving(false);});
@@ -2830,6 +2885,7 @@ function DonorsView() {
       }).then(function(result){
         setSaving(false);
         var d=result.donor,don=result.donation;
+        logActivity('New donation of $'+(parseFloat(don.amount)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' from '+(d.formal_name||'a donor'),'donation_added');
         var newDonorObj=buildDonor(d,[don]);
         setDonors(function(prev){
           var exists=prev.some(function(x){return x.id===d.id;});
@@ -3547,6 +3603,7 @@ function BoardView() {
     }).then(function(rows) {
       if (rows && rows.message) { alert('Error: ' + rows.message); setTopicSaving(false); return; }
       setTopicSaving(false);
+      logActivity('New board vote opened: ' + topicForm.title + (topicForm.submitted_by ? ' (by ' + topicForm.submitted_by + ')' : ''), 'board_vote_opened');
       setShowAdd(false);
       setTopicForm({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
       setAttachFileName(''); setAttachUploading(false);
@@ -3558,6 +3615,11 @@ function BoardView() {
   function fmtDate(d) {
     if (!d) return '—';
     return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function fmtSubmitted(ts) {
+    if (!ts) return '—';
+    return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
   var bInp = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 3, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
@@ -3626,12 +3688,15 @@ function BoardView() {
                     {item.meeting_date ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                  <span style={{ fontSize: 12, color: '#777' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
-                  {revealed
-                    ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Closed</span>
-                    : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Open</span>
-                  }
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                  {item.created_at && <span style={{ fontSize: 11, color: '#aaa' }}>Submitted {fmtSubmitted(item.created_at)}</span>}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: '#777' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                    {revealed
+                      ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Closed</span>
+                      : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Open</span>
+                    }
+                  </div>
                 </div>
               </div>
               {revealed && (
@@ -3666,7 +3731,8 @@ function BoardView() {
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 22, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
                 <div style={{ fontSize: 12, color: '#777' }}>
-                  {selected.submitted_by ? <span>Submitted by {selected.submitted_by}</span> : null}
+                  {selected.created_at ? <span>Submitted {fmtSubmitted(selected.created_at)}</span> : null}
+                  {selected.submitted_by ? <span> · by {selected.submitted_by}</span> : null}
                   {selected.due_date ? <span> · Due {fmtDate(selected.due_date)}</span> : null}
                   {selected.meeting_date ? <span> · Meeting {fmtDate(selected.meeting_date)}</span> : null}
                 </div>
@@ -4648,6 +4714,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
       clearCache('Op Quarter Goals');
       clearCache('Op Quarterly Updates');
       setSaving(false);
+      logActivity(area + ' submitted their ' + quarter + ' ' + year + ' quarterly review', 'quarterly_review_submitted');
       if (navigateOp && area) { navigateOp(area); } else { setSaved(true); setTimeout(function() { setSaved(false); }, 4000); }
     });
   }
@@ -4964,6 +5031,66 @@ function EventsProfitLossModal({ onClose }) {
                   <span style={{ fontSize: 12, color: '#5a8a5a', width: 90, textAlign: 'right' }}>{fmt(r.earnings)}</span>
                   <span style={{ fontSize: 12, color: '#c07040', width: 90, textAlign: 'right' }}>-{fmt(r.costs)}</span>
                   <span style={{ fontSize: 13, fontWeight: 700, width: 90, textAlign: 'right', color: r.net >= 0 ? '#2e7d32' : '#c62828' }}>{r.net >= 0 ? '' : '-'}{fmt(Math.abs(r.net))}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AllReimbursementsModal({ onClose }) {
+  var { useState, useEffect } = React;
+  var [loading, setLoading] = useState(true);
+  var [rows, setRows] = useState([]);
+
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?volunteer_name=not.is.null&select=*&order=date.desc,id.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      setRows(Array.isArray(data) ? data : []);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }, []);
+
+  function fmt(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  function statusBadge(b) {
+    var label = b.volunteer_auth_user_id ? (b.status || 'Submitted') : (b.needs_reimbursement ? 'Pending' : 'Reimbursed');
+    var colors = {
+      'Submitted': '#1d4ed8', 'Pending Review': '#92600c', 'More Information Needed': '#c2410c',
+      'Approved': '#15803d', 'Paid': '#15803d', 'Denied': '#c0392b', 'Pending': '#b45309', 'Reimbursed': '#15803d'
+    };
+    return <span style={{ fontSize: 10, fontWeight: 600, color: colors[label] || '#666', background: '#f5f0ea', padding: '2px 8px', borderRadius: 10, flexShrink: 0 }}>{label}</span>;
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }} onClick={onClose}>
+      <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 640, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '85vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>All Past Reimbursements</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>×</button>
+        </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 30, color: '#aaa', fontSize: 13 }}>Loading…</div>
+        ) : rows.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 30, color: '#bbb', fontSize: 13 }}>No reimbursement history yet.</div>
+        ) : (
+          <div>
+            {rows.map(function(b) {
+              return (
+                <div key={b.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
+                    <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
+                      {b.volunteer_name}{b.area ? <span style={{ color: '#aaa' }}> · {b.area}</span> : null}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
+                  </div>
+                  {statusBadge(b)}
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', flexShrink: 0, width: 80, textAlign: 'right' }}>{fmt(b.amount)}</div>
                 </div>
               );
             })}
@@ -6287,8 +6414,11 @@ function SponsorsView() {
   var logoInputRef = useRef(null);
   var [allInKind, setAllInKind] = useState([]);
   var [inkind, setInkind] = useState([]);
-  var [inkindForm, setInkindForm] = useState({ description: '', date: new Date().toISOString().slice(0,10), value: '' });
+  var [inkindForm, setInkindForm] = useState({ description: '', date: new Date().toISOString().slice(0,10), value: '', contribution_type: '' });
   var [inkindSaving, setInkindSaving] = useState(false);
+  var [editingInKindId, setEditingInKindId] = useState(null);
+  var [editInKindForm, setEditInKindForm] = useState({});
+  var [inkindSavingId, setInkindSavingId] = useState(null);
   var [editing, setEditing] = useState(false);
   var [editSponsorForm, setEditSponsorForm] = useState({});
   var [editSponsorSaving, setEditSponsorSaving] = useState(false);
@@ -6351,7 +6481,7 @@ function SponsorsView() {
     e.preventDefault();
     if (!inkindForm.description || !inkindForm.date || !inkindForm.value) return;
     setInkindSaving(true);
-    var payload = { sponsor_id: selected.id, description: inkindForm.description, date: inkindForm.date, value: parseFloat(inkindForm.value) };
+    var payload = { sponsor_id: selected.id, description: inkindForm.description, date: inkindForm.date, value: parseFloat(inkindForm.value), contribution_type: inkindForm.contribution_type || null };
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -6362,7 +6492,7 @@ function SponsorsView() {
       setInkind(function(prev) { return [rows[0]].concat(prev); });
       setAllInKind(function(prev) { return prev.concat([rows[0]]); });
       clearCache('Sponsor In-Kind');
-      setInkindForm({ description: '', date: new Date().toISOString().slice(0,10), value: '' });
+      setInkindForm({ description: '', date: new Date().toISOString().slice(0,10), value: '', contribution_type: '' });
     }).catch(function(err) { alert('Error saving in-kind: ' + err.message); setInkindSaving(false); });
   }
 
@@ -6374,6 +6504,24 @@ function SponsorsView() {
       setInkind(function(prev) { return prev.filter(function(e) { return e.id !== id; }); });
       setAllInKind(function(prev) { return prev.filter(function(e) { return e.id !== id; }); });
     });
+  }
+
+  function updateInKind(id, patch) {
+    setInkindSavingId(id);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(patch)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setInkindSavingId(null);
+      var updated = rows && rows[0];
+      if (updated) {
+        setInkind(function(prev) { return prev.map(function(e) { return e.id === id ? updated : e; }); });
+        setAllInKind(function(prev) { return prev.map(function(e) { return e.id === id ? updated : e; }); });
+        clearCache('Sponsor In-Kind');
+        setEditingInKindId(null);
+      }
+    }).catch(function() { setInkindSavingId(null); });
   }
 
   function handleLogoUpload(e) {
@@ -6694,20 +6842,58 @@ function SponsorsView() {
                     <input type="number" min="0" step="1" value={inkindForm.value} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{value:e.target.value});});}} style={inpStyle} placeholder="e.g. 1500" required />
                   </div>
                 </div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Type</div>
+                  <select value={inkindForm.contribution_type} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{contribution_type:e.target.value});});}} style={inpStyle}>
+                    <option value="">Untagged</option>
+                    <option value="Monetary Value">Monetary Value</option>
+                    <option value="In-Kind (Work)">In-Kind (Work)</option>
+                    <option value="Discount">Discount</option>
+                  </select>
+                </div>
                 <button type="submit" disabled={inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: (inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value) ? 0.6 : 1, width: '100%' }}>{inkindSaving ? 'Saving…' : 'Add In-Kind Entry'}</button>
               </form>
               {inkind.length === 0
                 ? <div style={{ fontSize: 12, color: '#ccc', fontStyle: 'italic' }}>No in-kind entries yet.</div>
                 : inkind.map(function(e) {
+                    var isEditing = editingInKindId === e.id;
+                    var isSaving = inkindSavingId === e.id;
+                    if (isEditing) {
+                      return (
+                        <div key={e.id} style={{ padding: '10px 0', borderBottom: '0.5px solid #f5f0ea', background: '#faf8f5' }}>
+                          <textarea value={editInKindForm.description} onChange={function(ev){setEditInKindForm(function(f){return Object.assign({},f,{description:ev.target.value});});}} rows={2} style={Object.assign({}, inpStyle, { resize: 'vertical', marginBottom: 8 })} />
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                            <input type="date" value={editInKindForm.date} onChange={function(ev){setEditInKindForm(function(f){return Object.assign({},f,{date:ev.target.value});});}} style={inpStyle} />
+                            <input type="number" min="0" step="1" value={editInKindForm.value} onChange={function(ev){setEditInKindForm(function(f){return Object.assign({},f,{value:ev.target.value});});}} style={inpStyle} />
+                          </div>
+                          <div style={{ marginBottom: 8 }}>
+                            <select value={editInKindForm.contribution_type || ''} onChange={function(ev){setEditInKindForm(function(f){return Object.assign({},f,{contribution_type:ev.target.value});});}} style={inpStyle}>
+                              <option value="">Untagged</option>
+                              <option value="Monetary Value">Monetary Value</option>
+                              <option value="In-Kind (Work)">In-Kind (Work)</option>
+                              <option value="Discount">Discount</option>
+                            </select>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={function() { updateInKind(e.id, { description: editInKindForm.description, date: editInKindForm.date, value: parseFloat(editInKindForm.value) || 0, contribution_type: editInKindForm.contribution_type || null }); }}
+                              disabled={isSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '7px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving…' : 'Save'}</button>
+                            <button onClick={function() { setEditingInKindId(null); }} style={{ padding: '7px 12px', background: '#f5f0ea', border: 'none', borderRadius: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                          </div>
+                        </div>
+                      );
+                    }
                     return (
                       <div key={e.id} style={{ padding: '8px 0', borderBottom: '0.5px solid #f5f0ea', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
                             <span style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>${(parseFloat(e.value)||0).toLocaleString()}</span>
                             <span style={{ fontSize: 11, color: '#aaa' }}>{e.date}</span>
+                            {e.contribution_type && <span style={{ fontSize: 10, fontWeight: 600, color: '#886c44', background: '#f5f0ea', padding: '2px 7px', borderRadius: 10 }}>{e.contribution_type}</span>}
                           </div>
                           <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{e.description}</div>
                         </div>
+                        <button onClick={function() { setEditingInKindId(e.id); setEditInKindForm({ description: e.description || '', date: e.date || '', value: e.value != null ? String(e.value) : '', contribution_type: e.contribution_type || '' }); }}
+                          style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer', flexShrink: 0 }}>Edit</button>
                         <button onClick={function() { deleteInKind(e.id); }} style={{ background: 'none', border: 'none', color: '#ddd', fontSize: 14, cursor: 'pointer', flexShrink: 0, padding: '2px 4px' }}>×</button>
                       </div>
                     );
@@ -7352,13 +7538,275 @@ function ReviewsView({ navigate }) {
   );
 }
 
-function FinancialsView() {
+function fetchAllPages(url, headers) {
+  var pageSize = 1000;
+  function go(offset, acc) {
+    var sep = url.indexOf('?') === -1 ? '?' : '&';
+    return fetch(url + sep + 'limit=' + pageSize + '&offset=' + offset, { headers: headers })
+      .then(function(r) { return r.json(); })
+      .then(function(page) {
+        if (!Array.isArray(page)) return acc;
+        var all = acc.concat(page);
+        if (page.length < pageSize) return all;
+        return go(offset + pageSize, all);
+      });
+  }
+  return go(0, []);
+}
+
+function FinancialOverviewView({ navigate }) {
+  var { useState, useEffect, useMemo } = React;
+  var thisYear = new Date().getFullYear();
+  var [year, setYear] = useState(thisYear);
+  var [loading, setLoading] = useState(true);
+  var [donations, setDonations] = useState([]);
+  var [sponsors, setSponsors] = useState([]);
+  var [budget, setBudget] = useState([]);
+  var [earnings, setEarnings] = useState([]);
+  var [cashLog, setCashLog] = useState([]);
+  var [rentals, setRentals] = useState([]);
+  var [sponsorInKindEntries, setSponsorInKindEntries] = useState([]);
+
+  useEffect(function() {
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    setLoading(true);
+    Promise.all([
+      fetchAllPages(SUPABASE_URL + '/rest/v1/donations?select=amount,date,type', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?select=*', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?select=area,event,amount,date', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=amount,date,direction', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=amount,date,name', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?select=*', hdrs)
+    ]).then(function(res) {
+      setDonations(res[0]); setSponsors(res[1]); setBudget(res[2]);
+      setEarnings(res[3]); setCashLog(res[4]); setRentals(res[5]);
+      setSponsorInKindEntries(res[6]);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }, []);
+
+  function inYear(dateStr) { return dateStr && dateStr.slice(0, 4) === String(year); }
+  function money(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  var stats = useMemo(function() {
+    var yearDonations = donations.filter(function(d) { return inYear(d.date); });
+    var donationTotal = yearDonations.reduce(function(s, d) { return s + (parseFloat(d.amount) || 0); }, 0);
+    var donationsByType = {};
+    yearDonations.forEach(function(d) {
+      var t = d.type || 'Other';
+      donationsByType[t] = (donationsByType[t] || 0) + (parseFloat(d.amount) || 0);
+    });
+
+    var currentSponsors = sponsors.filter(function(s) { return (s['sponsor_status'] || 'current') === 'current'; });
+    var currentSponsorIds = new Set(currentSponsors.map(function(s) { return s.id; }));
+    var currentEntries = sponsorInKindEntries.filter(function(e) { return currentSponsorIds.has(e.sponsor_id); });
+    var sponsorCash = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'Monetary Value' ? (parseFloat(e.value) || 0) : 0); }, 0);
+    var sponsorInKind = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'In-Kind (Work)' ? (parseFloat(e.value) || 0) : 0); }, 0);
+    var sponsorDiscount = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'Discount' ? (parseFloat(e.value) || 0) : 0); }, 0);
+    var sponsorUntagged = currentEntries.reduce(function(s, e) { return s + (e.contribution_type ? 0 : (parseFloat(e.value) || 0)); }, 0);
+    var sponsorEntriesBySponsor = {};
+    currentEntries.forEach(function(e) {
+      if (!sponsorEntriesBySponsor[e.sponsor_id]) sponsorEntriesBySponsor[e.sponsor_id] = [];
+      sponsorEntriesBySponsor[e.sponsor_id].push(e);
+    });
+
+    var yearBudget = budget.filter(function(b) { return inYear(b.date); });
+    var yearEarnings = earnings.filter(function(e) { return inYear(e.date); });
+    var byArea = {};
+    function areaBucket(a) {
+      var key = a || 'Unassigned';
+      if (!byArea[key]) byArea[key] = { area: key, purchases: 0, inKind: 0, earnings: 0, allocated: (AREA_DEFAULTS[key] && AREA_DEFAULTS[key].budget) || null };
+      return byArea[key];
+    }
+    yearBudget.forEach(function(b) {
+      var amt = parseFloat(b.amount) || 0;
+      if (b.type === 'In-Kind') areaBucket(b.area).inKind += amt;
+      else areaBucket(b.area).purchases += amt;
+    });
+    yearEarnings.forEach(function(e) { areaBucket(e.area).earnings += parseFloat(e.amount) || 0; });
+    var areaRows = Object.keys(byArea).map(function(k) { return byArea[k]; }).sort(function(a, b) {
+      var aRem = a.allocated != null ? a.allocated - a.purchases : Infinity;
+      var bRem = b.allocated != null ? b.allocated - b.purchases : Infinity;
+      return aRem - bRem;
+    });
+
+    var totalPurchases = yearBudget.reduce(function(s, b) { return s + (b.type === 'In-Kind' ? 0 : (parseFloat(b.amount) || 0)); }, 0);
+    var totalInKind = yearBudget.reduce(function(s, b) { return s + (b.type === 'In-Kind' ? (parseFloat(b.amount) || 0) : 0); }, 0);
+    var totalEarnings = yearEarnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0);
+    var pendingReimb = yearBudget.filter(function(b) { return b.needs_reimbursement; }).reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
+
+    var yearCash = cashLog.filter(function(c) { return inYear(c.date); });
+    var cashLogIn = yearCash.reduce(function(s, c) { return s + (c.direction === 'In' ? (parseFloat(c.amount) || 0) : 0); }, 0);
+    var cashOut = yearCash.reduce(function(s, c) { return s + (c.direction === 'Out' ? (parseFloat(c.amount) || 0) : 0); }, 0);
+
+    var yearRentals = rentals.filter(function(r) { return inYear(r.date); });
+    var rentalTotal = yearRentals.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
+    var earningsByCategory = {};
+    yearRentals.forEach(function(r) {
+      var cat = r.name || 'Other';
+      earningsByCategory[cat] = (earningsByCategory[cat] || 0) + (parseFloat(r.amount) || 0);
+    });
+
+    // "Office Cash Flow" = Creative Rentals (earnings) + Cash Log, matching the Financials page's own grouping.
+    var cashIn = cashLogIn + rentalTotal;
+
+    var totalIncome = donationTotal + totalEarnings + cashIn + sponsorCash;
+    var totalOutflow = totalPurchases + cashOut;
+
+    return {
+      donationTotal: donationTotal, donationsByType: donationsByType,
+      currentSponsors: currentSponsors, sponsorCash: sponsorCash, sponsorInKind: sponsorInKind, sponsorDiscount: sponsorDiscount, sponsorUntagged: sponsorUntagged, sponsorEntriesBySponsor: sponsorEntriesBySponsor,
+      areaRows: areaRows, totalPurchases: totalPurchases, totalInKind: totalInKind, totalEarnings: totalEarnings,
+      pendingReimb: pendingReimb, cashIn: cashIn, cashOut: cashOut, rentalTotal: rentalTotal, earningsByCategory: earningsByCategory,
+      totalIncome: totalIncome, totalOutflow: totalOutflow, net: totalIncome - totalOutflow
+    };
+  }, [donations, sponsors, budget, earnings, cashLog, rentals, sponsorInKindEntries, year]);
+
+  var card = { background: '#faf8f5', borderRadius: 10, padding: '14px 16px' };
+  var cardLabel = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 };
+  var cardValue = { fontSize: 19, fontWeight: 700, marginTop: 5 };
+  var yearOptions = [thisYear];
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: '#888' }}>Combined view across donations, in-kind sponsorships, operational budgets, and office cash flow.</div>
+        <select value={year} onChange={function(e) { setYear(parseInt(e.target.value)); }} style={{ padding: '7px 12px', borderRadius: 8, border: '0.5px solid #e0d8cc', fontSize: 13, background: '#fff' }}>
+          {yearOptions.map(function(y) { return <option key={y} value={y}>{y}</option>; })}
+        </select>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            <div style={card}><div style={cardLabel}>Total Income</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(stats.totalIncome)}</div></div>
+            <div style={card}><div style={cardLabel}>Total Outflow</div><div style={{ ...cardValue, color: '#c07040' }}>{money(stats.totalOutflow)}</div></div>
+            <div style={card}><div style={cardLabel}>Net</div><div style={{ ...cardValue, color: stats.net >= 0 ? '#2e7d32' : '#c62828' }}>{stats.net >= 0 ? '' : '-'}{money(Math.abs(stats.net))}</div></div>
+            <div style={card}><div style={cardLabel}>In-Kind Total</div><div style={{ ...cardValue, color: '#886c44' }}>{money(stats.totalInKind + stats.sponsorInKind)}</div></div>
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 12 }}>Donations — {year}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: '#2e7d32', marginBottom: 12 }}>{money(stats.donationTotal)}</div>
+            {Object.keys(stats.donationsByType).length === 0 ? (
+              <div style={{ fontSize: 12, color: '#bbb' }}>No donations recorded for {year}.</div>
+            ) : Object.keys(stats.donationsByType).sort(function(a, b) { return stats.donationsByType[b] - stats.donationsByType[a]; }).map(function(t) {
+              return (
+                <div key={t} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12 }}>
+                  <span style={{ color: '#555' }}>{t}</span>
+                  <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(stats.donationsByType[t])}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>In-Kind Sponsorships</div>
+              <button onClick={function() { navigate('sponsors'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>Edit on Sponsors page</button>
+            </div>
+            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Current sponsors only, summed from each sponsor's tagged contributions (not year-filtered — sponsorships often span multiple years)</div>
+            <div style={{ display: 'flex', gap: 24, marginBottom: 14 }}>
+              <div><div style={cardLabel}>Current Sponsors</div><div style={{ ...cardValue, fontSize: 16 }}>{stats.currentSponsors.length}</div></div>
+              <div><div style={cardLabel}>Monetary Value</div><div style={{ ...cardValue, fontSize: 16, color: '#2e7d32' }}>{money(stats.sponsorCash)}</div></div>
+              <div><div style={cardLabel}>In-Kind (Work)</div><div style={{ ...cardValue, fontSize: 16, color: '#886c44' }}>{money(stats.sponsorInKind)}</div></div>
+              <div><div style={cardLabel}>Discount</div><div style={{ ...cardValue, fontSize: 16, color: '#1565c0' }}>{money(stats.sponsorDiscount)}</div></div>
+              {stats.sponsorUntagged > 0 && <div><div style={cardLabel}>Untagged</div><div style={{ ...cardValue, fontSize: 16, color: '#b45309' }}>{money(stats.sponsorUntagged)}</div></div>}
+            </div>
+            {stats.currentSponsors.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#bbb' }}>No current sponsors recorded.</div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', gap: 10, padding: '0 0 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, borderBottom: '0.5px solid #f0ece6' }}>
+                  <span style={{ flex: 1 }}>Business</span>
+                  <span style={{ width: 110, textAlign: 'right' }}>Total Value</span>
+                </div>
+                {stats.currentSponsors.map(function(sp) {
+                  var entries = stats.sponsorEntriesBySponsor[sp.id] || [];
+                  var total = entries.reduce(function(s, e) { return s + (parseFloat(e.value) || 0); }, 0);
+                  return (
+                    <div key={sp.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid #f9f6f2' }}>
+                      <span style={{ flex: 1, fontSize: 12, color: '#2a2a2a', fontWeight: 500 }}>{sp['Business Name'] || '—'}</span>
+                      <span style={{ width: 110, textAlign: 'right', fontSize: 12, fontWeight: 600, color: '#555' }}>{entries.length ? money(total) : '—'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Operational Areas — {year}</div>
+            <div style={{ display: 'flex', gap: 10, padding: '8px 18px 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>
+              <span style={{ flex: 1 }}>Area</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Budget</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Spent</span>
+              <span style={{ width: 90, textAlign: 'right' }}>In-Kind</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Earnings</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Remaining</span>
+            </div>
+            {stats.areaRows.length === 0 ? (
+              <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>No budget or earnings activity recorded for {year}.</div>
+            ) : stats.areaRows.map(function(r) {
+              var hasAllocated = r.allocated != null;
+              var remaining = hasAllocated ? r.allocated - r.purchases : null;
+              return (
+                <div key={r.area} style={{ display: 'flex', gap: 10, padding: '9px 18px', borderBottom: '0.5px solid #f9f6f2', fontSize: 12 }}>
+                  <span style={{ flex: 1, fontWeight: 500, color: '#2a2a2a' }}>{r.area}</span>
+                  <span style={{ width: 90, textAlign: 'right', fontWeight: 600, color: '#2a2a2a' }}>{hasAllocated ? money(r.allocated) : '—'}</span>
+                  <span style={{ width: 90, textAlign: 'right', color: '#c07040' }}>{r.purchases ? money(r.purchases) : '—'}</span>
+                  <span style={{ width: 90, textAlign: 'right', color: '#886c44' }}>{r.inKind ? money(r.inKind) : '—'}</span>
+                  <span style={{ width: 90, textAlign: 'right', color: '#5a8a5a' }}>{r.earnings ? money(r.earnings) : '—'}</span>
+                  <span style={{ width: 90, textAlign: 'right', fontWeight: 700, color: !hasAllocated ? '#bbb' : remaining >= 0 ? '#2e7d32' : '#c62828' }}>
+                    {!hasAllocated ? '—' : (remaining >= 0 ? '' : '-') + money(Math.abs(remaining))}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            <div style={card}><div style={cardLabel}>Office Cash In</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(stats.cashIn)}</div></div>
+            <div style={card}><div style={cardLabel}>Office Cash Out</div><div style={{ ...cardValue, color: '#c07040' }}>{money(stats.cashOut)}</div></div>
+            <div style={card}><div style={cardLabel}>Pending Reimbursements</div><div style={{ ...cardValue, color: '#b45309' }}>{money(stats.pendingReimb)}</div></div>
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Office Earnings by Category — {year}</div>
+            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Creative Rentals income, grouped by the same category picked when logging each earning</div>
+            {Object.keys(stats.earningsByCategory).length === 0 ? (
+              <div style={{ fontSize: 12, color: '#bbb' }}>No earnings recorded for {year}.</div>
+            ) : Object.keys(stats.earningsByCategory).sort(function(a, b) { return stats.earningsByCategory[b] - stats.earningsByCategory[a]; }).map(function(cat) {
+              return (
+                <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12 }}>
+                  <span style={{ color: '#555' }}>{cat}</span>
+                  <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(stats.earningsByCategory[cat])}</span>
+                </div>
+              );
+            })}
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FinancialsView({ navigate }) {
   var { useState, useEffect, useRef } = React;
 
   // Reimbursements
   var [items, setItems] = useState([]);
   var [loading, setLoading] = useState(true);
   var [markingId, setMarkingId] = useState(null);
+  var [noteBoxId, setNoteBoxId] = useState(null);
+  var [noteBoxAction, setNoteBoxAction] = useState(null);
+  var [noteDraft, setNoteDraft] = useState('');
+  var [reviewerName, setReviewerName] = useState(function() { try { return localStorage.getItem('nsh-reviewer-name') || ''; } catch (e) { return ''; } });
 
   // Earnings (Creative Rentals)
   var RENTAL_NAMES = ['Yoga with Teena Bates', 'Mahjong Group', 'Donation Box', 'Book Sales', 'Other'];
@@ -7390,6 +7838,7 @@ function FinancialsView() {
   var [resourceSaving, setResourceSaving] = useState(false);
   var resourceFileRef = useRef(null);
   var [showPnl, setShowPnl] = useState(false);
+  var [showAllReim, setShowAllReim] = useState(false);
 
 
   function loadReimbursements() {
@@ -7440,6 +7889,50 @@ function FinancialsView() {
       setMarkingId(null);
       setItems(function(prev) { return prev.filter(function(b) { return b.id !== id; }); });
     });
+  }
+
+  // Volunteer-submitted reimbursement workflow (rows with volunteer_auth_user_id set)
+  var REIM_STATUSES = ['Submitted', 'Pending Review', 'More Information Needed', 'Approved', 'Paid', 'Denied'];
+  var REIM_STATUS_COLORS = {
+    'Submitted': '#1d4ed8', 'Pending Review': '#92600c', 'More Information Needed': '#c2410c',
+    'Approved': '#15803d', 'Paid': '#15803d', 'Denied': '#c0392b'
+  };
+
+  function updateReimbursementStatus(id, status, reviewerNotes) {
+    setMarkingId(id);
+    try { localStorage.setItem('nsh-reviewer-name', reviewerName || ''); } catch (e) {}
+    var payload = { status: status, reviewed_at: new Date().toISOString(), reviewed_by: reviewerName || null };
+    if (reviewerNotes !== undefined) payload.reviewer_notes = reviewerNotes || null;
+    if (status === 'Paid' || status === 'Denied') payload.needs_reimbursement = false;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      clearCache('Op Budget');
+      setMarkingId(null);
+      setNoteBoxId(null);
+      setNoteBoxAction(null);
+      setNoteDraft('');
+      var updated = rows && rows[0];
+      if (payload.needs_reimbursement === false) {
+        setItems(function(prev) { return prev.filter(function(b) { return b.id !== id; }); });
+      } else if (updated) {
+        setItems(function(prev) { return prev.map(function(b) { return b.id === id ? updated : b; }); });
+      }
+    });
+  }
+
+  function openNoteBox(id, action) {
+    setNoteBoxId(id);
+    setNoteBoxAction(action);
+    setNoteDraft('');
+  }
+
+  function reimReceipts(receiptUrl) {
+    if (!receiptUrl) return [];
+    try { var p = JSON.parse(receiptUrl); if (Array.isArray(p)) return p; } catch (e) {}
+    return [receiptUrl];
   }
 
   function submitRental(e) {
@@ -7496,7 +7989,7 @@ function FinancialsView() {
       <button onClick={function() { setShowPnl(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Events Profit / Loss</button>
     </div>
     {showPnl && <EventsProfitLossModal onClose={function() { setShowPnl(false); }} />}
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
         <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
@@ -7504,7 +7997,12 @@ function FinancialsView() {
             <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Pending Reimbursements</div>
             {!loading && items.length > 0 && <div style={{ fontSize: 12, color: '#b45309', fontWeight: 600, marginTop: 2 }}>{fmt(reimTotal)} total · {items.length} item{items.length !== 1 ? 's' : ''}</div>}
           </div>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button onClick={function() { setShowAllReim(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>See All Past Reimbursements</button>
+            <button onClick={function() { navigate('financial-overview'); }} style={{ background: gold, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>View All Financials</button>
+          </div>
         </div>
+        {showAllReim && <AllReimbursementsModal onClose={function() { setShowAllReim(false); }} />}
         {loading ? (
           <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
         ) : items.length === 0 ? (
@@ -7526,27 +8024,96 @@ function FinancialsView() {
                   var isMarking = markingId === b.id;
                   var volMatch = b.volunteer_name && volList.find(function(v) { return ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim() === b.volunteer_name; });
                   var volAddress = volMatch && volMatch['Address'];
-                  return (
-                    <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
-                        {b.volunteer_name && (
-                          <div style={{ fontSize: 11, color: '#2e7d32', fontWeight: 500, marginTop: 2 }}>
-                            {b.volunteer_name}{volAddress ? <span style={{ color: '#888', fontWeight: 400 }}> · {volAddress}</span> : null}
-                          </div>
+
+                  // Legacy Portal-logged reimbursement (no Volunteer Hub identity) — unchanged behavior.
+                  if (!b.volunteer_auth_user_id) {
+                    return (
+                      <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
+                          {b.volunteer_name && (
+                            <div style={{ fontSize: 11, color: '#2e7d32', fontWeight: 500, marginTop: 2 }}>
+                              {b.volunteer_name}{volAddress ? <span style={{ color: '#888', fontWeight: 400 }}> · {volAddress}</span> : null}
+                            </div>
+                          )}
+                          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
+                        {b.receipt_url && (
+                          <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                          </a>
                         )}
-                        <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: isMarking ? 'default' : 'pointer', flexShrink: 0 }}>
+                          <input type="checkbox" checked={false} disabled={isMarking} onChange={function() { markReimbursed(b.id); }} style={{ accentColor: '#059669', width: 14, height: 14 }} />
+                          <span style={{ fontSize: 11, color: '#059669', fontWeight: 500 }}>{isMarking ? '…' : 'Reimbursed'}</span>
+                        </label>
                       </div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', flexShrink: 0 }}>{fmt(parseFloat(b.amount) || 0)}</div>
-                      {b.receipt_url && (
-                        <a href={b.receipt_url} target="_blank" title="View receipt" style={{ color: gold, textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                        </a>
+                    );
+                  }
+
+                  // Volunteer Hub submission — full status workflow.
+                  var receipts = reimReceipts(b.receipt_url);
+                  var statusColor = REIM_STATUS_COLORS[b.status] || '#666';
+                  var noteOpen = noteBoxId === b.id;
+                  return (
+                    <div key={b.id} style={{ padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
+                          <div style={{ fontSize: 11, color: '#2e7d32', fontWeight: 500, marginTop: 2 }}>
+                            {b.volunteer_name || 'Volunteer'}{volAddress ? <span style={{ color: '#888', fontWeight: 400 }}> · {volAddress}</span> : null}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>
+                            {b.date || ''}{b.event_name ? ' · ' + b.event_name : ''}
+                          </div>
+                          {b.notes && <div style={{ fontSize: 11, color: '#888', marginTop: 4, fontStyle: 'italic' }}>"{b.notes}"</div>}
+                          {b.reviewer_notes && (b.status === 'More Information Needed' || b.status === 'Denied') && (
+                            <div style={{ fontSize: 11, color: statusColor, marginTop: 4 }}><strong>Note sent:</strong> {b.reviewer_notes}</div>
+                          )}
+                          {receipts.length > 0 && (
+                            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                              {receipts.map(function(url, i) {
+                                return <a key={i} href={url} target="_blank" style={{ fontSize: 11, color: gold }}>Receipt{receipts.length > 1 ? ' ' + (i + 1) : ''}</a>;
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{fmt(parseFloat(b.amount) || 0)}</div>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: statusColor, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>{b.status || 'Submitted'}</div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                        {b.status === 'Submitted' && (
+                          <button disabled={isMarking} onClick={function() { updateReimbursementStatus(b.id, 'Pending Review'); }} style={{ fontSize: 11, background: '#f5f0ea', color: '#666', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>Start Review</button>
+                        )}
+                        {(b.status === 'Submitted' || b.status === 'Pending Review') && (
+                          <>
+                            <button disabled={isMarking} onClick={function() { updateReimbursementStatus(b.id, 'Approved', ''); }} style={{ fontSize: 11, background: '#e3f6ec', color: '#15803d', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>Approve</button>
+                            <button disabled={isMarking} onClick={function() { openNoteBox(b.id, 'more_info'); }} style={{ fontSize: 11, background: '#fde8e0', color: '#c2410c', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>Request Info</button>
+                            <button disabled={isMarking} onClick={function() { openNoteBox(b.id, 'deny'); }} style={{ fontSize: 11, background: '#fbe4e4', color: '#c0392b', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>Deny</button>
+                          </>
+                        )}
+                        {b.status === 'Approved' && (
+                          <button disabled={isMarking} onClick={function() { updateReimbursementStatus(b.id, 'Paid', ''); }} style={{ fontSize: 11, background: '#e3f6ec', color: '#15803d', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>{isMarking ? 'Saving…' : 'Mark Paid'}</button>
+                        )}
+                        {b.status === 'More Information Needed' && (
+                          <div style={{ fontSize: 11, color: '#c2410c' }}>Waiting on volunteer to resubmit.</div>
+                        )}
+                      </div>
+
+                      {noteOpen && (
+                        <div style={{ marginTop: 8, background: '#fdfcfb', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: 10 }}>
+                          <input placeholder="Your name (shown as reviewer)" value={reviewerName} onChange={function(e) { setReviewerName(e.target.value); }} style={{ width: '100%', padding: '6px 9px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, marginBottom: 6, boxSizing: 'border-box' }} />
+                          <textarea placeholder={noteBoxAction === 'deny' ? 'Reason for denial (sent to volunteer)' : 'What additional info is needed?'} value={noteDraft} onChange={function(e) { setNoteDraft(e.target.value); }} rows={2} style={{ width: '100%', padding: '6px 9px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', resize: 'vertical' }} />
+                          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                            <button onClick={function() { setNoteBoxId(null); setNoteBoxAction(null); }} style={{ fontSize: 11, background: '#f5f0ea', color: '#666', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}>Cancel</button>
+                            <button disabled={!noteDraft.trim()} onClick={function() { updateReimbursementStatus(b.id, noteBoxAction === 'deny' ? 'Denied' : 'More Information Needed', noteDraft.trim()); }} style={{ fontSize: 11, background: noteBoxAction === 'deny' ? '#c0392b' : '#c2410c', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', opacity: !noteDraft.trim() ? 0.6 : 1 }}>{noteBoxAction === 'deny' ? 'Confirm Deny' : 'Send Request'}</button>
+                          </div>
+                        </div>
                       )}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: isMarking ? 'default' : 'pointer', flexShrink: 0 }}>
-                        <input type="checkbox" checked={false} disabled={isMarking} onChange={function() { markReimbursed(b.id); }} style={{ accentColor: '#059669', width: 14, height: 14 }} />
-                        <span style={{ fontSize: 11, color: '#059669', fontWeight: 500 }}>{isMarking ? '…' : 'Reimbursed'}</span>
-                      </label>
                     </div>
                   );
                 })}
@@ -7561,7 +8128,9 @@ function FinancialsView() {
         )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#2a2a2a', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>Office Cash Flow</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
         <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
           <div>
@@ -7688,9 +8257,10 @@ function FinancialsView() {
           </div>
         );
       })()}
+        </div>
       </div>
 
-      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden', gridColumn: 1 }}>
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
       <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Resources</div>
       </div>
@@ -7912,6 +8482,7 @@ function IdeasView() {
       if (!r.ok) { return r.json().then(function(e) { alert('Error: ' + (e.message || JSON.stringify(e))); setSaving(false); }); }
       return r.json().then(function(rows) {
         setSaving(false);
+        logActivity('New idea submitted: ' + payload.title + (payload.submitted_by ? ' (by ' + payload.submitted_by + ')' : ''), 'idea_submitted');
         setForm(emptyForm); setShowAdd(false);
         var newStatus = payload.status;
         setMainTab(['Active','On Hold','Completed','Inactive'].includes(newStatus) ? 'initiatives' : 'ideas');
@@ -9146,6 +9717,7 @@ function WixFormsView({ navigate }) {
     var newStatus = sub.status === 'handled' ? '' : 'handled';
     upsertOverride(sub, { status: newStatus }).then(function(r) {
       if (r.ok) {
+        if (newStatus === 'handled') logActivity((sub.form_name || 'A form') + ' submission was marked handled', 'form_handled');
         setData(function(prev) { return prev ? { submissions: prev.submissions.map(function(s) { return s.id === sub.id ? Object.assign({}, s, { status: newStatus }) : s; }) } : prev; });
         setSelected(function(prev) { return prev && prev.id === sub.id ? Object.assign({}, prev, { status: newStatus }) : prev; });
       }
@@ -9671,6 +10243,7 @@ const views = {
   ideas: IdeasView,
   operational: OperationalView,
   financials: FinancialsView,
+  'financial-overview': FinancialOverviewView,
   reviews: ReviewsView,
   'quarter-workspace': QuarterWorkspaceView,
   admin: AdminView,
@@ -9800,6 +10373,17 @@ function Dashboard() {
               }}>
               Financials
             </button>
+            <button onClick={function() { navigate("financial-overview"); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 16px",
+                background: active === "financial-overview" ? "rgba(181,161,133,0.15)" : "transparent",
+                border: "none", cursor: "pointer", textAlign: "left",
+                color: active === "financial-overview" ? "#b5a185" : "rgba(255,255,255,0.45)",
+                fontSize: 13, fontWeight: active === "financial-overview" ? 600 : 400,
+                transition: "all 0.15s"
+              }}>
+              Financial Overview
+            </button>
             <button onClick={function() { navigate("reviews"); }}
               style={{
                 display: "block", width: "100%", padding: "9px 16px",
@@ -9865,6 +10449,7 @@ function Dashboard() {
                 })}
                 <div style={{ borderTop: '0.5px solid rgba(255,255,255,0.08)', margin: '8px 4px' }} />
                 <button onClick={function() { navigate('financials'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'financials' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financials' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financials' ? 600 : 400, marginBottom: 2 }}>Financials</button>
+                <button onClick={function() { navigate('financial-overview'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'financial-overview' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financial-overview' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financial-overview' ? 600 : 400, marginBottom: 2 }}>Financial Overview</button>
                 <button onClick={function() { navigate('reviews'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'reviews' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'reviews' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'reviews' ? 600 : 400, marginBottom: 2 }}>Reviews</button>
                 <button onClick={function() { navigate('admin'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'admin' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'admin' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'admin' ? 600 : 400, marginBottom: 2 }}>Admin</button>
               </div>
@@ -9881,7 +10466,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Financials" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Financials" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
