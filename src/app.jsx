@@ -4988,6 +4988,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
   var [leadInput, setLeadInput] = useState('');
   var [showEarnings, setShowEarnings] = useState(false);
   var [showPnl, setShowPnl] = useState(false);
+  var [volCopied, setVolCopied] = useState(null);
   var [earnings, setEarnings] = useState([]);
   var emptyEarningsForm = { event: '', earning_source: '', amount: '', notes: '', date: today };
   var [earningsForm, setEarningsForm] = useState(emptyEarningsForm);
@@ -6059,6 +6060,26 @@ function OperationalView({ opArea, navigateToQuarterly }) {
               <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>{area} Volunteers ({vols.length})</div>
               <button onClick={function() { setShowVols(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>x</button>
             </div>
+            {vols.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                <button onClick={function() {
+                  var emails = vols.filter(function(v) { return v['Email'] && v['Email'].trim(); }).map(function(v) { return v['Email'].trim(); }).join(', ');
+                  navigator.clipboard.writeText(emails);
+                  setVolCopied('emails');
+                  setTimeout(function() { setVolCopied(null); }, 2000);
+                }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', fontSize: 12, border: '0.5px solid #e0d8cc', borderRadius: 7, background: '#fff', color: volCopied === 'emails' ? '#2e7d32' : '#666', cursor: 'pointer' }}>
+                  {volCopied === 'emails' ? '✓ Copied' : '⧉ Copy Emails'}
+                </button>
+                <button onClick={function() {
+                  var lines = vols.filter(function(v) { return v['Email'] && v['Email'].trim(); }).map(function(v) { return ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim() + ' - ' + v['Email'].trim(); }).join('\n');
+                  navigator.clipboard.writeText(lines);
+                  setVolCopied('names');
+                  setTimeout(function() { setVolCopied(null); }, 2000);
+                }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', fontSize: 12, border: '0.5px solid #e0d8cc', borderRadius: 7, background: '#fff', color: volCopied === 'names' ? '#2e7d32' : '#666', cursor: 'pointer' }}>
+                  {volCopied === 'names' ? '✓ Copied' : '⧉ Copy Names - Emails'}
+                </button>
+              </div>
+            )}
             {vols.length === 0 ? (
               <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No volunteers assigned to {area}.</div>
             ) : vols.map(function(v) {
