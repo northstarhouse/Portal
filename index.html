@@ -30,7 +30,20 @@
 </head>
 <body>
   <div id="root"></div>
-  <script src="assets/app.js?v=393" defer></script>
-  <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/Portal/sw.js'); }</script>
+  <script src="assets/app.js?v=1784830578747" defer></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      // updateViaCache: 'none' forces the browser to always fetch sw.js itself fresh from the
+      // network on every check, instead of possibly serving a browser-HTTP-cached copy of the
+      // service worker script -- without this, an old SW can look "up to date" to the browser
+      // even after a new one is deployed, and users get stuck on stale cached content.
+      navigator.serviceWorker.register('/Portal/sw.js', { updateViaCache: 'none' });
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (window.__nshSwReloaded) return;
+        window.__nshSwReloaded = true;
+        window.location.reload();
+      });
+    }
+  </script>
 </body>
 </html>
