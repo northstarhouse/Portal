@@ -247,7 +247,7 @@ async function mergeDocxTemplate(templateBytes: Uint8Array, variables: Record<st
   }
 
   zip.file("word/document.xml", xml);
-  const outBytes = await zip.generateAsync({ type: "uint8array" });
+  const outBytes = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 6 } });
   return { bytes: outBytes };
 }
 
@@ -500,6 +500,44 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
+
+    if (req.method === "GET" && url.searchParams.get("selfTestMerge")) {
+      const templatePath = url.searchParams.get("selfTestMerge") || "membership.docx";
+      const started = Date.now();
+      const bytes = await fetchStorageFile(templatePath);
+      const fetchMs = Date.now() - started;
+
+      const dummyVars: Record<string, string> = {
+        DonorName: "Jane Test Donor", Address: "123 Main St\nGrass Valley, CA 95945",
+        Name: "Jane", Amount: "$100.00", Date: "July 23, 2026",
+        "Restricted Purpose / Project": "Test Project", "Name of Honoree": "Test Honoree",
+        "Description of Donated Goods/Services": "Test Goods", "Estimated Value": "$50.00",
+        RETURN_ADDRESS_LINE1: "North Star Historic Conservancy", RETURN_ADDRESS_LINE2: "PO Box 1538",
+        RETURN_ADDRESS_CITY_STATE_ZIP: "Grass Valley, CA 95945",
+        RECIPIENT_NAME: "Jane Test Donor", RECIPIENT_ADDRESS_LINE1: "123 Main St", RECIPIENT_ADDRESS_LINE2: "",
+        RECIPIENT_CITY_STATE_ZIP: "Grass Valley, CA 95945",
+      };
+      try {
+        const { bytes: mergedBytes } = await mergeDocxTemplate(bytes, dummyVars);
+        return json({
+          success: true,
+          templatePath,
+          fetchedBytes: bytes.length,
+          fetchMs,
+          mergedBytes: mergedBytes.length,
+          totalMs: Date.now() - started,
+        });
+      } catch (mergeErr: any) {
+        return json({
+          success: false,
+          step: "merge",
+          templatePath,
+          fetchedBytes: bytes.length,
+          fetchMs,
+          error: mergeErr.message || String(mergeErr),
+        });
+      }
+    }
 
     if (req.method === "GET" && url.searchParams.get("selfTestDrive")) {
       const started = Date.now();
