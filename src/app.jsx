@@ -505,7 +505,7 @@ const typeColors = {
         else setOotNotices([]);
       }).catch(function() { setOotNotices([]); });
     })();
-    fetch(SUPABASE_URL + '/rest/v1/activity_log?select=*&order=created_at.desc&limit=15', {
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?select=*&order=created_at.desc&limit=7', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
       setActivity(Array.isArray(rows) ? rows : []);
@@ -2682,6 +2682,29 @@ var NSH_STATUS_PILLS={current:{background:'#d1fae5',color:'#065f46'},recently_la
 var NSH_STATUS_LABELS={current:'Current',recently_lapsed:'Lapsed',long_lapsed:'Long Lapsed',non_donor:'Non-donor'};
 var NSH_TYPE_COLORS={'Donation':{bg:'#dbeafe',color:'#1d4ed8'},'Membership':{bg:'#d1fae5',color:'#065f46'},'Restricted':{bg:'#fce7f3',color:'#831843'},'Membership, Donation':{bg:'#ede9fe',color:'#5b21b6'},'Brick Purchase':{bg:'#fee2e2',color:'#7f1d1d'},'Tribute':{bg:'#fef9c3',color:'#713f12'}};
 
+var ACK_TYPES=['Membership','General Donation','Event Donation','Sponsorship','Brick Purchase','In-Kind Donation','Memorial Donation','Honorary Donation','Other'];
+var ACK_STATUS_LABELS={not_required:'Not Required',needs_review:'Needs Review',ready_to_generate:'Ready to Generate',generated:'Generated',printed:'Printed',mailed:'Mailed',email_sent:'Email Sent',error:'Error'};
+var ACK_STATUS_PILLS={
+  not_required:{background:'#f3f4f6',color:'#6b7280'},
+  needs_review:{background:'#fef9c3',color:'#713f12'},
+  ready_to_generate:{background:'#e0f2fe',color:'#075985'},
+  generated:{background:'#d1fae5',color:'#065f46'},
+  printed:{background:'#ede9fe',color:'#5b21b6'},
+  mailed:{background:'#dcfce7',color:'#166534'},
+  email_sent:{background:'#dcfce7',color:'#166534'},
+  error:{background:'#fee2e2',color:'#7f1d1d'},
+};
+function ackRequiredFields(type){
+  if(type==='Membership')return ['membership_level'];
+  if(type==='Event Donation')return ['event_name'];
+  if(type==='Sponsorship')return ['sponsorship_level'];
+  if(type==='Brick Purchase')return ['brick_inscription'];
+  if(type==='In-Kind Donation')return ['in_kind_description'];
+  if(type==='Memorial Donation')return ['memorial_recipient'];
+  if(type==='Honorary Donation')return ['honoree_name'];
+  return [];
+}
+
 function DonorsView() {
   var THIS_YEAR = new Date().getFullYear();
   var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
@@ -2709,6 +2732,14 @@ function DonorsView() {
   const [addMode, setAddMode] = useState('search');
   const [addSearchQuery, setAddSearchQuery] = useState('');
   const [addExistingDonor, setAddExistingDonor] = useState(null);
+  const [donorFieldsForm, setDonorFieldsForm] = useState(null);
+  const [savingDonorFields, setSavingDonorFields] = useState(false);
+  const [ackDonation, setAckDonation] = useState(null);
+  const [ackStep, setAckStep] = useState(null);
+  const [ackOverrides, setAckOverrides] = useState({});
+  const [ackGenerating, setAckGenerating] = useState(false);
+  const [ackError, setAckError] = useState(null);
+  const [ackResult, setAckResult] = useState(null);
 
   var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
   var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
@@ -2816,6 +2847,67 @@ function DonorsView() {
     setSelected(function(prev){if(!prev||prev.id!==donorId)return prev;var newD=updater(prev);return buildDonor(Object.assign({},prev),newD.donations);});
   }
 
+  function saveDonorFields(e){
+    e.preventDefault();setSavingDonorFields(true);
+    var patch={preferred_letter_greeting:donorFieldsForm.preferred_letter_greeting||null,joint_donor_name:donorFieldsForm.joint_donor_name||null,
+      mailing_address_line1:donorFieldsForm.mailing_address_line1||null,mailing_address_line2:donorFieldsForm.mailing_address_line2||null,
+      mailing_city:donorFieldsForm.mailing_city||null,mailing_state:donorFieldsForm.mailing_state||null,mailing_zip:donorFieldsForm.mailing_zip||null};
+    fetch(SUPABASE_URL+'/rest/v1/donors?id=eq.'+selected.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(patch)})
+      .then(function(r){return r.json();}).then(function(rows){
+        setSavingDonorFields(false);
+        var updated=Array.isArray(rows)?rows[0]:rows;
+        setDonors(function(prev){return prev.map(function(d){return d.id===selected.id?Object.assign({},d,updated):d;});});
+        setSelected(function(prev){return prev?Object.assign({},prev,updated):prev;});
+        setDonorFieldsForm(null);
+      }).catch(function(){setSavingDonorFields(false);});
+  }
+
+  function openGenerateFlow(don){
+    setAckDonation(don);setAckError(null);setAckResult(null);
+    if(don.letter_drive_url){setAckStep('exists-choice');}
+    else{prepareReview(don);}
+  }
+
+  function prepareReview(don){
+    var donor=selected;
+    var isOrg=['Organization','Corporate','Foundation'].indexOf(donor.account_type)!==-1;
+    var lastName=(donor.formal_name||'').trim().split(/\s+/).pop();
+    var firstName=donor.informal_first_name||(donor.formal_name||'').replace(new RegExp('\\s*'+lastName+'$'),'');
+    var defaultGreeting=isOrg?('Friends at '+donor.formal_name):(donor.joint_donor_name?(firstName+' and '+donor.joint_donor_name):(donor.informal_first_name||donor.formal_name));
+    var defaultMailingName=isOrg?donor.formal_name:(donor.joint_donor_name?(firstName+' and '+donor.joint_donor_name+' '+lastName):donor.formal_name);
+    setAckOverrides({
+      greeting:donor.preferred_letter_greeting||defaultGreeting,
+      mailingName:defaultMailingName,
+      signerName:don.signer_name||'',
+      signerTitle:don.signer_title||'',
+      letterDate:new Date().toISOString().slice(0,10),
+    });
+    setAckStep('review');
+  }
+
+  function confirmGenerate(){
+    setAckStep('generating');setAckGenerating(true);setAckError(null);
+    fetch(SUPABASE_URL+'/functions/v1/generate-acknowledgment',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({donationId:ackDonation.id,overrides:ackOverrides})})
+      .then(function(r){return r.json();}).then(function(data){
+        setAckGenerating(false);
+        if(!data.success){setAckError(data.error||'Generation failed');setAckStep('error');return;}
+        setAckResult(data);setAckStep('result');
+        if(selected)updateDonorInState(selected.id,function(d){return{donations:d.donations.map(function(x){return x.id===ackDonation.id?Object.assign({},x,{acknowledgment_status:'generated',letter_drive_url:data.letterUrl,envelope_drive_url:data.envelopeUrl,document_version:(x.document_version||0)+1}):x;})};});
+      }).catch(function(err){setAckGenerating(false);setAckError(err.message);setAckStep('error');});
+  }
+
+  function closeAckFlow(){setAckStep(null);setAckDonation(null);setAckResult(null);setAckError(null);}
+
+  function markAckStatus(don,status){
+    var patch=status==='printed'?{acknowledgment_status:'printed',date_printed:new Date().toISOString()}:{acknowledgment_status:'mailed',date_mailed:new Date().toISOString()};
+    fetch(SUPABASE_URL+'/rest/v1/donations?id=eq.'+don.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(patch)})
+      .then(function(r){return r.json();}).then(function(rows){
+        var updated=Array.isArray(rows)?rows[0]:rows;
+        if(selected)updateDonorInState(selected.id,function(d){return{donations:d.donations.map(function(x){return x.id===don.id?Object.assign({},x,updated):x;})};});
+      });
+  }
+
   function deleteDonation(don){
     if(!window.confirm('Delete this donation? This cannot be undone.'))return;
     fetch(SUPABASE_URL+'/rest/v1/donations?id=eq.'+don.id,{method:'DELETE',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}})
@@ -2827,7 +2919,29 @@ function DonorsView() {
 
   function saveEditDonation(e){
     e.preventDefault();setEditSaving(true);
-    var patch={amount:parseFloat(String(editForm.amount||0).replace(/[^\d.]/g,'')||0),date:editForm.date,type:editForm.type,payment_type:editForm.payment_type||null,acknowledged:!!editForm.acknowledged,donation_notes:editForm.donation_notes||null};
+    var patch={amount:parseFloat(String(editForm.amount||0).replace(/[^\d.]/g,'')||0),date:editForm.date,type:editForm.type,payment_type:editForm.payment_type||null,acknowledged:!!editForm.acknowledged,donation_notes:editForm.donation_notes||null,
+      acknowledgment_type:editForm.acknowledgment_type||null,
+      membership_level:editForm.membership_level||null,
+      membership_start_date:editForm.membership_start_date||null,
+      membership_expiration_date:editForm.membership_expiration_date||null,
+      event_name:editForm.event_name||null,
+      sponsorship_level:editForm.sponsorship_level||null,
+      brick_inscription:editForm.brick_inscription||null,
+      memorial_recipient:editForm.memorial_recipient||null,
+      honoree_name:editForm.honoree_name||null,
+      in_kind_description:editForm.in_kind_description||null,
+      in_kind_value:editForm.in_kind_value?parseFloat(editForm.in_kind_value):null,
+      tax_deductible_amount:editForm.tax_deductible_amount?parseFloat(editForm.tax_deductible_amount):null,
+      goods_services_value:editForm.goods_services_value?parseFloat(editForm.goods_services_value):null,
+      check_number:editForm.check_number||null,
+      signer_name:editForm.signer_name||null,
+      signer_title:editForm.signer_title||null,
+    };
+    var lockedStatuses=['generated','printed','mailed','email_sent'];
+    if(editForm.acknowledgment_type&&lockedStatuses.indexOf(editForm.acknowledgment_status)===-1){
+      var missingField=ackRequiredFields(editForm.acknowledgment_type).some(function(f){return !editForm[f];});
+      patch.acknowledgment_status=missingField?'needs_review':'ready_to_generate';
+    }
     fetch(SUPABASE_URL+'/rest/v1/donations?id=eq.'+editDon.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(patch)})
       .then(function(r){return r.json();}).then(function(rows){
         setEditSaving(false);
@@ -3104,6 +3218,38 @@ function DonorsView() {
               {selected.address && <div><span style={{color:'#777'}}>Address </span><span style={{whiteSpace:'pre-line'}}>{selected.address}</span></div>}
             </div>
 
+            {/* Letter greeting + structured mailing address, used for acknowledgment generation */}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={sec}>Letter & Mailing</span>
+              {!donorFieldsForm && <button onClick={function(){setDonorFieldsForm({preferred_letter_greeting:selected.preferred_letter_greeting||'',joint_donor_name:selected.joint_donor_name||'',mailing_address_line1:selected.mailing_address_line1||'',mailing_address_line2:selected.mailing_address_line2||'',mailing_city:selected.mailing_city||'',mailing_state:selected.mailing_state||'',mailing_zip:selected.mailing_zip||''});}} style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'2px 10px',cursor:'pointer'}}>Edit</button>}
+            </div>
+            {donorFieldsForm ? (
+              <form onSubmit={saveDonorFields} style={{background:'#faf8f4',borderRadius:8,padding:'12px 14px',border:'0.5px solid #e0d8cc',marginBottom:10}}>
+                <div style={{marginBottom:8}}><label style={lStyle}>Preferred Letter Greeting</label><input value={donorFieldsForm.preferred_letter_greeting} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{preferred_letter_greeting:e.target.value});});}} placeholder="e.g. Jane and Robert" style={iStyle} /></div>
+                <div style={{marginBottom:8}}><label style={lStyle}>Joint Donor / Spouse Name</label><input value={donorFieldsForm.joint_donor_name} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{joint_donor_name:e.target.value});});}} placeholder="e.g. Robert" style={iStyle} /></div>
+                <div style={{marginBottom:8}}><label style={lStyle}>Mailing Address Line 1</label><input value={donorFieldsForm.mailing_address_line1} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{mailing_address_line1:e.target.value});});}} style={iStyle} /></div>
+                <div style={{marginBottom:8}}><label style={lStyle}>Mailing Address Line 2</label><input value={donorFieldsForm.mailing_address_line2} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{mailing_address_line2:e.target.value});});}} style={iStyle} /></div>
+                <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:8,marginBottom:10}}>
+                  <div><label style={lStyle}>City</label><input value={donorFieldsForm.mailing_city} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{mailing_city:e.target.value});});}} style={iStyle} /></div>
+                  <div><label style={lStyle}>State</label><input value={donorFieldsForm.mailing_state} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{mailing_state:e.target.value});});}} style={iStyle} /></div>
+                  <div><label style={lStyle}>ZIP</label><input value={donorFieldsForm.mailing_zip} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{mailing_zip:e.target.value});});}} style={iStyle} /></div>
+                </div>
+                <div style={{display:'flex',gap:8}}>
+                  <button type="submit" disabled={savingDonorFields} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:6,padding:'7px',fontSize:12,fontWeight:500,cursor:'pointer',opacity:savingDonorFields?0.7:1}}>{savingDonorFields?'Saving...':'Save'}</button>
+                  <button type="button" onClick={function(){setDonorFieldsForm(null);}} style={{padding:'7px 12px',background:'#f5f0ea',border:'none',borderRadius:6,fontSize:12,color:'#666',cursor:'pointer'}}>Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <div style={{fontSize:12,lineHeight:1.7,marginBottom:8,color:'#444'}}>
+                {selected.preferred_letter_greeting && <div><span style={{color:'#777'}}>Greeting </span>"{selected.preferred_letter_greeting}"</div>}
+                {selected.mailing_address_line1 ? (
+                  <div style={{whiteSpace:'pre-line'}}>{[selected.mailing_address_line1,selected.mailing_address_line2,[selected.mailing_city,selected.mailing_state,selected.mailing_zip].filter(Boolean).join(', ')].filter(Boolean).join('\n')}</div>
+                ) : (
+                  <div style={{color:'#c0392b'}}>No structured mailing address — envelopes can't be generated until one is added.</div>
+                )}
+              </div>
+            )}
+
             {selected.background && <div style={{marginBottom:10}}><span style={sec}>Background</span><div style={{fontSize:12,background:'#faf8f4',borderRadius:8,padding:'8px 12px',color:'#444',lineHeight:1.6}}>{selected.background}</div></div>}
             {selected.first_connected && <div style={{marginBottom:10}}><span style={sec}>What Ties Them to NSH</span><div style={{fontSize:12,background:'#faf8f4',borderRadius:8,padding:'8px 12px',color:'#444',lineHeight:1.6}}>{selected.first_connected}</div></div>}
             {selected.donor_notes && <div style={{marginBottom:10}}><span style={sec}>Donor Notes</span><div style={{fontSize:12,background:'#faf8f4',borderRadius:8,padding:'8px 12px',color:'#444',lineHeight:1.6}}>{selected.donor_notes}</div></div>}
@@ -3144,6 +3290,51 @@ function DonorsView() {
                               </div>
                               <div style={{marginBottom:8}}><label style={lStyle}>Notes</label><textarea value={editForm.donation_notes||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{donation_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
                               <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,marginBottom:10,cursor:'pointer'}}><input type="checkbox" checked={!!editForm.acknowledged} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{acknowledged:e.target.checked});});}} /> Acknowledged</label>
+
+                              <span style={sec}>Acknowledgment</span>
+                              <div style={{marginBottom:8}}><label style={lStyle}>Acknowledgment Type *</label>
+                                <select required value={editForm.acknowledgment_type||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{acknowledgment_type:e.target.value});});}} style={iStyle}>
+                                  <option value="">Select type…</option>
+                                  {ACK_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                                </select>
+                              </div>
+                              {editForm.acknowledgment_type==='Membership' && (
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:8}}>
+                                  <div><label style={lStyle}>Level</label><input value={editForm.membership_level||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{membership_level:e.target.value});});}} style={iStyle} /></div>
+                                  <div><label style={lStyle}>Start</label><input type="date" value={editForm.membership_start_date||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{membership_start_date:e.target.value});});}} style={iStyle} /></div>
+                                  <div><label style={lStyle}>Expires</label><input type="date" value={editForm.membership_expiration_date||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{membership_expiration_date:e.target.value});});}} style={iStyle} /></div>
+                                </div>
+                              )}
+                              {editForm.acknowledgment_type==='Event Donation' && (
+                                <div style={{marginBottom:8}}><label style={lStyle}>Event Name</label><input value={editForm.event_name||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{event_name:e.target.value});});}} style={iStyle} /></div>
+                              )}
+                              {editForm.acknowledgment_type==='Sponsorship' && (
+                                <div style={{marginBottom:8}}><label style={lStyle}>Sponsorship Level</label><input value={editForm.sponsorship_level||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{sponsorship_level:e.target.value});});}} style={iStyle} /></div>
+                              )}
+                              {editForm.acknowledgment_type==='Brick Purchase' && (
+                                <div style={{marginBottom:8}}><label style={lStyle}>Brick Inscription</label><input value={editForm.brick_inscription||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{brick_inscription:e.target.value});});}} style={iStyle} /></div>
+                              )}
+                              {editForm.acknowledgment_type==='Memorial Donation' && (
+                                <div style={{marginBottom:8}}><label style={lStyle}>Memorial Recipient</label><input value={editForm.memorial_recipient||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{memorial_recipient:e.target.value});});}} style={iStyle} /></div>
+                              )}
+                              {editForm.acknowledgment_type==='Honorary Donation' && (
+                                <div style={{marginBottom:8}}><label style={lStyle}>Honoree Name</label><input value={editForm.honoree_name||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{honoree_name:e.target.value});});}} style={iStyle} /></div>
+                              )}
+                              {editForm.acknowledgment_type==='In-Kind Donation' && (
+                                <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:8,marginBottom:8}}>
+                                  <div><label style={lStyle}>Description of Goods/Services</label><input value={editForm.in_kind_description||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{in_kind_description:e.target.value});});}} style={iStyle} /></div>
+                                  <div><label style={lStyle}>Estimated Value</label><input value={editForm.in_kind_value||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{in_kind_value:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
+                                </div>
+                              )}
+                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                                <div><label style={lStyle}>Tax-Deductible Amount</label><input value={editForm.tax_deductible_amount||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{tax_deductible_amount:e.target.value});});}} style={iStyle} placeholder="Leave blank = full amount" /></div>
+                                <div><label style={lStyle}>Goods/Services Value</label><input value={editForm.goods_services_value||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{goods_services_value:e.target.value});});}} style={iStyle} /></div>
+                              </div>
+                              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                                <div><label style={lStyle}>Signer Override</label><input value={editForm.signer_name||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{signer_name:e.target.value});});}} placeholder="Default: Ken Underwood" style={iStyle} /></div>
+                                <div><label style={lStyle}>Signer Title</label><input value={editForm.signer_title||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{signer_title:e.target.value});});}} placeholder="Default: President" style={iStyle} /></div>
+                              </div>
+
                               <div style={{display:'flex',gap:8}}>
                                 <button type="submit" disabled={editSaving} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:6,padding:'7px',fontSize:12,fontWeight:500,cursor:'pointer',opacity:editSaving?0.7:1}}>{editSaving?'Saving...':'Save'}</button>
                                 <button type="button" onClick={function(){setEditDon(null);}} style={{padding:'7px 12px',background:'#f5f0ea',border:'none',borderRadius:6,fontSize:12,color:'#666',cursor:'pointer'}}>Cancel</button>
@@ -3151,15 +3342,32 @@ function DonorsView() {
                               </div>
                             </form>
                           ) : (
-                            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 12px'}}>
-                              <div style={{display:'flex',gap:6,alignItems:'center',flex:1,flexWrap:'wrap'}}>
-                                <span style={{background:tc.bg,color:tc.color,fontSize:11,fontWeight:500,padding:'2px 7px',borderRadius:20,whiteSpace:'nowrap'}}>{don.type}</span>
-                                <span style={{fontSize:12,color:'#888'}}>{fmtDate(don.date)}</span>
-                                <span style={{fontSize:12,fontWeight:600,color:'#2a2a2a'}}>{fmtAmtFull(don.amount)}</span>
-                                <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,background:acked?'#e8f5e9':'#fff8e1',color:acked?'#2e7d32':'#8a6200',fontWeight:500}}>{acked?'Thanked':'Pending'}</span>
+                            <div style={{padding:'9px 12px'}}>
+                              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                <div style={{display:'flex',gap:6,alignItems:'center',flex:1,flexWrap:'wrap'}}>
+                                  <span style={{background:tc.bg,color:tc.color,fontSize:11,fontWeight:500,padding:'2px 7px',borderRadius:20,whiteSpace:'nowrap'}}>{don.type}</span>
+                                  <span style={{fontSize:12,color:'#888'}}>{fmtDate(don.date)}</span>
+                                  <span style={{fontSize:12,fontWeight:600,color:'#2a2a2a'}}>{fmtAmtFull(don.amount)}</span>
+                                  <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,background:acked?'#e8f5e9':'#fff8e1',color:acked?'#2e7d32':'#8a6200',fontWeight:500}}>{acked?'Thanked':'Pending'}</span>
+                                  {don.acknowledgment_status && <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,fontWeight:500,...(ACK_STATUS_PILLS[don.acknowledgment_status]||{background:'#f3f4f6',color:'#6b7280'})}}>{ACK_STATUS_LABELS[don.acknowledgment_status]||don.acknowledgment_status}</span>}
+                                </div>
+                                <button onClick={function(e){e.stopPropagation();setEditDon(don);setEditForm({amount:String(don.amount),date:don.date||'',type:don.type||'Donation',payment_type:don.payment_type||'',acknowledged:don.acknowledged===true||String(don.acknowledged).toUpperCase()==='TRUE',donation_notes:don.donation_notes||'',
+                                  acknowledgment_type:don.acknowledgment_type||'',acknowledgment_status:don.acknowledgment_status||'',membership_level:don.membership_level||'',membership_start_date:don.membership_start_date||'',membership_expiration_date:don.membership_expiration_date||'',
+                                  event_name:don.event_name||'',sponsorship_level:don.sponsorship_level||'',brick_inscription:don.brick_inscription||'',memorial_recipient:don.memorial_recipient||'',honoree_name:don.honoree_name||'',
+                                  in_kind_description:don.in_kind_description||'',in_kind_value:don.in_kind_value!=null?String(don.in_kind_value):'',tax_deductible_amount:don.tax_deductible_amount!=null?String(don.tax_deductible_amount):'',goods_services_value:don.goods_services_value!=null?String(don.goods_services_value):'',
+                                  check_number:don.check_number||'',signer_name:don.signer_name||'',signer_title:don.signer_title||''});}}
+                                  style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'3px 10px',cursor:'pointer',flexShrink:0,marginLeft:6}}>Edit</button>
                               </div>
-                              <button onClick={function(e){e.stopPropagation();setEditDon(don);setEditForm({amount:String(don.amount),date:don.date||'',type:don.type||'Donation',payment_type:don.payment_type||'',acknowledged:don.acknowledged===true||String(don.acknowledged).toUpperCase()==='TRUE',donation_notes:don.donation_notes||''});}}
-                                style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'3px 10px',cursor:'pointer',flexShrink:0,marginLeft:6}}>Edit</button>
+                              {don.acknowledgment_type && (
+                                <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginTop:6}}>
+                                  <button onClick={function(e){e.stopPropagation();openGenerateFlow(don);}} style={{fontSize:11,color:gold,background:'none',border:'0.5px solid '+gold,borderRadius:6,padding:'3px 10px',cursor:'pointer'}}>{don.letter_drive_url?'Thank-You Docs':'Generate Thank-You Documents'}</button>
+                                  {don.letter_drive_url && <a href={don.letter_drive_url} target="_blank" rel="noreferrer" onClick={function(e){e.stopPropagation();}} style={{fontSize:11,color:'#888'}}>Open Letter</a>}
+                                  {don.envelope_drive_url && <a href={don.envelope_drive_url} target="_blank" rel="noreferrer" onClick={function(e){e.stopPropagation();}} style={{fontSize:11,color:'#888'}}>Open Envelope</a>}
+                                  {don.acknowledgment_status==='generated' && <button onClick={function(e){e.stopPropagation();markAckStatus(don,'printed');}} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Mark Printed</button>}
+                                  {(don.acknowledgment_status==='generated'||don.acknowledgment_status==='printed') && <button onClick={function(e){e.stopPropagation();markAckStatus(don,'mailed');}} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Mark Mailed</button>}
+                                  {don.acknowledgment_status==='error' && don.generation_error && <span style={{fontSize:11,color:'#c0392b'}} title={don.generation_error}>Error: {don.generation_error.slice(0,60)}</span>}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -3306,6 +3514,89 @@ function DonorsView() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Acknowledgment document generation flow */}
+      {ackStep && ackDonation && (
+        <div onClick={closeAckFlow} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.32)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1100,padding:20}}>
+          <div onClick={function(e){e.stopPropagation();}} style={{background:'#fff',borderRadius:16,padding:28,maxWidth:480,width:'100%',boxShadow:'0 8px 40px rgba(0,0,0,0.18)',maxHeight:'90vh',overflowY:'auto'}}>
+
+            {ackStep==='exists-choice' && (
+              <div>
+                <div style={{fontSize:17,fontWeight:600,marginBottom:14}}>Thank-you documents already exist</div>
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  <a href={ackDonation.letter_drive_url} target="_blank" rel="noreferrer" style={{textDecoration:'none'}}>
+                    <button style={{width:'100%',padding:10,background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>Open Existing Documents</button>
+                  </a>
+                  <button onClick={function(){prepareReview(ackDonation);}} style={{width:'100%',padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#444',cursor:'pointer',fontWeight:500}}>Regenerate & Replace</button>
+                  <button onClick={function(){prepareReview(ackDonation);}} style={{width:'100%',padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#444',cursor:'pointer',fontWeight:500}}>Create New Version</button>
+                  <button onClick={closeAckFlow} style={{width:'100%',padding:10,background:'none',border:'none',fontSize:12,color:'#999',cursor:'pointer'}}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {ackStep==='review' && (
+              <div>
+                <div style={{fontSize:17,fontWeight:600,marginBottom:14}}>Review Before Generating</div>
+                <div style={{fontSize:12,color:'#888',marginBottom:10}}>Template: {ackDonation.acknowledgment_type}</div>
+                <div style={{marginBottom:10}}><label style={lStyle}>Mailing Name</label><input value={ackOverrides.mailingName||''} onChange={function(e){setAckOverrides(function(f){return Object.assign({},f,{mailingName:e.target.value});});}} style={iStyle} /></div>
+                <div style={{marginBottom:10}}><label style={lStyle}>Greeting</label><input value={ackOverrides.greeting||''} onChange={function(e){setAckOverrides(function(f){return Object.assign({},f,{greeting:e.target.value});});}} style={iStyle} /></div>
+                <div style={{marginBottom:10,fontSize:12,color:'#444'}}>
+                  <label style={lStyle}>Mailing Address</label>
+                  <div style={{marginTop:4,padding:'8px 10px',background:'#faf8f4',borderRadius:8,whiteSpace:'pre-line'}}>
+                    {selected.mailing_address_line1 ? [selected.mailing_address_line1,selected.mailing_address_line2,[selected.mailing_city,selected.mailing_state,selected.mailing_zip].filter(Boolean).join(', ')].filter(Boolean).join('\n') : 'No structured address on file — letter only, no envelope.'}
+                  </div>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                  <div><label style={lStyle}>Contribution Amount</label><div style={{marginTop:4,fontSize:13,fontWeight:600}}>{fmtAmtFull(ackDonation.amount)}</div></div>
+                  <div><label style={lStyle}>Contribution Date</label><div style={{marginTop:4,fontSize:13}}>{fmtDate(ackDonation.date)}</div></div>
+                </div>
+                <div style={{marginBottom:10}}><label style={lStyle}>Letter Date</label><input type="date" value={ackOverrides.letterDate||''} onChange={function(e){setAckOverrides(function(f){return Object.assign({},f,{letterDate:e.target.value});});}} style={iStyle} /></div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
+                  <div><label style={lStyle}>Signer</label><input value={ackOverrides.signerName||''} onChange={function(e){setAckOverrides(function(f){return Object.assign({},f,{signerName:e.target.value});});}} placeholder="Ken Underwood" style={iStyle} /></div>
+                  <div><label style={lStyle}>Signer Title</label><input value={ackOverrides.signerTitle||''} onChange={function(e){setAckOverrides(function(f){return Object.assign({},f,{signerTitle:e.target.value});});}} placeholder="President" style={iStyle} /></div>
+                </div>
+                <div style={{fontSize:11,color:'#aaa',marginBottom:14}}>Drive destination: North Star House / Donor Acknowledgments / {(ackOverrides.letterDate||'').slice(0,4)} / {selected.formal_name}</div>
+                <div style={{display:'flex',gap:8}}>
+                  <button onClick={confirmGenerate} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer'}}>Generate Letter and Envelope</button>
+                  <button onClick={closeAckFlow} style={{padding:'10px 16px',background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer'}}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {ackStep==='generating' && (
+              <div style={{textAlign:'center',padding:'20px 0'}}>
+                <div style={{fontSize:14,color:'#666'}}>Generating documents…</div>
+              </div>
+            )}
+
+            {ackStep==='result' && ackResult && (
+              <div>
+                <div style={{fontSize:17,fontWeight:600,marginBottom:6,color:'#166534'}}>Thank-you documents created successfully.</div>
+                <div style={{fontSize:12,color:'#666',marginBottom:14}}>{ackResult.folderPath}</div>
+                <div style={{fontSize:12,marginBottom:6}}><span style={{color:'#777'}}>Letter: </span>{ackResult.letterName}</div>
+                {ackResult.envelopeName && <div style={{fontSize:12,marginBottom:14}}><span style={{color:'#777'}}>Envelope: </span>{ackResult.envelopeName}</div>}
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  <a href={ackResult.letterUrl} target="_blank" rel="noreferrer" style={{textDecoration:'none'}}><button style={{width:'100%',padding:9,background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>Open Letter</button></a>
+                  {ackResult.envelopeUrl && <a href={ackResult.envelopeUrl} target="_blank" rel="noreferrer" style={{textDecoration:'none'}}><button style={{width:'100%',padding:9,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#444',cursor:'pointer',fontWeight:500}}>Open Envelope</button></a>}
+                  <button onClick={closeAckFlow} style={{width:'100%',padding:9,background:'none',border:'none',fontSize:12,color:'#999',cursor:'pointer'}}>Return to Contribution</button>
+                </div>
+              </div>
+            )}
+
+            {ackStep==='error' && (
+              <div>
+                <div style={{fontSize:17,fontWeight:600,marginBottom:10,color:'#7f1d1d'}}>Couldn't generate documents</div>
+                <div style={{fontSize:12,color:'#c0392b',background:'#fee2e2',borderRadius:8,padding:'10px 12px',marginBottom:14}}>{ackError}</div>
+                <div style={{display:'flex',gap:8}}>
+                  <button onClick={function(){setAckStep('review');}} style={{flex:1,padding:9,background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>Back to Review</button>
+                  <button onClick={closeAckFlow} style={{padding:'9px 16px',background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer'}}>Close</button>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       )}
@@ -8998,6 +9289,15 @@ function AdminView({ navigate }) {
           <span style={{ color: '#b5a185', flexShrink: 0 }}>{eventsIcon}</span>
           Events
         </div>
+        <div
+          onClick={function() { navigate('acknowledgment-templates'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{docIcon}</span>
+          Acknowledgment Templates
+        </div>
       </div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Outreach</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -9005,6 +9305,131 @@ function AdminView({ navigate }) {
           return <AdminToolCard key={form.label} tool={form} icon={docIcon} />;
         })}
       </div>
+    </div>
+  );
+}
+
+function AcknowledgmentTemplatesView({ navigate }) {
+  const [templates, setTemplates] = useState({});
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [savingType, setSavingType] = useState(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  useEffect(function() {
+    Promise.all([
+      fetch(SUPABASE_URL+'/rest/v1/acknowledgment_templates?select=*',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
+      fetch(SUPABASE_URL+'/rest/v1/acknowledgment_settings?select=*&limit=1',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
+    ]).then(function(results){
+      var rows=Array.isArray(results[0])?results[0]:[];
+      var byType={};
+      rows.forEach(function(r){byType[r.acknowledgment_type]=r;});
+      setTemplates(byType);
+      setSettings((Array.isArray(results[1])&&results[1][0])||{org_legal_name:'',ein:'',return_address_line1:'',return_address_line2:'',return_address_city:'',return_address_state:'',return_address_zip:'',envelope_size:'#10',shared_drive_id:'',root_folder_name:'North Star House'});
+      setLoading(false);
+    }).catch(function(){setLoading(false);});
+  }, []);
+
+  function updateTemplateField(type, field, value){
+    setTemplates(function(prev){
+      var row=prev[type]||{acknowledgment_type:type,active:true};
+      var next=Object.assign({},prev);
+      next[type]=Object.assign({},row,{});
+      next[type][field]=value;
+      return next;
+    });
+  }
+
+  function saveTemplate(type){
+    var row=templates[type]||{acknowledgment_type:type};
+    setSavingType(type);
+    fetch(SUPABASE_URL+'/rest/v1/acknowledgment_templates?on_conflict=acknowledgment_type',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=representation'},
+      body:JSON.stringify({acknowledgment_type:type,template_name:row.template_name||null,letter_storage_path:row.letter_storage_path||null,envelope_storage_path:row.envelope_storage_path||null,active:row.active!==false,default_signer_name:row.default_signer_name||null,default_signer_title:row.default_signer_title||null})})
+      .then(function(r){return r.json();}).then(function(rows){
+        setSavingType(null);
+        var updated=Array.isArray(rows)?rows[0]:rows;
+        setTemplates(function(prev){var next=Object.assign({},prev);next[type]=updated;return next;});
+      }).catch(function(){setSavingType(null);});
+  }
+
+  function saveSettings(e){
+    e.preventDefault();setSavingSettings(true);
+    var body=Object.assign({},settings);
+    var isNew=!settings.id;
+    var url=SUPABASE_URL+'/rest/v1/acknowledgment_settings'+(isNew?'':'?id=eq.'+settings.id);
+    fetch(url,{method:isNew?'POST':'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(body)})
+      .then(function(r){return r.json();}).then(function(rows){
+        setSavingSettings(false);
+        var updated=Array.isArray(rows)?rows[0]:rows;
+        if(updated)setSettings(updated);
+      }).catch(function(){setSavingSettings(false);});
+  }
+
+  var iStyle={width:'100%',padding:'7px 9px',border:'0.5px solid #e0d8cc',borderRadius:6,fontSize:12,marginTop:3,boxSizing:'border-box',fontFamily:'system-ui, sans-serif',background:'#fff'};
+  var lStyle={fontSize:11,color:'#666',fontWeight:500};
+
+  if(loading)return <div style={{fontSize:13,color:'#888'}}>Loading…</div>;
+
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
+        <button onClick={function(){navigate('admin');}} style={{background:'none',border:'none',fontSize:16,cursor:'pointer',color:'#aaa',padding:0}}>←</button>
+        <div style={{fontSize:18,fontWeight:600,color:'#2a2a2a'}}>Acknowledgment Templates</div>
+      </div>
+
+      <div style={{fontSize:11,fontWeight:700,color:'#888',textTransform:'uppercase',letterSpacing:1.2,marginBottom:12}}>Templates by Acknowledgment Type</div>
+      <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:28}}>
+        {ACK_TYPES.map(function(type){
+          var row=templates[type]||{};
+          var hasTemplate=!!row.letter_storage_path;
+          return (
+            <div key={type} style={{background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:10,padding:'14px 16px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:hasTemplate||row.template_name?10:0}}>
+                <div style={{fontSize:13,fontWeight:600,color:'#2a2a2a'}}>{type}</div>
+                {!hasTemplate && <span style={{fontSize:11,color:'#c0392b'}}>No template — donations of this type show "Needs Review"</span>}
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                <div><label style={lStyle}>Template Name</label><input value={row.template_name||''} onChange={function(e){updateTemplateField(type,'template_name',e.target.value);}} style={iStyle} /></div>
+                <div><label style={lStyle}>Letter Storage Path</label><input value={row.letter_storage_path||''} onChange={function(e){updateTemplateField(type,'letter_storage_path',e.target.value);}} placeholder="e.g. membership.docx" style={iStyle} /></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:8}}>
+                <div><label style={lStyle}>Envelope Storage Path</label><input value={row.envelope_storage_path||''} onChange={function(e){updateTemplateField(type,'envelope_storage_path',e.target.value);}} placeholder="envelope-standard.docx" style={iStyle} /></div>
+                <div><label style={lStyle}>Default Signer</label><input value={row.default_signer_name||''} onChange={function(e){updateTemplateField(type,'default_signer_name',e.target.value);}} placeholder="Ken Underwood" style={iStyle} /></div>
+                <div><label style={lStyle}>Signer Title</label><input value={row.default_signer_title||''} onChange={function(e){updateTemplateField(type,'default_signer_title',e.target.value);}} placeholder="President" style={iStyle} /></div>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,cursor:'pointer'}}><input type="checkbox" checked={row.active!==false} onChange={function(e){updateTemplateField(type,'active',e.target.checked);}} /> Active</label>
+                <button onClick={function(){saveTemplate(type);}} disabled={savingType===type} style={{padding:'6px 14px',background:gold,color:'#fff',border:'none',borderRadius:6,fontSize:12,fontWeight:500,cursor:'pointer',opacity:savingType===type?0.7:1}}>{savingType===type?'Saving...':'Save'}</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{fontSize:11,fontWeight:700,color:'#888',textTransform:'uppercase',letterSpacing:1.2,marginBottom:12}}>Organization & Envelope Settings</div>
+      <form onSubmit={saveSettings} style={{background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:10,padding:'16px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:10,marginBottom:10}}>
+          <div><label style={lStyle}>Organization Legal Name</label><input value={settings.org_legal_name||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{org_legal_name:e.target.value});});}} style={iStyle} /></div>
+          <div><label style={lStyle}>EIN</label><input value={settings.ein||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{ein:e.target.value});});}} style={iStyle} /></div>
+        </div>
+        <div style={{fontSize:11,fontWeight:600,color:'#888',marginBottom:6,marginTop:10}}>Return Address</div>
+        <div style={{marginBottom:8}}><input value={settings.return_address_line1||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{return_address_line1:e.target.value});});}} placeholder="Line 1" style={iStyle} /></div>
+        <div style={{marginBottom:8}}><input value={settings.return_address_line2||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{return_address_line2:e.target.value});});}} placeholder="Line 2" style={iStyle} /></div>
+        <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:8,marginBottom:14}}>
+          <input value={settings.return_address_city||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{return_address_city:e.target.value});});}} placeholder="City" style={iStyle} />
+          <input value={settings.return_address_state||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{return_address_state:e.target.value});});}} placeholder="State" style={iStyle} />
+          <input value={settings.return_address_zip||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{return_address_zip:e.target.value});});}} placeholder="ZIP" style={iStyle} />
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:14}}>
+          <div><label style={lStyle}>Envelope Size</label><input value={settings.envelope_size||'#10'} onChange={function(e){setSettings(function(s){return Object.assign({},s,{envelope_size:e.target.value});});}} style={iStyle} /></div>
+          <div><label style={lStyle}>Shared Drive ID</label><input value={settings.shared_drive_id||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{shared_drive_id:e.target.value});});}} style={iStyle} /></div>
+          <div><label style={lStyle}>Root Folder Name</label><input value={settings.root_folder_name||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{root_folder_name:e.target.value});});}} style={iStyle} /></div>
+        </div>
+        <div style={{marginBottom:14}}><label style={lStyle}>Tax Acknowledgment Language</label><textarea value={settings.tax_ack_language||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{tax_ack_language:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+        <div style={{marginBottom:14}}><label style={lStyle}>Goods/Services Language</label><textarea value={settings.goods_services_language||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{goods_services_language:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+        <div style={{marginBottom:14}}><label style={lStyle}>In-Kind Language</label><textarea value={settings.in_kind_language||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{in_kind_language:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+        <button type="submit" disabled={savingSettings} style={{padding:'8px 16px',background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer',opacity:savingSettings?0.7:1}}>{savingSettings?'Saving...':'Save Settings'}</button>
+      </form>
     </div>
   );
 }
@@ -10249,6 +10674,7 @@ const views = {
   admin: AdminView,
   'vol-email-lists': VolEmailListsView,
   'wix-forms': WixFormsView,
+  'acknowledgment-templates': AcknowledgmentTemplatesView,
 };
 
 var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];
