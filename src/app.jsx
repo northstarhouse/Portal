@@ -9797,6 +9797,7 @@ function AcknowledgmentsQueueView({ navigate }) {
                     <td style={{padding:'8px 10px'}}>
                       {r.letter_drive_url ? <a href={r.letter_drive_url} target="_blank" rel="noreferrer" style={{fontSize:11,color:gold,marginRight:8}}>Letter</a> : <span style={{fontSize:11,color:'#bbb',marginRight:8}}>—</span>}
                       {r.envelope_drive_url ? <a href={r.envelope_drive_url} target="_blank" rel="noreferrer" style={{fontSize:11,color:gold}}>Envelope</a> : <span style={{fontSize:11,color:'#bbb'}}>—</span>}
+                      {r.generation_error && <div style={{fontSize:10,color:'#c0392b',marginTop:2,maxWidth:220}} title={r.generation_error}>{r.generation_error}</div>}
                     </td>
                   </tr>
                 );
