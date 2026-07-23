@@ -126,17 +126,42 @@ async function driveFindOrCreateFolder(name: string, parentId: string, driveId: 
   return created.id as string;
 }
 
+// Module-level cache: survives across warm invocations of the same function instance (helps
+// back-to-back calls, e.g. batch generation), on top of the persisted root_folder_cache_id below
+// (which survives cold starts too, since it's stored in the database).
+const warmFolderCache = new Map<string, string>();
+
 async function resolveDestinationFolder(settings: any, donorFolderName: string, letterDate: Date, token: string) {
   const driveId = settings.shared_drive_id;
   if (!driveId) throw new Error("No Shared Drive configured (acknowledgment_settings.shared_drive_id is empty)");
   const year = String(letterDate.getFullYear());
   const month = letterDate.toLocaleString("en-US", { month: "long" });
+  const rootName = settings.root_folder_name || "North Star House";
 
-  let parentId = driveId;
-  const path = [settings.root_folder_name || "North Star House", "Donor Acknowledgments", year, month, donorFolderName];
-  for (const segment of path) {
+  // The top two levels (org root, "Donor Acknowledgments") never change once created --
+  // resolving them from scratch every single call was costing ~4 sequential Drive API round
+  // trips (~4s) for zero benefit. Cache the resolved id persistently once found.
+  let rootFolderId: string;
+  const warmKey = `root:${driveId}:${rootName}`;
+  if (settings.root_folder_cache_id) {
+    rootFolderId = settings.root_folder_cache_id;
+  } else if (warmFolderCache.has(warmKey)) {
+    rootFolderId = warmFolderCache.get(warmKey)!;
+  } else {
+    const orgFolderId = await driveFindOrCreateFolder(rootName, driveId, driveId, token);
+    rootFolderId = await driveFindOrCreateFolder("Donor Acknowledgments", orgFolderId, driveId, token);
+    if (settings.id) {
+      await sbPatch(`acknowledgment_settings?id=eq.${settings.id}`, { root_folder_cache_id: rootFolderId }).catch(() => {});
+    }
+  }
+  warmFolderCache.set(warmKey, rootFolderId);
+
+  let parentId = rootFolderId;
+  const yearMonthDonor = [year, month, donorFolderName];
+  for (const segment of yearMonthDonor) {
     parentId = await driveFindOrCreateFolder(segment, parentId, driveId, token);
   }
+  const path = [rootName, "Donor Acknowledgments", ...yearMonthDonor];
   return { folderId: parentId, pathLabel: path.join(" / ") };
 }
 
@@ -537,6 +562,41 @@ Deno.serve(async (req) => {
           error: mergeErr.message || String(mergeErr),
         });
       }
+    }
+
+    if (req.method === "GET" && url.searchParams.get("selfTestFull")) {
+      const started = Date.now();
+      const timings: Record<string, number> = {};
+      let mark = started;
+      const lap = (label: string) => { const now = Date.now(); timings[label] = now - mark; mark = now; };
+
+      const settingsRows = await sbGet(`acknowledgment_settings?select=*&limit=1`);
+      const settings = settingsRows[0] || {};
+      lap("fetchSettings");
+
+      const templateBytes = await fetchStorageFile("membership.docx");
+      lap("fetchTemplate");
+
+      const dummyVars: Record<string, string> = {
+        DonorName: "ZZZ SelfTest Donor (delete me)", Address: "123 Main St\nGrass Valley, CA 95945",
+        Name: "Test", Amount: "$1.00", Date: "July 23, 2026",
+      };
+      const merged = await mergeDocxTemplate(templateBytes, dummyVars);
+      lap("merge");
+
+      const token = await getDriveAccessToken();
+      lap("driveToken");
+
+      const { folderId, pathLabel } = await resolveDestinationFolder(settings, "ZZZ SelfTest Donor (delete me)", new Date(), token);
+      lap("resolveFolder");
+
+      const uploaded = await driveUploadDocx("selfTestFull-" + Date.now() + ".docx", merged.bytes, folderId, token);
+      lap("upload");
+
+      await driveDeleteFile(uploaded.id, token);
+      lap("cleanupDelete");
+
+      return json({ success: true, pathLabel, totalMs: Date.now() - started, timings });
     }
 
     if (req.method === "GET" && url.searchParams.get("selfTestDrive")) {
