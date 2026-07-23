@@ -2671,6 +2671,50 @@ var DONOR_TIERS_NSH = [
   { tier: 'none',          min: 0,    label: 'Non-member',              color: '#9ca3af', bg: '#f9fafb', border: '#e5e7eb' },
 ];
 function nshGetTier(cyTotal) { return DONOR_TIERS_NSH.find(function(t){return cyTotal>=t.min;})||DONOR_TIERS_NSH[DONOR_TIERS_NSH.length-1]; }
+function linkifyHtml(html) {
+  if (!html) return html;
+  var container = document.createElement('div');
+  container.innerHTML = html;
+  var urlRe = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)/gi;
+
+  function linkifyTextNode(node) {
+    var text = node.nodeValue;
+    urlRe.lastIndex = 0;
+    if (!urlRe.test(text)) return;
+    urlRe.lastIndex = 0;
+    var frag = document.createDocumentFragment();
+    var lastIndex = 0, m;
+    while ((m = urlRe.exec(text))) {
+      var url = m[0];
+      var trail = '';
+      while (url.length && /[.,;:!?)\]]$/.test(url)) { trail = url.slice(-1) + trail; url = url.slice(0, -1); }
+      if (!url) continue;
+      frag.appendChild(document.createTextNode(text.slice(lastIndex, m.index)));
+      var a = document.createElement('a');
+      a.href = /^https?:\/\//i.test(url) ? url : 'https://' + url;
+      a.textContent = url;
+      a.target = '_blank';
+      a.rel = 'noreferrer';
+      a.style.color = gold;
+      a.style.textDecoration = 'underline';
+      frag.appendChild(a);
+      if (trail) frag.appendChild(document.createTextNode(trail));
+      lastIndex = m.index + m[0].length;
+    }
+    frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+    node.parentNode.replaceChild(frag, node);
+  }
+
+  function walk(node) {
+    if (node.nodeType === 3) { linkifyTextNode(node); return; }
+    if (node.nodeType === 1 && node.tagName !== 'A') {
+      Array.prototype.slice.call(node.childNodes).forEach(walk);
+    }
+  }
+  Array.prototype.slice.call(container.childNodes).forEach(walk);
+  return container.innerHTML;
+}
+
 function ackExportUrl(fileId) {
   return SUPABASE_URL + '/functions/v1/generate-acknowledgment?exportFileId=' + encodeURIComponent(fileId) + '&mime=application%2Fpdf';
 }
@@ -4147,7 +4191,7 @@ function BoardView() {
             </div>
 
             {selected.description && (
-              <div dangerouslySetInnerHTML={{ __html: selected.description }} style={{ fontSize: 12, color: '#555', lineHeight: 1.6, marginBottom: 16, padding: '12px 14px', background: '#faf8f4', borderRadius: 0, borderLeft: '3px solid ' + gold }} />
+              <div dangerouslySetInnerHTML={{ __html: linkifyHtml(selected.description) }} style={{ fontSize: 12, color: '#555', lineHeight: 1.6, marginBottom: 16, padding: '12px 14px', background: '#faf8f4', borderRadius: 0, borderLeft: '3px solid ' + gold }} />
             )}
 
             {selected.attachment_url && (

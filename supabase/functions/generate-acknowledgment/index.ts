@@ -501,6 +501,28 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
 
+    if (req.method === "GET" && url.searchParams.get("selfTestDrive")) {
+      const started = Date.now();
+      const token = await getDriveAccessToken();
+      const tokenMs = Date.now() - started;
+      const settingsRows = await sbGet(`acknowledgment_settings?select=shared_drive_id&limit=1`);
+      const driveId = settingsRows[0]?.shared_drive_id;
+      if (!driveId) return json({ success: false, step: "settings", error: "No shared_drive_id configured" });
+      const listRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files?corpora=drive&driveId=${driveId}&includeItemsFromAllDrives=true&supportsAllDrives=true&pageSize=5&fields=files(id,name)`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const listMs = Date.now() - started - tokenMs;
+      const listBody = await listRes.text();
+      return json({
+        success: listRes.ok,
+        tokenAcquiredMs: tokenMs,
+        driveListMs: listMs,
+        driveListStatus: listRes.status,
+        driveListBody: listBody.slice(0, 500),
+      });
+    }
+
     if (req.method === "GET" && url.searchParams.get("exportFileId")) {
       const fileId = url.searchParams.get("exportFileId")!;
       const mime = url.searchParams.get("mime") || "application/pdf";
