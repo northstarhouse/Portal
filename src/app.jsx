@@ -9836,8 +9836,13 @@ function VolEmailListsView({ navigate }) {
     return activeOnly ? volunteers.filter(isActive) : volunteers;
   }, [volunteers, activeOnly]);
 
+  var onCallGroup = useMemo(function() {
+    if (!volunteers) return null;
+    var members = volunteers.filter(function(v) { return (v['Status'] || '').trim() === 'On-Call Supporter'; });
+    return members.length ? { tag: 'On-Call Supporter', members: members } : null;
+  }, [volunteers]);
+
   var groups = useMemo(function() {
-    if (!displayed.length) return [];
     var tagMap = {};
     displayed.forEach(function(v) {
       parseTeams(v['Team']).forEach(function(t) {
@@ -9848,8 +9853,12 @@ function VolEmailListsView({ navigate }) {
     var knownOrder = TEAM_OPTIONS;
     var known = knownOrder.filter(function(t) { return tagMap[t]; }).map(function(t) { return { tag: t, members: tagMap[t] }; });
     var custom = Object.keys(tagMap).filter(function(t) { return TEAM_OPTIONS.indexOf(t) === -1; }).sort().map(function(t) { return { tag: t, members: tagMap[t] }; });
-    return known.concat(custom);
-  }, [displayed]);
+    var teamGroups = known.concat(custom);
+    // On-Call Supporter is a volunteer Status, not a Team tag, and gets excluded by the
+    // "Active only" filter above (it's neither Active nor Inactive) -- so it's sourced from
+    // the full roster and always shown, alongside the regular team groups.
+    return onCallGroup ? [onCallGroup].concat(teamGroups) : teamGroups;
+  }, [displayed, onCallGroup]);
 
   var eventGroups = useMemo(function() {
     if (!displayed.length) return [];
@@ -10191,7 +10200,7 @@ function VolEmailListsView({ navigate }) {
             <div style={{ textAlign: 'center', padding: 48, color: '#aaa', fontSize: 13 }}>Loading…</div>
           ) : groups.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 48, color: '#ccc', fontSize: 13 }}>No volunteers found.</div>
-          ) : groups.map(function(g) { return renderGroupCard(g, function(tag) { return TEAM_COLORS[tag] || { bg: '#f5f5f5', color: '#555' }; }); })}
+          ) : groups.map(function(g) { return renderGroupCard(g, function(tag) { if (tag === 'On-Call Supporter') return { bg: '#fef3c7', color: '#92400e' }; return TEAM_COLORS[tag] || { bg: '#f5f5f5', color: '#555' }; }); })}
         </div>
 
         {/* Recent sends sidebar */}
