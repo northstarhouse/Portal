@@ -2750,6 +2750,18 @@ function mergePdfsAndDownload(fileIds, filename) {
     .then(function(bytes) { downloadBlob(bytes, filename); });
 }
 
+function computeDefaultGreeting(donor) {
+  if (!donor) return '';
+  var isOrg = ['Organization', 'Corporate', 'Foundation'].indexOf(donor.account_type) !== -1;
+  if (isOrg) return 'Friends at ' + (donor.formal_name || '');
+  if (donor.joint_donor_name) {
+    var last = (donor.formal_name || '').trim().split(/\s+/).pop() || '';
+    var first = donor.informal_first_name || (donor.formal_name || '').replace(new RegExp('\\s*' + last + '$'), '');
+    return first + ' and ' + donor.joint_donor_name;
+  }
+  return donor.informal_first_name || donor.formal_name || '';
+}
+
 function parseAddressBlock(text) {
   if (!text || !text.trim()) return null;
   var lines = text.split('\n').map(function(l){return l.trim();}).filter(Boolean);
@@ -3379,8 +3391,14 @@ function DonorsView({ navigate }) {
                     setDonorFieldsForm(function(f){return Object.assign({},f,{mailing_address_line1:parsed.line1,mailing_address_line2:parsed.line2,mailing_city:parsed.city,mailing_state:parsed.state,mailing_zip:parsed.zip});});
                   }} style={{width:'100%',marginBottom:10,padding:'6px 10px',background:'#fff',border:'0.5px dashed #b5a185',borderRadius:6,fontSize:11,color:'#8a6200',cursor:'pointer'}}>↓ Auto-fill from existing Address field</button>
                 )}
-                <div style={{marginBottom:8}}><label style={lStyle}>Preferred Letter Greeting</label><input value={donorFieldsForm.preferred_letter_greeting} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{preferred_letter_greeting:e.target.value});});}} placeholder="e.g. Jane and Robert" style={iStyle} /></div>
-                <div style={{marginBottom:8}}><label style={lStyle}>Joint Donor / Spouse Name</label><input value={donorFieldsForm.joint_donor_name} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{joint_donor_name:e.target.value});});}} placeholder="e.g. Robert" style={iStyle} /></div>
+                <div style={{marginBottom:2}}><label style={lStyle}>Preferred Letter Greeting <span style={{fontWeight:400,color:'#aaa'}}>(optional — only if you want to override the automatic one)</span></label>
+                  <input value={donorFieldsForm.preferred_letter_greeting} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{preferred_letter_greeting:e.target.value});});}} placeholder={'Leave blank to auto-use: "' + computeDefaultGreeting(Object.assign({},selected,donorFieldsForm)) + '"'} style={iStyle} />
+                </div>
+                <div style={{fontSize:10,color:'#aaa',marginBottom:8}}>Without anything typed here, letters already greet this donor as <b>"{computeDefaultGreeting(Object.assign({},selected,donorFieldsForm))}"</b> — computed from Formal Name / Informal First Name on this record. Only fill this in to say something different.</div>
+                <div style={{marginBottom:2}}><label style={lStyle}>Joint Donor / Spouse Name <span style={{fontWeight:400,color:'#aaa'}}>(only for couples/joint households)</span></label>
+                  <input value={donorFieldsForm.joint_donor_name} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{joint_donor_name:e.target.value});});}} placeholder="e.g. Robert — leave blank for individuals/organizations" style={iStyle} />
+                </div>
+                <div style={{fontSize:10,color:'#aaa',marginBottom:8}}>Only needed if this gift should be acknowledged to both spouses, e.g. "Jane and Robert Smith." Leave blank otherwise — it's not required and doesn't duplicate the Formal/Informal Name fields.</div>
                 <div style={{marginBottom:8}}><label style={lStyle}>Mailing Address Line 1</label><input value={donorFieldsForm.mailing_address_line1} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{mailing_address_line1:e.target.value});});}} style={iStyle} /></div>
                 <div style={{marginBottom:8}}><label style={lStyle}>Mailing Address Line 2</label><input value={donorFieldsForm.mailing_address_line2} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{mailing_address_line2:e.target.value});});}} style={iStyle} /></div>
                 <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:8,marginBottom:10}}>
@@ -3395,7 +3413,7 @@ function DonorsView({ navigate }) {
               </form>
             ) : (
               <div style={{fontSize:12,lineHeight:1.7,marginBottom:8,color:'#444'}}>
-                {selected.preferred_letter_greeting && <div><span style={{color:'#777'}}>Greeting </span>"{selected.preferred_letter_greeting}"</div>}
+                <div><span style={{color:'#777'}}>Greeting </span>"{selected.preferred_letter_greeting || computeDefaultGreeting(selected)}"{!selected.preferred_letter_greeting && <span style={{color:'#aaa'}}> (auto)</span>}</div>
                 {selected.mailing_address_line1 ? (
                   <div style={{whiteSpace:'pre-line'}}>{[selected.mailing_address_line1,selected.mailing_address_line2,[selected.mailing_city,selected.mailing_state,selected.mailing_zip].filter(Boolean).join(', ')].filter(Boolean).join('\n')}</div>
                 ) : (
