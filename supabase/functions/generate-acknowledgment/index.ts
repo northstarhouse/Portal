@@ -505,21 +505,26 @@ Deno.serve(async (req) => {
       const started = Date.now();
       const token = await getDriveAccessToken();
       const tokenMs = Date.now() - started;
-      const settingsRows = await sbGet(`acknowledgment_settings?select=shared_drive_id&limit=1`);
-      const driveId = settingsRows[0]?.shared_drive_id;
-      if (!driveId) return json({ success: false, step: "settings", error: "No shared_drive_id configured" });
-      const listRes = await fetch(
-        `https://www.googleapis.com/drive/v3/files?corpora=drive&driveId=${driveId}&includeItemsFromAllDrives=true&supportsAllDrives=true&pageSize=5&fields=files(id,name)`,
+
+      const drivesRes = await fetch(
+        `https://www.googleapis.com/drive/v3/drives?pageSize=25&fields=drives(id,name)`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      const listMs = Date.now() - started - tokenMs;
-      const listBody = await listRes.text();
+      const visibleDrives = await drivesRes.json();
+
+      const settingsRows = await sbGet(`acknowledgment_settings?select=shared_drive_id&limit=1`);
+      const driveId = settingsRows[0]?.shared_drive_id;
+
+      const about = await fetch(`https://www.googleapis.com/drive/v3/about?fields=user`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((r) => r.json());
+
       return json({
-        success: listRes.ok,
+        success: true,
         tokenAcquiredMs: tokenMs,
-        driveListMs: listMs,
-        driveListStatus: listRes.status,
-        driveListBody: listBody.slice(0, 500),
+        serviceAccountIdentity: about?.user || null,
+        configuredSharedDriveId: driveId,
+        drivesVisibleToServiceAccount: visibleDrives,
       });
     }
 
