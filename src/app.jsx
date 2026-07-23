@@ -10155,7 +10155,10 @@ function VolEmailListsView({ navigate }) {
           <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Volunteer Email Lists</div>
           <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Auto-populated from volunteer database · click a group to expand</div>
         </div>
-        <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>
+        <button onClick={function() { copyEmails((volunteers || []).filter(isActive), '__all_active__'); }} disabled={!volunteers} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 600, border: 'none', borderRadius: 8, background: gold, color: '#fff', cursor: volunteers ? 'pointer' : 'not-allowed', opacity: volunteers ? 1 : 0.5 }}>
+          {copied === '__all_active__' ? '✓ Copied' : '⧉ Copy All Active Volunteer Emails'}
+        </button>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>
           <input type="checkbox" checked={activeOnly} onChange={function(e) { setActiveOnly(e.target.checked); }} style={{ accentColor: gold }} />
           Active only
         </label>
