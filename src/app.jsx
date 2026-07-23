@@ -2800,6 +2800,19 @@ var NSH_STATUS_LABELS={current:'Current',recently_lapsed:'Lapsed',long_lapsed:'L
 var NSH_TYPE_COLORS={'Donation':{bg:'#dbeafe',color:'#1d4ed8'},'Membership':{bg:'#d1fae5',color:'#065f46'},'Restricted':{bg:'#fce7f3',color:'#831843'},'Membership, Donation':{bg:'#ede9fe',color:'#5b21b6'},'Brick Purchase':{bg:'#fee2e2',color:'#7f1d1d'},'Tribute':{bg:'#fef9c3',color:'#713f12'}};
 
 var ACK_TYPES=['Membership','General Donation','Event Donation','Sponsorship','Brick Purchase','In-Kind Donation','Memorial Donation','Honorary Donation','Other'];
+var DONATION_TYPE_TO_ACK_TYPES={
+  'Donation':['General Donation','Event Donation','Sponsorship','In-Kind Donation','Other'],
+  'Membership':['Membership'],
+  'Restricted':['General Donation','Event Donation','Other'],
+  'Membership, Donation':['Membership','General Donation'],
+  'Brick Purchase':['Brick Purchase'],
+  'Tribute':['Memorial Donation','Honorary Donation'],
+};
+function ackTypesForDonationType(donationType, currentValue){
+  var list=DONATION_TYPE_TO_ACK_TYPES[donationType]||ACK_TYPES;
+  if(currentValue&&list.indexOf(currentValue)===-1)list=list.concat([currentValue]);
+  return list;
+}
 var ACK_STATUS_LABELS={not_required:'Not Required',needs_review:'Needs Review',ready_to_generate:'Ready to Generate',generated:'Generated',printed:'Printed',mailed:'Mailed',email_sent:'Email Sent',error:'Error'};
 var ACK_STATUS_PILLS={
   not_required:{background:'#f3f4f6',color:'#6b7280'},
@@ -3451,7 +3464,7 @@ function DonorsView({ navigate }) {
                                 <div><label style={lStyle}>Date</label><input type="date" value={editForm.date||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
                               </div>
                               <div style={{marginBottom:8}}><label style={lStyle}>Type</label>
-                                <select value={editForm.type||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
+                                <select value={editForm.type||''} onChange={function(e){var newType=e.target.value;setEditForm(function(f){var mapped=DONATION_TYPE_TO_ACK_TYPES[newType];var nextAck=(!f.acknowledgment_type&&mapped&&mapped.length===1)?mapped[0]:f.acknowledgment_type;return Object.assign({},f,{type:newType,acknowledgment_type:nextAck});});}} style={iStyle}>
                                   {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
                                 </select>
                               </div>
@@ -3467,8 +3480,9 @@ function DonorsView({ navigate }) {
                               <div style={{marginBottom:8}}><label style={lStyle}>Acknowledgment Type *</label>
                                 <select required value={editForm.acknowledgment_type||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{acknowledgment_type:e.target.value});});}} style={iStyle}>
                                   <option value="">Select type…</option>
-                                  {ACK_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                                  {ackTypesForDonationType(editForm.type,editForm.acknowledgment_type).map(function(t){return <option key={t} value={t}>{t}</option>;})}
                                 </select>
+                                <div style={{fontSize:10,color:'#aaa',marginTop:2}}>Narrowed to what fits Donation Type "{editForm.type}" — change Donation Type above to see other options.</div>
                               </div>
                               {editForm.acknowledgment_type==='Membership' && (
                                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:8}}>
