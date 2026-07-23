@@ -2671,6 +2671,41 @@ var DONOR_TIERS_NSH = [
   { tier: 'none',          min: 0,    label: 'Non-member',              color: '#9ca3af', bg: '#f9fafb', border: '#e5e7eb' },
 ];
 function nshGetTier(cyTotal) { return DONOR_TIERS_NSH.find(function(t){return cyTotal>=t.min;})||DONOR_TIERS_NSH[DONOR_TIERS_NSH.length-1]; }
+function ackExportUrl(fileId) {
+  return SUPABASE_URL + '/functions/v1/generate-acknowledgment?exportFileId=' + encodeURIComponent(fileId) + '&mime=application%2Fpdf';
+}
+
+function fetchPdfBytes(fileId) {
+  return fetch(ackExportUrl(fileId), { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+    .then(function(r) { if (!r.ok) throw new Error('Export failed for file ' + fileId); return r.arrayBuffer(); });
+}
+
+function downloadBlob(bytes, filename) {
+  var blob = new Blob([bytes], { type: 'application/pdf' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadSinglePdf(fileId, filename) {
+  return fetchPdfBytes(fileId).then(function(bytes) { downloadBlob(bytes, filename); });
+}
+
+function mergePdfsAndDownload(fileIds, filename) {
+  return PDFLib.PDFDocument.create().then(function(merged) {
+    function next(i) {
+      if (i >= fileIds.length) return Promise.resolve(merged);
+      return fetchPdfBytes(fileIds[i])
+        .then(function(bytes) { return PDFLib.PDFDocument.load(bytes); })
+        .then(function(doc) { return merged.copyPages(doc, doc.getPageIndices()); })
+        .then(function(pages) { pages.forEach(function(p) { merged.addPage(p); }); return next(i + 1); });
+    }
+    return next(0);
+  }).then(function(merged) { return merged.save(); })
+    .then(function(bytes) { downloadBlob(bytes, filename); });
+}
+
 function parseAddressBlock(text) {
   if (!text || !text.trim()) return null;
   var lines = text.split('\n').map(function(l){return l.trim();}).filter(Boolean);
@@ -2762,6 +2797,7 @@ function DonorsView({ navigate }) {
   const [savingDonorFields, setSavingDonorFields] = useState(false);
   const [bulkFilling, setBulkFilling] = useState(false);
   const [bulkFillResult, setBulkFillResult] = useState(null);
+  const [downloadingDocKey, setDownloadingDocKey] = useState(null);
   const [ackDonation, setAckDonation] = useState(null);
   const [ackStep, setAckStep] = useState(null);
   const [ackOverrides, setAckOverrides] = useState({});
@@ -2921,7 +2957,7 @@ function DonorsView({ navigate }) {
         setAckGenerating(false);
         if(!data.success){setAckError(data.error||'Generation failed');setAckStep('error');return;}
         setAckResult(data);setAckStep('result');
-        if(selected)updateDonorInState(selected.id,function(d){return{donations:d.donations.map(function(x){return x.id===ackDonation.id?Object.assign({},x,{acknowledgment_status:'generated',letter_drive_url:data.letterUrl,envelope_drive_url:data.envelopeUrl,document_version:(x.document_version||0)+1}):x;})};});
+        if(selected)updateDonorInState(selected.id,function(d){return{donations:d.donations.map(function(x){return x.id===ackDonation.id?Object.assign({},x,{acknowledgment_status:'generated',letter_drive_url:data.letterUrl,envelope_drive_url:data.envelopeUrl,letter_drive_file_id:data.letterFileId,envelope_drive_file_id:data.envelopeFileId,document_version:(x.document_version||0)+1}):x;})};});
       }).catch(function(err){setAckGenerating(false);setAckError(err.message);setAckStep('error');});
   }
 
@@ -3437,6 +3473,8 @@ function DonorsView({ navigate }) {
                                   <button onClick={function(e){e.stopPropagation();openGenerateFlow(don);}} style={{fontSize:11,color:gold,background:'none',border:'0.5px solid '+gold,borderRadius:6,padding:'3px 10px',cursor:'pointer'}}>{don.letter_drive_url?'Thank-You Docs':'Generate Thank-You Documents'}</button>
                                   {don.letter_drive_url && <a href={don.letter_drive_url} target="_blank" rel="noreferrer" onClick={function(e){e.stopPropagation();}} style={{fontSize:11,color:'#888'}}>Open Letter</a>}
                                   {don.envelope_drive_url && <a href={don.envelope_drive_url} target="_blank" rel="noreferrer" onClick={function(e){e.stopPropagation();}} style={{fontSize:11,color:'#888'}}>Open Envelope</a>}
+                                  {don.letter_drive_file_id && <button onClick={function(e){e.stopPropagation();var key='letter-'+don.id;setDownloadingDocKey(key);downloadSinglePdf(don.letter_drive_file_id,(don.date||'')+' - Letter.pdf').then(function(){setDownloadingDocKey(null);}).catch(function(){setDownloadingDocKey(null);});}} disabled={downloadingDocKey==='letter-'+don.id} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>{downloadingDocKey==='letter-'+don.id?'…':'Download Letter PDF'}</button>}
+                                  {don.envelope_drive_file_id && <button onClick={function(e){e.stopPropagation();var key='envelope-'+don.id;setDownloadingDocKey(key);downloadSinglePdf(don.envelope_drive_file_id,(don.date||'')+' - Envelope.pdf').then(function(){setDownloadingDocKey(null);}).catch(function(){setDownloadingDocKey(null);});}} disabled={downloadingDocKey==='envelope-'+don.id} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>{downloadingDocKey==='envelope-'+don.id?'…':'Download Envelope PDF'}</button>}
                                   {don.acknowledgment_status==='generated' && <button onClick={function(e){e.stopPropagation();markAckStatus(don,'printed');}} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Mark Printed</button>}
                                   {(don.acknowledgment_status==='generated'||don.acknowledgment_status==='printed') && <button onClick={function(e){e.stopPropagation();markAckStatus(don,'mailed');}} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Mark Mailed</button>}
                                   {don.acknowledgment_status==='error' && don.generation_error && <span style={{fontSize:11,color:'#c0392b'}} title={don.generation_error}>Error: {don.generation_error.slice(0,60)}</span>}
@@ -3655,6 +3693,11 @@ function DonorsView({ navigate }) {
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
                   <a href={ackResult.letterUrl} target="_blank" rel="noreferrer" style={{textDecoration:'none'}}><button style={{width:'100%',padding:9,background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>Open Letter</button></a>
                   {ackResult.envelopeUrl && <a href={ackResult.envelopeUrl} target="_blank" rel="noreferrer" style={{textDecoration:'none'}}><button style={{width:'100%',padding:9,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#444',cursor:'pointer',fontWeight:500}}>Open Envelope</button></a>}
+                  {ackResult.envelopeUrl && <button onClick={function(){window.open(ackResult.letterUrl,'_blank');window.open(ackResult.envelopeUrl,'_blank');}} style={{width:'100%',padding:9,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#444',cursor:'pointer',fontWeight:500}}>Print Both</button>}
+                  <div style={{display:'flex',gap:8}}>
+                    {ackResult.letterFileId && <button onClick={function(){downloadSinglePdf(ackResult.letterFileId,ackResult.letterName+'.pdf');}} style={{flex:1,padding:8,background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:11,color:'#666',cursor:'pointer'}}>↓ Letter PDF</button>}
+                    {ackResult.envelopeFileId && <button onClick={function(){downloadSinglePdf(ackResult.envelopeFileId,ackResult.envelopeName+'.pdf');}} style={{flex:1,padding:8,background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:11,color:'#666',cursor:'pointer'}}>↓ Envelope PDF</button>}
+                  </div>
                   <button onClick={closeAckFlow} style={{width:'100%',padding:9,background:'none',border:'none',fontSize:12,color:'#999',cursor:'pointer'}}>Return to Contribution</button>
                 </div>
               </div>
@@ -9525,6 +9568,7 @@ function AcknowledgmentsQueueView({ navigate }) {
   const [generating, setGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState(null);
   const [genSummary, setGenSummary] = useState(null);
+  const [downloading, setDownloading] = useState(null);
 
   function load(){
     Promise.all([
@@ -9596,6 +9640,16 @@ function AcknowledgmentsQueueView({ navigate }) {
     urls.forEach(function(u){window.open(u,'_blank');});
   }
 
+  function downloadSelectedMerged(field, label){
+    var ids=selectedRows.map(function(r){return r[field];}).filter(Boolean);
+    if(ids.length===0)return;
+    setDownloading(label);
+    var today=new Date().toISOString().slice(0,10);
+    mergePdfsAndDownload(ids, today+' - '+label+' ('+ids.length+').pdf')
+      .then(function(){setDownloading(null);})
+      .catch(function(err){setDownloading(null);window.alert('Could not build combined PDF: '+err.message);});
+  }
+
   function markSelected(status){
     var ids=selectedRows.map(function(r){return r.id;});
     if(ids.length===0)return;
@@ -9635,15 +9689,17 @@ function AcknowledgmentsQueueView({ navigate }) {
         <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center',marginBottom:14,padding:'10px 14px',background:'#faf8f4',border:'0.5px solid #e0d8cc',borderRadius:8}}>
           <span style={{fontSize:12,fontWeight:600,color:'#444'}}>{selectedRows.length} selected</span>
           <button onClick={generateSelected} disabled={generating} style={{padding:'6px 12px',background:gold,color:'#fff',border:'none',borderRadius:6,fontSize:12,fontWeight:500,cursor:'pointer',opacity:generating?0.7:1}}>{generating?'Generating…':'Generate Selected Letters and Envelopes'}</button>
-          <button onClick={function(){openSelectedDocs('letter_drive_url');}} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:6,fontSize:12,color:'#444',cursor:'pointer'}}>Print Selected Letters</button>
-          <button onClick={function(){openSelectedDocs('envelope_drive_url');}} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:6,fontSize:12,color:'#444',cursor:'pointer'}}>Print Selected Envelopes</button>
+          <button onClick={function(){openSelectedDocs('letter_drive_url');}} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:6,fontSize:12,color:'#444',cursor:'pointer'}}>Open Selected Letters</button>
+          <button onClick={function(){openSelectedDocs('envelope_drive_url');}} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:6,fontSize:12,color:'#444',cursor:'pointer'}}>Open Selected Envelopes</button>
+          <button onClick={function(){downloadSelectedMerged('letter_drive_file_id','Letters');}} disabled={!!downloading} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid '+gold,color:gold,borderRadius:6,fontSize:12,fontWeight:500,cursor:'pointer',opacity:downloading?0.7:1}}>{downloading==='Letters'?'Building PDF…':'↓ Download Letters as One PDF'}</button>
+          <button onClick={function(){downloadSelectedMerged('envelope_drive_file_id','Envelopes');}} disabled={!!downloading} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid '+gold,color:gold,borderRadius:6,fontSize:12,fontWeight:500,cursor:'pointer',opacity:downloading?0.7:1}}>{downloading==='Envelopes'?'Building PDF…':'↓ Download Envelopes as One PDF'}</button>
           <button onClick={function(){markSelected('printed');}} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:6,fontSize:12,color:'#444',cursor:'pointer'}}>Mark Selected as Printed</button>
           <button onClick={function(){markSelected('mailed');}} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:6,fontSize:12,color:'#444',cursor:'pointer'}}>Mark Selected as Mailed</button>
         </div>
       )}
       {genProgress && <div style={{fontSize:12,color:'#888',marginBottom:10}}>Generating {genProgress.i}/{genProgress.total} — {genProgress.name}…</div>}
       {genSummary && <div style={{fontSize:12,marginBottom:10,padding:'8px 12px',background:genSummary.fail?'#fee2e2':'#d1fae5',borderRadius:8,color:genSummary.fail?'#7f1d1d':'#065f46'}}>Generated {genSummary.ok} of {genSummary.total}{genSummary.fail?'; '+genSummary.fail+' failed — check each row\'s error.':'.'}</div>}
-      <div style={{fontSize:11,color:'#aaa',marginBottom:10}}>Note: "Print Selected" opens each document in its own browser tab (your browser may prompt to allow pop-ups) — there's no combined single-PDF download yet.</div>
+      <div style={{fontSize:11,color:'#aaa',marginBottom:10}}>"Download as One PDF" merges the selected rows in the order shown above, so letters and envelopes line up when printed. Rows without a generated document yet are skipped.</div>
 
       {rows===null && <div style={{fontSize:13,color:'#888'}}>Loading…</div>}
       {error && <div style={{fontSize:13,color:'#c0392b'}}>{error}</div>}

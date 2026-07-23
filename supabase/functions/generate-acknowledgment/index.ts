@@ -465,6 +465,8 @@ async function generateInner(donationId: number, overrides: any) {
       envelopeName: envelopeFile ? envelopeName : null,
       letterUrl: letterFile.webViewLink,
       envelopeUrl: envelopeFile?.webViewLink || null,
+      letterFileId: letterFile.id,
+      envelopeFileId: envelopeFile?.id || null,
       folderPath: pathLabel,
     };
   } catch (err) {
