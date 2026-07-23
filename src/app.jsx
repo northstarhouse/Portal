@@ -9987,6 +9987,20 @@ function VolEmailListsView({ navigate }) {
     setTimeout(function() { setCopied(null); }, 2000);
   }
 
+  function downloadEmailsCsv(members, filename) {
+    var withEmail = members.filter(function(v) { return v['Email'] && v['Email'].trim(); });
+    var headers = ['First Name', 'Last Name', 'Email', 'Team', 'Status'];
+    var rows = withEmail.map(function(v) {
+      return headers.map(function(h) { return '"' + String(v[h] || '').replace(/"/g, '""') + '"'; }).join(',');
+    });
+    var csv = [headers.join(',')].concat(rows).join('\n');
+    var blob = new Blob([csv], { type: 'text/csv' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function openModal(tag, members) {
     var withEmail = members.filter(function(v) { return v['Email'] && v['Email'].trim(); });
     setModal({ tag: tag, members: withEmail });
@@ -10030,6 +10044,9 @@ function VolEmailListsView({ navigate }) {
             )}
             <button onClick={function() { copyEmails(g.members, g.tag); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: '0.5px solid #e0d8cc', borderRadius: 7, background: '#fff', color: copied === g.tag ? '#2e7d32' : '#666', cursor: 'pointer' }}>
               {copied === g.tag ? '✓ Copied' : '⧉ Copy emails'}
+            </button>
+            <button onClick={function() { downloadEmailsCsv(g.members, g.tag.replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '-emails.csv'); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: '0.5px solid #e0d8cc', borderRadius: 7, background: '#fff', color: '#666', cursor: 'pointer' }}>
+              ↓ CSV
             </button>
             <button onClick={function() { openModal(g.tag, g.members); }} disabled={withEmail.length === 0} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: 'none', borderRadius: 7, background: gold, color: '#fff', fontWeight: 600, cursor: withEmail.length === 0 ? 'not-allowed' : 'pointer', opacity: withEmail.length === 0 ? 0.4 : 1 }}>
               ✉ Email group
@@ -10157,6 +10174,9 @@ function VolEmailListsView({ navigate }) {
         </div>
         <button onClick={function() { copyEmails((volunteers || []).filter(isActive), '__all_active__'); }} disabled={!volunteers} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 600, border: 'none', borderRadius: 8, background: gold, color: '#fff', cursor: volunteers ? 'pointer' : 'not-allowed', opacity: volunteers ? 1 : 0.5 }}>
           {copied === '__all_active__' ? '✓ Copied' : '⧉ Copy All Active Volunteer Emails'}
+        </button>
+        <button onClick={function() { downloadEmailsCsv((volunteers || []).filter(isActive), 'active-volunteer-emails.csv'); }} disabled={!volunteers} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 500, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#666', cursor: volunteers ? 'pointer' : 'not-allowed', opacity: volunteers ? 1 : 0.5 }}>
+          ↓ Download CSV
         </button>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>
           <input type="checkbox" checked={activeOnly} onChange={function(e) { setActiveOnly(e.target.checked); }} style={{ accentColor: gold }} />
