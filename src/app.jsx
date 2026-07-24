@@ -8247,6 +8247,37 @@ function FinancialOverviewView({ navigate }) {
     };
   }, [donations, sponsors, budget, earnings, cashLog, rentals, sponsorInKindEntries, year]);
 
+  var outflowDetail = useMemo(function() {
+    var purchaseRows = budget.filter(function(b) { return inYear(b.date) && b.type !== 'In-Kind'; }).map(function(b) {
+      return { source: 'Op Budget', area: b.area || 'Unassigned', description: b.description || '—', amount: parseFloat(b.amount) || 0, date: b.date };
+    });
+    var cashOutRows = cashLog.filter(function(c) { return inYear(c.date) && c.direction === 'Out'; }).map(function(c) {
+      return { source: 'Cash Log', area: 'Office', description: c.description || '—', amount: parseFloat(c.amount) || 0, date: c.date };
+    });
+    var all = purchaseRows.concat(cashOutRows);
+
+    var dupKeyCounts = {};
+    all.forEach(function(r) {
+      var key = [r.source, r.area, r.description, r.amount, r.date].join('|');
+      dupKeyCounts[key] = (dupKeyCounts[key] || 0) + 1;
+    });
+    all.forEach(function(r) {
+      var key = [r.source, r.area, r.description, r.amount, r.date].join('|');
+      r.possibleDuplicate = dupKeyCounts[key] > 1;
+    });
+
+    all.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+
+    var byMonth = {};
+    all.forEach(function(r) {
+      var m = (r.date || '').slice(0, 7) || 'Unknown';
+      byMonth[m] = (byMonth[m] || 0) + r.amount;
+    });
+    var monthRows = Object.keys(byMonth).sort().reverse().map(function(m) { return { month: m, total: byMonth[m] }; });
+
+    return { all: all, monthRows: monthRows, duplicateCount: all.filter(function(r) { return r.possibleDuplicate; }).length };
+  }, [budget, cashLog, year]);
+
   var card = { background: '#faf8f5', borderRadius: 10, padding: '14px 16px' };
   var cardLabel = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 };
   var cardValue = { fontSize: 19, fontWeight: 700, marginTop: 5 };
@@ -8257,7 +8288,13 @@ function FinancialOverviewView({ navigate }) {
     { id: 'sponsorships', label: 'In-Kind Sponsorships' },
     { id: 'operational', label: 'Operational Areas' },
     { id: 'cashflow', label: 'Office Cash Flow' },
+    { id: 'outflow-detail', label: 'Spending Detail' },
   ];
+  function monthLabel(ym) {
+    if (!ym || ym === 'Unknown') return 'Unknown date';
+    var parts = ym.split('-');
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
 
   return (
     <div>
@@ -8400,6 +8437,56 @@ function FinancialOverviewView({ navigate }) {
               );
             })}
           </div>
+          </div>
+          )}
+
+          {activeTab === 'outflow-detail' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ fontSize: 12, color: '#888' }}>Every line item behind Total Outflow ({money(stats.totalOutflow)}) for {year} — Op Budget purchases (excluding In-Kind, which isn't cash outflow) plus Cash Log "Out" entries. Use this to spot duplicates, mis-dated entries, or anything mistagged as a purchase.</div>
+
+            {outflowDetail.duplicateCount > 0 && (
+              <div style={{ background: '#fff8e1', border: '0.5px solid #f0d98c', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#8a6200' }}>
+                ⚠ {outflowDetail.duplicateCount} entr{outflowDetail.duplicateCount === 1 ? 'y matches' : 'ies match'} another one exactly (same area, description, amount, and date) — flagged below. Could be a legitimate repeat purchase, or an accidental double-entry worth checking.
+              </div>
+            )}
+
+            <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 12 }}>By Month</div>
+              {outflowDetail.monthRows.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#bbb' }}>No outflow recorded for {year}.</div>
+              ) : outflowDetail.monthRows.map(function(m) {
+                return (
+                  <div key={m.month} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12 }}>
+                    <span style={{ color: '#555' }}>{monthLabel(m.month)}</span>
+                    <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(m.total)}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>All Line Items — {year}</div>
+              <div style={{ display: 'flex', gap: 10, padding: '8px 18px 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>
+                <span style={{ width: 90 }}>Date</span>
+                <span style={{ width: 110 }}>Area</span>
+                <span style={{ flex: 1 }}>Description</span>
+                <span style={{ width: 70 }}>Source</span>
+                <span style={{ width: 90, textAlign: 'right' }}>Amount</span>
+              </div>
+              {outflowDetail.all.length === 0 ? (
+                <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>No outflow recorded for {year}.</div>
+              ) : outflowDetail.all.map(function(r, i) {
+                return (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 18px', borderBottom: '0.5px solid #f9f6f2', fontSize: 12, background: r.possibleDuplicate ? '#fffaf0' : 'transparent' }}>
+                    <span style={{ width: 90, color: '#888' }}>{r.date || '—'}</span>
+                    <span style={{ width: 110, color: '#555' }}>{r.area}</span>
+                    <span style={{ flex: 1, color: '#2a2a2a' }}>{r.description}{r.possibleDuplicate && <span title="Matches another entry exactly (same area/description/amount/date)" style={{ marginLeft: 6, fontSize: 11, color: '#b45309', fontWeight: 600 }}>⚠ possible duplicate</span>}</span>
+                    <span style={{ width: 70, fontSize: 11, color: '#aaa' }}>{r.source}</span>
+                    <span style={{ width: 90, textAlign: 'right', fontWeight: 600, color: '#c07040' }}>{money(r.amount)}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
           )}
 
