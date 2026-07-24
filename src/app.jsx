@@ -2765,16 +2765,43 @@ function computeDefaultGreeting(donor) {
 // Real .xlsx (not CSV) -- avoids Excel's CSV auto-open date/number reinterpretation
 // (e.g. "2026-07-16" getting column-width-truncated into "#####") since values land in
 // their actual cell types instead of being re-parsed from text on open.
-function downloadXlsxRows(headers, rows, filename) {
+function buildXlsxSheet(headers, rows) {
   var worksheet = XLSX.utils.json_to_sheet(rows, { header: headers });
-  var colWidths = headers.map(function(h) {
+  worksheet['!cols'] = headers.map(function(h) {
     var maxLen = h.length;
     rows.forEach(function(r) { var v = r[h]; if (v != null) maxLen = Math.max(maxLen, String(v).length); });
     return { wch: Math.min(Math.max(maxLen + 2, 8), 50) };
   });
-  worksheet['!cols'] = colWidths;
+  return worksheet;
+}
+
+// Excel sheet names: max 31 chars, no \ / ? * [ ] : , and must be unique within the workbook.
+function sanitizeSheetName(name, usedNames) {
+  var clean = String(name || 'Sheet').replace(/[\\/?*\[\]:]/g, '-').slice(0, 31) || 'Sheet';
+  var candidate = clean;
+  var n = 2;
+  while (usedNames[candidate]) {
+    var suffix = ' (' + n + ')';
+    candidate = clean.slice(0, 31 - suffix.length) + suffix;
+    n++;
+  }
+  usedNames[candidate] = true;
+  return candidate;
+}
+
+function downloadXlsxRows(headers, rows, filename) {
   var workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+  XLSX.utils.book_append_sheet(workbook, buildXlsxSheet(headers, rows), 'Sheet1');
+  XLSX.writeFile(workbook, filename);
+}
+
+// sheets: [{ name, headers, rows }, ...] -- first sheet is whatever's listed first.
+function downloadXlsxMultiSheet(sheets, filename) {
+  var workbook = XLSX.utils.book_new();
+  var usedNames = {};
+  sheets.forEach(function(s) {
+    XLSX.utils.book_append_sheet(workbook, buildXlsxSheet(s.headers, s.rows), sanitizeSheetName(s.name, usedNames));
+  });
   XLSX.writeFile(workbook, filename);
 }
 
@@ -8319,6 +8346,14 @@ function FinancialOverviewView({ navigate }) {
     { id: 'cashflow', label: 'Office Cash Flow' },
     { id: 'outflow-detail', label: 'Spending Detail' },
   ];
+  function computeAreaItems(areaName) {
+    return budget.filter(function(b) { return inYear(b.date) && (b.area || 'Unassigned') === areaName; })
+      .map(function(b) { return { kind: b.type === 'In-Kind' ? 'In-Kind' : 'Purchase', description: b.description || '—', by: b.purchased_by || (b.needs_reimbursement ? b.volunteer_name : null), amount: parseFloat(b.amount) || 0, date: b.date }; })
+      .concat(earnings.filter(function(e) { return inYear(e.date) && (e.area || 'Unassigned') === areaName; })
+        .map(function(e) { return { kind: 'Earning', description: e.event || '—', by: null, amount: parseFloat(e.amount) || 0, date: e.date }; }))
+      .sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+  }
+
   function monthLabel(ym) {
     if (!ym || ym === 'Unknown') return 'Unknown date';
     var parts = ym.split('-');
@@ -8340,11 +8375,18 @@ function FinancialOverviewView({ navigate }) {
       });
       downloadXlsxRows(['Business', 'Date', 'Type', 'Description', 'Value'], rows, 'sponsorships-' + year + '.xlsx');
     } else if (activeTab === 'operational') {
-      var rows = stats.areaRows.map(function(r) {
+      var overviewRows = stats.areaRows.map(function(r) {
         var remaining = r.allocated != null ? r.allocated - r.purchases : null;
         return { Area: r.area, Budget: r.allocated != null ? r.allocated : '', Spent: r.purchases, Earnings: r.earnings, 'In-Kind': r.inKind, Remaining: remaining != null ? remaining : '' };
       });
-      downloadXlsxRows(['Area', 'Budget', 'Spent', 'Earnings', 'In-Kind', 'Remaining'], rows, 'operational-areas-' + year + '.xlsx');
+      var sheets = [{ name: 'Overview', headers: ['Area', 'Budget', 'Spent', 'Earnings', 'In-Kind', 'Remaining'], rows: overviewRows }];
+      stats.areaRows.forEach(function(r) {
+        var areaRows = computeAreaItems(r.area).map(function(item) {
+          return { Date: item.date || '', Kind: item.kind, Description: item.description, By: item.by || '', Amount: item.amount };
+        });
+        sheets.push({ name: r.area, headers: ['Date', 'Kind', 'Description', 'By', 'Amount'], rows: areaRows });
+      });
+      downloadXlsxMultiSheet(sheets, 'operational-areas-' + year + '.xlsx');
     } else if (activeTab === 'cashflow') {
       var rows = rentals.filter(function(r) { return inYear(r.date); }).map(function(r) {
         return { Date: r.date || '', Source: 'Earning', Category: r.name || 'Other', Direction: 'In', Amount: parseFloat(r.amount) || 0 };
@@ -8513,11 +8555,7 @@ function FinancialOverviewView({ navigate }) {
               var hasAllocated = r.allocated != null;
               var remaining = hasAllocated ? r.allocated - r.purchases : null;
               var isOpen = expandedArea === r.area;
-              var areaItems = budget.filter(function(b) { return inYear(b.date) && (b.area || 'Unassigned') === r.area; })
-                .map(function(b) { return { kind: b.type === 'In-Kind' ? 'In-Kind' : 'Purchase', description: b.description || '—', by: b.purchased_by || (b.needs_reimbursement ? b.volunteer_name : null), amount: parseFloat(b.amount) || 0, date: b.date }; })
-                .concat(earnings.filter(function(e) { return inYear(e.date) && (e.area || 'Unassigned') === r.area; })
-                  .map(function(e) { return { kind: 'Earning', description: e.event || '—', by: null, amount: parseFloat(e.amount) || 0, date: e.date }; }))
-                .sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+              var areaItems = computeAreaItems(r.area);
               var kindColors = { Purchase: { bg: '#fdf0e6', color: '#c07040' }, 'In-Kind': { bg: '#f3ede1', color: '#886c44' }, Earning: { bg: '#eaf4ea', color: '#5a8a5a' } };
               return (
                 <div key={r.area}>
