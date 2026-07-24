@@ -9855,8 +9855,8 @@ function AcknowledgmentsQueueView({ navigate }) {
       {rows!==null && filtered.length===0 && <div style={{fontSize:13,color:'#aaa',fontStyle:'italic'}}>Nothing in the backlog — everything's been mailed or nothing needs acknowledgment yet.</div>}
 
       {filtered.length>0 && (
-        <div style={{border:'0.5px solid #e0d8cc',borderRadius:10,overflow:'hidden'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+        <div style={{border:'0.5px solid #e0d8cc',borderRadius:10,overflow:'hidden',background:'#fff'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,background:'#fff'}}>
             <thead>
               <tr style={{background:'#faf8f4',textAlign:'left'}}>
                 <th style={{padding:'8px 10px'}}><input type="checkbox" checked={allChecked} onChange={toggleAll} /></th>
@@ -9873,7 +9873,7 @@ function AcknowledgmentsQueueView({ navigate }) {
               {filtered.map(function(r){
                 var hasAddr=!!(r.donor&&r.donor.mailing_address_line1);
                 return (
-                  <tr key={r.id} style={{borderTop:'0.5px solid #f0ebe2'}}>
+                  <tr key={r.id} style={{borderTop:'0.5px solid #f0ebe2',background:'#fff'}}>
                     <td style={{padding:'8px 10px'}}><input type="checkbox" checked={!!selectedIds[r.id]} onChange={function(){toggleOne(r.id);}} /></td>
                     <td style={{padding:'8px 10px',fontWeight:500}}>{r.donor?r.donor.formal_name:'Unknown donor'}</td>
                     <td style={{padding:'8px 10px'}}>{r.acknowledgment_type}</td>
