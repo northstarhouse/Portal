@@ -3392,7 +3392,6 @@ function DonorsView({ navigate }) {
                                 <span style={{fontWeight:500,color:'#2a2a2a'}}>{d.formal_name}</span>
                                 {d.starred && <span style={{color:'#b5a185',fontSize:12}}>★</span>}
                                 {d.deceased && <span style={{fontSize:9,fontWeight:600,padding:'1px 5px',borderRadius:20,background:'#e5e7eb',color:'#6b7280'}}>Deceased</span>}
-                                {(d.tags||[]).map(function(tag){return <span key={tag.id} title={tag.name} style={{width:7,height:7,borderRadius:'50%',background:tag.color,flexShrink:0,display:'inline-block'}}/>;})}
                               </div>
                               {d.informal_first_name && <div style={{fontSize:11,color:'#999',marginTop:1}}>{d.informal_first_name}</div>}
                             </div>
