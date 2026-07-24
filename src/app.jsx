@@ -2996,26 +2996,39 @@ function DonorsView({ navigate }) {
       }).catch(function(){setSavingDonorFields(false);});
   }
 
+  function computeDefaultOverrides(donor,don){
+    var isOrg=['Organization','Corporate','Foundation'].indexOf(donor.account_type)!==-1;
+    var lastName=(donor.formal_name||'').trim().split(/\s+/).pop();
+    var firstName=donor.informal_first_name||(donor.formal_name||'').replace(new RegExp('\\s*'+lastName+'$'),'');
+    var defaultGreeting=isOrg?('Friends at '+donor.formal_name):(donor.joint_donor_name?(firstName+' and '+donor.joint_donor_name):(donor.informal_first_name||donor.formal_name));
+    var defaultMailingName=isOrg?donor.formal_name:(donor.joint_donor_name?(firstName+' and '+donor.joint_donor_name+' '+lastName):donor.formal_name);
+    return {
+      greeting:donor.preferred_letter_greeting||defaultGreeting,
+      mailingName:defaultMailingName,
+      signerName:don.signer_name||'',
+      signerTitle:don.signer_title||'',
+      letterDate:new Date().toISOString().slice(0,10),
+    };
+  }
+
   function openGenerateFlow(don){
     setAckDonation(don);setAckError(null);setAckResult(null);
     if(don.letter_drive_url){setAckStep('exists-choice');}
     else{prepareReview(don);}
   }
 
+  // One-click generate for when a donation's Acknowledgment Type (and everything else) is
+  // already set correctly -- skips the review screen entirely and goes straight to generating,
+  // since re-confirming already-correct info on every single letter was the main complaint.
+  function quickGenerate(don){
+    setAckDonation(don);setAckError(null);setAckResult(null);
+    if(don.letter_drive_url){setAckStep('exists-choice');return;}
+    if(!don.acknowledgment_type){prepareReview(don);return;}
+    runGenerate(don,computeDefaultOverrides(selected,don));
+  }
+
   function prepareReview(don){
-    var donor=selected;
-    var isOrg=['Organization','Corporate','Foundation'].indexOf(donor.account_type)!==-1;
-    var lastName=(donor.formal_name||'').trim().split(/\s+/).pop();
-    var firstName=donor.informal_first_name||(donor.formal_name||'').replace(new RegExp('\\s*'+lastName+'$'),'');
-    var defaultGreeting=isOrg?('Friends at '+donor.formal_name):(donor.joint_donor_name?(firstName+' and '+donor.joint_donor_name):(donor.informal_first_name||donor.formal_name));
-    var defaultMailingName=isOrg?donor.formal_name:(donor.joint_donor_name?(firstName+' and '+donor.joint_donor_name+' '+lastName):donor.formal_name);
-    setAckOverrides({
-      greeting:donor.preferred_letter_greeting||defaultGreeting,
-      mailingName:defaultMailingName,
-      signerName:don.signer_name||'',
-      signerTitle:don.signer_title||'',
-      letterDate:new Date().toISOString().slice(0,10),
-    });
+    setAckOverrides(computeDefaultOverrides(selected,don));
     setAckStep('review');
   }
 
@@ -3048,11 +3061,12 @@ function DonorsView({ navigate }) {
     },3000);
   }
 
-  function confirmGenerate(){
+  function runGenerate(don,overrides){
+    setAckDonation(don);setAckOverrides(overrides);
     setAckStep('generating');setAckGenerating(true);setAckError(null);setAckRecovering(false);
-    var donationId=ackDonation.id,previousVersion=ackDonation.document_version||0;
+    var donationId=don.id,previousVersion=don.document_version||0;
     fetch(SUPABASE_URL+'/functions/v1/generate-acknowledgment',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({donationId:donationId,overrides:ackOverrides})})
+      body:JSON.stringify({donationId:donationId,overrides:overrides})})
       .then(function(r){return r.json();}).then(function(data){
         setAckGenerating(false);
         if(!data.success){setAckError(data.error||'Generation failed');setAckStep('error');return;}
@@ -3570,6 +3584,7 @@ function DonorsView({ navigate }) {
                                   <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,background:acked?'#e8f5e9':'#fff8e1',color:acked?'#2e7d32':'#8a6200',fontWeight:500}}>{acked?'Thanked':'Pending'}</span>
                                   {don.acknowledgment_status && <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,fontWeight:500,...(ACK_STATUS_PILLS[don.acknowledgment_status]||{background:'#f3f4f6',color:'#6b7280'})}}>{ACK_STATUS_LABELS[don.acknowledgment_status]||don.acknowledgment_status}</span>}
                                 </div>
+                                <button onClick={function(e){e.stopPropagation();quickGenerate(don);}} title={don.letter_drive_url?'Regenerate thank-you documents':don.acknowledgment_type?'Generate thank-you documents now, using the info already on file':'Set Acknowledgment Type, then generate'} style={{fontSize:13,background:'none',border:'0.5px solid '+gold,borderRadius:6,padding:'3px 8px',cursor:'pointer',flexShrink:0,lineHeight:1}}>✉️</button>
                                 <button onClick={function(e){e.stopPropagation();setEditDon(don);
                                   var mappedAck=DONATION_TYPE_TO_ACK_TYPES[don.type||'Donation'];
                                   var initialAck=don.acknowledgment_type||((mappedAck&&mappedAck.length===1)?mappedAck[0]:'');
@@ -3784,7 +3799,7 @@ function DonorsView({ navigate }) {
                 </div>
                 <div style={{fontSize:11,color:'#aaa',marginBottom:14}}>Drive destination: North Star House / Donor Acknowledgments / {(ackOverrides.letterDate||'').slice(0,4)} / {selected.formal_name}</div>
                 <div style={{display:'flex',gap:8}}>
-                  <button onClick={confirmGenerate} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer'}}>Generate Letter and Envelope</button>
+                  <button onClick={function(){runGenerate(ackDonation,ackOverrides);}} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer'}}>Generate Letter and Envelope</button>
                   <button onClick={closeAckFlow} style={{padding:'10px 16px',background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer'}}>Cancel</button>
                 </div>
               </div>
