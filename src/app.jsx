@@ -8148,6 +8148,8 @@ function FinancialOverviewView({ navigate }) {
   var [expandedEarningCat, setExpandedEarningCat] = useState(null);
   var [loading, setLoading] = useState(true);
   var [donations, setDonations] = useState([]);
+  var [donorsList, setDonorsList] = useState([]);
+  var [expandedDonationType, setExpandedDonationType] = useState(null);
   var [sponsors, setSponsors] = useState([]);
   var [budget, setBudget] = useState([]);
   var [earnings, setEarnings] = useState([]);
@@ -8159,7 +8161,8 @@ function FinancialOverviewView({ navigate }) {
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
     setLoading(true);
     Promise.all([
-      fetchAllPages(SUPABASE_URL + '/rest/v1/donations?select=amount,date,type', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/donations?select=amount,date,type,donor_id', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/donors?select=id,formal_name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?select=*', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement,description,purchased_by,volunteer_name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?select=area,event,amount,date', hdrs),
@@ -8167,9 +8170,9 @@ function FinancialOverviewView({ navigate }) {
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=amount,date,name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?select=*', hdrs)
     ]).then(function(res) {
-      setDonations(res[0]); setSponsors(res[1]); setBudget(res[2]);
-      setEarnings(res[3]); setCashLog(res[4]); setRentals(res[5]);
-      setSponsorInKindEntries(res[6]);
+      setDonations(res[0]); setDonorsList(res[1]); setSponsors(res[2]); setBudget(res[3]);
+      setEarnings(res[4]); setCashLog(res[5]); setRentals(res[6]);
+      setSponsorInKindEntries(res[7]);
       setLoading(false);
     }).catch(function() { setLoading(false); });
   }, []);
@@ -8250,6 +8253,12 @@ function FinancialOverviewView({ navigate }) {
       totalIncome: totalIncome, totalOutflow: totalOutflow, net: totalIncome - totalOutflow
     };
   }, [donations, sponsors, budget, earnings, cashLog, rentals, sponsorInKindEntries, year]);
+
+  var donorNameById = useMemo(function() {
+    var m = {};
+    donorsList.forEach(function(d) { m[d.id] = d.formal_name; });
+    return m;
+  }, [donorsList]);
 
   var outflowDetail = useMemo(function() {
     var purchaseRows = budget.filter(function(b) { return inYear(b.date) && b.type !== 'In-Kind'; }).map(function(b) {
@@ -8340,10 +8349,31 @@ function FinancialOverviewView({ navigate }) {
             {Object.keys(stats.donationsByType).length === 0 ? (
               <div style={{ fontSize: 12, color: '#bbb' }}>No donations recorded for {year}.</div>
             ) : Object.keys(stats.donationsByType).sort(function(a, b) { return stats.donationsByType[b] - stats.donationsByType[a]; }).map(function(t) {
+              var isOpen = expandedDonationType === t;
+              var typeDonations = donations.filter(function(d) { return inYear(d.date) && (d.type || 'Other') === t; })
+                .sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
               return (
-                <div key={t} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12 }}>
-                  <span style={{ color: '#555' }}>{t}</span>
-                  <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(stats.donationsByType[t])}</span>
+                <div key={t}>
+                  <div onClick={function() { setExpandedDonationType(isOpen ? null : t); }} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12, cursor: 'pointer', background: isOpen ? '#faf8f4' : 'transparent' }}>
+                    <span style={{ color: '#555', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 10, color: '#bbb', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s', display: 'inline-block' }}>▶</span>
+                      {t}
+                    </span>
+                    <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(stats.donationsByType[t])}</span>
+                  </div>
+                  {isOpen && (
+                    <div style={{ background: '#faf8f4', padding: '4px 0 8px 20px' }}>
+                      {typeDonations.map(function(d, i) {
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < typeDonations.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12 }}>
+                            <span style={{ width: 90, color: '#aaa', fontSize: 11 }}>{d.date || '—'}</span>
+                            <span style={{ flex: 1, color: '#2a2a2a' }}>{donorNameById[d.donor_id] || 'Unknown donor'}</span>
+                            <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(d.amount)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
