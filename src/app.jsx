@@ -8187,7 +8187,7 @@ function FinancialOverviewView({ navigate }) {
 
     var currentSponsors = sponsors.filter(function(s) { return (s['sponsor_status'] || 'current') === 'current'; });
     var currentSponsorIds = new Set(currentSponsors.map(function(s) { return s.id; }));
-    var currentEntries = sponsorInKindEntries.filter(function(e) { return currentSponsorIds.has(e.sponsor_id); });
+    var currentEntries = sponsorInKindEntries.filter(function(e) { return currentSponsorIds.has(e.sponsor_id) && inYear(e.date); });
     var sponsorCash = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'Monetary Value' ? (parseFloat(e.value) || 0) : 0); }, 0);
     var sponsorInKind = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'In-Kind (Work)' ? (parseFloat(e.value) || 0) : 0); }, 0);
     var sponsorDiscount = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'Discount' ? (parseFloat(e.value) || 0) : 0); }, 0);
@@ -8355,7 +8355,7 @@ function FinancialOverviewView({ navigate }) {
               <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Sponsorships</div>
               <button onClick={function() { navigate('sponsors'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>Edit on Sponsors page</button>
             </div>
-            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Current sponsors only, summed from each sponsor's tagged contributions (not year-filtered — sponsorships often span multiple years)</div>
+            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Current sponsors only, summed from each sponsor's contributions dated in {year}</div>
             <div style={{ display: 'flex', gap: 24, marginBottom: 14 }}>
               <div><div style={cardLabel}>Current Sponsors</div><div style={{ ...cardValue, fontSize: 16 }}>{stats.currentSponsors.length}</div></div>
               <div><div style={cardLabel}>Monetary Value</div><div style={{ ...cardValue, fontSize: 16, color: '#2e7d32' }}>{money(stats.sponsorCash)}</div></div>
