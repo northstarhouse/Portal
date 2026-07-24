@@ -11663,7 +11663,7 @@ function VenueRentalsView() {
   }, []);
 
   function getTrack(uid) {
-    return tracking[uid] || { pictures_done: false, blog_done: false, socials_done: false, photographer_link: '', photo_album_link: '' };
+    return tracking[uid] || { pictures_done: false, blog_done: false, socials_done: false, photographer_link: '', photo_album_link: '', total_cost: null };
   }
 
   function saveTrack(uid, title, date, patch) {
@@ -11685,7 +11685,7 @@ function VenueRentalsView() {
       fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking', {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-        body: JSON.stringify({ event_uid: uid, event_title: title, event_date: dateStr, pictures_done: merged.pictures_done, blog_done: merged.blog_done, socials_done: merged.socials_done, photographer_link: merged.photographer_link || null, photo_album_link: merged.photo_album_link || null })
+        body: JSON.stringify({ event_uid: uid, event_title: title, event_date: dateStr, pictures_done: merged.pictures_done, blog_done: merged.blog_done, socials_done: merged.socials_done, photographer_link: merged.photographer_link || null, photo_album_link: merged.photo_album_link || null, total_cost: merged.total_cost != null ? merged.total_cost : null })
       }).then(function(r) { return r.json(); }).then(function(rows) {
         if (Array.isArray(rows) && rows[0]) setTracking(function(prev) { return Object.assign({}, prev, { [uid]: rows[0] }); });
         setSavingUid(null);
@@ -11703,6 +11703,12 @@ function VenueRentalsView() {
     setTracking(function(prev) { return Object.assign({}, prev, { [uid]: Object.assign({}, prev[uid] || {}, { photo_album_link: val }) }); });
     clearTimeout(debounceTimers.current[uid + '_album']);
     debounceTimers.current[uid + '_album'] = setTimeout(function() { saveTrack(uid, title, date, { photo_album_link: val || null }); }, 700);
+  }
+
+  function handleCostChange(uid, title, date, val) {
+    setTracking(function(prev) { return Object.assign({}, prev, { [uid]: Object.assign({}, prev[uid] || {}, { total_cost: val }) }); });
+    clearTimeout(debounceTimers.current[uid + '_cost']);
+    debounceTimers.current[uid + '_cost'] = setTimeout(function() { saveTrack(uid, title, date, { total_cost: val === '' ? null : parseFloat(val) || 0 }); }, 700);
   }
 
   function Checkbox({ checked, onChange, label, color }) {
@@ -11815,6 +11821,28 @@ function VenueRentalsView() {
                   Photo Album
                 </button>
               )}
+              {(editingField && editingField.uid === w.uid && editingField.field === 'cost') ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#eaf4ea', border: '0.5px solid #a5d6a7', borderRadius: 20, padding: '3px 12px' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#2e7d32' }}>$</span>
+                  <input autoFocus type="number" step="0.01" min="0" value={editingField.val}
+                    onChange={function(e) { setEditingField(function(ef) { return Object.assign({}, ef, { val: e.target.value }); }); }}
+                    onKeyDown={function(e) { if (e.key === 'Enter') { handleCostChange(w.uid, w.title, w.date, editingField.val); setEditingField(null); } if (e.key === 'Escape') setEditingField(null); }}
+                    onBlur={function() { handleCostChange(w.uid, w.title, w.date, editingField.val); setEditingField(null); }}
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, fontWeight: 600, color: '#2e7d32', width: 90 }} />
+                </div>
+              ) : t.total_cost != null ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#eaf4ea', border: '0.5px solid #a5d6a7', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: '#2e7d32', whiteSpace: 'nowrap' }}>
+                    {'$' + parseFloat(t.total_cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <button onClick={function() { setEditingField({ uid: w.uid, field: 'cost', val: t.total_cost != null ? String(t.total_cost) : '' }); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: 13, padding: '0 2px', lineHeight: 1 }}>✎</button>
+                </div>
+              ) : (
+                <button onClick={function() { setEditingField({ uid: w.uid, field: 'cost', val: '' }); }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: '0.5px dashed #d0c8bc', borderRadius: 20, padding: '4px 12px', fontSize: 12, color: '#bbb', cursor: 'pointer' }}>
+                  Total Cost
+                </button>
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 2 }}>
@@ -11833,7 +11861,19 @@ function VenueRentalsView() {
   return (
     <div>
       <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 6 }}>Venue Rentals</div>
-      <div style={{ fontSize: 13, color: '#aaa', marginBottom: 24 }}>Wedding tracking and post-event checklist</div>
+      <div style={{ fontSize: 13, color: '#aaa', marginBottom: 16 }}>Wedding tracking and post-event checklist</div>
+
+      {!loading && !calError && (function() {
+        var withCost = visible.filter(function(w) { return getTrack(w.uid).total_cost != null; });
+        var total = withCost.reduce(function(s, w) { return s + (parseFloat(getTrack(w.uid).total_cost) || 0); }, 0);
+        if (withCost.length === 0) return null;
+        return (
+          <div style={{ display: 'inline-block', background: '#eaf4ea', border: '0.5px solid #a5d6a7', borderRadius: 10, padding: '10px 16px', marginBottom: 16 }}>
+            <span style={{ fontSize: 11, color: '#5a8a5a', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>Total Cost — {withCost.length} event{withCost.length !== 1 ? 's' : ''} tracked</span>
+            <div style={{ fontSize: 19, fontWeight: 700, color: '#2e7d32', marginTop: 2 }}>${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          </div>
+        );
+      })()}
 
       {loading && <div style={{ color: '#aaa', fontSize: 13, padding: 40, textAlign: 'center' }}>Loading calendar…</div>}
       {calError && <div style={{ color: '#c62828', fontSize: 12, background: '#ffebee', borderRadius: 8, padding: 16 }}>Could not load calendar: {calError}</div>}
