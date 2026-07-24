@@ -3123,7 +3123,7 @@ function DonorsView({ navigate }) {
   function closeAckFlow(){setAckStep(null);setAckDonation(null);setAckResult(null);setAckError(null);}
 
   function markAckStatus(don,status){
-    var patch=status==='printed'?{acknowledgment_status:'printed',date_printed:new Date().toISOString()}:{acknowledgment_status:'mailed',date_mailed:new Date().toISOString()};
+    var patch=status==='printed'?{acknowledgment_status:'printed',date_printed:new Date().toISOString()}:{acknowledgment_status:'mailed',date_mailed:new Date().toISOString(),acknowledged:true};
     fetch(SUPABASE_URL+'/rest/v1/donations?id=eq.'+don.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(patch)})
       .then(function(r){return r.json();}).then(function(rows){
         var updated=Array.isArray(rows)?rows[0]:rows;
@@ -3313,12 +3313,12 @@ function DonorsView({ navigate }) {
           <option value="yes">Has Address</option>
           <option value="no">No Address</option>
         </select>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginLeft:'auto'}}>
+        <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto'}}>
           <span style={{fontSize:11,color:'#aaa'}}>{filteredDonors.length} donor{filteredDonors.length!==1?'s':''}</span>
-          {navigate && <button onClick={function(){navigate('acknowledgments-queue');}} style={{padding:'7px 14px',background:'#fff',border:'0.5px solid '+gold,color:gold,borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>Acknowledgments to Process</button>}
-          <button onClick={bulkFillAddresses} disabled={bulkFilling} title="Fill blank structured mailing address fields from each donor's existing Address field" style={{padding:'7px 14px',background:'#fff',border:'0.5px solid '+gold,color:gold,borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer',opacity:bulkFilling?0.7:1}}>{bulkFilling?'Filling…':'Bulk-Fill Mailing Addresses'}</button>
-          <button onClick={exportCSV} style={{padding:'7px 14px',background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>↓ Export CSV</button>
-          <button onClick={function(){setAddForm(emptyAddForm);setAddGiftForm(emptyGiftForm);setAddExistingDonor(null);setAddSearchQuery('');setAddMode('search');setShowAdd(true);}} style={{padding:'7px 14px',background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>+ Add Donation</button>
+          {navigate && <button onClick={function(){navigate('acknowledgments-queue');}} style={{padding:'5px 10px',background:'none',border:'0.5px solid #e0d8cc',color:'#888',borderRadius:6,fontSize:11,fontWeight:500,cursor:'pointer'}}>Acknowledgments to Process</button>}
+          <button onClick={bulkFillAddresses} disabled={bulkFilling} title="Fill blank structured mailing address fields from each donor's existing Address field" style={{padding:'5px 10px',background:'none',border:'0.5px solid #e0d8cc',color:'#888',borderRadius:6,fontSize:11,fontWeight:500,cursor:'pointer',opacity:bulkFilling?0.7:1}}>{bulkFilling?'Filling…':'Bulk-Fill Addresses'}</button>
+          <button onClick={exportCSV} style={{padding:'5px 10px',background:'none',border:'0.5px solid #e0d8cc',color:'#888',borderRadius:6,fontSize:11,fontWeight:500,cursor:'pointer'}}>↓ CSV</button>
+          <button onClick={function(){setAddForm(emptyAddForm);setAddGiftForm(emptyGiftForm);setAddExistingDonor(null);setAddSearchQuery('');setAddMode('search');setShowAdd(true);}} style={{padding:'6px 12px',background:gold,color:'#fff',border:'none',borderRadius:6,fontSize:11,fontWeight:600,cursor:'pointer'}}>+ Add Donation</button>
         </div>
       </div>
       {bulkFillResult && (
@@ -10243,7 +10243,7 @@ function AcknowledgmentsQueueView({ navigate }) {
   function markSelected(status){
     var ids=selectedRows.map(function(r){return r.id;});
     if(ids.length===0)return;
-    var patch=status==='printed'?{acknowledgment_status:'printed',date_printed:new Date().toISOString()}:{acknowledgment_status:'mailed',date_mailed:new Date().toISOString()};
+    var patch=status==='printed'?{acknowledgment_status:'printed',date_printed:new Date().toISOString()}:{acknowledgment_status:'mailed',date_mailed:new Date().toISOString(),acknowledged:true};
     fetch(SUPABASE_URL+'/rest/v1/donations?id=in.('+ids.join(',')+')',{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(patch)})
       .then(function(){load();setSelectedIds({});});
   }
