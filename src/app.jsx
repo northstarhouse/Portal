@@ -8390,8 +8390,8 @@ function FinancialOverviewView({ navigate }) {
               <span style={{ flex: 1 }}>Area</span>
               <span style={{ width: 90, textAlign: 'right' }}>Budget</span>
               <span style={{ width: 90, textAlign: 'right' }}>Spent</span>
-              <span style={{ width: 90, textAlign: 'right' }}>In-Kind</span>
               <span style={{ width: 90, textAlign: 'right' }}>Earnings</span>
+              <span style={{ width: 90, textAlign: 'right' }}>In-Kind</span>
               <span style={{ width: 90, textAlign: 'right' }}>Remaining</span>
             </div>
             {stats.areaRows.length === 0 ? (
@@ -8404,8 +8404,8 @@ function FinancialOverviewView({ navigate }) {
                   <span style={{ flex: 1, fontWeight: 500, color: '#2a2a2a' }}>{r.area}</span>
                   <span style={{ width: 90, textAlign: 'right', fontWeight: 600, color: '#2a2a2a' }}>{hasAllocated ? money(r.allocated) : '—'}</span>
                   <span style={{ width: 90, textAlign: 'right', color: '#c07040' }}>{r.purchases ? money(r.purchases) : '—'}</span>
-                  <span style={{ width: 90, textAlign: 'right', color: '#886c44' }}>{r.inKind ? money(r.inKind) : '—'}</span>
                   <span style={{ width: 90, textAlign: 'right', color: '#5a8a5a' }}>{r.earnings ? money(r.earnings) : '—'}</span>
+                  <span style={{ width: 90, textAlign: 'right', color: '#886c44' }}>{r.inKind ? money(r.inKind) : '—'}</span>
                   <span style={{ width: 90, textAlign: 'right', fontWeight: 700, color: !hasAllocated ? '#bbb' : remaining >= 0 ? '#2e7d32' : '#c62828' }}>
                     {!hasAllocated ? '—' : (remaining >= 0 ? '' : '-') + money(Math.abs(remaining))}
                   </span>
