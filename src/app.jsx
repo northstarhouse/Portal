@@ -2223,7 +2223,9 @@ function VolunteersView() {
       </div>
 
       <div style={{ position: 'relative', marginBottom: 16 }}>
-        <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#aaa', fontSize: 12, pointerEvents: 'none' }}>🔍</span>
+        <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#aaa', pointerEvents: 'none', display: 'flex' }}>
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
         <input
           type="text"
           value={searchQuery}
@@ -3279,7 +3281,9 @@ function DonorsView({ navigate }) {
       {/* Filter bar */}
       <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8,marginBottom:14}}>
         <div style={{position:'relative',flex:'1 1 160px',minWidth:160}}>
-          <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'#aaa',fontSize:12,pointerEvents:'none'}}>🔍</span>
+          <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'#aaa',pointerEvents:'none',display:'flex'}}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </span>
           <input type="text" placeholder="Search donors..." value={filters.search}
             onChange={function(e){setFilters(function(f){return Object.assign({},f,{search:e.target.value});});}}
             style={{width:'100%',padding:'7px 12px 7px 30px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff',boxSizing:'border-box'}} />
@@ -3625,7 +3629,9 @@ function DonorsView({ navigate }) {
                                   <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,background:acked?'#e8f5e9':'#fff8e1',color:acked?'#2e7d32':'#8a6200',fontWeight:500}}>{acked?'Thanked':'Pending'}</span>
                                   {don.acknowledgment_status && don.acknowledgment_status!=='ready_to_generate' && <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,fontWeight:500,...(ACK_STATUS_PILLS[don.acknowledgment_status]||{background:'#f3f4f6',color:'#6b7280'})}}>{ACK_STATUS_LABELS[don.acknowledgment_status]||don.acknowledgment_status}</span>}
                                 </div>
-                                <button onClick={function(e){e.stopPropagation();quickGenerate(don);}} title={don.letter_drive_url?'Regenerate thank-you documents':don.acknowledgment_type?'Generate thank-you documents now, using the info already on file':'Set Acknowledgment Type, then generate'} style={{fontSize:13,background:'none',border:'0.5px solid '+gold,borderRadius:6,padding:'3px 8px',cursor:'pointer',flexShrink:0,lineHeight:1}}>✉️</button>
+                                <button onClick={function(e){e.stopPropagation();quickGenerate(don);}} title={don.letter_drive_url?'Regenerate thank-you documents':don.acknowledgment_type?'Generate thank-you documents now, using the info already on file':'Set Acknowledgment Type, then generate'} style={{background:'none',border:'0.5px solid '+gold,color:gold,borderRadius:6,padding:'4px 7px',cursor:'pointer',flexShrink:0,display:'flex',alignItems:'center'}}>
+                                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>
+                                </button>
                                 <button onClick={function(e){e.stopPropagation();setEditDon(don);
                                   var mappedAck=DONATION_TYPE_TO_ACK_TYPES[don.type||'Donation'];
                                   var initialAck=don.acknowledgment_type||((mappedAck&&don.type!=='Restricted')?mappedAck[0]:'');
