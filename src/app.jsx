@@ -3511,7 +3511,7 @@ function DonorsView({ navigate }) {
                                 <div><label style={lStyle}>Date</label><input type="date" value={editForm.date||''} onChange={function(e){setEditForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
                               </div>
                               <div style={{marginBottom:8}}><label style={lStyle}>Type</label>
-                                <select value={editForm.type||''} onChange={function(e){var newType=e.target.value;setEditForm(function(f){var mapped=DONATION_TYPE_TO_ACK_TYPES[newType];var nextAck=(!f.acknowledgment_type&&mapped&&mapped.length===1)?mapped[0]:f.acknowledgment_type;return Object.assign({},f,{type:newType,acknowledgment_type:nextAck});});}} style={iStyle}>
+                                <select value={editForm.type||''} onChange={function(e){var newType=e.target.value;setEditForm(function(f){var mapped=DONATION_TYPE_TO_ACK_TYPES[newType];var nextAck=(!f.acknowledgment_type&&mapped)?mapped[0]:f.acknowledgment_type;return Object.assign({},f,{type:newType,acknowledgment_type:nextAck});});}} style={iStyle}>
                                   {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
                                 </select>
                               </div>
@@ -3587,7 +3587,7 @@ function DonorsView({ navigate }) {
                                 <button onClick={function(e){e.stopPropagation();quickGenerate(don);}} title={don.letter_drive_url?'Regenerate thank-you documents':don.acknowledgment_type?'Generate thank-you documents now, using the info already on file':'Set Acknowledgment Type, then generate'} style={{fontSize:13,background:'none',border:'0.5px solid '+gold,borderRadius:6,padding:'3px 8px',cursor:'pointer',flexShrink:0,lineHeight:1}}>✉️</button>
                                 <button onClick={function(e){e.stopPropagation();setEditDon(don);
                                   var mappedAck=DONATION_TYPE_TO_ACK_TYPES[don.type||'Donation'];
-                                  var initialAck=don.acknowledgment_type||((mappedAck&&mappedAck.length===1)?mappedAck[0]:'');
+                                  var initialAck=don.acknowledgment_type||(mappedAck?mappedAck[0]:'');
                                   setEditForm({amount:String(don.amount),date:don.date||'',type:don.type||'Donation',payment_type:don.payment_type||'',acknowledged:don.acknowledged===true||String(don.acknowledged).toUpperCase()==='TRUE',donation_notes:don.donation_notes||'',
                                   acknowledgment_type:initialAck,acknowledgment_status:don.acknowledgment_status||'',membership_level:don.membership_level||'',membership_start_date:don.membership_start_date||'',membership_expiration_date:don.membership_expiration_date||'',
                                   event_name:don.event_name||'',sponsorship_level:don.sponsorship_level||'',brick_inscription:don.brick_inscription||'',memorial_recipient:don.memorial_recipient||'',honoree_name:don.honoree_name||'',
