@@ -9364,7 +9364,6 @@ function FinancialsView({ navigate }) {
   var [resourceUrl, setResourceUrl] = useState('');
   var [resourceSaving, setResourceSaving] = useState(false);
   var resourceFileRef = useRef(null);
-  var [showPnl, setShowPnl] = useState(false);
   var [showAllReim, setShowAllReim] = useState(false);
 
 
@@ -9455,10 +9454,6 @@ function FinancialsView({ navigate }) {
 
   return (
     <div>
-    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-      <button onClick={function() { setShowPnl(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Events Profit / Loss</button>
-    </div>
-    {showPnl && <EventsProfitLossModal onClose={function() { setShowPnl(false); }} />}
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
