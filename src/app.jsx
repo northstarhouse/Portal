@@ -8161,7 +8161,7 @@ function FinancialOverviewView({ navigate }) {
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
     setLoading(true);
     Promise.all([
-      fetchAllPages(SUPABASE_URL + '/rest/v1/donations?select=amount,date,type,donor_id', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/donations?select=amount,date,type,donor_id,payment_type,acknowledged,donation_notes', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/donors?select=id,formal_name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?select=*', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement,description,purchased_by,volunteer_name', hdrs),
@@ -8367,7 +8367,9 @@ function FinancialOverviewView({ navigate }) {
                         return (
                           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < typeDonations.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12 }}>
                             <span style={{ width: 90, color: '#aaa', fontSize: 11 }}>{d.date || '—'}</span>
-                            <span style={{ flex: 1, color: '#2a2a2a' }}>{donorNameById[d.donor_id] || 'Unknown donor'}</span>
+                            <span style={{ width: 150, color: '#2a2a2a' }}>{donorNameById[d.donor_id] || 'Unknown donor'}</span>
+                            {d.payment_type && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: '#eef2f7', color: '#3a5068', flexShrink: 0 }}>{d.payment_type}</span>}
+                            <span style={{ flex: 1, color: '#888', fontSize: 11 }}>{d.donation_notes || ''}</span>
                             <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(d.amount)}</span>
                           </div>
                         );
