@@ -10142,7 +10142,7 @@ function AcknowledgmentsQueueView({ navigate }) {
 
   function load(){
     Promise.all([
-      fetch(SUPABASE_URL+'/rest/v1/donations?select=*&acknowledgment_type=not.is.null&acknowledgment_status=not.in.(mailed,not_required)&order=date.desc',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
+      fetch(SUPABASE_URL+'/rest/v1/donations?select=*&acknowledgment_type=not.is.null&acknowledgment_status=not.in.(printed,mailed,not_required)&order=date.desc',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
       fetch(SUPABASE_URL+'/rest/v1/donors?select=id,formal_name,mailing_address_line1,mailing_city,mailing_state,mailing_zip,address',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
     ]).then(function(results){
       var dons=Array.isArray(results[0])?results[0]:[];
