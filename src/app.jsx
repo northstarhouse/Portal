@@ -8189,6 +8189,8 @@ function FinancialOverviewView({ navigate }) {
   var [expandedMonth, setExpandedMonth] = useState(null);
   var [expandedSponsor, setExpandedSponsor] = useState(null);
   var [expandedEarningCat, setExpandedEarningCat] = useState(null);
+  var [reconciledAt, setReconciledAt] = useState(null);
+  var [reconciling, setReconciling] = useState(false);
   var [loading, setLoading] = useState(true);
   var [donations, setDonations] = useState([]);
   var [donorsList, setDonorsList] = useState([]);
@@ -8218,10 +8220,34 @@ function FinancialOverviewView({ navigate }) {
       setSponsorInKindEntries(res[7]);
       setLoading(false);
     }).catch(function() { setLoading(false); });
+    loadReconciliation();
   }, []);
+
+  function loadReconciliation() {
+    fetch(SUPABASE_URL + '/rest/v1/financial_reconciliations?scope=eq.office_cash_flow&select=reconciled_at&order=reconciled_at.desc&limit=1', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows) && rows[0]) setReconciledAt(rows[0].reconciled_at);
+    }).catch(function() {});
+  }
+
+  function markReconciled() {
+    if (!window.confirm('Mark everything up to right now as reconciled? This is just a visual marker — no records are changed, hidden, or deleted, and totals stay the same. It only grays out prior entries and starts a fresh "since reconciliation" list.')) return;
+    setReconciling(true);
+    fetch(SUPABASE_URL + '/rest/v1/financial_reconciliations', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ scope: 'office_cash_flow' })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setReconciling(false);
+      var row = Array.isArray(rows) ? rows[0] : rows;
+      if (row) setReconciledAt(row.reconciled_at);
+    }).catch(function() { setReconciling(false); });
+  }
 
   function inYear(dateStr) { return dateStr && dateStr.slice(0, 4) === String(year); }
   function money(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function isSinceReconciliation(dateStr) { return !reconciledAt || (dateStr && dateStr + 'T23:59:59' > reconciledAt); }
 
   var stats = useMemo(function() {
     var yearDonations = donations.filter(function(d) { return inYear(d.date); });
@@ -8601,6 +8627,12 @@ function FinancialOverviewView({ navigate }) {
 
           {activeTab === 'cashflow' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#faf8f4', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '10px 14px' }}>
+            <div style={{ fontSize: 12, color: '#666' }}>
+              {reconciledAt ? <span>Reconciled through <b>{new Date(reconciledAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</b> — entries from before then are grayed out below. Totals still include everything.</span> : <span>Not reconciled yet — mark a checkpoint to gray out everything up to now and start a fresh running list.</span>}
+            </div>
+            <button onClick={markReconciled} disabled={reconciling} style={{ padding: '6px 14px', fontSize: 11, fontWeight: 600, border: 'none', borderRadius: 8, background: gold, color: '#fff', cursor: 'pointer', flexShrink: 0, opacity: reconciling ? 0.7 : 1 }}>{reconciling ? 'Marking…' : 'Mark Reconciled'}</button>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
             <div style={card}><div style={cardLabel}>Office Cash In</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(stats.cashIn)}</div></div>
             <div style={card}><div style={cardLabel}>Office Cash Out</div><div style={{ ...cardValue, color: '#c07040' }}>{money(stats.cashOut)}</div></div>
@@ -8627,8 +8659,9 @@ function FinancialOverviewView({ navigate }) {
                   {isOpen && (
                     <div style={{ background: '#faf8f4', padding: '4px 0 8px 20px' }}>
                       {catEntries.map(function(r, i) {
+                        var isNew = isSinceReconciliation(r.date);
                         return (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < catEntries.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12 }}>
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < catEntries.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12, opacity: isNew ? 1 : 0.45 }}>
                             <span style={{ width: 90, color: '#aaa', fontSize: 11 }}>{r.date || '—'}</span>
                             <span style={{ flex: 1, color: '#2a2a2a' }}>{r.name || '—'}</span>
                             <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(r.amount)}</span>
@@ -8642,24 +8675,40 @@ function FinancialOverviewView({ navigate }) {
             })}
           </div>
 
-          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
-            <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Cash Log — {year}</div>
-            {(function() {
-              var yearCashRows = cashLog.filter(function(c) { return inYear(c.date); }).sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
-              if (yearCashRows.length === 0) return <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>No cash log entries for {year}.</div>;
-              return yearCashRows.map(function(c, i) {
-                var isIn = c.direction === 'In';
-                return (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 18px', borderBottom: '0.5px solid #f9f6f2', fontSize: 12 }}>
-                    <span style={{ width: 90, color: '#888' }}>{c.date || '—'}</span>
-                    <span style={{ width: 50, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: isIn ? '#eaf4ea' : '#fdf0e6', color: isIn ? '#2e7d32' : '#c07040', textAlign: 'center' }}>{c.direction}</span>
-                    <span style={{ flex: 1, color: '#2a2a2a' }}>{c.description || '—'}</span>
-                    <span style={{ fontWeight: 600, color: isIn ? '#2e7d32' : '#c07040' }}>{money(c.amount)}</span>
+          {(function() {
+            var yearCashRows = cashLog.filter(function(c) { return inYear(c.date); }).sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+            var newRows = reconciledAt ? yearCashRows.filter(function(c) { return isSinceReconciliation(c.date); }) : [];
+            function cashLogRow(c, i, total) {
+              var isIn = c.direction === 'In';
+              var isNew = isSinceReconciliation(c.date);
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 18px', borderBottom: i < total - 1 ? '0.5px solid #f9f6f2' : 'none', fontSize: 12, opacity: isNew ? 1 : 0.45 }}>
+                  <span style={{ width: 90, color: '#888' }}>{c.date || '—'}</span>
+                  <span style={{ width: 50, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: isIn ? '#eaf4ea' : '#fdf0e6', color: isIn ? '#2e7d32' : '#c07040', textAlign: 'center' }}>{c.direction}</span>
+                  <span style={{ flex: 1, color: '#2a2a2a' }}>{c.description || '—'}</span>
+                  <span style={{ fontWeight: 600, color: isIn ? '#2e7d32' : '#c07040' }}>{money(c.amount)}</span>
+                </div>
+              );
+            }
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {reconciledAt && (
+                  <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Since Reconciliation</div>
+                    {newRows.length === 0 ? (
+                      <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>Nothing logged since the last reconciliation yet.</div>
+                    ) : newRows.map(function(c, i) { return cashLogRow(c, i, newRows.length); })}
                   </div>
-                );
-              });
-            })()}
-          </div>
+                )}
+                <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+                  <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Cash Log — {year} (everything)</div>
+                  {yearCashRows.length === 0 ? (
+                    <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>No cash log entries for {year}.</div>
+                  ) : yearCashRows.map(function(c, i) { return cashLogRow(c, i, yearCashRows.length); })}
+                </div>
+              </div>
+            );
+          })()}
           </div>
           )}
 
