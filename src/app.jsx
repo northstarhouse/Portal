@@ -5593,6 +5593,12 @@ function AllReimbursementsModal({ onClose }) {
 
   function fmt(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+  function receiptsOf(receiptUrl) {
+    if (!receiptUrl) return [];
+    try { var p = JSON.parse(receiptUrl); if (Array.isArray(p)) return p; } catch (e) {}
+    return [receiptUrl];
+  }
+
   function statusBadge(b) {
     var label = b.volunteer_auth_user_id ? (b.status || 'Submitted') : (b.needs_reimbursement ? 'Pending' : 'Reimbursed');
     var colors = {
@@ -5616,6 +5622,7 @@ function AllReimbursementsModal({ onClose }) {
         ) : (
           <div>
             {rows.map(function(b) {
+              var receipts = receiptsOf(b.receipt_url);
               return (
                 <div key={b.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 0', borderBottom: '0.5px solid #f0ece6' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -5624,6 +5631,13 @@ function AllReimbursementsModal({ onClose }) {
                       {b.volunteer_name}{b.area ? <span style={{ color: '#aaa' }}> · {b.area}</span> : null}
                     </div>
                     <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
+                    {receipts.length > 0 && (
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                        {receipts.map(function(url, i) {
+                          return <a key={i} href={url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: gold, textDecoration: 'none' }}>📎 Receipt{receipts.length > 1 ? ' ' + (i + 1) : ''}</a>;
+                        })}
+                      </div>
+                    )}
                   </div>
                   {statusBadge(b)}
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', flexShrink: 0, width: 80, textAlign: 'right' }}>{fmt(b.amount)}</div>
@@ -5869,6 +5883,9 @@ function OperationalView({ opArea, navigateToQuarterly }) {
       if (rows && rows.code) { setBudgetSaving(false); alert('Add failed: ' + (rows.message || rows.hint || rows.code)); return; }
       var newRow = rows && rows[0];
       if (!newRow) { setBudgetSaving(false); return; }
+      if (payload.needs_reimbursement) {
+        logActivity('New reimbursement submitted for ' + area + ' for ' + (payload.volunteer_name || 'a volunteer') + ': ' + payload.description, 'reimbursement_submitted');
+      }
       function finish(finalRow) {
         clearCache('Op Budget');
         setBudgetSaving(false);
@@ -9063,6 +9080,9 @@ function IdeasView() {
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (rows && rows.message) { alert('Budget error: ' + rows.message); setBudgetSaving(false); return; }
       var newRow = rows && rows[0] ? rows[0] : {};
+      if (needsReimb) {
+        logActivity('New reimbursement submitted for ' + selected.title + ' for ' + (budgetForm.volunteer_name || 'a volunteer') + ': ' + budgetForm.description, 'reimbursement_submitted');
+      }
       var file = receiptRef.current && receiptRef.current.files[0];
       function finish(row) {
         setBudgetItems(function(p) { return [row].concat(p); });
