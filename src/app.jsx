@@ -8141,6 +8141,7 @@ function FinancialOverviewView({ navigate }) {
   var { useState, useEffect, useMemo } = React;
   var thisYear = new Date().getFullYear();
   var [year, setYear] = useState(thisYear);
+  var [activeTab, setActiveTab] = useState('donations');
   var [loading, setLoading] = useState(true);
   var [donations, setDonations] = useState([]);
   var [sponsors, setSponsors] = useState([]);
@@ -8251,6 +8252,13 @@ function FinancialOverviewView({ navigate }) {
   var cardValue = { fontSize: 19, fontWeight: 700, marginTop: 5 };
   var yearOptions = [thisYear];
 
+  var TABS = [
+    { id: 'donations', label: 'Donations' },
+    { id: 'sponsorships', label: 'In-Kind Sponsorships' },
+    { id: 'operational', label: 'Operational Areas' },
+    { id: 'cashflow', label: 'Office Cash Flow' },
+  ];
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -8272,6 +8280,19 @@ function FinancialOverviewView({ navigate }) {
             <div style={card}><div style={cardLabel}>In-Kind Total</div><div style={{ ...cardValue, color: '#886c44' }}>{money(stats.totalInKind + stats.sponsorInKind)}</div></div>
           </div>
 
+          <div style={{ display: 'flex', gap: 4, borderBottom: '0.5px solid #e8e0d5' }}>
+            {TABS.map(function(t) {
+              var isActive = activeTab === t.id;
+              return (
+                <button key={t.id} onClick={function() { setActiveTab(t.id); }}
+                  style={{ padding: '9px 16px', fontSize: 12, fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: isActive ? gold : '#888', borderBottom: '2px solid ' + (isActive ? gold : 'transparent'), marginBottom: -1 }}>
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {activeTab === 'donations' && (
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 12 }}>Donations — {year}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#2e7d32', marginBottom: 12 }}>{money(stats.donationTotal)}</div>
@@ -8286,7 +8307,9 @@ function FinancialOverviewView({ navigate }) {
               );
             })}
           </div>
+          )}
 
+          {activeTab === 'sponsorships' && (
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>In-Kind Sponsorships</div>
@@ -8321,7 +8344,9 @@ function FinancialOverviewView({ navigate }) {
               </div>
             )}
           </div>
+          )}
 
+          {activeTab === 'operational' && (
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
             <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Operational Areas — {year}</div>
             <div style={{ display: 'flex', gap: 10, padding: '8px 18px 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>
@@ -8351,7 +8376,10 @@ function FinancialOverviewView({ navigate }) {
               );
             })}
           </div>
+          )}
 
+          {activeTab === 'cashflow' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
             <div style={card}><div style={cardLabel}>Office Cash In</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(stats.cashIn)}</div></div>
             <div style={card}><div style={cardLabel}>Office Cash Out</div><div style={{ ...cardValue, color: '#c07040' }}>{money(stats.cashOut)}</div></div>
@@ -8372,6 +8400,8 @@ function FinancialOverviewView({ navigate }) {
               );
             })}
           </div>
+          </div>
+          )}
 
         </div>
       )}
