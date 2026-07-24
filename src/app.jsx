@@ -8143,6 +8143,7 @@ function FinancialOverviewView({ navigate }) {
   var [year, setYear] = useState(thisYear);
   var [activeTab, setActiveTab] = useState('donations');
   var [expandedArea, setExpandedArea] = useState(null);
+  var [expandedMonth, setExpandedMonth] = useState(null);
   var [loading, setLoading] = useState(true);
   var [donations, setDonations] = useState([]);
   var [sponsors, setSponsors] = useState([]);
@@ -8488,10 +8489,34 @@ function FinancialOverviewView({ navigate }) {
               {outflowDetail.monthRows.length === 0 ? (
                 <div style={{ fontSize: 12, color: '#bbb' }}>No outflow recorded for {year}.</div>
               ) : outflowDetail.monthRows.map(function(m) {
+                var isOpen = expandedMonth === m.month;
+                var monthItems = outflowDetail.all.filter(function(r) { return (r.date || '').slice(0, 7) === m.month; });
                 return (
-                  <div key={m.month} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12 }}>
-                    <span style={{ color: '#555' }}>{monthLabel(m.month)}</span>
-                    <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(m.total)}</span>
+                  <div key={m.month}>
+                    <div onClick={function() { setExpandedMonth(isOpen ? null : m.month); }} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12, cursor: 'pointer', background: isOpen ? '#faf8f4' : 'transparent' }}>
+                      <span style={{ color: '#555', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10, color: '#bbb', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s', display: 'inline-block' }}>▶</span>
+                        {monthLabel(m.month)}
+                      </span>
+                      <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(m.total)}</span>
+                    </div>
+                    {isOpen && (
+                      <div style={{ background: '#faf8f4', padding: '4px 0 8px 20px' }}>
+                        {monthItems.map(function(item, i) {
+                          return (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < monthItems.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12 }}>
+                              <span style={{ width: 80, color: '#aaa', fontSize: 11 }}>{item.date || '—'}</span>
+                              <span style={{ width: 100, color: '#555', fontSize: 11 }}>{item.area}</span>
+                              <span style={{ flex: 1, color: '#2a2a2a' }}>
+                                {item.description}
+                                {item.by && <span style={{ color: '#aaa', fontSize: 11 }}> · {item.by}</span>}
+                              </span>
+                              <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(item.amount)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
