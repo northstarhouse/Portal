@@ -8145,6 +8145,7 @@ function FinancialOverviewView({ navigate }) {
   var [expandedArea, setExpandedArea] = useState(null);
   var [expandedMonth, setExpandedMonth] = useState(null);
   var [expandedSponsor, setExpandedSponsor] = useState(null);
+  var [expandedEarningCat, setExpandedEarningCat] = useState(null);
   var [loading, setLoading] = useState(true);
   var [donations, setDonations] = useState([]);
   var [sponsors, setSponsors] = useState([]);
@@ -8162,7 +8163,7 @@ function FinancialOverviewView({ navigate }) {
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?select=*', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement,description,purchased_by,volunteer_name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?select=area,event,amount,date', hdrs),
-      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=amount,date,direction', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=amount,date,direction,description', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=amount,date,name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?select=*', hdrs)
     ]).then(function(res) {
@@ -8485,13 +8486,53 @@ function FinancialOverviewView({ navigate }) {
             {Object.keys(stats.earningsByCategory).length === 0 ? (
               <div style={{ fontSize: 12, color: '#bbb' }}>No earnings recorded for {year}.</div>
             ) : Object.keys(stats.earningsByCategory).sort(function(a, b) { return stats.earningsByCategory[b] - stats.earningsByCategory[a]; }).map(function(cat) {
+              var isOpen = expandedEarningCat === cat;
+              var catEntries = rentals.filter(function(r) { return inYear(r.date) && (r.name || 'Other') === cat; })
+                .sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
               return (
-                <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12 }}>
-                  <span style={{ color: '#555' }}>{cat}</span>
-                  <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(stats.earningsByCategory[cat])}</span>
+                <div key={cat}>
+                  <div onClick={function() { setExpandedEarningCat(isOpen ? null : cat); }} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12, cursor: 'pointer', background: isOpen ? '#faf8f4' : 'transparent' }}>
+                    <span style={{ color: '#555', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 10, color: '#bbb', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s', display: 'inline-block' }}>▶</span>
+                      {cat}
+                    </span>
+                    <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(stats.earningsByCategory[cat])}</span>
+                  </div>
+                  {isOpen && (
+                    <div style={{ background: '#faf8f4', padding: '4px 0 8px 20px' }}>
+                      {catEntries.map(function(r, i) {
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < catEntries.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12 }}>
+                            <span style={{ width: 90, color: '#aaa', fontSize: 11 }}>{r.date || '—'}</span>
+                            <span style={{ flex: 1, color: '#2a2a2a' }}>{r.name || '—'}</span>
+                            <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(r.amount)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Cash Log — {year}</div>
+            {(function() {
+              var yearCashRows = cashLog.filter(function(c) { return inYear(c.date); }).sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+              if (yearCashRows.length === 0) return <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>No cash log entries for {year}.</div>;
+              return yearCashRows.map(function(c, i) {
+                var isIn = c.direction === 'In';
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 18px', borderBottom: '0.5px solid #f9f6f2', fontSize: 12 }}>
+                    <span style={{ width: 90, color: '#888' }}>{c.date || '—'}</span>
+                    <span style={{ width: 50, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: isIn ? '#eaf4ea' : '#fdf0e6', color: isIn ? '#2e7d32' : '#c07040', textAlign: 'center' }}>{c.direction}</span>
+                    <span style={{ flex: 1, color: '#2a2a2a' }}>{c.description || '—'}</span>
+                    <span style={{ fontWeight: 600, color: isIn ? '#2e7d32' : '#c07040' }}>{money(c.amount)}</span>
+                  </div>
+                );
+              });
+            })()}
           </div>
           </div>
           )}
