@@ -5581,6 +5581,8 @@ function AllReimbursementsModal({ onClose }) {
   var { useState, useEffect } = React;
   var [loading, setLoading] = useState(true);
   var [rows, setRows] = useState([]);
+  var [volByAuthId, setVolByAuthId] = useState({});
+  var [volByEmail, setVolByEmail] = useState({});
 
   useEffect(function() {
     // Include anything that's ever been a reimbursement -- currently pending (needs_reimbursement),
@@ -5594,7 +5596,30 @@ function AllReimbursementsModal({ onClose }) {
       setRows(Array.isArray(data) ? data : []);
       setLoading(false);
     }).catch(function() { setLoading(false); });
+    // Lets a row's name resolve either direction: a Portal-submitted reimbursement only has an
+    // email until the volunteer signs into the Hub (and gets an auth_user_id later), while a
+    // Hub-submitted one may only have an auth_user_id and no name yet -- so match on whichever
+    // of the two this volunteer roster has for them.
+    cachedSbFetch('2026 Volunteers', ['First Name', 'Last Name', 'Email', 'auth_user_id']).then(function(vs) {
+      if (!Array.isArray(vs)) return;
+      var byAuth = {}, byEmail = {};
+      vs.forEach(function(v) {
+        var name = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim();
+        if (!name) return;
+        if (v.auth_user_id) byAuth[v.auth_user_id] = name;
+        if (v['Email']) byEmail[v['Email'].toLowerCase()] = name;
+      });
+      setVolByAuthId(byAuth);
+      setVolByEmail(byEmail);
+    });
   }, []);
+
+  function resolveName(b) {
+    if (b.volunteer_name) return b.volunteer_name;
+    if (b.volunteer_auth_user_id && volByAuthId[b.volunteer_auth_user_id]) return volByAuthId[b.volunteer_auth_user_id];
+    if (b.volunteer_email && volByEmail[b.volunteer_email.toLowerCase()]) return volByEmail[b.volunteer_email.toLowerCase()];
+    return b.volunteer_email || 'Unknown volunteer';
+  }
 
   function fmt(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -5633,7 +5658,7 @@ function AllReimbursementsModal({ onClose }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, color: '#2a2a2a' }}>{b.description || '—'}</div>
                     <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
-                      {b.volunteer_name}{b.area ? <span style={{ color: '#aaa' }}> · {b.area}</span> : null}
+                      {resolveName(b)}{b.area ? <span style={{ color: '#aaa' }}> · {b.area}</span> : null}
                     </div>
                     <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{b.date || ''}</div>
                     {receipts.length > 0 && (
@@ -5879,7 +5904,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     var files = budgetReceiptFiles;
     var payload = { area: area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null, purchased_by: budgetForm.purchased_by || null };
     if (area === 'Events') payload.event_name = budgetForm.event_name || null;
-    if (budgetForm.needs_reimbursement) { payload.needs_reimbursement = true; payload.volunteer_name = budgetForm.volunteer_name || null; payload.volunteer_auth_user_id = budgetForm.volunteer_auth_user_id || null; }
+    if (budgetForm.needs_reimbursement) { payload.needs_reimbursement = true; payload.volunteer_name = budgetForm.volunteer_name || null; payload.volunteer_auth_user_id = budgetForm.volunteer_auth_user_id || null; payload.volunteer_email = budgetForm.volunteer_email || null; }
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -6556,7 +6581,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                           {filtered.map(function(v) {
                             var fullName = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim();
                             return (
-                              <div key={v.id} onMouseDown={function() { setBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName, volunteer_auth_user_id: v.auth_user_id || null }); }); setReimburseVolQuery(fullName); setShowReimburseVolDrop(false); }}
+                              <div key={v.id} onMouseDown={function() { setBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName, volunteer_auth_user_id: v.auth_user_id || null, volunteer_email: v.Email || null }); }); setReimburseVolQuery(fullName); setShowReimburseVolDrop(false); }}
                                 style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '0.5px solid #f5f0ea', background: '#fff' }}
                                 onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
                                 onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}>
@@ -8994,7 +9019,7 @@ function IdeasView() {
   var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 };
 
   useEffect(function() {
-    cachedSbFetch('2026 Volunteers', ['id', 'First Name', 'Last Name', 'Address', 'Status', 'auth_user_id']).then(function(rows) {
+    cachedSbFetch('2026 Volunteers', ['id', 'First Name', 'Last Name', 'Address', 'Status', 'auth_user_id', 'Email']).then(function(rows) {
       if (Array.isArray(rows)) setVolunteers(rows.filter(function(v) { return v['Status'] === 'Active'; }).sort(function(a, b) { return (a['First Name'] || '').localeCompare(b['First Name'] || ''); }));
     });
   }, []);
@@ -9081,7 +9106,7 @@ function IdeasView() {
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ area: selected.title, description: budgetForm.description, amount: parseFloat(budgetForm.amount), date: budgetForm.date, type: isInKind ? 'In-Kind' : 'Purchase', needs_reimbursement: needsReimb, volunteer_name: needsReimb ? (budgetForm.volunteer_name || null) : null, volunteer_auth_user_id: needsReimb ? (budgetForm.volunteer_auth_user_id || null) : null })
+      body: JSON.stringify({ area: selected.title, description: budgetForm.description, amount: parseFloat(budgetForm.amount), date: budgetForm.date, type: isInKind ? 'In-Kind' : 'Purchase', needs_reimbursement: needsReimb, volunteer_name: needsReimb ? (budgetForm.volunteer_name || null) : null, volunteer_auth_user_id: needsReimb ? (budgetForm.volunteer_auth_user_id || null) : null, volunteer_email: needsReimb ? (budgetForm.volunteer_email || null) : null })
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (rows && rows.message) { alert('Budget error: ' + rows.message); setBudgetSaving(false); return; }
       var newRow = rows && rows[0] ? rows[0] : {};
@@ -9120,7 +9145,7 @@ function IdeasView() {
     setEditBudgetSaving(true);
     var isInKind = editBudgetForm.expense_type === 'In-Kind';
     var needsReimb = editBudgetForm.expense_type === 'Reimbursement';
-    var patch = { description: editBudgetForm.description, amount: parseFloat(editBudgetForm.amount), date: editBudgetForm.date, type: isInKind ? 'In-Kind' : 'Purchase', needs_reimbursement: needsReimb, volunteer_name: needsReimb ? (editBudgetForm.volunteer_name || null) : null, volunteer_auth_user_id: needsReimb ? (editBudgetForm.volunteer_auth_user_id || null) : null };
+    var patch = { description: editBudgetForm.description, amount: parseFloat(editBudgetForm.amount), date: editBudgetForm.date, type: isInKind ? 'In-Kind' : 'Purchase', needs_reimbursement: needsReimb, volunteer_name: needsReimb ? (editBudgetForm.volunteer_name || null) : null, volunteer_auth_user_id: needsReimb ? (editBudgetForm.volunteer_auth_user_id || null) : null, volunteer_email: needsReimb ? (editBudgetForm.volunteer_email || null) : null };
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + editingBudgetId, {
       method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
     }).then(function() {
@@ -9316,7 +9341,7 @@ function IdeasView() {
                                   {filtered.map(function(v) {
                                     var fullName = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim();
                                     return (
-                                      <div key={v.id} onMouseDown={function() { setBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName, volunteer_auth_user_id: v.auth_user_id || null }); }); setVolQuery(fullName); setShowVolDrop(false); }}
+                                      <div key={v.id} onMouseDown={function() { setBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName, volunteer_auth_user_id: v.auth_user_id || null, volunteer_email: v.Email || null }); }); setVolQuery(fullName); setShowVolDrop(false); }}
                                         style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '0.5px solid #f5f0ea' }}
                                         onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
                                         onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}>
@@ -9381,7 +9406,7 @@ function IdeasView() {
                                       {filteredE.map(function(v) {
                                         var fullName = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim();
                                         return (
-                                          <div key={v.id} onMouseDown={function() { setEditBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName, volunteer_auth_user_id: v.auth_user_id || null }); }); setEditVolQuery(fullName); setShowEditVolDrop(false); }}
+                                          <div key={v.id} onMouseDown={function() { setEditBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName, volunteer_auth_user_id: v.auth_user_id || null, volunteer_email: v.Email || null }); }); setEditVolQuery(fullName); setShowEditVolDrop(false); }}
                                             style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '0.5px solid #f5f0ea' }}
                                             onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
                                             onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}>
