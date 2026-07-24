@@ -2908,6 +2908,12 @@ function DonorsView({ navigate }) {
   const [addSearchQuery, setAddSearchQuery] = useState('');
   const [addExistingDonor, setAddExistingDonor] = useState(null);
   const [donorFieldsForm, setDonorFieldsForm] = useState(null);
+  const [profileForm, setProfileForm] = useState(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [tagCatalog, setTagCatalog] = useState([]);
+  const [addTagQuery, setAddTagQuery] = useState('');
+  const [showAddTagDrop, setShowAddTagDrop] = useState(false);
+  const [savingTag, setSavingTag] = useState(false);
   const [savingDonorFields, setSavingDonorFields] = useState(false);
   const [bulkFilling, setBulkFilling] = useState(false);
   const [bulkFillResult, setBulkFillResult] = useState(null);
@@ -2946,15 +2952,17 @@ function DonorsView({ navigate }) {
     Promise.all([
       fetch(SUPABASE_URL+'/rest/v1/donors?select=*&order=formal_name',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
       fetch(SUPABASE_URL+'/rest/v1/donations?select=*',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
-      fetch(SUPABASE_URL+'/rest/v1/donor_tags?select=donor_id,tags(*)',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();})
+      fetch(SUPABASE_URL+'/rest/v1/donor_tags?select=donor_id,tags(*)',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
+      fetch(SUPABASE_URL+'/rest/v1/tags?select=*&order=name',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();})
     ]).then(function(results) {
-      var donorRows=results[0], donationRows=results[1], tagRows=Array.isArray(results[2])?results[2]:[];
+      var donorRows=results[0], donationRows=results[1], tagRows=Array.isArray(results[2])?results[2]:[], allTags=Array.isArray(results[3])?results[3]:[];
       if(!Array.isArray(donorRows)||!Array.isArray(donationRows)){setError('Failed to load');setLoading(false);return;}
       var byDonor={};
       donationRows.forEach(function(d){if(!byDonor[d.donor_id])byDonor[d.donor_id]=[];byDonor[d.donor_id].push(d);});
       var tagsByDonor={};
       tagRows.forEach(function(r){if(!r.tags)return;if(!tagsByDonor[r.donor_id])tagsByDonor[r.donor_id]=[];tagsByDonor[r.donor_id].push(r.tags);});
       setDonors(donorRows.map(function(d){return Object.assign(buildDonor(d,byDonor[d.id]||[]),{tags:tagsByDonor[d.id]||[]});}));
+      setTagCatalog(allTags);
       setLoading(false);
     }).catch(function(err){setError(err.message);setLoading(false);});
   }, []);
@@ -3039,6 +3047,50 @@ function DonorsView({ navigate }) {
         setSelected(function(prev){return prev?Object.assign({},prev,updated):prev;});
         setDonorFieldsForm(null);
       }).catch(function(){setSavingDonorFields(false);});
+  }
+
+  function saveProfileFields(e){
+    e.preventDefault();setSavingProfile(true);
+    var patch={background:profileForm.background||null,first_connected:profileForm.first_connected||null,nsh_contact:profileForm.nsh_contact||null,donor_notes:profileForm.donor_notes||null,also_supports:profileForm.also_supports||null};
+    fetch(SUPABASE_URL+'/rest/v1/donors?id=eq.'+selected.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(patch)})
+      .then(function(r){return r.json();}).then(function(rows){
+        setSavingProfile(false);
+        var updated=Array.isArray(rows)?rows[0]:rows;
+        setDonors(function(prev){return prev.map(function(d){return d.id===selected.id?Object.assign({},d,updated):d;});});
+        setSelected(function(prev){return prev?Object.assign({},prev,updated):prev;});
+        setProfileForm(null);
+      }).catch(function(){setSavingProfile(false);});
+  }
+
+  function removeTagFromDonor(tag){
+    fetch(SUPABASE_URL+'/rest/v1/donor_tags?donor_id=eq.'+selected.id+'&tag_id=eq.'+tag.id,{method:'DELETE',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}})
+      .then(function(){
+        function strip(d){return Object.assign({},d,{tags:(d.tags||[]).filter(function(t){return t.id!==tag.id;})});}
+        setDonors(function(prev){return prev.map(function(d){return d.id===selected.id?strip(d):d;});});
+        setSelected(function(prev){return prev?strip(prev):prev;});
+      });
+  }
+
+  function addTagToDonor(tag){
+    setSavingTag(true);
+    fetch(SUPABASE_URL+'/rest/v1/donor_tags',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({donor_id:selected.id,tag_id:tag.id})})
+      .then(function(){
+        function add(d){return Object.assign({},d,{tags:(d.tags||[]).some(function(t){return t.id===tag.id;})?d.tags:(d.tags||[]).concat([tag])});}
+        setDonors(function(prev){return prev.map(function(d){return d.id===selected.id?add(d):d;});});
+        setSelected(function(prev){return prev?add(prev):prev;});
+        setSavingTag(false);setAddTagQuery('');setShowAddTagDrop(false);
+      }).catch(function(){setSavingTag(false);});
+  }
+
+  function createAndAddTag(name){
+    if(!name.trim())return;
+    setSavingTag(true);
+    fetch(SUPABASE_URL+'/rest/v1/tags',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({name:name.trim(),color:'#886c44'})})
+      .then(function(r){return r.json();}).then(function(rows){
+        var newTag=Array.isArray(rows)?rows[0]:rows;
+        setTagCatalog(function(prev){return prev.concat([newTag]);});
+        addTagToDonor(newTag);
+      }).catch(function(){setSavingTag(false);});
   }
 
   function computeDefaultOverrides(donor,don){
@@ -3205,20 +3257,6 @@ function DonorsView({ navigate }) {
         if(selected)updateDonorInState(selected.id,function(d){return{donations:d.donations.map(function(x){return x.id===editDon.id?Object.assign({},x,updated):x;})};});
         setEditDon(null);
       }).catch(function(){setEditSaving(false);});
-  }
-
-  function submitAddGift(e){
-    e.preventDefault();setAddingGift(true);
-    if(!selected)return;
-    fetch(SUPABASE_URL+'/rest/v1/donations',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},
-      body:JSON.stringify({donor_id:selected.id,amount:parseFloat(String(addGiftForm.amount||0).replace(/[^\d.]/g,'')||0),date:addGiftForm.date,type:addGiftForm.type,payment_type:addGiftForm.payment_type||null,acknowledged:!!addGiftForm.acknowledged,donation_notes:addGiftForm.donation_notes||null})})
-      .then(function(r){return r.json();}).then(function(rows){
-        setAddingGift(false);
-        var newDon=Array.isArray(rows)?rows[0]:rows;
-        logActivity('New donation of $'+(parseFloat(newDon.amount)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' from '+(selected.formal_name||'a donor'),'donation_added');
-        updateDonorInState(selected.id,function(d){return{donations:d.donations.concat([newDon])};});
-        setAddGiftForm(emptyGiftForm);
-      }).catch(function(){setAddingGift(false);});
   }
 
   function submitGiftForExisting(e){
@@ -3478,7 +3516,6 @@ function DonorsView({ navigate }) {
               {selected.email && <div><span style={{color:'#777'}}>Email </span><a href={'mailto:'+selected.email} style={{color:gold,textDecoration:'none'}}>{selected.email}</a></div>}
               {selected.phone && <div><span style={{color:'#777'}}>Phone </span>{selected.phone}</div>}
               {selected.employer && <div><span style={{color:'#777'}}>Employer </span>{selected.employer}</div>}
-              {selected.nsh_contact && <div><span style={{color:'#777'}}>NSH Contact </span>{selected.nsh_contact}</div>}
               {selected.address && <div><span style={{color:'#777'}}>Address </span><span style={{whiteSpace:'pre-line'}}>{selected.address}</span></div>}
             </div>
 
@@ -3527,9 +3564,64 @@ function DonorsView({ navigate }) {
               </div>
             )}
 
-            {selected.background && <div style={{marginBottom:10}}><span style={sec}>Background</span><div style={{fontSize:12,background:'#faf8f4',borderRadius:8,padding:'8px 12px',color:'#444',lineHeight:1.6}}>{selected.background}</div></div>}
-            {selected.first_connected && <div style={{marginBottom:10}}><span style={sec}>What Ties Them to NSH</span><div style={{fontSize:12,background:'#faf8f4',borderRadius:8,padding:'8px 12px',color:'#444',lineHeight:1.6}}>{selected.first_connected}</div></div>}
-            {selected.donor_notes && <div style={{marginBottom:10}}><span style={sec}>Donor Notes</span><div style={{fontSize:12,background:'#faf8f4',borderRadius:8,padding:'8px 12px',color:'#444',lineHeight:1.6}}>{selected.donor_notes}</div></div>}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={sec}>Profile</span>
+              {!profileForm && <button onClick={function(){setProfileForm({background:selected.background||'',first_connected:selected.first_connected||'',nsh_contact:selected.nsh_contact||'',donor_notes:selected.donor_notes||'',also_supports:selected.also_supports||''});}} style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'2px 10px',cursor:'pointer'}}>Edit</button>}
+            </div>
+            {profileForm ? (
+              <form onSubmit={saveProfileFields} style={{background:'#faf8f4',borderRadius:8,padding:'12px 14px',border:'0.5px solid #e0d8cc',marginBottom:10}}>
+                <div style={{marginBottom:8}}><label style={lStyle}>Background</label><textarea value={profileForm.background} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{background:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                <div style={{marginBottom:8}}><label style={lStyle}>What Ties Them to North Star House</label><textarea value={profileForm.first_connected} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{first_connected:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                <div style={{marginBottom:8}}><label style={lStyle}>Main NSH Contact</label><input value={profileForm.nsh_contact} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{nsh_contact:e.target.value});});}} style={iStyle} /></div>
+                <div style={{marginBottom:8}}><label style={lStyle}>More Donor Notes</label><textarea value={profileForm.donor_notes} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{donor_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                <div style={{marginBottom:10}}><label style={lStyle}>Also Supports</label><textarea value={profileForm.also_supports} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{also_supports:e.target.value});});}} rows={2} placeholder="Other organizations or causes this donor supports…" style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                <div style={{display:'flex',gap:8}}>
+                  <button type="submit" disabled={savingProfile} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:6,padding:'7px',fontSize:12,fontWeight:500,cursor:'pointer',opacity:savingProfile?0.7:1}}>{savingProfile?'Saving...':'Save'}</button>
+                  <button type="button" onClick={function(){setProfileForm(null);}} style={{padding:'7px 12px',background:'#f5f0ea',border:'none',borderRadius:6,fontSize:12,color:'#666',cursor:'pointer'}}>Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <div style={{fontSize:12,lineHeight:1.7,marginBottom:10}}>
+                {selected.background && <div style={{marginBottom:8}}><span style={{color:'#777',display:'block'}}>Background</span><div style={{color:'#444'}}>{selected.background}</div></div>}
+                {selected.first_connected && <div style={{marginBottom:8}}><span style={{color:'#777',display:'block'}}>What Ties Them to North Star House</span><div style={{color:'#444'}}>{selected.first_connected}</div></div>}
+                {selected.nsh_contact && <div style={{marginBottom:8}}><span style={{color:'#777',display:'block'}}>Main NSH Contact</span><div style={{color:'#444'}}>{selected.nsh_contact}</div></div>}
+                {selected.donor_notes && <div style={{marginBottom:8}}><span style={{color:'#777',display:'block'}}>More Donor Notes</span><div style={{color:'#444'}}>{selected.donor_notes}</div></div>}
+                {selected.also_supports && <div style={{marginBottom:8}}><span style={{color:'#777',display:'block'}}>Also Supports</span><div style={{color:'#444'}}>{selected.also_supports}</div></div>}
+                {!selected.background&&!selected.first_connected&&!selected.nsh_contact&&!selected.donor_notes&&!selected.also_supports && <div style={{color:'#bbb'}}>Nothing on file yet — click Edit to add.</div>}
+              </div>
+            )}
+
+            <div style={{fontSize:11,color:'#777',marginBottom:4}}>Tags</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:14,position:'relative'}}>
+              {(selected.tags||[]).map(function(tag){
+                return (
+                  <span key={tag.id} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 6px 3px 9px',borderRadius:20,fontSize:11,fontWeight:500,background:tag.color+'22',color:tag.color}}>
+                    {tag.name}
+                    <button onClick={function(){removeTagFromDonor(tag);}} style={{background:'none',border:'none',cursor:'pointer',color:tag.color,fontSize:13,lineHeight:1,padding:0}}>×</button>
+                  </span>
+                );
+              })}
+              <div style={{position:'relative'}}>
+                <button type="button" onClick={function(){setShowAddTagDrop(!showAddTagDrop);setAddTagQuery('');}} style={{fontSize:11,color:'#888',background:'none',border:'0.5px dashed #ccc',borderRadius:20,padding:'3px 10px',cursor:'pointer'}}>+ Add tag</button>
+                {showAddTagDrop && (function(){
+                  var existingIds={};(selected.tags||[]).forEach(function(t){existingIds[t.id]=true;});
+                  var options=tagCatalog.filter(function(t){return !existingIds[t.id]&&(!addTagQuery||t.name.toLowerCase().includes(addTagQuery.toLowerCase()));});
+                  var exactMatch=tagCatalog.some(function(t){return t.name.toLowerCase()===addTagQuery.trim().toLowerCase();});
+                  return (
+                    <div style={{position:'absolute',zIndex:50,top:'110%',left:0,background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:8,boxShadow:'0 4px 16px rgba(0,0,0,0.1)',width:220,maxHeight:220,overflowY:'auto'}}>
+                      <input autoFocus value={addTagQuery} onChange={function(e){setAddTagQuery(e.target.value);}} placeholder="Search or create a tag…" style={{width:'100%',padding:'7px 10px',border:'none',borderBottom:'0.5px solid #f0ece6',fontSize:12,boxSizing:'border-box',outline:'none'}} />
+                      {options.map(function(t){
+                        return <div key={t.id} onMouseDown={function(){addTagToDonor(t);}} style={{padding:'7px 10px',fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}><span style={{width:8,height:8,borderRadius:'50%',background:t.color,flexShrink:0,display:'inline-block'}}/>{t.name}</div>;
+                      })}
+                      {addTagQuery.trim()&&!exactMatch && (
+                        <div onMouseDown={function(){createAndAddTag(addTagQuery);}} style={{padding:'7px 10px',fontSize:12,cursor:'pointer',color:gold,borderTop:options.length?'0.5px solid #f0ece6':'none'}}>+ Create "{addTagQuery.trim()}"</div>
+                      )}
+                      {!options.length&&!addTagQuery.trim() && <div style={{padding:'7px 10px',fontSize:11,color:'#bbb'}}>Type to search or create a tag</div>}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
 
             {/* Donation history by year */}
             <span style={sec}>Donation History</span>
@@ -3664,27 +3756,6 @@ function DonorsView({ navigate }) {
               );
             })}
 
-            {/* Add Gift */}
-            <span style={sec}>Add Gift</span>
-            <form onSubmit={submitAddGift} style={{background:'#faf8f4',borderRadius:8,padding:'12px 14px',border:'0.5px solid #e0d8cc'}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
-                <div><label style={lStyle}>Amount *</label><input required value={addGiftForm.amount} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
-                <div><label style={lStyle}>Date *</label><input required type="date" value={addGiftForm.date} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
-              </div>
-              <div style={{marginBottom:8}}><label style={lStyle}>Type</label>
-                <select value={addGiftForm.type} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
-                  {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
-                </select>
-              </div>
-              <div style={{marginBottom:8}}><label style={lStyle}>Payment Type</label>
-                <select value={addGiftForm.payment_type} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{payment_type:e.target.value});});}} style={iStyle}>
-                  {PAYMENT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
-                </select>
-              </div>
-              <div style={{marginBottom:8}}><label style={lStyle}>Notes</label><textarea value={addGiftForm.donation_notes} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{donation_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
-              <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,marginBottom:10,cursor:'pointer'}}><input type="checkbox" checked={addGiftForm.acknowledged} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{acknowledged:e.target.checked});});}} /> Acknowledged / Thanked</label>
-              <button type="submit" disabled={addingGift} style={{width:'100%',background:gold,color:'#fff',border:'none',borderRadius:8,padding:'8px',fontSize:12,fontWeight:500,cursor:'pointer',opacity:addingGift?0.7:1}}>{addingGift?'Saving...':'Add Gift'}</button>
-            </form>
           </div>
         </div>
       )}
