@@ -8603,12 +8603,14 @@ function FinancialOverviewView({ navigate }) {
                       <div style={{ background: '#faf8f4', padding: '4px 0 8px 20px' }}>
                         {monthItems.map(function(item, i) {
                           return (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < monthItems.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12 }}>
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < monthItems.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12, background: item.possibleDuplicate ? '#fffaf0' : 'transparent' }}>
                               <span style={{ width: 80, color: '#aaa', fontSize: 11 }}>{item.date || '—'}</span>
                               <span style={{ width: 100, color: '#555', fontSize: 11 }}>{item.area}</span>
+                              <span style={{ width: 60, fontSize: 10, color: '#aaa' }}>{item.source}</span>
                               <span style={{ flex: 1, color: '#2a2a2a' }}>
                                 {item.description}
                                 {item.by && <span style={{ color: '#aaa', fontSize: 11 }}> · {item.by}</span>}
+                                {item.possibleDuplicate && <span title="Matches another entry exactly (same area/description/amount/date)" style={{ marginLeft: 6, fontSize: 11, color: '#b45309', fontWeight: 600 }}>⚠ possible duplicate</span>}
                               </span>
                               <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(item.amount)}</span>
                             </div>
@@ -8616,30 +8618,6 @@ function FinancialOverviewView({ navigate }) {
                         })}
                       </div>
                     )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
-              <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>All Line Items — {year}</div>
-              <div style={{ display: 'flex', gap: 10, padding: '8px 18px 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>
-                <span style={{ width: 90 }}>Date</span>
-                <span style={{ width: 110 }}>Area</span>
-                <span style={{ flex: 1 }}>Description</span>
-                <span style={{ width: 70 }}>Source</span>
-                <span style={{ width: 90, textAlign: 'right' }}>Amount</span>
-              </div>
-              {outflowDetail.all.length === 0 ? (
-                <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>No outflow recorded for {year}.</div>
-              ) : outflowDetail.all.map(function(r, i) {
-                return (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 18px', borderBottom: '0.5px solid #f9f6f2', fontSize: 12, background: r.possibleDuplicate ? '#fffaf0' : 'transparent' }}>
-                    <span style={{ width: 90, color: '#888' }}>{r.date || '—'}</span>
-                    <span style={{ width: 110, color: '#555' }}>{r.area}</span>
-                    <span style={{ flex: 1, color: '#2a2a2a' }}>{r.description}{r.by && <span style={{ color: '#aaa', fontSize: 11 }}> · {r.by}</span>}{r.possibleDuplicate && <span title="Matches another entry exactly (same area/description/amount/date)" style={{ marginLeft: 6, fontSize: 11, color: '#b45309', fontWeight: 600 }}>⚠ possible duplicate</span>}</span>
-                    <span style={{ width: 70, fontSize: 11, color: '#aaa' }}>{r.source}</span>
-                    <span style={{ width: 90, textAlign: 'right', fontWeight: 600, color: '#c07040' }}>{money(r.amount)}</span>
                   </div>
                 );
               })}
