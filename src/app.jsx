@@ -2871,6 +2871,7 @@ function DonorsView({ navigate }) {
   const [ackStep, setAckStep] = useState(null);
   const [ackOverrides, setAckOverrides] = useState({});
   const [ackGenerating, setAckGenerating] = useState(false);
+  const [ackRecovering, setAckRecovering] = useState(false);
   const [ackError, setAckError] = useState(null);
   const [ackResult, setAckResult] = useState(null);
 
@@ -3018,16 +3019,48 @@ function DonorsView({ navigate }) {
     setAckStep('review');
   }
 
+  function applyGeneratedResult(donationId,data){
+    setAckResult(data);setAckStep('result');setAckGenerating(false);setAckRecovering(false);
+    if(selected)updateDonorInState(selected.id,function(d){return{donations:d.donations.map(function(x){return x.id===donationId?Object.assign({},x,{acknowledgment_status:'generated',letter_drive_url:data.letterUrl,envelope_drive_url:data.envelopeUrl,letter_drive_file_id:data.letterFileId,envelope_drive_file_id:data.envelopeFileId,document_version:(x.document_version||0)+1}):x;})};});
+  }
+
+  // If the fetch to generate-acknowledgment itself fails client-side (flaky connection, proxy
+  // timeout, etc.) the Edge Function may well have kept running and completed anyway -- it isn't
+  // cancelled just because the browser gave up on the request. Poll the donation row for a bit
+  // before reporting a hard failure, since jumping straight to "failed" here was misleading staff
+  // into re-clicking Generate on documents that had actually already been created.
+  function pollForCompletion(donationId,previousVersion,attemptsLeft){
+    if(attemptsLeft<=0){setAckGenerating(false);setAckRecovering(false);setAckError('Could not reach the server, and the document did not show up after checking for a while. Please try again.');setAckStep('error');return;}
+    setTimeout(function(){
+      fetch(SUPABASE_URL+'/rest/v1/donations?id=eq.'+donationId+'&select=*',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}})
+        .then(function(r){return r.json();}).then(function(rows){
+          var d=Array.isArray(rows)?rows[0]:null;
+          if(d&&d.acknowledgment_status==='generated'&&d.letter_drive_url&&(d.document_version||0)>previousVersion){
+            applyGeneratedResult(donationId,{letterName:d.template_used||'Letter',envelopeName:d.envelope_drive_url?'Envelope':null,letterUrl:d.letter_drive_url,envelopeUrl:d.envelope_drive_url,letterFileId:d.letter_drive_file_id,envelopeFileId:d.envelope_drive_file_id,folderPath:'Generated — connection to your browser dropped partway through, but the document finished on the server.'});
+            return;
+          }
+          if(d&&d.acknowledgment_status==='error'&&d.generation_error){
+            setAckGenerating(false);setAckRecovering(false);setAckError(d.generation_error);setAckStep('error');
+            return;
+          }
+          pollForCompletion(donationId,previousVersion,attemptsLeft-1);
+        }).catch(function(){pollForCompletion(donationId,previousVersion,attemptsLeft-1);});
+    },3000);
+  }
+
   function confirmGenerate(){
-    setAckStep('generating');setAckGenerating(true);setAckError(null);
+    setAckStep('generating');setAckGenerating(true);setAckError(null);setAckRecovering(false);
+    var donationId=ackDonation.id,previousVersion=ackDonation.document_version||0;
     fetch(SUPABASE_URL+'/functions/v1/generate-acknowledgment',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({donationId:ackDonation.id,overrides:ackOverrides})})
+      body:JSON.stringify({donationId:donationId,overrides:ackOverrides})})
       .then(function(r){return r.json();}).then(function(data){
         setAckGenerating(false);
         if(!data.success){setAckError(data.error||'Generation failed');setAckStep('error');return;}
-        setAckResult(data);setAckStep('result');
-        if(selected)updateDonorInState(selected.id,function(d){return{donations:d.donations.map(function(x){return x.id===ackDonation.id?Object.assign({},x,{acknowledgment_status:'generated',letter_drive_url:data.letterUrl,envelope_drive_url:data.envelopeUrl,letter_drive_file_id:data.letterFileId,envelope_drive_file_id:data.envelopeFileId,document_version:(x.document_version||0)+1}):x;})};});
-      }).catch(function(err){setAckGenerating(false);setAckError(err.message);setAckStep('error');});
+        applyGeneratedResult(donationId,data);
+      }).catch(function(){
+        setAckRecovering(true);
+        pollForCompletion(donationId,previousVersion,12);
+      });
   }
 
   function closeAckFlow(){setAckStep(null);setAckDonation(null);setAckResult(null);setAckError(null);}
@@ -3759,7 +3792,8 @@ function DonorsView({ navigate }) {
 
             {ackStep==='generating' && (
               <div style={{textAlign:'center',padding:'20px 0'}}>
-                <div style={{fontSize:14,color:'#666'}}>Generating documents…</div>
+                <div style={{fontSize:14,color:'#666'}}>{ackRecovering?'Connection dropped — checking whether it finished anyway…':'Generating documents…'}</div>
+                {ackRecovering && <div style={{fontSize:11,color:'#aaa',marginTop:6}}>This can take up to a minute. Please don\'t close this or click Generate again yet.</div>}
               </div>
             )}
 
@@ -9687,6 +9721,20 @@ function AcknowledgmentsQueueView({ navigate }) {
   function fmtAmt(n){return(n||0).toLocaleString('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2});}
   function fmtDate(d){if(!d)return '—';return new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
 
+  // Mirrors the recovery logic in DonorsView: a client-side fetch failure doesn't mean the
+  // Edge Function didn't finish the job on the server, so check before counting it as failed.
+  function checkIfActuallyGenerated(donationId,previousVersion,attemptsLeft,cb){
+    if(attemptsLeft<=0){cb(false);return;}
+    setTimeout(function(){
+      fetch(SUPABASE_URL+'/rest/v1/donations?id=eq.'+donationId+'&select=acknowledgment_status,document_version,letter_drive_url',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}})
+        .then(function(r){return r.json();}).then(function(rows){
+          var d=Array.isArray(rows)?rows[0]:null;
+          if(d&&d.acknowledgment_status==='generated'&&d.letter_drive_url&&(d.document_version||0)>previousVersion){cb(true);return;}
+          checkIfActuallyGenerated(donationId,previousVersion,attemptsLeft-1,cb);
+        }).catch(function(){checkIfActuallyGenerated(donationId,previousVersion,attemptsLeft-1,cb);});
+    },3000);
+  }
+
   function generateSelected(){
     var targets=selectedRows.filter(function(r){return r.donor;});
     if(targets.length===0)return;
@@ -9707,7 +9755,13 @@ function AcknowledgmentsQueueView({ navigate }) {
         .then(function(res){return res.json();}).then(function(data){
           if(data.success)ok++;else fail++;
           next(i+1);
-        }).catch(function(){fail++;next(i+1);});
+        }).catch(function(){
+          setGenProgress({i:i+1,total:targets.length,name:r.donor.formal_name+' (connection dropped, checking...)'});
+          checkIfActuallyGenerated(r.id,r.document_version||0,10,function(succeeded){
+            if(succeeded)ok++;else fail++;
+            next(i+1);
+          });
+        });
     }
     next(0);
   }
