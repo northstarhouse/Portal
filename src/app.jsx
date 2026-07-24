@@ -8441,6 +8441,10 @@ function FinancialOverviewView({ navigate }) {
           )}
 
           {activeTab === 'operational' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            <div style={card}><div style={cardLabel}>Pending Reimbursements</div><div style={{ ...cardValue, color: '#b45309' }}>{money(stats.pendingReimb)}</div></div>
+          </div>
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
             <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Operational Areas — {year}</div>
             <div style={{ display: 'flex', gap: 10, padding: '8px 18px 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>
@@ -8502,6 +8506,7 @@ function FinancialOverviewView({ navigate }) {
               );
             })}
           </div>
+          </div>
           )}
 
           {activeTab === 'cashflow' && (
@@ -8509,7 +8514,6 @@ function FinancialOverviewView({ navigate }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
             <div style={card}><div style={cardLabel}>Office Cash In</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(stats.cashIn)}</div></div>
             <div style={card}><div style={cardLabel}>Office Cash Out</div><div style={{ ...cardValue, color: '#c07040' }}>{money(stats.cashOut)}</div></div>
-            <div style={card}><div style={cardLabel}>Pending Reimbursements</div><div style={{ ...cardValue, color: '#b45309' }}>{money(stats.pendingReimb)}</div></div>
           </div>
 
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
