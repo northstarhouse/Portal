@@ -112,10 +112,14 @@ async function getDriveAccessToken(): Promise<string> {
 
 // ---------- Drive helpers ----------
 
-async function driveFindOrCreateFolder(name: string, parentId: string, driveId: string, token: string) {
+async function driveFindOrCreateFolder(name: string, parentId: string, token: string) {
+  // Scoping the search by parent folder id (rather than corpora=drive&driveId=...) means this
+  // works whether the service account is a full Shared Drive member or only has item-level
+  // access to one specific folder shared with it directly (the latter doesn't support
+  // corpora=drive searches at all, since that requires drive-level membership).
   const escaped = name.replace(/'/g, "\\'");
   const q = `name='${escaped}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
-  const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&corpora=drive&driveId=${driveId}&includeItemsFromAllDrives=true&supportsAllDrives=true&fields=files(id,name)`;
+  const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&includeItemsFromAllDrives=true&supportsAllDrives=true&fields=files(id,name)`;
   const listRes = await fetch(listUrl, { headers: { Authorization: `Bearer ${token}` } });
   if (!listRes.ok) throw new Error(`Drive folder lookup failed: ${listRes.status} ${await listRes.text()}`);
   const found = await listRes.json();
@@ -131,43 +135,24 @@ async function driveFindOrCreateFolder(name: string, parentId: string, driveId: 
   return created.id as string;
 }
 
-// Module-level cache: survives across warm invocations of the same function instance (helps
-// back-to-back calls, e.g. batch generation), on top of the persisted root_folder_cache_id below
-// (which survives cold starts too, since it's stored in the database).
+// Module-level cache: survives across warm invocations of the same function instance, so a
+// batch of letters generated back-to-back in the same month only resolves the month folder once.
 const warmFolderCache = new Map<string, string>();
 
-async function resolveDestinationFolder(settings: any, donorFolderName: string, letterDate: Date, token: string) {
-  const driveId = settings.shared_drive_id;
-  if (!driveId) throw new Error("No Shared Drive configured (acknowledgment_settings.shared_drive_id is empty)");
-  const year = String(letterDate.getFullYear());
-  const month = letterDate.toLocaleString("en-US", { month: "long" });
-  const rootName = settings.root_folder_name || "North Star House";
-
-  // The top two levels (org root, "Donor Acknowledgments") never change once created --
-  // resolving them from scratch every single call was costing ~4 sequential Drive API round
-  // trips (~4s) for zero benefit. Cache the resolved id persistently once found.
-  let rootFolderId: string;
-  const warmKey = `root:${driveId}:${rootName}`;
-  if (settings.root_folder_cache_id) {
-    rootFolderId = settings.root_folder_cache_id;
-  } else if (warmFolderCache.has(warmKey)) {
-    rootFolderId = warmFolderCache.get(warmKey)!;
-  } else {
-    const orgFolderId = await driveFindOrCreateFolder(rootName, driveId, driveId, token);
-    rootFolderId = await driveFindOrCreateFolder("Donor Acknowledgments", orgFolderId, driveId, token);
-    if (settings.id) {
-      await sbPatch(`acknowledgment_settings?id=eq.${settings.id}`, { root_folder_cache_id: rootFolderId }).catch(() => {});
-    }
+async function resolveDestinationFolder(settings: any, letterDate: Date, token: string) {
+  const rootFolderId = settings.output_folder_id;
+  if (!rootFolderId) {
+    throw new Error("No output folder configured (acknowledgment_settings.output_folder_id is empty)");
   }
-  warmFolderCache.set(warmKey, rootFolderId);
+  const monthYear = `${letterDate.toLocaleString("en-US", { month: "long" })} ${letterDate.getFullYear()}`;
 
-  let parentId = rootFolderId;
-  const yearMonthDonor = [year, month, donorFolderName];
-  for (const segment of yearMonthDonor) {
-    parentId = await driveFindOrCreateFolder(segment, parentId, driveId, token);
+  const warmKey = `${rootFolderId}:${monthYear}`;
+  let folderId = warmFolderCache.get(warmKey);
+  if (!folderId) {
+    folderId = await driveFindOrCreateFolder(monthYear, rootFolderId, token);
+    warmFolderCache.set(warmKey, folderId);
   }
-  const path = [rootName, "Donor Acknowledgments", ...yearMonthDonor];
-  return { folderId: parentId, pathLabel: path.join(" / ") };
+  return { folderId, pathLabel: `${settings.output_folder_name || "Acknowledgement Templates"} / ${monthYear}` };
 }
 
 async function driveUploadDocx(filename: string, bytes: Uint8Array, folderId: string, token: string) {
@@ -456,13 +441,11 @@ async function generateInner(donationId: number, overrides: any) {
     getDriveAccessToken(),
   ]);
 
-  const donorFolderName = donorName.trim().replace(/\s+/g, " ").replace(/[\\/:*?"<>|]/g, "-");
-
   // Merging (CPU-bound, no network) and folder resolution (network) are independent -- run together.
   const [letterMerge, envelopeMerge, folderResult] = await Promise.all([
     mergeDocxTemplate(letterTemplateBytes, vars),
     envelopeTemplateBytes ? mergeDocxTemplate(envelopeTemplateBytes, vars) : Promise.resolve(null),
-    resolveDestinationFolder(settings, donorFolderName, letterDate, token),
+    resolveDestinationFolder(settings, letterDate, token),
   ]);
   const { folderId, pathLabel } = folderResult;
 
@@ -575,6 +558,54 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (req.method === "GET" && url.searchParams.get("selfTestDelete")) {
+      const fileId = url.searchParams.get("selfTestDelete")!;
+      const token = await getDriveAccessToken();
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = res.status === 204 ? "" : await res.text();
+      return json({ success: res.ok, status: res.status, body: body.slice(0, 500) });
+    }
+
+    if (req.method === "GET" && url.searchParams.get("selfTestListChildren")) {
+      const parentId = url.searchParams.get("selfTestListChildren")!;
+      const token = await getDriveAccessToken();
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${parentId}' in parents and trashed=false`)}&supportsAllDrives=true&includeItemsFromAllDrives=true&pageSize=50&fields=files(id,name,mimeType)`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const body = await res.text();
+      return json({ success: res.ok, status: res.status, body: body.slice(0, 2000) });
+    }
+
+    if (req.method === "GET" && url.searchParams.get("selfTestWriteTo")) {
+      const parentId = url.searchParams.get("selfTestWriteTo")!;
+      const token = await getDriveAccessToken();
+      const createRes = await fetch("https://www.googleapis.com/drive/v3/files?supportsAllDrives=true", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "ZZZ write-test (delete me)", mimeType: "application/vnd.google-apps.folder", parents: [parentId] }),
+      });
+      const createBody = await createRes.text();
+      if (!createRes.ok) return json({ success: false, step: "create", status: createRes.status, body: createBody.slice(0, 500) });
+      const created = JSON.parse(createBody);
+      await driveDeleteFile(created.id, token);
+      return json({ success: true, createdAndDeletedId: created.id });
+    }
+
+    if (req.method === "GET" && url.searchParams.get("selfTestFolderInfo")) {
+      const folderId = url.searchParams.get("selfTestFolderInfo")!;
+      const token = await getDriveAccessToken();
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${folderId}?supportsAllDrives=true&fields=id,name,mimeType,driveId,parents`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const body = await res.text();
+      return json({ success: res.ok, status: res.status, body: body.slice(0, 500) });
+    }
+
     if (req.method === "GET" && url.searchParams.get("selfTestFull")) {
       const started = Date.now();
       const timings: Record<string, number> = {};
@@ -598,7 +629,7 @@ Deno.serve(async (req) => {
       const token = await getDriveAccessToken();
       lap("driveToken");
 
-      const { folderId, pathLabel } = await resolveDestinationFolder(settings, "ZZZ SelfTest Donor (delete me)", new Date(), token);
+      const { folderId, pathLabel } = await resolveDestinationFolder(settings, new Date(), token);
       lap("resolveFolder");
 
       const uploaded = await driveUploadDocx("selfTestFull-" + Date.now() + ".docx", merged.bytes, folderId, token);

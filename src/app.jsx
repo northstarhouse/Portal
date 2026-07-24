@@ -3797,7 +3797,7 @@ function DonorsView({ navigate }) {
                   <div><label style={lStyle}>Signer</label><input value={ackOverrides.signerName||''} onChange={function(e){setAckOverrides(function(f){return Object.assign({},f,{signerName:e.target.value});});}} placeholder="Ken Underwood" style={iStyle} /></div>
                   <div><label style={lStyle}>Signer Title</label><input value={ackOverrides.signerTitle||''} onChange={function(e){setAckOverrides(function(f){return Object.assign({},f,{signerTitle:e.target.value});});}} placeholder="President" style={iStyle} /></div>
                 </div>
-                <div style={{fontSize:11,color:'#aaa',marginBottom:14}}>Drive destination: North Star House / Donor Acknowledgments / {(ackOverrides.letterDate||'').slice(0,4)} / {selected.formal_name}</div>
+                <div style={{fontSize:11,color:'#aaa',marginBottom:14}}>Drive destination: the "{ackOverrides.letterDate?new Date(ackOverrides.letterDate+'T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'}):''}" folder (shared with all other letters from that month)</div>
                 <div style={{display:'flex',gap:8}}>
                   <button onClick={function(){runGenerate(ackDonation,ackOverrides);}} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer'}}>Generate Letter and Envelope</button>
                   <button onClick={closeAckFlow} style={{padding:'10px 16px',background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer'}}>Cancel</button>
@@ -9674,11 +9674,12 @@ function AcknowledgmentTemplatesView({ navigate }) {
           <input value={settings.return_address_state||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{return_address_state:e.target.value});});}} placeholder="State" style={iStyle} />
           <input value={settings.return_address_zip||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{return_address_zip:e.target.value});});}} placeholder="ZIP" style={iStyle} />
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:14}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 2fr 1fr',gap:10,marginBottom:6}}>
           <div><label style={lStyle}>Envelope Size</label><input value={settings.envelope_size||'#10'} onChange={function(e){setSettings(function(s){return Object.assign({},s,{envelope_size:e.target.value});});}} style={iStyle} /></div>
-          <div><label style={lStyle}>Shared Drive ID</label><input value={settings.shared_drive_id||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{shared_drive_id:e.target.value});});}} style={iStyle} /></div>
-          <div><label style={lStyle}>Root Folder Name</label><input value={settings.root_folder_name||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{root_folder_name:e.target.value});});}} style={iStyle} /></div>
+          <div><label style={lStyle}>Output Folder ID</label><input value={settings.output_folder_id||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{output_folder_id:e.target.value});});}} placeholder="From the Drive folder's URL" style={iStyle} /></div>
+          <div><label style={lStyle}>Output Folder Name</label><input value={settings.output_folder_name||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{output_folder_name:e.target.value});});}} placeholder="For display only" style={iStyle} /></div>
         </div>
+        <div style={{fontSize:10,color:'#aaa',marginBottom:14}}>All generated letters/envelopes go into one "[Month Year]" folder (e.g. "July 2026") inside this folder — no separate folder per donor. The service account needs at least view+edit access to whatever folder you put here (a whole Shared Drive, or one specific folder shared directly with it).</div>
         <div style={{marginBottom:14}}><label style={lStyle}>Tax Acknowledgment Language</label><textarea value={settings.tax_ack_language||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{tax_ack_language:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
         <div style={{marginBottom:14}}><label style={lStyle}>Goods/Services Language</label><textarea value={settings.goods_services_language||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{goods_services_language:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
         <div style={{marginBottom:14}}><label style={lStyle}>In-Kind Language</label><textarea value={settings.in_kind_language||''} onChange={function(e){setSettings(function(s){return Object.assign({},s,{in_kind_language:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
