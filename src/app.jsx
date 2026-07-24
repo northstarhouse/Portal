@@ -5583,7 +5583,12 @@ function AllReimbursementsModal({ onClose }) {
   var [rows, setRows] = useState([]);
 
   useEffect(function() {
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?volunteer_name=not.is.null&select=*&order=date.desc,id.desc', {
+    // Include anything that's ever been a reimbursement -- currently pending (needs_reimbursement),
+    // already paid/settled (has a volunteer_name even after the flag was cleared), or submitted
+    // through the Volunteer Hub (identified by volunteer_auth_user_id, which may have no
+    // volunteer_name filled in yet). Filtering on volunteer_name alone silently dropped anything
+    // still pending without a name resolved, and any Volunteer-Hub-submitted row before it got one.
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?or=(volunteer_name.not.is.null,needs_reimbursement.eq.true,volunteer_auth_user_id.not.is.null)&select=*&order=date.desc,id.desc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(data) {
       setRows(Array.isArray(data) ? data : []);
