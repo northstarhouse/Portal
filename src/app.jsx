@@ -5759,7 +5759,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     cachedFetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?area=eq.' + encodeURIComponent(area) + '&select=*&order=date.desc,id.desc').then(function(rows) {
       if (Array.isArray(rows)) setBudget(rows);
     });
-    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Notes','Overview Notes','Status','Picture URL','Phone Number','Email']).then(function(rows) {
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Notes','Overview Notes','Status','Picture URL','Phone Number','Email','auth_user_id']).then(function(rows) {
       if (!Array.isArray(rows)) return;
       setVols(rows.filter(function(v) {
         if (!v.Team) return false;
@@ -5879,7 +5879,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
     var files = budgetReceiptFiles;
     var payload = { area: area, type: budgetForm.type, description: budgetForm.description, amount: parseFloat(budgetForm.amount) || 0, date: budgetForm.date || null, purchased_by: budgetForm.purchased_by || null };
     if (area === 'Events') payload.event_name = budgetForm.event_name || null;
-    if (budgetForm.needs_reimbursement) { payload.needs_reimbursement = true; payload.volunteer_name = budgetForm.volunteer_name || null; }
+    if (budgetForm.needs_reimbursement) { payload.needs_reimbursement = true; payload.volunteer_name = budgetForm.volunteer_name || null; payload.volunteer_auth_user_id = budgetForm.volunteer_auth_user_id || null; }
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -6525,7 +6525,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: budgetForm.needs_reimbursement ? '#b45309' : '#555' }}>
-                    <input type="checkbox" checked={budgetForm.needs_reimbursement} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { needs_reimbursement: e.target.checked, volunteer_name: '' }); }); setReimburseVolQuery(''); }} style={{ width: 15, height: 15, accentColor: gold, cursor: 'pointer' }} />
+                    <input type="checkbox" checked={budgetForm.needs_reimbursement} onChange={function(e) { setBudgetForm(function(f) { return Object.assign({}, f, { needs_reimbursement: e.target.checked, volunteer_name: '', volunteer_auth_user_id: null }); }); setReimburseVolQuery(''); }} style={{ width: 15, height: 15, accentColor: gold, cursor: 'pointer' }} />
                     Needs reimbursement?
                     {budgetForm.needs_reimbursement && <span style={{ fontSize: 11, background: '#fef3c7', color: '#b45309', padding: '2px 7px', borderRadius: 10, fontWeight: 500 }}>Will appear in Financials</span>}
                   </label>
@@ -6542,7 +6542,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                       <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Reimburse To *</div>
                       <input
                         value={reimburseVolQuery}
-                        onChange={function(e) { setReimburseVolQuery(e.target.value); setBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: '' }); }); setShowReimburseVolDrop(true); }}
+                        onChange={function(e) { setReimburseVolQuery(e.target.value); setBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: '', volunteer_auth_user_id: null }); }); setShowReimburseVolDrop(true); }}
                         onFocus={function() { setShowReimburseVolDrop(true); }}
                         onBlur={function() { setTimeout(function() { setShowReimburseVolDrop(false); }, 150); }}
                         placeholder="Type a volunteer name…"
@@ -6556,7 +6556,7 @@ function OperationalView({ opArea, navigateToQuarterly }) {
                           {filtered.map(function(v) {
                             var fullName = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim();
                             return (
-                              <div key={v.id} onMouseDown={function() { setBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName }); }); setReimburseVolQuery(fullName); setShowReimburseVolDrop(false); }}
+                              <div key={v.id} onMouseDown={function() { setBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName, volunteer_auth_user_id: v.auth_user_id || null }); }); setReimburseVolQuery(fullName); setShowReimburseVolDrop(false); }}
                                 style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '0.5px solid #f5f0ea', background: '#fff' }}
                                 onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
                                 onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}>
@@ -8994,7 +8994,7 @@ function IdeasView() {
   var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 };
 
   useEffect(function() {
-    cachedSbFetch('2026 Volunteers', ['id', 'First Name', 'Last Name', 'Address', 'Status']).then(function(rows) {
+    cachedSbFetch('2026 Volunteers', ['id', 'First Name', 'Last Name', 'Address', 'Status', 'auth_user_id']).then(function(rows) {
       if (Array.isArray(rows)) setVolunteers(rows.filter(function(v) { return v['Status'] === 'Active'; }).sort(function(a, b) { return (a['First Name'] || '').localeCompare(b['First Name'] || ''); }));
     });
   }, []);
@@ -9081,7 +9081,7 @@ function IdeasView() {
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ area: selected.title, description: budgetForm.description, amount: parseFloat(budgetForm.amount), date: budgetForm.date, type: isInKind ? 'In-Kind' : 'Purchase', needs_reimbursement: needsReimb, volunteer_name: needsReimb ? (budgetForm.volunteer_name || null) : null })
+      body: JSON.stringify({ area: selected.title, description: budgetForm.description, amount: parseFloat(budgetForm.amount), date: budgetForm.date, type: isInKind ? 'In-Kind' : 'Purchase', needs_reimbursement: needsReimb, volunteer_name: needsReimb ? (budgetForm.volunteer_name || null) : null, volunteer_auth_user_id: needsReimb ? (budgetForm.volunteer_auth_user_id || null) : null })
     }).then(function(r) { return r.json(); }).then(function(rows) {
       if (rows && rows.message) { alert('Budget error: ' + rows.message); setBudgetSaving(false); return; }
       var newRow = rows && rows[0] ? rows[0] : {};
@@ -9120,7 +9120,7 @@ function IdeasView() {
     setEditBudgetSaving(true);
     var isInKind = editBudgetForm.expense_type === 'In-Kind';
     var needsReimb = editBudgetForm.expense_type === 'Reimbursement';
-    var patch = { description: editBudgetForm.description, amount: parseFloat(editBudgetForm.amount), date: editBudgetForm.date, type: isInKind ? 'In-Kind' : 'Purchase', needs_reimbursement: needsReimb, volunteer_name: needsReimb ? (editBudgetForm.volunteer_name || null) : null };
+    var patch = { description: editBudgetForm.description, amount: parseFloat(editBudgetForm.amount), date: editBudgetForm.date, type: isInKind ? 'In-Kind' : 'Purchase', needs_reimbursement: needsReimb, volunteer_name: needsReimb ? (editBudgetForm.volunteer_name || null) : null, volunteer_auth_user_id: needsReimb ? (editBudgetForm.volunteer_auth_user_id || null) : null };
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + editingBudgetId, {
       method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
     }).then(function() {
@@ -9316,7 +9316,7 @@ function IdeasView() {
                                   {filtered.map(function(v) {
                                     var fullName = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim();
                                     return (
-                                      <div key={v.id} onMouseDown={function() { setBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName }); }); setVolQuery(fullName); setShowVolDrop(false); }}
+                                      <div key={v.id} onMouseDown={function() { setBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName, volunteer_auth_user_id: v.auth_user_id || null }); }); setVolQuery(fullName); setShowVolDrop(false); }}
                                         style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '0.5px solid #f5f0ea' }}
                                         onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
                                         onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}>
@@ -9381,7 +9381,7 @@ function IdeasView() {
                                       {filteredE.map(function(v) {
                                         var fullName = ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim();
                                         return (
-                                          <div key={v.id} onMouseDown={function() { setEditBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName }); }); setEditVolQuery(fullName); setShowEditVolDrop(false); }}
+                                          <div key={v.id} onMouseDown={function() { setEditBudgetForm(function(f) { return Object.assign({}, f, { volunteer_name: fullName, volunteer_auth_user_id: v.auth_user_id || null }); }); setEditVolQuery(fullName); setShowEditVolDrop(false); }}
                                             style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, borderBottom: '0.5px solid #f5f0ea' }}
                                             onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
                                             onMouseLeave={function(e) { e.currentTarget.style.background = '#fff'; }}>
