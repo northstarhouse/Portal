@@ -8142,6 +8142,7 @@ function FinancialOverviewView({ navigate }) {
   var thisYear = new Date().getFullYear();
   var [year, setYear] = useState(thisYear);
   var [activeTab, setActiveTab] = useState('donations');
+  var [expandedArea, setExpandedArea] = useState(null);
   var [loading, setLoading] = useState(true);
   var [donations, setDonations] = useState([]);
   var [sponsors, setSponsors] = useState([]);
@@ -8399,16 +8400,45 @@ function FinancialOverviewView({ navigate }) {
             ) : stats.areaRows.map(function(r) {
               var hasAllocated = r.allocated != null;
               var remaining = hasAllocated ? r.allocated - r.purchases : null;
+              var isOpen = expandedArea === r.area;
+              var areaItems = budget.filter(function(b) { return inYear(b.date) && (b.area || 'Unassigned') === r.area; })
+                .map(function(b) { return { kind: b.type === 'In-Kind' ? 'In-Kind' : 'Purchase', description: b.description || '—', amount: parseFloat(b.amount) || 0, date: b.date }; })
+                .concat(earnings.filter(function(e) { return inYear(e.date) && (e.area || 'Unassigned') === r.area; })
+                  .map(function(e) { return { kind: 'Earning', description: e.event || '—', amount: parseFloat(e.amount) || 0, date: e.date }; }))
+                .sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+              var kindColors = { Purchase: { bg: '#fdf0e6', color: '#c07040' }, 'In-Kind': { bg: '#f3ede1', color: '#886c44' }, Earning: { bg: '#eaf4ea', color: '#5a8a5a' } };
               return (
-                <div key={r.area} style={{ display: 'flex', gap: 10, padding: '9px 18px', borderBottom: '0.5px solid #f9f6f2', fontSize: 12 }}>
-                  <span style={{ flex: 1, fontWeight: 500, color: '#2a2a2a' }}>{r.area}</span>
-                  <span style={{ width: 90, textAlign: 'right', fontWeight: 600, color: '#2a2a2a' }}>{hasAllocated ? money(r.allocated) : '—'}</span>
-                  <span style={{ width: 90, textAlign: 'right', color: '#c07040' }}>{r.purchases ? money(r.purchases) : '—'}</span>
-                  <span style={{ width: 90, textAlign: 'right', color: '#5a8a5a' }}>{r.earnings ? money(r.earnings) : '—'}</span>
-                  <span style={{ width: 90, textAlign: 'right', color: '#886c44' }}>{r.inKind ? money(r.inKind) : '—'}</span>
-                  <span style={{ width: 90, textAlign: 'right', fontWeight: 700, color: !hasAllocated ? '#bbb' : remaining >= 0 ? '#2e7d32' : '#c62828' }}>
-                    {!hasAllocated ? '—' : (remaining >= 0 ? '' : '-') + money(Math.abs(remaining))}
-                  </span>
+                <div key={r.area}>
+                  <div onClick={function() { setExpandedArea(isOpen ? null : r.area); }} style={{ display: 'flex', gap: 10, padding: '9px 18px', borderBottom: '0.5px solid #f9f6f2', fontSize: 12, cursor: 'pointer', background: isOpen ? '#faf8f4' : 'transparent' }}>
+                    <span style={{ flex: 1, fontWeight: 500, color: '#2a2a2a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 10, color: '#bbb', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s', display: 'inline-block' }}>▶</span>
+                      {r.area}
+                    </span>
+                    <span style={{ width: 90, textAlign: 'right', fontWeight: 600, color: '#2a2a2a' }}>{hasAllocated ? money(r.allocated) : '—'}</span>
+                    <span style={{ width: 90, textAlign: 'right', color: '#c07040' }}>{r.purchases ? money(r.purchases) : '—'}</span>
+                    <span style={{ width: 90, textAlign: 'right', color: '#5a8a5a' }}>{r.earnings ? money(r.earnings) : '—'}</span>
+                    <span style={{ width: 90, textAlign: 'right', color: '#886c44' }}>{r.inKind ? money(r.inKind) : '—'}</span>
+                    <span style={{ width: 90, textAlign: 'right', fontWeight: 700, color: !hasAllocated ? '#bbb' : remaining >= 0 ? '#2e7d32' : '#c62828' }}>
+                      {!hasAllocated ? '—' : (remaining >= 0 ? '' : '-') + money(Math.abs(remaining))}
+                    </span>
+                  </div>
+                  {isOpen && (
+                    <div style={{ background: '#faf8f4', padding: '4px 18px 12px 42px', borderBottom: '0.5px solid #f9f6f2' }}>
+                      {areaItems.length === 0 ? (
+                        <div style={{ fontSize: 11, color: '#bbb', padding: '8px 0' }}>No line items for {r.area} in {year}.</div>
+                      ) : areaItems.map(function(item, i) {
+                        var kc = kindColors[item.kind];
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < areaItems.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12 }}>
+                            <span style={{ width: 80, color: '#aaa', fontSize: 11 }}>{item.date || '—'}</span>
+                            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: kc.bg, color: kc.color, flexShrink: 0 }}>{item.kind}</span>
+                            <span style={{ flex: 1, color: '#2a2a2a' }}>{item.description}</span>
+                            <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(item.amount)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
