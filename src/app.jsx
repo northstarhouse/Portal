@@ -214,7 +214,7 @@ const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthsta
 
 // Kick off critical fetches immediately so data is ready when views mount
 (function prefetch() {
-  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Favorite Quote','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day']);
+  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Favorite Quote','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day','donor_id']);
   cachedSbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes']);
   cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']);
   cachedFetchAll('Board Voting Items');
@@ -1729,7 +1729,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete, 
   );
 }
 
-function VolunteersView() {
+function VolunteersView({ navigate }) {
   var isMobile = React.useContext(MobileCtx);
   const [volunteers, setVolunteers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1747,6 +1747,54 @@ function VolunteersView() {
   var HOUR_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const [hoursData, setHoursData] = React.useState({});
   const [listColors, setListColors] = useState({});
+  const [donorOptions, setDonorOptions] = useState([]);
+  const [donorLinkQuery, setDonorLinkQuery] = useState('');
+  const [showDonorLinkDrop, setShowDonorLinkDrop] = useState(false);
+  const [linkingDonor, setLinkingDonor] = useState(false);
+
+  useEffect(function() {
+    cachedSbFetch('donors', ['id', 'formal_name']).then(function(data) { if (Array.isArray(data)) setDonorOptions(data); });
+  }, []);
+
+  function linkDonor(donorId) {
+    if (!selected) return;
+    setLinkingDonor(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?id=eq.' + selected.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ donor_id: donorId })
+    }).then(function() {
+      setLinkingDonor(false);
+      var merged = Object.assign({}, selected, { donor_id: donorId });
+      setVolunteers(function(prev) { return prev.map(function(v) { return v.id === selected.id ? merged : v; }); });
+      setSelected(merged);
+      setDonorLinkQuery('');
+      setShowDonorLinkDrop(false);
+      clearCache('2026 Volunteers');
+    }).catch(function() { setLinkingDonor(false); });
+  }
+
+  function unlinkDonor() {
+    if (!selected) return;
+    setLinkingDonor(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?id=eq.' + selected.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ donor_id: null })
+    }).then(function() {
+      setLinkingDonor(false);
+      var merged = Object.assign({}, selected, { donor_id: null });
+      setVolunteers(function(prev) { return prev.map(function(v) { return v.id === selected.id ? merged : v; }); });
+      setSelected(merged);
+      clearCache('2026 Volunteers');
+    }).catch(function() { setLinkingDonor(false); });
+  }
+
+  function viewLinkedDonor() {
+    if (!selected || !selected.donor_id) return;
+    window.__nshOpenDonorId = selected.donor_id;
+    navigate('donors');
+  }
 
   function buildHoursMapFromLogs(logs) {
     var byName = {};
@@ -1849,9 +1897,16 @@ function VolunteersView() {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(function() {
-    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day'])
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day','donor_id'])
       .then(function(data) {
-        if (Array.isArray(data)) setVolunteers(data);
+        if (Array.isArray(data)) {
+          setVolunteers(data);
+          if (window.__nshOpenVolunteerId) {
+            var match = data.find(function(v) { return v.id === window.__nshOpenVolunteerId; });
+            window.__nshOpenVolunteerId = null;
+            if (match) setSelected(match);
+          }
+        }
         else setError(JSON.stringify(data));
         setLoading(false);
       })
@@ -2341,6 +2396,44 @@ function VolunteersView() {
                   <InfoRow label="Birthday" value={fmtBirthday(selected['Birthday'])} />
                 </div>
               )}
+              <div style={{ marginBottom: 4 }}>
+                <span style={volSecLabel}>Donor Profile</span>
+                {selected.donor_id ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: '#2a2a2a', fontWeight: 500 }}>
+                      {(donorOptions.find(function(d) { return d.id === selected.donor_id; }) || {}).formal_name || 'Linked donor'}
+                    </span>
+                    <button onClick={viewLinkedDonor} style={{ background: '#fff', border: '0.5px solid #ddd4c4', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: gold, cursor: 'pointer', fontWeight: 500 }}>View Donor Profile →</button>
+                    <button onClick={unlinkDonor} disabled={linkingDonor} style={{ background: 'transparent', border: 'none', fontSize: 11, color: '#bbb', cursor: linkingDonor ? 'default' : 'pointer' }}>Unlink</button>
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      value={donorLinkQuery}
+                      onChange={function(e) { setDonorLinkQuery(e.target.value); setShowDonorLinkDrop(true); }}
+                      onFocus={function() { setShowDonorLinkDrop(true); }}
+                      onBlur={function() { setTimeout(function() { setShowDonorLinkDrop(false); }, 150); }}
+                      placeholder="Search donors to link…"
+                      disabled={linkingDonor}
+                      style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, boxSizing: 'border-box' }}
+                    />
+                    {showDonorLinkDrop && donorLinkQuery.trim() && (
+                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, marginTop: 4, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: 180, overflowY: 'auto' }}>
+                        {donorOptions.filter(function(d) { return (d.formal_name || '').toLowerCase().includes(donorLinkQuery.toLowerCase()); }).slice(0, 8).map(function(d) {
+                          return (
+                            <div key={d.id} onMouseDown={function() { linkDonor(d.id); }} style={{ padding: '7px 10px', fontSize: 12, cursor: 'pointer', borderBottom: '0.5px solid #f5f0ea' }}>
+                              {d.formal_name}
+                            </div>
+                          );
+                        })}
+                        {donorOptions.filter(function(d) { return (d.formal_name || '').toLowerCase().includes(donorLinkQuery.toLowerCase()); }).length === 0 && (
+                          <div style={{ padding: '8px 10px', fontSize: 12, color: '#bbb' }}>No matching donors</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               {(selected['Background Notes'] || selected['Notes']) && (
                 <div style={{ marginBottom: 4 }}>
                   <span style={volSecLabel}>Notes</span>
@@ -2925,6 +3018,7 @@ function DonorsView({ navigate }) {
   const [ackRecovering, setAckRecovering] = useState(false);
   const [ackError, setAckError] = useState(null);
   const [ackResult, setAckResult] = useState(null);
+  const [volunteerLinks, setVolunteerLinks] = useState([]);
 
   var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
   var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
@@ -2961,10 +3055,19 @@ function DonorsView({ navigate }) {
       donationRows.forEach(function(d){if(!byDonor[d.donor_id])byDonor[d.donor_id]=[];byDonor[d.donor_id].push(d);});
       var tagsByDonor={};
       tagRows.forEach(function(r){if(!r.tags)return;if(!tagsByDonor[r.donor_id])tagsByDonor[r.donor_id]=[];tagsByDonor[r.donor_id].push(r.tags);});
-      setDonors(donorRows.map(function(d){return Object.assign(buildDonor(d,byDonor[d.id]||[]),{tags:tagsByDonor[d.id]||[]});}));
+      var built=donorRows.map(function(d){return Object.assign(buildDonor(d,byDonor[d.id]||[]),{tags:tagsByDonor[d.id]||[]});});
+      setDonors(built);
       setTagCatalog(allTags);
       setLoading(false);
+      if(window.__nshOpenDonorId){
+        var match=built.find(function(d){return d.id===window.__nshOpenDonorId;});
+        window.__nshOpenDonorId=null;
+        if(match)setSelected(match);
+      }
     }).catch(function(err){setError(err.message);setLoading(false);});
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','donor_id']).then(function(data){
+      if(Array.isArray(data))setVolunteerLinks(data.filter(function(v){return v.donor_id;}));
+    });
   }, []);
 
   // Derived data
@@ -3508,6 +3611,16 @@ function DonorsView({ navigate }) {
               {selected.phone && <div><span style={{color:'#777'}}>Phone </span>{selected.phone}</div>}
               {selected.employer && <div><span style={{color:'#777'}}>Employer </span>{selected.employer}</div>}
               {selected.address && <div><span style={{color:'#777'}}>Address </span><span style={{whiteSpace:'pre-line'}}>{selected.address}</span></div>}
+              {(function(){
+                var link=volunteerLinks.find(function(v){return v.donor_id===selected.id;});
+                if(!link)return null;
+                return (
+                  <div style={{marginTop:2}}>
+                    <span style={{color:'#777'}}>Volunteer </span>
+                    <a href="#volunteers" onClick={function(e){e.preventDefault();window.__nshOpenVolunteerId=link.id;navigate('volunteers');}} style={{color:gold,textDecoration:'none'}}>{(link['First Name']||'')+' '+(link['Last Name']||'')} →</a>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Letter greeting + structured mailing address, used for acknowledgment generation */}
