@@ -2762,16 +2762,20 @@ function computeDefaultGreeting(donor) {
   return donor.informal_first_name || donor.formal_name || '';
 }
 
-function downloadCsvRows(headers, rows, filename) {
-  var csvRows = rows.map(function(row) {
-    return headers.map(function(h) { return '"' + String(row[h] == null ? '' : row[h]).replace(/"/g, '""') + '"'; }).join(',');
+// Real .xlsx (not CSV) -- avoids Excel's CSV auto-open date/number reinterpretation
+// (e.g. "2026-07-16" getting column-width-truncated into "#####") since values land in
+// their actual cell types instead of being re-parsed from text on open.
+function downloadXlsxRows(headers, rows, filename) {
+  var worksheet = XLSX.utils.json_to_sheet(rows, { header: headers });
+  var colWidths = headers.map(function(h) {
+    var maxLen = h.length;
+    rows.forEach(function(r) { var v = r[h]; if (v != null) maxLen = Math.max(maxLen, String(v).length); });
+    return { wch: Math.min(Math.max(maxLen + 2, 8), 50) };
   });
-  var csv = [headers.join(',')].concat(csvRows).join('\n');
-  var blob = new Blob([csv], { type: 'text/csv' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+  worksheet['!cols'] = colWidths;
+  var workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+  XLSX.writeFile(workbook, filename);
 }
 
 function parseAddressBlock(text) {
@@ -8324,35 +8328,35 @@ function FinancialOverviewView({ navigate }) {
   function exportActiveTab() {
     if (activeTab === 'donations') {
       var rows = donations.filter(function(d) { return inYear(d.date); }).map(function(d) {
-        return { Date: d.date || '', Donor: donorNameById[d.donor_id] || 'Unknown donor', Type: d.type || '', 'Payment Type': d.payment_type || '', Notes: d.donation_notes || '', Amount: (parseFloat(d.amount) || 0).toFixed(2) };
+        return { Date: d.date || '', Donor: donorNameById[d.donor_id] || 'Unknown donor', Type: d.type || '', 'Payment Type': d.payment_type || '', Notes: d.donation_notes || '', Amount: parseFloat(d.amount) || 0 };
       });
-      downloadCsvRows(['Date', 'Donor', 'Type', 'Payment Type', 'Notes', 'Amount'], rows, 'donations-' + year + '.csv');
+      downloadXlsxRows(['Date', 'Donor', 'Type', 'Payment Type', 'Notes', 'Amount'], rows, 'donations-' + year + '.xlsx');
     } else if (activeTab === 'sponsorships') {
       var rows = [];
       stats.currentSponsors.forEach(function(sp) {
         (stats.sponsorEntriesBySponsor[sp.id] || []).forEach(function(e) {
-          rows.push({ Business: sp['Business Name'] || '', Date: e.date || '', Type: e.contribution_type || '', Description: e.description || '', Value: (parseFloat(e.value) || 0).toFixed(2) });
+          rows.push({ Business: sp['Business Name'] || '', Date: e.date || '', Type: e.contribution_type || '', Description: e.description || '', Value: parseFloat(e.value) || 0 });
         });
       });
-      downloadCsvRows(['Business', 'Date', 'Type', 'Description', 'Value'], rows, 'sponsorships-' + year + '.csv');
+      downloadXlsxRows(['Business', 'Date', 'Type', 'Description', 'Value'], rows, 'sponsorships-' + year + '.xlsx');
     } else if (activeTab === 'operational') {
       var rows = stats.areaRows.map(function(r) {
         var remaining = r.allocated != null ? r.allocated - r.purchases : null;
-        return { Area: r.area, Budget: r.allocated != null ? r.allocated.toFixed(2) : '', Spent: r.purchases.toFixed(2), Earnings: r.earnings.toFixed(2), 'In-Kind': r.inKind.toFixed(2), Remaining: remaining != null ? remaining.toFixed(2) : '' };
+        return { Area: r.area, Budget: r.allocated != null ? r.allocated : '', Spent: r.purchases, Earnings: r.earnings, 'In-Kind': r.inKind, Remaining: remaining != null ? remaining : '' };
       });
-      downloadCsvRows(['Area', 'Budget', 'Spent', 'Earnings', 'In-Kind', 'Remaining'], rows, 'operational-areas-' + year + '.csv');
+      downloadXlsxRows(['Area', 'Budget', 'Spent', 'Earnings', 'In-Kind', 'Remaining'], rows, 'operational-areas-' + year + '.xlsx');
     } else if (activeTab === 'cashflow') {
       var rows = rentals.filter(function(r) { return inYear(r.date); }).map(function(r) {
-        return { Date: r.date || '', Source: 'Earning', Category: r.name || 'Other', Direction: 'In', Amount: (parseFloat(r.amount) || 0).toFixed(2) };
+        return { Date: r.date || '', Source: 'Earning', Category: r.name || 'Other', Direction: 'In', Amount: parseFloat(r.amount) || 0 };
       }).concat(cashLog.filter(function(c) { return inYear(c.date); }).map(function(c) {
-        return { Date: c.date || '', Source: 'Cash Log', Category: c.description || '', Direction: c.direction || '', Amount: (parseFloat(c.amount) || 0).toFixed(2) };
+        return { Date: c.date || '', Source: 'Cash Log', Category: c.description || '', Direction: c.direction || '', Amount: parseFloat(c.amount) || 0 };
       }));
-      downloadCsvRows(['Date', 'Source', 'Category', 'Direction', 'Amount'], rows, 'office-cash-flow-' + year + '.csv');
+      downloadXlsxRows(['Date', 'Source', 'Category', 'Direction', 'Amount'], rows, 'office-cash-flow-' + year + '.xlsx');
     } else if (activeTab === 'outflow-detail') {
       var rows = outflowDetail.all.map(function(r) {
-        return { Date: r.date || '', Area: r.area, Description: r.description, By: r.by || '', Source: r.source, Amount: r.amount.toFixed(2), 'Possible Duplicate': r.possibleDuplicate ? 'Yes' : '' };
+        return { Date: r.date || '', Area: r.area, Description: r.description, By: r.by || '', Source: r.source, Amount: r.amount, 'Possible Duplicate': r.possibleDuplicate ? 'Yes' : '' };
       });
-      downloadCsvRows(['Date', 'Area', 'Description', 'By', 'Source', 'Amount', 'Possible Duplicate'], rows, 'spending-detail-' + year + '.csv');
+      downloadXlsxRows(['Date', 'Area', 'Description', 'By', 'Source', 'Amount', 'Possible Duplicate'], rows, 'spending-detail-' + year + '.xlsx');
     }
   }
 
@@ -8387,7 +8391,7 @@ function FinancialOverviewView({ navigate }) {
                 </button>
               );
             })}
-            <button onClick={exportActiveTab} style={{ marginLeft: 'auto', marginBottom: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>↓ Export CSV</button>
+            <button onClick={exportActiveTab} style={{ marginLeft: 'auto', marginBottom: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>↓ Export Excel</button>
           </div>
 
           {activeTab === 'donations' && (

@@ -1,13 +1,14 @@
-var CACHE = 'nsh-v1784863910313';
+var CACHE = 'nsh-v1784864578815';
 var STATIC = [
   '/Portal/',
   '/Portal/index.html',
-  '/Portal/assets/app.js?v=1784863910313',
+  '/Portal/assets/app.js?v=1784864578815',
   '/Portal/assets/logo.png',
   '/Portal/favicon.svg',
   'https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js',
   'https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js',
   'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
 ];
 
 self.addEventListener('install', function(e) {
