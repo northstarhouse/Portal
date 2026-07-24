@@ -438,26 +438,28 @@ async function generateInner(donationId: number, overrides: any) {
 
   const { vars, donorName, addressComplete, letterDate } = buildVariableMap(donation, donor, settings, overrides);
 
-  const [letterTemplateBytes, envelopeTemplateBytes] = await Promise.all([
-    fetchStorageFile(template.letter_storage_path),
-    template.envelope_storage_path ? fetchStorageFile(template.envelope_storage_path) : Promise.resolve(null),
-  ]);
-
-  const letterMerge = await mergeDocxTemplate(letterTemplateBytes, vars);
-
-  let envelopeMerge: { bytes: Uint8Array } | null = null;
-  if (envelopeTemplateBytes) {
-    if (!addressComplete) {
-      throw new Error(
-        "This donor does not have a complete mailing address. Add an address or choose to generate the letter without an envelope.",
-      );
-    }
-    envelopeMerge = await mergeDocxTemplate(envelopeTemplateBytes, vars);
+  if (template.envelope_storage_path && !addressComplete) {
+    throw new Error(
+      "This donor does not have a complete mailing address. Add an address or choose to generate the letter without an envelope.",
+    );
   }
 
-  const token = await getDriveAccessToken();
+  // Fetch templates and acquire the Drive token in parallel -- these are independent of each other.
+  const [letterTemplateBytes, envelopeTemplateBytes, token] = await Promise.all([
+    fetchStorageFile(template.letter_storage_path),
+    template.envelope_storage_path ? fetchStorageFile(template.envelope_storage_path) : Promise.resolve(null),
+    getDriveAccessToken(),
+  ]);
+
   const donorFolderName = donorName.trim().replace(/\s+/g, " ").replace(/[\\/:*?"<>|]/g, "-");
-  const { folderId, pathLabel } = await resolveDestinationFolder(settings, donorFolderName, letterDate, token);
+
+  // Merging (CPU-bound, no network) and folder resolution (network) are independent -- run together.
+  const [letterMerge, envelopeMerge, folderResult] = await Promise.all([
+    mergeDocxTemplate(letterTemplateBytes, vars),
+    envelopeTemplateBytes ? mergeDocxTemplate(envelopeTemplateBytes, vars) : Promise.resolve(null),
+    resolveDestinationFolder(settings, donorFolderName, letterDate, token),
+  ]);
+  const { folderId, pathLabel } = folderResult;
 
   const dateStamp = letterDate.toISOString().slice(0, 10);
   const docLabel = `${donation.acknowledgment_type} Letter`;
@@ -465,12 +467,16 @@ async function generateInner(donationId: number, overrides: any) {
   const envelopeName = `${dateStamp} - ${donorName} - Envelope`;
 
   let letterFile: { id: string; webViewLink: string } | null = null;
+  let envelopeFile: { id: string; webViewLink: string } | null = null;
   try {
-    letterFile = await driveUploadDocx(letterName, letterMerge.bytes, folderId, token);
-    let envelopeFile: { id: string; webViewLink: string } | null = null;
-    if (envelopeMerge) {
-      envelopeFile = await driveUploadDocx(envelopeName, envelopeMerge.bytes, folderId, token);
-    }
+    // Assign each result as soon as ITS OWN upload resolves (not via a single destructured
+    // Promise.all result) so that if the envelope upload fails after the letter succeeded,
+    // letterFile is already set and the catch block below can clean it up -- otherwise a
+    // Promise.all rejection would leave letterFile null even though a file was really created.
+    await Promise.all([
+      driveUploadDocx(letterName, letterMerge.bytes, folderId, token).then((f) => { letterFile = f; }),
+      envelopeMerge ? driveUploadDocx(envelopeName, envelopeMerge.bytes, folderId, token).then((f) => { envelopeFile = f; }) : Promise.resolve(),
+    ]);
 
     await sbPatch(`donations?id=eq.${donationId}`, {
       acknowledgment_status: "generated",
