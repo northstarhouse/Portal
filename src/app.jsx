@@ -3442,9 +3442,6 @@ function DonorsView({ navigate }) {
                           <span style={{display:'inline-flex',padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,...(NSH_STATUS_PILLS[d.status]||{background:'#f3f4f6',color:'#6b7280'})}}>
                             {NSH_STATUS_LABELS[d.status]||d.status}
                           </span>
-                          {(d.tags||[]).length>0 && <div style={{display:'flex',flexWrap:'wrap',gap:3,marginTop:4}}>
-                            {(d.tags||[]).map(function(tag){return <span key={tag.id} style={{display:'inline-flex',alignItems:'center',gap:3,padding:'1px 6px',borderRadius:20,fontSize:10,fontWeight:500,background:tag.color+'22',color:tag.color}}>{tag.name}</span>;})}
-                          </div>}
                         </td>
                         <td style={{padding:'10px 14px'}}>
                           {d.tier==='none'
