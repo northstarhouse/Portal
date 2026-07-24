@@ -2893,7 +2893,7 @@ function DonorsView({ navigate }) {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState({});
-  const [filters, setFilters] = useState({search:'',status:'current',tier:'all',donationType:'all',year:'all',hasAddress:'all'});
+  const [filters, setFilters] = useState({search:'',status:'current',tier:'all',donationType:'all',year:String(THIS_YEAR),hasAddress:'all'});
   const [sortKey, setSortKey] = useState('last_gift_date');
   const [sortDir, setSortDir] = useState('desc');
   const [editDon, setEditDon] = useState(null);
@@ -3304,7 +3304,6 @@ function DonorsView({ navigate }) {
         </select>
         <select value={filters.year} onChange={function(e){setFilters(function(f){return Object.assign({},f,{year:e.target.value});});}}
           style={{padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff'}}>
-          <option value="all">All Years</option>
           {availableYears.map(function(y){return <option key={y} value={y}>{y}</option>;})}
         </select>
         <select value={filters.hasAddress} onChange={function(e){setFilters(function(f){return Object.assign({},f,{hasAddress:e.target.value});});}}
@@ -3330,7 +3329,7 @@ function DonorsView({ navigate }) {
 
       {/* Stat cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12,marginBottom:20}}>
-        <StatCard label="Total Raised" value={loading?'...':fmtAmtFull(totalRaised)} sub={filters.year==='all'?'All Years':filters.year+' YTD'} />
+        <StatCard label="Total Raised" value={loading?'...':fmtAmtFull(totalRaised)} sub={filters.year+' YTD'} />
         <StatCard label="Donors in View" value={loading?'...':filteredDonors.length} sub="in view" />
         <StatCard label="Members" value={loading?'...':membersCount} />
         <StatCard label="Total Records" value={loading?'...':donors.length} />
