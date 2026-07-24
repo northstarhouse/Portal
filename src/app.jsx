@@ -3625,7 +3625,7 @@ function DonorsView({ navigate }) {
                                   <span style={{fontSize:12,color:'#888'}}>{fmtDate(don.date)}</span>
                                   <span style={{fontSize:12,fontWeight:600,color:'#2a2a2a'}}>{fmtAmtFull(don.amount)}</span>
                                   <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,background:acked?'#e8f5e9':'#fff8e1',color:acked?'#2e7d32':'#8a6200',fontWeight:500}}>{acked?'Thanked':'Pending'}</span>
-                                  {don.acknowledgment_status && <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,fontWeight:500,...(ACK_STATUS_PILLS[don.acknowledgment_status]||{background:'#f3f4f6',color:'#6b7280'})}}>{ACK_STATUS_LABELS[don.acknowledgment_status]||don.acknowledgment_status}</span>}
+                                  {don.acknowledgment_status && don.acknowledgment_status!=='ready_to_generate' && <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,fontWeight:500,...(ACK_STATUS_PILLS[don.acknowledgment_status]||{background:'#f3f4f6',color:'#6b7280'})}}>{ACK_STATUS_LABELS[don.acknowledgment_status]||don.acknowledgment_status}</span>}
                                 </div>
                                 <button onClick={function(e){e.stopPropagation();quickGenerate(don);}} title={don.letter_drive_url?'Regenerate thank-you documents':don.acknowledgment_type?'Generate thank-you documents now, using the info already on file':'Set Acknowledgment Type, then generate'} style={{fontSize:13,background:'none',border:'0.5px solid '+gold,borderRadius:6,padding:'3px 8px',cursor:'pointer',flexShrink:0,lineHeight:1}}>✉️</button>
                                 <button onClick={function(e){e.stopPropagation();setEditDon(don);
