@@ -3793,7 +3793,7 @@ function DonorsView({ navigate }) {
             {ackStep==='generating' && (
               <div style={{textAlign:'center',padding:'20px 0'}}>
                 <div style={{fontSize:14,color:'#666'}}>{ackRecovering?'Connection dropped — checking whether it finished anyway…':'Generating documents…'}</div>
-                {ackRecovering && <div style={{fontSize:11,color:'#aaa',marginTop:6}}>This can take up to a minute. Please don\'t close this or click Generate again yet.</div>}
+                {ackRecovering && <div style={{fontSize:11,color:'#aaa',marginTop:6}}>This can take up to a minute. Please don't close this or click Generate again yet.</div>}
               </div>
             )}
 
