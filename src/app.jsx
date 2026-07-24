@@ -2762,6 +2762,18 @@ function computeDefaultGreeting(donor) {
   return donor.informal_first_name || donor.formal_name || '';
 }
 
+function downloadCsvRows(headers, rows, filename) {
+  var csvRows = rows.map(function(row) {
+    return headers.map(function(h) { return '"' + String(row[h] == null ? '' : row[h]).replace(/"/g, '""') + '"'; }).join(',');
+  });
+  var csv = [headers.join(',')].concat(csvRows).join('\n');
+  var blob = new Blob([csv], { type: 'text/csv' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 function parseAddressBlock(text) {
   if (!text || !text.trim()) return null;
   var lines = text.split('\n').map(function(l){return l.trim();}).filter(Boolean);
@@ -8309,6 +8321,41 @@ function FinancialOverviewView({ navigate }) {
     return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   }
 
+  function exportActiveTab() {
+    if (activeTab === 'donations') {
+      var rows = donations.filter(function(d) { return inYear(d.date); }).map(function(d) {
+        return { Date: d.date || '', Donor: donorNameById[d.donor_id] || 'Unknown donor', Type: d.type || '', 'Payment Type': d.payment_type || '', Notes: d.donation_notes || '', Amount: (parseFloat(d.amount) || 0).toFixed(2) };
+      });
+      downloadCsvRows(['Date', 'Donor', 'Type', 'Payment Type', 'Notes', 'Amount'], rows, 'donations-' + year + '.csv');
+    } else if (activeTab === 'sponsorships') {
+      var rows = [];
+      stats.currentSponsors.forEach(function(sp) {
+        (stats.sponsorEntriesBySponsor[sp.id] || []).forEach(function(e) {
+          rows.push({ Business: sp['Business Name'] || '', Date: e.date || '', Type: e.contribution_type || '', Description: e.description || '', Value: (parseFloat(e.value) || 0).toFixed(2) });
+        });
+      });
+      downloadCsvRows(['Business', 'Date', 'Type', 'Description', 'Value'], rows, 'sponsorships-' + year + '.csv');
+    } else if (activeTab === 'operational') {
+      var rows = stats.areaRows.map(function(r) {
+        var remaining = r.allocated != null ? r.allocated - r.purchases : null;
+        return { Area: r.area, Budget: r.allocated != null ? r.allocated.toFixed(2) : '', Spent: r.purchases.toFixed(2), Earnings: r.earnings.toFixed(2), 'In-Kind': r.inKind.toFixed(2), Remaining: remaining != null ? remaining.toFixed(2) : '' };
+      });
+      downloadCsvRows(['Area', 'Budget', 'Spent', 'Earnings', 'In-Kind', 'Remaining'], rows, 'operational-areas-' + year + '.csv');
+    } else if (activeTab === 'cashflow') {
+      var rows = rentals.filter(function(r) { return inYear(r.date); }).map(function(r) {
+        return { Date: r.date || '', Source: 'Earning', Category: r.name || 'Other', Direction: 'In', Amount: (parseFloat(r.amount) || 0).toFixed(2) };
+      }).concat(cashLog.filter(function(c) { return inYear(c.date); }).map(function(c) {
+        return { Date: c.date || '', Source: 'Cash Log', Category: c.description || '', Direction: c.direction || '', Amount: (parseFloat(c.amount) || 0).toFixed(2) };
+      }));
+      downloadCsvRows(['Date', 'Source', 'Category', 'Direction', 'Amount'], rows, 'office-cash-flow-' + year + '.csv');
+    } else if (activeTab === 'outflow-detail') {
+      var rows = outflowDetail.all.map(function(r) {
+        return { Date: r.date || '', Area: r.area, Description: r.description, By: r.by || '', Source: r.source, Amount: r.amount.toFixed(2), 'Possible Duplicate': r.possibleDuplicate ? 'Yes' : '' };
+      });
+      downloadCsvRows(['Date', 'Area', 'Description', 'By', 'Source', 'Amount', 'Possible Duplicate'], rows, 'spending-detail-' + year + '.csv');
+    }
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -8330,7 +8377,7 @@ function FinancialOverviewView({ navigate }) {
             <div style={card}><div style={cardLabel}>In-Kind Total</div><div style={{ ...cardValue, color: '#886c44' }}>{money(stats.totalInKind + stats.sponsorInKind)}</div></div>
           </div>
 
-          <div style={{ display: 'flex', gap: 4, borderBottom: '0.5px solid #e8e0d5' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderBottom: '0.5px solid #e8e0d5' }}>
             {TABS.map(function(t) {
               var isActive = activeTab === t.id;
               return (
@@ -8340,6 +8387,7 @@ function FinancialOverviewView({ navigate }) {
                 </button>
               );
             })}
+            <button onClick={exportActiveTab} style={{ marginLeft: 'auto', marginBottom: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>↓ Export CSV</button>
           </div>
 
           {activeTab === 'donations' && (
