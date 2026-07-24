@@ -9124,6 +9124,223 @@ function FinancialOverviewView({ navigate }) {
   );
 }
 
+function OfficeCashFlowView({ navigate }) {
+  var { useState, useEffect } = React;
+
+  var RENTAL_NAMES = ['Yoga with Teena Bates', 'Mahjong Group', 'Donation Box', 'Book Sales', 'Other'];
+  var PAYMENT_TYPES = ['Cash', 'Card', 'Check'];
+  var emptyRentalForm = { name: 'Yoga with Teena Bates', custom_name: '', amount: '', date: new Date().toISOString().slice(0,10), payment_type: 'Cash' };
+  var [rentals, setRentals] = useState([]);
+  var [rentalsLoading, setRentalsLoading] = useState(true);
+  var [rentalForm, setRentalForm] = useState(emptyRentalForm);
+  var [rentalSaving, setRentalSaving] = useState(false);
+  var [showRentalForm, setShowRentalForm] = useState(false);
+
+  var [cashLog, setCashLog] = useState([]);
+  var [cashLoading, setCashLoading] = useState(true);
+  var emptyCashForm = { description: '', amount: '', date: new Date().toISOString().slice(0,10), direction: 'Out' };
+  var [cashForm, setCashForm] = useState(emptyCashForm);
+  var [showCashForm, setShowCashForm] = useState(false);
+  var [cashSaving, setCashSaving] = useState(false);
+
+  function loadRentals() {
+    setRentalsLoading(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=*&order=date.desc,id.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setRentals(Array.isArray(rows) ? rows : []); setRentalsLoading(false); });
+  }
+
+  useEffect(function() {
+    loadRentals();
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=*&order=date.desc,id.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setCashLog(rows);
+      setCashLoading(false);
+    }).catch(function() { setCashLoading(false); });
+  }, []);
+
+  function submitRental(e) {
+    e.preventDefault();
+    var finalName = rentalForm.name === 'Other' ? rentalForm.custom_name : rentalForm.name;
+    if (!finalName || !rentalForm.amount || !rentalForm.date) return;
+    setRentalSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ name: finalName, amount: parseFloat(rentalForm.amount), date: rentalForm.date, payment_type: rentalForm.payment_type })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var newRow = (rows && rows[0]) ? rows[0] : { name: finalName, amount: parseFloat(rentalForm.amount), date: rentalForm.date, payment_type: rentalForm.payment_type };
+      setRentals(function(prev) { return [newRow].concat(prev); });
+      setRentalForm(emptyRentalForm);
+      setShowRentalForm(false);
+      setRentalSaving(false);
+    }).catch(function() { setRentalSaving(false); });
+  }
+
+  function submitCash(e) {
+    e.preventDefault();
+    if (!cashForm.description || !cashForm.amount || !cashForm.date) return;
+    setCashSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ description: cashForm.description, amount: parseFloat(cashForm.amount), date: cashForm.date, direction: cashForm.direction })
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var newRow = rows && rows[0] ? rows[0] : { description: cashForm.description, amount: parseFloat(cashForm.amount), date: cashForm.date, direction: cashForm.direction };
+      setCashLog(function(p) { return [newRow].concat(p); });
+      setCashForm(emptyCashForm); setShowCashForm(false); setCashSaving(false);
+    }).catch(function() { setCashSaving(false); });
+  }
+
+  function deleteCash(id) {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?id=eq.' + id, {
+      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() { setCashLog(function(p) { return p.filter(function(c) { return c.id !== id; }); }); });
+  }
+
+  function fmt(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  var rentTotal = rentals.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
+  var inpSt = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff', boxSizing: 'border-box' };
+
+  return (
+    <div style={{ paddingBottom: 60 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: '#888' }}>Office earnings (Creative Rentals) and cash log — the day-to-day office cash flow ledger.</div>
+        <button onClick={function() { navigate('financial-overview'); }} style={{ background: gold, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#fff', cursor: 'pointer', flexShrink: 0 }}>View All Financials</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+          <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Earnings</div>
+              {!rentalsLoading && rentals.length > 0 && <div style={{ fontSize: 12, color: '#059669', fontWeight: 600, marginTop: 2 }}>{fmt(rentTotal)} total · {rentals.length} entr{rentals.length !== 1 ? 'ies' : 'y'}</div>}
+            </div>
+            <button onClick={function() { setShowRentalForm(function(v) { return !v; }); }} style={{ fontSize: 12, background: showRentalForm ? '#f5f0ea' : gold, color: showRentalForm ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}>{showRentalForm ? 'Cancel' : '+ Log Earning'}</button>
+          </div>
+          {showRentalForm && (
+            <form onSubmit={submitRental} style={{ padding: '16px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fefcf8' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Rental Name</label>
+                  <select name="name" value={rentalForm.name} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { name: e.target.value, custom_name: '' }); }); }} style={inpSt}>
+                    {RENTAL_NAMES.map(function(n) { return <option key={n} value={n}>{n}</option>; })}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Payment Type</label>
+                  <select name="payment_type" value={rentalForm.payment_type} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { payment_type: e.target.value }); }); }} style={inpSt}>
+                    {PAYMENT_TYPES.map(function(p) { return <option key={p} value={p}>{p}</option>; })}
+                  </select>
+                </div>
+              </div>
+              {rentalForm.name === 'Other' && (
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Specify Name</label>
+                  <input required name="custom_name" value={rentalForm.custom_name} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { custom_name: e.target.value }); }); }} placeholder="Enter rental name" style={inpSt} />
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Amount</label>
+                  <input required name="amount" type="number" step="0.01" min="0" value={rentalForm.amount} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} placeholder="0.00" style={inpSt} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Date</label>
+                  <input required name="date" type="date" value={rentalForm.date} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={inpSt} />
+                </div>
+              </div>
+              <button type="submit" disabled={rentalSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: rentalSaving ? 0.7 : 1 }}>{rentalSaving ? 'Saving…' : 'Save Earning'}</button>
+            </form>
+          )}
+          {rentalsLoading ? (
+            <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
+          ) : rentals.length === 0 ? (
+            <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No earnings logged yet.</div>
+          ) : rentals.map(function(r) {
+            return (
+              <div key={r.id || r.date + r.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, color: '#2a2a2a', fontWeight: 500 }}>{r.name}</div>
+                  <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{r.date}{r.payment_type ? ' · ' + r.payment_type : ''}</div>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#059669', flexShrink: 0 }}>{fmt(parseFloat(r.amount) || 0)}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Expenditures / Cash Log */}
+        {(function() {
+          var cashIn = cashLog.filter(function(c) { return c.direction === 'In'; }).reduce(function(s, c) { return s + (parseFloat(c.amount) || 0); }, 0);
+          var cashOut = cashLog.filter(function(c) { return c.direction === 'Out'; }).reduce(function(s, c) { return s + (parseFloat(c.amount) || 0); }, 0);
+          return (
+            <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Expenditures</div>
+                  {!cashLoading && cashLog.length > 0 && (
+                    <div style={{ fontSize: 12, marginTop: 2, display: 'flex', gap: 10 }}>
+                      {cashIn > 0 && <span style={{ color: '#059669', fontWeight: 600 }}>↑ {fmt(cashIn)}</span>}
+                      <span style={{ color: '#c62828', fontWeight: 600 }}>↓ {fmt(cashOut)}</span>
+                      {cashIn > 0 && <span style={{ color: '#888', fontWeight: 500 }}>Net {fmt(cashIn - cashOut)}</span>}
+                    </div>
+                  )}
+                </div>
+                <button onClick={function() { setShowCashForm(function(v) { return !v; }); }} style={{ fontSize: 12, background: showCashForm ? '#f5f0ea' : gold, color: showCashForm ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}>{showCashForm ? 'Cancel' : '+ Log Cash'}</button>
+              </div>
+              {showCashForm && (
+                <form onSubmit={submitCash} style={{ padding: '14px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fefcf8' }}>
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Description *</label>
+                    <input required value={cashForm.description} onChange={function(e) { setCashForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} placeholder="What is this for?" style={inpSt} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Amount *</label>
+                      <input required type="number" step="0.01" min="0" value={cashForm.amount} onChange={function(e) { setCashForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} placeholder="0.00" style={inpSt} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Date *</label>
+                      <input required type="date" value={cashForm.date} onChange={function(e) { setCashForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={inpSt} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Direction</label>
+                      <select value={cashForm.direction} onChange={function(e) { setCashForm(function(f) { return Object.assign({}, f, { direction: e.target.value }); }); }} style={inpSt}>
+                        <option value="Out">Cash Out</option>
+                        <option value="In">Cash In</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button type="submit" disabled={cashSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: cashSaving ? 0.7 : 1 }}>{cashSaving ? 'Saving…' : 'Save'}</button>
+                </form>
+              )}
+              {cashLoading ? (
+                <div style={{ padding: '20px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
+              ) : cashLog.length === 0 ? (
+                <div style={{ padding: '20px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No cash entries yet.</div>
+              ) : cashLog.map(function(c) {
+                var isIn = c.direction === 'In';
+                return (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
+                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: isIn ? '#ecfdf5' : '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 700, color: isIn ? '#059669' : '#c62828' }}>{isIn ? '↑' : '↓'}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, color: '#2a2a2a' }}>{c.description}</div>
+                      <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{c.date}</div>
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: isIn ? '#059669' : '#c62828', flexShrink: 0 }}>{isIn ? '+' : '-'}{fmt(parseFloat(c.amount) || 0)}</div>
+                    <button onClick={function() { deleteCash(c.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
 function FinancialsView({ navigate }) {
   var { useState, useEffect, useRef } = React;
 
@@ -9135,24 +9352,6 @@ function FinancialsView({ navigate }) {
   var [noteBoxAction, setNoteBoxAction] = useState(null);
   var [noteDraft, setNoteDraft] = useState('');
   var [reviewerName, setReviewerName] = useState(function() { try { return localStorage.getItem('nsh-reviewer-name') || ''; } catch (e) { return ''; } });
-
-  // Earnings (Creative Rentals)
-  var RENTAL_NAMES = ['Yoga with Teena Bates', 'Mahjong Group', 'Donation Box', 'Book Sales', 'Other'];
-  var PAYMENT_TYPES = ['Cash', 'Card', 'Check'];
-  var emptyRentalForm = { name: 'Yoga with Teena Bates', custom_name: '', amount: '', date: new Date().toISOString().slice(0,10), payment_type: 'Cash' };
-  var [rentals, setRentals] = useState([]);
-  var [rentalsLoading, setRentalsLoading] = useState(true);
-  var [rentalForm, setRentalForm] = useState(emptyRentalForm);
-  var [rentalSaving, setRentalSaving] = useState(false);
-  var [showRentalForm, setShowRentalForm] = useState(false);
-
-  // Cash Log (Expenditures)
-  var [cashLog, setCashLog] = useState([]);
-  var [cashLoading, setCashLoading] = useState(true);
-  var emptyCashForm = { description: '', amount: '', date: new Date().toISOString().slice(0,10), direction: 'Out' };
-  var [cashForm, setCashForm] = useState(emptyCashForm);
-  var [showCashForm, setShowCashForm] = useState(false);
-  var [cashSaving, setCashSaving] = useState(false);
 
   // Resources
   var [resources, setResources] = useState([]);
@@ -9176,28 +9375,14 @@ function FinancialsView({ navigate }) {
     }).then(function(r) { return r.json(); }).then(function(rows) { setItems(Array.isArray(rows) ? rows : []); setLoading(false); });
   }
 
-  function loadRentals() {
-    setRentalsLoading(true);
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=*&order=date.desc,id.desc', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) { setRentals(Array.isArray(rows) ? rows : []); setRentalsLoading(false); });
-  }
-
   useEffect(function() {
     loadReimbursements();
-    loadRentals();
     cachedSbFetch('2026 Volunteers', ['id', 'First Name', 'Last Name', 'Address', 'Status']).then(function(rows) {
       if (Array.isArray(rows)) setVolList(rows);
     });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas') + '?select=id,title,submitted_by', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) { if (Array.isArray(rows)) setIdeas(rows); });
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=*&order=date.desc,id.desc', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      if (Array.isArray(rows)) setCashLog(rows);
-      setCashLoading(false);
-    }).catch(function() { setCashLoading(false); });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?area=eq.Financials&select=*&order=created_at.asc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
@@ -9263,53 +9448,10 @@ function FinancialsView({ navigate }) {
     return [receiptUrl];
   }
 
-  function submitRental(e) {
-    e.preventDefault();
-    var finalName = rentalForm.name === 'Other' ? rentalForm.custom_name : rentalForm.name;
-    if (!finalName || !rentalForm.amount || !rentalForm.date) return;
-    setRentalSaving(true);
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals'), {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ name: finalName, amount: parseFloat(rentalForm.amount), date: rentalForm.date, payment_type: rentalForm.payment_type })
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      var newRow = (rows && rows[0]) ? rows[0] : { name: finalName, amount: parseFloat(rentalForm.amount), date: rentalForm.date, payment_type: rentalForm.payment_type };
-      setRentals(function(prev) { return [newRow].concat(prev); });
-      setRentalForm(emptyRentalForm);
-      setShowRentalForm(false);
-      setRentalSaving(false);
-    }).catch(function() { setRentalSaving(false); });
-  }
-
-  function submitCash(e) {
-    e.preventDefault();
-    if (!cashForm.description || !cashForm.amount || !cashForm.date) return;
-    setCashSaving(true);
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log'), {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ description: cashForm.description, amount: parseFloat(cashForm.amount), date: cashForm.date, direction: cashForm.direction })
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      var newRow = rows && rows[0] ? rows[0] : { description: cashForm.description, amount: parseFloat(cashForm.amount), date: cashForm.date, direction: cashForm.direction };
-      setCashLog(function(p) { return [newRow].concat(p); });
-      setCashForm(emptyCashForm); setShowCashForm(false); setCashSaving(false);
-    }).catch(function() { setCashSaving(false); });
-  }
-
-  function deleteCash(id) {
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?id=eq.' + id, {
-      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function() { setCashLog(function(p) { return p.filter(function(c) { return c.id !== id; }); }); });
-  }
-
-
   function fmt(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   var reimTotal = items.reduce(function(s, b) { return s + (parseFloat(b.amount) || 0); }, 0);
-  var rentTotal = rentals.reduce(function(s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
   var byArea = {};
   items.forEach(function(b) { var a = b.area || 'Unknown'; if (!byArea[a]) byArea[a] = []; byArea[a].push(b); });
-
-  var inpSt = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff', boxSizing: 'border-box' };
 
   return (
     <div>
@@ -9454,138 +9596,6 @@ function FinancialsView({ navigate }) {
           </div>
           </div>
         )}
-      </div>
-
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#2a2a2a', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>Office Cash Flow</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
-      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
-        <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Earnings</div>
-            {!rentalsLoading && rentals.length > 0 && <div style={{ fontSize: 12, color: '#059669', fontWeight: 600, marginTop: 2 }}>{fmt(rentTotal)} total · {rentals.length} entr{rentals.length !== 1 ? 'ies' : 'y'}</div>}
-          </div>
-          <button onClick={function() { setShowRentalForm(function(v) { return !v; }); }} style={{ fontSize: 12, background: showRentalForm ? '#f5f0ea' : gold, color: showRentalForm ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}>{showRentalForm ? 'Cancel' : '+ Log Earning'}</button>
-        </div>
-        {showRentalForm && (
-          <form onSubmit={submitRental} style={{ padding: '16px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fefcf8' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Rental Name</label>
-                <select name="name" value={rentalForm.name} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { name: e.target.value, custom_name: '' }); }); }} style={inpSt}>
-                  {RENTAL_NAMES.map(function(n) { return <option key={n} value={n}>{n}</option>; })}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Payment Type</label>
-                <select name="payment_type" value={rentalForm.payment_type} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { payment_type: e.target.value }); }); }} style={inpSt}>
-                  {PAYMENT_TYPES.map(function(p) { return <option key={p} value={p}>{p}</option>; })}
-                </select>
-              </div>
-            </div>
-            {rentalForm.name === 'Other' && (
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Specify Name</label>
-                <input required name="custom_name" value={rentalForm.custom_name} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { custom_name: e.target.value }); }); }} placeholder="Enter rental name" style={inpSt} />
-              </div>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <div>
-                <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Amount</label>
-                <input required name="amount" type="number" step="0.01" min="0" value={rentalForm.amount} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} placeholder="0.00" style={inpSt} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Date</label>
-                <input required name="date" type="date" value={rentalForm.date} onChange={function(e) { setRentalForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={inpSt} />
-              </div>
-            </div>
-            <button type="submit" disabled={rentalSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: rentalSaving ? 0.7 : 1 }}>{rentalSaving ? 'Saving…' : 'Save Earning'}</button>
-          </form>
-        )}
-        {rentalsLoading ? (
-          <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
-        ) : rentals.length === 0 ? (
-          <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No earnings logged yet.</div>
-        ) : rentals.map(function(r) {
-          return (
-            <div key={r.id || r.date + r.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, color: '#2a2a2a', fontWeight: 500 }}>{r.name}</div>
-                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{r.date}{r.payment_type ? ' · ' + r.payment_type : ''}</div>
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#059669', flexShrink: 0 }}>{fmt(parseFloat(r.amount) || 0)}</div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Expenditures / Cash Log */}
-      {(function() {
-        var cashIn = cashLog.filter(function(c) { return c.direction === 'In'; }).reduce(function(s, c) { return s + (parseFloat(c.amount) || 0); }, 0);
-        var cashOut = cashLog.filter(function(c) { return c.direction === 'Out'; }).reduce(function(s, c) { return s + (parseFloat(c.amount) || 0); }, 0);
-        return (
-          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
-            <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Expenditures</div>
-                {!cashLoading && cashLog.length > 0 && (
-                  <div style={{ fontSize: 12, marginTop: 2, display: 'flex', gap: 10 }}>
-                    {cashIn > 0 && <span style={{ color: '#059669', fontWeight: 600 }}>↑ {fmt(cashIn)}</span>}
-                    <span style={{ color: '#c62828', fontWeight: 600 }}>↓ {fmt(cashOut)}</span>
-                    {cashIn > 0 && <span style={{ color: '#888', fontWeight: 500 }}>Net {fmt(cashIn - cashOut)}</span>}
-                  </div>
-                )}
-              </div>
-              <button onClick={function() { setShowCashForm(function(v) { return !v; }); }} style={{ fontSize: 12, background: showCashForm ? '#f5f0ea' : gold, color: showCashForm ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 500 }}>{showCashForm ? 'Cancel' : '+ Log Cash'}</button>
-            </div>
-            {showCashForm && (
-              <form onSubmit={submitCash} style={{ padding: '14px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fefcf8' }}>
-                <div style={{ marginBottom: 10 }}>
-                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Description *</label>
-                  <input required value={cashForm.description} onChange={function(e) { setCashForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} placeholder="What is this for?" style={inpSt} />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
-                  <div>
-                    <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Amount *</label>
-                    <input required type="number" step="0.01" min="0" value={cashForm.amount} onChange={function(e) { setCashForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} placeholder="0.00" style={inpSt} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Date *</label>
-                    <input required type="date" value={cashForm.date} onChange={function(e) { setCashForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={inpSt} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Direction</label>
-                    <select value={cashForm.direction} onChange={function(e) { setCashForm(function(f) { return Object.assign({}, f, { direction: e.target.value }); }); }} style={inpSt}>
-                      <option value="Out">Cash Out</option>
-                      <option value="In">Cash In</option>
-                    </select>
-                  </div>
-                </div>
-                <button type="submit" disabled={cashSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: cashSaving ? 0.7 : 1 }}>{cashSaving ? 'Saving…' : 'Save'}</button>
-              </form>
-            )}
-            {cashLoading ? (
-              <div style={{ padding: '20px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
-            ) : cashLog.length === 0 ? (
-              <div style={{ padding: '20px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>No cash entries yet.</div>
-            ) : cashLog.map(function(c) {
-              var isIn = c.direction === 'In';
-              return (
-                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', borderBottom: '0.5px solid #f9f6f2' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: isIn ? '#ecfdf5' : '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, fontWeight: 700, color: isIn ? '#059669' : '#c62828' }}>{isIn ? '↑' : '↓'}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, color: '#2a2a2a' }}>{c.description}</div>
-                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{c.date}</div>
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: isIn ? '#059669' : '#c62828', flexShrink: 0 }}>{isIn ? '+' : '-'}{fmt(parseFloat(c.amount) || 0)}</div>
-                  <button onClick={function() { deleteCash(c.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}>×</button>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
-        </div>
       </div>
 
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
@@ -10295,6 +10305,7 @@ function AdminView({ navigate }) {
   var emailIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/><polyline points="2,18 8,13"/><polyline points="22,18 16,13"/></svg>;
   var checkIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
   var eventsIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+  var cashIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 6v0M18 6v0M6 18v0M18 18v0"/></svg>;
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Tools</div>
@@ -10346,6 +10357,15 @@ function AdminView({ navigate }) {
         >
           <span style={{ color: '#b5a185', flexShrink: 0 }}>{checkIcon}</span>
           Acknowledgments to Process
+        </div>
+        <div
+          onClick={function() { navigate('office-cash-flow'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{cashIcon}</span>
+          Office Cash Flow
         </div>
       </div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Outreach</div>
@@ -11958,6 +11978,7 @@ const views = {
   ideas: IdeasView,
   operational: OperationalView,
   financials: FinancialsView,
+  'office-cash-flow': OfficeCashFlowView,
   'financial-overview': FinancialOverviewView,
   reviews: ReviewsView,
   'quarter-workspace': QuarterWorkspaceView,
