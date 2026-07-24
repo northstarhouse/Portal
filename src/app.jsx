@@ -8144,6 +8144,7 @@ function FinancialOverviewView({ navigate }) {
   var [activeTab, setActiveTab] = useState('donations');
   var [expandedArea, setExpandedArea] = useState(null);
   var [expandedMonth, setExpandedMonth] = useState(null);
+  var [expandedSponsor, setExpandedSponsor] = useState(null);
   var [loading, setLoading] = useState(true);
   var [donations, setDonations] = useState([]);
   var [sponsors, setSponsors] = useState([]);
@@ -8287,7 +8288,7 @@ function FinancialOverviewView({ navigate }) {
 
   var TABS = [
     { id: 'donations', label: 'Donations' },
-    { id: 'sponsorships', label: 'In-Kind Sponsorships' },
+    { id: 'sponsorships', label: 'Sponsorships' },
     { id: 'operational', label: 'Operational Areas' },
     { id: 'cashflow', label: 'Office Cash Flow' },
     { id: 'outflow-detail', label: 'Spending Detail' },
@@ -8351,7 +8352,7 @@ function FinancialOverviewView({ navigate }) {
           {activeTab === 'sponsorships' && (
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>In-Kind Sponsorships</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Sponsorships</div>
               <button onClick={function() { navigate('sponsors'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>Edit on Sponsors page</button>
             </div>
             <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Current sponsors only, summed from each sponsor's tagged contributions (not year-filtered — sponsorships often span multiple years)</div>
@@ -8373,10 +8374,31 @@ function FinancialOverviewView({ navigate }) {
                 {stats.currentSponsors.map(function(sp) {
                   var entries = stats.sponsorEntriesBySponsor[sp.id] || [];
                   var total = entries.reduce(function(s, e) { return s + (parseFloat(e.value) || 0); }, 0);
+                  var isOpen = expandedSponsor === sp.id;
+                  var sortedEntries = entries.slice().sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
                   return (
-                    <div key={sp.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid #f9f6f2' }}>
-                      <span style={{ flex: 1, fontSize: 12, color: '#2a2a2a', fontWeight: 500 }}>{sp['Business Name'] || '—'}</span>
-                      <span style={{ width: 110, textAlign: 'right', fontSize: 12, fontWeight: 600, color: '#555' }}>{entries.length ? money(total) : '—'}</span>
+                    <div key={sp.id}>
+                      <div onClick={function() { setExpandedSponsor(isOpen ? null : sp.id); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid #f9f6f2', cursor: entries.length ? 'pointer' : 'default', background: isOpen ? '#faf8f4' : 'transparent' }}>
+                        <span style={{ flex: 1, fontSize: 12, color: '#2a2a2a', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {entries.length > 0 && <span style={{ fontSize: 10, color: '#bbb', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s', display: 'inline-block' }}>▶</span>}
+                          {sp['Business Name'] || '—'}
+                        </span>
+                        <span style={{ width: 110, textAlign: 'right', fontSize: 12, fontWeight: 600, color: '#555' }}>{entries.length ? money(total) : '—'}</span>
+                      </div>
+                      {isOpen && entries.length > 0 && (
+                        <div style={{ background: '#faf8f4', padding: '4px 0 8px 20px' }}>
+                          {sortedEntries.map(function(e, i) {
+                            return (
+                              <div key={e.id || i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < sortedEntries.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12 }}>
+                                <span style={{ width: 80, color: '#aaa', fontSize: 11 }}>{e.date || '—'}</span>
+                                <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: '#f3ede1', color: '#886c44', flexShrink: 0 }}>{e.contribution_type || 'Untagged'}</span>
+                                <span style={{ flex: 1, color: '#2a2a2a' }}>{e.description || '—'}</span>
+                                <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(e.value)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
