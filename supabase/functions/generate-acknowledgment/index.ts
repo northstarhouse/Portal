@@ -14,7 +14,12 @@ const GOOGLE_SERVICE_ACCOUNT_KEY = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY")!;
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  // x-app-token: the Portal's own login gate (installFetchGate in app.jsx) attaches this to
+  // every request aimed at *.supabase.co once a staff member is signed in -- omitting it here
+  // caused the browser to block the real request at the CORS-preflight stage before it was ever
+  // sent, while curl (which never sends this header) never hit the problem. That mismatch was
+  // the actual cause of "Failed to fetch" in the browser despite the function always working.
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-app-token",
 };
 
 const sbHeaders = (extra?: Record<string, string>) => ({
