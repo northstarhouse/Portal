@@ -3396,7 +3396,6 @@ function DonorsView({ navigate }) {
                     </th>
                     {[
                       {label:'Donor',k:'formal_name',align:'left'},
-                      {label:'Status',k:'status',align:'left'},
                       {label:'Tier',k:'tier',align:'left'},
                       {label:'This Year',k:'current_year_total',align:'right'},
                       {label:'Lifetime',k:'lifetime_total',align:'right'},
@@ -3437,11 +3436,6 @@ function DonorsView({ navigate }) {
                               {d.informal_first_name && <div style={{fontSize:11,color:'#999',marginTop:1}}>{d.informal_first_name}</div>}
                             </div>
                           </div>
-                        </td>
-                        <td style={{padding:'10px 14px'}}>
-                          <span style={{display:'inline-flex',padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,...(NSH_STATUS_PILLS[d.status]||{background:'#f3f4f6',color:'#6b7280'})}}>
-                            {NSH_STATUS_LABELS[d.status]||d.status}
-                          </span>
                         </td>
                         <td style={{padding:'10px 14px'}}>
                           {d.tier==='none'
