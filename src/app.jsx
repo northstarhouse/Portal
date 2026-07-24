@@ -8158,7 +8158,7 @@ function FinancialOverviewView({ navigate }) {
     Promise.all([
       fetchAllPages(SUPABASE_URL + '/rest/v1/donations?select=amount,date,type', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?select=*', hdrs),
-      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement,description,purchased_by,volunteer_name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?select=area,event,amount,date', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=amount,date,direction', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=amount,date,name', hdrs),
@@ -8250,10 +8250,10 @@ function FinancialOverviewView({ navigate }) {
 
   var outflowDetail = useMemo(function() {
     var purchaseRows = budget.filter(function(b) { return inYear(b.date) && b.type !== 'In-Kind'; }).map(function(b) {
-      return { source: 'Op Budget', area: b.area || 'Unassigned', description: b.description || '—', amount: parseFloat(b.amount) || 0, date: b.date };
+      return { source: 'Op Budget', area: b.area || 'Unassigned', description: b.description || '—', by: b.purchased_by || (b.needs_reimbursement ? b.volunteer_name : null), amount: parseFloat(b.amount) || 0, date: b.date };
     });
     var cashOutRows = cashLog.filter(function(c) { return inYear(c.date) && c.direction === 'Out'; }).map(function(c) {
-      return { source: 'Cash Log', area: 'Office', description: c.description || '—', amount: parseFloat(c.amount) || 0, date: c.date };
+      return { source: 'Cash Log', area: 'Office', description: c.description || '—', by: null, amount: parseFloat(c.amount) || 0, date: c.date };
     });
     var all = purchaseRows.concat(cashOutRows);
 
@@ -8402,9 +8402,9 @@ function FinancialOverviewView({ navigate }) {
               var remaining = hasAllocated ? r.allocated - r.purchases : null;
               var isOpen = expandedArea === r.area;
               var areaItems = budget.filter(function(b) { return inYear(b.date) && (b.area || 'Unassigned') === r.area; })
-                .map(function(b) { return { kind: b.type === 'In-Kind' ? 'In-Kind' : 'Purchase', description: b.description || '—', amount: parseFloat(b.amount) || 0, date: b.date }; })
+                .map(function(b) { return { kind: b.type === 'In-Kind' ? 'In-Kind' : 'Purchase', description: b.description || '—', by: b.purchased_by || (b.needs_reimbursement ? b.volunteer_name : null), amount: parseFloat(b.amount) || 0, date: b.date }; })
                 .concat(earnings.filter(function(e) { return inYear(e.date) && (e.area || 'Unassigned') === r.area; })
-                  .map(function(e) { return { kind: 'Earning', description: e.event || '—', amount: parseFloat(e.amount) || 0, date: e.date }; }))
+                  .map(function(e) { return { kind: 'Earning', description: e.event || '—', by: null, amount: parseFloat(e.amount) || 0, date: e.date }; }))
                 .sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
               var kindColors = { Purchase: { bg: '#fdf0e6', color: '#c07040' }, 'In-Kind': { bg: '#f3ede1', color: '#886c44' }, Earning: { bg: '#eaf4ea', color: '#5a8a5a' } };
               return (
@@ -8432,7 +8432,10 @@ function FinancialOverviewView({ navigate }) {
                           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < areaItems.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12 }}>
                             <span style={{ width: 80, color: '#aaa', fontSize: 11 }}>{item.date || '—'}</span>
                             <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: kc.bg, color: kc.color, flexShrink: 0 }}>{item.kind}</span>
-                            <span style={{ flex: 1, color: '#2a2a2a' }}>{item.description}</span>
+                            <span style={{ flex: 1, color: '#2a2a2a' }}>
+                              {item.description}
+                              {item.by && <span style={{ color: '#aaa', fontSize: 11 }}> · {item.by}</span>}
+                            </span>
                             <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(item.amount)}</span>
                           </div>
                         );
@@ -8510,7 +8513,7 @@ function FinancialOverviewView({ navigate }) {
                   <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 18px', borderBottom: '0.5px solid #f9f6f2', fontSize: 12, background: r.possibleDuplicate ? '#fffaf0' : 'transparent' }}>
                     <span style={{ width: 90, color: '#888' }}>{r.date || '—'}</span>
                     <span style={{ width: 110, color: '#555' }}>{r.area}</span>
-                    <span style={{ flex: 1, color: '#2a2a2a' }}>{r.description}{r.possibleDuplicate && <span title="Matches another entry exactly (same area/description/amount/date)" style={{ marginLeft: 6, fontSize: 11, color: '#b45309', fontWeight: 600 }}>⚠ possible duplicate</span>}</span>
+                    <span style={{ flex: 1, color: '#2a2a2a' }}>{r.description}{r.by && <span style={{ color: '#aaa', fontSize: 11 }}> · {r.by}</span>}{r.possibleDuplicate && <span title="Matches another entry exactly (same area/description/amount/date)" style={{ marginLeft: 6, fontSize: 11, color: '#b45309', fontWeight: 600 }}>⚠ possible duplicate</span>}</span>
                     <span style={{ width: 70, fontSize: 11, color: '#aaa' }}>{r.source}</span>
                     <span style={{ width: 90, textAlign: 'right', fontWeight: 600, color: '#c07040' }}>{money(r.amount)}</span>
                   </div>
