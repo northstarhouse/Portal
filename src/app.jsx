@@ -8430,6 +8430,7 @@ function FinancialOverviewView({ navigate }) {
   var [year, setYear] = useState(thisYear);
   var [activeTab, setActiveTab] = useState('donations');
   var [expandedArea, setExpandedArea] = useState(null);
+  var [expandedEvent, setExpandedEvent] = useState(null);
   var [expandedMonth, setExpandedMonth] = useState(null);
   var [expandedSponsor, setExpandedSponsor] = useState(null);
   var [expandedEarningCat, setExpandedEarningCat] = useState(null);
@@ -8453,7 +8454,7 @@ function FinancialOverviewView({ navigate }) {
       fetchAllPages(SUPABASE_URL + '/rest/v1/donations?select=amount,date,type,donor_id,payment_type,acknowledged,donation_notes', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/donors?select=id,formal_name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?select=*', hdrs),
-      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement,description,purchased_by,volunteer_name', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement,description,purchased_by,volunteer_name,event_name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?select=area,event,amount,date', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=amount,date,direction,description', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=amount,date,name', hdrs),
@@ -8573,6 +8574,38 @@ function FinancialOverviewView({ navigate }) {
     return m;
   }, [donorsList]);
 
+  var eventsStats = useMemo(function() {
+    var yearEventBudget = budget.filter(function(b) { return inYear(b.date) && b.area === 'Events'; });
+    var yearEventEarnings = earnings.filter(function(e) { return inYear(e.date) && e.area === 'Events'; });
+    var byEvent = {};
+    function eventBucket(name) {
+      var key = name || 'Unassigned / General Events';
+      if (!byEvent[key]) byEvent[key] = { event: key, expenses: 0, inKind: 0, earnings: 0 };
+      return byEvent[key];
+    }
+    yearEventBudget.forEach(function(b) {
+      var amt = parseFloat(b.amount) || 0;
+      if (b.type === 'In-Kind') eventBucket(b.event_name).inKind += amt;
+      else eventBucket(b.event_name).expenses += amt;
+    });
+    yearEventEarnings.forEach(function(e) { eventBucket(e.event).earnings += parseFloat(e.amount) || 0; });
+    var eventRows = Object.keys(byEvent).map(function(k) { return byEvent[k]; }).map(function(r) {
+      return Object.assign(r, { profit: r.earnings - r.expenses });
+    }).sort(function(a, b) { return b.earnings - a.earnings; });
+    var totalExpenses = eventRows.reduce(function(s, r) { return s + r.expenses; }, 0);
+    var totalEarnings = eventRows.reduce(function(s, r) { return s + r.earnings; }, 0);
+    var totalInKind = eventRows.reduce(function(s, r) { return s + r.inKind; }, 0);
+    return { eventRows: eventRows, totalExpenses: totalExpenses, totalEarnings: totalEarnings, totalInKind: totalInKind, totalProfit: totalEarnings - totalExpenses };
+  }, [budget, earnings, year]);
+
+  function computeEventItems(eventName) {
+    return budget.filter(function(b) { return inYear(b.date) && b.area === 'Events' && (b.event_name || 'Unassigned / General Events') === eventName; })
+      .map(function(b) { return { kind: b.type === 'In-Kind' ? 'In-Kind' : 'Expense', description: b.description || '—', by: b.purchased_by || (b.needs_reimbursement ? b.volunteer_name : null), amount: parseFloat(b.amount) || 0, date: b.date }; })
+      .concat(earnings.filter(function(e) { return inYear(e.date) && e.area === 'Events' && (e.event || 'Unassigned / General Events') === eventName; })
+        .map(function(e) { return { kind: 'Earning', description: e.event || '—', by: null, amount: parseFloat(e.amount) || 0, date: e.date }; }))
+      .sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+  }
+
   var outflowDetail = useMemo(function() {
     var purchaseRows = budget.filter(function(b) { return inYear(b.date) && b.type !== 'In-Kind'; }).map(function(b) {
       return { source: 'Op Budget', area: b.area || 'Unassigned', description: b.description || '—', by: b.purchased_by || (b.needs_reimbursement ? b.volunteer_name : null), amount: parseFloat(b.amount) || 0, date: b.date };
@@ -8613,6 +8646,7 @@ function FinancialOverviewView({ navigate }) {
     { id: 'donations', label: 'Donations' },
     { id: 'sponsorships', label: 'Sponsorships' },
     { id: 'operational', label: 'Operational Areas' },
+    { id: 'events', label: 'Events' },
     { id: 'cashflow', label: 'Office Cash Flow' },
     { id: 'outflow-detail', label: 'Spending Detail' },
   ];
@@ -8657,6 +8691,18 @@ function FinancialOverviewView({ navigate }) {
         sheets.push({ name: r.area, headers: ['Date', 'Kind', 'Description', 'By', 'Amount'], rows: areaRows });
       });
       downloadXlsxMultiSheet(sheets, 'operational-areas-' + year + '.xlsx');
+    } else if (activeTab === 'events') {
+      var overviewRows = eventsStats.eventRows.map(function(r) {
+        return { Event: r.event, Expenses: r.expenses, Earnings: r.earnings, 'In-Kind': r.inKind, 'Profit / Loss': r.profit };
+      });
+      var sheets = [{ name: 'Overview', headers: ['Event', 'Expenses', 'Earnings', 'In-Kind', 'Profit / Loss'], rows: overviewRows }];
+      eventsStats.eventRows.forEach(function(r) {
+        var itemRows = computeEventItems(r.event).map(function(item) {
+          return { Date: item.date || '', Kind: item.kind, Description: item.description, By: item.by || '', Amount: item.amount };
+        });
+        sheets.push({ name: r.event, headers: ['Date', 'Kind', 'Description', 'By', 'Amount'], rows: itemRows });
+      });
+      downloadXlsxMultiSheet(sheets, 'events-' + year + '.xlsx');
     } else if (activeTab === 'cashflow') {
       var rows = rentals.filter(function(r) { return inYear(r.date); }).map(function(r) {
         return { Date: r.date || '', Source: 'Earning', Category: r.name || 'Other', Direction: 'In', Amount: parseFloat(r.amount) || 0 };
@@ -8850,6 +8896,70 @@ function FinancialOverviewView({ navigate }) {
                         var kc = kindColors[item.kind];
                         return (
                           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < areaItems.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12 }}>
+                            <span style={{ width: 80, color: '#aaa', fontSize: 11 }}>{item.date || '—'}</span>
+                            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: kc.bg, color: kc.color, flexShrink: 0 }}>{item.kind}</span>
+                            <span style={{ flex: 1, color: '#2a2a2a' }}>
+                              {item.description}
+                              {item.by && <span style={{ color: '#aaa', fontSize: 11 }}> · {item.by}</span>}
+                            </span>
+                            <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(item.amount)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          </div>
+          )}
+
+          {activeTab === 'events' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            <div style={card}><div style={cardLabel}>Event Revenue</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(eventsStats.totalEarnings)}</div></div>
+            <div style={card}><div style={cardLabel}>Event Expenses</div><div style={{ ...cardValue, color: '#c07040' }}>{money(eventsStats.totalExpenses)}</div></div>
+            <div style={card}><div style={cardLabel}>Net Profit / Loss</div><div style={{ ...cardValue, color: eventsStats.totalProfit >= 0 ? '#2e7d32' : '#c62828' }}>{eventsStats.totalProfit >= 0 ? '' : '-'}{money(Math.abs(eventsStats.totalProfit))}</div></div>
+            <div style={card}><div style={cardLabel}>Event In-Kind</div><div style={{ ...cardValue, color: '#886c44' }}>{money(eventsStats.totalInKind)}</div></div>
+          </div>
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Events — {year}</div>
+            <div style={{ display: 'flex', gap: 10, padding: '8px 18px 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>
+              <span style={{ flex: 1 }}>Event</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Expenses</span>
+              <span style={{ width: 90, textAlign: 'right' }}>Earnings</span>
+              <span style={{ width: 90, textAlign: 'right' }}>In-Kind</span>
+              <span style={{ width: 100, textAlign: 'right' }}>Profit / Loss</span>
+            </div>
+            {eventsStats.eventRows.length === 0 ? (
+              <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>No event budget or earnings activity recorded for {year}.</div>
+            ) : eventsStats.eventRows.map(function(r) {
+              var isOpen = expandedEvent === r.event;
+              var eventItems = computeEventItems(r.event);
+              var kindColors = { Expense: { bg: '#fdf0e6', color: '#c07040' }, 'In-Kind': { bg: '#f3ede1', color: '#886c44' }, Earning: { bg: '#eaf4ea', color: '#5a8a5a' } };
+              return (
+                <div key={r.event}>
+                  <div onClick={function() { setExpandedEvent(isOpen ? null : r.event); }} style={{ display: 'flex', gap: 10, padding: '9px 18px', borderBottom: '0.5px solid #f9f6f2', fontSize: 12, cursor: 'pointer', background: isOpen ? '#faf8f4' : 'transparent' }}>
+                    <span style={{ flex: 1, fontWeight: 500, color: '#2a2a2a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 10, color: '#bbb', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s', display: 'inline-block' }}>▶</span>
+                      {r.event}
+                    </span>
+                    <span style={{ width: 90, textAlign: 'right', color: '#c07040' }}>{r.expenses ? money(r.expenses) : '—'}</span>
+                    <span style={{ width: 90, textAlign: 'right', color: '#5a8a5a' }}>{r.earnings ? money(r.earnings) : '—'}</span>
+                    <span style={{ width: 90, textAlign: 'right', color: '#886c44' }}>{r.inKind ? money(r.inKind) : '—'}</span>
+                    <span style={{ width: 100, textAlign: 'right', fontWeight: 700, color: r.profit >= 0 ? '#2e7d32' : '#c62828' }}>
+                      {r.profit >= 0 ? '' : '-'}{money(Math.abs(r.profit))}
+                    </span>
+                  </div>
+                  {isOpen && (
+                    <div style={{ background: '#faf8f4', padding: '4px 18px 12px 42px', borderBottom: '0.5px solid #f9f6f2' }}>
+                      {eventItems.length === 0 ? (
+                        <div style={{ fontSize: 11, color: '#bbb', padding: '8px 0' }}>No line items for {r.event} in {year}.</div>
+                      ) : eventItems.map(function(item, i) {
+                        var kc = kindColors[item.kind];
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < eventItems.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12 }}>
                             <span style={{ width: 80, color: '#aaa', fontSize: 11 }}>{item.date || '—'}</span>
                             <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: kc.bg, color: kc.color, flexShrink: 0 }}>{item.kind}</span>
                             <span style={{ flex: 1, color: '#2a2a2a' }}>
