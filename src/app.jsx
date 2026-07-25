@@ -8455,7 +8455,7 @@ function FinancialOverviewView({ navigate }) {
       fetchAllPages(SUPABASE_URL + '/rest/v1/donors?select=id,formal_name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?select=*', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement,description,purchased_by,volunteer_name,event_name', hdrs),
-      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?select=area,event,amount,date', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Earnings') + '?select=area,event,earning_source,amount,date', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Cash Log') + '?select=amount,date,direction,description', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Creative Rentals') + '?select=amount,date,name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?select=*', hdrs)
@@ -8602,7 +8602,7 @@ function FinancialOverviewView({ navigate }) {
     return budget.filter(function(b) { return inYear(b.date) && b.area === 'Events' && (b.event_name || 'Unassigned / General Events') === eventName; })
       .map(function(b) { return { kind: b.type === 'In-Kind' ? 'In-Kind' : 'Expense', description: b.description || '—', by: b.purchased_by || (b.needs_reimbursement ? b.volunteer_name : null), amount: parseFloat(b.amount) || 0, date: b.date }; })
       .concat(earnings.filter(function(e) { return inYear(e.date) && e.area === 'Events' && (e.event || 'Unassigned / General Events') === eventName; })
-        .map(function(e) { return { kind: 'Earning', description: e.event || '—', by: null, amount: parseFloat(e.amount) || 0, date: e.date }; }))
+        .map(function(e) { return { kind: 'Earning', description: e.earning_source || '—', by: null, amount: parseFloat(e.amount) || 0, date: e.date }; }))
       .sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
   }
 
