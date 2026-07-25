@@ -11859,13 +11859,21 @@ function VenueRentalsView() {
       <div style={{ fontSize: 13, color: '#aaa', marginBottom: 16 }}>Wedding tracking and post-event checklist</div>
 
       {!loading && !calError && (function() {
+        var SECURITY_DEPOSIT = 800;
         var withCost = visible.filter(function(w) { return getTrack(w.uid).total_cost != null; });
         var total = withCost.reduce(function(s, w) { return s + (parseFloat(getTrack(w.uid).total_cost) || 0); }, 0);
+        var netTotal = total - (withCost.length * SECURITY_DEPOSIT);
         if (withCost.length === 0) return null;
         return (
-          <div style={{ display: 'inline-block', background: '#eaf4ea', border: '0.5px solid #a5d6a7', borderRadius: 10, padding: '10px 16px', marginBottom: 16 }}>
-            <span style={{ fontSize: 11, color: '#5a8a5a', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>Total Cost — {withCost.length} event{withCost.length !== 1 ? 's' : ''} tracked</span>
-            <div style={{ fontSize: 19, fontWeight: 700, color: '#2e7d32', marginTop: 2 }}>${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'inline-block', background: '#eaf4ea', border: '0.5px solid #a5d6a7', borderRadius: 10, padding: '10px 16px' }}>
+              <span style={{ fontSize: 11, color: '#5a8a5a', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>Total Cost — {withCost.length} event{withCost.length !== 1 ? 's' : ''} tracked</span>
+              <div style={{ fontSize: 19, fontWeight: 700, color: '#2e7d32', marginTop: 2 }}>${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div style={{ display: 'inline-block', background: '#faf8f4', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '10px 16px' }}>
+              <span style={{ fontSize: 11, color: '#8a7a5c', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8 }}>Total Minus Security Deposits (${SECURITY_DEPOSIT}/event)</span>
+              <div style={{ fontSize: 19, fontWeight: 700, color: '#886c44', marginTop: 2 }}>${netTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
           </div>
         );
       })()}
