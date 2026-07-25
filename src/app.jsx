@@ -11778,8 +11778,8 @@ function VenueRentalsView() {
                   {'$' + parseFloat(t.total_cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               ) : (
-                <span onClick={function() { setEditingField({ uid: w.uid, field: 'cost', val: '' }); }} style={{ fontSize: 12, color: '#bbb', cursor: 'pointer', fontStyle: 'italic' }}>
-                  + total cost
+                <span onClick={function() { setEditingField({ uid: w.uid, field: 'cost', val: '' }); }} title="Add total cost" style={{ fontSize: 13, fontWeight: 600, color: '#bbb', cursor: 'pointer' }}>
+                  —
                 </span>
               )}
               {allDone && <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', padding: '1px 8px', borderRadius: 20 }}>Complete</span>}
