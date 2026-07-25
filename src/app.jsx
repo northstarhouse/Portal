@@ -11765,6 +11765,23 @@ function VenueRentalsView() {
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{w.title}</div>
+              {(editingField && editingField.uid === w.uid && editingField.field === 'cost') ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 13, fontWeight: 600, color: '#2e7d32' }}>
+                  $<input autoFocus type="number" step="0.01" min="0" value={editingField.val}
+                    onChange={function(e) { setEditingField(function(ef) { return Object.assign({}, ef, { val: e.target.value }); }); }}
+                    onKeyDown={function(e) { if (e.key === 'Enter') { handleCostChange(w.uid, w.title, w.date, editingField.val); setEditingField(null); } if (e.key === 'Escape') setEditingField(null); }}
+                    onBlur={function() { handleCostChange(w.uid, w.title, w.date, editingField.val); setEditingField(null); }}
+                    style={{ border: 'none', borderBottom: '1px solid #a5d6a7', background: 'transparent', outline: 'none', fontSize: 13, fontWeight: 600, color: '#2e7d32', width: 80 }} />
+                </span>
+              ) : t.total_cost != null ? (
+                <span onClick={function() { setEditingField({ uid: w.uid, field: 'cost', val: t.total_cost != null ? String(t.total_cost) : '' }); }} title="Edit total cost" style={{ fontSize: 13, fontWeight: 600, color: '#2e7d32', cursor: 'pointer' }}>
+                  {'$' + parseFloat(t.total_cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              ) : (
+                <span onClick={function() { setEditingField({ uid: w.uid, field: 'cost', val: '' }); }} style={{ fontSize: 12, color: '#bbb', cursor: 'pointer', fontStyle: 'italic' }}>
+                  + total cost
+                </span>
+              )}
               {allDone && <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', padding: '1px 8px', borderRadius: 20 }}>Complete</span>}
               {isSaving && <span style={{ fontSize: 10, color: '#bbb' }}>saving…</span>}
               <button onClick={function() { if (window.confirm('Remove "' + w.title + '" from this list?')) dismissWedding(w); }} title="Remove duplicate" style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: 16, lineHeight: 1, padding: '0 2px' }}>×</button>
@@ -11819,28 +11836,6 @@ function VenueRentalsView() {
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: '0.5px dashed #d0c8bc', borderRadius: 20, padding: '4px 12px', fontSize: 12, color: '#bbb', cursor: 'pointer' }}>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                   Photo Album
-                </button>
-              )}
-              {(editingField && editingField.uid === w.uid && editingField.field === 'cost') ? (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#eaf4ea', border: '0.5px solid #a5d6a7', borderRadius: 20, padding: '3px 12px' }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#2e7d32' }}>$</span>
-                  <input autoFocus type="number" step="0.01" min="0" value={editingField.val}
-                    onChange={function(e) { setEditingField(function(ef) { return Object.assign({}, ef, { val: e.target.value }); }); }}
-                    onKeyDown={function(e) { if (e.key === 'Enter') { handleCostChange(w.uid, w.title, w.date, editingField.val); setEditingField(null); } if (e.key === 'Escape') setEditingField(null); }}
-                    onBlur={function() { handleCostChange(w.uid, w.title, w.date, editingField.val); setEditingField(null); }}
-                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 12, fontWeight: 600, color: '#2e7d32', width: 90 }} />
-                </div>
-              ) : t.total_cost != null ? (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#eaf4ea', border: '0.5px solid #a5d6a7', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: '#2e7d32', whiteSpace: 'nowrap' }}>
-                    {'$' + parseFloat(t.total_cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                  <button onClick={function() { setEditingField({ uid: w.uid, field: 'cost', val: t.total_cost != null ? String(t.total_cost) : '' }); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: 13, padding: '0 2px', lineHeight: 1 }}>✎</button>
-                </div>
-              ) : (
-                <button onClick={function() { setEditingField({ uid: w.uid, field: 'cost', val: '' }); }}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: '0.5px dashed #d0c8bc', borderRadius: 20, padding: '4px 12px', fontSize: 12, color: '#bbb', cursor: 'pointer' }}>
-                  Total Cost
                 </button>
               )}
             </div>
