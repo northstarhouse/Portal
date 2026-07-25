@@ -454,6 +454,8 @@ const typeColors = {
   const [iheAdding, setIheAdding] = useState(false);
   const [iheSaving, setIheSaving] = useState(false);
   const [activity, setActivity] = useState(null);
+  const [vaEvent, setVaEvent] = useState(null);
+  const [vaResponses, setVaResponses] = useState(null);
   var isMobile = React.useContext(MobileCtx);
   useEffect(function() {
     cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']).then(function(rows) {
@@ -510,6 +512,16 @@ const typeColors = {
     }).then(function(r) { return r.json(); }).then(function(rows) {
       setActivity(Array.isArray(rows) ? rows : []);
     }).catch(function() { setActivity([]); });
+    fetch(SUPABASE_URL + '/rest/v1/vol_events?title=ilike.*Appreciation*&select=id,title,date,time&order=date.desc&limit=1', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var ev = Array.isArray(rows) && rows[0] ? rows[0] : null;
+      setVaEvent(ev);
+      if (!ev) { setVaResponses([]); return; }
+      return fetch(SUPABASE_URL + '/rest/v1/vol_event_responses?event_id=eq.' + ev.id + '&select=name,response,created_at&order=created_at.asc', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function(r) { return r.json(); }).then(function(resp) { setVaResponses(Array.isArray(resp) ? resp : []); });
+    }).catch(function() { setVaEvent(null); setVaResponses([]); });
     fetchCalendarEvents().then(function(events) {
       var now = new Date();
       var windowEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
@@ -554,6 +566,60 @@ const typeColors = {
             <div style={{ fontSize: 14, color: '#c0392b' }}>⚠</div>
             <div style={{ fontSize: 12, fontWeight: 500, color: "#c0392b", fontStyle: 'italic' }}>Quarterly Update Due — {dueStr}</div>
             <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 600, color: '#c0392b', flexShrink: 0 }}>{label} →</div>
+          </div>
+        );
+      })()}
+
+      {(function() {
+        if (!vaEvent || vaResponses === null) return null;
+        var todayStr = new Date().toISOString().slice(0, 10);
+        if (vaEvent.date && todayStr > vaEvent.date) return null;
+        var byName = {};
+        vaResponses.forEach(function(r) {
+          var key = (r.name || '').trim().toLowerCase();
+          if (!key) return;
+          if (!byName[key] || r.created_at > byName[key].created_at) byName[key] = r;
+        });
+        var deduped = Object.keys(byName).map(function(k) { return byName[k]; }).sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+        var headcount = deduped.reduce(function(s, r) {
+          var m = (r.response || '').match(/\+(\d+)/);
+          return s + 1 + (m ? parseInt(m[1]) : 0);
+        }, 0);
+        var dateStr = vaEvent.date ? new Date(vaEvent.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '';
+        return (
+          <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '16px 18px', marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: gold, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                  {vaEvent.title} — RSVPs
+                </div>
+                <div style={{ fontSize: 12, color: '#999', marginTop: 3 }}>{dateStr}{vaEvent.time ? ' · ' + vaEvent.time : ''}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: gold }}>{deduped.length}</div>
+                  <div style={{ fontSize: 10, color: '#999', textTransform: 'uppercase', letterSpacing: 0.6 }}>RSVPs</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: gold }}>{headcount}</div>
+                  <div style={{ fontSize: 10, color: '#999', textTransform: 'uppercase', letterSpacing: 0.6 }}>Headcount</div>
+                </div>
+              </div>
+            </div>
+            {deduped.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>No RSVPs yet.</div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {deduped.map(function(r, i) {
+                  return (
+                    <span key={i} style={{ fontSize: 12, background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 20, padding: '4px 12px', color: '#3a3226' }}>
+                      {r.name}{/\+\d+/.test(r.response || '') ? <span style={{ color: gold, fontWeight: 600 }}> {r.response.match(/\+\d+/)[0]}</span> : null}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })()}
