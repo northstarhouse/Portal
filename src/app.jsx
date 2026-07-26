@@ -456,6 +456,7 @@ const typeColors = {
   const [activity, setActivity] = useState(null);
   const [vaEvent, setVaEvent] = useState(null);
   const [vaResponses, setVaResponses] = useState(null);
+  const [vaShowDeclined, setVaShowDeclined] = useState(false);
   var isMobile = React.useContext(MobileCtx);
   useEffect(function() {
     cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']).then(function(rows) {
@@ -581,10 +582,13 @@ const typeColors = {
           if (!byName[key] || r.created_at > byName[key].created_at) byName[key] = r;
         });
         var deduped = Object.keys(byName).map(function(k) { return byName[k]; }).sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
-        var headcount = deduped.reduce(function(s, r) {
+        var attending = deduped.filter(function(r) { return /^attending/i.test((r.response || '').trim()); });
+        var declined = deduped.filter(function(r) { return !/^attending/i.test((r.response || '').trim()); });
+        var headcount = attending.reduce(function(s, r) {
           var m = (r.response || '').match(/\+(\d+)/);
           return s + 1 + (m ? parseInt(m[1]) : 0);
         }, 0);
+        var shownList = vaShowDeclined ? declined : attending;
         var dateStr = vaEvent.date ? new Date(vaEvent.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : '';
         return (
           <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '16px 18px', marginBottom: 24 }}>
@@ -598,7 +602,7 @@ const typeColors = {
               </div>
               <div style={{ display: 'flex', gap: 16 }}>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: gold }}>{deduped.length}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: gold }}>{attending.length}</div>
                   <div style={{ fontSize: 10, color: '#999', textTransform: 'uppercase', letterSpacing: 0.6 }}>RSVPs</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
@@ -607,13 +611,19 @@ const typeColors = {
                 </div>
               </div>
             </div>
-            {deduped.length === 0 ? (
-              <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>No RSVPs yet.</div>
+            {declined.length > 0 && (
+              <button onClick={function() { setVaShowDeclined(function(v) { return !v; }); }}
+                style={{ marginBottom: 12, background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '5px 12px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>
+                {vaShowDeclined ? "← Show who's coming (" + attending.length + ')' : "Show who can't make it (" + declined.length + ')'}
+              </button>
+            )}
+            {shownList.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>{vaShowDeclined ? "No one has said they can't make it." : 'No RSVPs yet.'}</div>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {deduped.map(function(r, i) {
+                {shownList.map(function(r, i) {
                   return (
-                    <span key={i} style={{ fontSize: 12, background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 20, padding: '4px 12px', color: '#3a3226' }}>
+                    <span key={i} style={{ fontSize: 12, background: vaShowDeclined ? '#fdf2f2' : '#faf8f4', border: '0.5px solid ' + (vaShowDeclined ? '#f0d5d5' : '#e8e0d5'), borderRadius: 20, padding: '4px 12px', color: '#3a3226' }}>
                       {r.name}{/\+\d+/.test(r.response || '') ? <span style={{ color: gold, fontWeight: 600 }}> {r.response.match(/\+\d+/)[0]}</span> : null}
                     </span>
                   );
