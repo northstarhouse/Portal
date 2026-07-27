@@ -11663,6 +11663,7 @@ function AcknowledgmentsQueueView({ navigate }) {
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
         <button onClick={function(){navigate('donors');}} style={{background:'none',border:'none',fontSize:16,cursor:'pointer',color:'#aaa',padding:0}}>←</button>
         <div style={{fontSize:18,fontWeight:600,color:'#2a2a2a'}}>Acknowledgments to Process</div>
+        <button onClick={function(){navigate('acknowledgment-templates');}} style={{marginLeft:'auto',padding:'6px 14px',background:'none',border:'0.5px solid #e0d8cc',color:gold,borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer'}}>Acknowledgment Templates</button>
       </div>
 
       <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8,marginBottom:14}}>
