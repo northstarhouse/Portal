@@ -4213,30 +4213,19 @@ function DonorsView({ navigate }) {
 }
 
 var POSTING_SCHEDULE = [
-  { week: 'First Week', days: [
-    { day: 'Monday', task: 'Wedding Posting + scheduling for the month', prompt: "Write a warm caption featuring a real couple who got married at North Star House. Include one specific, vivid detail from their day (a moment during the ceremony, the weather, a detail in the decor, something a guest said). End with a soft invitation for other couples to inquire about booking. Also: block time today to schedule out the rest of this month's posts." },
-    { day: 'Tuesday', task: 'Testimonial or Small History', prompt: "Share a small, fun piece of North Star House history that hasn't been posted before — something specific: a quirky detail about the house's design or construction, a past owner or resident, a local legend, or an odd fact uncovered during restoration. Keep it short and conversational, like telling a friend something they didn't know." },
-    { day: 'Thursday', task: 'Monthly email send out', prompt: "Send this month's newsletter: recap one or two highlights from last month, preview what's coming up this month (events, weddings, restoration progress), and include one clear call-to-action (volunteer, donate, or book a tour)." },
-    { day: 'Friday', task: 'Volunteer Outreach - Events', prompt: "Write a volunteer recruitment post for upcoming events. Name a specific upcoming event, describe what helping out actually looks like day-of, and give a clear next step to sign up." },
-  ] },
-  { week: 'Second Week', days: [
-    { day: 'Monday', task: 'Sponsor Spotlight', prompt: "Write a sponsor spotlight for one current business sponsor. Say what their business does, how they've supported North Star House, and thank them by name. Tag their business page." },
-    { day: 'Tuesday', task: 'Upcoming Event / Tours', prompt: "Promote an upcoming public event or estate tour. Include what it is, the date/time, and how to RSVP or book." },
-    { day: 'Thursday', task: 'Planning Update', prompt: "Share a behind-the-scenes update on something the board or staff are currently planning — a project taking shape, a goal being worked toward, or a decision in progress. Keep it honest and specific, not vague." },
-    { day: 'Friday', task: 'Volunteer Outreach - Restoration', prompt: "Write a volunteer recruitment post for restoration/construction work. Mention what's currently being worked on, what skills or experience help (if any), and how to get involved." },
-  ] },
-  { week: 'Third Week', days: [
-    { day: 'Monday', task: 'Upcoming Event or Wedding', prompt: "Write a caption promoting an upcoming event or featuring a recent wedding at North Star House — a specific detail, not generic. End with a call-to-action (RSVP, inquire, book a tour)." },
-    { day: 'Tuesday', task: 'OPEN' },
-    { day: 'Thursday', task: 'History Update', prompt: "Share a piece of North Star House history — the architecture, a past resident, a restoration milestone, or an old photo with context on what's changed. Make it something that hasn't been posted before." },
-    { day: 'Friday', task: 'Volunteer Outreach - Garden', prompt: "Write a volunteer recruitment post for the grounds/garden team. Mention what's currently blooming or needs tending, and how to join." },
-  ] },
-  { week: 'Fourth Week', days: [
-    { day: 'Monday', task: 'OPEN' },
-    { day: 'Tuesday', task: 'Restoration Video', prompt: "Post a short video clip of restoration work in progress — before/after, a craftsperson at work, or a quick time-lapse. Caption should explain what viewers are looking at and why it matters." },
-    { day: 'Thursday', task: 'Development / Board Update', prompt: "Share an update on fundraising progress, a new board initiative, or an organizational milestone. Be specific about numbers or outcomes where you can." },
-    { day: 'Friday', task: 'Volunteer Outreach - Docents', prompt: "Write a volunteer recruitment post for docents. Mention what leading a tour involves, what training is provided, and how to apply." },
-  ] },
+  { key: 'wedding-post', task: 'Wedding Post', prompt: "Write a warm caption featuring a real couple who got married at North Star House. Include one specific, vivid detail from their day (a moment during the ceremony, the weather, a detail in the decor, something a guest said). End with a soft invitation for other couples to inquire about booking." },
+  { key: 'history-testimonial', task: 'History or Testimonial', prompt: "Share a small, fun piece of North Star House history that hasn't been posted before — something specific: a quirky detail about the house's design or construction, a past owner or resident, a local legend, or an odd fact uncovered during restoration. Keep it short and conversational, like telling a friend something they didn't know. (Or swap in a guest/couple testimonial if one's on hand.)" },
+  { key: 'newsletter-send', task: 'Newsletter Send Out', prompt: "Send this month's newsletter: recap one or two highlights from last month, preview what's coming up this month (events, weddings, restoration progress), and include one clear call-to-action (volunteer, donate, or book a tour)." },
+  { key: 'join-newsletter', task: 'Join Our Newsletter', prompt: "Write a short post inviting people to join the North Star House newsletter. Give them a real reason to sign up (first look at events, behind-the-scenes restoration updates, etc.) and include the sign-up link." },
+  { key: 'volunteer-events', task: 'Volunteer Outreach — Events', prompt: "Write a volunteer recruitment post for upcoming events. Name a specific upcoming event, describe what helping out actually looks like day-of, and give a clear next step to sign up." },
+  { key: 'volunteer-restoration', task: 'Volunteer Outreach — Restoration', prompt: "Write a volunteer recruitment post for restoration/construction work. Mention what's currently being worked on, what skills or experience help (if any), and how to get involved." },
+  { key: 'volunteer-garden', task: 'Volunteer Outreach — Garden', prompt: "Write a volunteer recruitment post for the grounds/garden team. Mention what's currently blooming or needs tending, and how to join." },
+  { key: 'volunteer-docents', task: 'Volunteer Outreach — Docents', prompt: "Write a volunteer recruitment post for docents. Mention what leading a tour involves, what training is provided, and how to apply." },
+  { key: 'sponsor-spotlight', task: 'Sponsor Spotlight', prompt: "Write a sponsor spotlight for one current business sponsor. Say what their business does, how they've supported North Star House, and thank them by name. Tag their business page." },
+  { key: 'upcoming-event-tours', task: 'Upcoming Event / Tours', prompt: "Promote an upcoming public event or estate tour. Include what it is, the date/time, and how to RSVP or book." },
+  { key: 'planning-update', task: 'Planning Update', prompt: "Share a behind-the-scenes update on something the board or staff are currently planning — a project taking shape, a goal being worked toward, or a decision in progress. Keep it honest and specific, not vague." },
+  { key: 'video', task: 'Video', prompt: "Post a short video clip — restoration work in progress, a wedding or event moment, a quick tour, or behind-the-scenes at the house. Caption should explain what viewers are looking at and why it matters." },
+  { key: 'development-board', task: 'Development / Board Update', prompt: "Share an update on fundraising progress, a new board initiative, or an organizational milestone. Be specific about numbers or outcomes where you can." },
 ];
 
 function MarketingPostingScheduleView({ navigate, navigateOp }) {
@@ -4295,7 +4284,7 @@ function MarketingPostingScheduleView({ navigate, navigateOp }) {
     debounceTimers.current[itemKey] = setTimeout(function() { saveRow(itemKey, { comment: val || null }); }, 700);
   }
 
-  function copyTask(itemKey, day, prompt) {
+  function copyTask(itemKey, prompt) {
     navigator.clipboard.writeText(prompt);
     setCopiedKey(itemKey);
     setTimeout(function() { setCopiedKey(null); }, 1500);
@@ -4309,45 +4298,30 @@ function MarketingPostingScheduleView({ navigate, navigateOp }) {
         {navigateOp && <button onClick={function() { navigateOp('Marketing'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: '#888', cursor: 'pointer' }}>← Marketing</button>}
       </div>
       <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', margin: '10px 0 2px' }}>Monthly Posting Schedule</div>
-      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>{monthLabel}</div>
+      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>{monthLabel} — things to cover this month, in any order</div>
 
       {loading ? (
         <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {POSTING_SCHEDULE.map(function(wk, wi) {
+        <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
+          {POSTING_SCHEDULE.map(function(d, di) {
+            var itemKey = d.key;
+            var row = log[itemKey] || { done: false, comment: '' };
             return (
-              <div key={wk.week} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
-                <div style={{ padding: '10px 16px', background: '#faf8f4', borderBottom: '0.5px solid #f0ece6', fontSize: 12, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.6 }}>{wk.week}</div>
-                {wk.days.map(function(d, di) {
-                  var itemKey = 'w' + (wi + 1) + '-' + d.day;
-                  var row = log[itemKey] || { done: false, comment: '' };
-                  var isOpen = d.task === 'OPEN';
-                  return (
-                    <div key={itemKey} style={{ padding: '12px 16px', borderBottom: di < wk.days.length - 1 ? '0.5px solid #f9f6f2' : 'none' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                        <div onClick={function() { if (!isOpen) toggleDone(itemKey); }} style={{ width: 18, height: 18, marginTop: 2, borderRadius: 5, border: '1.5px solid ' + (row.done ? gold : '#d0c8bc'), background: row.done ? gold : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: isOpen ? 'default' : 'pointer', opacity: isOpen ? 0.4 : 1 }}>
-                          {row.done && <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="2 6 5 9 10 3"/></svg>}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, color: '#2a2a2a' }}>
-                            <span style={{ fontWeight: 600 }}>{d.day}:</span>{' '}
-                            <span style={{ color: isOpen ? '#bbb' : '#2a2a2a', fontStyle: isOpen ? 'italic' : 'normal', textDecoration: row.done ? 'line-through' : 'none' }}>{d.task}</span>
-                          </div>
-                          {!isOpen && (
-                            <input value={row.comment || ''} onChange={function(e) { handleCommentChange(itemKey, e.target.value); }} placeholder="Comments…"
-                              style={{ width: '100%', marginTop: 6, padding: '5px 8px', border: '0.5px solid #e8e0d5', borderRadius: 6, fontSize: 12, background: '#faf8f4', boxSizing: 'border-box' }} />
-                          )}
-                        </div>
-                        {!isOpen && (
-                          <button onClick={function() { copyTask(itemKey, d.day, d.prompt || d.task); }} title="Copy writing prompt" style={{ flexShrink: 0, marginTop: 2, background: copiedKey === itemKey ? '#f0ebe2' : 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 7px', cursor: 'pointer', color: copiedKey === itemKey ? gold : '#aaa', display: 'flex', alignItems: 'center' }}>
-                            {scissorsIcon}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div key={itemKey} style={{ padding: '12px 16px', borderBottom: di < POSTING_SCHEDULE.length - 1 ? '0.5px solid #f9f6f2' : 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <div onClick={function() { toggleDone(itemKey); }} style={{ width: 18, height: 18, marginTop: 2, borderRadius: 5, border: '1.5px solid ' + (row.done ? gold : '#d0c8bc'), background: row.done ? gold : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }}>
+                    {row.done && <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="2 6 5 9 10 3"/></svg>}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: '#2a2a2a', fontWeight: 600, textDecoration: row.done ? 'line-through' : 'none' }}>{d.task}</div>
+                    <input value={row.comment || ''} onChange={function(e) { handleCommentChange(itemKey, e.target.value); }} placeholder="Comments…"
+                      style={{ width: '100%', marginTop: 6, padding: '5px 8px', border: '0.5px solid #e8e0d5', borderRadius: 6, fontSize: 12, background: '#faf8f4', boxSizing: 'border-box' }} />
+                  </div>
+                  <button onClick={function() { copyTask(itemKey, d.prompt); }} title="Copy writing prompt" style={{ flexShrink: 0, marginTop: 2, background: copiedKey === itemKey ? '#f0ebe2' : 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 7px', cursor: 'pointer', color: copiedKey === itemKey ? gold : '#aaa', display: 'flex', alignItems: 'center' }}>
+                    {scissorsIcon}
+                  </button>
+                </div>
               </div>
             );
           })}
