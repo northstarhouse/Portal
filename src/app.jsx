@@ -590,16 +590,22 @@ const typeColors = {
     }).then(function(r) { return r.json(); }).then(function(rows) {
       setActivity(Array.isArray(rows) ? rows : []);
     }).catch(function() { setActivity([]); });
-    fetch(SUPABASE_URL + '/rest/v1/vol_events?title=ilike.*Appreciation*&select=id,title,date,time&order=date.desc&limit=1', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      var ev = Array.isArray(rows) && rows[0] ? rows[0] : null;
-      setVaEvent(ev);
-      if (!ev) { setVaResponses([]); return; }
-      return fetch(SUPABASE_URL + '/rest/v1/vol_event_responses?event_id=eq.' + ev.id + '&select=name,response,created_at&order=created_at.asc', {
+    function loadVaRsvps() {
+      fetch(SUPABASE_URL + '/rest/v1/vol_events?title=ilike.*Appreciation*&select=id,title,date,time&order=date.desc&limit=1', {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-      }).then(function(r) { return r.json(); }).then(function(resp) { setVaResponses(Array.isArray(resp) ? resp : []); });
-    }).catch(function() { setVaEvent(null); setVaResponses([]); });
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        var ev = Array.isArray(rows) && rows[0] ? rows[0] : null;
+        setVaEvent(ev);
+        if (!ev) { setVaResponses([]); return; }
+        return fetch(SUPABASE_URL + '/rest/v1/vol_event_responses?event_id=eq.' + ev.id + '&select=name,response,created_at&order=created_at.asc', {
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+        }).then(function(r) { return r.json(); }).then(function(resp) { setVaResponses(Array.isArray(resp) ? resp : []); });
+      }).catch(function() { setVaEvent(null); setVaResponses([]); });
+    }
+    loadVaRsvps();
+    // Poll instead of a one-off fetch so new RSVPs submitted on the public
+    // NSH-forms page (or added via Form Builder) show up here without a reload.
+    var vaInterval = setInterval(loadVaRsvps, 30000);
     fetchCalendarEvents().then(function(events) {
       var now = new Date();
       var windowEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
@@ -611,6 +617,7 @@ const typeColors = {
       }).slice(0, 8);
       setCalEvents(filtered);
     }).catch(function() { setCalEvents([]); });
+    return function() { clearInterval(vaInterval); };
   }, []);
   return (
     <div>
