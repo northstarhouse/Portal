@@ -13220,15 +13220,11 @@ function Dashboard() {
               <span style={{ marginLeft: "auto", fontSize: 10, opacity: 0.6 }}>{opOpen ? "▲" : "▶"}</span>
             </button>
             <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
-              <button onClick={function() { navigate("dev-log"); }} title="Dev Log" style={{
-                width: 26, height: 26, borderRadius: "50%", cursor: "pointer",
-                background: active === "dev-log" ? "rgba(181,161,133,0.25)" : "rgba(255,255,255,0.06)",
-                border: "0.5px solid rgba(255,255,255,0.15)",
-                color: active === "dev-log" ? "#f0ebe3" : "rgba(255,255,255,0.5)",
-                display: "flex", alignItems: "center", justifyContent: "center", padding: 0
-              }}>
-                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
-              </button>
+              <button onClick={function() { navigate("dev-log"); }} style={{
+                width: 6, height: 6, borderRadius: "50%", cursor: "pointer", padding: 0,
+                background: active === "dev-log" ? "rgba(181,161,133,0.6)" : "rgba(255,255,255,0.12)",
+                border: "none"
+              }} />
             </div>
           </div>
           <div style={{ padding: "0 20px 20px" }} />
