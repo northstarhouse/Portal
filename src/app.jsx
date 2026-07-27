@@ -804,7 +804,9 @@ const typeColors = {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div onClick={function() { navigate('activity-log'); }} style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+            onMouseEnter={function(e) { e.currentTarget.style.textDecoration = 'underline'; }}
+            onMouseLeave={function(e) { e.currentTarget.style.textDecoration = 'none'; }}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
             Recent Activity
           </div>
@@ -11314,6 +11316,95 @@ function FormResponsesView({ navigate }) {
   );
 }
 
+function ActivityLogView({ navigate }) {
+  var [activity, setActivity] = useState(null);
+  var [editingTagId, setEditingTagId] = useState(null);
+
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?select=*&order=created_at.desc&limit=1000', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setActivity(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setActivity([]); });
+  }, []);
+
+  function updateActivityTag(id, newTag) {
+    setActivity(function(prev) { return prev.map(function(a) { return a.id === id ? Object.assign({}, a, { tag: newTag }) : a; }); });
+    setEditingTagId(null);
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag: newTag })
+    }).catch(function() {});
+  }
+
+  var groups = [];
+  (activity || []).forEach(function(a) {
+    var monthStr = new Date(a.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    var last = groups[groups.length - 1];
+    if (last && last.monthStr === monthStr) last.items.push(a);
+    else groups.push({ monthStr: monthStr, items: [a] });
+  });
+
+  return (
+    <div style={{ maxWidth: 640 }}>
+      <button onClick={function() { navigate('home'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Back</button>
+      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Activity Log</div>
+      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Everything that's happened, grouped by month.</div>
+
+      {activity === null ? (
+        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
+      ) : activity.length === 0 ? (
+        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No activity yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {groups.map(function(g, gi) {
+            return (
+              <div key={gi}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>{g.monthStr}</div>
+                <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '12px 16px' }}>
+                  {g.items.map(function(a, ai) {
+                    var ts = a.created_at ? new Date(a.created_at) : null;
+                    var when = ts ? ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+                    var tagStyle = a.tag && ACTIVITY_TAG_COLORS[a.tag];
+                    var isHandled = a.action === 'voicemail_handled';
+                    return (
+                      <div key={a.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 0', borderBottom: ai < g.items.length - 1 ? '0.5px solid #f5f0e8' : 'none' }}>
+                        {isHandled ? (
+                          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 4, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>
+                        ) : (
+                          <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: gold, marginTop: 5, flexShrink: 0 }} />
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <div style={{ fontSize: 12, color: '#2a2a2a', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+                              {editingTagId === a.id ? (
+                                <select autoFocus value={a.tag || ''} onChange={function(e) { updateActivityTag(a.id, e.target.value); }} onBlur={function() { setEditingTagId(null); }}
+                                  style={{ fontSize: 10, fontWeight: 700, border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '2px 6px', flexShrink: 0 }}>
+                                  {Object.keys(ACTIVITY_TAG_COLORS).map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+                                </select>
+                              ) : (
+                                tagStyle && <span onClick={function() { setEditingTagId(a.id); }} title="Click to change tag" style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 8px', flexShrink: 0, cursor: 'pointer' }}>{a.tag}</span>
+                              )}
+                              <span>{a.description}</span>
+                            </div>
+                            {isHandled && a.handled_by && <span style={{ fontSize: 10, fontWeight: 700, color: '#2e7d32', flexShrink: 0 }}>{a.handled_by}</span>}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{when}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DevLogView({ navigate }) {
   var [entries, setEntries] = useState(null);
 
@@ -13131,6 +13222,7 @@ const views = {
   'form-builder': FormBuilderView,
   'form-responses': FormResponsesView,
   'dev-log': DevLogView,
+  'activity-log': ActivityLogView,
   'acknowledgment-templates': AcknowledgmentTemplatesView,
   'acknowledgments-queue': AcknowledgmentsQueueView,
 };
@@ -13357,7 +13449,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
