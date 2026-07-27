@@ -817,8 +817,12 @@ const typeColors = {
             var tagStyle = a.tag && ACTIVITY_TAG_COLORS[a.tag];
             var isHandled = a.action === 'voicemail_handled';
             return (
-              <div key={a.id || i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i === activity.length - 1 ? 0 : 10, background: isHandled ? '#eafaf0' : 'transparent', border: isHandled ? '0.5px solid #cdebd8' : 'none', borderRadius: isHandled ? 8 : 0, padding: isHandled ? '6px 8px' : 0 }}>
-                <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: isHandled ? '#2e7d32' : gold, marginTop: 5, flexShrink: 0 }} />
+              <div key={a.id || i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i === activity.length - 1 ? 0 : 10 }}>
+                {isHandled ? (
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 4, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>
+                ) : (
+                  <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: gold, marginTop: 5, flexShrink: 0 }} />
+                )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                     <div style={{ fontSize: 12, color: '#2a2a2a', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
