@@ -13227,6 +13227,17 @@ function Dashboard() {
               Operational Areas
               <span style={{ marginLeft: "auto", fontSize: 10, opacity: 0.6 }}>{opOpen ? "▲" : "▶"}</span>
             </button>
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
+              <button onClick={function() { navigate("dev-log"); }} title="Dev Log" style={{
+                width: 26, height: 26, borderRadius: "50%", cursor: "pointer",
+                background: active === "dev-log" ? "rgba(181,161,133,0.25)" : "rgba(255,255,255,0.06)",
+                border: "0.5px solid rgba(255,255,255,0.15)",
+                color: active === "dev-log" ? "#f0ebe3" : "rgba(255,255,255,0.5)",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 0
+              }}>
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+              </button>
+            </div>
           </div>
           <div style={{ padding: "0 20px 20px" }} />
         </div>
@@ -13275,17 +13286,6 @@ function Dashboard() {
                 transition: "all 0.15s"
               }}>
               Financial Overview
-            </button>
-            <button onClick={function() { navigate("dev-log"); }}
-              style={{
-                display: "block", width: "100%", padding: "9px 16px",
-                background: active === "dev-log" ? "rgba(181,161,133,0.15)" : "transparent",
-                border: "none", cursor: "pointer", textAlign: "left",
-                color: active === "dev-log" ? "#b5a185" : "rgba(255,255,255,0.35)",
-                fontSize: 11, fontWeight: active === "dev-log" ? 600 : 400,
-                transition: "all 0.15s"
-              }}>
-              Dev Log
             </button>
             <button onClick={function() { navigate("reviews"); }}
               style={{
