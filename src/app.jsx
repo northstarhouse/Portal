@@ -258,7 +258,7 @@ const cream = "#f8f4ec";
 var ACTIVITY_TAG_COLORS = {
   Wedding: { bg: '#fbeaf0', color: '#b5457a' },
   Event: { bg: '#eaf1fb', color: '#3a6ea5' },
-  Inquiry: { bg: '#eafaf0', color: '#2e7d32' },
+  'Venue Inquiry': { bg: '#eafaf0', color: '#2e7d32' },
   General: { bg: '#f0ece6', color: '#888' },
 };
 
@@ -809,10 +809,12 @@ const typeColors = {
               <div key={a.id || i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i === activity.length - 1 ? 0 : 10, background: isHandled ? '#eafaf0' : 'transparent', border: isHandled ? '0.5px solid #cdebd8' : 'none', borderRadius: isHandled ? 8 : 0, padding: isHandled ? '6px 8px' : 0 }}>
                 <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: isHandled ? '#2e7d32' : gold, marginTop: 5, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: '#2a2a2a', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    {isHandled && <span style={{ fontSize: 10, fontWeight: 700, background: '#d5f0dd', color: '#2e7d32', borderRadius: 10, padding: '2px 8px', flexShrink: 0 }}>✓ Handled</span>}
-                    {tagStyle && <span style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 8px', flexShrink: 0 }}>{a.tag}</span>}
-                    <span style={{ fontWeight: isHandled ? 600 : 400 }}>{a.description}</span>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{ fontSize: 12, color: '#2a2a2a', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+                      {tagStyle && <span style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 8px', flexShrink: 0 }}>{a.tag}</span>}
+                      <span>{a.description}</span>
+                    </div>
+                    {isHandled && a.handled_by && <span style={{ fontSize: 10, fontWeight: 700, color: '#2e7d32', flexShrink: 0 }}>{a.handled_by}</span>}
                   </div>
                   <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{when}</div>
                 </div>
