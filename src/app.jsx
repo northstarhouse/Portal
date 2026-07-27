@@ -11322,6 +11322,60 @@ function FormResponsesView({ navigate }) {
   );
 }
 
+function DevLogView({ navigate }) {
+  var [entries, setEntries] = useState(null);
+
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/portal_changelog?select=*&order=created_at.desc&limit=200', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setEntries(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setEntries([]); });
+  }, []);
+
+  var groups = [];
+  (entries || []).forEach(function(e) {
+    var dateStr = new Date(e.created_at).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    var last = groups[groups.length - 1];
+    if (last && last.dateStr === dateStr) last.items.push(e);
+    else groups.push({ dateStr: dateStr, items: [e] });
+  });
+
+  return (
+    <div style={{ maxWidth: 640 }}>
+      <button onClick={function() { navigate('operational'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Back</button>
+      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Dev Log</div>
+      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>What's changed in Portal, and when.</div>
+
+      {entries === null ? (
+        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
+      ) : entries.length === 0 ? (
+        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>No entries yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {groups.map(function(g, gi) {
+            return (
+              <div key={gi}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>{g.dateStr}</div>
+                <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
+                  {g.items.map(function(e, ei) {
+                    return (
+                      <div key={e.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 14px', borderBottom: ei < g.items.length - 1 ? '0.5px solid #f5f0e8' : 'none' }}>
+                        <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: gold, marginTop: 6, flexShrink: 0 }} />
+                        <div style={{ fontSize: 13, color: '#2a2a2a', lineHeight: 1.5 }}>{e.description}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminToolCard(props) {
   var tool = props.tool;
   var card = (
@@ -13084,6 +13138,7 @@ const views = {
   'wix-forms': WixFormsView,
   'form-builder': FormBuilderView,
   'form-responses': FormResponsesView,
+  'dev-log': DevLogView,
   'acknowledgment-templates': AcknowledgmentTemplatesView,
   'acknowledgments-queue': AcknowledgmentsQueueView,
 };
@@ -13221,6 +13276,17 @@ function Dashboard() {
               }}>
               Financial Overview
             </button>
+            <button onClick={function() { navigate("dev-log"); }}
+              style={{
+                display: "block", width: "100%", padding: "9px 16px",
+                background: active === "dev-log" ? "rgba(181,161,133,0.15)" : "transparent",
+                border: "none", cursor: "pointer", textAlign: "left",
+                color: active === "dev-log" ? "#b5a185" : "rgba(255,255,255,0.35)",
+                fontSize: 11, fontWeight: active === "dev-log" ? 600 : 400,
+                transition: "all 0.15s"
+              }}>
+              Dev Log
+            </button>
             <button onClick={function() { navigate("reviews"); }}
               style={{
                 display: "block", width: "100%", padding: "9px 16px",
@@ -13303,7 +13369,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
