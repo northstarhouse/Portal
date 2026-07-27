@@ -804,13 +804,15 @@ const typeColors = {
             var mins = ts ? Math.round((Date.now() - ts.getTime()) / 60000) : null;
             var when = mins === null ? '' : mins < 1 ? 'just now' : mins < 60 ? mins + 'm ago' : mins < 1440 ? Math.round(mins / 60) + 'h ago' : ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             var tagStyle = a.tag && ACTIVITY_TAG_COLORS[a.tag];
+            var isHandled = a.action === 'voicemail_handled';
             return (
-              <div key={a.id || i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i === activity.length - 1 ? 0 : 10 }}>
-                <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: gold, marginTop: 5, flexShrink: 0 }} />
+              <div key={a.id || i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i === activity.length - 1 ? 0 : 10, background: isHandled ? '#eafaf0' : 'transparent', border: isHandled ? '0.5px solid #cdebd8' : 'none', borderRadius: isHandled ? 8 : 0, padding: isHandled ? '6px 8px' : 0 }}>
+                <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: isHandled ? '#2e7d32' : gold, marginTop: 5, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: '#2a2a2a', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {isHandled && <span style={{ fontSize: 10, fontWeight: 700, background: '#d5f0dd', color: '#2e7d32', borderRadius: 10, padding: '2px 8px', flexShrink: 0 }}>✓ Handled</span>}
                     {tagStyle && <span style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 8px', flexShrink: 0 }}>{a.tag}</span>}
-                    <span>{a.description}</span>
+                    <span style={{ fontWeight: isHandled ? 600 : 400 }}>{a.description}</span>
                   </div>
                   <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{when}</div>
                 </div>
