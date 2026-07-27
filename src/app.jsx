@@ -4214,28 +4214,28 @@ function DonorsView({ navigate }) {
 
 var POSTING_SCHEDULE = [
   { week: 'First Week', days: [
-    { day: 'Monday', task: 'Wedding Posting + scheduling for the month' },
-    { day: 'Tuesday', task: 'Testimonial or Small History' },
-    { day: 'Thursday', task: 'Monthly email send out' },
-    { day: 'Friday', task: 'Volunteer Outreach - Events' },
+    { day: 'Monday', task: 'Wedding Posting + scheduling for the month', prompt: "Write a warm caption featuring a real couple who got married at North Star House. Include one specific, vivid detail from their day (a moment during the ceremony, the weather, a detail in the decor, something a guest said). End with a soft invitation for other couples to inquire about booking. Also: block time today to schedule out the rest of this month's posts." },
+    { day: 'Tuesday', task: 'Testimonial or Small History', prompt: "Share a small, fun piece of North Star House history that hasn't been posted before — something specific: a quirky detail about the house's design or construction, a past owner or resident, a local legend, or an odd fact uncovered during restoration. Keep it short and conversational, like telling a friend something they didn't know." },
+    { day: 'Thursday', task: 'Monthly email send out', prompt: "Send this month's newsletter: recap one or two highlights from last month, preview what's coming up this month (events, weddings, restoration progress), and include one clear call-to-action (volunteer, donate, or book a tour)." },
+    { day: 'Friday', task: 'Volunteer Outreach - Events', prompt: "Write a volunteer recruitment post for upcoming events. Name a specific upcoming event, describe what helping out actually looks like day-of, and give a clear next step to sign up." },
   ] },
   { week: 'Second Week', days: [
-    { day: 'Monday', task: 'Sponsor Spotlight' },
-    { day: 'Tuesday', task: 'Upcoming Event / Tours' },
-    { day: 'Thursday', task: 'Planning Update' },
-    { day: 'Friday', task: 'Volunteer Outreach - Restoration' },
+    { day: 'Monday', task: 'Sponsor Spotlight', prompt: "Write a sponsor spotlight for one current business sponsor. Say what their business does, how they've supported North Star House, and thank them by name. Tag their business page." },
+    { day: 'Tuesday', task: 'Upcoming Event / Tours', prompt: "Promote an upcoming public event or estate tour. Include what it is, the date/time, and how to RSVP or book." },
+    { day: 'Thursday', task: 'Planning Update', prompt: "Share a behind-the-scenes update on something the board or staff are currently planning — a project taking shape, a goal being worked toward, or a decision in progress. Keep it honest and specific, not vague." },
+    { day: 'Friday', task: 'Volunteer Outreach - Restoration', prompt: "Write a volunteer recruitment post for restoration/construction work. Mention what's currently being worked on, what skills or experience help (if any), and how to get involved." },
   ] },
   { week: 'Third Week', days: [
-    { day: 'Monday', task: 'Upcoming Event or Wedding' },
+    { day: 'Monday', task: 'Upcoming Event or Wedding', prompt: "Write a caption promoting an upcoming event or featuring a recent wedding at North Star House — a specific detail, not generic. End with a call-to-action (RSVP, inquire, book a tour)." },
     { day: 'Tuesday', task: 'OPEN' },
-    { day: 'Thursday', task: 'History Update' },
-    { day: 'Friday', task: 'Volunteer Outreach - Garden' },
+    { day: 'Thursday', task: 'History Update', prompt: "Share a piece of North Star House history — the architecture, a past resident, a restoration milestone, or an old photo with context on what's changed. Make it something that hasn't been posted before." },
+    { day: 'Friday', task: 'Volunteer Outreach - Garden', prompt: "Write a volunteer recruitment post for the grounds/garden team. Mention what's currently blooming or needs tending, and how to join." },
   ] },
   { week: 'Fourth Week', days: [
     { day: 'Monday', task: 'OPEN' },
-    { day: 'Tuesday', task: 'Restoration Video' },
-    { day: 'Thursday', task: 'Development / Board Update' },
-    { day: 'Friday', task: 'Volunteer Outreach - Docents' },
+    { day: 'Tuesday', task: 'Restoration Video', prompt: "Post a short video clip of restoration work in progress — before/after, a craftsperson at work, or a quick time-lapse. Caption should explain what viewers are looking at and why it matters." },
+    { day: 'Thursday', task: 'Development / Board Update', prompt: "Share an update on fundraising progress, a new board initiative, or an organizational milestone. Be specific about numbers or outcomes where you can." },
+    { day: 'Friday', task: 'Volunteer Outreach - Docents', prompt: "Write a volunteer recruitment post for docents. Mention what leading a tour involves, what training is provided, and how to apply." },
   ] },
 ];
 
@@ -4295,8 +4295,8 @@ function MarketingPostingScheduleView({ navigate, navigateOp }) {
     debounceTimers.current[itemKey] = setTimeout(function() { saveRow(itemKey, { comment: val || null }); }, 700);
   }
 
-  function copyTask(itemKey, day, task) {
-    navigator.clipboard.writeText(task);
+  function copyTask(itemKey, day, prompt) {
+    navigator.clipboard.writeText(prompt);
     setCopiedKey(itemKey);
     setTimeout(function() { setCopiedKey(null); }, 1500);
   }
@@ -4340,7 +4340,7 @@ function MarketingPostingScheduleView({ navigate, navigateOp }) {
                           )}
                         </div>
                         {!isOpen && (
-                          <button onClick={function() { copyTask(itemKey, d.day, d.task); }} title="Copy task text" style={{ flexShrink: 0, marginTop: 2, background: copiedKey === itemKey ? '#f0ebe2' : 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 7px', cursor: 'pointer', color: copiedKey === itemKey ? gold : '#aaa', display: 'flex', alignItems: 'center' }}>
+                          <button onClick={function() { copyTask(itemKey, d.day, d.prompt || d.task); }} title="Copy writing prompt" style={{ flexShrink: 0, marginTop: 2, background: copiedKey === itemKey ? '#f0ebe2' : 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 7px', cursor: 'pointer', color: copiedKey === itemKey ? gold : '#aaa', display: 'flex', alignItems: 'center' }}>
                             {scissorsIcon}
                           </button>
                         )}
