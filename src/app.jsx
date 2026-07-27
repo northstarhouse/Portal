@@ -255,6 +255,83 @@ function parseIcalDate(val) {
 const gold = "#886c44";
 const cream = "#f8f4ec";
 
+// ─── Sign-ups (Form Builder / Form Responses) shared helpers ──────────────────
+// Ported from the NSH-forms app's shared.jsx — kept byte-for-byte so the
+// answer/section schema already stored in Supabase for existing forms keeps
+// working exactly as before.
+
+var QUESTION_TYPES = [
+  { value: 'short_text',      label: 'Short answer' },
+  { value: 'long_text',       label: 'Paragraph' },
+  { value: 'multiple_choice', label: 'Multiple choice' },
+  { value: 'checkboxes',      label: 'Checkboxes' },
+  { value: 'yes_no',          label: 'Yes / No' },
+  { value: 'rating',          label: 'Rating (1–5)' },
+  { value: 'date',            label: 'Date' },
+];
+
+function suSlugify(str) { return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+function suGenId() { return Math.random().toString(36).slice(2, 10); }
+function suMkQuestion(type) { return { id: suGenId(), type: type || 'short_text', label: '', required: false, options: ['', ''] }; }
+
+// Parses pasted lines like "Jane Smith - jane@example.com" (email optional) into { name, email }
+function suParseRoster(text) {
+  return (text || '')
+    .split(/\r?\n/)
+    .map(function(line) { return line.trim(); })
+    .filter(Boolean)
+    .map(function(line) {
+      var m = line.match(/^(.+?)\s*[-–—]\s*(\S+@\S+)$/);
+      return m ? { name: m[1].trim(), email: m[2].trim() } : { name: line, email: '' };
+    });
+}
+
+// Expands a question template into one cloned copy of its questions per roster person,
+// tagging each clone with { section, sectionEmail } so it renders/groups under that person.
+function suFieldsFromRoster(template, people) {
+  var out = [];
+  people.forEach(function(p) {
+    (template.questions || []).forEach(function(q) {
+      out.push(Object.assign({}, q, { id: suGenId(), section: p.name, sectionEmail: p.email || undefined }));
+    });
+  });
+  return out;
+}
+
+// Groups a flat fields array into consecutive runs sharing the same `section` (e.g. volunteer name).
+function suGroupFieldsBySection(fields) {
+  var groups = [];
+  (fields || []).forEach(function(f) {
+    var last = groups[groups.length - 1];
+    if (f.section && last && last.section === f.section) last.fields.push(f);
+    else groups.push({ section: f.section || null, fields: [f] });
+  });
+  return groups;
+}
+
+// Cleans + trims a raw editor fields array before saving to Supabase.
+function suNormalizeFields(fields) {
+  return (fields || [])
+    .filter(function(q) { return q.type === 'group' ? (q.parts || []).some(function(p) { return p.label.trim(); }) : q.label.trim(); })
+    .map(function(q) {
+      var base = { id: q.id, type: q.type, label: (q.label || '').trim(), required: !!q.required };
+      if (q.section) base.section = q.section;
+      if (q.section && q.sectionEmail) base.sectionEmail = q.sectionEmail;
+      if (q.type === 'group') {
+        base.parts = (q.parts || [])
+          .filter(function(p) { return p.label.trim(); })
+          .map(function(p) {
+            var part = { id: p.id, type: p.type, label: p.label.trim(), required: !!p.required };
+            if (['multiple_choice', 'checkboxes'].indexOf(p.type) !== -1) part.options = (p.options || []).filter(function(o) { return o.trim(); });
+            return part;
+          });
+      } else if (['multiple_choice', 'checkboxes'].indexOf(q.type) !== -1) {
+        base.options = (q.options || []).filter(function(o) { return o.trim(); });
+      }
+      return base;
+    });
+}
+
 var MobileCtx = React.createContext(false);
 
 var NAV_ICONS = {
@@ -10372,14 +10449,844 @@ var ADMIN_TOOLS = [
     url: "https://northstarhouse.github.io/nsh-events-committee/",
     icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
   },
-  {
-    label: "Form Builder",
-    url: "https://northstarhouse.github.io/NSH-forms/",
-    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
-  },
 ];
 
 var docIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>;
+
+// ─── Sign-ups (Form Builder / Form Responses) ──────────────────────────────
+// Manages the same vol_events/vol_shift_slots/vol_event_responses/vol_polls/
+// vol_poll_votes/nsh_forms/nsh_form_responses/nsh_templates tables the
+// standalone NSH-forms admin app (https://northstarhouse.github.io/NSH-forms/)
+// writes into. The public fill-out pages stay on that app; this is the
+// staff-facing management surface, moved here so it sits behind Portal's
+// password gate.
+
+var SU_INPUT = { width: '100%', padding: '8px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' };
+var SU_BTN_PRIMARY = { background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' };
+var SU_BTN_GHOST = { background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#888' };
+var suCalendarIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+var suClipboardIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
+
+function suFmtDate(d) { if (!d) return ''; return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+
+function suPublicLink(kind, id, title) {
+  var idParam = kind === 'event' ? (suSlugify(title || '') + '__' + id) : id;
+  return 'https://northstarhouse.github.io/NSH-forms/?view=' + kind + '&id=' + idParam;
+}
+function suEmbedHtml(id, title) {
+  var src = 'https://northstarhouse.github.io/NSH-forms/?view=form&id=' + id;
+  var esc = (title || 'Form').replace(/"/g, '&quot;');
+  return '<iframe src="' + src + '" style="width:100%;min-height:900px;border:none;" title="' + esc + '"></iframe>';
+}
+
+function SuBuilderBack({ onBack, label }) {
+  return <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← {label || 'Back to list'}</button>;
+}
+function SuEmpty({ text }) {
+  return <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>{text}</div>;
+}
+function SuListRow({ title, subtitle, meta, onClick, onCopyLink, copied, onDelete }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '0.5px solid #f0ece6' }}>
+      <div onClick={onClick} style={{ flex: 1, minWidth: 0, cursor: onClick ? 'pointer' : 'default' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{title || '(untitled)'}</div>
+        {subtitle && <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{subtitle}</div>}
+        {meta && <div style={{ fontSize: 11, color: gold, marginTop: 2, fontWeight: 600 }}>{meta}</div>}
+      </div>
+      {onCopyLink && <button onClick={onCopyLink} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: copied ? '#2e7d32' : '#888', flexShrink: 0 }}>{copied ? '✓ Copied' : 'Copy link'}</button>}
+      {onDelete && <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#c88', cursor: 'pointer', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Delete</button>}
+    </div>
+  );
+}
+
+function SuPartEditor({ part, onUpdate, onRemove, canRemove }) {
+  var isChoice = part.type === 'multiple_choice' || part.type === 'checkboxes';
+  function updateOption(i, val) { var opts = (part.options || []).slice(); opts[i] = val; onUpdate(Object.assign({}, part, { options: opts })); }
+  function addOption() { onUpdate(Object.assign({}, part, { options: (part.options || []).concat(['']) })); }
+  function removeOption(i) { onUpdate(Object.assign({}, part, { options: (part.options || []).filter(function(_, idx) { return idx !== i; }) })); }
+  return (
+    <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: 10, marginTop: 8 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+        <select value={part.type} onChange={function(e) { onUpdate(Object.assign({}, part, { type: e.target.value })); }} style={Object.assign({}, SU_INPUT, { width: 140, flexShrink: 0 })}>
+          {QUESTION_TYPES.map(function(t) { return <option key={t.value} value={t.value}>{t.label}</option>; })}
+        </select>
+        <input value={part.label} onChange={function(e) { onUpdate(Object.assign({}, part, { label: e.target.value })); }} placeholder="Question label" style={SU_INPUT} />
+        {canRemove && <button onClick={onRemove} style={{ background: 'none', border: 'none', color: '#c88', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>×</button>}
+      </div>
+      {isChoice && (
+        <div style={{ marginBottom: 6 }}>
+          {(part.options || []).map(function(opt, i) {
+            return (
+              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                <input value={opt} onChange={function(e) { updateOption(i, e.target.value); }} placeholder={'Option ' + (i + 1)} style={SU_INPUT} />
+                {(part.options || []).length > 2 && <button onClick={function() { removeOption(i); }} style={{ background: 'none', border: 'none', color: '#c88', cursor: 'pointer', fontSize: 14 }}>×</button>}
+              </div>
+            );
+          })}
+          <button onClick={addOption} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>+ Add option</button>
+        </div>
+      )}
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>
+        <input type="checkbox" checked={!!part.required} onChange={function(e) { onUpdate(Object.assign({}, part, { required: e.target.checked })); }} />
+        Required
+      </label>
+    </div>
+  );
+}
+
+function SuQuestionEditor({ question, onUpdate, onRemove, canRemove, onDuplicate, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
+  var q = question;
+  var isChoice = q.type === 'multiple_choice' || q.type === 'checkboxes';
+  function updateOption(i, val) { var opts = (q.options || []).slice(); opts[i] = val; onUpdate(Object.assign({}, q, { options: opts })); }
+  function addOption() { onUpdate(Object.assign({}, q, { options: (q.options || []).concat(['']) })); }
+  function removeOption(i) { onUpdate(Object.assign({}, q, { options: (q.options || []).filter(function(_, idx) { return idx !== i; }) })); }
+  function handleAddOn() {
+    var firstPart = { id: q.id, type: q.type, label: q.label, required: q.required, options: q.options };
+    onUpdate({ id: q.id, type: 'group', section: q.section, sectionEmail: q.sectionEmail, parts: [firstPart, suMkQuestion()] });
+  }
+  function updatePart(i, updated) { var parts = (q.parts || []).slice(); parts[i] = updated; onUpdate(Object.assign({}, q, { parts: parts })); }
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 14 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {q.section && <div style={{ fontSize: 11, color: gold, fontWeight: 700, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>{q.section}{q.sectionEmail ? ' · ' + q.sectionEmail : ''}</div>}
+          {q.type === 'group' ? (
+            <div>
+              <div style={{ fontSize: 12, color: '#999', marginBottom: 6 }}>Grouped question ({(q.parts || []).length} parts)</div>
+              {(q.parts || []).map(function(part, pi) {
+                return <SuPartEditor key={part.id} part={part} onUpdate={function(u) { updatePart(pi, u); }}
+                  onRemove={function() { onUpdate(Object.assign({}, q, { parts: q.parts.filter(function(_, idx) { return idx !== pi; }) })); }}
+                  canRemove={(q.parts || []).length > 1} />;
+              })}
+              <button onClick={function() { onUpdate(Object.assign({}, q, { parts: (q.parts || []).concat([suMkQuestion()]) })); }} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 12, fontWeight: 600, marginTop: 6, padding: 0 }}>+ Add another question</button>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                <select value={q.type} onChange={function(e) { onUpdate(Object.assign({}, q, { type: e.target.value })); }} style={Object.assign({}, SU_INPUT, { width: 140, flexShrink: 0 })}>
+                  {QUESTION_TYPES.map(function(t) { return <option key={t.value} value={t.value}>{t.label}</option>; })}
+                </select>
+                <input value={q.label} onChange={function(e) { onUpdate(Object.assign({}, q, { label: e.target.value })); }} placeholder="Question label" style={SU_INPUT} />
+              </div>
+              {isChoice && (
+                <div style={{ marginBottom: 8 }}>
+                  {(q.options || []).map(function(opt, i) {
+                    return (
+                      <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                        <input value={opt} onChange={function(e) { updateOption(i, e.target.value); }} placeholder={'Option ' + (i + 1)} style={SU_INPUT} />
+                        {(q.options || []).length > 2 && <button onClick={function() { removeOption(i); }} style={{ background: 'none', border: 'none', color: '#c88', cursor: 'pointer', fontSize: 14 }}>×</button>}
+                      </div>
+                    );
+                  })}
+                  <button onClick={addOption} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>+ Add option</button>
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!q.required} onChange={function(e) { onUpdate(Object.assign({}, q, { required: e.target.checked })); }} />
+                  Required
+                </label>
+                <button onClick={handleAddOn} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>+ Add on (turn into multiple questions)</button>
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
+          <button onClick={onMoveUp} disabled={!canMoveUp} style={{ background: 'none', border: 'none', cursor: canMoveUp ? 'pointer' : 'default', color: canMoveUp ? '#888' : '#ddd', fontSize: 13, padding: 2 }}>↑</button>
+          <button onClick={onMoveDown} disabled={!canMoveDown} style={{ background: 'none', border: 'none', cursor: canMoveDown ? 'pointer' : 'default', color: canMoveDown ? '#888' : '#ddd', fontSize: 13, padding: 2 }}>↓</button>
+          <button onClick={onDuplicate} title="Duplicate" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: 12, padding: 2 }}>⧉</button>
+          <button onClick={onRemove} disabled={!canRemove} title="Remove" style={{ background: 'none', border: 'none', cursor: canRemove ? 'pointer' : 'default', color: canRemove ? '#c88' : '#ddd', fontSize: 14, padding: 2 }}>×</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SuRosterGenerator({ templates, onGenerate }) {
+  var [templateId, setTemplateId] = useState('');
+  var [rosterText, setRosterText] = useState('');
+  var people = suParseRoster(rosterText);
+  function generate() {
+    var template = (templates || []).find(function(t) { return String(t.id) === String(templateId); });
+    if (!template || !people.length) return;
+    onGenerate(suFieldsFromRoster(template, people));
+    setRosterText('');
+  }
+  return (
+    <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Generate per-person sections from a template</div>
+      <select value={templateId} onChange={function(e) { setTemplateId(e.target.value); }} style={Object.assign({}, SU_INPUT, { marginBottom: 8 })}>
+        <option value="">Choose a question template…</option>
+        {(templates || []).map(function(t) { return <option key={t.id} value={t.id}>{t.name}</option>; })}
+      </select>
+      <textarea value={rosterText} onChange={function(e) { setRosterText(e.target.value); }} placeholder={'Paste one name per line, e.g.\nJane Smith - jane@example.com\nJohn Doe'} rows={4} style={Object.assign({}, SU_INPUT, { marginBottom: 8 })} />
+      <button onClick={generate} disabled={!templateId || !people.length} style={Object.assign({}, SU_BTN_PRIMARY, { opacity: (!templateId || !people.length) ? 0.5 : 1 })}>
+        Add {people.length || ''} section{people.length === 1 ? '' : 's'} to form
+      </button>
+    </div>
+  );
+}
+
+function SuSlotRow({ slot, onChange, onRemove }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+      <input value={slot.time_label || ''} onChange={function(e) { onChange(Object.assign({}, slot, { time_label: e.target.value })); }} placeholder="e.g. 9am–11am · Kitchen Help" style={SU_INPUT} />
+      <input value={slot.duration || ''} onChange={function(e) { onChange(Object.assign({}, slot, { duration: e.target.value })); }} placeholder="Description (optional)" style={SU_INPUT} />
+      <input type="number" value={slot.spots == null ? '' : slot.spots} onChange={function(e) { onChange(Object.assign({}, slot, { spots: e.target.value })); }} placeholder="Spots" style={Object.assign({}, SU_INPUT, { width: 80, flexShrink: 0 })} />
+      <button onClick={onRemove} style={{ background: 'none', border: 'none', color: '#c88', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>×</button>
+    </div>
+  );
+}
+
+function SuEventPanel({ event, onSaved, onCancel }) {
+  var isEdit = !!event;
+  var [eventType, setEventType] = useState(event ? event.event_type : 'rsvp');
+  var [form, setForm] = useState({ title: event ? event.title || '' : '', date: event ? event.date || '' : '', time: event ? event.time || '' : '', description: event ? event.description || '' : '' });
+  var [options, setOptions] = useState(event && event.options && event.options.length ? event.options : ['Attending', 'Attending +1', "Can't Make It"]);
+  var [slots, setSlots] = useState([]);
+  var [origSlotIds, setOrigSlotIds] = useState([]);
+  var [loadingSlots, setLoadingSlots] = useState(isEdit && event.event_type === 'shift');
+  var [saving, setSaving] = useState(false);
+
+  useEffect(function() {
+    if (!isEdit || event.event_type !== 'shift') return;
+    fetch(SUPABASE_URL + '/rest/v1/vol_shift_slots?event_id=eq.' + event.id + '&select=*&order=sort_order', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var slotRows = Array.isArray(rows) ? rows : [];
+      setSlots(slotRows);
+      setOrigSlotIds(slotRows.map(function(s) { return s.id; }));
+      setLoadingSlots(false);
+    }).catch(function() { setLoadingSlots(false); });
+  }, []);
+
+  function updateSlot(i, updated) { var s = slots.slice(); s[i] = updated; setSlots(s); }
+  function removeSlot(i) { setSlots(slots.filter(function(_, idx) { return idx !== i; })); }
+  function addSlot() { setSlots(slots.concat([{ time_label: '', duration: '', spots: '' }])); }
+  function updateOption(i, val) { var o = options.slice(); o[i] = val; setOptions(o); }
+  function removeOption(i) { setOptions(options.filter(function(_, idx) { return idx !== i; })); }
+  function addOption() { setOptions(options.concat([''])); }
+
+  function saveSlots(eventId) {
+    var validSlots = slots.filter(function(s) { return (s.time_label || '').trim(); });
+    var keptIds = validSlots.filter(function(s) { return s.id; }).map(function(s) { return s.id; });
+    var toDelete = origSlotIds.filter(function(id) { return keptIds.indexOf(id) === -1; });
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+    var chain = Promise.resolve();
+    if (toDelete.length) {
+      chain = chain.then(function() {
+        return fetch(SUPABASE_URL + '/rest/v1/vol_shift_slots?id=in.(' + toDelete.join(',') + ')', { method: 'DELETE', headers: hdrs });
+      });
+    }
+    validSlots.forEach(function(s, i) {
+      if (!s.id) return;
+      chain = chain.then(function() {
+        return fetch(SUPABASE_URL + '/rest/v1/vol_shift_slots?id=eq.' + s.id, {
+          method: 'PATCH', headers: hdrs,
+          body: JSON.stringify({ time_label: s.time_label.trim(), duration: (s.duration || '').trim() || null, role: null, spots: (s.spots === '' || s.spots == null) ? null : Number(s.spots), sort_order: i })
+        });
+      });
+    });
+    var newSlots = validSlots.filter(function(s) { return !s.id; }).map(function(s) {
+      return { event_id: eventId, time_label: s.time_label.trim(), duration: (s.duration || '').trim() || null, role: null, spots: (s.spots === '' || s.spots == null) ? null : Number(s.spots), sort_order: validSlots.indexOf(s) };
+    });
+    if (newSlots.length) {
+      chain = chain.then(function() {
+        return fetch(SUPABASE_URL + '/rest/v1/vol_shift_slots', { method: 'POST', headers: hdrs, body: JSON.stringify(newSlots) });
+      });
+    }
+    return chain;
+  }
+
+  function handleSave() {
+    if (!form.title.trim() || saving) return;
+    setSaving(true);
+    var payload = { title: form.title.trim(), date: form.date || null, time: form.time || null, description: form.description.trim() || null, options: eventType === 'rsvp' ? options.filter(function(o) { return o.trim(); }) : [] };
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+
+    function finish(eventId) {
+      if (eventType !== 'shift') { setSaving(false); onSaved(); return; }
+      saveSlots(eventId).then(function() { setSaving(false); onSaved(); }).catch(function() { setSaving(false); });
+    }
+
+    if (isEdit) {
+      fetch(SUPABASE_URL + '/rest/v1/vol_events?id=eq.' + event.id, { method: 'PATCH', headers: hdrs, body: JSON.stringify(payload) })
+        .then(function() { finish(event.id); }).catch(function() { setSaving(false); });
+    } else {
+      payload.event_type = eventType;
+      fetch(SUPABASE_URL + '/rest/v1/vol_events', { method: 'POST', headers: Object.assign({}, hdrs, { Prefer: 'return=representation' }), body: JSON.stringify(payload) })
+        .then(function(r) { return r.json(); }).then(function(rows) { finish((Array.isArray(rows) ? rows[0] : rows).id); }).catch(function() { setSaving(false); });
+    }
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 16 }}>{isEdit ? 'Edit Event' : 'New Event'}</div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        {[['rsvp', 'RSVP Event'], ['shift', 'Volunteer Shifts']].map(function(pair) {
+          var val = pair[0], label = pair[1];
+          return (
+            <button key={val} disabled={isEdit} onClick={function() { setEventType(val); }}
+              style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: isEdit ? 'default' : 'pointer', background: eventType === val ? gold : '#faf8f4', color: eventType === val ? '#fff' : '#888', border: '0.5px solid ' + (eventType === val ? gold : '#e0d8cc'), opacity: isEdit && eventType !== val ? 0.4 : 1 }}>
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+        <input value={form.title} onChange={function(e) { setForm(Object.assign({}, form, { title: e.target.value })); }} placeholder="Event title" style={SU_INPUT} />
+        <div style={{ display: 'flex', gap: 10 }}>
+          <input type="date" value={form.date} onChange={function(e) { setForm(Object.assign({}, form, { date: e.target.value })); }} style={SU_INPUT} />
+          <input value={form.time} onChange={function(e) { setForm(Object.assign({}, form, { time: e.target.value })); }} placeholder="Time (e.g. 6:00 PM)" style={SU_INPUT} />
+        </div>
+        <textarea value={form.description} onChange={function(e) { setForm(Object.assign({}, form, { description: e.target.value })); }} placeholder="Description (optional)" rows={3} style={SU_INPUT} />
+      </div>
+      {eventType === 'rsvp' ? (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>RSVP Options</div>
+          {options.map(function(opt, i) {
+            return (
+              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                <input value={opt} onChange={function(e) { updateOption(i, e.target.value); }} style={SU_INPUT} />
+                {options.length > 1 && <button onClick={function() { removeOption(i); }} style={{ background: 'none', border: 'none', color: '#c88', cursor: 'pointer', fontSize: 14 }}>×</button>}
+              </div>
+            );
+          })}
+          <button onClick={addOption} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>+ Add option</button>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Time Slots</div>
+          {loadingSlots ? <div style={{ color: '#ccc', fontSize: 13 }}>Loading…</div> : (
+            <div>
+              {slots.map(function(slot, i) {
+                return <SuSlotRow key={slot.id || 'new' + i} slot={slot} onChange={function(u) { updateSlot(i, u); }} onRemove={function() { removeSlot(i); }} />;
+              })}
+              <button onClick={addSlot} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>+ Add slot</button>
+            </div>
+          )}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button onClick={handleSave} disabled={saving || !form.title.trim()} style={Object.assign({}, SU_BTN_PRIMARY, { opacity: (saving || !form.title.trim()) ? 0.6 : 1 })}>{saving ? 'Saving…' : 'Save'}</button>
+        <button onClick={onCancel} style={SU_BTN_GHOST}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function SuPollPanel({ poll, onSaved, onCancel }) {
+  var isEdit = !!poll;
+  var [question, setQuestion] = useState(poll ? poll.question || '' : '');
+  var [options, setOptions] = useState(poll && poll.options && poll.options.length ? poll.options : ['', '']);
+  var [saving, setSaving] = useState(false);
+  function updateOption(i, val) { var o = options.slice(); o[i] = val; setOptions(o); }
+  function removeOption(i) { setOptions(options.filter(function(_, idx) { return idx !== i; })); }
+  function addOption() { setOptions(options.concat([''])); }
+  function handleSave() {
+    var opts = options.map(function(o) { return o.trim(); }).filter(Boolean);
+    if (!question.trim() || opts.length < 2 || saving) return;
+    setSaving(true);
+    var payload = { question: question.trim(), options: opts };
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+    var req = isEdit
+      ? fetch(SUPABASE_URL + '/rest/v1/vol_polls?id=eq.' + poll.id, { method: 'PATCH', headers: hdrs, body: JSON.stringify(payload) })
+      : fetch(SUPABASE_URL + '/rest/v1/vol_polls', { method: 'POST', headers: hdrs, body: JSON.stringify(payload) });
+    req.then(function() { setSaving(false); onSaved(); }).catch(function() { setSaving(false); });
+  }
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 16 }}>{isEdit ? 'Edit Poll' : 'New Poll'}</div>
+      <textarea value={question} onChange={function(e) { setQuestion(e.target.value); }} placeholder="Poll question" rows={2} style={Object.assign({}, SU_INPUT, { marginBottom: 12 })} />
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Options</div>
+      {options.map(function(opt, i) {
+        return (
+          <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+            <input value={opt} onChange={function(e) { updateOption(i, e.target.value); }} placeholder={'Option ' + (i + 1)} style={SU_INPUT} />
+            {options.length > 2 && <button onClick={function() { removeOption(i); }} style={{ background: 'none', border: 'none', color: '#c88', cursor: 'pointer', fontSize: 14 }}>×</button>}
+          </div>
+        );
+      })}
+      <button onClick={addOption} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0, marginBottom: 16, display: 'block' }}>+ Add option</button>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button onClick={handleSave} disabled={saving} style={Object.assign({}, SU_BTN_PRIMARY, { opacity: saving ? 0.6 : 1 })}>{saving ? 'Saving…' : 'Save'}</button>
+        <button onClick={onCancel} style={SU_BTN_GHOST}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function SuTemplatePanel({ template, onSaved, onCancel }) {
+  var isEdit = !!template;
+  var [name, setName] = useState(template ? template.name || '' : '');
+  var [questions, setQuestions] = useState(template && template.questions && template.questions.length ? template.questions : [suMkQuestion()]);
+  var [saving, setSaving] = useState(false);
+  function updateQ(i, updated) { var qs = questions.slice(); qs[i] = updated; setQuestions(qs); }
+  function removeQ(i) { setQuestions(questions.filter(function(_, idx) { return idx !== i; })); }
+  function duplicateQ(i) { var qs = questions.slice(); qs.splice(i + 1, 0, Object.assign({}, qs[i], { id: suGenId() })); setQuestions(qs); }
+  function moveUp(i) { var qs = questions.slice(); var t = qs[i - 1]; qs[i - 1] = qs[i]; qs[i] = t; setQuestions(qs); }
+  function moveDown(i) { var qs = questions.slice(); var t = qs[i + 1]; qs[i + 1] = qs[i]; qs[i] = t; setQuestions(qs); }
+  function handleSave() {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    var payload = { name: name.trim(), questions: suNormalizeFields(questions) };
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+    var req = isEdit
+      ? fetch(SUPABASE_URL + '/rest/v1/nsh_templates?id=eq.' + template.id, { method: 'PATCH', headers: hdrs, body: JSON.stringify(payload) })
+      : fetch(SUPABASE_URL + '/rest/v1/nsh_templates', { method: 'POST', headers: hdrs, body: JSON.stringify(payload) });
+    req.then(function() { setSaving(false); onSaved(); }).catch(function() { setSaving(false); });
+  }
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 16 }}>{isEdit ? 'Edit Template' : 'New Template'}</div>
+      <input value={name} onChange={function(e) { setName(e.target.value); }} placeholder="Template name" style={Object.assign({}, SU_INPUT, { marginBottom: 16 })} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+        {questions.map(function(q, i) {
+          return <SuQuestionEditor key={q.id} question={q}
+            onUpdate={function(u) { updateQ(i, u); }} onRemove={function() { removeQ(i); }} canRemove={questions.length > 1}
+            onDuplicate={function() { duplicateQ(i); }} onMoveUp={function() { moveUp(i); }} onMoveDown={function() { moveDown(i); }}
+            canMoveUp={i > 0} canMoveDown={i < questions.length - 1} />;
+        })}
+      </div>
+      <button onClick={function() { setQuestions(questions.concat([suMkQuestion()])); }} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 20, display: 'block' }}>+ Add question</button>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button onClick={handleSave} disabled={saving || !name.trim()} style={Object.assign({}, SU_BTN_PRIMARY, { opacity: (saving || !name.trim()) ? 0.6 : 1 })}>{saving ? 'Saving…' : 'Save'}</button>
+        <button onClick={onCancel} style={SU_BTN_GHOST}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function SuFormPanel({ form, templates, onSaved, onCancel }) {
+  var isEdit = !!form;
+  var [title, setTitle] = useState(form ? form.title || '' : '');
+  var [description, setDescription] = useState(form ? form.description || '' : '');
+  var [showResponses, setShowResponses] = useState(form ? form.show_responses !== false : true);
+  var [questions, setQuestions] = useState(form && form.fields && form.fields.length ? form.fields : [suMkQuestion()]);
+  var [saving, setSaving] = useState(false);
+  function updateQ(i, updated) { var qs = questions.slice(); qs[i] = updated; setQuestions(qs); }
+  function removeQ(i) { setQuestions(questions.filter(function(_, idx) { return idx !== i; })); }
+  function duplicateQ(i) { var qs = questions.slice(); qs.splice(i + 1, 0, Object.assign({}, qs[i], { id: suGenId() })); setQuestions(qs); }
+  function moveUp(i) { var qs = questions.slice(); var t = qs[i - 1]; qs[i - 1] = qs[i]; qs[i] = t; setQuestions(qs); }
+  function moveDown(i) { var qs = questions.slice(); var t = qs[i + 1]; qs[i + 1] = qs[i]; qs[i] = t; setQuestions(qs); }
+  function handleRosterGenerate(newFields) { setQuestions(function(prev) { return prev.filter(function(q) { return q.label.trim(); }).concat(newFields); }); }
+  function handleSave() {
+    if (!title.trim() || saving) return;
+    setSaving(true);
+    var payload = { title: title.trim(), description: description.trim() || null, fields: suNormalizeFields(questions), show_responses: showResponses };
+    var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+    var req = isEdit
+      ? fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=eq.' + form.id, { method: 'PATCH', headers: hdrs, body: JSON.stringify(payload) })
+      : fetch(SUPABASE_URL + '/rest/v1/nsh_forms', { method: 'POST', headers: hdrs, body: JSON.stringify(payload) });
+    req.then(function() { setSaving(false); onSaved(); }).catch(function() { setSaving(false); });
+  }
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 16 }}>{isEdit ? 'Edit Form' : 'New Form'}</div>
+      <input value={title} onChange={function(e) { setTitle(e.target.value); }} placeholder="Form title" style={Object.assign({}, SU_INPUT, { marginBottom: 10 })} />
+      <textarea value={description} onChange={function(e) { setDescription(e.target.value); }} placeholder="Description (optional)" rows={2} style={Object.assign({}, SU_INPUT, { marginBottom: 10 })} />
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer', marginBottom: 16 }}>
+        <input type="checkbox" checked={showResponses} onChange={function(e) { setShowResponses(e.target.checked); }} />
+        Show other people's answers to respondents after they submit
+      </label>
+      {isEdit && (
+        <button onClick={function() { navigator.clipboard.writeText(suEmbedHtml(form.id, title)); }} style={Object.assign({}, SU_BTN_GHOST, { marginBottom: 16 })}>Copy Embed HTML</button>
+      )}
+      <SuRosterGenerator templates={templates} onGenerate={handleRosterGenerate} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+        {questions.map(function(q, i) {
+          return <SuQuestionEditor key={q.id} question={q}
+            onUpdate={function(u) { updateQ(i, u); }} onRemove={function() { removeQ(i); }} canRemove={questions.length > 1}
+            onDuplicate={function() { duplicateQ(i); }} onMoveUp={function() { moveUp(i); }} onMoveDown={function() { moveDown(i); }}
+            canMoveUp={i > 0} canMoveDown={i < questions.length - 1} />;
+        })}
+      </div>
+      <button onClick={function() { setQuestions(questions.concat([suMkQuestion()])); }} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 20, display: 'block' }}>+ Add question</button>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button onClick={handleSave} disabled={saving || !title.trim()} style={Object.assign({}, SU_BTN_PRIMARY, { opacity: (saving || !title.trim()) ? 0.6 : 1 })}>{saving ? 'Saving…' : 'Save'}</button>
+        <button onClick={onCancel} style={SU_BTN_GHOST}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+var SU_BUILDER_TABS = [
+  { key: 'events', label: 'Events' },
+  { key: 'polls', label: 'Polls' },
+  { key: 'forms', label: 'Forms' },
+  { key: 'templates', label: 'Templates' },
+];
+
+function FormBuilderView({ navigate }) {
+  var [tab, setTab] = useState('events');
+  var [events, setEvents] = useState([]);
+  var [polls, setPolls] = useState([]);
+  var [forms, setForms] = useState([]);
+  var [templates, setTemplates] = useState([]);
+  var [loading, setLoading] = useState(true);
+  var [editing, setEditing] = useState(null);
+  var [copiedId, setCopiedId] = useState(null);
+
+  function fetchAll() {
+    setLoading(true);
+    var h = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/vol_events?select=*,vol_event_responses(count),vol_shift_slots(count)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/vol_polls?select=*,vol_poll_votes(count)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/nsh_forms?select=*,nsh_form_responses(count)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/nsh_templates?select=*&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
+    ]).then(function(res) {
+      setEvents(Array.isArray(res[0]) ? res[0] : []);
+      setPolls(Array.isArray(res[1]) ? res[1] : []);
+      setForms(Array.isArray(res[2]) ? res[2] : []);
+      setTemplates(Array.isArray(res[3]) ? res[3] : []);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }
+  useEffect(function() { fetchAll(); }, []);
+
+  function handleSaved() { setEditing(null); fetchAll(); }
+  function handleDelete(label, id, table) {
+    if (!window.confirm('Delete this ' + label + '? This cannot be undone.')) return;
+    fetch(SUPABASE_URL + '/rest/v1/' + table + '?id=eq.' + id, { method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function() { fetchAll(); });
+  }
+  function handleCopyLink(kind, id, title) {
+    navigator.clipboard.writeText(suPublicLink(kind, id, title));
+    setCopiedId(kind + id);
+    setTimeout(function() { setCopiedId(null); }, 2000);
+  }
+
+  if (editing) {
+    var back = function() { setEditing(null); };
+    return (
+      <div style={{ maxWidth: 640 }}>
+        <SuBuilderBack onBack={back} />
+        {editing.type === 'events' && <SuEventPanel event={editing.id ? events.find(function(e) { return e.id === editing.id; }) : null} onSaved={handleSaved} onCancel={back} />}
+        {editing.type === 'polls' && <SuPollPanel poll={editing.id ? polls.find(function(p) { return p.id === editing.id; }) : null} onSaved={handleSaved} onCancel={back} />}
+        {editing.type === 'forms' && <SuFormPanel form={editing.id ? forms.find(function(f) { return f.id === editing.id; }) : null} templates={templates} onSaved={handleSaved} onCancel={back} />}
+        {editing.type === 'templates' && <SuTemplatePanel template={editing.id ? templates.find(function(t) { return t.id === editing.id; }) : null} onSaved={handleSaved} onCancel={back} />}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
+      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Form Builder</div>
+      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Create and manage sign-up events, polls, forms, and question templates.</div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+        {SU_BUILDER_TABS.map(function(t) {
+          return <button key={t.key} onClick={function() { setTab(t.key); }} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: tab === t.key ? gold : '#fff', color: tab === t.key ? '#fff' : '#888', border: '0.5px solid ' + (tab === t.key ? gold : '#e0d8cc') }}>{t.label}</button>;
+        })}
+      </div>
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '0.5px solid #f0ece6' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>{SU_BUILDER_TABS.find(function(t) { return t.key === tab; }).label}</div>
+          <button onClick={function() { setEditing({ type: tab, id: null }); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ New</button>
+        </div>
+        {loading ? <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div> : (
+          <div>
+            {tab === 'events' && (events.length === 0 ? <SuEmpty text="No events yet." /> : events.map(function(ev) {
+              var subtitle = (ev.date ? suFmtDate(ev.date) : '') + (ev.event_type === 'shift' ? ' · Shift sign-up' : ' · RSVP');
+              var meta = ev.event_type === 'shift' ? (((ev.vol_shift_slots && ev.vol_shift_slots[0] && ev.vol_shift_slots[0].count) || 0) + ' slots') : (((ev.vol_event_responses && ev.vol_event_responses[0] && ev.vol_event_responses[0].count) || 0) + ' RSVPs');
+              return <SuListRow key={ev.id} title={ev.title} subtitle={subtitle} meta={meta}
+                onClick={function() { setEditing({ type: 'events', id: ev.id }); }}
+                onCopyLink={function() { handleCopyLink('event', ev.id, ev.title); }} copied={copiedId === 'event' + ev.id}
+                onDelete={function() { handleDelete('event', ev.id, 'vol_events'); }} />;
+            }))}
+            {tab === 'polls' && (polls.length === 0 ? <SuEmpty text="No polls yet." /> : polls.map(function(pl) {
+              var meta = ((pl.vol_poll_votes && pl.vol_poll_votes[0] && pl.vol_poll_votes[0].count) || 0) + ' votes';
+              return <SuListRow key={pl.id} title={pl.question} meta={meta}
+                onClick={function() { setEditing({ type: 'polls', id: pl.id }); }}
+                onCopyLink={function() { handleCopyLink('poll', pl.id, pl.question); }} copied={copiedId === 'poll' + pl.id}
+                onDelete={function() { handleDelete('poll', pl.id, 'vol_polls'); }} />;
+            }))}
+            {tab === 'forms' && (forms.length === 0 ? <SuEmpty text="No forms yet." /> : forms.map(function(fm) {
+              var meta = (((fm.nsh_form_responses && fm.nsh_form_responses[0] && fm.nsh_form_responses[0].count) || 0) + ' responses') + (fm.show_responses === false ? ' · private' : '');
+              return <SuListRow key={fm.id} title={fm.title} subtitle={fm.description} meta={meta}
+                onClick={function() { setEditing({ type: 'forms', id: fm.id }); }}
+                onCopyLink={function() { handleCopyLink('form', fm.id, fm.title); }} copied={copiedId === 'form' + fm.id}
+                onDelete={function() { handleDelete('form', fm.id, 'nsh_forms'); }} />;
+            }))}
+            {tab === 'templates' && (templates.length === 0 ? <SuEmpty text="No templates yet." /> : templates.map(function(tp) {
+              var meta = ((tp.questions && tp.questions.length) || 0) + ' questions';
+              return <SuListRow key={tp.id} title={tp.name} meta={meta}
+                onClick={function() { setEditing({ type: 'templates', id: tp.id }); }}
+                onDelete={function() { handleDelete('template', tp.id, 'nsh_templates'); }} />;
+            }))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SuEventResponses({ event }) {
+  var [responses, setResponses] = useState([]);
+  var [slots, setSlots] = useState([]);
+  var [signups, setSignups] = useState({});
+  var [loading, setLoading] = useState(true);
+  useEffect(function() {
+    if (!event) { setLoading(false); return; }
+    var h = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    if (event.event_type === 'rsvp') {
+      fetch(SUPABASE_URL + '/rest/v1/vol_event_responses?event_id=eq.' + event.id + '&select=*&order=created_at', { headers: h })
+        .then(function(r) { return r.json(); }).then(function(rows) { setResponses(Array.isArray(rows) ? rows : []); setLoading(false); }).catch(function() { setLoading(false); });
+    } else {
+      fetch(SUPABASE_URL + '/rest/v1/vol_shift_slots?event_id=eq.' + event.id + '&select=*&order=sort_order', { headers: h })
+        .then(function(r) { return r.json(); }).then(function(sl) {
+          var slotRows = Array.isArray(sl) ? sl : [];
+          setSlots(slotRows);
+          if (!slotRows.length) { setLoading(false); return; }
+          var ids = slotRows.map(function(s) { return s.id; }).join(',');
+          fetch(SUPABASE_URL + '/rest/v1/vol_slot_signups?slot_id=in.(' + ids + ')&select=*&order=created_at', { headers: h })
+            .then(function(r) { return r.json(); }).then(function(sg) {
+              var grouped = {};
+              slotRows.forEach(function(s) { grouped[s.id] = []; });
+              (Array.isArray(sg) ? sg : []).forEach(function(s) { if (grouped[s.slot_id]) grouped[s.slot_id].push(s); });
+              setSignups(grouped);
+              setLoading(false);
+            }).catch(function() { setLoading(false); });
+        }).catch(function() { setLoading(false); });
+    }
+  }, [event && event.id]);
+
+  if (!event) return null;
+  if (loading) return <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>;
+
+  if (event.event_type === 'rsvp') {
+    var counts = {};
+    (event.options && event.options.length ? event.options : ['Attending', 'Attending +1', "Can't Make It"]).forEach(function(o) { counts[o] = 0; });
+    responses.forEach(function(r) { if (counts[r.response] !== undefined) counts[r.response]++; });
+    return (
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>{event.title}</div>
+        <div style={{ fontSize: 12, color: '#999', marginBottom: 16 }}>{event.date ? suFmtDate(event.date) : ''}{event.time ? ' · ' + event.time : ''}</div>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+          {Object.keys(counts).map(function(opt) {
+            return (
+              <div key={opt} style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '10px 16px', minWidth: 100 }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{counts[opt]}</div>
+                <div style={{ fontSize: 11, color: '#999' }}>{opt}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>All Responses ({responses.length})</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {responses.map(function(r) { return <div key={r.id} style={{ fontSize: 13, color: '#2a2a2a', padding: '6px 0', borderBottom: '0.5px solid #f5f0e8' }}>{r.name} <span style={{ color: gold, fontWeight: 600 }}>— {r.response}</span></div>; })}
+          {!responses.length && <div style={{ color: '#ccc', fontSize: 13 }}>No responses yet.</div>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>{event.title}</div>
+      <div style={{ fontSize: 12, color: '#999', marginBottom: 16 }}>{event.date ? suFmtDate(event.date) : ''}{event.time ? ' · ' + event.time : ''}</div>
+      {slots.map(function(slot) {
+        var su = signups[slot.id] || [];
+        return (
+          <div key={slot.id} style={{ marginBottom: 18, paddingBottom: 18, borderBottom: '0.5px solid #f5f0e8' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{slot.time_label}</div>
+            {slot.duration && <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{slot.duration}</div>}
+            <div style={{ fontSize: 11, color: gold, fontWeight: 600, marginTop: 4 }}>{su.length}{slot.spots != null ? '/' + slot.spots : ''} signed up</div>
+            <div style={{ marginTop: 6 }}>
+              {su.map(function(s) { return <div key={s.id} style={{ fontSize: 13, color: '#2a2a2a', padding: '3px 0' }}>{s.name}</div>; })}
+              {!su.length && <div style={{ color: '#ccc', fontSize: 12 }}>No signups yet.</div>}
+            </div>
+          </div>
+        );
+      })}
+      {!slots.length && <div style={{ color: '#ccc', fontSize: 13 }}>No slots.</div>}
+    </div>
+  );
+}
+
+function SuPollResponses({ poll }) {
+  var [votes, setVotes] = useState([]);
+  var [loading, setLoading] = useState(true);
+  useEffect(function() {
+    if (!poll) { setLoading(false); return; }
+    fetch(SUPABASE_URL + '/rest/v1/vol_poll_votes?poll_id=eq.' + poll.id + '&select=*&order=created_at', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); }).then(function(rows) { setVotes(Array.isArray(rows) ? rows : []); setLoading(false); }).catch(function() { setLoading(false); });
+  }, [poll && poll.id]);
+
+  if (!poll) return null;
+  if (loading) return <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>;
+
+  var counts = {};
+  votes.forEach(function(v) { counts[v.option] = (counts[v.option] || 0) + 1; });
+  var total = votes.length;
+
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', marginBottom: 16 }}>{poll.question}</div>
+      <div style={{ marginBottom: 20 }}>
+        {(poll.options || []).map(function(opt) {
+          var c = counts[opt] || 0;
+          var pct = total ? Math.round((c / total) * 100) : 0;
+          return (
+            <div key={opt} style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 3 }}>
+                <span style={{ color: '#2a2a2a', fontWeight: 600 }}>{opt}</span>
+                <span style={{ color: gold, fontWeight: 600 }}>{c} ({pct}%)</span>
+              </div>
+              <div style={{ height: 6, background: '#f0e6d8', borderRadius: 3 }}>
+                <div style={{ height: 6, background: gold, borderRadius: 3, width: pct + '%' }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>All Votes ({total})</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {votes.map(function(v) { return <div key={v.id} style={{ fontSize: 13, color: '#2a2a2a', padding: '6px 0', borderBottom: '0.5px solid #f5f0e8' }}>{v.name} <span style={{ color: gold, fontWeight: 600 }}>— {v.option}</span></div>; })}
+        {!votes.length && <div style={{ color: '#ccc', fontSize: 13 }}>No votes yet.</div>}
+      </div>
+    </div>
+  );
+}
+
+function suAnswerEntries(field, answer) {
+  if (field.type === 'group') {
+    return (field.parts || []).map(function(part) { return { label: part.label, value: answer && answer[part.id] }; })
+      .filter(function(e) { return e.value !== undefined && e.value !== '' && e.value !== null && !(Array.isArray(e.value) && e.value.length === 0); });
+  }
+  return (answer === undefined || answer === '' || answer === null || (Array.isArray(answer) && answer.length === 0)) ? [] : [{ label: field.label, value: answer }];
+}
+
+function SuFormResponses({ form }) {
+  var [responses, setResponses] = useState([]);
+  var [loading, setLoading] = useState(true);
+  useEffect(function() {
+    if (!form) { setLoading(false); return; }
+    fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?form_id=eq.' + form.id + '&select=*&order=created_at.desc', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); }).then(function(rows) { setResponses(Array.isArray(rows) ? rows : []); setLoading(false); }).catch(function() { setLoading(false); });
+  }, [form && form.id]);
+
+  if (!form) return null;
+  if (loading) return <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>;
+
+  var groups = suGroupFieldsBySection(form.fields || []);
+
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', marginBottom: 2 }}>{form.title}</div>
+      <div style={{ fontSize: 12, color: '#999', marginBottom: 20 }}>{responses.length} response{responses.length !== 1 ? 's' : ''}</div>
+      {!responses.length && <div style={{ color: '#ccc', fontSize: 13 }}>No responses yet.</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {responses.map(function(r) {
+          return (
+            <div key={r.id} style={{ paddingBottom: 20, borderBottom: '0.5px solid #f5f0e8' }}>
+              <div style={{ fontSize: 11, color: '#bbb', marginBottom: 10 }}>{new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+              {groups.map(function(g, gi) {
+                if (!g.section) {
+                  var q = g.fields[0];
+                  var entries = suAnswerEntries(q, r.answers ? r.answers[q.id] : undefined);
+                  if (!entries.length) return null;
+                  return (
+                    <div key={q.id} style={{ marginBottom: 8 }}>
+                      {entries.map(function(en, ei) {
+                        return <div key={ei} style={{ fontSize: 13, marginBottom: 3 }}><span style={{ color: '#999' }}>{en.label}: </span><span style={{ color: '#2a2a2a', fontWeight: 500 }}>{Array.isArray(en.value) ? en.value.join(', ') : String(en.value)}</span></div>;
+                      })}
+                    </div>
+                  );
+                }
+                var blocks = g.fields.map(function(q2) { return { q: q2, entries: suAnswerEntries(q2, r.answers ? r.answers[q2.id] : undefined) }; }).filter(function(b) { return b.entries.length; });
+                if (!blocks.length) return null;
+                return (
+                  <div key={gi} style={{ marginBottom: 10, background: '#faf8f4', borderRadius: 8, padding: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: gold, marginBottom: 6 }}>{g.section}</div>
+                    {blocks.map(function(b) {
+                      return b.entries.map(function(en, ei) {
+                        return <div key={b.q.id + ei} style={{ fontSize: 13, marginBottom: 3 }}><span style={{ color: '#999' }}>{en.label}: </span><span style={{ color: '#2a2a2a', fontWeight: 500 }}>{Array.isArray(en.value) ? en.value.join(', ') : String(en.value)}</span></div>;
+                      });
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+var SU_RESP_TABS = [
+  { key: 'events', label: 'Events' },
+  { key: 'polls', label: 'Polls' },
+  { key: 'forms', label: 'Forms' },
+];
+
+function FormResponsesView({ navigate }) {
+  var [tab, setTab] = useState('events');
+  var [events, setEvents] = useState([]);
+  var [polls, setPolls] = useState([]);
+  var [forms, setForms] = useState([]);
+  var [loading, setLoading] = useState(true);
+  var [selected, setSelected] = useState(null);
+
+  function fetchAll() {
+    setLoading(true);
+    var h = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/vol_events?select=*,vol_event_responses(count),vol_shift_slots(count)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/vol_polls?select=*,vol_poll_votes(count)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/nsh_forms?select=*,nsh_form_responses(count)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
+    ]).then(function(res) {
+      setEvents(Array.isArray(res[0]) ? res[0] : []);
+      setPolls(Array.isArray(res[1]) ? res[1] : []);
+      setForms(Array.isArray(res[2]) ? res[2] : []);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }
+  useEffect(function() { fetchAll(); }, []);
+
+  if (selected) {
+    return (
+      <div style={{ maxWidth: 640 }}>
+        <SuBuilderBack onBack={function() { setSelected(null); }} />
+        {selected.type === 'events' && <SuEventResponses event={events.find(function(e) { return e.id === selected.id; })} />}
+        {selected.type === 'polls' && <SuPollResponses poll={polls.find(function(p) { return p.id === selected.id; })} />}
+        {selected.type === 'forms' && <SuFormResponses form={forms.find(function(f) { return f.id === selected.id; })} />}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
+      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Form Responses</div>
+      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Browse RSVPs, shift signups, poll votes, and form answers.</div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+        {SU_RESP_TABS.map(function(t) {
+          return <button key={t.key} onClick={function() { setTab(t.key); }} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: tab === t.key ? gold : '#fff', color: tab === t.key ? '#fff' : '#888', border: '0.5px solid ' + (tab === t.key ? gold : '#e0d8cc') }}>{t.label}</button>;
+        })}
+      </div>
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden' }}>
+        {loading ? <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div> : (
+          <div>
+            {tab === 'events' && (events.length === 0 ? <SuEmpty text="No events yet." /> : events.map(function(ev) {
+              var meta = ev.event_type === 'shift' ? (((ev.vol_shift_slots && ev.vol_shift_slots[0] && ev.vol_shift_slots[0].count) || 0) + ' slots') : (((ev.vol_event_responses && ev.vol_event_responses[0] && ev.vol_event_responses[0].count) || 0) + ' RSVPs');
+              return <SuListRow key={ev.id} title={ev.title} subtitle={ev.date ? suFmtDate(ev.date) : ''} meta={meta} onClick={function() { setSelected({ type: 'events', id: ev.id }); }} />;
+            }))}
+            {tab === 'polls' && (polls.length === 0 ? <SuEmpty text="No polls yet." /> : polls.map(function(pl) {
+              var meta = ((pl.vol_poll_votes && pl.vol_poll_votes[0] && pl.vol_poll_votes[0].count) || 0) + ' votes';
+              return <SuListRow key={pl.id} title={pl.question} meta={meta} onClick={function() { setSelected({ type: 'polls', id: pl.id }); }} />;
+            }))}
+            {tab === 'forms' && (forms.length === 0 ? <SuEmpty text="No forms yet." /> : forms.map(function(fm) {
+              var meta = ((fm.nsh_form_responses && fm.nsh_form_responses[0] && fm.nsh_form_responses[0].count) || 0) + ' responses';
+              return <SuListRow key={fm.id} title={fm.title} meta={meta} onClick={function() { setSelected({ type: 'forms', id: fm.id }); }} />;
+            }))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function AdminToolCard(props) {
   var tool = props.tool;
@@ -10468,6 +11375,24 @@ function AdminView({ navigate }) {
         >
           <span style={{ color: '#b5a185', flexShrink: 0 }}>{cashIcon}</span>
           Office Cash Flow
+        </div>
+        <div
+          onClick={function() { navigate('form-builder'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{suCalendarIcon}</span>
+          Form Builder
+        </div>
+        <div
+          onClick={function() { navigate('form-responses'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{suClipboardIcon}</span>
+          Form Responses
         </div>
       </div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Outreach</div>
@@ -12131,6 +13056,8 @@ const views = {
   admin: AdminView,
   'vol-email-lists': VolEmailListsView,
   'wix-forms': WixFormsView,
+  'form-builder': FormBuilderView,
+  'form-responses': FormResponsesView,
   'acknowledgment-templates': AcknowledgmentTemplatesView,
   'acknowledgments-queue': AcknowledgmentsQueueView,
 };
