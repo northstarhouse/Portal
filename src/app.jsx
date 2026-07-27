@@ -255,6 +255,13 @@ function parseIcalDate(val) {
 const gold = "#886c44";
 const cream = "#f8f4ec";
 
+var ACTIVITY_TAG_COLORS = {
+  Wedding: { bg: '#fbeaf0', color: '#b5457a' },
+  Event: { bg: '#eaf1fb', color: '#3a6ea5' },
+  Inquiry: { bg: '#eafaf0', color: '#2e7d32' },
+  General: { bg: '#f0ece6', color: '#888' },
+};
+
 // ─── Sign-ups (Form Builder / Form Responses) shared helpers ──────────────────
 // Ported from the NSH-forms app's shared.jsx — kept byte-for-byte so the
 // answer/section schema already stored in Supabase for existing forms keeps
@@ -796,11 +803,15 @@ const typeColors = {
             var ts = a.created_at ? new Date(a.created_at) : null;
             var mins = ts ? Math.round((Date.now() - ts.getTime()) / 60000) : null;
             var when = mins === null ? '' : mins < 1 ? 'just now' : mins < 60 ? mins + 'm ago' : mins < 1440 ? Math.round(mins / 60) + 'h ago' : ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            var tagStyle = a.tag && ACTIVITY_TAG_COLORS[a.tag];
             return (
               <div key={a.id || i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i === activity.length - 1 ? 0 : 10 }}>
                 <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: gold, marginTop: 5, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: '#2a2a2a' }}>{a.description}</div>
+                  <div style={{ fontSize: 12, color: '#2a2a2a', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {tagStyle && <span style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 8px', flexShrink: 0 }}>{a.tag}</span>}
+                    <span>{a.description}</span>
+                  </div>
                   <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{when}</div>
                 </div>
               </div>
