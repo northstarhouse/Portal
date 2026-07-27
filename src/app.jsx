@@ -4212,7 +4212,152 @@ function DonorsView({ navigate }) {
   );
 }
 
-function MarketingView() {
+var POSTING_SCHEDULE = [
+  { week: 'First Week', days: [
+    { day: 'Monday', task: 'Wedding Posting + scheduling for the month' },
+    { day: 'Tuesday', task: 'Testimonial or Small History' },
+    { day: 'Thursday', task: 'Monthly email send out' },
+    { day: 'Friday', task: 'Volunteer Outreach - Events' },
+  ] },
+  { week: 'Second Week', days: [
+    { day: 'Monday', task: 'Sponsor Spotlight' },
+    { day: 'Tuesday', task: 'Upcoming Event / Tours' },
+    { day: 'Thursday', task: 'Planning Update' },
+    { day: 'Friday', task: 'Volunteer Outreach - Restoration' },
+  ] },
+  { week: 'Third Week', days: [
+    { day: 'Monday', task: 'Upcoming Event or Wedding' },
+    { day: 'Tuesday', task: 'OPEN' },
+    { day: 'Thursday', task: 'History Update' },
+    { day: 'Friday', task: 'Volunteer Outreach - Garden' },
+  ] },
+  { week: 'Fourth Week', days: [
+    { day: 'Monday', task: 'OPEN' },
+    { day: 'Tuesday', task: 'Restoration Video' },
+    { day: 'Thursday', task: 'Development / Board Update' },
+    { day: 'Friday', task: 'Volunteer Outreach - Docents' },
+  ] },
+];
+
+function MarketingPostingScheduleView({ navigate }) {
+  var { useState, useEffect, useRef } = React;
+  var month = new Date().toISOString().slice(0, 7);
+  var monthLabel = new Date(month + '-01T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  var [log, setLog] = useState({});
+  var [loading, setLoading] = useState(true);
+  var [copiedKey, setCopiedKey] = useState(null);
+  var debounceTimers = useRef({});
+
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/marketing_posting_log?month=eq.' + month + '&select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var map = {};
+      (Array.isArray(rows) ? rows : []).forEach(function(r) { map[r.item_key] = r; });
+      setLog(map);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }, []);
+
+  function saveRow(itemKey, patch) {
+    setLog(function(prev) { return Object.assign({}, prev, { [itemKey]: Object.assign({}, prev[itemKey] || { done: false, comment: '' }, patch) }); });
+    var existing = log[itemKey];
+    var body = Object.assign({ month: month, item_key: itemKey }, existing ? {} : { done: false, comment: null }, patch);
+    if (existing && existing.id) {
+      fetch(SUPABASE_URL + '/rest/v1/marketing_posting_log?id=eq.' + existing.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify(patch)
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        var updated = Array.isArray(rows) ? rows[0] : rows;
+        if (updated) setLog(function(prev) { return Object.assign({}, prev, { [itemKey]: updated }); });
+      });
+    } else {
+      fetch(SUPABASE_URL + '/rest/v1/marketing_posting_log?on_conflict=month,item_key', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify(body)
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        var inserted = Array.isArray(rows) ? rows[0] : rows;
+        if (inserted) setLog(function(prev) { return Object.assign({}, prev, { [itemKey]: inserted }); });
+      });
+    }
+  }
+
+  function toggleDone(itemKey) {
+    var current = log[itemKey];
+    saveRow(itemKey, { done: !(current && current.done) });
+  }
+
+  function handleCommentChange(itemKey, val) {
+    setLog(function(prev) { return Object.assign({}, prev, { [itemKey]: Object.assign({}, prev[itemKey] || { done: false }, { comment: val }) }); });
+    clearTimeout(debounceTimers.current[itemKey]);
+    debounceTimers.current[itemKey] = setTimeout(function() { saveRow(itemKey, { comment: val || null }); }, 700);
+  }
+
+  function copyTask(itemKey, day, task) {
+    navigator.clipboard.writeText(task);
+    setCopiedKey(itemKey);
+    setTimeout(function() { setCopiedKey(null); }, 1500);
+  }
+
+  var scissorsIcon = <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>;
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+        {navigate && <button onClick={function() { navigate('marketing'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: '#888', cursor: 'pointer' }}>← Marketing</button>}
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', margin: '10px 0 2px' }}>Monthly Posting Schedule</div>
+      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>{monthLabel}</div>
+
+      {loading ? (
+        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {POSTING_SCHEDULE.map(function(wk, wi) {
+            return (
+              <div key={wk.week} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 16px', background: '#faf8f4', borderBottom: '0.5px solid #f0ece6', fontSize: 12, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.6 }}>{wk.week}</div>
+                {wk.days.map(function(d, di) {
+                  var itemKey = 'w' + (wi + 1) + '-' + d.day;
+                  var row = log[itemKey] || { done: false, comment: '' };
+                  var isOpen = d.task === 'OPEN';
+                  return (
+                    <div key={itemKey} style={{ padding: '12px 16px', borderBottom: di < wk.days.length - 1 ? '0.5px solid #f9f6f2' : 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <div onClick={function() { if (!isOpen) toggleDone(itemKey); }} style={{ width: 18, height: 18, marginTop: 2, borderRadius: 5, border: '1.5px solid ' + (row.done ? gold : '#d0c8bc'), background: row.done ? gold : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: isOpen ? 'default' : 'pointer', opacity: isOpen ? 0.4 : 1 }}>
+                          {row.done && <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="2 6 5 9 10 3"/></svg>}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, color: '#2a2a2a' }}>
+                            <span style={{ fontWeight: 600 }}>{d.day}:</span>{' '}
+                            <span style={{ color: isOpen ? '#bbb' : '#2a2a2a', fontStyle: isOpen ? 'italic' : 'normal', textDecoration: row.done ? 'line-through' : 'none' }}>{d.task}</span>
+                          </div>
+                          {!isOpen && (
+                            <input value={row.comment || ''} onChange={function(e) { handleCommentChange(itemKey, e.target.value); }} placeholder="Comments…"
+                              style={{ width: '100%', marginTop: 6, padding: '5px 8px', border: '0.5px solid #e8e0d5', borderRadius: 6, fontSize: 12, background: '#faf8f4', boxSizing: 'border-box' }} />
+                          )}
+                        </div>
+                        {!isOpen && (
+                          <button onClick={function() { copyTask(itemKey, d.day, d.task); }} title="Copy task text" style={{ flexShrink: 0, marginTop: 2, background: copiedKey === itemKey ? '#f0ebe2' : 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 7px', cursor: 'pointer', color: copiedKey === itemKey ? gold : '#aaa', display: 'flex', alignItems: 'center' }}>
+                            {scissorsIcon}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MarketingView({ navigate }) {
   var { useState, useEffect } = React;
   var [links, setLinks] = useState([]);
   var [loading, setLoading] = useState(true);
@@ -4255,6 +4400,19 @@ function MarketingView() {
 
   return (
     <div style={{ maxWidth: 680 }}>
+      {navigate && (
+        <div onClick={function() { navigate('marketing-posting-schedule'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '14px 18px', marginBottom: 16, cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s' }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}>
+          <span style={{ color: '#b5a185', flexShrink: 0 }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg></span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>Monthly Posting Schedule</div>
+            <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>Weekly content plan with check-off tracking</div>
+          </div>
+          <span style={{ color: '#ccc', fontSize: 14 }}>→</span>
+        </div>
+      )}
       <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', letterSpacing: 0.2 }}>Quick Links</div>
@@ -11988,6 +12146,7 @@ const views = {
   volunteers: VolunteersView,
   donors: DonorsView,
   marketing: MarketingView,
+  'marketing-posting-schedule': MarketingPostingScheduleView,
   board: BoardView,
   sponsors: SponsorsView,
   strategy: StrategyView,
