@@ -10456,15 +10456,7 @@ function IdeasView() {
 }
 
 var ADMIN_FORMS = [
-  { label: "In-Kind Documentation Form", url: "https://drive.google.com/file/d/1cNGysqW__wS2IEKDaNzG1MPo-5JCE-ay/view" },
-  { label: "Reimbursement Form", url: "https://drive.google.com/file/d/1Vkfh6Z5eM1RPUtw6j8mQjqKM71-YFPrW/view" },
-  { label: "Board Submission Form", url: "https://drive.google.com/file/d/1_-AcaquXeK-O1x9AOubbQNCwoLWzu3f_/view" },
-  { label: "Incident & Injury Form", url: "https://drive.google.com/file/d/1UNzWO6b_-YbKd_rYUxC5GkA2dRQVfcg-/view" },
-  { label: "Brick Form", url: "https://drive.google.com/file/d/128gaSH9S_JtsjmxPd5Fq_ugumetBTiwt/view" },
-  { label: "Thank You Notes", url: "https://drive.google.com/drive/folders/1Mi8nNZzNWx1fz7CQ11XiW8SHPqQnBAgR?usp=sharing" },
-  { label: "2026 Pricing Guide", url: "https://drive.google.com/drive/folders/1Mi8nNZzNWx1fz7CQ11XiW8SHPqQnBAgR" },
-  { label: "Creative Rental Form", url: "https://drive.google.com/file/d/1Lp3WDaYukjmZ4lB_iS4sJj9PC6fjzz6I/view" },
-  { label: "Creative Rental Contract", url: "https://docs.google.com/document/d/1hKb9QK7MmrNpbmQcONyqNFbffEYGqJm5/edit?rtpof=true&sd=true#heading=h.3ff89qn2162x" },
+  { label: "Printable Forms", url: "https://drive.google.com/drive/folders/1m7RLU9lwPS_0N-qqwP2aNJaz6fp6UXQt?dmr=1&ec=wgc-drive-%5Bmodule%5D-goto" },
 ];
 
 var ADMIN_TOOLS = [
