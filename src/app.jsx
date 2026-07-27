@@ -4239,7 +4239,7 @@ var POSTING_SCHEDULE = [
   ] },
 ];
 
-function MarketingPostingScheduleView({ navigate }) {
+function MarketingPostingScheduleView({ navigate, navigateOp }) {
   var { useState, useEffect, useRef } = React;
   var month = new Date().toISOString().slice(0, 7);
   var monthLabel = new Date(month + '-01T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -4306,7 +4306,7 @@ function MarketingPostingScheduleView({ navigate }) {
   return (
     <div style={{ maxWidth: 720 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-        {navigate && <button onClick={function() { navigate('marketing'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: '#888', cursor: 'pointer' }}>← Marketing</button>}
+        {navigateOp && <button onClick={function() { navigateOp('Marketing'); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: '#888', cursor: 'pointer' }}>← Marketing</button>}
       </div>
       <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', margin: '10px 0 2px' }}>Monthly Posting Schedule</div>
       <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>{monthLabel}</div>
@@ -4400,19 +4400,6 @@ function MarketingView({ navigate }) {
 
   return (
     <div style={{ maxWidth: 680 }}>
-      {navigate && (
-        <div onClick={function() { navigate('marketing-posting-schedule'); }}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '14px 18px', marginBottom: 16, cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s' }}
-          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
-          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}>
-          <span style={{ color: '#b5a185', flexShrink: 0 }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg></span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>Monthly Posting Schedule</div>
-            <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>Weekly content plan with check-off tracking</div>
-          </div>
-          <span style={{ color: '#ccc', fontSize: 14 }}>→</span>
-        </div>
-      )}
       <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', letterSpacing: 0.2 }}>Quick Links</div>
@@ -6202,7 +6189,7 @@ function AllReimbursementsModal({ onClose }) {
   );
 }
 
-function OperationalView({ opArea, navigateToQuarterly }) {
+function OperationalView({ opArea, navigateToQuarterly, navigate }) {
   var { useState, useEffect } = React;
   var isMobile = React.useContext(MobileCtx);
   var area = opArea || OPERATIONAL_AREAS[0];
@@ -6862,6 +6849,15 @@ function OperationalView({ opArea, navigateToQuarterly }) {
               <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
               <span style={{ fontSize: 13, fontWeight: 500, color: gold, flex: 1 }}>Profit / Loss by Event</span>
               <span style={{ fontSize: 11, color: '#aaa' }}>Earnings vs. costs</span>
+            </div>
+          )}
+          {area === 'Marketing' && navigate && (
+            <div onClick={function() { navigate('marketing-posting-schedule'); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 6, background: '#faf8f5', borderRadius: 8, border: '0.5px solid #e8e0d5', cursor: 'pointer' }}
+              onMouseEnter={function(e) { e.currentTarget.style.background = '#f5f0e8'; }}
+              onMouseLeave={function(e) { e.currentTarget.style.background = '#faf8f5'; }}>
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
+              <span style={{ fontSize: 13, fontWeight: 500, color: gold, flex: 1 }}>Monthly Posting Schedule</span>
+              <span style={{ fontSize: 11, color: '#aaa' }}>Weekly content plan</span>
             </div>
           )}
           {resources.length === 0 && area !== 'Events'
