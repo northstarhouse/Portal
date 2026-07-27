@@ -538,6 +538,17 @@ const typeColors = {
   const [iheAdding, setIheAdding] = useState(false);
   const [iheSaving, setIheSaving] = useState(false);
   const [activity, setActivity] = useState(null);
+  const [editingTagId, setEditingTagId] = useState(null);
+
+  function updateActivityTag(id, newTag) {
+    setActivity(function(prev) { return prev.map(function(a) { return a.id === id ? Object.assign({}, a, { tag: newTag }) : a; }); });
+    setEditingTagId(null);
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag: newTag })
+    }).catch(function() {});
+  }
   const [vaEvent, setVaEvent] = useState(null);
   const [vaResponses, setVaResponses] = useState(null);
   const [vaShowDeclined, setVaShowDeclined] = useState(false);
@@ -811,7 +822,14 @@ const typeColors = {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                     <div style={{ fontSize: 12, color: '#2a2a2a', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-                      {tagStyle && <span style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 8px', flexShrink: 0 }}>{a.tag}</span>}
+                      {editingTagId === a.id ? (
+                        <select autoFocus value={a.tag || ''} onChange={function(e) { updateActivityTag(a.id, e.target.value); }} onBlur={function() { setEditingTagId(null); }}
+                          style={{ fontSize: 10, fontWeight: 700, border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '2px 6px', flexShrink: 0 }}>
+                          {Object.keys(ACTIVITY_TAG_COLORS).map(function(t) { return <option key={t} value={t}>{t}</option>; })}
+                        </select>
+                      ) : (
+                        tagStyle && <span onClick={function() { setEditingTagId(a.id); }} title="Click to change tag" style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 8px', flexShrink: 0, cursor: 'pointer' }}>{a.tag}</span>
+                      )}
                       <span>{a.description}</span>
                     </div>
                     {isHandled && a.handled_by && <span style={{ fontSize: 10, fontWeight: 700, color: '#2e7d32', flexShrink: 0 }}>{a.handled_by}</span>}
