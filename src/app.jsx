@@ -632,7 +632,10 @@ const typeColors = {
         return start && start >= now && start <= windowEnd;
       }).sort(function(a, b) {
         return parseIcalDate(a['DTSTART']) - parseIcalDate(b['DTSTART']);
-      }).slice(0, 8);
+      });
+      // No cap here — venue tours/walkthroughs can easily fill 8+ slots within
+      // two weeks and were crowding out Docent Tours/Planning Meetings entirely.
+      // The list scrolls instead (see render) so nothing gets silently dropped.
       setCalEvents(filtered);
     }).catch(function() { setCalEvents([]); });
     return function() { clearInterval(vaInterval); };
@@ -750,6 +753,7 @@ const typeColors = {
           </div>
           {calEvents === null && <div style={{ fontSize: 12, color: "#777" }}>Loading…</div>}
           {calEvents !== null && calEvents.length === 0 && <div style={{ fontSize: 12, color: "#777" }}>No upcoming events in the next 2 weeks.</div>}
+          <div style={{ maxHeight: 420, overflowY: 'auto' }}>
           {calEvents !== null && calEvents.map(function(ev, i) {
             var start = parseIcalDate(ev['DTSTART']);
             var isAllDay = ev['DTSTART'] && ev['DTSTART'].replace(/[^0-9TZ]/g,'').length === 8;
@@ -797,6 +801,7 @@ const typeColors = {
               </div>
             );
           })}
+          </div>
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: "0.5px solid #f0ebe2", fontSize: 12, color: "#999" }}>
             Synced from Google Calendar
           </div>
