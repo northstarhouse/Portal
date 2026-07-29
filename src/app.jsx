@@ -3210,6 +3210,9 @@ function DonorsView({ navigate }) {
   const [bulkFilling, setBulkFilling] = useState(false);
   const [bulkFillResult, setBulkFillResult] = useState(null);
   const [downloadingDocKey, setDownloadingDocKey] = useState(null);
+  const [uploadingCheckId, setUploadingCheckId] = useState(null);
+  const checkFileInputRef = React.useRef(null);
+  const [checkUploadForDon, setCheckUploadForDon] = useState(null);
   const [ackDonation, setAckDonation] = useState(null);
   const [ackStep, setAckStep] = useState(null);
   const [ackOverrides, setAckOverrides] = useState({});
@@ -3367,6 +3370,28 @@ function DonorsView({ navigate }) {
   function updateDonorInState(donorId, updater) {
     setDonors(function(prev){return prev.map(function(d){if(d.id!==donorId)return d;var newD=updater(d);return buildDonor(Object.assign({},d),newD.donations);});});
     setSelected(function(prev){if(!prev||prev.id!==donorId)return prev;var newD=updater(prev);return buildDonor(Object.assign({},prev),newD.donations);});
+  }
+
+  function handleCheckFileChosen(e){
+    var file=e.target.files[0];
+    var don=checkUploadForDon;
+    if(!file||!don)return;
+    setUploadingCheckId(don.id);
+    var reader=new FileReader();
+    reader.onload=function(){
+      var dataUrl=reader.result;
+      var base64=dataUrl.slice(dataUrl.indexOf(',')+1);
+      var filename=(don.date||'')+' - '+(selected?selected.formal_name:'')+' - Check'+(file.name.match(/\.[a-zA-Z0-9]+$/)||[''])[0];
+      fetch(SUPABASE_URL+'/functions/v1/upload-check',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({donationId:don.id,filename:filename,mimeType:file.type||'application/octet-stream',base64:base64})})
+        .then(function(r){return r.json();}).then(function(data){
+          setUploadingCheckId(null);
+          if(!data.success){alert('Upload failed: '+(data.error||'unknown error'));return;}
+          updateDonorInState(don.donor_id,function(d){return{donations:d.donations.map(function(x){return x.id===don.id?Object.assign({},x,{check_drive_url:data.checkUrl,check_drive_file_id:data.checkFileId}):x;})};});
+        }).catch(function(err){setUploadingCheckId(null);alert('Upload failed: '+err.message);});
+    };
+    reader.readAsDataURL(file);
+    e.target.value='';
   }
 
   function saveDonorFields(e){
@@ -3696,6 +3721,7 @@ function DonorsView({ navigate }) {
           <button onClick={exportCSV} style={{padding:'5px 10px',background:'none',border:'0.5px solid #e0d8cc',color:'#888',borderRadius:6,fontSize:11,fontWeight:500,cursor:'pointer'}}>↓ CSV</button>
           <button onClick={function(){setAddForm(emptyAddForm);setAddGiftForm(emptyGiftForm);setAddExistingDonor(null);setAddSearchQuery('');setAddMode('search');setShowAdd(true);}} style={{padding:'6px 12px',background:gold,color:'#fff',border:'none',borderRadius:6,fontSize:11,fontWeight:600,cursor:'pointer'}}>+ Add Donation</button>
         </div>
+        <input ref={checkFileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleCheckFileChosen} />
       </div>
       {bulkFillResult && (
         <div style={{marginBottom:14,padding:'8px 14px',background:'#e0f2fe',border:'0.5px solid #7dd3fc',borderRadius:8,fontSize:12,color:'#075985',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -4114,6 +4140,10 @@ function DonorsView({ navigate }) {
                                   {don.acknowledgment_status==='error' && don.generation_error && <span style={{fontSize:11,color:'#c0392b'}} title={don.generation_error}>Error: {don.generation_error.slice(0,60)}</span>}
                                 </div>
                               )}
+                              <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginTop:6}}>
+                                <button onClick={function(e){e.stopPropagation();setCheckUploadForDon(don);setTimeout(function(){checkFileInputRef.current&&checkFileInputRef.current.click();},0);}} disabled={uploadingCheckId===don.id} style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'3px 10px',cursor:'pointer'}}>{uploadingCheckId===don.id?'Uploading…':(don.check_drive_url?'Replace Check':'Upload Check')}</button>
+                                {don.check_drive_url && <a href={don.check_drive_url} target="_blank" rel="noreferrer" onClick={function(e){e.stopPropagation();}} style={{fontSize:11,color:'#888'}}>View Check</a>}
+                              </div>
                             </div>
                           )}
                         </div>
