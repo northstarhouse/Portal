@@ -3381,7 +3381,11 @@ function DonorsView({ navigate }) {
     reader.onload=function(){
       var dataUrl=reader.result;
       var base64=dataUrl.slice(dataUrl.indexOf(',')+1);
-      var filename=(don.date||'')+' - '+(selected?selected.formal_name:'')+' - Check'+(file.name.match(/\.[a-zA-Z0-9]+$/)||[''])[0];
+      var dateParts=(don.date||'').split('-');
+      var mdY=dateParts.length===3?(parseInt(dateParts[1],10)+'.'+parseInt(dateParts[2],10)+'.'+dateParts[0]):(don.date||'');
+      var nameParts=(selected?selected.formal_name:'').trim().split(/\s+/);
+      var lastName=nameParts[nameParts.length-1]||'';
+      var filename=mdY+'.'+lastName+' check'+(file.name.match(/\.[a-zA-Z0-9]+$/)||[''])[0];
       fetch(SUPABASE_URL+'/functions/v1/upload-check',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},
         body:JSON.stringify({donationId:don.id,filename:filename,mimeType:file.type||'application/octet-stream',base64:base64})})
         .then(function(r){return r.json();}).then(function(data){
