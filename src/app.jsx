@@ -252,6 +252,114 @@ function parseIcalDate(val) {
   return new Date(y + "-" + mo + "-" + d + "T" + h + ":" + mi + ":" + s + (val.endsWith("Z") ? "Z" : ""));
 }
 
+// ─── ICS recurrence (RRULE) expansion ──────────────────────────────────────
+// Our ICS parser only reads each VEVENT's literal DTSTART, which for a
+// recurring event is its very first occurrence (often months/years in the
+// past) — recurring events like "Public Docent Tours" or "Planning
+// Committee" (FREQ=MONTHLY;BYDAY=4TH etc.) would otherwise never appear as
+// "upcoming" since that original DTSTART already passed. This expands the
+// common patterns actually used on the calendar (monthly-by-nth-weekday,
+// weekly, daily) into concrete occurrence dates within a date range.
+var ICAL_WEEKDAY = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+
+function nthWeekdayOfMonth(year, month, weekday, n) {
+  if (n > 0) {
+    var first = new Date(year, month, 1);
+    var offset = (weekday - first.getDay() + 7) % 7;
+    return new Date(year, month, 1 + offset + (n - 1) * 7);
+  }
+  var last = new Date(year, month + 1, 0);
+  var offsetEnd = (last.getDay() - weekday + 7) % 7;
+  return new Date(year, month, last.getDate() - offsetEnd + (n + 1) * 7);
+}
+
+function parseRRuleParams(rruleStr) {
+  var params = {};
+  rruleStr.split(";").forEach(function(pair) {
+    var kv = pair.split("=");
+    if (kv[0]) params[kv[0]] = kv[1];
+  });
+  return params;
+}
+
+function expandRecurringOccurrences(ev, rangeStart, rangeEnd) {
+  var rrule = ev["RRULE"], dtStartStr = ev["DTSTART"];
+  if (!rrule || !dtStartStr) return [];
+  var start = parseIcalDate(dtStartStr);
+  if (!start) return [];
+  var params = parseRRuleParams(rrule);
+  var freq = params.FREQ;
+  var interval = parseInt(params.INTERVAL || "1", 10) || 1;
+  var until = params.UNTIL ? parseIcalDate(params.UNTIL) : null;
+  var count = params.COUNT ? parseInt(params.COUNT, 10) : null;
+
+  var exDates = {};
+  if (ev["EXDATE"]) {
+    ev["EXDATE"].split(",").forEach(function(exd) {
+      var d = parseIcalDate(exd);
+      if (d) exDates[d.toISOString().slice(0, 10)] = true;
+    });
+  }
+
+  var occurrences = [];
+  var hh = start.getHours(), mm = start.getMinutes();
+
+  if (freq === "MONTHLY" && params.BYDAY) {
+    var m = params.BYDAY.match(/(-?\d+)([A-Z]{2})/);
+    if (!m) return [];
+    var n = parseInt(m[1], 10);
+    var wd = ICAL_WEEKDAY[m[2]];
+    var cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    var occCount = 0;
+    for (var i = 0; i < 600; i++) {
+      var occDate = nthWeekdayOfMonth(cursor.getFullYear(), cursor.getMonth(), wd, n);
+      occDate.setHours(hh, mm, 0, 0);
+      if (occDate >= start) {
+        if (until && occDate > until) break;
+        occCount++;
+        if (count && occCount > count) break;
+        if (occDate >= rangeStart && occDate <= rangeEnd && !exDates[occDate.toISOString().slice(0, 10)]) occurrences.push(occDate);
+        if (occDate > rangeEnd) break;
+      }
+      cursor.setMonth(cursor.getMonth() + interval);
+    }
+  } else if (freq === "WEEKLY" || freq === "DAILY") {
+    var stepDays = freq === "WEEKLY" ? 7 * interval : interval;
+    var cur = new Date(start.getTime());
+    var occCount2 = 0;
+    for (var j = 0; j < 3000; j++) {
+      if (until && cur > until) break;
+      occCount2++;
+      if (count && occCount2 > count) break;
+      if (cur >= rangeStart && cur <= rangeEnd && !exDates[cur.toISOString().slice(0, 10)]) occurrences.push(new Date(cur.getTime()));
+      if (cur > rangeEnd) break;
+      cur = new Date(cur.getTime() + stepDays * 86400000);
+    }
+  }
+  return occurrences;
+}
+
+// Filters/expands a raw ICS event list down to concrete occurrences (with a
+// resolved `_occStart`/`_occEnd`) that fall within [rangeStart, rangeEnd].
+function occurrencesInRange(events, rangeStart, rangeEnd) {
+  var out = [];
+  events.forEach(function(ev) {
+    var origStart = parseIcalDate(ev["DTSTART"]);
+    var origEnd = ev["DTEND"] ? parseIcalDate(ev["DTEND"]) : null;
+    var durationMs = (origStart && origEnd) ? (origEnd - origStart) : null;
+    if (ev["RRULE"]) {
+      expandRecurringOccurrences(ev, rangeStart, rangeEnd).forEach(function(occStart) {
+        var occEnd = durationMs != null ? new Date(occStart.getTime() + durationMs) : null;
+        out.push(Object.assign({}, ev, { _occStart: occStart, _occEnd: occEnd }));
+      });
+    } else if (origStart && origStart >= rangeStart && origStart <= rangeEnd) {
+      out.push(Object.assign({}, ev, { _occStart: origStart, _occEnd: origEnd }));
+    }
+  });
+  out.sort(function(a, b) { return a._occStart - b._occStart; });
+  return out;
+}
+
 const gold = "#886c44";
 const cream = "#f8f4ec";
 
@@ -627,12 +735,11 @@ const typeColors = {
     fetchCalendarEvents().then(function(events) {
       var now = new Date();
       var windowEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-      var filtered = events.filter(function(ev) {
-        var start = parseIcalDate(ev['DTSTART']);
-        return start && start >= now && start <= windowEnd;
-      }).sort(function(a, b) {
-        return parseIcalDate(a['DTSTART']) - parseIcalDate(b['DTSTART']);
-      });
+      // occurrencesInRange expands recurring events (RRULE) into their actual
+      // upcoming dates — without this, monthly things like "Public Docent
+      // Tours" or "Planning Committee" never show since their literal DTSTART
+      // is the very first occurrence, long since passed.
+      var filtered = occurrencesInRange(events, now, windowEnd);
       // No cap here — venue tours/walkthroughs can easily fill 8+ slots within
       // two weeks and were crowding out Docent Tours/Planning Meetings entirely.
       // The list scrolls instead (see render) so nothing gets silently dropped.
@@ -755,12 +862,12 @@ const typeColors = {
           {calEvents !== null && calEvents.length === 0 && <div style={{ fontSize: 12, color: "#777" }}>No upcoming events in the next 2 weeks.</div>}
           <div style={{ maxHeight: 420, overflowY: 'auto' }}>
           {calEvents !== null && calEvents.map(function(ev, i) {
-            var start = parseIcalDate(ev['DTSTART']);
+            var start = ev._occStart || parseIcalDate(ev['DTSTART']);
             var isAllDay = ev['DTSTART'] && ev['DTSTART'].replace(/[^0-9TZ]/g,'').length === 8;
             var dayStr = start ? start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
             var todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
             var isToday = start && dayStr === todayStr;
-            var end = ev['DTEND'] ? parseIcalDate(ev['DTEND']) : null;
+            var end = ev._occEnd || (ev['DTEND'] ? parseIcalDate(ev['DTEND']) : null);
             if (!end && ev['DURATION']) {
               var dur = ev['DURATION'];
               var durMs = 0;
