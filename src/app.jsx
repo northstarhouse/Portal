@@ -930,7 +930,7 @@ const typeColors = {
             var mins = ts ? Math.round((Date.now() - ts.getTime()) / 60000) : null;
             var when = mins === null ? '' : mins < 1 ? 'just now' : mins < 60 ? mins + 'm ago' : mins < 1440 ? Math.round(mins / 60) + 'h ago' : ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             var tagStyle = a.tag && ACTIVITY_TAG_COLORS[a.tag];
-            var isHandled = a.action === 'voicemail_handled';
+            var isHandled = a.action === 'voicemail_handled' || a.resolved === true;
             return (
               <div key={a.id || i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i === activity.length - 1 ? 0 : 10 }}>
                 {isHandled ? (
@@ -11524,7 +11524,7 @@ function ActivityLogView({ navigate }) {
                     var ts = a.created_at ? new Date(a.created_at) : null;
                     var when = ts ? ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
                     var tagStyle = a.tag && ACTIVITY_TAG_COLORS[a.tag];
-                    var isHandled = a.action === 'voicemail_handled';
+                    var isHandled = a.action === 'voicemail_handled' || a.resolved === true;
                     return (
                       <div key={a.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 0', borderBottom: ai < g.items.length - 1 ? '0.5px solid #f5f0e8' : 'none' }}>
                         {isHandled ? (
@@ -11569,6 +11569,18 @@ function MaintenanceRequestView({ navigate }) {
   var [urgency, setUrgency] = useState('Normal');
   var [saving, setSaving] = useState(false);
   var [submitted, setSubmitted] = useState(false);
+  var [log, setLog] = useState(null);
+  var [resolvingId, setResolvingId] = useState(null);
+  var [showResolved, setShowResolved] = useState(false);
+
+  function fetchLog() {
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?action=eq.maintenance_request&select=*&order=created_at.desc&limit=200', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setLog(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setLog([]); });
+  }
+  useEffect(function() { fetchLog(); }, []);
 
   function submit(e) {
     e.preventDefault();
@@ -11579,58 +11591,114 @@ function MaintenanceRequestView({ navigate }) {
     var desc = parts.join(' ') + ': ' + description.trim() + (location.trim() ? ' — ' + location.trim() : '') + (reportedBy.trim() ? ' (reported by ' + reportedBy.trim() + ')' : '');
     fetch(SUPABASE_URL + '/rest/v1/activity_log', {
       method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
       body: JSON.stringify({ description: desc, action: 'maintenance_request', tag: 'Maintenance' })
-    }).then(function() {
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var inserted = Array.isArray(rows) ? rows[0] : rows;
       setSaving(false);
       setSubmitted(true);
       setDescription(''); setLocation(''); setReportedBy(''); setUrgency('Normal');
+      if (inserted) setLog(function(prev) { return [inserted].concat(prev || []); });
     }).catch(function() { setSaving(false); });
+  }
+
+  function markResolved(item) {
+    setResolvingId(item.id);
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?id=eq.' + item.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resolved: true, resolved_at: new Date().toISOString() })
+    }).then(function() {
+      setResolvingId(null);
+      setLog(function(prev) { return prev.map(function(x) { return x.id === item.id ? Object.assign({}, x, { resolved: true, resolved_at: new Date().toISOString() }) : x; }); });
+    }).catch(function() { setResolvingId(null); });
   }
 
   var inputStyle = { width: '100%', padding: '9px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' };
   var labelStyle = { fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 6 };
+  var open = (log || []).filter(function(x) { return !x.resolved; });
+  var resolved = (log || []).filter(function(x) { return x.resolved; });
 
   return (
-    <div style={{ maxWidth: 500 }}>
+    <div style={{ maxWidth: 900 }}>
       <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
       <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Maintenance Request</div>
       <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Logs straight to the Activity Log, tagged Maintenance.</div>
 
-      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
-        {submitted && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff3e0', border: '0.5px solid #f0d5b0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#c46a1a' }}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            Logged. <a onClick={function() { navigate('activity-log'); }} style={{ color: '#c46a1a', textDecoration: 'underline', cursor: 'pointer', marginLeft: 4 }}>View in Activity Log →</a>
-          </div>
-        )}
-        <form onSubmit={submit}>
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>What needs attention? *</label>
-            <textarea required value={description} onChange={function(e) { setDescription(e.target.value); }} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} placeholder="Describe the issue…" />
-          </div>
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Location / Area</label>
-            <input value={location} onChange={function(e) { setLocation(e.target.value); }} style={inputStyle} placeholder="e.g. Kitchen, South Grounds, Main Hall…" />
-          </div>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Urgency</label>
-              <select value={urgency} onChange={function(e) { setUrgency(e.target.value); }} style={inputStyle}>
-                <option>Normal</option>
-                <option>Urgent</option>
-                <option>Safety Issue</option>
-              </select>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
+          {submitted && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff3e0', border: '0.5px solid #f0d5b0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#c46a1a' }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Logged. <a onClick={function() { navigate('activity-log'); }} style={{ color: '#c46a1a', textDecoration: 'underline', cursor: 'pointer', marginLeft: 4 }}>View in Activity Log →</a>
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Reported By</label>
-              <input value={reportedBy} onChange={function(e) { setReportedBy(e.target.value); }} style={inputStyle} placeholder="Name…" />
+          )}
+          <form onSubmit={submit}>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>What needs attention? *</label>
+              <textarea required value={description} onChange={function(e) { setDescription(e.target.value); }} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} placeholder="Describe the issue…" />
             </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Location / Area</label>
+              <input value={location} onChange={function(e) { setLocation(e.target.value); }} style={inputStyle} placeholder="e.g. Kitchen, South Grounds, Main Hall…" />
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Urgency</label>
+                <select value={urgency} onChange={function(e) { setUrgency(e.target.value); }} style={inputStyle}>
+                  <option>Normal</option>
+                  <option>Urgent</option>
+                  <option>Safety Issue</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Reported By</label>
+                <input value={reportedBy} onChange={function(e) { setReportedBy(e.target.value); }} style={inputStyle} placeholder="Name…" />
+              </div>
+            </div>
+            <button type="submit" disabled={saving || !description.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (saving || !description.trim()) ? 0.6 : 1 }}>
+              {saving ? 'Submitting…' : 'Submit Request'}
+            </button>
+          </form>
+        </div>
+
+        <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '0.5px solid #f0ece6' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Open Requests {log !== null && '(' + open.length + ')'}</div>
+            {resolved.length > 0 && (
+              <button onClick={function() { setShowResolved(function(v) { return !v; }); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: '#888', cursor: 'pointer' }}>
+                {showResolved ? 'Hide' : 'Show'} Resolved ({resolved.length})
+              </button>
+            )}
           </div>
-          <button type="submit" disabled={saving || !description.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (saving || !description.trim()) ? 0.6 : 1 }}>
-            {saving ? 'Submitting…' : 'Submit Request'}
-          </button>
-        </form>
+          <div style={{ maxHeight: 520, overflowY: 'auto' }}>
+            {log === null && <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>}
+            {log !== null && open.length === 0 && !showResolved && <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No open requests.</div>}
+            {(showResolved ? open.concat(resolved) : open).map(function(item, i, arr) {
+              var ts = item.created_at ? new Date(item.created_at) : null;
+              var when = ts ? ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+              return (
+                <div key={item.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '12px 18px', borderBottom: i < arr.length - 1 ? '0.5px solid #f5f0e8' : 'none', opacity: item.resolved ? 0.55 : 1 }}>
+                  {item.resolved ? (
+                    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 3, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>
+                  ) : (
+                    <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: '#c46a1a', marginTop: 5, flexShrink: 0 }} />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5, textDecoration: item.resolved ? 'line-through' : 'none' }}>{item.description}</div>
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{when}</div>
+                  </div>
+                  {!item.resolved && (
+                    <button onClick={function() { markResolved(item); }} disabled={resolvingId === item.id}
+                      style={{ fontSize: 11, fontWeight: 600, color: '#2e7d32', background: '#eafaf0', border: '0.5px solid #cdebd8', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', flexShrink: 0, opacity: resolvingId === item.id ? 0.6 : 1 }}>
+                      {resolvingId === item.id ? '…' : 'Mark Resolved'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
