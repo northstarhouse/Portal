@@ -5100,7 +5100,7 @@ function BoardView() {
                   <div style={{ marginBottom: 12 }}>
                     <label style={bLbl}>Vote</label>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
-                      {['Yes', 'No', 'Abstain', 'Not in attendance'].concat(showNotesOption ? ['Notes in Place of Vote'] : []).map(function(opt) {
+                      {['Yes', 'No', 'Abstain'].concat(showNotesOption ? ['Notes in Place of Vote'] : []).map(function(opt) {
                         var vc2 = VOTE_COLORS[opt];
                         var active = voteForm.choice === opt;
                         return (
