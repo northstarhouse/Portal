@@ -4712,7 +4712,7 @@ function RichEditor({ value, onChange, placeholder }) {
 }
 
 var BOARD_MEMBERS = ['Ken', 'Rick', 'Wyn', 'Paula', 'Jeff', 'Rich'];
-var VOTE_COLORS = { 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#f3f0ff', color: '#7c3aed' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' }, 'Notes in Place of Vote': { bg: '#fff8e1', color: '#8a6200' } };
+var VOTE_COLORS = { 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#f3f0ff', color: '#7c3aed' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' }, 'Notes or Request Changes in Place of Vote': { bg: '#fff8e1', color: '#8a6200' } };
 
 function BoardView() {
   var isMobile = React.useContext(MobileCtx);
@@ -4722,9 +4722,8 @@ function BoardView() {
   const [showAdd, setShowAdd] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState(null);
-  const [topicForm, setTopicForm] = React.useState({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
+  const [topicForm, setTopicForm] = React.useState({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '', allow_notes_vote: false });
   const [voteForm, setVoteForm] = React.useState({ voter: '', choice: '', note: '' });
-  const [showNotesOption, setShowNotesOption] = React.useState(false);
   const [showPostMeeting, setShowPostMeeting] = React.useState(false);
   const [voteSaving, setVoteSaving] = React.useState(false);
   const [topicSaving, setTopicSaving] = React.useState(false);
@@ -4887,13 +4886,14 @@ function BoardView() {
       submitted_by: topicForm.submitted_by || null,
       due_date: topicForm.due_date || null,
       meeting_date: topicForm.meeting_date || null,
+      allow_notes_vote: topicForm.allow_notes_vote,
       status: 'Open'
     }).then(function(rows) {
       if (rows && rows.message) { alert('Error: ' + rows.message); setTopicSaving(false); return; }
       setTopicSaving(false);
       logActivity('New board vote opened: ' + topicForm.title + (topicForm.submitted_by ? ' (by ' + topicForm.submitted_by + ')' : ''), 'board_vote_opened');
       setShowAdd(false);
-      setTopicForm({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
+      setTopicForm({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '', allow_notes_vote: false });
       setAttachFileName(''); setAttachUploading(false);
       clearCache('Board Voting Items');
       load();
@@ -5100,27 +5100,21 @@ function BoardView() {
                   <div style={{ marginBottom: 12 }}>
                     <label style={bLbl}>Vote</label>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
-                      {['Yes', 'No', 'Abstain'].concat(showNotesOption ? ['Notes in Place of Vote'] : []).map(function(opt) {
+                      {['Yes', 'No', 'Abstain'].concat(selected.allow_notes_vote ? ['Notes or Request Changes in Place of Vote'] : []).map(function(opt) {
                         var vc2 = VOTE_COLORS[opt];
                         var active = voteForm.choice === opt;
                         return (
                           <button key={opt} type="button" onClick={function() { setVoteForm(function(f) { return Object.assign({}, f, { choice: opt }); }); }}
                             style={{ padding: '7px 14px', borderRadius: 20, border: '1.5px solid ' + (active ? vc2.color : '#e0d8cc'), background: active ? vc2.bg : '#fff', color: active ? vc2.color : '#888', fontSize: 13, fontWeight: active ? 700 : 400, cursor: 'pointer', transition: 'all 0.1s' }}>
-                            {opt}
+                            {opt === 'Notes or Request Changes in Place of Vote' ? 'Add Notes or Request Changes in Place of Vote' : opt}
                           </button>
                         );
                       })}
-                      {!showNotesOption && (
-                        <button type="button" onClick={function() { setShowNotesOption(true); }}
-                          style={{ padding: '7px 14px', borderRadius: 20, border: '1.5px solid #e0d8cc', background: '#fff', color: '#888', fontSize: 13, fontWeight: 400, cursor: 'pointer', transition: 'all 0.1s' }}>
-                          + Notes in Place of Vote
-                        </button>
-                      )}
                     </div>
                   </div>
-                  <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={2} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 12 })} placeholder={voteForm.choice === 'Notes in Place of Vote' ? 'Your notes…' : 'Note (optional)…'} />
-                  <button onClick={handleVoteSubmit} disabled={voteSaving || !voteForm.voter || !voteForm.choice || (voteForm.choice === 'Notes in Place of Vote' && !voteForm.note.trim())}
-                    style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (voteSaving || !voteForm.voter || !voteForm.choice || (voteForm.choice === 'Notes in Place of Vote' && !voteForm.note.trim())) ? 0.5 : 1 }}>
+                  <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={2} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 12 })} placeholder={voteForm.choice === 'Notes or Request Changes in Place of Vote' ? 'Your notes…' : 'Note (optional)…'} />
+                  <button onClick={handleVoteSubmit} disabled={voteSaving || !voteForm.voter || !voteForm.choice || (voteForm.choice === 'Notes or Request Changes in Place of Vote' && !voteForm.note.trim())}
+                    style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (voteSaving || !voteForm.voter || !voteForm.choice || (voteForm.choice === 'Notes or Request Changes in Place of Vote' && !voteForm.note.trim())) ? 0.5 : 1 }}>
                     {voteSaving ? 'Saving…' : 'Submit Vote'}
                   </button>
                 </div>
@@ -5275,7 +5269,14 @@ function BoardView() {
       {showAdd && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 4, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a', marginBottom: 20 }}>New Voting Topic</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 20 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>New Voting Topic</div>
+              <button type="button" onClick={function() { setTopicForm(function(f) { return Object.assign({}, f, { allow_notes_vote: !f.allow_notes_vote }); }); }}
+                title="Let voters submit notes/requested changes instead of a Yes/No/Abstain vote on this topic"
+                style={{ padding: '5px 10px', borderRadius: 20, border: '1.5px solid ' + (topicForm.allow_notes_vote ? '#8a6200' : '#e0d8cc'), background: topicForm.allow_notes_vote ? '#fff8e1' : '#fff', color: topicForm.allow_notes_vote ? '#8a6200' : '#888', fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                {topicForm.allow_notes_vote ? '✓ Notes Option On' : 'Allow Notes Option'}
+              </button>
+            </div>
             <form onSubmit={handleTopicSubmit}>
               <div style={bGrp}><label style={bLbl}>Title *</label><input required value={topicForm.title} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { title: e.target.value }); }); }} style={bInp} placeholder="Topic title…" /></div>
               <div style={bGrp}><label style={bLbl}>Description</label><RichEditor value={topicForm.description} onChange={function(html) { setTopicForm(function(f) { return Object.assign({}, f, { description: html }); }); }} placeholder="Background, details, context…" /></div>
