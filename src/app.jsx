@@ -2654,9 +2654,6 @@ function VolunteersView({ navigate }) {
                 <div style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a', marginBottom: 3, lineHeight: 1.3 }}>{v['First Name']} {v['Last Name']}</div>
                 {v['Team'] && <div style={{ fontSize: 12, color: '#777', marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v['Team'] || '').split('|')[0].trim()}</div>}
                 <Badge status={v['Status'] || 'Active'} />
-                {(v['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).length > 0 && (
-                  <div style={{ fontSize: 10, color: '#0d6eab', marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🏷 {(v['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).length}</div>
-                )}
               </div>
             );
           })}
