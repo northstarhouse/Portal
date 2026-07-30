@@ -368,6 +368,7 @@ var ACTIVITY_TAG_COLORS = {
   Event: { bg: '#eaf1fb', color: '#3a6ea5' },
   'Venue Inquiry': { bg: '#eafaf0', color: '#2e7d32' },
   General: { bg: '#f0ece6', color: '#888' },
+  Maintenance: { bg: '#fff3e0', color: '#c46a1a' },
 };
 
 // ─── Sign-ups (Form Builder / Form Responses) shared helpers ──────────────────
@@ -11561,6 +11562,80 @@ function ActivityLogView({ navigate }) {
   );
 }
 
+function MaintenanceRequestView({ navigate }) {
+  var [description, setDescription] = useState('');
+  var [location, setLocation] = useState('');
+  var [reportedBy, setReportedBy] = useState('');
+  var [urgency, setUrgency] = useState('Normal');
+  var [saving, setSaving] = useState(false);
+  var [submitted, setSubmitted] = useState(false);
+
+  function submit(e) {
+    e.preventDefault();
+    if (!description.trim() || saving) return;
+    setSaving(true);
+    var parts = ['Maintenance Request'];
+    if (urgency !== 'Normal') parts.push('[' + urgency + ']');
+    var desc = parts.join(' ') + ': ' + description.trim() + (location.trim() ? ' — ' + location.trim() : '') + (reportedBy.trim() ? ' (reported by ' + reportedBy.trim() + ')' : '');
+    fetch(SUPABASE_URL + '/rest/v1/activity_log', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: desc, action: 'maintenance_request', tag: 'Maintenance' })
+    }).then(function() {
+      setSaving(false);
+      setSubmitted(true);
+      setDescription(''); setLocation(''); setReportedBy(''); setUrgency('Normal');
+    }).catch(function() { setSaving(false); });
+  }
+
+  var inputStyle = { width: '100%', padding: '9px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' };
+  var labelStyle = { fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 6 };
+
+  return (
+    <div style={{ maxWidth: 500 }}>
+      <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
+      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Maintenance Request</div>
+      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Logs straight to the Activity Log, tagged Maintenance.</div>
+
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
+        {submitted && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff3e0', border: '0.5px solid #f0d5b0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#c46a1a' }}>
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Logged. <a onClick={function() { navigate('activity-log'); }} style={{ color: '#c46a1a', textDecoration: 'underline', cursor: 'pointer', marginLeft: 4 }}>View in Activity Log →</a>
+          </div>
+        )}
+        <form onSubmit={submit}>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>What needs attention? *</label>
+            <textarea required value={description} onChange={function(e) { setDescription(e.target.value); }} rows={3} style={Object.assign({}, inputStyle, { resize: 'vertical' })} placeholder="Describe the issue…" />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Location / Area</label>
+            <input value={location} onChange={function(e) { setLocation(e.target.value); }} style={inputStyle} placeholder="e.g. Kitchen, South Grounds, Main Hall…" />
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Urgency</label>
+              <select value={urgency} onChange={function(e) { setUrgency(e.target.value); }} style={inputStyle}>
+                <option>Normal</option>
+                <option>Urgent</option>
+                <option>Safety Issue</option>
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Reported By</label>
+              <input value={reportedBy} onChange={function(e) { setReportedBy(e.target.value); }} style={inputStyle} placeholder="Name…" />
+            </div>
+          </div>
+          <button type="submit" disabled={saving || !description.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (saving || !description.trim()) ? 0.6 : 1 }}>
+            {saving ? 'Submitting…' : 'Submit Request'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function DevLogView({ navigate }) {
   var [entries, setEntries] = useState(null);
 
@@ -11711,6 +11786,17 @@ function AdminView({ navigate }) {
         >
           <span style={{ color: '#b5a185', flexShrink: 0 }}>{suClipboardIcon}</span>
           Form Responses
+        </div>
+        <div
+          onClick={function() { navigate('maintenance-request'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          </span>
+          Maintenance Request
         </div>
       </div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Outreach</div>
@@ -13380,6 +13466,7 @@ const views = {
   'form-builder': FormBuilderView,
   'form-responses': FormResponsesView,
   'dev-log': DevLogView,
+  'maintenance-request': MaintenanceRequestView,
   'activity-log': ActivityLogView,
   'acknowledgment-templates': AcknowledgmentTemplatesView,
   'acknowledgments-queue': AcknowledgmentsQueueView,
@@ -13607,7 +13694,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
