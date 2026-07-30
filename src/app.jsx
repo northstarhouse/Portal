@@ -4712,7 +4712,7 @@ function RichEditor({ value, onChange, placeholder }) {
 }
 
 var BOARD_MEMBERS = ['Ken', 'Rick', 'Wyn', 'Paula', 'Jeff', 'Rich'];
-var VOTE_COLORS = { 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#f3f0ff', color: '#7c3aed' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' } };
+var VOTE_COLORS = { 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#f3f0ff', color: '#7c3aed' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' }, 'Notes in Place of Vote': { bg: '#fff8e1', color: '#8a6200' } };
 
 function BoardView() {
   var isMobile = React.useContext(MobileCtx);
@@ -4724,6 +4724,7 @@ function BoardView() {
   const [loadError, setLoadError] = React.useState(null);
   const [topicForm, setTopicForm] = React.useState({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '' });
   const [voteForm, setVoteForm] = React.useState({ voter: '', choice: '', note: '' });
+  const [showNotesOption, setShowNotesOption] = React.useState(false);
   const [showPostMeeting, setShowPostMeeting] = React.useState(false);
   const [voteSaving, setVoteSaving] = React.useState(false);
   const [topicSaving, setTopicSaving] = React.useState(false);
@@ -5098,8 +5099,8 @@ function BoardView() {
                   </div>
                   <div style={{ marginBottom: 12 }}>
                     <label style={bLbl}>Vote</label>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-                      {['Yes', 'No', 'Abstain', 'Not in attendance'].map(function(opt) {
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
+                      {['Yes', 'No', 'Abstain', 'Not in attendance'].concat(showNotesOption ? ['Notes in Place of Vote'] : []).map(function(opt) {
                         var vc2 = VOTE_COLORS[opt];
                         var active = voteForm.choice === opt;
                         return (
@@ -5109,11 +5110,17 @@ function BoardView() {
                           </button>
                         );
                       })}
+                      {!showNotesOption && (
+                        <button type="button" onClick={function() { setShowNotesOption(true); }}
+                          style={{ padding: '6px 12px', borderRadius: 20, border: '1px dashed #cbbfa8', background: 'none', color: '#a08a5f', fontSize: 12, cursor: 'pointer' }}>
+                          + Add Notes in Place of Vote
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={2} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 12 })} placeholder="Note (optional)…" />
-                  <button onClick={handleVoteSubmit} disabled={voteSaving || !voteForm.choice || !voteForm.voter}
-                    style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (voteSaving || !voteForm.choice || !voteForm.voter) ? 0.5 : 1 }}>
+                  <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={2} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 12 })} placeholder={voteForm.choice === 'Notes in Place of Vote' ? 'Your notes…' : 'Note (optional)…'} />
+                  <button onClick={handleVoteSubmit} disabled={voteSaving || !voteForm.voter || !voteForm.choice || (voteForm.choice === 'Notes in Place of Vote' && !voteForm.note.trim())}
+                    style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (voteSaving || !voteForm.voter || !voteForm.choice || (voteForm.choice === 'Notes in Place of Vote' && !voteForm.note.trim())) ? 0.5 : 1 }}>
                     {voteSaving ? 'Saving…' : 'Submit Vote'}
                   </button>
                 </div>
