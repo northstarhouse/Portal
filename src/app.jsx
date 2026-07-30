@@ -3653,7 +3653,10 @@ function DonorsView({ navigate }) {
   function closeAckFlow(){setAckStep(null);setAckDonation(null);setAckResult(null);setAckError(null);}
 
   function markAckStatus(don,status){
-    var patch=status==='printed'?{acknowledgment_status:'printed',date_printed:new Date().toISOString()}:{acknowledgment_status:'mailed',date_mailed:new Date().toISOString(),acknowledged:true};
+    var now=new Date().toISOString();
+    var patch=status==='printed'?{acknowledgment_status:'printed',date_printed:now}
+      :status==='printed_mailed'?{acknowledgment_status:'mailed',date_printed:now,date_mailed:now,acknowledged:true}
+      :{acknowledgment_status:'mailed',date_mailed:now,acknowledged:true};
     fetch(SUPABASE_URL+'/rest/v1/donations?id=eq.'+don.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(patch)})
       .then(function(r){return r.json();}).then(function(rows){
         var updated=Array.isArray(rows)?rows[0]:rows;
@@ -4251,8 +4254,7 @@ function DonorsView({ navigate }) {
                                   {don.envelope_drive_url && <a href={don.envelope_drive_url} target="_blank" rel="noreferrer" onClick={function(e){e.stopPropagation();}} style={{fontSize:11,color:'#888'}}>Open Envelope</a>}
                                   {don.letter_drive_file_id && <button onClick={function(e){e.stopPropagation();var key='letter-'+don.id;setDownloadingDocKey(key);downloadSinglePdf(don.letter_drive_file_id,(don.date||'')+' - Letter.pdf').then(function(){setDownloadingDocKey(null);}).catch(function(){setDownloadingDocKey(null);});}} disabled={downloadingDocKey==='letter-'+don.id} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>{downloadingDocKey==='letter-'+don.id?'…':'Download Letter PDF'}</button>}
                                   {don.envelope_drive_file_id && <button onClick={function(e){e.stopPropagation();var key='envelope-'+don.id;setDownloadingDocKey(key);downloadSinglePdf(don.envelope_drive_file_id,(don.date||'')+' - Envelope.pdf').then(function(){setDownloadingDocKey(null);}).catch(function(){setDownloadingDocKey(null);});}} disabled={downloadingDocKey==='envelope-'+don.id} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>{downloadingDocKey==='envelope-'+don.id?'…':'Download Envelope PDF'}</button>}
-                                  {don.acknowledgment_status==='generated' && <button onClick={function(e){e.stopPropagation();markAckStatus(don,'printed');}} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Mark Printed</button>}
-                                  {(don.acknowledgment_status==='generated'||don.acknowledgment_status==='printed') && <button onClick={function(e){e.stopPropagation();markAckStatus(don,'mailed');}} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Mark Mailed</button>}
+                                  {(don.acknowledgment_status==='generated'||don.acknowledgment_status==='printed') && <button onClick={function(e){e.stopPropagation();markAckStatus(don,'printed_mailed');}} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Mark Printed & Mailed</button>}
                                   {don.acknowledgment_status==='error' && don.generation_error && <span style={{fontSize:11,color:'#c0392b'}} title={don.generation_error}>Error: {don.generation_error.slice(0,60)}</span>}
                                 </div>
                               )}
@@ -11960,7 +11962,10 @@ function AcknowledgmentsQueueView({ navigate }) {
   function markSelected(status){
     var ids=selectedRows.map(function(r){return r.id;});
     if(ids.length===0)return;
-    var patch=status==='printed'?{acknowledgment_status:'printed',date_printed:new Date().toISOString()}:{acknowledgment_status:'mailed',date_mailed:new Date().toISOString(),acknowledged:true};
+    var now=new Date().toISOString();
+    var patch=status==='printed'?{acknowledgment_status:'printed',date_printed:now}
+      :status==='printed_mailed'?{acknowledgment_status:'mailed',date_printed:now,date_mailed:now,acknowledged:true}
+      :{acknowledgment_status:'mailed',date_mailed:now,acknowledged:true};
     fetch(SUPABASE_URL+'/rest/v1/donations?id=in.('+ids.join(',')+')',{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(patch)})
       .then(function(){load();setSelectedIds({});});
   }
@@ -12001,8 +12006,7 @@ function AcknowledgmentsQueueView({ navigate }) {
           <button onClick={function(){openSelectedDocs('envelope_drive_url');}} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:6,fontSize:12,color:'#444',cursor:'pointer'}}>Open Selected Envelopes</button>
           <button onClick={function(){downloadSelectedMerged('letter_drive_file_id','Letters');}} disabled={!!downloading} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid '+gold,color:gold,borderRadius:6,fontSize:12,fontWeight:500,cursor:'pointer',opacity:downloading?0.7:1}}>{downloading==='Letters'?'Building PDF…':'↓ Download Letters as One PDF'}</button>
           <button onClick={function(){downloadSelectedMerged('envelope_drive_file_id','Envelopes');}} disabled={!!downloading} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid '+gold,color:gold,borderRadius:6,fontSize:12,fontWeight:500,cursor:'pointer',opacity:downloading?0.7:1}}>{downloading==='Envelopes'?'Building PDF…':'↓ Download Envelopes as One PDF'}</button>
-          <button onClick={function(){markSelected('printed');}} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:6,fontSize:12,color:'#444',cursor:'pointer'}}>Mark Selected as Printed</button>
-          <button onClick={function(){markSelected('mailed');}} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:6,fontSize:12,color:'#444',cursor:'pointer'}}>Mark Selected as Mailed</button>
+          <button onClick={function(){markSelected('printed_mailed');}} style={{padding:'6px 12px',background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:6,fontSize:12,color:'#444',cursor:'pointer'}}>Mark Selected as Printed & Mailed</button>
         </div>
       )}
       {genProgress && <div style={{fontSize:12,color:'#888',marginBottom:10}}>Generating {genProgress.i}/{genProgress.total} — {genProgress.name}…</div>}
