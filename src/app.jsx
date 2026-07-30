@@ -5112,8 +5112,8 @@ function BoardView() {
                       })}
                       {!showNotesOption && (
                         <button type="button" onClick={function() { setShowNotesOption(true); }}
-                          style={{ padding: '6px 12px', borderRadius: 20, border: '1px dashed #cbbfa8', background: 'none', color: '#a08a5f', fontSize: 12, cursor: 'pointer' }}>
-                          + Add Notes in Place of Vote
+                          style={{ padding: '7px 14px', borderRadius: 20, border: '1.5px solid #e0d8cc', background: '#fff', color: '#888', fontSize: 13, fontWeight: 400, cursor: 'pointer', transition: 'all 0.1s' }}>
+                          + Notes in Place of Vote
                         </button>
                       )}
                     </div>
