@@ -4986,21 +4986,40 @@ function BoardView() {
   if (loading) return <div style={{ color: '#777', fontSize: 12, padding: 40, textAlign: 'center' }}>Loading…</div>;
   if (loadError) return <div style={{ color: '#c62828', fontSize: 12, padding: 20, background: '#ffebee', borderRadius: 8, border: '0.5px solid #ffcdd2' }}><strong>Supabase error:</strong> {loadError}<br/><br/>Make sure you've run the SQL setup in Supabase and that RLS is disabled on both tables.</div>;
 
+  var latestOpenItem = items.filter(function(i) { return !isRevealed(i); }).sort(function(a, b) {
+    var da = a.created_at ? new Date(a.created_at).getTime() : 0;
+    var db = b.created_at ? new Date(b.created_at).getTime() : 0;
+    if (db !== da) return db - da;
+    return (b.row_id || 0) - (a.row_id || 0);
+  })[0];
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Voting Topics</div>
           <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{items.length} topic{items.length !== 1 ? 's' : ''}</div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={function() { setShowAdmin(true); }} style={{ background: '#fff', color: '#555', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-            Admin
-          </button>
-          <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Topic</button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={function() { setShowAdmin(true); }} style={{ background: '#fff', color: '#555', border: '0.5px solid #e0d8cc', borderRadius: 7, padding: '6px 12px', fontSize: 11, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+              Admin
+            </button>
+            <button
+              onClick={function() { if (latestOpenItem) sendVoteNotification(latestOpenItem); }}
+              disabled={!latestOpenItem || !!sendingVoteId}
+              style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: (!latestOpenItem || sendingVoteId) ? 'default' : 'pointer', opacity: (!latestOpenItem || sendingVoteId) ? 0.5 : 1 }}
+            >
+              {sendingVoteId ? 'Sending…' : 'Send Notification'}
+            </button>
+          </div>
+          <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>+ Add Topic</button>
         </div>
       </div>
+      {voteNotifResult && (
+        <div style={{ textAlign: 'right', fontSize: 11, color: voteNotifResult.ok ? '#2e6b4f' : '#a04545', marginTop: -12, marginBottom: 12 }}>{voteNotifResult.text}</div>
+      )}
 
       {items.length === 0 && <div style={{ color: '#777', fontSize: 12, textAlign: 'center', padding: 40 }}>No voting items yet.</div>}
 
@@ -5065,9 +5084,6 @@ function BoardView() {
                   )}
                 </div>
               </div>
-              {sendingVoteId === null && voteNotifResult && voteNotifResult.forRowId === item.row_id && (
-                <div style={{ marginTop: 8, fontSize: 11, color: voteNotifResult.ok ? '#2e6b4f' : '#a04545' }}>{voteNotifResult.text}</div>
-              )}
               {revealed && (
                 <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
                   {[['Yes', t.yes, '#2e7d32'], ['No', t.no, '#c62828'], ['Abstain', t.abstain, '#7c3aed']].map(function(entry) {
