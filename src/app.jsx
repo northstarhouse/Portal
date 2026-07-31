@@ -9839,6 +9839,43 @@ function FinancialsView({ navigate }) {
   var [volList, setVolList] = useState([]);
   var [showAllReim, setShowAllReim] = useState(false);
 
+  // Quick-add: lets a reimbursement be entered right from this page, but it's
+  // still just an "Op Budget" row tagged with an area — so it shows up in that
+  // area's own Budget list too, same as one added from Operational Areas.
+  var [showAddReim, setShowAddReim] = useState(false);
+  var [addReimSaving, setAddReimSaving] = useState(false);
+  var todayStr = new Date().toISOString().slice(0, 10);
+  var emptyReimForm = { area: OPERATIONAL_AREAS[0], type: 'Purchase', description: '', amount: '', date: todayStr, purchased_by: '', volunteer_name: '' };
+  var [addReimForm, setAddReimForm] = useState(emptyReimForm);
+
+  function addReimbursement(e) {
+    e.preventDefault();
+    setAddReimSaving(true);
+    var payload = {
+      area: addReimForm.area,
+      type: addReimForm.type,
+      description: addReimForm.description,
+      amount: parseFloat(addReimForm.amount) || 0,
+      date: addReimForm.date || null,
+      purchased_by: addReimForm.purchased_by || null,
+      needs_reimbursement: true,
+      volunteer_name: addReimForm.volunteer_name || null
+    };
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setAddReimSaving(false);
+      if (rows && rows.code) { alert('Add failed: ' + (rows.message || rows.hint || rows.code)); return; }
+      clearCache('Op Budget');
+      setAddReimForm(Object.assign({}, emptyReimForm, { area: addReimForm.area }));
+      setShowAddReim(false);
+      loadReimbursements();
+      loadNotifyQueue();
+    });
+  }
+
   // Board notification: any Op Budget row (reimbursement or not, any area)
   // that hasn't been notified yet. Persisted server-side via board_notified_at
   // so the queue survives across page navigation and sessions.
@@ -10062,10 +10099,34 @@ function FinancialsView({ navigate }) {
             {!loading && items.length > 0 && <div style={{ fontSize: 12, color: '#b45309', fontWeight: 600, marginTop: 2 }}>{fmt(reimTotal)} total · {items.length} item{items.length !== 1 ? 's' : ''}</div>}
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button onClick={function() { setShowAddReim(function(v) { return !v; }); }} style={{ background: showAddReim ? '#f0ece6' : gold, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: showAddReim ? '#886c44' : '#fff', cursor: 'pointer' }}>{showAddReim ? 'Cancel' : '+ Add Reimbursement'}</button>
             <button onClick={function() { setShowAllReim(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>See All Past Reimbursements</button>
             <button onClick={function() { navigate('financial-overview'); }} style={{ background: gold, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>View All Financials</button>
           </div>
         </div>
+        {showAddReim && (
+          <form onSubmit={addReimbursement} style={{ padding: '14px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <select required value={addReimForm.area} onChange={function(e) { setAddReimForm(function(f) { return Object.assign({}, f, { area: e.target.value }); }); }} style={{ padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff' }}>
+                {OPERATIONAL_AREAS.map(function(a) { return <option key={a} value={a}>{a}</option>; })}
+              </select>
+              <select value={addReimForm.type} onChange={function(e) { setAddReimForm(function(f) { return Object.assign({}, f, { type: e.target.value }); }); }} style={{ padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff' }}>
+                <option>Purchase</option>
+                <option>In-Kind</option>
+              </select>
+            </div>
+            <input required value={addReimForm.description} onChange={function(e) { setAddReimForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} placeholder="Description" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <input required type="number" step="0.01" min="0" value={addReimForm.amount} onChange={function(e) { setAddReimForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} placeholder="Amount" style={{ padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
+              <input type="date" value={addReimForm.date} onChange={function(e) { setAddReimForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={{ padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
+            </div>
+            <input value={addReimForm.volunteer_name} onChange={function(e) { setAddReimForm(function(f) { return Object.assign({}, f, { volunteer_name: e.target.value }); }); }} placeholder="Volunteer / who to reimburse" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+            <input value={addReimForm.purchased_by} onChange={function(e) { setAddReimForm(function(f) { return Object.assign({}, f, { purchased_by: e.target.value }); }); }} placeholder="Purchased by" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="submit" disabled={addReimSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: addReimSaving ? 0.7 : 1 }}>{addReimSaving ? 'Saving…' : 'Add'}</button>
+            </div>
+          </form>
+        )}
         {showAllReim && <AllReimbursementsModal onClose={function() { setShowAllReim(false); }} />}
         {loading ? (
           <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
