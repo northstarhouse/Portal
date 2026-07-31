@@ -13757,8 +13757,11 @@ function buildBoardEmailRequest(g, toOverride) {
     buttonUrl = PORTAL_URL + '#financials';
   } else {
     // Area leads just get an FYI, same as any other operational-area activity — no action implied.
-    subject = 'New ' + g.items[0].area + ' Item' + (n > 1 ? 's' : '') + ' Submitted';
-    subtext = 'For your awareness, the following item' + (n > 1 ? 's have' : ' has') + ' been submitted for ' + g.items[0].area + ':<br/><br/>' + itemListHtml;
+    // Call it out as a "Reimbursement" specifically when every item in the batch is one.
+    var allReimb = g.items.every(function(it) { return it.needsReimbursement; });
+    var noun = allReimb ? 'Reimbursement' : 'Item';
+    subject = 'New ' + g.items[0].area + ' ' + noun + (n > 1 ? 's' : '') + ' Submitted';
+    subtext = 'For your awareness, the following ' + (allReimb ? 'reimbursement' : 'item') + (n > 1 ? 's have' : ' has') + ' been submitted for ' + g.items[0].area + ':<br/><br/>' + itemListHtml;
     buttonUrl = PORTAL_URL + '#operational';
   }
   buttonText = 'Click Here to View ' + (n > 1 ? 'Them' : 'It') + ' in the Portal';
