@@ -12347,7 +12347,21 @@ function AdminView({ navigate }) {
       }).then(function(r) { return r.json(); }).then(function(res) {
         setUploadingMail(false);
         if (!res.success) { setMailUploadResult({ ok: false, text: res.error || 'Upload failed.' }); return; }
-        setMailUploadResult({ ok: true, text: 'Uploaded as "' + filename + '".', url: res.url });
+        if (WYN_EMAIL) {
+          var html = buildBoardNotificationEmailHtml({
+            headline: 'New Mail Uploaded',
+            subtext: 'New mail has been uploaded to the Portal for your review.',
+            buttonText: 'Click Here to View in Portal',
+            buttonUrl: res.url
+          });
+          var text = 'New Mail Uploaded\n\nNew mail has been uploaded to the Portal for your review.\n\nClick Here to View in Portal: ' + res.url;
+          fetch(SUPABASE_URL + '/functions/v1/send-email', {
+            method: 'POST',
+            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: [WYN_EMAIL], subject: 'New Mail Uploaded', body: text, html: html })
+          }).catch(function() {});
+        }
+        setMailUploadResult({ ok: true, text: 'Uploaded as "' + filename + '".' + (WYN_EMAIL ? ' Wyn notified.' : ' (No email on file for Wyn — notification not sent.)'), url: res.url });
       }).catch(function(err) { setUploadingMail(false); setMailUploadResult({ ok: false, text: err.message || 'Upload failed.' }); });
     };
     reader.readAsDataURL(file);
