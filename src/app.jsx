@@ -4792,7 +4792,7 @@ function BoardView() {
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: recipients, bcc: [BOARD_VOTE_NOTIFY_BCC], subject: 'New Item for Board Review: ' + item.title, body: text, html: html })
+      body: JSON.stringify({ to: recipients, bcc: [BOARD_VOTE_NOTIFY_BCC], subject: 'New Item for Board Review', body: text, html: html })
     }).then(function(r) { return r.ok; }).catch(function() { return false; }).then(function(ok) {
       setSendingVoteId(null);
       var parts = [];
