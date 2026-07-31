@@ -4159,48 +4159,6 @@ function DonorsView({ navigate }) {
               {selected.address && <div><span style={{color:'#777'}}>Address </span><span style={{whiteSpace:'pre-line'}}>{selected.address}</span></div>}
             </div>
 
-            {/* Linked volunteer profile */}
-            <span style={sec}>Volunteer Profile</span>
-            <div style={{marginBottom:10}}>
-              {(function(){
-                var link=volunteerLinks.find(function(v){return v.donor_id===selected.id;});
-                if(link) return (
-                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',fontSize:12}}>
-                    <span style={{fontWeight:500,color:'#2a2a2a'}}>{(link['First Name']||'')+' '+(link['Last Name']||'')}</span>
-                    <button onClick={function(){window.__nshOpenVolunteerId=link.id;navigate('volunteers');}} style={{background:'#fff',border:'0.5px solid #ddd4c4',borderRadius:6,padding:'3px 10px',fontSize:11,color:gold,cursor:'pointer',fontWeight:500}}>View Volunteer Profile →</button>
-                    <button onClick={function(){unlinkVolunteer(link.id);}} disabled={linkingVol} style={{background:'transparent',border:'none',fontSize:11,color:'#bbb',cursor:linkingVol?'default':'pointer'}}>Unlink</button>
-                  </div>
-                );
-                return (
-                  <div style={{position:'relative'}}>
-                    <input
-                      value={volLinkQuery}
-                      onChange={function(e){setVolLinkQuery(e.target.value);setShowVolLinkDrop(true);}}
-                      onFocus={function(){setShowVolLinkDrop(true);}}
-                      onBlur={function(){setTimeout(function(){setShowVolLinkDrop(false);},150);}}
-                      placeholder="Search volunteers to link…"
-                      disabled={linkingVol}
-                      style={{width:'100%',padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,boxSizing:'border-box'}}
-                    />
-                    {showVolLinkDrop && volLinkQuery.trim() && (
-                      <div style={{position:'absolute',top:'100%',left:0,right:0,background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:8,marginTop:4,boxShadow:'0 4px 16px rgba(0,0,0,0.1)',zIndex:10,maxHeight:180,overflowY:'auto'}}>
-                        {volunteerOptions.filter(function(v){return !v.donor_id&&((v['First Name']||'')+' '+(v['Last Name']||'')).toLowerCase().includes(volLinkQuery.toLowerCase());}).slice(0,8).map(function(v){
-                          return (
-                            <div key={v.id} onMouseDown={function(){linkVolunteer(v.id);}} style={{padding:'7px 10px',fontSize:12,cursor:'pointer',borderBottom:'0.5px solid #f5f0ea'}}>
-                              {(v['First Name']||'')+' '+(v['Last Name']||'')}
-                            </div>
-                          );
-                        })}
-                        {volunteerOptions.filter(function(v){return !v.donor_id&&((v['First Name']||'')+' '+(v['Last Name']||'')).toLowerCase().includes(volLinkQuery.toLowerCase());}).length===0 && (
-                          <div style={{padding:'8px 10px',fontSize:12,color:'#bbb'}}>No matching volunteers</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-
             {/* Letter greeting + structured mailing address, used for acknowledgment generation */}
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={sec}>Letter & Mailing</span>
@@ -4440,6 +4398,48 @@ function DonorsView({ navigate }) {
                 </div>
               );
             })}
+
+            {/* Linked volunteer profile */}
+            <span style={sec}>Volunteer Profile</span>
+            <div style={{marginBottom:10}}>
+              {(function(){
+                var link=volunteerLinks.find(function(v){return v.donor_id===selected.id;});
+                if(link) return (
+                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',fontSize:12}}>
+                    <span style={{fontWeight:500,color:'#2a2a2a'}}>{(link['First Name']||'')+' '+(link['Last Name']||'')}</span>
+                    <button onClick={function(){window.__nshOpenVolunteerId=link.id;navigate('volunteers');}} style={{background:'#fff',border:'0.5px solid #ddd4c4',borderRadius:6,padding:'3px 10px',fontSize:11,color:gold,cursor:'pointer',fontWeight:500}}>View Volunteer Profile →</button>
+                    <button onClick={function(){unlinkVolunteer(link.id);}} disabled={linkingVol} style={{background:'transparent',border:'none',fontSize:11,color:'#bbb',cursor:linkingVol?'default':'pointer'}}>Unlink</button>
+                  </div>
+                );
+                return (
+                  <div style={{position:'relative'}}>
+                    <input
+                      value={volLinkQuery}
+                      onChange={function(e){setVolLinkQuery(e.target.value);setShowVolLinkDrop(true);}}
+                      onFocus={function(){setShowVolLinkDrop(true);}}
+                      onBlur={function(){setTimeout(function(){setShowVolLinkDrop(false);},150);}}
+                      placeholder="Search volunteers to link…"
+                      disabled={linkingVol}
+                      style={{width:'100%',padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,boxSizing:'border-box'}}
+                    />
+                    {showVolLinkDrop && volLinkQuery.trim() && (
+                      <div style={{position:'absolute',top:'100%',left:0,right:0,background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:8,marginTop:4,boxShadow:'0 4px 16px rgba(0,0,0,0.1)',zIndex:10,maxHeight:180,overflowY:'auto'}}>
+                        {volunteerOptions.filter(function(v){return !v.donor_id&&((v['First Name']||'')+' '+(v['Last Name']||'')).toLowerCase().includes(volLinkQuery.toLowerCase());}).slice(0,8).map(function(v){
+                          return (
+                            <div key={v.id} onMouseDown={function(){linkVolunteer(v.id);}} style={{padding:'7px 10px',fontSize:12,cursor:'pointer',borderBottom:'0.5px solid #f5f0ea'}}>
+                              {(v['First Name']||'')+' '+(v['Last Name']||'')}
+                            </div>
+                          );
+                        })}
+                        {volunteerOptions.filter(function(v){return !v.donor_id&&((v['First Name']||'')+' '+(v['Last Name']||'')).toLowerCase().includes(volLinkQuery.toLowerCase());}).length===0 && (
+                          <div style={{padding:'8px 10px',fontSize:12,color:'#bbb'}}>No matching volunteers</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
 
           </div>
         </div>
