@@ -6718,13 +6718,26 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
     setNotifySending(true);
     setNotifyResult(null);
 
+    // Reimbursements go to BOTH Wyn Spiller and that area's lead; all other
+    // budget-category items go to the area lead only.
+    function recipientsForItem(item) {
+      var areaLead = AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].lead : item.area;
+      var areaLeadEmail = AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].leadEmail : '';
+      var list = [{ label: areaLead, email: areaLeadEmail }];
+      if (item.needsReimbursement) list.unshift({ label: 'Wyn Spiller', email: WYN_EMAIL });
+      return list;
+    }
+
     var groups = {};
+    var itemKeys = {};
     pendingNotifications.forEach(function(item) {
-      var recipientLabel = item.needsReimbursement ? 'Wyn Spiller' : (AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].lead : item.area);
-      var recipientEmail = item.needsReimbursement ? WYN_EMAIL : (AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].leadEmail : '');
-      var key = recipientLabel + '|' + recipientEmail;
-      if (!groups[key]) groups[key] = { label: recipientLabel, email: recipientEmail, items: [] };
-      groups[key].items.push(item);
+      itemKeys[item.id] = [];
+      recipientsForItem(item).forEach(function(r) {
+        var key = r.label + '|' + r.email;
+        if (!groups[key]) groups[key] = { label: r.label, email: r.email, items: [] };
+        groups[key].items.push(item);
+        itemKeys[item.id].push(key);
+      });
     });
 
     var recipients = Object.keys(groups).map(function(k) { return groups[k]; });
@@ -6746,12 +6759,17 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
     };
 
     Promise.all(toSend.map(sendOne)).then(function(results) {
+      var sentKeys = {};
+      toSend.forEach(function(g, i) { if (results[i]) sentKeys[g.label + '|' + g.email] = true; });
       var sentCount = results.filter(Boolean).length;
       var failedCount = results.length - sentCount;
       setNotifySending(false);
-      if (sentCount) {
-        setPendingNotifications(function(prev) { return prev.filter(function(item) { var lbl = item.needsReimbursement ? 'Wyn Spiller' : (AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].lead : item.area); var em = item.needsReimbursement ? WYN_EMAIL : (AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].leadEmail : ''); return !em; }); });
-      }
+      setPendingNotifications(function(prev) {
+        return prev.filter(function(item) {
+          // Keep the item pending unless every one of its recipients has been sent.
+          return !itemKeys[item.id].every(function(key) { return sentKeys[key]; });
+        });
+      });
       var parts = [];
       if (sentCount) parts.push('Sent to ' + sentCount + ' recipient' + (sentCount > 1 ? 's' : '') + '.');
       if (failedCount) parts.push(failedCount + ' failed to send.');
