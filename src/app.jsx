@@ -11790,6 +11790,28 @@ function FormResponsesView({ navigate }) {
 function ActivityLogView({ navigate }) {
   var [activity, setActivity] = useState(null);
   var [editingTagId, setEditingTagId] = useState(null);
+  var [showAdmin, setShowAdmin] = useState(false);
+  var [adminAuthed, setAdminAuthed] = useState(false);
+  var [adminPwInput, setAdminPwInput] = useState('');
+  var [adminPwError, setAdminPwError] = useState(false);
+  var [deletingId, setDeletingId] = useState(null);
+
+  function tryUnlock() {
+    if (adminPwInput.trim() === 'JM1905') { setAdminAuthed(true); setAdminPwInput(''); setAdminPwError(false); }
+    else setAdminPwError(true);
+  }
+
+  function deleteActivityRow(id) {
+    if (!window.confirm('Delete this activity log entry? This can\'t be undone.')) return;
+    setDeletingId(id);
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      setActivity(function(prev) { return prev.filter(function(a) { return a.id !== id; }); });
+      setDeletingId(null);
+    }).catch(function() { setDeletingId(null); });
+  }
 
   useEffect(function() {
     fetch(SUPABASE_URL + '/rest/v1/activity_log?select=*&order=created_at.desc&limit=1000', {
@@ -11819,9 +11841,45 @@ function ActivityLogView({ navigate }) {
 
   return (
     <div style={{ maxWidth: 640 }}>
-      <button onClick={function() { navigate('home'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Back</button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <button onClick={function() { navigate('home'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
+        <button
+          onClick={function() { setShowAdmin(true); }}
+          style={{ background: adminAuthed ? '#fdecea' : '#fff', color: adminAuthed ? '#a04545' : '#555', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '6px 14px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+        >
+          {adminAuthed ? 'Admin (unlocked)' : 'Admin'}
+        </button>
+      </div>
       <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Activity Log</div>
       <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Everything that's happened, grouped by month.</div>
+
+      {showAdmin && (
+        <div onClick={function() { setShowAdmin(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 340, padding: '24px' }}>
+            {!adminAuthed ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+                <div style={{ fontSize: 13, color: '#555' }}>Enter admin password to enable deleting entries</div>
+                <input
+                  type="password"
+                  value={adminPwInput}
+                  onChange={function(e) { setAdminPwInput(e.target.value); setAdminPwError(false); }}
+                  onKeyDown={function(e) { if (e.key === 'Enter') tryUnlock(); }}
+                  placeholder="Password"
+                  style={{ border: '0.5px solid ' + (adminPwError ? '#c62828' : '#d0c8bc'), borderRadius: 8, padding: '9px 14px', fontSize: 13, width: '100%', boxSizing: 'border-box', outline: 'none' }}
+                  autoFocus
+                />
+                {adminPwError && <div style={{ fontSize: 11, color: '#c62828' }}>Incorrect password</div>}
+                <button onClick={tryUnlock} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%' }}>Unlock</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 13, color: '#2e6b4f', fontWeight: 600 }}>Unlocked — a delete (✕) button now appears on every entry.</div>
+                <button onClick={function() { setShowAdmin(false); }} style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '8px 22px', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%' }}>Close</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {activity === null ? (
         <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
@@ -11860,6 +11918,16 @@ function ActivityLogView({ navigate }) {
                               <span>{boldBeforeColon(a.description)}</span>
                             </div>
                             {isHandled && a.handled_by && <span style={{ fontSize: 10, fontWeight: 700, color: '#2e7d32', flexShrink: 0 }}>{a.handled_by}</span>}
+                            {adminAuthed && (
+                              <button
+                                onClick={function() { deleteActivityRow(a.id); }}
+                                disabled={deletingId === a.id}
+                                title="Delete entry"
+                                style={{ background: 'none', border: 'none', color: '#c62828', cursor: 'pointer', fontSize: 13, padding: '0 2px', flexShrink: 0, opacity: deletingId === a.id ? 0.4 : 1 }}
+                              >
+                                {deletingId === a.id ? '…' : '✕'}
+                              </button>
+                            )}
                           </div>
                           <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{when}</div>
                         </div>
