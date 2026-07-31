@@ -4361,7 +4361,7 @@ function DonorsView({ navigate }) {
                                   <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,background:acked?'#e8f5e9':'#fff8e1',color:acked?'#2e7d32':'#8a6200',fontWeight:500}}>{acked?'Thanked':'Pending'}</span>
                                   {don.acknowledgment_status && don.acknowledgment_status!=='ready_to_generate' && don.acknowledgment_status!=='mailed' && <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,fontWeight:500,...(ACK_STATUS_PILLS[don.acknowledgment_status]||{background:'#f3f4f6',color:'#6b7280'})}}>{ACK_STATUS_LABELS[don.acknowledgment_status]||don.acknowledgment_status}</span>}
                                 </div>
-                                <button onClick={function(e){e.stopPropagation();quickGenerate(don);}} title={don.letter_drive_url?'Regenerate acknowledgment':don.acknowledgment_type?'Generate acknowledgment now, using the info already on file':'Set Acknowledgment Type, then generate'} style={{background:'none',border:'0.5px solid '+gold,color:gold,borderRadius:6,padding:'4px 7px',cursor:'pointer',flexShrink:0,display:'flex',alignItems:'center'}}>
+                                <button onClick={function(e){e.stopPropagation();quickGenerate(don);}} title={don.letter_drive_url?'Regenerate acknowledgment':don.acknowledgment_type?'Write acknowledgment now, using the info already on file':'Set Acknowledgment Type, then generate'} style={{background:'none',border:'0.5px solid '+gold,color:gold,borderRadius:6,padding:'4px 7px',cursor:'pointer',flexShrink:0,display:'flex',alignItems:'center'}}>
                                   <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>
                                 </button>
                                 <button onClick={function(e){e.stopPropagation();setEditDon(don);
@@ -4376,7 +4376,7 @@ function DonorsView({ navigate }) {
                               </div>
                               {don.acknowledgment_type && (
                                 <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginTop:6}}>
-                                  <button onClick={function(e){e.stopPropagation();openGenerateFlow(don);}} style={{fontSize:11,color:gold,background:'none',border:'0.5px solid '+gold,borderRadius:6,padding:'3px 10px',cursor:'pointer'}}>{don.letter_drive_url?'Acknowledgment':'Generate Acknowledgment'}</button>
+                                  <button onClick={function(e){e.stopPropagation();openGenerateFlow(don);}} style={{fontSize:11,color:gold,background:'none',border:'0.5px solid '+gold,borderRadius:6,padding:'3px 10px',cursor:'pointer'}}>{don.letter_drive_url?'Acknowledgment':'Write Acknowledgment'}</button>
                                   {don.acknowledgment_status==='error' && don.generation_error && <span style={{fontSize:11,color:'#c0392b'}} title={don.generation_error}>Error: {don.generation_error.slice(0,60)}</span>}
                                 </div>
                               )}
