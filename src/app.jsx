@@ -13755,7 +13755,7 @@ function buildBoardEmailRequest(g, toOverride) {
     // email is just a heads-up that new ones landed, not an itemized rundown. Always
     // plural "Reimbursements", regardless of how many are actually in this batch.
     subject = 'New Reimbursements Added to the Portal';
-    subtext = 'New reimbursements have been added to the Portal. For your review.';
+    subtext = 'New reimbursements have been added to the Portal for your review.';
     buttonUrl = PORTAL_URL + '#financials';
     textBody = subtext;
   } else {
@@ -13765,7 +13765,7 @@ function buildBoardEmailRequest(g, toOverride) {
     buttonUrl = PORTAL_URL + '#operational';
     textBody = itemLines;
   }
-  buttonText = 'Click Here to View in the Portal';
+  buttonText = 'Click Here to View in Portal';
 
   var html = buildBoardNotificationEmailHtml({ headline: subject, subtext: subtext, buttonText: buttonText, buttonUrl: buttonUrl });
   var text = subject + '\n\n' + textBody + '\n\n' + buttonText + ': ' + buttonUrl;
