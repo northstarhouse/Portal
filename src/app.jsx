@@ -9845,8 +9845,19 @@ function FinancialsView({ navigate }) {
   var [showAddReim, setShowAddReim] = useState(false);
   var [addReimSaving, setAddReimSaving] = useState(false);
   var todayStr = new Date().toISOString().slice(0, 10);
-  var emptyReimForm = { area: OPERATIONAL_AREAS[0], type: 'Purchase', description: '', amount: '', date: todayStr, purchased_by: '', volunteer_name: '' };
+  var emptyReimForm = { area: OPERATIONAL_AREAS[0], type: 'Purchase', description: '', amount: '', date: todayStr, purchased_by: '', volunteer_name: '', event_name: '' };
   var [addReimForm, setAddReimForm] = useState(emptyReimForm);
+  var [eventNameOptions, setEventNameOptions] = useState([]);
+
+  function loadEventNameOptions() {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?area=eq.Events&select=event_name', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (!Array.isArray(rows)) return;
+      var names = Array.from(new Set(rows.map(function(r) { return (r.event_name || '').trim(); }).filter(Boolean))).sort();
+      setEventNameOptions(names);
+    });
+  }
 
   function addReimbursement(e) {
     e.preventDefault();
@@ -9861,6 +9872,7 @@ function FinancialsView({ navigate }) {
       needs_reimbursement: true,
       volunteer_name: addReimForm.volunteer_name || null
     };
+    if (addReimForm.area === 'Events') payload.event_name = addReimForm.event_name || null;
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -9899,6 +9911,7 @@ function FinancialsView({ navigate }) {
   useEffect(function() {
     loadReimbursements();
     loadNotifyQueue();
+    loadEventNameOptions();
     cachedSbFetch('2026 Volunteers', ['id', 'First Name', 'Last Name', 'Address', 'Status']).then(function(rows) {
       if (Array.isArray(rows)) setVolList(rows);
     });
@@ -10063,6 +10076,12 @@ function FinancialsView({ navigate }) {
                 <option>In-Kind</option>
               </select>
             </div>
+            {addReimForm.area === 'Events' && (
+              <div>
+                <input list="reim-event-name-options" value={addReimForm.event_name} onChange={function(e) { setAddReimForm(function(f) { return Object.assign({}, f, { event_name: e.target.value }); }); }} style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} placeholder="Which event was this for…" />
+                <datalist id="reim-event-name-options">{eventNameOptions.map(function(n) { return <option key={n} value={n} />; })}</datalist>
+              </div>
+            )}
             <input required value={addReimForm.description} onChange={function(e) { setAddReimForm(function(f) { return Object.assign({}, f, { description: e.target.value }); }); }} placeholder="Description" style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <input required type="number" step="0.01" min="0" value={addReimForm.amount} onChange={function(e) { setAddReimForm(function(f) { return Object.assign({}, f, { amount: e.target.value }); }); }} placeholder="Amount" style={{ padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
