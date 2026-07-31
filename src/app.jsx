@@ -6472,12 +6472,6 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
   var fileInputRef = React.useRef(null);
   var [budgetReceiptFiles, setBudgetReceiptFiles] = useState([]);
   var budgetReceiptRef = React.useRef(null);
-  var [pendingNotifications, setPendingNotifications] = useState([]);
-  var [notifySending, setNotifySending] = useState(false);
-  var [notifyResult, setNotifyResult] = useState(null);
-  var [testEmail, setTestEmail] = useState('');
-  var [testSending, setTestSending] = useState(false);
-  var [testResult, setTestResult] = useState(null);
   var [reimburseVolQuery, setReimburseVolQuery] = useState('');
   var [showReimburseVolDrop, setShowReimburseVolDrop] = useState(false);
   var [noteEdit, setNoteEdit] = useState(null);
@@ -6685,20 +6679,6 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
         clearCache('Op Budget');
         setBudgetSaving(false);
         setBudget(function(prev) { return [finalRow].concat(prev); });
-        setPendingNotifications(function(prev) {
-          return prev.concat([{
-            id: finalRow.id,
-            area: area,
-            type: finalRow.type,
-            needsReimbursement: !!finalRow.needs_reimbursement,
-            description: finalRow.description,
-            amount: finalRow.amount,
-            date: finalRow.date,
-            purchasedBy: finalRow.purchased_by,
-            volunteerName: finalRow.volunteer_name
-          }]);
-        });
-        setNotifyResult(null);
         setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '', purchased_by: '', event_name: '' });
         setReimburseVolQuery('');
         setBudgetReceiptFiles([]);
@@ -6713,81 +6693,6 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
           body: JSON.stringify({ receipt_url: receiptVal })
         }).then(function() { finish(Object.assign({}, newRow, { receipt_url: receiptVal })); });
       });
-    });
-  }
-
-  function sendBoardNotifications() {
-    if (!pendingNotifications.length || notifySending) return;
-    setNotifySending(true);
-    setNotifyResult(null);
-
-    // Reimbursements go to BOTH Wyn Spiller and that area's lead; all other
-    // budget-category items go to the area lead only.
-    function recipientsForItem(item) {
-      var areaLead = AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].lead : item.area;
-      var areaLeadEmail = AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].leadEmail : '';
-      var list = [{ label: areaLead, email: areaLeadEmail, isWyn: false }];
-      if (item.needsReimbursement) list.unshift({ label: 'Wyn Spiller', email: WYN_EMAIL, isWyn: true });
-      return list;
-    }
-
-    var groups = {};
-    var itemKeys = {};
-    pendingNotifications.forEach(function(item) {
-      itemKeys[item.id] = [];
-      recipientsForItem(item).forEach(function(r) {
-        var key = r.label + '|' + r.email;
-        if (!groups[key]) groups[key] = { label: r.label, email: r.email, isWyn: r.isWyn, items: [] };
-        groups[key].items.push(item);
-        itemKeys[item.id].push(key);
-      });
-    });
-
-    var recipients = Object.keys(groups).map(function(k) { return groups[k]; });
-    var missing = recipients.filter(function(g) { return !g.email; }).map(function(g) { return g.label; });
-    var toSend = recipients.filter(function(g) { return g.email; });
-
-    var sendOne = function(g) { return fetch(SUPABASE_URL + '/functions/v1/send-email', buildBoardEmailRequest(g)).then(function(r) { return r.ok; }).catch(function() { return false; }); };
-
-    Promise.all(toSend.map(sendOne)).then(function(results) {
-      var sentKeys = {};
-      toSend.forEach(function(g, i) { if (results[i]) sentKeys[g.label + '|' + g.email] = true; });
-      var sentCount = results.filter(Boolean).length;
-      var failedCount = results.length - sentCount;
-      setNotifySending(false);
-      setPendingNotifications(function(prev) {
-        return prev.filter(function(item) {
-          // Keep the item pending unless every one of its recipients has been sent.
-          return !itemKeys[item.id].every(function(key) { return sentKeys[key]; });
-        });
-      });
-      var parts = [];
-      if (sentCount) parts.push('Sent to ' + sentCount + ' recipient' + (sentCount > 1 ? 's' : '') + '.');
-      if (failedCount) parts.push(failedCount + ' failed to send.');
-      if (missing.length) parts.push('No email on file for: ' + missing.join(', ') + '.');
-      setNotifyResult({ ok: failedCount === 0, text: parts.join(' ') || 'Nothing to send.' });
-    });
-  }
-
-  // Sends both the Wyn-style and lead-style templates to a test address
-  // (using real pending items if any exist, otherwise a sample item) so the
-  // design can be previewed before real recipient emails are wired in.
-  function sendTestNotifications() {
-    var addr = testEmail.trim();
-    if (!addr || testSending) return;
-    setTestSending(true);
-    setTestResult(null);
-
-    var sampleItem = pendingNotifications[0] || { area: area, type: 'Purchase', needsReimbursement: true, description: 'Sample item — replace with a real submission to preview live data', amount: 125.5, date: today, purchasedBy: 'A Volunteer' };
-    var wynGroup = { label: 'Wyn Spiller', isWyn: true, items: [Object.assign({}, sampleItem, { needsReimbursement: true })] };
-    var leadGroup = { label: AREA_DEFAULTS[sampleItem.area] ? AREA_DEFAULTS[sampleItem.area].lead : sampleItem.area, isWyn: false, items: [Object.assign({}, sampleItem, { needsReimbursement: false })] };
-
-    Promise.all([wynGroup, leadGroup].map(function(g) {
-      return fetch(SUPABASE_URL + '/functions/v1/send-email', buildBoardEmailRequest(g, addr)).then(function(r) { return r.ok; }).catch(function() { return false; });
-    })).then(function(results) {
-      setTestSending(false);
-      var sentCount = results.filter(Boolean).length;
-      setTestResult({ ok: sentCount === 2, text: sentCount === 2 ? 'Sent both preview emails to ' + addr + '.' : (sentCount === 1 ? 'Only one of the two previews sent — check the address and try again.' : 'Failed to send previews.') });
     });
   }
 
@@ -7466,36 +7371,7 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
                   <button type="submit" disabled={budgetSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: budgetSaving ? 0.7 : 1 }}>{budgetSaving ? 'Saving…' : 'Add'}</button>
                 </div>
               </form>
-              {pendingNotifications.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 12, borderTop: '0.5px solid #f0ece6' }}>
-                  <button
-                    type="button"
-                    disabled={notifySending}
-                    onClick={sendBoardNotifications}
-                    style={{ background: '#2e6b4f', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: notifySending ? 'default' : 'pointer', opacity: notifySending ? 0.7 : 1 }}
-                  >
-                    {notifySending ? 'Sending…' : 'Send Board Notification (' + pendingNotifications.length + ')'}
-                  </button>
-                  <span style={{ fontSize: 12, color: '#999' }}>{pendingNotifications.length} item{pendingNotifications.length > 1 ? 's' : ''} pending notification</span>
-                </div>
-              )}
-              {notifyResult && (
-                <div style={{ marginTop: 10, fontSize: 12, color: notifyResult.ok ? '#2e6b4f' : '#a04545' }}>{notifyResult.text}</div>
-              )}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '0.5px solid #f0ece6' }}>
-                <input type="email" value={testEmail} onChange={function(e) { setTestEmail(e.target.value); }} placeholder="your@email.com" style={{ padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, width: 200 }} />
-                <button
-                  type="button"
-                  disabled={testSending || !testEmail.trim()}
-                  onClick={sendTestNotifications}
-                  style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 500, cursor: (testSending || !testEmail.trim()) ? 'default' : 'pointer', opacity: (testSending || !testEmail.trim()) ? 0.6 : 1 }}
-                >
-                  {testSending ? 'Sending…' : 'Send Test Preview to Myself'}
-                </button>
-              </div>
-              {testResult && (
-                <div style={{ marginTop: 8, fontSize: 12, color: testResult.ok ? '#2e6b4f' : '#a04545' }}>{testResult.text}</div>
-              )}
+              <div style={{ marginTop: 10, fontSize: 11, color: '#aaa' }}>Submitted items are queued for board notification — send them from the Reimbursements page.</div>
             </div>
             {budget.length === 0 ? (
               <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No entries yet.</div>
@@ -9963,6 +9839,15 @@ function FinancialsView({ navigate }) {
   var [volList, setVolList] = useState([]);
   var [showAllReim, setShowAllReim] = useState(false);
 
+  // Board notification: any Op Budget row (reimbursement or not, any area)
+  // that hasn't been notified yet. Persisted server-side via board_notified_at
+  // so the queue survives across page navigation and sessions.
+  var [notifyItems, setNotifyItems] = useState([]);
+  var [notifySending, setNotifySending] = useState(false);
+  var [notifyResult, setNotifyResult] = useState(null);
+  var [testEmail, setTestEmail] = useState('');
+  var [testSending, setTestSending] = useState(false);
+  var [testResult, setTestResult] = useState(null);
 
   function loadReimbursements() {
     setLoading(true);
@@ -9971,8 +9856,15 @@ function FinancialsView({ navigate }) {
     }).then(function(r) { return r.json(); }).then(function(rows) { setItems(Array.isArray(rows) ? rows : []); setLoading(false); });
   }
 
+  function loadNotifyQueue() {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?board_notified_at=is.null&select=*&order=id.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setNotifyItems(Array.isArray(rows) ? rows : []); });
+  }
+
   useEffect(function() {
     loadReimbursements();
+    loadNotifyQueue();
     cachedSbFetch('2026 Volunteers', ['id', 'First Name', 'Last Name', 'Address', 'Status']).then(function(rows) {
       if (Array.isArray(rows)) setVolList(rows);
     });
@@ -9980,6 +9872,88 @@ function FinancialsView({ navigate }) {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) { if (Array.isArray(rows)) setIdeas(rows); });
   }, []);
+
+  function sendBoardNotifications() {
+    if (!notifyItems.length || notifySending) return;
+    setNotifySending(true);
+    setNotifyResult(null);
+
+    var queueItems = notifyItems.map(function(row) {
+      return { id: row.id, area: row.area, type: row.type, needsReimbursement: !!row.needs_reimbursement, description: row.description, amount: row.amount, date: row.date, purchasedBy: row.purchased_by };
+    });
+
+    var groups = {};
+    var itemKeys = {};
+    queueItems.forEach(function(item) {
+      itemKeys[item.id] = [];
+      recipientsForItem(item).forEach(function(r) {
+        var key = r.label + '|' + r.email;
+        if (!groups[key]) groups[key] = { label: r.label, email: r.email, isWyn: r.isWyn, items: [] };
+        groups[key].items.push(item);
+        itemKeys[item.id].push(key);
+      });
+    });
+
+    var recipients = Object.keys(groups).map(function(k) { return groups[k]; });
+    var missing = recipients.filter(function(g) { return !g.email; }).map(function(g) { return g.label; });
+    var toSend = recipients.filter(function(g) { return g.email; });
+
+    var sendOne = function(g) { return fetch(SUPABASE_URL + '/functions/v1/send-email', buildBoardEmailRequest(g)).then(function(r) { return r.ok; }).catch(function() { return false; }); };
+
+    Promise.all(toSend.map(sendOne)).then(function(results) {
+      var sentKeys = {};
+      toSend.forEach(function(g, i) { if (results[i]) sentKeys[g.label + '|' + g.email] = true; });
+      var sentCount = results.filter(Boolean).length;
+      var failedCount = results.length - sentCount;
+
+      var notifiedIds = queueItems.filter(function(item) {
+        return itemKeys[item.id].every(function(key) { return sentKeys[key]; });
+      }).map(function(item) { return item.id; });
+
+      var finish = function() {
+        setNotifySending(false);
+        loadNotifyQueue();
+        var parts = [];
+        if (sentCount) parts.push('Sent to ' + sentCount + ' recipient' + (sentCount > 1 ? 's' : '') + '.');
+        if (failedCount) parts.push(failedCount + ' failed to send.');
+        if (missing.length) parts.push('No email on file for: ' + missing.join(', ') + '.');
+        setNotifyResult({ ok: failedCount === 0, text: parts.join(' ') || 'Nothing to send.' });
+      };
+
+      if (!notifiedIds.length) { finish(); return; }
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=in.(' + notifiedIds.join(',') + ')', {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ board_notified_at: new Date().toISOString() })
+      }).then(finish).catch(finish);
+    });
+  }
+
+  // Sends both the Wyn-style and lead-style templates to a test address
+  // (using the first queued item if any exist, otherwise a sample item) so the
+  // design can be previewed before real recipient emails are wired in. Does
+  // not touch board_notified_at — safe to run repeatedly.
+  function sendTestNotifications() {
+    var addr = testEmail.trim();
+    if (!addr || testSending) return;
+    setTestSending(true);
+    setTestResult(null);
+
+    var first = notifyItems[0];
+    var sampleItem = first
+      ? { area: first.area, type: first.type, description: first.description, amount: first.amount, date: first.date, purchasedBy: first.purchased_by }
+      : { area: 'Construction', type: 'Purchase', description: 'Sample item — replace with a real submission to preview live data', amount: 125.5, date: new Date().toISOString().slice(0, 10), purchasedBy: 'A Volunteer' };
+    var wynGroup = { label: 'Wyn Spiller', isWyn: true, items: [Object.assign({}, sampleItem, { needsReimbursement: true })] };
+    var leadGroup = { label: AREA_DEFAULTS[sampleItem.area] ? AREA_DEFAULTS[sampleItem.area].lead : sampleItem.area, isWyn: false, items: [Object.assign({}, sampleItem, { needsReimbursement: false })] };
+
+    Promise.all([wynGroup, leadGroup].map(function(g) {
+      return fetch(SUPABASE_URL + '/functions/v1/send-email', buildBoardEmailRequest(g, addr)).then(function(r) { return r.ok; }).catch(function() { return false; });
+    })).then(function(results) {
+      setTestSending(false);
+      var sentCount = results.filter(Boolean).length;
+      setTestResult({ ok: sentCount === 2, text: sentCount === 2 ? 'Sent both preview emails to ' + addr + '.' : (sentCount === 1 ? 'Only one of the two previews sent — check the address and try again.' : 'Failed to send previews.') });
+    });
+  }
 
   function markReimbursed(id) {
     setMarkingId(id);
@@ -10046,6 +10020,40 @@ function FinancialsView({ navigate }) {
   return (
     <div>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Board Notification</div>
+            <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{notifyItems.length ? notifyItems.length + ' item' + (notifyItems.length > 1 ? 's' : '') + ' queued across all areas' : 'No items queued'}</div>
+          </div>
+          <button
+            type="button"
+            disabled={!notifyItems.length || notifySending}
+            onClick={sendBoardNotifications}
+            style={{ background: '#2e6b4f', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: (!notifyItems.length || notifySending) ? 'default' : 'pointer', opacity: (!notifyItems.length || notifySending) ? 0.5 : 1 }}
+          >
+            {notifySending ? 'Sending…' : 'Send Board Notification' + (notifyItems.length ? ' (' + notifyItems.length + ')' : '')}
+          </button>
+        </div>
+        {notifyResult && (
+          <div style={{ marginTop: 10, fontSize: 12, color: notifyResult.ok ? '#2e6b4f' : '#a04545' }}>{notifyResult.text}</div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '0.5px solid #f0ece6' }}>
+          <input type="email" value={testEmail} onChange={function(e) { setTestEmail(e.target.value); }} placeholder="your@email.com" style={{ padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, width: 200 }} />
+          <button
+            type="button"
+            disabled={testSending || !testEmail.trim()}
+            onClick={sendTestNotifications}
+            style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 500, cursor: (testSending || !testEmail.trim()) ? 'default' : 'pointer', opacity: (testSending || !testEmail.trim()) ? 0.6 : 1 }}
+          >
+            {testSending ? 'Sending…' : 'Send Test Preview to Myself'}
+          </button>
+        </div>
+        {testResult && (
+          <div style={{ marginTop: 8, fontSize: 12, color: testResult.ok ? '#2e6b4f' : '#a04545' }}>{testResult.text}</div>
+        )}
+      </div>
 
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
         <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
@@ -13714,6 +13722,16 @@ function buildBoardNotificationEmailHtml(opts) {
       '</div>' +
     '</div>'
   );
+}
+
+// Reimbursements go to BOTH Wyn Spiller and that area's lead; all other
+// budget-category items go to the area lead only.
+function recipientsForItem(item) {
+  var areaLead = AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].lead : item.area;
+  var areaLeadEmail = AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].leadEmail : '';
+  var list = [{ label: areaLead, email: areaLeadEmail, isWyn: false }];
+  if (item.needsReimbursement) list.unshift({ label: 'Wyn Spiller', email: WYN_EMAIL, isWyn: true });
+  return list;
 }
 
 // Builds the fetch() init object for a board-notification group ({label, email,
