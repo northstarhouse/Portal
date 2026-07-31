@@ -363,6 +363,43 @@ function occurrencesInRange(events, rangeStart, rangeEnd) {
 const gold = "#886c44";
 const cream = "#f8f4ec";
 
+// Trailing ︎ forces text (monochrome) presentation instead of colored emoji
+// glyphs, so CSS text color actually applies. Ported from Volunteer Hub's
+// lib/db.js getZodiacSign so both apps agree on the same sign boundaries.
+var ZODIAC_SIGNS = [
+  { name: 'Capricorn', symbol: '♑︎', from: [12, 22], to: [1, 19] },
+  { name: 'Aquarius', symbol: '♒︎', from: [1, 20], to: [2, 18] },
+  { name: 'Pisces', symbol: '♓︎', from: [2, 19], to: [3, 20] },
+  { name: 'Aries', symbol: '♈︎', from: [3, 21], to: [4, 19] },
+  { name: 'Taurus', symbol: '♉︎', from: [4, 20], to: [5, 20] },
+  { name: 'Gemini', symbol: '♊︎', from: [5, 21], to: [6, 20] },
+  { name: 'Cancer', symbol: '♋︎', from: [6, 21], to: [7, 22] },
+  { name: 'Leo', symbol: '♌︎', from: [7, 23], to: [8, 22] },
+  { name: 'Virgo', symbol: '♍︎', from: [8, 23], to: [9, 22] },
+  { name: 'Libra', symbol: '♎︎', from: [9, 23], to: [10, 22] },
+  { name: 'Scorpio', symbol: '♏︎', from: [10, 23], to: [11, 21] },
+  { name: 'Sagittarius', symbol: '♐︎', from: [11, 22], to: [12, 21] },
+];
+function getZodiacSign(month, day) {
+  if (!month || !day) return null;
+  var found = null;
+  ZODIAC_SIGNS.forEach(function(s) {
+    if (found) return;
+    var fm = s.from[0], fd = s.from[1], tm = s.to[0], td = s.to[1];
+    var match = fm === tm ? (month === fm && day >= fd && day <= td)
+      : fm > tm ? ((month === fm && day >= fd) || (month === tm && day <= td))
+      : ((month === fm && day >= fd) || (month > fm && month < tm) || (month === tm && day <= td));
+    if (match) found = s;
+  });
+  return found;
+}
+function zodiacFromIsoDate(val) {
+  if (!val) return null;
+  var parts = String(val).split('-');
+  if (parts.length < 3) return null;
+  return getZodiacSign(parseInt(parts[1], 10), parseInt(parts[2], 10));
+}
+
 // Bolds everything before the first colon in an activity description
 // ("Maintenance Request: Door..." -> **Maintenance Request**: Door...).
 function boldBeforeColon(text) {
@@ -2835,7 +2872,7 @@ function VolunteersView({ navigate }) {
                 <div style={{ marginBottom: 4 }}>
                   <span style={volSecLabel}>Volunteer Info</span>
                   <InfoRow label="Anniversary" value={fmtAnniversary(selected['Volunteer Anniversary'])} />
-                  <InfoRow label="Birthday" value={fmtBirthday(selected['Birthday'])} />
+                  <InfoRow label="Birthday" value={fmtBirthday(selected['Birthday']) + (zodiacFromIsoDate(selected['Birthday']) ? '  ·  ' + zodiacFromIsoDate(selected['Birthday']).name + ' ' + zodiacFromIsoDate(selected['Birthday']).symbol : '')} />
                 </div>
               )}
               <div style={{ marginBottom: 4 }}>
