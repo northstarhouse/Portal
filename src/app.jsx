@@ -6951,13 +6951,25 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
 
   function uploadFile(file, itemId) {
     var ext = (file.name.split('.').pop() || 'bin');
-    var slug = area.toLowerCase().replace(/\s+/g, '-');
-    var filename = slug + '-' + itemId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6) + '.' + ext;
-    return fetch(SUPABASE_URL + '/storage/v1/object/receipts/' + filename, {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream' },
-      body: file
-    }).then(function() { return SUPABASE_URL + '/storage/v1/object/public/receipts/' + filename; });
+    var now = new Date();
+    var mdY = (now.getMonth() + 1) + '.' + now.getDate() + '.' + now.getFullYear();
+    var filename = mdY + ' - ' + area + ' Receipt - ' + itemId + '.' + ext;
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() {
+        var base64 = reader.result.split(',')[1];
+        fetch(SUPABASE_URL + '/functions/v1/upload-receipt', {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: filename, mimeType: file.type || 'application/octet-stream', base64: base64 })
+        }).then(function(r) { return r.json(); }).then(function(res) {
+          if (!res.success) { reject(new Error(res.error || 'Upload failed')); return; }
+          resolve(res.url);
+        }).catch(reject);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
   function addBudgetItem(e) {
@@ -10732,15 +10744,24 @@ function IdeasView() {
       }
       if (file && newRow.id) {
         var ext = file.name.split('.').pop();
-        var fn = 'idea-' + newRow.id + '-' + Date.now() + '.' + ext;
-        fetch(SUPABASE_URL + '/storage/v1/object/receipts/' + fn, {
-          method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type }, body: file
-        }).then(function() {
-          var url = SUPABASE_URL + '/storage/v1/object/public/receipts/' + fn;
-          fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + newRow.id, {
-            method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ receipt_url: url })
-          }).then(function() { finish(Object.assign({}, newRow, { receipt_url: url })); });
-        }).catch(function() { finish(newRow); });
+        var now = new Date();
+        var mdY = (now.getMonth() + 1) + '.' + now.getDate() + '.' + now.getFullYear();
+        var fn = mdY + ' - Idea Receipt - ' + newRow.id + '.' + ext;
+        var reader = new FileReader();
+        reader.onload = function() {
+          var base64 = reader.result.split(',')[1];
+          fetch(SUPABASE_URL + '/functions/v1/upload-receipt', {
+            method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: fn, mimeType: file.type || 'application/octet-stream', base64: base64 })
+          }).then(function(r) { return r.json(); }).then(function(res) {
+            if (!res.success) { finish(newRow); return; }
+            var url = res.url;
+            fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + newRow.id, {
+              method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ receipt_url: url })
+            }).then(function() { finish(Object.assign({}, newRow, { receipt_url: url })); });
+          }).catch(function() { finish(newRow); });
+        };
+        reader.onerror = function() { finish(newRow); };
+        reader.readAsDataURL(file);
       } else { finish(newRow); }
     }).catch(function(err) { alert('Budget error: ' + err); setBudgetSaving(false); });
   }
