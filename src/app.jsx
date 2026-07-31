@@ -363,12 +363,25 @@ function occurrencesInRange(events, rangeStart, rangeEnd) {
 const gold = "#886c44";
 const cream = "#f8f4ec";
 
+// Bolds everything before the first colon in an activity description
+// ("Maintenance Request: Door..." -> **Maintenance Request**: Door...).
+function boldBeforeColon(text) {
+  if (!text) return text;
+  var idx = text.indexOf(':');
+  if (idx === -1) return text;
+  return React.createElement(React.Fragment, null, React.createElement('b', null, text.slice(0, idx)), text.slice(idx));
+}
+
 var ACTIVITY_TAG_COLORS = {
   Wedding: { bg: '#fbeaf0', color: '#b5457a' },
   Event: { bg: '#eaf1fb', color: '#3a6ea5' },
   'Venue Inquiry': { bg: '#eafaf0', color: '#2e7d32' },
   General: { bg: '#f0ece6', color: '#888' },
   Maintenance: { bg: '#fff3e0', color: '#c46a1a' },
+  'Wedding - Voicemail': { bg: '#fbeaf0', color: '#b5457a' },
+  'Event - Voicemail': { bg: '#eaf1fb', color: '#3a6ea5' },
+  'Venue Inquiry - Voicemail': { bg: '#eafaf0', color: '#2e7d32' },
+  'General - Voicemail': { bg: '#f0ece6', color: '#888' },
 };
 
 // ─── Sign-ups (Form Builder / Form Responses) shared helpers ──────────────────
@@ -949,7 +962,7 @@ const typeColors = {
                       ) : (
                         tagStyle && <span onClick={function() { setEditingTagId(a.id); }} title="Click to change tag" style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 8px', flexShrink: 0, cursor: 'pointer' }}>{a.tag}</span>
                       )}
-                      <span>{a.description}</span>
+                      <span>{boldBeforeColon(a.description)}</span>
                     </div>
                     {isHandled && a.handled_by && <span style={{ fontSize: 10, fontWeight: 700, color: '#2e7d32', flexShrink: 0 }}>{a.handled_by}</span>}
                   </div>
@@ -11844,7 +11857,7 @@ function ActivityLogView({ navigate }) {
                               ) : (
                                 tagStyle && <span onClick={function() { setEditingTagId(a.id); }} title="Click to change tag" style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 8px', flexShrink: 0, cursor: 'pointer' }}>{a.tag}</span>
                               )}
-                              <span>{a.description}</span>
+                              <span>{boldBeforeColon(a.description)}</span>
                             </div>
                             {isHandled && a.handled_by && <span style={{ fontSize: 10, fontWeight: 700, color: '#2e7d32', flexShrink: 0 }}>{a.handled_by}</span>}
                           </div>
