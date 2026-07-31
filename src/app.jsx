@@ -6472,6 +6472,9 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
   var fileInputRef = React.useRef(null);
   var [budgetReceiptFiles, setBudgetReceiptFiles] = useState([]);
   var budgetReceiptRef = React.useRef(null);
+  var [pendingNotifications, setPendingNotifications] = useState([]);
+  var [notifySending, setNotifySending] = useState(false);
+  var [notifyResult, setNotifyResult] = useState(null);
   var [reimburseVolQuery, setReimburseVolQuery] = useState('');
   var [showReimburseVolDrop, setShowReimburseVolDrop] = useState(false);
   var [noteEdit, setNoteEdit] = useState(null);
@@ -6679,6 +6682,20 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
         clearCache('Op Budget');
         setBudgetSaving(false);
         setBudget(function(prev) { return [finalRow].concat(prev); });
+        setPendingNotifications(function(prev) {
+          return prev.concat([{
+            id: finalRow.id,
+            area: area,
+            type: finalRow.type,
+            needsReimbursement: !!finalRow.needs_reimbursement,
+            description: finalRow.description,
+            amount: finalRow.amount,
+            date: finalRow.date,
+            purchasedBy: finalRow.purchased_by,
+            volunteerName: finalRow.volunteer_name
+          }]);
+        });
+        setNotifyResult(null);
         setBudgetForm({ type: 'Purchase', description: '', amount: '', date: today, needs_reimbursement: false, volunteer_name: '', purchased_by: '', event_name: '' });
         setReimburseVolQuery('');
         setBudgetReceiptFiles([]);
@@ -6693,6 +6710,53 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
           body: JSON.stringify({ receipt_url: receiptVal })
         }).then(function() { finish(Object.assign({}, newRow, { receipt_url: receiptVal })); });
       });
+    });
+  }
+
+  function sendBoardNotifications() {
+    if (!pendingNotifications.length || notifySending) return;
+    setNotifySending(true);
+    setNotifyResult(null);
+
+    var groups = {};
+    pendingNotifications.forEach(function(item) {
+      var recipientLabel = item.needsReimbursement ? 'Wyn Spiller' : (AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].lead : item.area);
+      var recipientEmail = item.needsReimbursement ? WYN_EMAIL : (AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].leadEmail : '');
+      var key = recipientLabel + '|' + recipientEmail;
+      if (!groups[key]) groups[key] = { label: recipientLabel, email: recipientEmail, items: [] };
+      groups[key].items.push(item);
+    });
+
+    var recipients = Object.keys(groups).map(function(k) { return groups[k]; });
+    var missing = recipients.filter(function(g) { return !g.email; }).map(function(g) { return g.label; });
+    var toSend = recipients.filter(function(g) { return g.email; });
+
+    var sendOne = function(g) {
+      var lines = g.items.map(function(item) {
+        var amt = item.amount != null ? '$' + Number(item.amount).toFixed(2) : '';
+        return '- ' + (item.needsReimbursement ? 'Reimbursement' : item.type) + ' (' + item.area + ')' + (amt ? ', ' + amt : '') + ': ' + (item.description || '') + (item.date ? ' — ' + item.date : '') + (item.purchasedBy ? ' — submitted by ' + item.purchasedBy : '');
+      }).join('\n');
+      var subject = (g.items.length > 1 ? g.items.length + ' new budget items' : 'New budget item') + ' — ' + g.items[0].area;
+      var body = 'The following item' + (g.items.length > 1 ? 's have' : ' has') + ' been submitted and need' + (g.items.length > 1 ? '' : 's') + ' your review:\n\n' + lines;
+      return fetch(SUPABASE_URL + '/functions/v1/send-email', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: g.email, subject: subject, body: body })
+      }).then(function(r) { return r.ok; }).catch(function() { return false; });
+    };
+
+    Promise.all(toSend.map(sendOne)).then(function(results) {
+      var sentCount = results.filter(Boolean).length;
+      var failedCount = results.length - sentCount;
+      setNotifySending(false);
+      if (sentCount) {
+        setPendingNotifications(function(prev) { return prev.filter(function(item) { var lbl = item.needsReimbursement ? 'Wyn Spiller' : (AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].lead : item.area); var em = item.needsReimbursement ? WYN_EMAIL : (AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].leadEmail : ''); return !em; }); });
+      }
+      var parts = [];
+      if (sentCount) parts.push('Sent to ' + sentCount + ' recipient' + (sentCount > 1 ? 's' : '') + '.');
+      if (failedCount) parts.push(failedCount + ' failed to send.');
+      if (missing.length) parts.push('No email on file for: ' + missing.join(', ') + '.');
+      setNotifyResult({ ok: failedCount === 0, text: parts.join(' ') || 'Nothing to send.' });
     });
   }
 
@@ -7371,6 +7435,22 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
                   <button type="submit" disabled={budgetSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: budgetSaving ? 0.7 : 1 }}>{budgetSaving ? 'Saving…' : 'Add'}</button>
                 </div>
               </form>
+              {pendingNotifications.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 12, borderTop: '0.5px solid #f0ece6' }}>
+                  <button
+                    type="button"
+                    disabled={notifySending}
+                    onClick={sendBoardNotifications}
+                    style={{ background: '#2e6b4f', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: notifySending ? 'default' : 'pointer', opacity: notifySending ? 0.7 : 1 }}
+                  >
+                    {notifySending ? 'Sending…' : 'Send Board Notification (' + pendingNotifications.length + ')'}
+                  </button>
+                  <span style={{ fontSize: 12, color: '#999' }}>{pendingNotifications.length} item{pendingNotifications.length > 1 ? 's' : ''} pending notification</span>
+                </div>
+              )}
+              {notifyResult && (
+                <div style={{ marginTop: 10, fontSize: 12, color: notifyResult.ok ? '#2e6b4f' : '#a04545' }}>{notifyResult.text}</div>
+              )}
             </div>
             {budget.length === 0 ? (
               <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No entries yet.</div>
@@ -13539,15 +13619,22 @@ const views = {
 
 var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];
 var AREA_DEFAULTS = {
-  'Construction':  { lead: 'Rick Panos',       budget: 12000, pic: 'https://drive.google.com/file/d/1hbFJxUUQEsuhoWnTDeARg6peSHCpiBFH/view?usp=drive_link' },
-  'Grounds':       { lead: 'Paula Campbell',   budget: 14000, pic: 'https://drive.google.com/file/d/17J0cF_okHkAs_HCRjuYm0TnpM0v8Ek5-/view?usp=sharing' },
-  'Interiors':     { lead: 'Bec Freeman',      budget: 2500,  pic: 'https://drive.google.com/file/d/1PsjDfGQLqDF9BVc5wuBd-Qx9D5E0Hvf4/view?usp=drive_link' },
-  'Docents':       { lead: 'Rich Hill',        budget: 1000,  pic: 'https://drive.google.com/file/d/1gBzqnzekKkTLn8mnn2mxt-PqAeeMZSJs/view?usp=drive_link' },
-  'Fundraising':   { lead: 'Kaelen Jennings',  budget: null,  pic: '' },
-  'Events':        { lead: 'Barb Kusha',       budget: 7500,  pic: '' },
-  'Marketing':     { lead: 'Haley Wright',     budget: 1000,  pic: 'https://drive.google.com/file/d/17Tse_3jiKZwmkVTTKMtt64zDghfZ8WrV/view?usp=drive_link' },
-  'Venue':         { lead: 'Staff',            budget: null,  pic: '' },
+  'Construction':  { lead: 'Rick Panos',       budget: 12000, pic: 'https://drive.google.com/file/d/1hbFJxUUQEsuhoWnTDeARg6peSHCpiBFH/view?usp=drive_link', leadEmail: '' },
+  'Grounds':       { lead: 'Paula Campbell',   budget: 14000, pic: 'https://drive.google.com/file/d/17J0cF_okHkAs_HCRjuYm0TnpM0v8Ek5-/view?usp=sharing', leadEmail: '' },
+  'Interiors':     { lead: 'Bec Freeman',      budget: 2500,  pic: 'https://drive.google.com/file/d/1PsjDfGQLqDF9BVc5wuBd-Qx9D5E0Hvf4/view?usp=drive_link', leadEmail: '' },
+  'Docents':       { lead: 'Rich Hill',        budget: 1000,  pic: 'https://drive.google.com/file/d/1gBzqnzekKkTLn8mnn2mxt-PqAeeMZSJs/view?usp=drive_link', leadEmail: '' },
+  'Fundraising':   { lead: 'Kaelen Jennings',  budget: null,  pic: '', leadEmail: '' },
+  'Events':        { lead: 'Barb Kusha',       budget: 7500,  pic: '', leadEmail: '' },
+  'Marketing':     { lead: 'Haley Wright',     budget: 1000,  pic: 'https://drive.google.com/file/d/17Tse_3jiKZwmkVTTKMtt64zDghfZ8WrV/view?usp=drive_link', leadEmail: '' },
+  'Venue':         { lead: 'Staff',            budget: null,  pic: '', leadEmail: '' },
 };
+
+// Board notification routing: reimbursements go to Wyn Spiller; all other
+// budget-category items go to that area's lead (AREA_DEFAULTS[area].leadEmail).
+// Real addresses are filled in once provided — until then, notifications for
+// a recipient with no email on file are reported as "no email on file" rather
+// than silently failing or guessing an address.
+var WYN_EMAIL = '';
 
 var validModuleIds = Object.keys(views);
 function hashToModule() {
