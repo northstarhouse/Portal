@@ -13752,22 +13752,20 @@ function buildBoardEmailRequest(g, toOverride) {
   var subject, subtext, buttonText, buttonUrl, textBody;
   if (g.isWyn) {
     // Wyn typically gets a batch at once and reconciles in the Portal itself — the
-    // email is just a heads-up that new ones landed, not an itemized rundown.
-    subject = 'New Reimbursement' + (n > 1 ? 's' : '') + ' Added to the Portal';
-    subtext = 'New reimbursement' + (n > 1 ? 's have' : ' has') + ' been added to the Portal. For your review.';
+    // email is just a heads-up that new ones landed, not an itemized rundown. Always
+    // plural "Reimbursements", regardless of how many are actually in this batch.
+    subject = 'New Reimbursements Added to the Portal';
+    subtext = 'New reimbursements have been added to the Portal. For your review.';
     buttonUrl = PORTAL_URL + '#financials';
     textBody = subtext;
   } else {
     // Area leads just get an FYI, same as any other operational-area activity — no action implied.
-    // Call it out as a "Reimbursement" specifically when every item in the batch is one.
-    var allReimb = g.items.every(function(it) { return it.needsReimbursement; });
-    var noun = allReimb ? 'Reimbursement' : 'Item';
-    subject = 'New ' + g.items[0].area + ' ' + noun + (n > 1 ? 's' : '') + ' Submitted';
-    subtext = 'For your awareness, the following ' + (allReimb ? 'reimbursement' : 'item') + (n > 1 ? 's have' : ' has') + ' been submitted for ' + g.items[0].area + ':<br/><br/>' + itemListHtml;
+    subject = 'New ' + g.items[0].area + ' Item' + (n > 1 ? 's' : '') + ' Submitted';
+    subtext = 'The following item' + (n > 1 ? 's have' : ' has') + ' been submitted for reimbursement from the ' + g.items[0].area + ' budget:<br/><br/>' + itemListHtml;
     buttonUrl = PORTAL_URL + '#operational';
     textBody = itemLines;
   }
-  buttonText = 'Click Here to View ' + (n > 1 ? 'Them' : 'It') + ' in the Portal';
+  buttonText = 'Click Here to View in the Portal';
 
   var html = buildBoardNotificationEmailHtml({ headline: subject, subtext: subtext, buttonText: buttonText, buttonUrl: buttonUrl });
   var text = subject + '\n\n' + textBody + '\n\n' + buttonText + ': ' + buttonUrl;
