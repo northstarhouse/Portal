@@ -4945,6 +4945,7 @@ function BoardView() {
       sbPatchById('Board-Votes', existing.id, fullPayload).then(function() {
         setVoteSaving(false);
         setVoteForm({ voter: '', choice: '', note: '' });
+        logActivity(voteForm.voter + ' changed their vote on "' + selected.title + '"', 'board_vote_changed');
         refreshVotes();
       });
     } else {
@@ -4952,6 +4953,7 @@ function BoardView() {
         if (rows && rows.message) { alert('Error saving vote: ' + rows.message); setVoteSaving(false); return; }
         setVoteSaving(false);
         setVoteForm({ voter: '', choice: '', note: '' });
+        logActivity(voteForm.voter + ' cast their vote on "' + selected.title + '"', 'board_vote_cast');
         refreshVotes();
       }).catch(function(err) { alert('Error: ' + err); setVoteSaving(false); });
     }
