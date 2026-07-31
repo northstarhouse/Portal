@@ -4361,7 +4361,7 @@ function DonorsView({ navigate }) {
                                   <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,background:acked?'#e8f5e9':'#fff8e1',color:acked?'#2e7d32':'#8a6200',fontWeight:500}}>{acked?'Thanked':'Pending'}</span>
                                   {don.acknowledgment_status && don.acknowledgment_status!=='ready_to_generate' && <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,fontWeight:500,...(ACK_STATUS_PILLS[don.acknowledgment_status]||{background:'#f3f4f6',color:'#6b7280'})}}>{ACK_STATUS_LABELS[don.acknowledgment_status]||don.acknowledgment_status}</span>}
                                 </div>
-                                <button onClick={function(e){e.stopPropagation();quickGenerate(don);}} title={don.letter_drive_url?'Regenerate thank-you documents':don.acknowledgment_type?'Generate thank-you documents now, using the info already on file':'Set Acknowledgment Type, then generate'} style={{background:'none',border:'0.5px solid '+gold,color:gold,borderRadius:6,padding:'4px 7px',cursor:'pointer',flexShrink:0,display:'flex',alignItems:'center'}}>
+                                <button onClick={function(e){e.stopPropagation();quickGenerate(don);}} title={don.letter_drive_url?'Regenerate acknowledgment':don.acknowledgment_type?'Generate acknowledgment now, using the info already on file':'Set Acknowledgment Type, then generate'} style={{background:'none',border:'0.5px solid '+gold,color:gold,borderRadius:6,padding:'4px 7px',cursor:'pointer',flexShrink:0,display:'flex',alignItems:'center'}}>
                                   <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>
                                 </button>
                                 <button onClick={function(e){e.stopPropagation();setEditDon(don);
@@ -4376,7 +4376,7 @@ function DonorsView({ navigate }) {
                               </div>
                               {don.acknowledgment_type && (
                                 <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginTop:6}}>
-                                  <button onClick={function(e){e.stopPropagation();openGenerateFlow(don);}} style={{fontSize:11,color:gold,background:'none',border:'0.5px solid '+gold,borderRadius:6,padding:'3px 10px',cursor:'pointer'}}>{don.letter_drive_url?'Thank-You Docs':'Generate Thank-You Documents'}</button>
+                                  <button onClick={function(e){e.stopPropagation();openGenerateFlow(don);}} style={{fontSize:11,color:gold,background:'none',border:'0.5px solid '+gold,borderRadius:6,padding:'3px 10px',cursor:'pointer'}}>{don.letter_drive_url?'Acknowledgment':'Generate Acknowledgment'}</button>
                                   {don.letter_drive_url && <a href={don.letter_drive_url} target="_blank" rel="noreferrer" onClick={function(e){e.stopPropagation();}} style={{fontSize:11,color:'#888'}}>Open Letter</a>}
                                   {don.envelope_drive_url && <a href={don.envelope_drive_url} target="_blank" rel="noreferrer" onClick={function(e){e.stopPropagation();}} style={{fontSize:11,color:'#888'}}>Open Envelope</a>}
                                   {don.letter_drive_file_id && <button onClick={function(e){e.stopPropagation();var key='letter-'+don.id;setDownloadingDocKey(key);downloadSinglePdf(don.letter_drive_file_id,(don.date||'')+' - Letter.pdf').then(function(){setDownloadingDocKey(null);}).catch(function(){setDownloadingDocKey(null);});}} disabled={downloadingDocKey==='letter-'+don.id} style={{fontSize:11,color:'#888',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>{downloadingDocKey==='letter-'+don.id?'…':'Download Letter PDF'}</button>}
@@ -4567,7 +4567,7 @@ function DonorsView({ navigate }) {
 
             {ackStep==='exists-choice' && (
               <div>
-                <div style={{fontSize:17,fontWeight:600,marginBottom:14}}>Thank-you documents already exist</div>
+                <div style={{fontSize:17,fontWeight:600,marginBottom:14}}>Acknowledgment already exists</div>
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
                   <a href={ackDonation.letter_drive_url} target="_blank" rel="noreferrer" style={{textDecoration:'none'}}>
                     <button style={{width:'100%',padding:10,background:gold,color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer'}}>Open Existing Documents</button>
@@ -4617,7 +4617,7 @@ function DonorsView({ navigate }) {
 
             {ackStep==='result' && ackResult && (
               <div>
-                <div style={{fontSize:17,fontWeight:600,marginBottom:6,color:'#166534'}}>Thank-you documents created successfully.</div>
+                <div style={{fontSize:17,fontWeight:600,marginBottom:6,color:'#166534'}}>Acknowledgment created successfully.</div>
                 <div style={{fontSize:12,color:'#666',marginBottom:14}}>{ackResult.folderPath}</div>
                 <div style={{fontSize:12,marginBottom:6}}><span style={{color:'#777'}}>Letter: </span>{ackResult.letterName}</div>
                 {ackResult.envelopeName && <div style={{fontSize:12,marginBottom:14}}><span style={{color:'#777'}}>Envelope: </span>{ackResult.envelopeName}</div>}
