@@ -4778,7 +4778,7 @@ function BoardView() {
     var missingNames = boardMembers.filter(function(m) { return !m.email; }).map(function(m) { return m.name; });
     if (!recipients.length) {
       setSendingVoteId(null);
-      setVoteNotifResult({ ok: false, text: 'No board member emails on file yet — add them above first.' });
+      setVoteNotifResult({ ok: false, text: 'No board member emails on file yet — add them above first.', forRowId: item.row_id });
       return;
     }
     var html = buildBoardNotificationEmailHtml({
@@ -4798,7 +4798,7 @@ function BoardView() {
       var parts = [];
       parts.push(ok ? ('Sent to ' + recipients.length + ' board member' + (recipients.length > 1 ? 's' : '') + '.') : 'Failed to send.');
       if (missingNames.length) parts.push('No email on file for: ' + missingNames.join(', ') + '.');
-      setVoteNotifResult({ ok: ok, text: parts.join(' ') });
+      setVoteNotifResult({ ok: ok, text: parts.join(' '), forRowId: item.row_id });
     });
   }
 
@@ -5054,8 +5054,20 @@ function BoardView() {
                       : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Open</span>
                     }
                   </div>
+                  {!revealed && (
+                    <button
+                      onClick={function(e) { e.stopPropagation(); sendVoteNotification(item); }}
+                      disabled={sendingVoteId === item.row_id}
+                      style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: sendingVoteId === item.row_id ? 0.6 : 1, whiteSpace: 'nowrap' }}
+                    >
+                      {sendingVoteId === item.row_id ? 'Sending…' : 'Send Notification'}
+                    </button>
+                  )}
                 </div>
               </div>
+              {sendingVoteId === null && voteNotifResult && voteNotifResult.forRowId === item.row_id && (
+                <div style={{ marginTop: 8, fontSize: 11, color: voteNotifResult.ok ? '#2e6b4f' : '#a04545' }}>{voteNotifResult.text}</div>
+              )}
               {revealed && (
                 <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
                   {[['Yes', t.yes, '#2e7d32'], ['No', t.no, '#c62828'], ['Abstain', t.abstain, '#7c3aed']].map(function(entry) {
