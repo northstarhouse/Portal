@@ -7,18 +7,21 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   try {
-    const { bcc, to, subject, body, html, sender } = await req.json()
-    const raw = to ?? bcc
+    const { to, bcc, subject, body, html, sender } = await req.json()
 
-    const recipients: string[] = Array.isArray(raw)
-      ? raw
-      : String(raw).split(',').map((e: string) => e.trim()).filter(Boolean)
+    const recipients: string[] = Array.isArray(to)
+      ? to
+      : String(to || '').split(',').map((e: string) => e.trim()).filter(Boolean)
 
     if (!recipients.length) {
       return new Response(JSON.stringify({ error: 'No recipients' }), {
         status: 400, headers: { ...CORS, 'Content-Type': 'application/json' },
       })
     }
+
+    const bccList: string[] = bcc
+      ? (Array.isArray(bcc) ? bcc : String(bcc).split(',').map((e: string) => e.trim()).filter(Boolean))
+      : []
 
     const fromName = sender ? `${sender} · North Star House` : 'North Star House'
 
@@ -34,6 +37,7 @@ Deno.serve(async (req) => {
         subject,
         text: body || '',
         ...(html ? { html } : {}),
+        ...(bccList.length ? { bcc: bccList } : {}),
       }),
     })
 

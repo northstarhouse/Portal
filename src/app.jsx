@@ -4734,6 +4734,75 @@ function BoardView() {
   const [adminPwInput, setAdminPwInput] = React.useState('');
   const [adminPwError, setAdminPwError] = React.useState(false);
   const [closingId, setClosingId] = React.useState(null);
+  const [boardMembers, setBoardMembers] = React.useState([]);
+  const [memberEmailDrafts, setMemberEmailDrafts] = React.useState({});
+  const [savingMemberEmails, setSavingMemberEmails] = React.useState(false);
+  const [sendingVoteId, setSendingVoteId] = React.useState(null);
+  const [voteNotifResult, setVoteNotifResult] = React.useState(null);
+
+  function loadBoardMembers() {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('board_members') + '?select=*&order=sort_order.asc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (!Array.isArray(rows)) return;
+      setBoardMembers(rows);
+      var drafts = {};
+      rows.forEach(function(m) { drafts[m.id] = m.email || ''; });
+      setMemberEmailDrafts(drafts);
+    });
+  }
+
+  function saveBoardMemberEmails() {
+    setSavingMemberEmails(true);
+    Promise.all(boardMembers.map(function(m) {
+      var email = (memberEmailDrafts[m.id] || '').trim();
+      if (email === (m.email || '')) return Promise.resolve();
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('board_members') + '?id=eq.' + m.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email || null })
+      });
+    })).then(function() {
+      setSavingMemberEmails(false);
+      loadBoardMembers();
+    });
+  }
+
+  // Sends the standing "New Item for Board Review" email to every board
+  // member with an email on file. Manual, per-topic — mirrors the button
+  // shown in the reference screenshot (gold CTA + "Password is NSH" note).
+  function sendVoteNotification(item) {
+    setSendingVoteId(item.row_id);
+    setVoteNotifResult(null);
+    var recipients = boardMembers.filter(function(m) { return m.email; }).map(function(m) { return m.email; });
+    var missingNames = boardMembers.filter(function(m) { return !m.email; }).map(function(m) { return m.name; });
+    if (!recipients.length) {
+      setSendingVoteId(null);
+      setVoteNotifResult({ ok: false, text: 'No board member emails on file yet — add them above first.' });
+      return;
+    }
+    var html = buildBoardNotificationEmailHtml({
+      headline: 'New Item for Board Review',
+      subtext: 'Please review the materials and submit your vote inside the portal.',
+      buttonText: 'Click Here to Review Materials & Cast Vote',
+      buttonUrl: PORTAL_URL + '#board',
+      note: 'Password is NSH'
+    });
+    var text = 'New Item for Board Review\n\nPlease review the materials and submit your vote inside the portal.\n\nClick Here to Review Materials & Cast Vote: ' + PORTAL_URL + '#board\n\nPassword is NSH';
+    fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: recipients, bcc: [BOARD_VOTE_NOTIFY_BCC], subject: 'New Item for Board Review: ' + item.title, body: text, html: html })
+    }).then(function(r) { return r.ok; }).catch(function() { return false; }).then(function(ok) {
+      setSendingVoteId(null);
+      var parts = [];
+      parts.push(ok ? ('Sent to ' + recipients.length + ' board member' + (recipients.length > 1 ? 's' : '') + '.') : 'Failed to send.');
+      if (missingNames.length) parts.push('No email on file for: ' + missingNames.join(', ') + '.');
+      setVoteNotifResult({ ok: ok, text: parts.join(' ') });
+    });
+  }
+
+  React.useEffect(function() { loadBoardMembers(); }, []);
 
   function handleAttachUpload(e) {
     var file = e.target.files[0];
@@ -5167,6 +5236,31 @@ function BoardView() {
               </div>
             ) : (
             <div style={{ padding: '16px 24px' }}>
+              <div style={{ background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#2a2a2a', marginBottom: 8 }}>Board Member Emails</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {boardMembers.map(function(m) {
+                    return (
+                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ fontSize: 12, color: '#555', width: 60, flexShrink: 0 }}>{m.name}</div>
+                        <input
+                          type="email"
+                          value={memberEmailDrafts[m.id] || ''}
+                          onChange={function(e) { setMemberEmailDrafts(function(d) { var nd = Object.assign({}, d); nd[m.id] = e.target.value; return nd; }); }}
+                          placeholder="email@example.com"
+                          style={{ flex: 1, padding: '6px 9px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12 }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <button onClick={saveBoardMemberEmails} disabled={savingMemberEmails} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: savingMemberEmails ? 0.7 : 1 }}>{savingMemberEmails ? 'Saving…' : 'Save Emails'}</button>
+                </div>
+              </div>
+              {voteNotifResult && (
+                <div style={{ fontSize: 12, color: voteNotifResult.ok ? '#2e6b4f' : '#a04545', marginBottom: 12 }}>{voteNotifResult.text}</div>
+              )}
               {items.length === 0
                 ? <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: 32 }}>No voting items.</div>
                 : (function() {
@@ -5207,12 +5301,20 @@ function BoardView() {
                                     })}
                                   </div>
                                 </div>
-                                <button
-                                  onClick={function() { closeVote(item); }}
-                                  disabled={isClosing}
-                                  style={{ background: won ? '#2e7d32' : '#fff', color: won ? '#fff' : '#555', border: '0.5px solid ' + (won ? '#2e7d32' : '#e0d8cc'), borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0, opacity: isClosing ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                                  {isClosing ? 'Closing…' : 'Close Vote'}
-                                </button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                                  <button
+                                    onClick={function() { sendVoteNotification(item); }}
+                                    disabled={sendingVoteId === item.row_id}
+                                    style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: sendingVoteId === item.row_id ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                                    {sendingVoteId === item.row_id ? 'Sending…' : 'Send to Board'}
+                                  </button>
+                                  <button
+                                    onClick={function() { closeVote(item); }}
+                                    disabled={isClosing}
+                                    style={{ background: won ? '#2e7d32' : '#fff', color: won ? '#fff' : '#555', border: '0.5px solid ' + (won ? '#2e7d32' : '#e0d8cc'), borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: isClosing ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                                    {isClosing ? 'Closing…' : 'Close Vote'}
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           );
@@ -13731,6 +13833,7 @@ var AREA_DEFAULTS = {
 var WYN_EMAIL = '';
 
 var PORTAL_URL = 'https://northstarhouse.github.io/Portal/';
+var BOARD_VOTE_NOTIFY_BCC = 'media@thenorthstarhouse.org';
 var VOLUNTEER_HUB_URL = 'https://northstarhouse.github.io/volunteerhub/';
 var WEBSITE_URL = 'https://thenorthstarhouse.org';
 
