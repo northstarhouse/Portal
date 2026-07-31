@@ -13751,12 +13751,14 @@ function buildBoardEmailRequest(g, toOverride) {
   var n = g.items.length;
   var subject, subtext, buttonText, buttonUrl;
   if (g.isWyn) {
+    // Wyn handles reimbursements directly — this one does need her review/approval.
     subject = 'New Reimbursement Request' + (n > 1 ? 's' : '') + ' Awaiting Review';
     subtext = 'The following reimbursement' + (n > 1 ? 's have' : ' has') + ' been submitted and ' + (n > 1 ? 'need' : 'needs') + ' your review:<br/><br/>' + itemListHtml;
     buttonUrl = PORTAL_URL + '#financials';
   } else {
-    subject = 'New ' + g.items[0].area + ' Item' + (n > 1 ? 's' : '') + ' Awaiting Review';
-    subtext = 'The following item' + (n > 1 ? 's have' : ' has') + ' been submitted for ' + g.items[0].area + ' and ' + (n > 1 ? 'need' : 'needs') + ' your review:<br/><br/>' + itemListHtml;
+    // Area leads just get an FYI, same as any other operational-area activity — no action implied.
+    subject = 'New ' + g.items[0].area + ' Item' + (n > 1 ? 's' : '') + ' Submitted';
+    subtext = 'For your awareness, the following item' + (n > 1 ? 's have' : ' has') + ' been submitted for ' + g.items[0].area + ':<br/><br/>' + itemListHtml;
     buttonUrl = PORTAL_URL + '#operational';
   }
   buttonText = 'Click Here to View ' + (n > 1 ? 'Them' : 'It') + ' in the Portal';
