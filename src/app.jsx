@@ -13749,12 +13749,14 @@ function buildBoardEmailRequest(g, toOverride) {
     '</ul>';
 
   var n = g.items.length;
-  var subject, subtext, buttonText, buttonUrl;
+  var subject, subtext, buttonText, buttonUrl, textBody;
   if (g.isWyn) {
-    // Wyn handles reimbursements directly — this one does need her review/approval.
-    subject = 'New Reimbursement Request' + (n > 1 ? 's' : '') + ' Awaiting Review';
-    subtext = 'The following reimbursement' + (n > 1 ? 's have' : ' has') + ' been submitted and ' + (n > 1 ? 'need' : 'needs') + ' your review:<br/><br/>' + itemListHtml;
+    // Wyn typically gets a batch at once and reconciles in the Portal itself — the
+    // email is just a heads-up that new ones landed, not an itemized rundown.
+    subject = 'New Reimbursement' + (n > 1 ? 's' : '') + ' Added to the Portal';
+    subtext = 'New reimbursement' + (n > 1 ? 's have' : ' has') + ' been added to the Portal. For your review.';
     buttonUrl = PORTAL_URL + '#financials';
+    textBody = subtext;
   } else {
     // Area leads just get an FYI, same as any other operational-area activity — no action implied.
     // Call it out as a "Reimbursement" specifically when every item in the batch is one.
@@ -13763,11 +13765,12 @@ function buildBoardEmailRequest(g, toOverride) {
     subject = 'New ' + g.items[0].area + ' ' + noun + (n > 1 ? 's' : '') + ' Submitted';
     subtext = 'For your awareness, the following ' + (allReimb ? 'reimbursement' : 'item') + (n > 1 ? 's have' : ' has') + ' been submitted for ' + g.items[0].area + ':<br/><br/>' + itemListHtml;
     buttonUrl = PORTAL_URL + '#operational';
+    textBody = itemLines;
   }
   buttonText = 'Click Here to View ' + (n > 1 ? 'Them' : 'It') + ' in the Portal';
 
   var html = buildBoardNotificationEmailHtml({ headline: subject, subtext: subtext, buttonText: buttonText, buttonUrl: buttonUrl });
-  var text = subject + '\n\n' + itemLines + '\n\n' + buttonText + ': ' + buttonUrl;
+  var text = subject + '\n\n' + textBody + '\n\n' + buttonText + ': ' + buttonUrl;
 
   return {
     method: 'POST',
