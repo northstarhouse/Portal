@@ -12323,6 +12323,36 @@ function AdminToolCard(props) {
 }
 
 function AdminView({ navigate }) {
+  var [uploadingMail, setUploadingMail] = useState(false);
+  var [mailUploadResult, setMailUploadResult] = useState(null);
+  var mailFileInputRef = React.useRef(null);
+
+  function handleMailFileChosen(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    setUploadingMail(true);
+    setMailUploadResult(null);
+    var reader = new FileReader();
+    reader.onload = function() {
+      var base64 = reader.result.split(',')[1];
+      var now = new Date();
+      var mdY = (now.getMonth() + 1) + '.' + now.getDate() + '.' + now.getFullYear();
+      var ext = (file.name.match(/\.[a-zA-Z0-9]+$/) || [''])[0];
+      var filename = mdY + ' - Mail' + ext;
+      fetch(SUPABASE_URL + '/functions/v1/upload-mail', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: filename, mimeType: file.type || 'application/octet-stream', base64: base64 })
+      }).then(function(r) { return r.json(); }).then(function(res) {
+        setUploadingMail(false);
+        if (!res.success) { setMailUploadResult({ ok: false, text: res.error || 'Upload failed.' }); return; }
+        setMailUploadResult({ ok: true, text: 'Uploaded as "' + filename + '".', url: res.url });
+      }).catch(function(err) { setUploadingMail(false); setMailUploadResult({ ok: false, text: err.message || 'Upload failed.' }); });
+    };
+    reader.readAsDataURL(file);
+  }
+
   var emailIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/><polyline points="2,18 8,13"/><polyline points="22,18 16,13"/></svg>;
   var checkIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
   var eventsIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
@@ -12408,7 +12438,24 @@ function AdminView({ navigate }) {
           </span>
           Maintenance Request
         </div>
+        <div
+          onClick={function() { if (!uploadingMail && mailFileInputRef.current) mailFileInputRef.current.click(); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: uploadingMail ? 'default' : 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500, opacity: uploadingMail ? 0.7 : 1 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/><polyline points="2,18 8,13"/><polyline points="22,18 16,13"/></svg>
+          </span>
+          {uploadingMail ? 'Uploading…' : 'Upload Mail'}
+        </div>
       </div>
+      <input ref={mailFileInputRef} type="file" accept="image/*,.pdf" onChange={handleMailFileChosen} style={{ display: 'none' }} />
+      {mailUploadResult && (
+        <div style={{ fontSize: 12, color: mailUploadResult.ok ? '#2e6b4f' : '#a04545', marginBottom: 20, marginTop: -14 }}>
+          {mailUploadResult.text}{mailUploadResult.ok && mailUploadResult.url && <a href={mailUploadResult.url} target="_blank" rel="noreferrer" style={{ color: gold, marginLeft: 6 }}>View →</a>}
+        </div>
+      )}
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Outreach</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {ADMIN_FORMS.map(function(form) {
