@@ -214,7 +214,7 @@ const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthsta
 
 // Kick off critical fetches immediately so data is ready when views mount
 (function prefetch() {
-  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','Favorite Quote','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day','donor_id']);
+  cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','Mid-Year Notes 2026','What they want to see at NSH','Favorite Quote','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day','donor_id']);
   cachedSbFetch('2026 Donations', ['id','Donor Name','Last Name','Informal Names','Amount','Close Date','Donation Type','Payment Type','Account Type','Acknowledged','Salesforce','Email','Phone Number','Address','Benefits','Donation Notes','Donor Notes','Notes']);
   cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']);
   cachedFetchAll('Board Voting Items');
@@ -2037,6 +2037,7 @@ function VolForm({ form, onChange, saving, onSubmit, title, onCancel, onDelete, 
           <div style={volGrp}><label style={volLabelStyle}>Overview Notes</label><textarea name="Overview Notes" value={form['Overview Notes']} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Background Notes</label><textarea name="Background Notes" value={form['Background Notes']} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Notes</label><textarea name="Notes" value={form['Notes']} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
+          <div style={volGrp}><label style={volLabelStyle}>2026 Mid-Year Volunteer Notes from Lead</label><textarea name="Mid-Year Notes 2026" value={form['Mid-Year Notes 2026']} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
           <span style={volSecLabel}>Goals & About</span>
           <div style={volGrp}><label style={volLabelStyle}>What they want to see at NSH</label><textarea name="What they want to see at NSH" value={form['What they want to see at NSH']} onChange={onChange} rows={3} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
           <div style={volGrp}><label style={volLabelStyle}>Favorite Quote</label><textarea name="Favorite Quote" value={form['Favorite Quote'] || ''} onChange={onChange} rows={2} style={Object.assign({}, volInputStyle, { resize: 'vertical' })} /></div>
@@ -2068,6 +2069,76 @@ function VolunteersView({ navigate }) {
   const [tab, setTab] = useState('active');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboarding, setOnboarding] = useState([]);
+  const [showImportNotes, setShowImportNotes] = useState(false);
+  const [importNotesText, setImportNotesText] = useState('');
+  const [importNotesRows, setImportNotesRows] = useState(null);
+  const [importNotesSaving, setImportNotesSaving] = useState(false);
+
+  // Parses a pasted block of lead responses (Google Forms-style: one line per
+  // volunteer name with no colon, followed by "Question: Answer" lines) into
+  // per-volunteer formatted notes, and matches each name against the roster.
+  // No colon at all = a new volunteer's name; any line containing ": " is a
+  // question/answer pair for whichever volunteer block it falls under. This
+  // deliberately doesn't hardcode the exact question wording so it keeps
+  // working if the form's questions get reworded.
+  function parseMidYearNotesText(text) {
+    var lines = text.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+    var blocks = [];
+    var current = null;
+    lines.forEach(function(line) {
+      var sep = line.indexOf(': ');
+      if (sep === -1) {
+        current = { name: line, qa: [] };
+        blocks.push(current);
+      } else if (current) {
+        current.qa.push({ label: line.slice(0, sep + 1).trim(), value: line.slice(sep + 2).trim() });
+      }
+    });
+
+    return blocks.map(function(b) {
+      var frequency = null, specialty = null, otherNotes = null, extras = [];
+      b.qa.forEach(function(pair, i) {
+        var l = pair.label.toLowerCase();
+        if (l.indexOf('specialty') !== -1) specialty = pair.value;
+        else if (l.indexOf('other') !== -1 && l.indexOf('note') !== -1) otherNotes = pair.value;
+        else if (i === 0) frequency = pair.value;
+        else extras.push(pair.value);
+      });
+      var parts = [frequency, specialty ? 'Specialty: ' + specialty : null, otherNotes].concat(extras).filter(Boolean);
+      var note = parts.join('. ');
+      if (note && !/[.!?]$/.test(note)) note += '.';
+
+      var nameParts = b.name.split(/\s+/);
+      var lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+      var firstName = nameParts.slice(0, -1).join(' ') || b.name;
+      var exact = volunteers.filter(function(v) {
+        return ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim().toLowerCase() === b.name.trim().toLowerCase();
+      });
+      var byLastName = lastName ? volunteers.filter(function(v) { return (v['Last Name'] || '').trim().toLowerCase() === lastName.toLowerCase(); }) : [];
+      var match = exact.length === 1 ? exact[0] : (exact.length === 0 && byLastName.length === 1 ? byLastName[0] : null);
+      var ambiguous = exact.length > 1 || (exact.length === 0 && byLastName.length > 1);
+
+      return { name: b.name, note: note, match: match, ambiguous: ambiguous };
+    });
+  }
+
+  function saveImportedNotes() {
+    if (!importNotesRows) return;
+    setImportNotesSaving(true);
+    var toSave = importNotesRows.filter(function(r) { return r.match && r.note; });
+    Promise.all(toSave.map(function(r) { return sbPatchById('2026 Volunteers', r.match.id, { 'Mid-Year Notes 2026': r.note }); }))
+      .then(function() {
+        setVolunteers(function(prev) { return prev.map(function(v) {
+          var hit = toSave.find(function(r) { return r.match.id === v.id; });
+          return hit ? Object.assign({}, v, { 'Mid-Year Notes 2026': hit.note }) : v;
+        }); });
+        setImportNotesSaving(false);
+        setShowImportNotes(false);
+        setImportNotesText('');
+        setImportNotesRows(null);
+        clearCache('2026 Volunteers');
+      }).catch(function() { setImportNotesSaving(false); });
+  }
   var OB_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRvOZozfWfzXyS5GyAHDyzQbXf-A8GxNMKTTRh6BGDJCVAAdimGW7MvLdhl0Ab0PuUgmUfm8xpZRUyP/pub?gid=544068320&single=true&output=csv';
   var HOUR_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const [hoursData, setHoursData] = React.useState({});
@@ -2215,14 +2286,14 @@ function VolunteersView({ navigate }) {
     'First Name': '', 'Last Name': '', 'Team': '', 'Event Tags': '', 'Status': 'Active',
     'Email': '', 'Phone Number': '', 'Address': '', 'Birthday': '',
     'Volunteer Anniversary': '', 'CC': false, 'Nametag': false,
-    'Overview Notes': '', 'Background Notes': '', 'Notes': '',
+    'Overview Notes': '', 'Background Notes': '', 'Notes': '', 'Mid-Year Notes 2026': '',
     'Preferred Contact': '', 'What they want to see at NSH': '', 'Favorite Quote': '', 'NSH Future Vision': '', 'Allergies': '', 'Special Considerations': '',
     'Picture URL': '', 'Emergency Contact': '', 'Month': '', 'Day': ''
   };
   const [form, setForm] = useState(emptyForm);
 
   useEffect(function() {
-    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day','donor_id'])
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','Mid-Year Notes 2026','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day','donor_id'])
       .then(function(data) {
         if (Array.isArray(data)) {
           setVolunteers(data);
@@ -2474,6 +2545,7 @@ function VolunteersView({ navigate }) {
       'Overview Notes': v['Overview Notes'] || '',
       'Background Notes': v['Background Notes'] || '',
       'Notes': v['Notes'] || '',
+      'Mid-Year Notes 2026': v['Mid-Year Notes 2026'] || '',
       'What they want to see at NSH': v['What they want to see at NSH'] || '',
       'Preferred Contact': v['Preferred Contact'] || '',
       'Favorite Quote': v['Favorite Quote'] || '',
@@ -2599,8 +2671,56 @@ function VolunteersView({ navigate }) {
             style={{ border: 'none', borderRadius: 8, padding: '6px 18px', fontSize: 12, fontWeight: tab === 'inactive' ? 600 : 400, cursor: 'pointer', background: tab === 'inactive' ? '#fff' : 'transparent', color: tab === 'inactive' ? '#2a2a2a' : '#999', boxShadow: tab === 'inactive' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}
           >Inactive <span style={{ fontSize: 12, color: tab === 'inactive' ? gold : '#bbb', fontWeight: 500 }}>{inactive}</span></button>
         </div>
+        <button onClick={function() { setShowImportNotes(true); setImportNotesText(''); setImportNotesRows(null); }} style={{ background: '#fff', color: '#886c44', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>Import Mid-Year Notes</button>
         <button onClick={function() { setForm(emptyForm); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Volunteer</button>
       </div>
+
+      {showImportNotes && (
+        <div onClick={function() { if (!importNotesSaving) setShowImportNotes(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 640, maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ padding: '18px 22px', borderBottom: '0.5px solid #f0ece6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a' }}>Import 2026 Mid-Year Volunteer Notes from Lead</div>
+              <button onClick={function() { setShowImportNotes(false); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb' }}>×</button>
+            </div>
+            <div style={{ padding: '18px 22px' }}>
+              {!importNotesRows ? (
+                <div>
+                  <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>Paste the lead's responses below — one volunteer name per line (no colon), followed by that volunteer's "Question: Answer" lines, repeated for each volunteer.</div>
+                  <textarea value={importNotesText} onChange={function(e) { setImportNotesText(e.target.value); }} rows={12} placeholder={"Mike French\nThis volunteer:: Regularly volunteers\nDoes this volunteer have a specialty...?: General Carpentry and Demolition\nAny other volunteer notes:: Mike is a very well rounded individual..."} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, fontFamily: 'monospace', resize: 'vertical' }} />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                    <button onClick={function() { setImportNotesRows(parseMidYearNotesText(importNotesText)); }} disabled={!importNotesText.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: importNotesText.trim() ? 1 : 0.5 }}>Parse</button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>{importNotesRows.filter(function(r) { return r.match; }).length} of {importNotesRows.length} matched to a volunteer. Unmatched or ambiguous names are skipped — fix those manually.</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {importNotesRows.map(function(r, i) {
+                      return (
+                        <div key={i} style={{ border: '0.5px solid #e8e0d5', borderRadius: 8, padding: '10px 12px', background: r.match ? '#fdfcfb' : '#fff5f0' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#2a2a2a' }}>{r.name}</span>
+                            {r.match ? (
+                              <span style={{ fontSize: 10, fontWeight: 600, color: '#2e7d32' }}>Matched: {r.match['First Name']} {r.match['Last Name']}</span>
+                            ) : (
+                              <span style={{ fontSize: 10, fontWeight: 600, color: '#c46a1a' }}>{r.ambiguous ? 'Ambiguous — multiple matches' : 'No match found'}</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 12, color: '#555' }}>{r.note}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+                    <button onClick={function() { setImportNotesRows(null); }} disabled={importNotesSaving} style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>Back</button>
+                    <button onClick={saveImportedNotes} disabled={importNotesSaving || !importNotesRows.some(function(r) { return r.match; })} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: importNotesSaving ? 0.7 : 1 }}>{importNotesSaving ? 'Saving…' : 'Save Matched Notes'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ position: 'relative', marginBottom: 16 }}>
         <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#aaa', pointerEvents: 'none', display: 'flex' }}>
@@ -2756,11 +2876,12 @@ function VolunteersView({ navigate }) {
                   </div>
                 )}
               </div>
-              {(selected['Background Notes'] || selected['Notes']) && (
+              {(selected['Background Notes'] || selected['Notes'] || selected['Mid-Year Notes 2026']) && (
                 <div style={{ marginBottom: 4 }}>
                   <span style={volSecLabel}>Notes</span>
                   <NoteBlock label="Background" value={selected['Background Notes']} />
                   <NoteBlock label="Additional" value={selected['Notes']} />
+                  <NoteBlock label="2026 Mid-Year Notes from Lead" value={selected['Mid-Year Notes 2026']} />
                 </div>
               )}
               {(selected['What they want to see at NSH'] || selected['Favorite Quote'] || selected['NSH Future Vision'] || selected['Allergies'] || selected['Special Considerations']) && (
