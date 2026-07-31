@@ -9882,9 +9882,6 @@ function FinancialsView({ navigate }) {
   var [notifyItems, setNotifyItems] = useState([]);
   var [notifySending, setNotifySending] = useState(false);
   var [notifyResult, setNotifyResult] = useState(null);
-  var [testEmail, setTestEmail] = useState('');
-  var [testSending, setTestSending] = useState(false);
-  var [testResult, setTestResult] = useState(null);
 
   function loadReimbursements() {
     setLoading(true);
@@ -9966,32 +9963,6 @@ function FinancialsView({ navigate }) {
     });
   }
 
-  // Sends both the Wyn-style and lead-style templates to a test address
-  // (using the first queued item if any exist, otherwise a sample item) so the
-  // design can be previewed before real recipient emails are wired in. Does
-  // not touch board_notified_at — safe to run repeatedly.
-  function sendTestNotifications() {
-    var addr = testEmail.trim();
-    if (!addr || testSending) return;
-    setTestSending(true);
-    setTestResult(null);
-
-    var first = notifyItems[0];
-    var sampleItem = first
-      ? { area: first.area, type: first.type, description: first.description, amount: first.amount, date: first.date, purchasedBy: first.purchased_by }
-      : { area: 'Construction', type: 'Purchase', description: 'Sample item — replace with a real submission to preview live data', amount: 125.5, date: new Date().toISOString().slice(0, 10), purchasedBy: 'A Volunteer' };
-    var wynGroup = { label: 'Wyn Spiller', isWyn: true, items: [Object.assign({}, sampleItem, { needsReimbursement: true })] };
-    var leadGroup = { label: AREA_DEFAULTS[sampleItem.area] ? AREA_DEFAULTS[sampleItem.area].lead : sampleItem.area, isWyn: false, items: [Object.assign({}, sampleItem, { needsReimbursement: false })] };
-
-    Promise.all([wynGroup, leadGroup].map(function(g) {
-      return fetch(SUPABASE_URL + '/functions/v1/send-email', buildBoardEmailRequest(g, addr)).then(function(r) { return r.ok; }).catch(function() { return false; });
-    })).then(function(results) {
-      setTestSending(false);
-      var sentCount = results.filter(Boolean).length;
-      setTestResult({ ok: sentCount === 2, text: sentCount === 2 ? 'Sent both preview emails to ' + addr + '.' : (sentCount === 1 ? 'Only one of the two previews sent — check the address and try again.' : 'Failed to send previews.') });
-    });
-  }
-
   function markReimbursed(id) {
     setMarkingId(id);
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?id=eq.' + id, {
@@ -10058,53 +10029,30 @@ function FinancialsView({ navigate }) {
     <div>
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Board Notification</div>
-            <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{notifyItems.length ? notifyItems.length + ' item' + (notifyItems.length > 1 ? 's' : '') + ' queued across all areas' : 'No items queued'}</div>
-          </div>
-          <button
-            type="button"
-            disabled={!notifyItems.length || notifySending}
-            onClick={sendBoardNotifications}
-            style={{ background: '#2e6b4f', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: (!notifyItems.length || notifySending) ? 'default' : 'pointer', opacity: (!notifyItems.length || notifySending) ? 0.5 : 1 }}
-          >
-            {notifySending ? 'Sending…' : 'Send Board Notification' + (notifyItems.length ? ' (' + notifyItems.length + ')' : '')}
-          </button>
-        </div>
-        {notifyResult && (
-          <div style={{ marginTop: 10, fontSize: 12, color: notifyResult.ok ? '#2e6b4f' : '#a04545' }}>{notifyResult.text}</div>
-        )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '0.5px solid #f0ece6' }}>
-          <input type="email" value={testEmail} onChange={function(e) { setTestEmail(e.target.value); }} placeholder="your@email.com" style={{ padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, width: 200 }} />
-          <button
-            type="button"
-            disabled={testSending || !testEmail.trim()}
-            onClick={sendTestNotifications}
-            style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 500, cursor: (testSending || !testEmail.trim()) ? 'default' : 'pointer', opacity: (testSending || !testEmail.trim()) ? 0.6 : 1 }}
-          >
-            {testSending ? 'Sending…' : 'Send Test Preview to Myself'}
-          </button>
-        </div>
-        {testResult && (
-          <div style={{ marginTop: 8, fontSize: 12, color: testResult.ok ? '#2e6b4f' : '#a04545' }}>{testResult.text}</div>
-        )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={function() { setShowAddReim(function(v) { return !v; }); }}
+          style={{ background: showAddReim ? '#f0ece6' : gold, border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, color: showAddReim ? '#886c44' : '#fff', cursor: 'pointer' }}
+        >
+          {showAddReim ? 'Cancel' : '+ Add New Reimbursement'}
+        </button>
+        <button
+          type="button"
+          disabled={!notifyItems.length || notifySending}
+          onClick={sendBoardNotifications}
+          style={{ background: '#2e6b4f', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: (!notifyItems.length || notifySending) ? 'default' : 'pointer', opacity: (!notifyItems.length || notifySending) ? 0.5 : 1 }}
+        >
+          {notifySending ? 'Sending…' : 'Send Notification' + (notifyItems.length ? ' (' + notifyItems.length + ')' : '')}
+        </button>
       </div>
+      {notifyResult && (
+        <div style={{ textAlign: 'right', fontSize: 12, color: notifyResult.ok ? '#2e6b4f' : '#a04545' }}>{notifyResult.text}</div>
+      )}
 
-      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
-        <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Pending Reimbursements</div>
-            {!loading && items.length > 0 && <div style={{ fontSize: 12, color: '#b45309', fontWeight: 600, marginTop: 2 }}>{fmt(reimTotal)} total · {items.length} item{items.length !== 1 ? 's' : ''}</div>}
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            <button onClick={function() { setShowAddReim(function(v) { return !v; }); }} style={{ background: showAddReim ? '#f0ece6' : gold, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: showAddReim ? '#886c44' : '#fff', cursor: 'pointer' }}>{showAddReim ? 'Cancel' : '+ Add Reimbursement'}</button>
-            <button onClick={function() { setShowAllReim(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>See All Past Reimbursements</button>
-            <button onClick={function() { navigate('financial-overview'); }} style={{ background: gold, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>View All Financials</button>
-          </div>
-        </div>
-        {showAddReim && (
+      {showAddReim && (
+        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 10 }}>Add New Reimbursement</div>
           <form onSubmit={addReimbursement} style={{ padding: '14px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb', display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <select required value={addReimForm.area} onChange={function(e) { setAddReimForm(function(f) { return Object.assign({}, f, { area: e.target.value }); }); }} style={{ padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff' }}>
@@ -10126,7 +10074,20 @@ function FinancialsView({ navigate }) {
               <button type="submit" disabled={addReimSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: addReimSaving ? 0.7 : 1 }}>{addReimSaving ? 'Saving…' : 'Add'}</button>
             </div>
           </form>
-        )}
+        </div>
+      )}
+
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+        <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Pending Reimbursements</div>
+            {!loading && items.length > 0 && <div style={{ fontSize: 12, color: '#b45309', fontWeight: 600, marginTop: 2 }}>{fmt(reimTotal)} total · {items.length} item{items.length !== 1 ? 's' : ''}</div>}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button onClick={function() { setShowAllReim(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>See All Past Reimbursements</button>
+            <button onClick={function() { navigate('financial-overview'); }} style={{ background: gold, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#fff', cursor: 'pointer' }}>View All Financials</button>
+          </div>
+        </div>
         {showAllReim && <AllReimbursementsModal onClose={function() { setShowAllReim(false); }} />}
         {loading ? (
           <div style={{ padding: '24px', fontSize: 12, color: '#ccc', textAlign: 'center' }}>Loading…</div>
