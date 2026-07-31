@@ -4963,7 +4963,7 @@ function BoardView() {
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: recipients, bcc: [BOARD_VOTE_NOTIFY_BCC], subject: 'New Item for Board Review', body: text, html: html })
+      body: JSON.stringify({ to: recipients, bcc: [ADMIN_NOTIFY_BCC], subject: 'New Item for Board Review', body: text, html: html })
     }).then(function(r) { return r.ok; }).catch(function() { return false; }).then(function(ok) {
       setSendingVoteId(null);
       var parts = [];
@@ -12358,7 +12358,7 @@ function AdminView({ navigate }) {
           fetch(SUPABASE_URL + '/functions/v1/send-email', {
             method: 'POST',
             headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to: [WYN_EMAIL], subject: 'New Mail Uploaded', body: text, html: html })
+            body: JSON.stringify({ to: [WYN_EMAIL], bcc: [ADMIN_NOTIFY_BCC], subject: 'New Mail Uploaded', body: text, html: html })
           }).catch(function() {});
         }
         setMailUploadResult({ ok: true, text: 'Uploaded as "' + filename + '".' + (WYN_EMAIL ? ' Wyn notified.' : ' (No email on file for Wyn — notification not sent.)'), url: res.url });
@@ -14160,10 +14160,12 @@ var AREA_DEFAULTS = {
 // Real addresses are filled in once provided — until then, notifications for
 // a recipient with no email on file are reported as "no email on file" rather
 // than silently failing or guessing an address.
-var WYN_EMAIL = '';
+var WYN_EMAIL = 'wyn.spiller@gmail.com';
 
 var PORTAL_URL = 'https://northstarhouse.github.io/Portal/';
-var BOARD_VOTE_NOTIFY_BCC = 'media@thenorthstarhouse.org';
+// Reused as the bcc on every admin-facing notification (board votes, mail
+// uploads, etc.) so the sender always has a copy of what went out.
+var ADMIN_NOTIFY_BCC = 'media@thenorthstarhouse.org';
 var VOLUNTEER_HUB_URL = 'https://northstarhouse.github.io/volunteerhub/';
 var WEBSITE_URL = 'https://thenorthstarhouse.org';
 
@@ -14247,7 +14249,7 @@ function buildBoardEmailRequest(g, toOverride) {
   return {
     method: 'POST',
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to: toOverride || g.email, subject: subject, body: text, html: html })
+    body: JSON.stringify({ to: toOverride || g.email, bcc: [ADMIN_NOTIFY_BCC], subject: subject, body: text, html: html })
   };
 }
 
