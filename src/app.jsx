@@ -6475,6 +6475,9 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
   var [pendingNotifications, setPendingNotifications] = useState([]);
   var [notifySending, setNotifySending] = useState(false);
   var [notifyResult, setNotifyResult] = useState(null);
+  var [testEmail, setTestEmail] = useState('');
+  var [testSending, setTestSending] = useState(false);
+  var [testResult, setTestResult] = useState(null);
   var [reimburseVolQuery, setReimburseVolQuery] = useState('');
   var [showReimburseVolDrop, setShowReimburseVolDrop] = useState(false);
   var [noteEdit, setNoteEdit] = useState(null);
@@ -6723,8 +6726,8 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
     function recipientsForItem(item) {
       var areaLead = AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].lead : item.area;
       var areaLeadEmail = AREA_DEFAULTS[item.area] ? AREA_DEFAULTS[item.area].leadEmail : '';
-      var list = [{ label: areaLead, email: areaLeadEmail }];
-      if (item.needsReimbursement) list.unshift({ label: 'Wyn Spiller', email: WYN_EMAIL });
+      var list = [{ label: areaLead, email: areaLeadEmail, isWyn: false }];
+      if (item.needsReimbursement) list.unshift({ label: 'Wyn Spiller', email: WYN_EMAIL, isWyn: true });
       return list;
     }
 
@@ -6734,7 +6737,7 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
       itemKeys[item.id] = [];
       recipientsForItem(item).forEach(function(r) {
         var key = r.label + '|' + r.email;
-        if (!groups[key]) groups[key] = { label: r.label, email: r.email, items: [] };
+        if (!groups[key]) groups[key] = { label: r.label, email: r.email, isWyn: r.isWyn, items: [] };
         groups[key].items.push(item);
         itemKeys[item.id].push(key);
       });
@@ -6744,19 +6747,7 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
     var missing = recipients.filter(function(g) { return !g.email; }).map(function(g) { return g.label; });
     var toSend = recipients.filter(function(g) { return g.email; });
 
-    var sendOne = function(g) {
-      var lines = g.items.map(function(item) {
-        var amt = item.amount != null ? '$' + Number(item.amount).toFixed(2) : '';
-        return '- ' + (item.needsReimbursement ? 'Reimbursement' : item.type) + ' (' + item.area + ')' + (amt ? ', ' + amt : '') + ': ' + (item.description || '') + (item.date ? ' — ' + item.date : '') + (item.purchasedBy ? ' — submitted by ' + item.purchasedBy : '');
-      }).join('\n');
-      var subject = (g.items.length > 1 ? g.items.length + ' new budget items' : 'New budget item') + ' — ' + g.items[0].area;
-      var body = 'The following item' + (g.items.length > 1 ? 's have' : ' has') + ' been submitted and need' + (g.items.length > 1 ? '' : 's') + ' your review:\n\n' + lines;
-      return fetch(SUPABASE_URL + '/functions/v1/send-email', {
-        method: 'POST',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: g.email, subject: subject, body: body })
-      }).then(function(r) { return r.ok; }).catch(function() { return false; });
-    };
+    var sendOne = function(g) { return fetch(SUPABASE_URL + '/functions/v1/send-email', buildBoardEmailRequest(g)).then(function(r) { return r.ok; }).catch(function() { return false; }); };
 
     Promise.all(toSend.map(sendOne)).then(function(results) {
       var sentKeys = {};
@@ -6775,6 +6766,28 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
       if (failedCount) parts.push(failedCount + ' failed to send.');
       if (missing.length) parts.push('No email on file for: ' + missing.join(', ') + '.');
       setNotifyResult({ ok: failedCount === 0, text: parts.join(' ') || 'Nothing to send.' });
+    });
+  }
+
+  // Sends both the Wyn-style and lead-style templates to a test address
+  // (using real pending items if any exist, otherwise a sample item) so the
+  // design can be previewed before real recipient emails are wired in.
+  function sendTestNotifications() {
+    var addr = testEmail.trim();
+    if (!addr || testSending) return;
+    setTestSending(true);
+    setTestResult(null);
+
+    var sampleItem = pendingNotifications[0] || { area: area, type: 'Purchase', needsReimbursement: true, description: 'Sample item — replace with a real submission to preview live data', amount: 125.5, date: today, purchasedBy: 'A Volunteer' };
+    var wynGroup = { label: 'Wyn Spiller', isWyn: true, items: [Object.assign({}, sampleItem, { needsReimbursement: true })] };
+    var leadGroup = { label: AREA_DEFAULTS[sampleItem.area] ? AREA_DEFAULTS[sampleItem.area].lead : sampleItem.area, isWyn: false, items: [Object.assign({}, sampleItem, { needsReimbursement: false })] };
+
+    Promise.all([wynGroup, leadGroup].map(function(g) {
+      return fetch(SUPABASE_URL + '/functions/v1/send-email', buildBoardEmailRequest(g, addr)).then(function(r) { return r.ok; }).catch(function() { return false; });
+    })).then(function(results) {
+      setTestSending(false);
+      var sentCount = results.filter(Boolean).length;
+      setTestResult({ ok: sentCount === 2, text: sentCount === 2 ? 'Sent both preview emails to ' + addr + '.' : (sentCount === 1 ? 'Only one of the two previews sent — check the address and try again.' : 'Failed to send previews.') });
     });
   }
 
@@ -7468,6 +7481,20 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
               )}
               {notifyResult && (
                 <div style={{ marginTop: 10, fontSize: 12, color: notifyResult.ok ? '#2e6b4f' : '#a04545' }}>{notifyResult.text}</div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '0.5px solid #f0ece6' }}>
+                <input type="email" value={testEmail} onChange={function(e) { setTestEmail(e.target.value); }} placeholder="your@email.com" style={{ padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, width: 200 }} />
+                <button
+                  type="button"
+                  disabled={testSending || !testEmail.trim()}
+                  onClick={sendTestNotifications}
+                  style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 500, cursor: (testSending || !testEmail.trim()) ? 'default' : 'pointer', opacity: (testSending || !testEmail.trim()) ? 0.6 : 1 }}
+                >
+                  {testSending ? 'Sending…' : 'Send Test Preview to Myself'}
+                </button>
+              </div>
+              {testResult && (
+                <div style={{ marginTop: 8, fontSize: 12, color: testResult.ok ? '#2e6b4f' : '#a04545' }}>{testResult.text}</div>
               )}
             </div>
             {budget.length === 0 ? (
@@ -13653,6 +13680,78 @@ var AREA_DEFAULTS = {
 // a recipient with no email on file are reported as "no email on file" rather
 // than silently failing or guessing an address.
 var WYN_EMAIL = '';
+
+var PORTAL_URL = 'https://northstarhouse.github.io/Portal/';
+var VOLUNTEER_HUB_URL = 'https://northstarhouse.github.io/volunteerhub/';
+var WEBSITE_URL = 'https://thenorthstarhouse.org';
+
+// Styled HTML email matching the brand's existing "New Item for Board Review"
+// template (gold top bar, serif headline, gold CTA button, 3-link footer).
+function buildBoardNotificationEmailHtml(opts) {
+  var headline = opts.headline;
+  var subtext = opts.subtext;
+  var buttonText = opts.buttonText;
+  var buttonUrl = opts.buttonUrl;
+  var note = opts.note || '';
+  return (
+    '<div style="background:#d9cdb8;padding:32px 16px;font-family:Georgia,\'Times New Roman\',serif;">' +
+      '<div style="max-width:560px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">' +
+        '<div style="height:14px;background:' + gold + ';"></div>' +
+        '<div style="padding:48px 40px 32px;text-align:center;">' +
+          '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">' + headline + '</h1>' +
+          '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>' +
+          '<p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;">' + subtext + '</p>' +
+          '<a href="' + buttonUrl + '" style="display:inline-block;background:' + gold + ';color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:16px;padding:16px 32px;border-radius:6px;margin-bottom:8px;">' + buttonText + '</a>' +
+          (note ? '<p style="margin:20px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>' + note + '</i></p>' : '') +
+        '</div>' +
+        '<table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #e5ddcf;">' +
+          '<tr>' +
+            '<td style="width:33.33%;text-align:center;padding:14px 8px;border-right:1px solid #e5ddcf;"><a href="' + PORTAL_URL + '" style="color:' + gold + ';text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">Portal</a></td>' +
+            '<td style="width:33.33%;text-align:center;padding:14px 8px;border-right:1px solid #e5ddcf;"><a href="' + VOLUNTEER_HUB_URL + '" style="color:' + gold + ';text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">Volunteer Hub</a></td>' +
+            '<td style="width:33.33%;text-align:center;padding:14px 8px;"><a href="' + WEBSITE_URL + '" style="color:' + gold + ';text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">Website</a></td>' +
+          '</tr>' +
+        '</table>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+// Builds the fetch() init object for a board-notification group ({label, email,
+// isWyn, items}). Wyn's copy points at Reimbursements; a lead's copy points at
+// Operational Areas. Pass toOverride to redirect delivery (e.g. a self-test send)
+// without changing the copy/routing logic itself.
+function buildBoardEmailRequest(g, toOverride) {
+  var lines = g.items.map(function(item) {
+    var amt = item.amount != null ? '$' + Number(item.amount).toFixed(2) : '';
+    return (item.needsReimbursement ? 'Reimbursement' : item.type) + ' (' + item.area + ')' + (amt ? ', ' + amt : '') + ': ' + (item.description || '') + (item.date ? ' — ' + item.date : '') + (item.purchasedBy ? ' — submitted by ' + item.purchasedBy : '');
+  });
+  var itemLines = lines.map(function(l) { return '- ' + l; }).join('\n');
+  var itemListHtml = '<ul style="text-align:left;display:inline-block;margin:0 0 8px;padding-left:20px;font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#555;line-height:1.6;">' +
+    lines.map(function(l) { return '<li>' + String(l).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</li>'; }).join('') +
+    '</ul>';
+
+  var n = g.items.length;
+  var subject, subtext, buttonText, buttonUrl;
+  if (g.isWyn) {
+    subject = 'New Reimbursement Request' + (n > 1 ? 's' : '') + ' Awaiting Review';
+    subtext = 'The following reimbursement' + (n > 1 ? 's have' : ' has') + ' been submitted and ' + (n > 1 ? 'need' : 'needs') + ' your review:<br/><br/>' + itemListHtml;
+    buttonUrl = PORTAL_URL + '#financials';
+  } else {
+    subject = 'New ' + g.items[0].area + ' Item' + (n > 1 ? 's' : '') + ' Awaiting Review';
+    subtext = 'The following item' + (n > 1 ? 's have' : ' has') + ' been submitted for ' + g.items[0].area + ' and ' + (n > 1 ? 'need' : 'needs') + ' your review:<br/><br/>' + itemListHtml;
+    buttonUrl = PORTAL_URL + '#operational';
+  }
+  buttonText = 'Click Here to View ' + (n > 1 ? 'Them' : 'It') + ' in the Portal';
+
+  var html = buildBoardNotificationEmailHtml({ headline: subject, subtext: subtext, buttonText: buttonText, buttonUrl: buttonUrl });
+  var text = subject + '\n\n' + itemLines + '\n\n' + buttonText + ': ' + buttonUrl;
+
+  return {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: toOverride || g.email, subject: subject, body: text, html: html })
+  };
+}
 
 var validModuleIds = Object.keys(views);
 function hashToModule() {
