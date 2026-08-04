@@ -202,6 +202,11 @@ function clearCache(table) {
 }
 window.__nshClearCache = clearCache;
 
+// Push notifications for every activity_log row (both rows inserted from here
+// and rows inserted directly by other systems, e.g. voicemails from the
+// Volunteer Hub) are handled by a Postgres trigger in Supabase — see
+// supabase/migrations_manual/add_activity_log_ntfy_push.sql — not from here,
+// so that externally-inserted rows are covered too.
 function logActivity(description, action) {
   fetch(SUPABASE_URL + '/rest/v1/activity_log', {
     method: 'POST',
@@ -2651,6 +2656,7 @@ function VolunteersView({ navigate }) {
         setVolunteers(function(prev) { return prev.map(function(v) { return v['First Name'] === selected['First Name'] && v['Last Name'] === selected['Last Name'] ? merged : v; }); });
         setSelected(merged);
         setEditing(false);
+        logActivity(selected['First Name'] + ' ' + selected['Last Name'] + '\'s profile was edited', 'volunteer_edited');
       })
       .catch(function(err) { setSaving(false); alert('Save error: ' + err.message); });
   }
@@ -4910,6 +4916,8 @@ function BoardView() {
   const [savingMemberEmails, setSavingMemberEmails] = React.useState(false);
   const [sendingVoteId, setSendingVoteId] = React.useState(null);
   const [voteNotifResult, setVoteNotifResult] = React.useState(null);
+  const [adminExpandedClosedId, setAdminExpandedClosedId] = React.useState(null);
+  const [voteNotifConfirmItem, setVoteNotifConfirmItem] = React.useState(null);
 
   function loadBoardMembers() {
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('board_members') + '?select=*&order=sort_order.asc', {
@@ -4952,18 +4960,19 @@ function BoardView() {
       setVoteNotifResult({ ok: false, text: 'No board member emails on file yet — add them above first.', forRowId: item.row_id });
       return;
     }
+    var subject = 'Board Vote: ' + item.title;
     var html = buildBoardNotificationEmailHtml({
-      headline: 'New Item for Board Review',
-      subtext: 'Please review the materials and submit your vote inside the portal.',
+      headline: item.title,
+      subtext: 'A new item is up for a board vote. Please review the materials and submit your vote inside the portal.',
       buttonText: 'Click Here to Review Materials & Cast Vote',
       buttonUrl: PORTAL_URL + '#board',
       note: 'Password is NSH'
     });
-    var text = 'New Item for Board Review\n\nPlease review the materials and submit your vote inside the portal.\n\nClick Here to Review Materials & Cast Vote: ' + PORTAL_URL + '#board\n\nPassword is NSH';
+    var text = item.title + '\n\nA new item is up for a board vote. Please review the materials and submit your vote inside the portal.\n\nClick Here to Review Materials & Cast Vote: ' + PORTAL_URL + '#board\n\nPassword is NSH';
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: recipients, bcc: [ADMIN_NOTIFY_BCC], subject: 'New Item for Board Review', body: text, html: html })
+      body: JSON.stringify({ to: recipients, bcc: [ADMIN_NOTIFY_BCC], subject: subject, body: text, html: html })
     }).then(function(r) { return r.ok; }).catch(function() { return false; }).then(function(ok) {
       setSendingVoteId(null);
       var parts = [];
@@ -5170,8 +5179,8 @@ function BoardView() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Voting Topics</div>
-          <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{items.length} topic{items.length !== 1 ? 's' : ''}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Board Items</div>
+          <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{items.length} item{items.length !== 1 ? 's' : ''}</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -5179,15 +5188,35 @@ function BoardView() {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
               Admin
             </button>
-            <button
-              onClick={function() { if (latestOpenItem) sendVoteNotification(latestOpenItem); }}
-              disabled={!latestOpenItem || !!sendingVoteId}
-              style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: (!latestOpenItem || sendingVoteId) ? 'default' : 'pointer', opacity: (!latestOpenItem || sendingVoteId) ? 0.5 : 1 }}
-            >
-              {sendingVoteId ? 'Sending…' : 'Send Notification'}
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={function() { if (latestOpenItem) setVoteNotifConfirmItem(latestOpenItem); }}
+                disabled={!latestOpenItem || !!sendingVoteId}
+                style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: (!latestOpenItem || sendingVoteId) ? 'default' : 'pointer', opacity: (!latestOpenItem || sendingVoteId) ? 0.5 : 1 }}
+              >
+                {sendingVoteId ? 'Sending…' : 'Send Notification'}
+              </button>
+              {voteNotifConfirmItem && (
+                <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, zIndex: 20, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.14)', padding: 14, width: 260, textAlign: 'left' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#2a2a2a', marginBottom: 6 }}>Send to {boardMembers.filter(function(m) { return m.email; }).length} board member{boardMembers.filter(function(m) { return m.email; }).length !== 1 ? 's' : ''}?</div>
+                  <div style={{ fontSize: 11, color: '#777', marginBottom: 8 }}>"{voteNotifConfirmItem.title}"</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 10, maxHeight: 120, overflowY: 'auto' }}>
+                    {boardMembers.filter(function(m) { return m.email; }).map(function(m) {
+                      return <div key={m.id} style={{ fontSize: 11, color: '#555' }}>{m.name} <span style={{ color: '#aaa' }}>({m.email})</span></div>;
+                    })}
+                    {boardMembers.filter(function(m) { return !m.email; }).map(function(m) {
+                      return <div key={m.id} style={{ fontSize: 11, color: '#c62828' }}>{m.name} <span style={{ color: '#c62828' }}>(no email on file)</span></div>;
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={function() { var item = voteNotifConfirmItem; setVoteNotifConfirmItem(null); sendVoteNotification(item); }} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Confirm & Send</button>
+                    <button onClick={function() { setVoteNotifConfirmItem(null); }} style={{ flex: 1, background: '#f0ece6', color: '#666', border: 'none', borderRadius: 6, padding: '6px 0', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>+ Add Topic</button>
+          <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>
         </div>
       </div>
       {voteNotifResult && (
@@ -5481,25 +5510,30 @@ function BoardView() {
                                     <span style={{ color: '#7c3aed', fontWeight: 600 }}>{t.abstain + t.absent} Abstain</span>
                                     <span style={{ color: '#888' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
                                   </div>
-                                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
                                     {BOARD_MEMBERS.map(function(m) {
                                       var mv = iv.find(function(v) { return v.voter === m; });
-                                      var vc = mv ? (VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' }) : null;
+                                      if (!mv) return (
+                                        <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                                          <span style={{ fontWeight: 500, color: '#2a2a2a', width: 90, flexShrink: 0 }}>{m}</span>
+                                          <span style={{ color: '#bbb' }}>No vote</span>
+                                        </div>
+                                      );
+                                      var vc = VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' };
                                       return (
-                                        <span key={m} title={mv ? m + ': ' + mv.choice : m + ': No vote'} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: vc ? vc.bg : '#f0ece6', color: vc ? vc.color : '#bbb', fontWeight: vc ? 600 : 400 }}>
-                                          {m.split(' ')[0]}
-                                        </span>
+                                        <div key={m} style={{ fontSize: 12 }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <span style={{ fontWeight: 500, color: '#2a2a2a', width: 90, flexShrink: 0 }}>{m}</span>
+                                            <span style={{ background: vc.bg, color: vc.color, fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20 }}>{mv.choice}</span>
+                                            {mv.changed_in_meeting && <span style={{ fontSize: 10, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '1px 7px', borderRadius: 20 }}>Changed in meeting</span>}
+                                          </div>
+                                          {mv.note && <div style={{ fontSize: 12, color: '#777', marginTop: 2, marginLeft: 98, fontStyle: 'italic' }}>{mv.note}</div>}
+                                        </div>
                                       );
                                     })}
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                                  <button
-                                    onClick={function() { sendVoteNotification(item); }}
-                                    disabled={sendingVoteId === item.row_id}
-                                    style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: sendingVoteId === item.row_id ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                                    {sendingVoteId === item.row_id ? 'Sending…' : 'Send to Board'}
-                                  </button>
                                   <button
                                     onClick={function() { closeVote(item); }}
                                     disabled={isClosing}
@@ -5523,9 +5557,13 @@ function BoardView() {
                                 var t = tally(item);
                                 var iv = itemVotes(item);
                                 var passed = isWon(item);
+                                var expanded = adminExpandedClosedId === item.row_id;
                                 return (
                                   <div key={item.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '12px 16px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    <div
+                                      onClick={function() { setAdminExpandedClosedId(expanded ? null : item.row_id); }}
+                                      style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+                                    >
                                       <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                                           <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{item.title}</div>
@@ -5543,7 +5581,32 @@ function BoardView() {
                                           <span style={{ color: '#888' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
                                         </div>
                                       </div>
+                                      <span style={{ fontSize: 11, color: '#aaa', flexShrink: 0 }}>{expanded ? '▲' : '▼'}</span>
                                     </div>
+                                    {expanded && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 10, paddingTop: 10, borderTop: '0.5px solid #f0ece6' }}>
+                                        {BOARD_MEMBERS.map(function(m) {
+                                          var mv = iv.find(function(v) { return v.voter === m; });
+                                          if (!mv) return (
+                                            <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                                              <span style={{ fontWeight: 500, color: '#2a2a2a', width: 90, flexShrink: 0 }}>{m}</span>
+                                              <span style={{ color: '#bbb' }}>No vote</span>
+                                            </div>
+                                          );
+                                          var vc = VOTE_COLORS[mv.choice] || { bg: '#f5f5f5', color: '#888' };
+                                          return (
+                                            <div key={m} style={{ fontSize: 12 }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <span style={{ fontWeight: 500, color: '#2a2a2a', width: 90, flexShrink: 0 }}>{m}</span>
+                                                <span style={{ background: vc.bg, color: vc.color, fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20 }}>{mv.choice}</span>
+                                                {mv.changed_in_meeting && <span style={{ fontSize: 10, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', fontWeight: 600, padding: '1px 7px', borderRadius: 20 }}>Changed in meeting</span>}
+                                              </div>
+                                              {mv.note && <div style={{ fontSize: 12, color: '#777', marginTop: 2, marginLeft: 98, fontStyle: 'italic' }}>{mv.note}</div>}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })}
@@ -5564,15 +5627,15 @@ function BoardView() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 4, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 20 }}>
-              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>New Voting Topic</div>
+              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>New Item</div>
               <button type="button" onClick={function() { setTopicForm(function(f) { return Object.assign({}, f, { allow_notes_vote: !f.allow_notes_vote }); }); }}
-                title="Let voters submit notes/requested changes instead of a Yes/No/Abstain vote on this topic"
+                title="Let voters submit notes/requested changes instead of a Yes/No/Abstain vote on this item"
                 style={{ padding: '5px 10px', borderRadius: 20, border: '1.5px solid ' + (topicForm.allow_notes_vote ? '#8a6200' : '#e0d8cc'), background: topicForm.allow_notes_vote ? '#fff8e1' : '#fff', color: topicForm.allow_notes_vote ? '#8a6200' : '#888', fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
                 {topicForm.allow_notes_vote ? '✓ Notes Option On' : 'Allow Notes Option'}
               </button>
             </div>
             <form onSubmit={handleTopicSubmit}>
-              <div style={bGrp}><label style={bLbl}>Title *</label><input required value={topicForm.title} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { title: e.target.value }); }); }} style={bInp} placeholder="Topic title…" /></div>
+              <div style={bGrp}><label style={bLbl}>Title *</label><input required value={topicForm.title} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { title: e.target.value }); }); }} style={bInp} placeholder="Item title…" /></div>
               <div style={bGrp}><label style={bLbl}>Description</label><RichEditor value={topicForm.description} onChange={function(html) { setTopicForm(function(f) { return Object.assign({}, f, { description: html }); }); }} placeholder="Background, details, context…" /></div>
               <div style={bGrp}>
                 <label style={bLbl}>Attachment</label>
@@ -5589,7 +5652,7 @@ function BoardView() {
                 <div><label style={bLbl}>Meeting Date</label><input type="date" value={topicForm.meeting_date} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { meeting_date: e.target.value }); }); }} style={bInp} /></div>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <button type="submit" disabled={topicSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: topicSaving ? 0.7 : 1 }}>{topicSaving ? 'Saving…' : 'Add Topic'}</button>
+                <button type="submit" disabled={topicSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: topicSaving ? 0.7 : 1 }}>{topicSaving ? 'Saving…' : 'Add Item'}</button>
                 <button type="button" onClick={function() { setShowAdd(false); }} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
               </div>
             </form>
@@ -10200,6 +10263,7 @@ function FinancialsView({ navigate }) {
   var [notifyItems, setNotifyItems] = useState([]);
   var [notifySending, setNotifySending] = useState(false);
   var [notifyResult, setNotifyResult] = useState(null);
+  var [notifyConfirmOpen, setNotifyConfirmOpen] = useState(false);
 
   function loadReimbursements() {
     setLoading(true);
@@ -10226,11 +10290,7 @@ function FinancialsView({ navigate }) {
     }).then(function(r) { return r.json(); }).then(function(rows) { if (Array.isArray(rows)) setIdeas(rows); });
   }, []);
 
-  function sendBoardNotifications() {
-    if (!notifyItems.length || notifySending) return;
-    setNotifySending(true);
-    setNotifyResult(null);
-
+  function computeNotifyGroups() {
     var queueItems = notifyItems.map(function(row) {
       return { id: row.id, area: row.area, type: row.type, needsReimbursement: !!row.needs_reimbursement, description: row.description, amount: row.amount, date: row.date, purchasedBy: row.purchased_by };
     });
@@ -10250,6 +10310,19 @@ function FinancialsView({ navigate }) {
     var recipients = Object.keys(groups).map(function(k) { return groups[k]; });
     var missing = recipients.filter(function(g) { return !g.email; }).map(function(g) { return g.label; });
     var toSend = recipients.filter(function(g) { return g.email; });
+    return { queueItems: queueItems, itemKeys: itemKeys, recipients: recipients, missing: missing, toSend: toSend };
+  }
+
+  function sendBoardNotifications() {
+    if (!notifyItems.length || notifySending) return;
+    setNotifySending(true);
+    setNotifyResult(null);
+
+    var computed = computeNotifyGroups();
+    var queueItems = computed.queueItems;
+    var itemKeys = computed.itemKeys;
+    var missing = computed.missing;
+    var toSend = computed.toSend;
 
     var sendOne = function(g) { return fetch(SUPABASE_URL + '/functions/v1/send-email', buildBoardEmailRequest(g)).then(function(r) { return r.ok; }).catch(function() { return false; }); };
 
@@ -10356,14 +10429,36 @@ function FinancialsView({ navigate }) {
         >
           {showAddReim ? 'Cancel' : '+ Add New Reimbursement'}
         </button>
-        <button
-          type="button"
-          disabled={!notifyItems.length || notifySending}
-          onClick={sendBoardNotifications}
-          style={{ background: '#2e6b4f', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: (!notifyItems.length || notifySending) ? 'default' : 'pointer', opacity: (!notifyItems.length || notifySending) ? 0.5 : 1 }}
-        >
-          {notifySending ? 'Sending…' : 'Send Notification' + (notifyItems.length ? ' (' + notifyItems.length + ')' : '')}
-        </button>
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            disabled={!notifyItems.length || notifySending}
+            onClick={function() { setNotifyConfirmOpen(true); }}
+            style={{ background: '#2e6b4f', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: (!notifyItems.length || notifySending) ? 'default' : 'pointer', opacity: (!notifyItems.length || notifySending) ? 0.5 : 1 }}
+          >
+            {notifySending ? 'Sending…' : 'Send Notification' + (notifyItems.length ? ' (' + notifyItems.length + ')' : '')}
+          </button>
+          {notifyConfirmOpen && (function() {
+            var computed = computeNotifyGroups();
+            return (
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, zIndex: 20, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.14)', padding: 14, width: 280, textAlign: 'left' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#2a2a2a', marginBottom: 8 }}>Send to {computed.toSend.length} recipient{computed.toSend.length !== 1 ? 's' : ''}?</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 10, maxHeight: 140, overflowY: 'auto' }}>
+                  {computed.toSend.map(function(g) {
+                    return <div key={g.label + '|' + g.email} style={{ fontSize: 11, color: '#555' }}>{g.label} <span style={{ color: '#aaa' }}>({g.email})</span> · {g.items.length} item{g.items.length !== 1 ? 's' : ''}</div>;
+                  })}
+                  {computed.missing.map(function(label) {
+                    return <div key={label} style={{ fontSize: 11, color: '#c62828' }}>{label} <span style={{ color: '#c62828' }}>(no email on file)</span></div>;
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={function() { setNotifyConfirmOpen(false); sendBoardNotifications(); }} style={{ flex: 1, background: '#2e6b4f', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 0', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Confirm & Send</button>
+                  <button onClick={function() { setNotifyConfirmOpen(false); }} style={{ flex: 1, background: '#f0ece6', color: '#666', border: 'none', borderRadius: 6, padding: '6px 0', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       </div>
       {notifyResult && (
         <div style={{ textAlign: 'right', fontSize: 12, color: notifyResult.ok ? '#2e6b4f' : '#a04545' }}>{notifyResult.text}</div>
@@ -12374,6 +12469,7 @@ function AdminView({ navigate }) {
           }).catch(function() {});
         }
         setMailUploadResult({ ok: true, text: 'Uploaded as "' + filename + '".' + (WYN_EMAIL ? ' Wyn notified.' : ' (No email on file for Wyn — notification not sent.)'), url: res.url });
+        logActivity('New mail uploaded: ' + filename, 'mail_uploaded');
       }).catch(function(err) { setUploadingMail(false); setMailUploadResult({ ok: false, text: err.message || 'Upload failed.' }); });
     };
     reader.readAsDataURL(file);
@@ -12861,6 +12957,21 @@ function VolEmailListsView({ navigate }) {
   var [newListColor, setNewListColor] = useS(DEFAULT_LIST_COLOR);
   var [editTagColor, setEditTagColor] = useS(DEFAULT_LIST_COLOR);
 
+  // Template Email — a one-off branded email (matching the board-notification
+  // template) sent to any hand-picked set of volunteers, not just a saved team/list.
+  var [showTemplateModal, setShowTemplateModal] = useS(false);
+  var [tplSearch, setTplSearch] = useS('');
+  var [tplSelected, setTplSelected] = useS({});
+  var [tplSubject, setTplSubject] = useS('');
+  var [tplHeadline, setTplHeadline] = useS('');
+  var [tplSubtext, setTplSubtext] = useS('');
+  var [tplButtonText, setTplButtonText] = useS('');
+  var [tplButtonUrl, setTplButtonUrl] = useS('');
+  var [tplNote, setTplNote] = useS('');
+  var [tplSending, setTplSending] = useS(false);
+  var [tplSent, setTplSent] = useS(false);
+  var [tplSendError, setTplSendError] = useS(null);
+
   useE(function() {
     cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Email','Status','Team','Event Tags','Overview Notes','Phone Number']).then(function(data) {
       if (Array.isArray(data)) setVolunteers(data);
@@ -13252,6 +13363,56 @@ function VolEmailListsView({ navigate }) {
     }).finally(function() { setSending(false); });
   }
 
+  function openTemplateModal() {
+    setShowTemplateModal(true);
+    setTplSearch('');
+    setTplSelected({});
+    setTplSubject('');
+    setTplHeadline('');
+    setTplSubtext('');
+    setTplButtonText('');
+    setTplButtonUrl('');
+    setTplNote('');
+    setTplSent(false);
+    setTplSendError(null);
+  }
+
+  function toggleTplSelected(id) {
+    setTplSelected(function(prev) { var n = Object.assign({}, prev); n[id] = !n[id]; return n; });
+  }
+
+  function handleTemplateSend() {
+    var recipients = (volunteers || []).filter(function(v) { return tplSelected[String(v.id)] && v['Email'] && v['Email'].trim(); });
+    if (!recipients.length || !tplSubject.trim() || !tplHeadline.trim() || !tplButtonText.trim() || !tplButtonUrl.trim()) return;
+    setTplSending(true);
+    setTplSendError(null);
+    var html = buildBoardNotificationEmailHtml({
+      headline: tplHeadline,
+      subtext: tplSubtext,
+      buttonText: tplButtonText,
+      buttonUrl: tplButtonUrl,
+      note: tplNote
+    });
+    var text = tplHeadline + '\n\n' + tplSubtext + '\n\n' + tplButtonText + ': ' + tplButtonUrl + (tplNote ? '\n\n' + tplNote : '');
+    fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: recipients.map(function(v) { return v['Email'].trim(); }), subject: tplSubject, body: text, html: html })
+    }).then(function(r) { return r.json().then(function(j) { return { ok: r.ok, json: j }; }); }).then(function(res) {
+      if (!res.ok) throw new Error(res.json.error || 'Send failed');
+      setTplSent(true);
+      return fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ sent_at: new Date().toISOString(), team_tag: 'Template', recipient_count: recipients.length, recipients: recipients.map(function(v) { return (v['First Name'] || '') + ' ' + (v['Last Name'] || '') + ' <' + v['Email'] + '>'; }), subject: tplSubject })
+      });
+    }).then(function() {
+      return fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=20', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }).then(function(data) { if (Array.isArray(data)) setLogs(data); });
+    }).catch(function(err) {
+      setTplSendError(err.message || 'Unknown error');
+    }).finally(function() { setTplSending(false); });
+  }
+
   var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', outline: 'none', background: '#fff' };
 
   return (
@@ -13263,7 +13424,10 @@ function VolEmailListsView({ navigate }) {
           <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Volunteer Email Lists</div>
           <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Auto-populated from volunteer database · click a group to expand</div>
         </div>
-        <button onClick={function() { copyEmails((volunteers || []).filter(isActive), '__all_active__'); }} disabled={!volunteers} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 600, border: 'none', borderRadius: 8, background: gold, color: '#fff', cursor: volunteers ? 'pointer' : 'not-allowed', opacity: volunteers ? 1 : 0.5 }}>
+        <button onClick={openTemplateModal} disabled={!volunteers} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 600, border: 'none', borderRadius: 8, background: gold, color: '#fff', cursor: volunteers ? 'pointer' : 'not-allowed', opacity: volunteers ? 1 : 0.5 }}>
+          ✉ Template Email
+        </button>
+        <button onClick={function() { copyEmails((volunteers || []).filter(isActive), '__all_active__'); }} disabled={!volunteers} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 500, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#666', cursor: volunteers ? 'pointer' : 'not-allowed', opacity: volunteers ? 1 : 0.5 }}>
           {copied === '__all_active__' ? '✓ Copied' : '⧉ Copy All Active Volunteer Emails'}
         </button>
         <button onClick={function() { downloadEmailsCsv((volunteers || []).filter(isActive), 'active-volunteer-emails.csv'); }} disabled={!volunteers} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 500, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#666', cursor: volunteers ? 'pointer' : 'not-allowed', opacity: volunteers ? 1 : 0.5 }}>
@@ -13477,6 +13641,102 @@ function VolEmailListsView({ navigate }) {
                   <button onClick={function() { setModal(null); }} disabled={sending} style={{ padding: '9px 16px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
                 </div>
                 <div style={{ fontSize: 10, color: '#ccc', textAlign: 'center' }}>{scheduled ? 'Will send from info@northstarhouse.org at scheduled time' : 'Sends from info@northstarhouse.org'}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Template Email modal — branded template, pick any volunteers to send to */}
+      {showTemplateModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 12px 48px rgba(0,0,0,0.18)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid #f0ece6', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>Template Email</div>
+                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Matches the standard branded notification email — fill it out and pick recipients</div>
+              </div>
+              <button onClick={function() { setShowTemplateModal(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: '#666', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            {tplSent ? (
+              <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 20 }}>✓</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>Email sent!</div>
+                <div style={{ fontSize: 12, color: '#aaa', marginTop: 4 }}>
+                  Delivered to {Object.keys(tplSelected).filter(function(id) { return tplSelected[id]; }).length} recipient(s) from info@northstarhouse.org
+                </div>
+                <button onClick={function() { setShowTemplateModal(false); }} style={{ marginTop: 16, padding: '7px 20px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer' }}>Done</button>
+              </div>
+            ) : (
+              <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Recipient search/picker */}
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>
+                    Recipients ({Object.keys(tplSelected).filter(function(id) { return tplSelected[id]; }).length} selected)
+                  </label>
+                  <input value={tplSearch} onChange={function(e) { setTplSearch(e.target.value); }} placeholder="Search volunteers by name or email…" style={Object.assign({}, inpSt, { marginBottom: 8 })} />
+                  <div style={{ background: '#faf8f4', borderRadius: 8, padding: '6px 10px', maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                    {(volunteers || [])
+                      .filter(function(v) { return v['Email'] && v['Email'].trim(); })
+                      .filter(function(v) {
+                        if (!tplSearch.trim()) return true;
+                        var q = tplSearch.trim().toLowerCase();
+                        return ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).toLowerCase().indexOf(q) !== -1 || (v['Email'] || '').toLowerCase().indexOf(q) !== -1;
+                      })
+                      .sort(function(a, b) { return (a['Last Name'] || '').localeCompare(b['Last Name'] || ''); })
+                      .map(function(v) {
+                        var checked = !!tplSelected[String(v.id)];
+                        return (
+                          <label key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 4px', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={checked} onChange={function() { toggleTplSelected(String(v.id)); }} style={{ accentColor: gold, flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a', flexShrink: 0 }}>{v['First Name']} {v['Last Name']}</span>
+                            <span style={{ fontSize: 11, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v['Email']}</span>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Subject line</label>
+                  <input value={tplSubject} onChange={function(e) { setTplSubject(e.target.value); }} placeholder="Email subject…" style={inpSt} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Headline</label>
+                  <input value={tplHeadline} onChange={function(e) { setTplHeadline(e.target.value); }} placeholder="Big text at the top of the email…" style={inpSt} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Body text</label>
+                  <textarea value={tplSubtext} onChange={function(e) { setTplSubtext(e.target.value); }} placeholder="Smaller paragraph below the headline…" rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Button text</label>
+                    <input value={tplButtonText} onChange={function(e) { setTplButtonText(e.target.value); }} placeholder="Click Here…" style={inpSt} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Button link</label>
+                    <input value={tplButtonUrl} onChange={function(e) { setTplButtonUrl(e.target.value); }} placeholder="https://…" style={inpSt} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Note (optional, small italic text under the button)</label>
+                  <input value={tplNote} onChange={function(e) { setTplNote(e.target.value); }} placeholder="e.g. Password is NSH" style={inpSt} />
+                </div>
+
+                {tplSendError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{tplSendError}</div>}
+                <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+                  <button
+                    onClick={handleTemplateSend}
+                    disabled={tplSending || !Object.keys(tplSelected).some(function(id) { return tplSelected[id]; }) || !tplSubject.trim() || !tplHeadline.trim() || !tplButtonText.trim() || !tplButtonUrl.trim()}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (tplSending || !Object.keys(tplSelected).some(function(id) { return tplSelected[id]; }) || !tplSubject.trim() || !tplHeadline.trim() || !tplButtonText.trim() || !tplButtonUrl.trim()) ? 0.5 : 1 }}
+                  >
+                    {tplSending ? 'Sending…' : '✉ Send Email'}
+                  </button>
+                  <button onClick={function() { setShowTemplateModal(false); }} disabled={tplSending} style={{ padding: '9px 16px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                </div>
+                <div style={{ fontSize: 10, color: '#ccc', textAlign: 'center' }}>Sends from info@northstarhouse.org</div>
               </div>
             )}
           </div>
