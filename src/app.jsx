@@ -5246,15 +5246,6 @@ function BoardView() {
                       : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Open</span>
                     }
                   </div>
-                  {!revealed && (
-                    <button
-                      onClick={function(e) { e.stopPropagation(); sendVoteNotification(item); }}
-                      disabled={sendingVoteId === item.row_id}
-                      style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: sendingVoteId === item.row_id ? 0.6 : 1, whiteSpace: 'nowrap' }}
-                    >
-                      {sendingVoteId === item.row_id ? 'Sending…' : 'Send Notification'}
-                    </button>
-                  )}
                 </div>
               </div>
               {revealed && (
