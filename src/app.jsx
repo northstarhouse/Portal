@@ -1778,6 +1778,25 @@ function getAreaColor(aoi) {
 }
 var TEAM_OPTIONS = Object.keys(TEAM_COLORS).filter(function(k) { return ['Events','Docents','Restoration','General','Other'].indexOf(k) === -1; });
 
+// The intake Google Form and the onboarding pipeline both collect "area of
+// interest" as free text, typed independently of the canonical Team labels
+// used on the Volunteers 2026 roster (TEAM_OPTIONS). Without reconciling
+// them, a volunteer auto-created from onboarding could land with a Team
+// value that looks like "Grounds crew" or "garden" instead of "Grounds" —
+// technically fine, but it won't group with everyone else already tagged
+// "Grounds" anywhere the roster groups by Team (email lists, filters, etc).
+// This maps free text onto the closest canonical label when one exists,
+// and falls back to the original text (never silently dropped) otherwise.
+function normalizeTeamLabel(text) {
+  var raw = String(text || '').trim();
+  if (!raw) return '';
+  var lower = raw.toLowerCase();
+  var exact = TEAM_OPTIONS.find(function(t) { return t.toLowerCase() === lower; });
+  if (exact) return exact;
+  var partial = TEAM_OPTIONS.find(function(t) { return lower.indexOf(t.toLowerCase()) !== -1 || t.toLowerCase().indexOf(lower) !== -1; });
+  return partial || raw;
+}
+
 function TeamPicker({ value, onChange, extraTeams }) {
   const { useState: useS } = React;
   const [open, setOpen] = useS(false);
@@ -2436,16 +2455,26 @@ function VolunteersView({ navigate }) {
       }).then(function(r) { return r.json(); }).then(function(rows) { return { sbId: rows && rows[0] ? rows[0].id : null }; });
     }
     req.then(function(result) {
-      if (stage === 'Successfully Onboarded') {
-        var volPayload = { 'First Name': ob.first_name, 'Last Name': ob.last_name || '', 'Status': 'Active', 'Email': ob.email || '', 'Phone Number': ob.phone || '', 'Address': ob.address || '', 'Birthday': ob.birthday || '', 'Emergency Contact': ob.emergency_contact || '', 'Team': ob.team || ob.area_of_interest || '', 'Notes': ob.notes || '' };
-        fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers'), {
-          method: 'POST',
-          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-          body: JSON.stringify(volPayload)
-        }).then(function(r) { return r.json(); }).then(function(rows) {
-          clearCache('2026 Volunteers');
-          if (rows && rows[0]) setVolunteers(function(p) { return p.concat([rows[0]]); });
-        });
+      // The Kiosk reads its volunteer list live from the "2026 Volunteers"
+      // table, so someone only actually shows up there — and can check in —
+      // once a row exists for them. Reaching "Added to Kiosk" is what's
+      // supposed to make that true, so create the row right here instead of
+      // waiting until "Successfully Onboarded" (many stages later). Guarded
+      // by email match so hitting both stages doesn't create a duplicate.
+      if (stage === 'Added to Kiosk' || stage === 'Successfully Onboarded') {
+        var alreadyExists = ob.email && volunteers.some(function(v) { return (v['Email'] || '').toLowerCase() === ob.email.toLowerCase(); });
+        if (!alreadyExists) {
+          var volPayload = { 'First Name': ob.first_name, 'Last Name': ob.last_name || '', 'Status': 'Active', 'Email': ob.email || '', 'Phone Number': ob.phone || '', 'Address': ob.address || '', 'Birthday': ob.birthday || '', 'Emergency Contact': ob.emergency_contact || '', 'Team': normalizeTeamLabel(ob.team || ob.area_of_interest || ''), 'Notes': ob.notes || '' };
+          fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers'), {
+            method: 'POST',
+            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+            body: JSON.stringify(volPayload)
+          }).then(function(r) { return r.json(); }).then(function(rows) {
+            if (rows && rows.code) { alert('Added "' + stage + '" but failed to create the volunteer record: ' + (rows.message || rows.code)); return; }
+            clearCache('2026 Volunteers');
+            if (rows && rows[0]) { setVolunteers(function(p) { return p.concat([rows[0]]); }); logActivity('New volunteer added: ' + ob.first_name + ' ' + (ob.last_name || ''), 'volunteer_added'); }
+          }).catch(function(err) { alert('Added "' + stage + '" but failed to create the volunteer record: ' + err.message); });
+        }
       }
       setOnboarding(function(p) { return p.map(function(o) { return o.id === ob.id ? Object.assign({}, o, patch, { _sbId: result.sbId || o._sbId, id: result.sbId || o.id }) : o; }); });
       setObActing(null);
@@ -3421,7 +3450,7 @@ function nshGetStatus(lastGiftDate) {
 }
 var NSH_STATUS_PILLS={current:{background:'#d1fae5',color:'#065f46'},recently_lapsed:{background:'#fef9c3',color:'#713f12'},long_lapsed:{background:'#ffedd5',color:'#7c2d12'},non_donor:{background:'#f3f4f6',color:'#6b7280'}};
 var NSH_STATUS_LABELS={current:'Current',recently_lapsed:'Lapsed',long_lapsed:'Long Lapsed',non_donor:'Non-donor'};
-var NSH_TYPE_COLORS={'Donation':{bg:'#dbeafe',color:'#1d4ed8'},'Membership':{bg:'#d1fae5',color:'#065f46'},'Restricted':{bg:'#fce7f3',color:'#831843'},'Membership, Donation':{bg:'#ede9fe',color:'#5b21b6'},'Brick Purchase':{bg:'#fee2e2',color:'#7f1d1d'},'Tribute':{bg:'#fef9c3',color:'#713f12'}};
+var NSH_TYPE_COLORS={'Donation':{bg:'#dbeafe',color:'#1d4ed8'},'Membership':{bg:'#d1fae5',color:'#065f46'},'Restricted':{bg:'#fce7f3',color:'#831843'},'Membership, Donation':{bg:'#ede9fe',color:'#5b21b6'},'Brick Purchase':{bg:'#fee2e2',color:'#7f1d1d'},'Tribute':{bg:'#fef9c3',color:'#713f12'},'In-Kind Gift':{bg:'#e0f2e9',color:'#166534'}};
 
 var ACK_TYPES=['Membership','General Donation','Event Donation','Sponsorship','Brick Purchase','In-Kind Donation','Memorial Donation','Honorary Donation','Other'];
 var DONATION_TYPE_TO_ACK_TYPES={
@@ -3431,6 +3460,7 @@ var DONATION_TYPE_TO_ACK_TYPES={
   'Membership, Donation':['Membership','General Donation'],
   'Brick Purchase':['Brick Purchase'],
   'Tribute':['Memorial Donation','Honorary Donation'],
+  'In-Kind Gift':['In-Kind Donation'],
 };
 function ackTypesForDonationType(donationType, currentValue){
   var list=DONATION_TYPE_TO_ACK_TYPES[donationType]||ACK_TYPES;
@@ -3461,7 +3491,7 @@ function ackRequiredFields(type){
 
 function DonorsView({ navigate }) {
   var THIS_YEAR = new Date().getFullYear();
-  var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
+  var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute','In-Kind Gift'];
   var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
   var ACCOUNT_TYPES = ['Individual','Family','Household','Foundation','Corporate','Organization'];
   var emptyAddForm = {formal_name:'',informal_first_name:'',account_type:'Individual',email:'',phone:'',address:'',amount:'',date:'',type:'Donation',payment_type:'Website',acknowledged:false,donation_notes:''};
@@ -3542,7 +3572,7 @@ function DonorsView({ navigate }) {
     }).catch(function(){setLinkingVol(false);});
   }
 
-  var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute'];
+  var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute','In-Kind Gift'];
   var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
   var ACCOUNT_TYPES = ['Individual','Family','Household','Foundation','Corporate','Organization'];
 
@@ -4496,7 +4526,7 @@ function DonorsView({ navigate }) {
               <form onSubmit={submitGiftForExisting}>
                 <span style={{...sec,marginTop:0}}>Gift Details</span>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
-                  <div><label style={lStyle}>Amount *</label><input required value={addGiftForm.amount} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
+                  <div><label style={lStyle}>{addGiftForm.type==='In-Kind Gift'?'Estimated Value *':'Amount *'}</label><input required value={addGiftForm.amount} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
                   <div><label style={lStyle}>Date *</label><input required type="date" value={addGiftForm.date} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
@@ -4536,7 +4566,7 @@ function DonorsView({ navigate }) {
                 <div style={{marginBottom:14}}><label style={lStyle}>Address</label><textarea value={addForm.address} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{address:e.target.value});});}} rows={3} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
                 <span style={sec}>Donation</span>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
-                  <div><label style={lStyle}>Amount *</label><input required value={addForm.amount} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
+                  <div><label style={lStyle}>{addForm.type==='In-Kind Gift'?'Estimated Value *':'Amount *'}</label><input required value={addForm.amount} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
                   <div><label style={lStyle}>Date</label><input type="date" value={addForm.date} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={iStyle} /></div>
                 </div>
                 <div style={{marginBottom:14}}><label style={lStyle}>Donation Type</label>
