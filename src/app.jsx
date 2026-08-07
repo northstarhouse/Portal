@@ -12502,11 +12502,11 @@ function AdminView({ navigate }) {
         if (WYN_EMAIL) {
           var html = buildBoardNotificationEmailHtml({
             headline: 'New Mail Uploaded',
-            subtext: 'New mail has been uploaded to the Portal for your review.',
-            buttonText: 'Click Here to View in Portal',
+            subtext: 'New mail has been uploaded for your review.',
+            buttonText: 'View in Google Drive',
             buttonUrl: res.url
           });
-          var text = 'New Mail Uploaded\n\nNew mail has been uploaded to the Portal for your review.\n\nClick Here to View in Portal: ' + res.url;
+          var text = 'New Mail Uploaded\n\nNew mail has been uploaded for your review.\n\nView in Google Drive: ' + res.url;
           fetch(SUPABASE_URL + '/functions/v1/send-email', {
             method: 'POST',
             headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
