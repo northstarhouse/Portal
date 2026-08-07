@@ -10494,6 +10494,23 @@ function FinancialsView({ navigate }) {
         <div style={{ textAlign: 'right', fontSize: 12, color: notifyResult.ok ? '#2e6b4f' : '#a04545' }}>{notifyResult.text}</div>
       )}
 
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {[
+          { label: 'Mail', url: 'https://drive.google.com/drive/folders/1XLd2euHsxR2oMwCqdaF5jRaJPh17P9RI?usp=drive_link' },
+          { label: 'Checks', url: 'https://drive.google.com/drive/folders/1H_XL4zTyR8la-QB5pty8pRiGzXJ9lvNT?usp=drive_link' },
+          { label: 'Receipts', url: 'https://drive.google.com/drive/folders/15TIsOX78ox_h2HxZQUn8kKtRkuLnh_sM?usp=drive_link' },
+        ].map(function(f) {
+          return (
+            <a key={f.label} href={f.url} target="_blank" rel="noopener noreferrer"
+              style={{ background: '#fff', color: '#666', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 500, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              {f.label}
+            </a>
+          );
+        })}
+      </div>
+
       {showAddReim && (
         <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 10 }}>Add New Reimbursement</div>
@@ -11244,21 +11261,6 @@ var ADMIN_TOOLS = [
     label: "Kiosk",
     url: "https://northstarhouse.github.io/northstar-kiosk/",
     icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
-  },
-  {
-    label: "Mail (Drive)",
-    url: "https://drive.google.com/drive/folders/1XLd2euHsxR2oMwCqdaF5jRaJPh17P9RI?usp=drive_link",
-    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
-  },
-  {
-    label: "Reimbursements (Drive)",
-    url: "https://drive.google.com/drive/folders/15TIsOX78ox_h2HxZQUn8kKtRkuLnh_sM?usp=drive_link",
-    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
-  },
-  {
-    label: "Checks (Drive)",
-    url: "https://drive.google.com/drive/folders/1H_XL4zTyR8la-QB5pty8pRiGzXJ9lvNT",
-    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
   },
 ];
 
