@@ -434,6 +434,7 @@ var ACTIVITY_TAG_COLORS = {
 var QUESTION_TYPES = [
   { value: 'short_text',      label: 'Short answer' },
   { value: 'long_text',       label: 'Paragraph' },
+  { value: 'single_choice',   label: 'Single Choice' },
   { value: 'multiple_choice', label: 'Multiple choice' },
   { value: 'checkboxes',      label: 'Checkboxes' },
   { value: 'yes_no',          label: 'Yes / No' },
@@ -493,11 +494,13 @@ function suNormalizeFields(fields) {
           .filter(function(p) { return p.label.trim(); })
           .map(function(p) {
             var part = { id: p.id, type: p.type, label: p.label.trim(), required: !!p.required };
-            if (['multiple_choice', 'checkboxes'].indexOf(p.type) !== -1) part.options = (p.options || []).filter(function(o) { return o.trim(); });
+            if (['single_choice', 'multiple_choice', 'checkboxes'].indexOf(p.type) !== -1) part.options = (p.options || []).filter(function(o) { return o.trim(); });
+            if (['single_choice', 'multiple_choice'].indexOf(p.type) !== -1 && p.as_dropdown) part.as_dropdown = true;
             return part;
           });
-      } else if (['multiple_choice', 'checkboxes'].indexOf(q.type) !== -1) {
+      } else if (['single_choice', 'multiple_choice', 'checkboxes'].indexOf(q.type) !== -1) {
         base.options = (q.options || []).filter(function(o) { return o.trim(); });
+        if (['single_choice', 'multiple_choice'].indexOf(q.type) !== -1 && q.as_dropdown) base.as_dropdown = true;
       }
       return base;
     });
@@ -11313,7 +11316,8 @@ function SuListRow({ title, subtitle, meta, onClick, onCopyLink, copied, onDelet
 }
 
 function SuPartEditor({ part, onUpdate, onRemove, canRemove }) {
-  var isChoice = part.type === 'multiple_choice' || part.type === 'checkboxes';
+  var isChoice = part.type === 'single_choice' || part.type === 'multiple_choice' || part.type === 'checkboxes';
+  var isDropdownCapable = part.type === 'single_choice' || part.type === 'multiple_choice';
   function updateOption(i, val) { var opts = (part.options || []).slice(); opts[i] = val; onUpdate(Object.assign({}, part, { options: opts })); }
   function addOption() { onUpdate(Object.assign({}, part, { options: (part.options || []).concat(['']) })); }
   function removeOption(i) { onUpdate(Object.assign({}, part, { options: (part.options || []).filter(function(_, idx) { return idx !== i; }) })); }
@@ -11339,6 +11343,12 @@ function SuPartEditor({ part, onUpdate, onRemove, canRemove }) {
           <button onClick={addOption} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>+ Add option</button>
         </div>
       )}
+      {isDropdownCapable && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer', marginBottom: 6 }}>
+          <input type="checkbox" checked={!!part.as_dropdown} onChange={function(e) { onUpdate(Object.assign({}, part, { as_dropdown: e.target.checked })); }} />
+          Show as a dropdown instead of buttons
+        </label>
+      )}
       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>
         <input type="checkbox" checked={!!part.required} onChange={function(e) { onUpdate(Object.assign({}, part, { required: e.target.checked })); }} />
         Required
@@ -11349,12 +11359,13 @@ function SuPartEditor({ part, onUpdate, onRemove, canRemove }) {
 
 function SuQuestionEditor({ question, onUpdate, onRemove, canRemove, onDuplicate, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
   var q = question;
-  var isChoice = q.type === 'multiple_choice' || q.type === 'checkboxes';
+  var isChoice = q.type === 'single_choice' || q.type === 'multiple_choice' || q.type === 'checkboxes';
+  var isDropdownCapable = q.type === 'single_choice' || q.type === 'multiple_choice';
   function updateOption(i, val) { var opts = (q.options || []).slice(); opts[i] = val; onUpdate(Object.assign({}, q, { options: opts })); }
   function addOption() { onUpdate(Object.assign({}, q, { options: (q.options || []).concat(['']) })); }
   function removeOption(i) { onUpdate(Object.assign({}, q, { options: (q.options || []).filter(function(_, idx) { return idx !== i; }) })); }
   function handleAddOn() {
-    var firstPart = { id: q.id, type: q.type, label: q.label, required: q.required, options: q.options };
+    var firstPart = { id: q.id, type: q.type, label: q.label, required: q.required, options: q.options, as_dropdown: q.as_dropdown };
     onUpdate({ id: q.id, type: 'group', section: q.section, sectionEmail: q.sectionEmail, parts: [firstPart, suMkQuestion()] });
   }
   function updatePart(i, updated) { var parts = (q.parts || []).slice(); parts[i] = updated; onUpdate(Object.assign({}, q, { parts: parts })); }
@@ -11393,6 +11404,12 @@ function SuQuestionEditor({ question, onUpdate, onRemove, canRemove, onDuplicate
                   })}
                   <button onClick={addOption} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>+ Add option</button>
                 </div>
+              )}
+              {isDropdownCapable && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer', marginBottom: 8 }}>
+                  <input type="checkbox" checked={!!q.as_dropdown} onChange={function(e) { onUpdate(Object.assign({}, q, { as_dropdown: e.target.checked })); }} />
+                  Show as a dropdown instead of buttons
+                </label>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>
