@@ -11687,10 +11687,13 @@ function SuTemplatePanel({ template, onSaved, onCancel }) {
   );
 }
 
+var FORM_CATEGORIES = ['Wedding', 'Volunteer', 'Website', 'Board'];
+
 function SuFormPanel({ form, templates, onSaved, onCancel }) {
   var isEdit = !!form;
   var [title, setTitle] = useState(form ? form.title || '' : '');
   var [description, setDescription] = useState(form ? form.description || '' : '');
+  var [category, setCategory] = useState(form ? form.category || '' : '');
   var [showResponses, setShowResponses] = useState(form ? form.show_responses !== false : true);
   var [questions, setQuestions] = useState(form && form.fields && form.fields.length ? form.fields : [suMkQuestion()]);
   var [saving, setSaving] = useState(false);
@@ -11703,7 +11706,7 @@ function SuFormPanel({ form, templates, onSaved, onCancel }) {
   function handleSave() {
     if (!title.trim() || saving) return;
     setSaving(true);
-    var payload = { title: title.trim(), description: description.trim() || null, fields: suNormalizeFields(questions), show_responses: showResponses };
+    var payload = { title: title.trim(), description: description.trim() || null, category: category || null, fields: suNormalizeFields(questions), show_responses: showResponses };
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
     var req = isEdit
       ? fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=eq.' + form.id, { method: 'PATCH', headers: hdrs, body: JSON.stringify(payload) })
@@ -11715,6 +11718,10 @@ function SuFormPanel({ form, templates, onSaved, onCancel }) {
       <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 16 }}>{isEdit ? 'Edit Form' : 'New Form'}</div>
       <input value={title} onChange={function(e) { setTitle(e.target.value); }} placeholder="Form title" style={Object.assign({}, SU_INPUT, { marginBottom: 10 })} />
       <textarea value={description} onChange={function(e) { setDescription(e.target.value); }} placeholder="Description (optional)" rows={2} style={Object.assign({}, SU_INPUT, { marginBottom: 10 })} />
+      <select value={category} onChange={function(e) { setCategory(e.target.value); }} style={Object.assign({}, SU_INPUT, { marginBottom: 10 })}>
+        <option value="">No category</option>
+        {FORM_CATEGORIES.map(function(c) { return <option key={c} value={c}>{c}</option>; })}
+      </select>
       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer', marginBottom: 16 }}>
         <input type="checkbox" checked={showResponses} onChange={function(e) { setShowResponses(e.target.checked); }} />
         Show other people's answers to respondents after they submit
@@ -11832,7 +11839,7 @@ function FormBuilderView({ navigate }) {
                 onDelete={function() { handleDelete('poll', pl.id, 'vol_polls'); }} />;
             }))}
             {tab === 'forms' && (forms.length === 0 ? <SuEmpty text="No forms yet." /> : forms.map(function(fm) {
-              var meta = (((fm.nsh_form_responses && fm.nsh_form_responses[0] && fm.nsh_form_responses[0].count) || 0) + ' responses') + (fm.show_responses === false ? ' · private' : '');
+              var meta = (fm.category ? fm.category + ' · ' : '') + (((fm.nsh_form_responses && fm.nsh_form_responses[0] && fm.nsh_form_responses[0].count) || 0) + ' responses') + (fm.show_responses === false ? ' · private' : '');
               return <SuListRow key={fm.id} title={fm.title} subtitle={fm.description} meta={meta}
                 onClick={function() { setEditing({ type: 'forms', id: fm.id }); }}
                 onCopyLink={function() { handleCopyLink('form', fm.id, fm.title); }} copied={copiedId === 'form' + fm.id}
