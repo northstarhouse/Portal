@@ -11689,11 +11689,11 @@ function SuTemplatePanel({ template, onSaved, onCancel }) {
 
 var FORM_CATEGORIES = ['Wedding', 'Volunteer', 'Website', 'Board'];
 
-function SuFormPanel({ form, templates, onSaved, onCancel }) {
+function SuFormPanel({ form, defaultCategory, templates, onSaved, onCancel }) {
   var isEdit = !!form;
   var [title, setTitle] = useState(form ? form.title || '' : '');
   var [description, setDescription] = useState(form ? form.description || '' : '');
-  var [category, setCategory] = useState(form ? form.category || '' : '');
+  var [category, setCategory] = useState(form ? form.category || '' : (defaultCategory || ''));
   var [showResponses, setShowResponses] = useState(form ? form.show_responses !== false : true);
   var [questions, setQuestions] = useState(form && form.fields && form.fields.length ? form.fields : [suMkQuestion()]);
   var [saving, setSaving] = useState(false);
@@ -11748,14 +11748,17 @@ function SuFormPanel({ form, templates, onSaved, onCancel }) {
 }
 
 var SU_BUILDER_TABS = [
+  { key: 'forms', label: 'Forms' },
   { key: 'events', label: 'Events' },
   { key: 'polls', label: 'Polls' },
-  { key: 'forms', label: 'Forms' },
   { key: 'templates', label: 'Templates' },
 ];
 
+var SU_FORM_CATEGORY_TABS = ['All'].concat(FORM_CATEGORIES);
+
 function FormBuilderView({ navigate }) {
-  var [tab, setTab] = useState('events');
+  var [tab, setTab] = useState('forms');
+  var [formCategory, setFormCategory] = useState('All');
   var [events, setEvents] = useState([]);
   var [polls, setPolls] = useState([]);
   var [forms, setForms] = useState([]);
@@ -11800,7 +11803,7 @@ function FormBuilderView({ navigate }) {
         <SuBuilderBack onBack={back} />
         {editing.type === 'events' && <SuEventPanel event={editing.id ? events.find(function(e) { return e.id === editing.id; }) : null} onSaved={handleSaved} onCancel={back} />}
         {editing.type === 'polls' && <SuPollPanel poll={editing.id ? polls.find(function(p) { return p.id === editing.id; }) : null} onSaved={handleSaved} onCancel={back} />}
-        {editing.type === 'forms' && <SuFormPanel form={editing.id ? forms.find(function(f) { return f.id === editing.id; }) : null} templates={templates} onSaved={handleSaved} onCancel={back} />}
+        {editing.type === 'forms' && <SuFormPanel form={editing.id ? forms.find(function(f) { return f.id === editing.id; }) : null} defaultCategory={formCategory !== 'All' ? formCategory : ''} templates={templates} onSaved={handleSaved} onCancel={back} />}
         {editing.type === 'templates' && <SuTemplatePanel template={editing.id ? templates.find(function(t) { return t.id === editing.id; }) : null} onSaved={handleSaved} onCancel={back} />}
       </div>
     );
@@ -11817,10 +11820,18 @@ function FormBuilderView({ navigate }) {
         })}
       </div>
       <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '0.5px solid #f0ece6' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: (tab === 'forms') ? 'none' : '0.5px solid #f0ece6' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>{SU_BUILDER_TABS.find(function(t) { return t.key === tab; }).label}</div>
           <button onClick={function() { setEditing({ type: tab, id: null }); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ New</button>
         </div>
+        {tab === 'forms' && (
+          <div style={{ display: 'flex', gap: 4, padding: '0 18px 14px', borderBottom: '0.5px solid #f0ece6', flexWrap: 'wrap' }}>
+            {SU_FORM_CATEGORY_TABS.map(function(c) {
+              var active = formCategory === c;
+              return <button key={c} onClick={function() { setFormCategory(c); }} style={{ padding: '4px 11px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: active ? '#f0ece6' : 'transparent', color: active ? '#2a2a2a' : '#999', border: 'none' }}>{c}</button>;
+            })}
+          </div>
+        )}
         {loading ? <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div> : (
           <div>
             {tab === 'events' && (events.length === 0 ? <SuEmpty text="No events yet." /> : events.map(function(ev) {
@@ -11838,13 +11849,17 @@ function FormBuilderView({ navigate }) {
                 onCopyLink={function() { handleCopyLink('poll', pl.id, pl.question); }} copied={copiedId === 'poll' + pl.id}
                 onDelete={function() { handleDelete('poll', pl.id, 'vol_polls'); }} />;
             }))}
-            {tab === 'forms' && (forms.length === 0 ? <SuEmpty text="No forms yet." /> : forms.map(function(fm) {
-              var meta = (fm.category ? fm.category + ' · ' : '') + (((fm.nsh_form_responses && fm.nsh_form_responses[0] && fm.nsh_form_responses[0].count) || 0) + ' responses') + (fm.show_responses === false ? ' · private' : '');
-              return <SuListRow key={fm.id} title={fm.title} subtitle={fm.description} meta={meta}
-                onClick={function() { setEditing({ type: 'forms', id: fm.id }); }}
-                onCopyLink={function() { handleCopyLink('form', fm.id, fm.title); }} copied={copiedId === 'form' + fm.id}
-                onDelete={function() { handleDelete('form', fm.id, 'nsh_forms'); }} />;
-            }))}
+            {tab === 'forms' && (function() {
+              var visible = formCategory === 'All' ? forms : forms.filter(function(fm) { return fm.category === formCategory; });
+              if (visible.length === 0) return <SuEmpty text={formCategory === 'All' ? 'No forms yet.' : 'No ' + formCategory + ' forms yet.'} />;
+              return visible.map(function(fm) {
+                var meta = (((fm.nsh_form_responses && fm.nsh_form_responses[0] && fm.nsh_form_responses[0].count) || 0) + ' responses') + (fm.show_responses === false ? ' · private' : '');
+                return <SuListRow key={fm.id} title={fm.title} subtitle={fm.description} meta={meta}
+                  onClick={function() { setEditing({ type: 'forms', id: fm.id }); }}
+                  onCopyLink={function() { handleCopyLink('form', fm.id, fm.title); }} copied={copiedId === 'form' + fm.id}
+                  onDelete={function() { handleDelete('form', fm.id, 'nsh_forms'); }} />;
+              });
+            })()}
             {tab === 'templates' && (templates.length === 0 ? <SuEmpty text="No templates yet." /> : templates.map(function(tp) {
               var meta = ((tp.questions && tp.questions.length) || 0) + ' questions';
               return <SuListRow key={tp.id} title={tp.name} meta={meta}
