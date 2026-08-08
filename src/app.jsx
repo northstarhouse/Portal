@@ -11693,6 +11693,7 @@ function SuFormPanel({ form, defaultCategory, templates, onSaved, onCancel }) {
   var isEdit = !!form;
   var [title, setTitle] = useState(form ? form.title || '' : '');
   var [description, setDescription] = useState(form ? form.description || '' : '');
+  var [internalNote, setInternalNote] = useState(form ? form.internal_note || '' : '');
   var [category, setCategory] = useState(form ? form.category || '' : (defaultCategory || ''));
   var [showResponses, setShowResponses] = useState(form ? form.show_responses !== false : true);
   var [questions, setQuestions] = useState(form && form.fields && form.fields.length ? form.fields : [suMkQuestion()]);
@@ -11706,7 +11707,7 @@ function SuFormPanel({ form, defaultCategory, templates, onSaved, onCancel }) {
   function handleSave() {
     if (!title.trim() || saving) return;
     setSaving(true);
-    var payload = { title: title.trim(), description: description.trim() || null, category: category || null, fields: suNormalizeFields(questions), show_responses: showResponses };
+    var payload = { title: title.trim(), description: description.trim() || null, internal_note: internalNote.trim() || null, category: category || null, fields: suNormalizeFields(questions), show_responses: showResponses };
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
     var req = isEdit
       ? fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=eq.' + form.id, { method: 'PATCH', headers: hdrs, body: JSON.stringify(payload) })
@@ -11717,7 +11718,10 @@ function SuFormPanel({ form, defaultCategory, templates, onSaved, onCancel }) {
     <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 16 }}>{isEdit ? 'Edit Form' : 'New Form'}</div>
       <input value={title} onChange={function(e) { setTitle(e.target.value); }} placeholder="Form title" style={Object.assign({}, SU_INPUT, { marginBottom: 10 })} />
+      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#999', marginBottom: 4 }}>Description — shown to respondents on the form itself</label>
       <textarea value={description} onChange={function(e) { setDescription(e.target.value); }} placeholder="Description (optional)" rows={2} style={Object.assign({}, SU_INPUT, { marginBottom: 10 })} />
+      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#999', marginBottom: 4 }}>Internal note — staff only, shown in this list, never on the public form</label>
+      <textarea value={internalNote} onChange={function(e) { setInternalNote(e.target.value); }} placeholder="e.g. who this is for, when to take it down…" rows={2} style={Object.assign({}, SU_INPUT, { marginBottom: 10 })} />
       <select value={category} onChange={function(e) { setCategory(e.target.value); }} style={Object.assign({}, SU_INPUT, { marginBottom: 10 })}>
         <option value="">No category</option>
         {FORM_CATEGORIES.map(function(c) { return <option key={c} value={c}>{c}</option>; })}
@@ -11854,7 +11858,7 @@ function FormBuilderView({ navigate }) {
               if (visible.length === 0) return <SuEmpty text={formCategory === 'All' ? 'No forms yet.' : 'No ' + formCategory + ' forms yet.'} />;
               return visible.map(function(fm) {
                 var meta = (((fm.nsh_form_responses && fm.nsh_form_responses[0] && fm.nsh_form_responses[0].count) || 0) + ' responses') + (fm.show_responses === false ? ' · private' : '');
-                return <SuListRow key={fm.id} title={fm.title} subtitle={fm.description} meta={meta}
+                return <SuListRow key={fm.id} title={fm.title} subtitle={fm.internal_note} meta={meta}
                   onClick={function() { setEditing({ type: 'forms', id: fm.id }); }}
                   onCopyLink={function() { handleCopyLink('form', fm.id, fm.title); }} copied={copiedId === 'form' + fm.id}
                   onDelete={function() { handleDelete('form', fm.id, 'nsh_forms'); }} />;
