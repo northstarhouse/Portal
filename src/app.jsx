@@ -13697,7 +13697,7 @@ function VolEmailListsView({ navigate }) {
       {/* Template Email modal — branded template, pick any volunteers to send to */}
       {showTemplateModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 12px 48px rgba(0,0,0,0.18)' }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 12px 48px rgba(0,0,0,0.18)' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid #f0ece6', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>Template Email</div>
@@ -13770,6 +13770,19 @@ function VolEmailListsView({ navigate }) {
                 <div>
                   <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Note (optional, small italic text under the button)</label>
                   <input value={tplNote} onChange={function(e) { setTplNote(e.target.value); }} placeholder="e.g. Password is NSH" style={inpSt} />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Preview — exactly what recipients will see</label>
+                  <div style={{ border: '0.5px solid #e0d8cc', borderRadius: 8, overflow: 'hidden' }}
+                    dangerouslySetInnerHTML={{ __html: buildBoardNotificationEmailHtml({
+                      headline: tplHeadline || 'Headline',
+                      subtext: tplSubtext || 'Body text will appear here…',
+                      buttonText: tplButtonText || 'Button Text',
+                      buttonUrl: tplButtonUrl || '#',
+                      note: tplNote
+                    }) }}
+                  />
                 </div>
 
                 {tplSendError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{tplSendError}</div>}
