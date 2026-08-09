@@ -232,9 +232,13 @@ Deno.serve(async (req) => {
       }),
     }).catch(() => {});
 
+    // drive.google.com/thumbnail (not uc?export=view, which is unreliable for
+    // hotlinking non-trivial files -- it can serve an HTML interstitial
+    // instead of the image) is the same pattern already used elsewhere in the
+    // Portal (driveImg()) for embedding Drive images as a plain <img src>.
     return json({
       success: true,
-      url: makePublic ? `https://drive.google.com/uc?export=view&id=${uploaded.id}` : uploaded.webViewLink,
+      url: makePublic ? `https://drive.google.com/thumbnail?id=${uploaded.id}&sz=w1000` : uploaded.webViewLink,
       fileId: uploaded.id,
       folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
     });
