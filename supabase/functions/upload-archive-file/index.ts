@@ -125,9 +125,16 @@ async function driveFindOrCreateFolder(name: string, parentId: string, token: st
   return created.id as string;
 }
 
+// Recent years live under a "2024+" grouping folder inside Archival Photos
+// (matching the existing structure: Archival Photos / 2024+ / 2026 / ...)
+// rather than directly at the root. Only applies to photos, and only to
+// 2024 onward — older years predate that grouping.
+const RECENT_YEARS_GROUP_START = 2024;
+const RECENT_YEARS_GROUP_NAME = "2024+";
+
 // Resolves (creating as needed) the year/month folder for a given kind, e.g.
-// Archival Photos/2026/06 - June. Missing year/month falls back to today's
-// date; year with no month lands directly in the year folder.
+// Archival Photos/2024+/2026/August. Missing year/month falls back to
+// today's date; year with no month lands directly in the year folder.
 async function resolveArchiveFolder(kind: string, year: number | undefined, month: number | undefined, token: string) {
   const rootId = kind === "document" ? ARCHIVAL_DOCUMENTS_ROOT_FOLDER_ID : ARCHIVAL_PHOTOS_ROOT_FOLDER_ID;
 
@@ -135,11 +142,15 @@ async function resolveArchiveFolder(kind: string, year: number | undefined, mont
   const resolvedYear = year || now.getFullYear();
   const resolvedMonth = year ? (month || null) : (month || now.getMonth() + 1);
 
-  const yearFolderId = await driveFindOrCreateFolder(String(resolvedYear), rootId, token);
+  let yearParentId = rootId;
+  if (kind !== "document" && resolvedYear >= RECENT_YEARS_GROUP_START) {
+    yearParentId = await driveFindOrCreateFolder(RECENT_YEARS_GROUP_NAME, rootId, token);
+  }
+
+  const yearFolderId = await driveFindOrCreateFolder(String(resolvedYear), yearParentId, token);
   if (!resolvedMonth) return yearFolderId;
 
-  const monthName = `${String(resolvedMonth).padStart(2, "0")} - ${MONTH_NAMES[resolvedMonth - 1]}`;
-  return driveFindOrCreateFolder(monthName, yearFolderId, token);
+  return driveFindOrCreateFolder(MONTH_NAMES[resolvedMonth - 1], yearFolderId, token);
 }
 
 async function driveUploadFile(filename: string, bytes: Uint8Array, mimeType: string, folderId: string, description: string | undefined, token: string) {
