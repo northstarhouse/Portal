@@ -12651,6 +12651,17 @@ function AdminView({ navigate }) {
           Maintenance Request
         </div>
         <div
+          onClick={function() { navigate('announcements'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+          </span>
+          Announcements
+        </div>
+        <div
           onClick={function() { if (!uploadingMail && mailFileInputRef.current) mailFileInputRef.current.click(); }}
           style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: uploadingMail ? 'default' : 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500, opacity: uploadingMail ? 0.7 : 1 }}
           onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
@@ -14486,6 +14497,154 @@ function VenueRentalsView() {
   );
 }
 
+function AnnouncementsView({ navigate }) {
+  const [items, setItems] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [showAdd, setShowAdd] = React.useState(false);
+  const emptyForm = { text: '', image_url: '', expires_at: '', button_text: '', button_url: '' };
+  const [form, setForm] = React.useState(emptyForm);
+  const [uploading, setUploading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const fileInputRef = React.useRef(null);
+
+  function load() {
+    setLoading(true);
+    fetch(SUPABASE_URL + '/rest/v1/announcements?select=*&order=created_at.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setItems(Array.isArray(rows) ? rows : []);
+      setLoading(false);
+    }).catch(function() { setLoading(false); });
+  }
+  React.useEffect(function() { load(); }, []);
+
+  function handleImageUpload(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    var path = 'announcements/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    fetch(SUPABASE_URL + '/storage/v1/object/board-attachments/' + path, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true' },
+      body: file
+    }).then(function(r) {
+      return r.text().then(function(text) {
+        setUploading(false);
+        if (!r.ok) { alert('Upload failed (' + r.status + '): ' + text); return; }
+        var url = SUPABASE_URL + '/storage/v1/object/public/board-attachments/' + path;
+        setForm(function(f) { return Object.assign({}, f, { image_url: url }); });
+      });
+    }).catch(function(err) { setUploading(false); alert('Upload error: ' + err.message); });
+  }
+
+  function handleSave(e) {
+    e.preventDefault();
+    if (!form.text.trim() && !form.image_url) { alert('Add some text or an image.'); return; }
+    setSaving(true);
+    var payload = {
+      text: form.text.trim() || null,
+      image_url: form.image_url || null,
+      expires_at: form.expires_at || null,
+      button_text: form.button_text.trim() || null,
+      button_url: form.button_url.trim() || null,
+    };
+    fetch(SUPABASE_URL + '/rest/v1/announcements', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setSaving(false);
+      if (rows && rows.message) { alert('Error: ' + rows.message); return; }
+      logActivity('New announcement posted' + (form.text ? ': ' + form.text.slice(0, 60) : ''), 'announcement_posted');
+      setForm(emptyForm);
+      setShowAdd(false);
+      load();
+    }).catch(function(err) { setSaving(false); alert('Error: ' + err.message); });
+  }
+
+  function handleDelete(id) {
+    if (!window.confirm('Delete this announcement?')) return;
+    fetch(SUPABASE_URL + '/rest/v1/announcements?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() { load(); });
+  }
+
+  var today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div style={{ maxWidth: 640 }}>
+      <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a' }}>Announcements</div>
+        <button onClick={function() { setForm(emptyForm); setShowAdd(!showAdd); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{showAdd ? 'Cancel' : '+ New Announcement'}</button>
+      </div>
+      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Shown on the Volunteer Hub dashboard, under Hours.</div>
+
+      {showAdd && (
+        <form onSubmit={handleSave} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '18px 20px', marginBottom: 20 }}>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, color: '#666', fontWeight: 500 }}>Text (optional)</label>
+            <textarea value={form.text} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { text: e.target.value }); }); }} rows={3} style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'inherit' }} placeholder="What's happening?" />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, color: '#666', fontWeight: 500 }}>Flyer image (optional)</label>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+            <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button type="button" onClick={function() { fileInputRef.current && fileInputRef.current.click(); }} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '7px 14px', fontSize: 12, cursor: 'pointer', color: '#666' }}>{uploading ? 'Uploading…' : form.image_url ? 'Replace image' : 'Choose image'}</button>
+              {form.image_url && <span style={{ fontSize: 11, color: '#2e7d32' }}>✓ Uploaded</span>}
+            </div>
+            {form.image_url && <img src={form.image_url} alt="" style={{ marginTop: 8, maxWidth: 160, borderRadius: 6, display: 'block' }} />}
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, color: '#666', fontWeight: 500 }}>Expires</label>
+            <input type="date" value={form.expires_at} min={today} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { expires_at: e.target.value }); }); }} style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: 'border-box' }} />
+            <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>Leave blank to show indefinitely.</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+            <div>
+              <label style={{ fontSize: 12, color: '#666', fontWeight: 500 }}>Button text (optional)</label>
+              <input value={form.button_text} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { button_text: e.target.value }); }); }} placeholder="e.g. RSVP" style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: '#666', fontWeight: 500 }}>Button link (optional)</label>
+              <input value={form.button_url} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { button_url: e.target.value }); }); }} placeholder="https://…" style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: 'border-box' }} />
+            </div>
+          </div>
+          <button type="submit" disabled={saving || uploading} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (saving || uploading) ? 0.6 : 1 }}>{saving ? 'Posting…' : 'Post Announcement'}</button>
+        </form>
+      )}
+
+      {loading ? (
+        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
+      ) : items.length === 0 ? (
+        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No announcements yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {items.map(function(a) {
+            var expired = a.expires_at && a.expires_at < today;
+            return (
+              <div key={a.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px', opacity: expired ? 0.55 : 1 }}>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  {a.image_url && <img src={a.image_url} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {a.text && <div style={{ fontSize: 13, color: '#2a2a2a', marginBottom: 4 }}>{a.text}</div>}
+                    <div style={{ fontSize: 11, color: '#999' }}>
+                      {a.expires_at ? (expired ? 'Expired ' : 'Expires ') + new Date(a.expires_at + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No expiration'}
+                      {a.button_text && ' · Button: "' + a.button_text + '"'}
+                    </div>
+                  </div>
+                  <button onClick={function() { handleDelete(a.id); }} style={{ background: 'none', border: 'none', color: '#c88', cursor: 'pointer', fontSize: 12, flexShrink: 0 }}>Delete</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
   birthdays: BirthdaysView,
@@ -14516,6 +14675,7 @@ const views = {
   'activity-log': ActivityLogView,
   'acknowledgment-templates': AcknowledgmentTemplatesView,
   'acknowledgments-queue': AcknowledgmentsQueueView,
+  announcements: AnnouncementsView,
 };
 
 var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];
