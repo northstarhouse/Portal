@@ -14522,19 +14522,31 @@ function AnnouncementsView({ navigate }) {
     var file = e.target.files[0];
     if (!file) return;
     setUploading(true);
-    var path = 'announcements/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    fetch(SUPABASE_URL + '/storage/v1/object/board-attachments/' + path, {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true' },
-      body: file
-    }).then(function(r) {
-      return r.text().then(function(text) {
+    var reader = new FileReader();
+    reader.onload = function() {
+      var base64 = reader.result.split(',')[1];
+      var ext = (file.name.match(/\.[a-zA-Z0-9]+$/) || [''])[0];
+      var filename = 'Announcement ' + Date.now() + ext;
+      fetch(SUPABASE_URL + '/functions/v1/upload-archive-file', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: filename,
+          mimeType: file.type || 'application/octet-stream',
+          base64: base64,
+          kind: 'photo',
+          subfolder: 'Announcements',
+          makePublic: true,
+          driveDescription: 'Announcement flyer'
+        })
+      }).then(function(r) { return r.json(); }).then(function(data) {
         setUploading(false);
-        if (!r.ok) { alert('Upload failed (' + r.status + '): ' + text); return; }
-        var url = SUPABASE_URL + '/storage/v1/object/public/board-attachments/' + path;
-        setForm(function(f) { return Object.assign({}, f, { image_url: url }); });
-      });
-    }).catch(function(err) { setUploading(false); alert('Upload error: ' + err.message); });
+        if (!data.success) { alert('Upload failed: ' + (data.error || 'unknown error')); return; }
+        setForm(function(f) { return Object.assign({}, f, { image_url: data.url }); });
+      }).catch(function(err) { setUploading(false); alert('Upload error: ' + err.message); });
+    };
+    reader.onerror = function() { setUploading(false); alert('Failed to read file.'); };
+    reader.readAsDataURL(file);
   }
 
   function handleSave(e) {

@@ -135,12 +135,13 @@ const RECENT_YEARS_GROUP_NAME = "2024+";
 // Resolves (creating as needed) the year/month folder for a given kind, e.g.
 // Archival Photos/2024+/2026/August. Missing year/month falls back to
 // today's date; year with no month lands directly in the year folder.
-async function resolveArchiveFolder(kind: string, year: number | undefined, month: number | undefined, token: string) {
+// A `subfolder` name (e.g. "Announcements") replaces the month folder
+// entirely, nesting under the current year instead: .../2026/Announcements.
+async function resolveArchiveFolder(kind: string, year: number | undefined, month: number | undefined, token: string, subfolder?: string) {
   const rootId = kind === "document" ? ARCHIVAL_DOCUMENTS_ROOT_FOLDER_ID : ARCHIVAL_PHOTOS_ROOT_FOLDER_ID;
 
   const now = new Date();
   const resolvedYear = year || now.getFullYear();
-  const resolvedMonth = year ? (month || null) : (month || now.getMonth() + 1);
 
   let yearParentId = rootId;
   if (kind !== "document" && resolvedYear >= RECENT_YEARS_GROUP_START) {
@@ -148,6 +149,10 @@ async function resolveArchiveFolder(kind: string, year: number | undefined, mont
   }
 
   const yearFolderId = await driveFindOrCreateFolder(String(resolvedYear), yearParentId, token);
+
+  if (subfolder) return driveFindOrCreateFolder(subfolder, yearFolderId, token);
+
+  const resolvedMonth = year ? (month || null) : (month || now.getMonth() + 1);
   if (!resolvedMonth) return yearFolderId;
 
   return driveFindOrCreateFolder(MONTH_NAMES[resolvedMonth - 1], yearFolderId, token);
@@ -178,6 +183,21 @@ async function driveUploadFile(filename: string, bytes: Uint8Array, mimeType: st
   return res.json() as Promise<{ id: string; webViewLink: string }>;
 }
 
+// Grants "anyone with the link can view" on a file so it can be hotlinked as
+// a plain <img src> (e.g. announcement flyers on the public Volunteer Hub) --
+// archival uploads that are just browsed in Drive don't need this.
+async function makeFilePublic(fileId: string, token: string) {
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}/permissions?supportsAllDrives=true`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ role: "reader", type: "anyone" }),
+    },
+  );
+  if (!res.ok) throw new Error(`Failed to make file public: ${res.status} ${await res.text()}`);
+}
+
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
@@ -193,13 +213,15 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { filename, mimeType, base64, kind, year, month, driveDescription } = body;
+    const { filename, mimeType, base64, kind, year, month, driveDescription, subfolder, makePublic } = body;
     if (!filename || !mimeType || !base64) return json({ error: "filename, mimeType, and base64 are required" }, 400);
 
     const bytes = base64ToBytes(base64);
     const token = await getDriveAccessToken();
-    const folderId = await resolveArchiveFolder(kind, year, month, token);
+    const folderId = await resolveArchiveFolder(kind, year, month, token, subfolder);
     const uploaded = await driveUploadFile(filename, bytes, mimeType, folderId, driveDescription, token);
+
+    if (makePublic) await makeFilePublic(uploaded.id, token);
 
     await fetch(`${SUPABASE_URL}/rest/v1/activity_log`, {
       method: "POST",
@@ -212,7 +234,7 @@ Deno.serve(async (req) => {
 
     return json({
       success: true,
-      url: uploaded.webViewLink,
+      url: makePublic ? `https://drive.google.com/uc?export=view&id=${uploaded.id}` : uploaded.webViewLink,
       fileId: uploaded.id,
       folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
     });
