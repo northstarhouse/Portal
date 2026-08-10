@@ -13510,7 +13510,7 @@ function VolEmailListsView({ navigate }) {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap', rowGap: 10 }}>
         <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
         <div>
           <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Volunteer Email Lists</div>
