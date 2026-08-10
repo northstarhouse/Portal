@@ -13063,6 +13063,9 @@ function VolEmailListsView({ navigate }) {
   var [tplSending, setTplSending] = useS(false);
   var [tplSent, setTplSent] = useS(false);
   var [tplSendError, setTplSendError] = useS(null);
+  var [savedTemplates, setSavedTemplates] = useS([]);
+  var [tplLoadId, setTplLoadId] = useS('');
+  var [tplSavingTemplate, setTplSavingTemplate] = useS(false);
 
   useE(function() {
     cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Email','Status','Team','Event Tags','Overview Notes','Phone Number']).then(function(data) {
@@ -13467,6 +13470,69 @@ function VolEmailListsView({ navigate }) {
     setTplNote('');
     setTplSent(false);
     setTplSendError(null);
+    setTplLoadId('');
+    fetch(SUPABASE_URL + '/rest/v1/email_templates?select=*&order=name.asc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setSavedTemplates(Array.isArray(rows) ? rows : []);
+    }).catch(function() {});
+  }
+
+  function handleLoadTemplate(id) {
+    setTplLoadId(id);
+    if (!id) return;
+    var t = savedTemplates.find(function(t) { return t.id === id; });
+    if (!t) return;
+    setTplSubject(t.subject || '');
+    setTplHeadline(t.headline || '');
+    setTplSubtext(t.subtext || '');
+    setTplButtonText(t.button_text || '');
+    setTplButtonUrl(t.button_url || '');
+    setTplNote(t.note || '');
+  }
+
+  function saveAsTemplate() {
+    var existing = tplLoadId ? savedTemplates.find(function(t) { return t.id === tplLoadId; }) : null;
+    var name = window.prompt('Save this as a template named:', existing ? existing.name : (tplSubject || ''));
+    if (!name || !name.trim()) return;
+    setTplSavingTemplate(true);
+    var payload = {
+      name: name.trim(),
+      subject: tplSubject || null,
+      headline: tplHeadline || null,
+      subtext: tplSubtext || null,
+      button_text: tplButtonText || null,
+      button_url: tplButtonUrl || null,
+      note: tplNote || null
+    };
+    var isOverwrite = existing && existing.name === name.trim();
+    var req = isOverwrite
+      ? fetch(SUPABASE_URL + '/rest/v1/email_templates?id=eq.' + existing.id, { method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(payload) })
+      : fetch(SUPABASE_URL + '/rest/v1/email_templates', { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(payload) });
+    req.then(function(r) { return r.json(); }).then(function(rows) {
+      setTplSavingTemplate(false);
+      if (rows && rows.message) { alert('Failed to save template: ' + rows.message); return; }
+      var saved = rows && rows[0];
+      if (saved) {
+        setSavedTemplates(function(prev) {
+          var next = isOverwrite ? prev.map(function(t) { return t.id === saved.id ? saved : t; }) : prev.concat([saved]);
+          return next.slice().sort(function(a, b) { return a.name.localeCompare(b.name); });
+        });
+        setTplLoadId(saved.id);
+      }
+    }).catch(function(err) { setTplSavingTemplate(false); alert('Failed to save template: ' + err.message); });
+  }
+
+  function deleteSavedTemplate(id) {
+    if (!id) return;
+    if (!window.confirm('Delete this saved template?')) return;
+    fetch(SUPABASE_URL + '/rest/v1/email_templates?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      setSavedTemplates(function(prev) { return prev.filter(function(t) { return t.id !== id; }); });
+      if (tplLoadId === id) setTplLoadId('');
+    });
   }
 
   function toggleTplSelected(id) {
@@ -13483,7 +13549,8 @@ function VolEmailListsView({ navigate }) {
       subtext: tplSubtext,
       buttonText: tplButtonText,
       buttonUrl: tplButtonUrl,
-      note: tplNote
+      note: tplNote,
+      footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
     });
     var text = tplHeadline + '\n\n' + tplSubtext + '\n\n' + tplButtonText + ': ' + tplButtonUrl + (tplNote ? '\n\n' + tplNote : '');
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
@@ -13762,6 +13829,25 @@ function VolEmailListsView({ navigate }) {
               </div>
             ) : (
               <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Saved templates */}
+                <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <select value={tplLoadId} onChange={function(e) { handleLoadTemplate(e.target.value); }} style={Object.assign({}, inpSt, { flex: 1 })}>
+                    <option value="">{savedTemplates.length ? 'Load a saved template…' : 'No saved templates yet'}</option>
+                    {savedTemplates.map(function(t) { return <option key={t.id} value={t.id}>{t.name}</option>; })}
+                  </select>
+                  {tplLoadId && (
+                    <button type="button" onClick={function() { deleteSavedTemplate(tplLoadId); }} title="Delete this saved template" style={{ background: 'none', border: 'none', color: '#c88', cursor: 'pointer', fontSize: 12, flexShrink: 0 }}>Delete</button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={saveAsTemplate}
+                    disabled={tplSavingTemplate || (!tplSubject.trim() && !tplHeadline.trim())}
+                    style={{ flexShrink: 0, background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 6, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (tplSavingTemplate || (!tplSubject.trim() && !tplHeadline.trim())) ? 0.5 : 1 }}
+                  >
+                    {tplSavingTemplate ? 'Saving…' : (tplLoadId ? 'Update Template' : 'Save as Template')}
+                  </button>
+                </div>
+
                 {/* Recipient search/picker */}
                 <div>
                   <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>
@@ -13825,7 +13911,8 @@ function VolEmailListsView({ navigate }) {
                       subtext: tplSubtext || 'Body text will appear here…',
                       buttonText: tplButtonText || 'Button Text',
                       buttonUrl: tplButtonUrl || '#',
-                      note: tplNote
+                      note: tplNote,
+                      footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
                     }) }}
                   />
                 </div>
@@ -14706,6 +14793,16 @@ var PORTAL_URL = 'https://northstarhouse.github.io/Portal/';
 var ADMIN_NOTIFY_BCC = 'media@thenorthstarhouse.org';
 var VOLUNTEER_HUB_URL = 'https://northstarhouse.github.io/volunteerhub/';
 var WEBSITE_URL = 'https://thenorthstarhouse.org';
+// Public (shareable) Google Calendar view -- distinct from CALENDAR_ICAL_URL
+// above, which is a private feed URL and must never go in an outgoing email.
+var CALENDAR_PUBLIC_URL = 'https://calendar.google.com/calendar/u/0?cid=dGhlbm9ydGhzdGFyaG91c2VAZ21haWwuY29t';
+// Volunteers don't have Portal access, so the Template Email tool's footer
+// swaps Portal for Calendar (board/staff emails keep the default Portal link).
+var TEMPLATE_EMAIL_FOOTER_LINKS = [
+  { label: 'Calendar', url: CALENDAR_PUBLIC_URL },
+  { label: 'Volunteer Hub', url: VOLUNTEER_HUB_URL },
+  { label: 'Website', url: WEBSITE_URL },
+];
 
 // Styled HTML email matching the brand's existing "New Item for Board Review"
 // template (gold top bar, serif headline, gold CTA button, 3-link footer).
@@ -14715,6 +14812,15 @@ function buildBoardNotificationEmailHtml(opts) {
   var buttonText = opts.buttonText;
   var buttonUrl = opts.buttonUrl;
   var note = opts.note || '';
+  var footerLinks = opts.footerLinks || [
+    { label: 'Portal', url: PORTAL_URL },
+    { label: 'Volunteer Hub', url: VOLUNTEER_HUB_URL },
+    { label: 'Website', url: WEBSITE_URL },
+  ];
+  var footerCells = footerLinks.map(function(l, i) {
+    var border = i < footerLinks.length - 1 ? 'border-right:1px solid #e5ddcf;' : '';
+    return '<td style="width:' + (100 / footerLinks.length).toFixed(2) + '%;text-align:center;padding:14px 8px;' + border + '"><a href="' + l.url + '" style="color:' + gold + ';text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">' + l.label + '</a></td>';
+  }).join('');
   return (
     '<div style="background:#d9cdb8;padding:32px 16px;font-family:Georgia,\'Times New Roman\',serif;">' +
       '<div style="max-width:560px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">' +
@@ -14727,11 +14833,7 @@ function buildBoardNotificationEmailHtml(opts) {
           (note ? '<p style="margin:20px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>' + note + '</i></p>' : '') +
         '</div>' +
         '<table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #e5ddcf;">' +
-          '<tr>' +
-            '<td style="width:33.33%;text-align:center;padding:14px 8px;border-right:1px solid #e5ddcf;"><a href="' + PORTAL_URL + '" style="color:' + gold + ';text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">Portal</a></td>' +
-            '<td style="width:33.33%;text-align:center;padding:14px 8px;border-right:1px solid #e5ddcf;"><a href="' + VOLUNTEER_HUB_URL + '" style="color:' + gold + ';text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">Volunteer Hub</a></td>' +
-            '<td style="width:33.33%;text-align:center;padding:14px 8px;"><a href="' + WEBSITE_URL + '" style="color:' + gold + ';text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">Website</a></td>' +
-          '</tr>' +
+          '<tr>' + footerCells + '</tr>' +
         '</table>' +
       '</div>' +
     '</div>'
