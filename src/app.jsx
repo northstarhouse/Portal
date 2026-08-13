@@ -15285,7 +15285,7 @@ function buildPlanningPdfHtml(data) {
           '</div>' +
         '</div>' +
       '</div>' +
-      '<div style="margin:6px 36px 16px;background:#fdfbf7;border-radius:12px;padding:18px 22px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;break-inside:avoid;box-shadow:0 1px 3px rgba(42,36,32,0.08),0 1px 2px rgba(42,36,32,0.05)">' +
+      '<div style="margin:6px 36px 16px;background:#fff;border:1px solid #d9c49c;border-radius:12px;padding:18px 22px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;break-inside:avoid;box-shadow:0 1px 3px rgba(42,36,32,0.08),0 1px 2px rgba(42,36,32,0.05)">' +
         '<div style="flex:1;min-width:220px">' +
           '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">' +
             bubble('finalize', 34) +
