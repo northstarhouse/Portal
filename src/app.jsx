@@ -14775,50 +14775,44 @@ var PLANNING_FIELD_PREFIXES = [
 var PLANNING_MONTH_RE = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}/i;
 var PLANNING_TIME_RE = /\d{1,2}(:\d{2})?\s*[ap]\.?m\.?/i;
 
-var PLANNING_PASTE_TEMPLATE = 'Title: Volunteer Appreciation Party\n' +
-  'Date: Sunday, August 23, 2026\n' +
-  'Time: 4:00–7:00 p.m.\n' +
-  'Location: North Star House\n' +
-  'Intro: The goal is to keep this year’s party simple and relaxed.\n' +
+var PLANNING_PASTE_TEMPLATE = 'Title: \n' +
+  'Date: \n' +
+  'Time: \n' +
+  'Location: \n' +
+  'Intro: \n' +
   '\n' +
   'Food:\n' +
-  '**Pizza** from Mountain Mike’s\n' +
-  'Board budget: up to $300\n' +
+  '\n' +
   '\n' +
   'Drinks:\n' +
-  'Beer: **Rick**\n' +
-  'Wine + bar setup: **Jeff**\n' +
+  '\n' +
   '\n' +
   'Dessert:\n' +
-  'Ice cream + toppings: **Ken**\n' +
+  '\n' +
   '\n' +
   'Supplies:\n' +
-  'Plates, napkins, cups — already in-house\n' +
   '\n' +
-  'Setup: Setup begins around 3:00 p.m.\n' +
+  '\n' +
+  'Setup: \n' +
   'Setup crew:\n' +
-  '**Haley**\n' +
-  '**Jen**\n' +
   '\n' +
-  'Setup note: Haley will also set up the TV and speaker.\n' +
+  '\n' +
+  'Setup note: \n' +
   '\n' +
   'Cleanup:\n' +
-  '**Haley**\n' +
-  '**Paula**\n' +
   '\n' +
-  'Cleanup note: Additional help at the end of the evening is welcome.\n' +
+  '\n' +
+  'Cleanup note: \n' +
   '\n' +
   'Activities:\n' +
-  'No organized games this year\n' +
-  'Volunteer slideshow running during the event\n' +
+  '\n' +
   '\n' +
   'Still to Finalize:\n' +
-  'Final RSVP/headcount\n' +
-  'Ice\n' +
   '\n' +
-  'RSVP count: 33 guests, including plus ones\n' +
   '\n' +
-  'Footer: Thank you to our volunteers—your support keeps the North Star shining!';
+  'RSVP count: \n' +
+  '\n' +
+  'Footer: ';
 
 function parsePlanningText(raw) {
   var result = {};
@@ -15010,9 +15004,9 @@ function PlanningView({ navigate }) {
       <div style={{ background: '#faf8f5', border: '0.5px dashed #d8cdb8', borderRadius: 10, padding: '14px 16px', marginBottom: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <label style={lStyle}>Paste event notes to auto-fill</label>
-          <button type="button" onClick={function() { navigator.clipboard && navigator.clipboard.writeText(PLANNING_PASTE_TEMPLATE); alert('Format template copied. Give this shape to your AI tool so its output pastes in cleanly.'); }} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: 0 }}>Copy expected format →</button>
+          <button type="button" onClick={function() { navigator.clipboard && navigator.clipboard.writeText(PLANNING_PASTE_TEMPLATE); alert('Blank field template copied. Hand this to your AI tool, have it fill in the values after each label, then paste its output back in below.'); }} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: 0 }}>Copy blank field template →</button>
         </div>
-        <div style={{ fontSize: 10.5, color: '#aaa', marginTop: 2, marginBottom: 6 }}>Paste output shaped like the labels this parser looks for — "Title:", "Date:", "Time:", "Location:", "Food:", "Drinks:", "Dessert:", "Supplies:", "Setup:", "Setup crew:", "Cleanup:", "Activities:", "Still to Finalize:", "RSVP count: 33 …". Copy the exact template above to hand to your AI tool so its output matches every time.</div>
+        <div style={{ fontSize: 10.5, color: '#aaa', marginTop: 2, marginBottom: 6 }}>Copy the blank template (empty "Title:", "Date:", "Food:", "Setup crew:", "RSVP count:", etc. labels) and hand it to your AI tool to fill in. Paste its filled-in output here — the parser matches by those exact labels, so keeping them intact guarantees every field lands correctly.</div>
         <textarea value={pasteText} onChange={function(e) { setPasteText(e.target.value); }} rows={6} placeholder="Paste here…" style={taStyle} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
           <button type="button" onClick={handleParsePaste} disabled={!pasteText.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: pasteText.trim() ? 'pointer' : 'not-allowed', opacity: pasteText.trim() ? 1 : 0.5 }}>Parse & Fill Fields</button>
