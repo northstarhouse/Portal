@@ -15104,6 +15104,7 @@ function EventOverviewsView({ navigate }) {
   var [plans, setPlans] = useState(null);
   var [openingId, setOpeningId] = useState(null);
   var [attachingId, setAttachingId] = useState(null);
+  var [copiedId, setCopiedId] = useState(null);
 
   useEffect(function() { load(); }, []);
 
@@ -15118,6 +15119,16 @@ function EventOverviewsView({ navigate }) {
   function handleView(p) {
     setOpeningId(p.id);
     openPlanPreview(p.id, function() { setOpeningId(null); });
+  }
+
+  function handleCopyLink(p) {
+    var link = window.location.origin + window.location.pathname + '#event-plan/' + p.id;
+    function done() { setCopiedId(p.id); setTimeout(function() { setCopiedId(null); }, 2000); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(done).catch(function() { window.prompt('Copy this link:', link); });
+    } else {
+      window.prompt('Copy this link:', link);
+    }
   }
 
   function handleAttach(p) {
@@ -15179,6 +15190,9 @@ function EventOverviewsView({ navigate }) {
                 <button onClick={function() { handleView(p); }} disabled={openingId === p.id} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: openingId === p.id ? 'default' : 'pointer', opacity: openingId === p.id ? 0.6 : 1, flexShrink: 0 }}>
                   {openingId === p.id ? 'Opening…' : 'View'}
                 </button>
+                <button onClick={function() { handleCopyLink(p); }} title="Copy a shareable link straight to this plan" style={{ background: '#fff', color: '#886c44', border: '1px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                  {copiedId === p.id ? 'Copied!' : 'Copy Link'}
+                </button>
                 <button onClick={function() { handleAttach(p); }} disabled={attachingId === p.id} title="Show a 'View Event Plan' button on the dashboard RSVP card for the current Appreciation event" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: attachingId === p.id ? 'default' : 'pointer', opacity: attachingId === p.id ? 0.6 : 1, flexShrink: 0 }}>
                   {attachingId === p.id ? 'Attaching…' : 'Attach to Dashboard'}
                 </button>
@@ -15187,6 +15201,57 @@ function EventOverviewsView({ navigate }) {
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Lands directly on a single saved plan's branded preview when someone opens a
+// shared "#event-plan/<id>" link -- no click-through needed, unlike the popup
+// flow used elsewhere (openPlanPreview), since arriving via a pasted link *is*
+// the user gesture.
+function EventPlanLinkView({ navigate }) {
+  var [html, setHtml] = useState(null);
+  var [error, setError] = useState(false);
+
+  function load() {
+    var m = window.location.hash.match(/event-plan\/([^/?#]+)/);
+    var id = m && m[1];
+    if (!id) { setError(true); return; }
+    setHtml(null);
+    setError(false);
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/planning_templates?id=eq.' + id + '&select=*', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }),
+      fetch('assets/logo.png').then(function(r) { return r.blob(); }).then(function(blob) {
+        return new Promise(function(resolve) {
+          var reader = new FileReader();
+          reader.onload = function() { resolve(reader.result); };
+          reader.onerror = function() { resolve(''); };
+          reader.readAsDataURL(blob);
+        });
+      }).catch(function() { return ''; })
+    ]).then(function(results) {
+      var row = Array.isArray(results[0]) && results[0][0];
+      if (!row || !row.data) { setError(true); return; }
+      setHtml(buildPlanningPdfHtml(Object.assign({}, row.data, { logoDataUrl: results[1] || '' })));
+    }).catch(function() { setError(true); });
+  }
+
+  useEffect(function() {
+    load();
+    window.addEventListener('hashchange', load);
+    return function() { window.removeEventListener('hashchange', load); };
+  }, []);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: cream, zIndex: 2000 }}>
+      <button onClick={function() { navigate('event-overviews'); }} style={{ position: 'fixed', top: 14, left: 14, zIndex: 2001, background: 'rgba(255,255,255,0.92)', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, color: gold, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>← Back to Portal</button>
+      {error ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#999' }}>This plan could not be found — it may have been deleted.</div>
+      ) : !html ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#999' }}>Loading…</div>
+      ) : (
+        <iframe title="Event Plan" srcDoc={html} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }} />
       )}
     </div>
   );
@@ -15215,6 +15280,7 @@ const views = {
   admin: AdminView,
   planning: PlanningView,
   'event-overviews': EventOverviewsView,
+  'event-plan': EventPlanLinkView,
   'vol-email-lists': VolEmailListsView,
   'wix-forms': WixFormsView,
   'form-builder': FormBuilderView,
@@ -15575,6 +15641,7 @@ function buildBoardEmailRequest(g, toOverride) {
 var validModuleIds = Object.keys(views);
 function hashToModule() {
   var h = window.location.hash.replace(/^#/, '');
+  if (h.indexOf('event-plan/') === 0) return 'event-plan';
   return validModuleIds.indexOf(h) !== -1 ? h : 'home';
 }
 
