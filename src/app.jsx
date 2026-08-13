@@ -15272,11 +15272,17 @@ function buildPlanningPdfHtml(data) {
         '<div style="flex:1;min-width:280px">' +
           '<div style="box-shadow:0 1px 3px rgba(42,36,32,0.08),0 1px 2px rgba(42,36,32,0.05);margin-bottom:12px">' +
             panelHead('Setup & Cleanup') +
-            '<div style="background:#fff;border-radius:0 0 10px 10px;padding:12px 14px 2px">' +
-              card(data.setupTime || 'Setup', bulletList(data.setupPeople), 'setup') +
-              (data.setupNote ? '<div style="font-size:11px;font-style:italic;color:#8a7d68;margin:-8px 0 10px">' + esc(data.setupNote) + '</div>' : '') +
+            '<div style="background:#fff;border-radius:0 0 10px 10px;padding:18px 18px 8px">' +
+              '<div style="margin-bottom:16px;break-inside:avoid">' +
+                '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">' +
+                  bubble('setup', 30) +
+                  '<div style="font-size:13.5px;line-height:1.4;color:#3a332a"><b style="font-family:\'Cardo\',Georgia,serif;color:#4a453e">Plan:</b> ' + esc(data.setupTime || 'TBD') + '</div>' +
+                '</div>' +
+                bulletList(data.setupPeople) +
+              '</div>' +
+              (data.setupNote ? '<div style="font-size:11.5px;font-style:italic;color:#8a7d68;margin:0 0 18px">' + esc(data.setupNote) + '</div>' : '') +
               card('Cleanup', bulletList(data.cleanupPeople), 'cleanup') +
-              (data.cleanupNote ? '<div style="font-size:11px;font-style:italic;color:#8a7d68;margin-top:-8px">' + esc(data.cleanupNote) + '</div>' : '') +
+              (data.cleanupNote ? '<div style="font-size:11.5px;font-style:italic;color:#8a7d68;margin-top:2px">' + esc(data.cleanupNote) + '</div>' : '') +
             '</div>' +
           '</div>' +
           '<div style="box-shadow:0 1px 3px rgba(42,36,32,0.08),0 1px 2px rgba(42,36,32,0.05)">' +
