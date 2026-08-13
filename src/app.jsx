@@ -12595,6 +12595,17 @@ function AdminView({ navigate }) {
           Events
         </div>
         <div
+          onClick={function() { navigate('planning'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+          </span>
+          Planning
+        </div>
+        <div
           onClick={function() { navigate('acknowledgments-queue'); }}
           style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
           onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
@@ -14735,6 +14746,330 @@ function AnnouncementsView({ navigate }) {
   );
 }
 
+var PLANNING_EMPTY_FORM = {
+  title: '', dateLine: '', timeLine: '', location: 'North Star House', intro: '',
+  food: '', drinks: '', dessert: '', supplies: '',
+  setupTime: '', setupPeople: '', setupNote: '',
+  cleanupPeople: '', cleanupNote: '',
+  activities: '', stillToFinalize: '',
+  rsvpCount: '', rsvpNote: 'guests, including plus ones',
+  footerNote: 'Thank you to our volunteers—your support keeps the North Star shining!'
+};
+
+var PLANNING_SECTION_HEADERS = {
+  'food': 'food', 'drinks': 'drinks', 'drink': 'drinks', 'dessert': 'dessert', 'desserts': 'dessert',
+  'supplies': 'supplies', 'setup crew': 'setupPeople', 'cleanup': 'cleanupPeople', 'clean up': 'cleanupPeople',
+  'activities': 'activities', 'still to finalize': 'stillToFinalize', 'to finalize': 'stillToFinalize', 'open items': 'stillToFinalize'
+};
+var PLANNING_FIELD_PREFIXES = [
+  { key: 'title', re: /^(?:title|event)\s*:\s*(.+)$/i },
+  { key: 'dateLine', re: /^date\s*:\s*(.+)$/i },
+  { key: 'timeLine', re: /^time\s*:\s*(.+)$/i },
+  { key: 'location', re: /^location\s*:\s*(.+)$/i },
+  { key: 'intro', re: /^(?:intro|goal)\s*:\s*(.+)$/i },
+  { key: 'setupTime', re: /^setup(?:\s*heading)?\s*:\s*(.+)$/i },
+  { key: 'setupNote', re: /^setup note\s*:\s*(.+)$/i },
+  { key: 'cleanupNote', re: /^cleanup note\s*:\s*(.+)$/i },
+  { key: 'footerNote', re: /^footer\s*:\s*(.+)$/i },
+];
+var PLANNING_MONTH_RE = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}/i;
+var PLANNING_TIME_RE = /\d{1,2}(:\d{2})?\s*[ap]\.?m\.?/i;
+
+var PLANNING_PASTE_TEMPLATE = 'Title: Volunteer Appreciation Party\n' +
+  'Date: Sunday, August 23, 2026\n' +
+  'Time: 4:00–7:00 p.m.\n' +
+  'Location: North Star House\n' +
+  'Intro: The goal is to keep this year’s party simple and relaxed.\n' +
+  '\n' +
+  'Food:\n' +
+  '**Pizza** from Mountain Mike’s\n' +
+  'Board budget: up to $300\n' +
+  '\n' +
+  'Drinks:\n' +
+  'Beer: **Rick**\n' +
+  'Wine + bar setup: **Jeff**\n' +
+  '\n' +
+  'Dessert:\n' +
+  'Ice cream + toppings: **Ken**\n' +
+  '\n' +
+  'Supplies:\n' +
+  'Plates, napkins, cups — already in-house\n' +
+  '\n' +
+  'Setup: Setup begins around 3:00 p.m.\n' +
+  'Setup crew:\n' +
+  '**Haley**\n' +
+  '**Jen**\n' +
+  '\n' +
+  'Setup note: Haley will also set up the TV and speaker.\n' +
+  '\n' +
+  'Cleanup:\n' +
+  '**Haley**\n' +
+  '**Paula**\n' +
+  '\n' +
+  'Cleanup note: Additional help at the end of the evening is welcome.\n' +
+  '\n' +
+  'Activities:\n' +
+  'No organized games this year\n' +
+  'Volunteer slideshow running during the event\n' +
+  '\n' +
+  'Still to Finalize:\n' +
+  'Final RSVP/headcount\n' +
+  'Ice\n' +
+  '\n' +
+  'RSVP count: 33 guests, including plus ones\n' +
+  '\n' +
+  'Footer: Thank you to our volunteers—your support keeps the North Star shining!';
+
+function parsePlanningText(raw) {
+  var result = {};
+  var buckets = {};
+  var introLines = [];
+  var currentBucket = null;
+  var sawAnySection = false;
+
+  String(raw || '').split(/\r?\n/).forEach(function(rawLine) {
+    var line = rawLine.trim();
+    if (!line) return;
+    // content keeps inline **bold** intact (it's stored/rendered downstream); matchKey
+    // additionally unwraps a line that's bolded in its entirety, for header/label detection only.
+    var content = line.replace(/^(?:[-•]|\*(?!\*))\s*/, '').trim();
+    var matchKey = content.replace(/^\*\*(.*)\*\*$/, '$1').trim();
+
+    for (var i = 0; i < PLANNING_FIELD_PREFIXES.length; i++) {
+      var m = matchKey.match(PLANNING_FIELD_PREFIXES[i].re);
+      if (m) { result[PLANNING_FIELD_PREFIXES[i].key] = m[1].trim(); currentBucket = null; return; }
+    }
+
+    var rsvpMatch = matchKey.match(/rsvp count\s*:?\s*(\d+)\s*(.*)$/i);
+    if (rsvpMatch) {
+      result.rsvpCount = rsvpMatch[1];
+      if (rsvpMatch[2]) result.rsvpNote = rsvpMatch[2].replace(/^[,\s]+/, '');
+      currentBucket = null;
+      return;
+    }
+
+    var headerKey = matchKey.replace(/:$/, '').toLowerCase().trim();
+    if (PLANNING_SECTION_HEADERS[headerKey]) {
+      currentBucket = PLANNING_SECTION_HEADERS[headerKey];
+      if (!buckets[currentBucket]) buckets[currentBucket] = [];
+      sawAnySection = true;
+      return;
+    }
+    if (/^(current plan|setup\s*&\s*cleanup)$/i.test(headerKey)) { return; }
+
+    if (/setup\s+(begins|starts)/i.test(content)) { result.setupTime = content; currentBucket = null; return; }
+
+    if (!result.dateLine && !result.timeLine && PLANNING_MONTH_RE.test(content) && PLANNING_TIME_RE.test(content)) {
+      var parts = content.split(/\s*\|\s*|\s{2,}/);
+      if (parts.length >= 2) { result.dateLine = parts[0].trim(); result.timeLine = parts.slice(1).join(' ').trim(); }
+      else { result.dateLine = content; }
+      return;
+    }
+    if (!result.dateLine && PLANNING_MONTH_RE.test(content) && content.length < 60) { result.dateLine = content; return; }
+    if (!result.timeLine && PLANNING_TIME_RE.test(content) && content.length < 40) { result.timeLine = content; return; }
+    if (result.dateLine && result.timeLine && !result.location && !sawAnySection) { result.location = content; return; }
+
+    if (!result.title && !sawAnySection && !result.dateLine) { result.title = content; return; }
+
+    if (currentBucket) { buckets[currentBucket].push(content); }
+    else if (!sawAnySection) { introLines.push(content); }
+  });
+
+  Object.keys(buckets).forEach(function(k) { result[k] = buckets[k].join('\n'); });
+  if (introLines.length && !result.intro) result.intro = introLines.join(' ');
+  return result;
+}
+
+function PlanningView({ navigate }) {
+  var [form, setForm] = useState(PLANNING_EMPTY_FORM);
+  var [savedTemplates, setSavedTemplates] = useState([]);
+  var [loadId, setLoadId] = useState('');
+  var [saving, setSaving] = useState(false);
+  var [pasteText, setPasteText] = useState('');
+  var [parseCount, setParseCount] = useState(0);
+
+  useEffect(function() { loadList(); }, []);
+
+  function loadList() {
+    fetch(SUPABASE_URL + '/rest/v1/planning_templates?select=id,name&order=name.asc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setSavedTemplates(Array.isArray(rows) ? rows : []);
+    }).catch(function() {});
+  }
+
+  function setField(key, value) {
+    setForm(function(f) { var n = Object.assign({}, f); n[key] = value; return n; });
+  }
+
+  function handleLoadTemplate(id) {
+    setLoadId(id);
+    if (!id) { setForm(PLANNING_EMPTY_FORM); return; }
+    fetch(SUPABASE_URL + '/rest/v1/planning_templates?id=eq.' + id + '&select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var t = rows && rows[0];
+      if (t && t.data) setForm(Object.assign({}, PLANNING_EMPTY_FORM, t.data));
+    }).catch(function() {});
+  }
+
+  function saveAsTemplate() {
+    var existing = loadId ? savedTemplates.find(function(t) { return t.id === loadId; }) : null;
+    var name = window.prompt('Save this plan as:', existing ? existing.name : (form.title || ''));
+    if (!name || !name.trim()) return;
+    setSaving(true);
+    var payload = { name: name.trim(), data: form };
+    var isOverwrite = existing && existing.name === name.trim();
+    var req = isOverwrite
+      ? fetch(SUPABASE_URL + '/rest/v1/planning_templates?id=eq.' + existing.id, { method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(payload) })
+      : fetch(SUPABASE_URL + '/rest/v1/planning_templates', { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(payload) });
+    req.then(function(r) { return r.json(); }).then(function(rows) {
+      setSaving(false);
+      if (rows && rows.message) { alert('Failed to save: ' + rows.message); return; }
+      var saved = rows && rows[0];
+      if (saved) {
+        setSavedTemplates(function(prev) {
+          var next = isOverwrite ? prev.map(function(t) { return t.id === saved.id ? saved : t; }) : prev.concat([saved]);
+          return next.slice().sort(function(a, b) { return a.name.localeCompare(b.name); });
+        });
+        setLoadId(saved.id);
+      }
+    }).catch(function(err) { setSaving(false); alert('Failed to save: ' + err.message); });
+  }
+
+  function deleteSavedTemplate(id) {
+    if (!id) return;
+    if (!window.confirm('Delete this saved plan?')) return;
+    fetch(SUPABASE_URL + '/rest/v1/planning_templates?id=eq.' + id, {
+      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      setSavedTemplates(function(prev) { return prev.filter(function(t) { return t.id !== id; }); });
+      if (loadId === id) { setLoadId(''); setForm(PLANNING_EMPTY_FORM); }
+    });
+  }
+
+  function handleGeneratePdf() {
+    var html = buildPlanningPdfHtml(form);
+    var w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(function() { w.print(); }, 400);
+  }
+
+  function handleParsePaste() {
+    if (!pasteText.trim()) return;
+    var parsed = parsePlanningText(pasteText);
+    setForm(function(f) { return Object.assign({}, f, parsed); });
+    setParseCount(Object.keys(parsed).length);
+  }
+
+  var iStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
+  var taStyle = Object.assign({}, iStyle, { resize: 'vertical', minHeight: 66, lineHeight: 1.5 });
+  var lStyle = { fontSize: 12, color: '#666', fontWeight: 500 };
+  var sectionHead = { fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, margin: '22px 0 12px' };
+
+  function Text(label, key, placeholder) {
+    return (
+      <div style={{ marginBottom: 12 }}>
+        <label style={lStyle}>{label}</label>
+        <input value={form[key]} placeholder={placeholder || ''} onChange={function(e) { setField(key, e.target.value); }} style={iStyle} />
+      </div>
+    );
+  }
+
+  function Area(label, key, placeholder, rows) {
+    return (
+      <div style={{ marginBottom: 12 }}>
+        <label style={lStyle}>{label}</label>
+        <div style={{ fontSize: 10.5, color: '#aaa', marginTop: 2 }}>One item per line. Wrap a name in **double asterisks** to bold it.</div>
+        <textarea value={form[key]} placeholder={placeholder || ''} rows={rows || 3} onChange={function(e) { setField(key, e.target.value); }} style={taStyle} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#aaa', padding: 0 }}>←</button>
+        <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a' }}>Planning</div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <label style={lStyle}>Load a saved plan</label>
+          <select value={loadId} onChange={function(e) { handleLoadTemplate(e.target.value); }} style={iStyle}>
+            <option value="">— Start a new plan —</option>
+            {savedTemplates.map(function(t) { return <option key={t.id} value={t.id}>{t.name}</option>; })}
+          </select>
+        </div>
+        <button onClick={saveAsTemplate} disabled={saving} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '8px 14px', fontSize: 12, cursor: 'pointer', color: '#666' }}>{saving ? 'Saving…' : 'Save as…'}</button>
+        {loadId && <button onClick={function() { deleteSavedTemplate(loadId); }} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 12 }}>Delete</button>}
+      </div>
+
+      <div style={{ background: '#faf8f5', border: '0.5px dashed #d8cdb8', borderRadius: 10, padding: '14px 16px', marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label style={lStyle}>Paste event notes to auto-fill</label>
+          <button type="button" onClick={function() { navigator.clipboard && navigator.clipboard.writeText(PLANNING_PASTE_TEMPLATE); alert('Format template copied. Give this shape to your AI tool so its output pastes in cleanly.'); }} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: 0 }}>Copy expected format →</button>
+        </div>
+        <div style={{ fontSize: 10.5, color: '#aaa', marginTop: 2, marginBottom: 6 }}>Paste output shaped like the labels this parser looks for — "Title:", "Date:", "Time:", "Location:", "Food:", "Drinks:", "Dessert:", "Supplies:", "Setup:", "Setup crew:", "Cleanup:", "Activities:", "Still to Finalize:", "RSVP count: 33 …". Copy the exact template above to hand to your AI tool so its output matches every time.</div>
+        <textarea value={pasteText} onChange={function(e) { setPasteText(e.target.value); }} rows={6} placeholder="Paste here…" style={taStyle} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+          <button type="button" onClick={handleParsePaste} disabled={!pasteText.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: pasteText.trim() ? 'pointer' : 'not-allowed', opacity: pasteText.trim() ? 1 : 0.5 }}>Parse & Fill Fields</button>
+          {parseCount > 0 && <span style={{ fontSize: 11.5, color: '#2e6b4f' }}>Filled {parseCount} field{parseCount === 1 ? '' : 's'} below — review before generating the PDF.</span>}
+        </div>
+      </div>
+
+      <div style={sectionHead}>Event Details</div>
+      {Text('Event title', 'title', 'e.g. Volunteer Appreciation Party')}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {Text('Date', 'dateLine', 'e.g. Sunday, August 23, 2026')}
+        {Text('Time', 'timeLine', 'e.g. 4:00–7:00 p.m.')}
+      </div>
+      {Text('Location', 'location')}
+      {Area('Intro / goal statement (optional)', 'intro', 'e.g. The goal is to keep this year\'s party simple and relaxed…', 2)}
+
+      <div style={sectionHead}>Current Plan</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {Area('Food', 'food', '**Pizza** from Mountain Mike\'s\nBoard budget: up to $300')}
+        {Area('Drinks', 'drinks', 'Beer: **Rick**\nWine + bar setup: **Jeff**')}
+        {Area('Dessert', 'dessert', 'Ice cream + toppings: **Ken**')}
+        {Area('Supplies', 'supplies', 'Plates, napkins, cups, etc. — already in-house')}
+      </div>
+
+      <div style={sectionHead}>Setup & Cleanup</div>
+      {Text('Setup heading', 'setupTime', 'e.g. Setup begins around 3:00 p.m.')}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div>
+          {Area('Setup crew', 'setupPeople', '**Haley**\n**Jen**\n**Paula**')}
+          {Text('Setup note (optional)', 'setupNote', 'e.g. Haley will also set up the TV, speaker, and slideshow.')}
+        </div>
+        <div>
+          {Area('Cleanup crew', 'cleanupPeople', '**Haley**\n**Paula**')}
+          {Text('Cleanup note (optional)', 'cleanupNote', 'e.g. Additional help at the end of the evening is welcome.')}
+        </div>
+      </div>
+
+      <div style={sectionHead}>Activities</div>
+      {Area('Activities', 'activities', 'No organized games this year\nVolunteer slideshow running during the event', 4)}
+
+      <div style={sectionHead}>Still to Finalize</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {Area('Open items', 'stillToFinalize', 'Final RSVP/headcount\nIce', 4)}
+        <div>
+          {Text('Current RSVP count', 'rsvpCount', 'e.g. 33')}
+          {Text('RSVP note', 'rsvpNote', 'e.g. guests, including plus ones')}
+        </div>
+      </div>
+
+      <div style={sectionHead}>Footer</div>
+      {Text('Footer note', 'footerNote')}
+
+      <button onClick={handleGeneratePdf} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 8 }}>Generate PDF</button>
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
   birthdays: BirthdaysView,
@@ -14756,6 +15091,7 @@ const views = {
   reviews: ReviewsView,
   'quarter-workspace': QuarterWorkspaceView,
   admin: AdminView,
+  planning: PlanningView,
   'vol-email-lists': VolEmailListsView,
   'wix-forms': WixFormsView,
   'form-builder': FormBuilderView,
@@ -14837,6 +15173,71 @@ function buildBoardNotificationEmailHtml(opts) {
         '</table>' +
       '</div>' +
     '</div>'
+  );
+}
+
+function buildPlanningPdfHtml(data) {
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function mdBold(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
+  function lines(s) { return String(s || '').split('\n').map(function(l) { return l.trim(); }).filter(Boolean); }
+  function bulletList(s) {
+    var arr = lines(s);
+    if (!arr.length) return '<div style="font-size:12px;color:#c2b8a5;font-style:italic">—</div>';
+    return '<ul style="margin:0 0 14px;padding-left:18px;font-size:12.5px;color:#3a332a;line-height:1.65">' + arr.map(function(l) { return '<li>' + mdBold(l) + '</li>'; }).join('') + '</ul>';
+  }
+  function card(title, bodyHtml) {
+    return '<div><div style="font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:' + gold + ';border-bottom:1.5px solid ' + gold + ';padding-bottom:4px;margin-bottom:8px">' + esc(title) + '</div>' + bodyHtml + '</div>';
+  }
+  function panelHead(title) {
+    return '<div style="background:#eee4d3;color:#2a2420;font-size:12px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;padding:8px 14px;border-radius:6px 6px 0 0">' + esc(title) + '</div>';
+  }
+  var metaLine = [data.dateLine, data.timeLine].filter(Boolean).map(esc).join('&nbsp;&nbsp;|&nbsp;&nbsp;');
+  return (
+    '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(data.title || 'Event Plan') + '</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap" rel="stylesheet">' +
+    '<style>@media print{body{margin:0}} body{margin:0;background:' + cream + ';font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}</style>' +
+    '</head><body>' +
+    '<div style="background:#2a2420;color:' + cream + ';padding:28px 40px">' +
+      '<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#c9a76a;margin-bottom:6px">North Star Historic Conservancy</div>' +
+      '<div style="font-family:\'Cardo\',Georgia,serif;font-size:34px;color:' + cream + '">' + esc(data.title || 'Event Plan') + '</div>' +
+      (metaLine ? '<div style="font-size:14px;color:#c9a76a;margin-top:8px">' + metaLine + '</div>' : '') +
+      (data.location ? '<div style="font-size:14px;color:' + cream + '">' + esc(data.location) + '</div>' : '') +
+    '</div>' +
+    (data.intro ? '<div style="padding:20px 40px 0;text-align:center;font-style:italic;color:#6b5f4d;font-size:13px;line-height:1.6">' + esc(data.intro).replace(/\n/g, '<br/>') + '</div>' : '') +
+    '<div style="padding:24px 40px 8px;display:flex;gap:32px;flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:280px">' +
+        panelHead('Current Plan') +
+        '<div style="border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 6px 6px;padding:14px 16px">' +
+          card('Food', bulletList(data.food)) + card('Drinks', bulletList(data.drinks)) + card('Dessert', bulletList(data.dessert)) + card('Supplies', bulletList(data.supplies)) +
+        '</div>' +
+      '</div>' +
+      '<div style="flex:1;min-width:280px">' +
+        panelHead('Setup & Cleanup') +
+        '<div style="border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 6px 6px;padding:14px 16px;margin-bottom:16px">' +
+          card(data.setupTime || 'Setup', bulletList(data.setupPeople)) +
+          (data.setupNote ? '<div style="font-size:11.5px;font-style:italic;color:#8a7d68;margin:-10px 0 14px">' + esc(data.setupNote) + '</div>' : '') +
+          card('Cleanup', bulletList(data.cleanupPeople)) +
+          (data.cleanupNote ? '<div style="font-size:11.5px;font-style:italic;color:#8a7d68;margin-top:-10px">' + esc(data.cleanupNote) + '</div>' : '') +
+        '</div>' +
+        panelHead('Activities') +
+        '<div style="border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 6px 6px;padding:14px 16px">' + bulletList(data.activities) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="margin:8px 40px 24px;background:#faf6ee;border:1px solid ' + gold + ';border-radius:8px;padding:16px 20px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:220px">' +
+        '<div style="font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:' + gold + ';margin-bottom:6px">Still to Finalize</div>' +
+        bulletList(data.stillToFinalize) +
+      '</div>' +
+      (data.rsvpCount ? (
+        '<div style="text-align:center;min-width:140px">' +
+          '<div style="font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:' + gold + '">Current RSVP Count</div>' +
+          '<div style="font-size:34px;font-weight:700;color:#2a2420;font-family:\'Cardo\',Georgia,serif">' + esc(data.rsvpCount) + '</div>' +
+          (data.rsvpNote ? '<div style="font-size:11px;color:#8a7d68">' + esc(data.rsvpNote) + '</div>' : '') +
+        '</div>'
+      ) : '') +
+    '</div>' +
+    (data.footerNote ? '<div style="background:#2a2420;color:' + cream + ';text-align:center;font-style:italic;font-size:13px;padding:16px;font-family:\'Cardo\',Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
+    '</body></html>'
   );
 }
 
