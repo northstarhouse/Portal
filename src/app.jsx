@@ -15277,7 +15277,7 @@ function buildPlanningPdfHtml(data) {
               '<div style="margin-bottom:16px;break-inside:avoid">' +
                 '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">' +
                   bubble('setup', 30) +
-                  '<div style="font-size:13.5px;line-height:1.4;color:#3a332a"><b style="font-family:\'Cardo\',Georgia,serif;color:#4a453e">Plan:</b> ' + esc(data.setupTime || 'TBD') + '</div>' +
+                  '<div style="font-size:13.5px;line-height:1.4;color:#3a332a"><b style="font-family:\'Cardo\',Georgia,serif;color:#4a453e">Setup:</b> ' + esc(data.setupTime || 'TBD') + '</div>' +
                 '</div>' +
                 bulletList(data.setupPeople) +
               '</div>' +
@@ -15309,7 +15309,7 @@ function buildPlanningPdfHtml(data) {
           '</div>'
         ) : '') +
       '</div>' +
-      (data.footerNote ? '<div style="background:' + accent + ';text-align:center;font-style:italic;font-size:12.5px;color:' + cream + ';padding:14px;font-family:\'Cardo\',Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
+      (data.footerNote ? '<div style="background:' + accentDark + ';text-align:center;font-style:italic;font-size:12.5px;color:' + cream + ';padding:14px;font-family:\'Cardo\',Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
     '</div>' +
     '<script>(function(){' +
       'function fit(){' +
