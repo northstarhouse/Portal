@@ -15170,6 +15170,18 @@ function buildBoardNotificationEmailHtml(opts) {
   );
 }
 
+var PLANNING_ICONS = {
+  food: '<path d="M12 3 3.5 19h17L12 3z"/><circle cx="12" cy="12.5" r="0.9" fill="#fff" stroke="none"/><circle cx="9.3" cy="16" r="0.9" fill="#fff" stroke="none"/><circle cx="14.7" cy="16" r="0.9" fill="#fff" stroke="none"/>',
+  drinks: '<path d="M8 2.5h8l-1 7.5a3 3 0 0 1-6 0L8 2.5z"/><path d="M12 13.5V20"/><path d="M8.5 20h7"/>',
+  dessert: '<path d="M12 3a4 4 0 0 1 4 4c0 2.3-4 3.2-4 3.2S8 9.3 8 7a4 4 0 0 1 4-4z"/><path d="M9 10.2 12 21l3-10.8"/>',
+  supplies: '<rect x="3.5" y="8" width="17" height="12" rx="1.5"/><path d="M3.5 8 12 3.5 20.5 8"/><path d="M9 12v4"/><path d="M15 12v4"/>',
+  setup: '<circle cx="9" cy="8" r="3"/><path d="M4.2 20v-1a4.8 4.8 0 0 1 4.8-4.8h0"/><circle cx="16.5" cy="9" r="2.4"/><path d="M13.8 20v-1a4 4 0 0 1 4-4h0.2"/>',
+  cleanup: '<path d="M18 3l-7 7"/><path d="M11 10 4.5 20h11L11 10z"/><path d="M8.3 20l1.4-4"/><path d="M12.3 20l1-4"/>',
+  activities: '<rect x="3.5" y="7" width="17" height="13" rx="2"/><path d="M8.5 7 10 4.5h4L15.5 7"/><circle cx="12" cy="13.7" r="3.4"/>',
+  finalize: '<rect x="6" y="3.5" width="12" height="17" rx="2"/><path d="M9 3.5V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v0.5"/><path d="M9 12l2 2 4-4.5"/>',
+  rsvp: '<circle cx="8.5" cy="8.5" r="3"/><circle cx="16" cy="9" r="2.5"/><path d="M2.8 20a5.8 5.8 0 0 1 11.4 0"/><path d="M13.8 20a5 5 0 0 1 7.4-4.4"/>',
+};
+
 function buildPlanningPdfHtml(data) {
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function mdBold(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
@@ -15179,11 +15191,26 @@ function buildPlanningPdfHtml(data) {
     if (!arr.length) return '<div style="font-size:12px;color:#c2b8a5;font-style:italic">—</div>';
     return '<ul style="margin:0 0 14px;padding-left:18px;font-size:12.5px;color:#3a332a;line-height:1.65">' + arr.map(function(l) { return '<li>' + mdBold(l) + '</li>'; }).join('') + '</ul>';
   }
-  function card(title, bodyHtml) {
-    return '<div><div style="font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:' + gold + ';border-bottom:1.5px solid ' + gold + ';padding-bottom:4px;margin-bottom:8px">' + esc(title) + '</div>' + bodyHtml + '</div>';
+  function bubble(iconKey, size) {
+    var d = size || 40;
+    return '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:50%;background:' + gold + ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">' +
+      '<svg width="' + Math.round(d * 0.5) + '" height="' + Math.round(d * 0.5) + '" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (PLANNING_ICONS[iconKey] || '') + '</svg>' +
+    '</div>';
   }
-  function panelHead(title) {
-    return '<div style="background:#eee4d3;color:#2a2420;font-size:12px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;padding:8px 14px;border-radius:6px 6px 0 0">' + esc(title) + '</div>';
+  function card(title, bodyHtml, iconKey) {
+    return '<div style="margin-bottom:16px">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+        (iconKey ? bubble(iconKey, 36) : '') +
+        '<div style="font-size:12px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:#2a2420">' + esc(title) + '</div>' +
+      '</div>' +
+      bodyHtml +
+    '</div>';
+  }
+  function panelHead(title, iconKey) {
+    return '<div style="background:#f2e9d8;color:#2a2420;padding:10px 14px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:10px">' +
+      (iconKey ? bubble(iconKey, 30) : '') +
+      '<div style="font-size:12px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase">' + esc(title) + '</div>' +
+    '</div>';
   }
   var metaLine = [data.dateLine, data.timeLine].filter(Boolean).map(esc).join('&nbsp;&nbsp;|&nbsp;&nbsp;');
   return (
@@ -15191,46 +15218,54 @@ function buildPlanningPdfHtml(data) {
     '<link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap" rel="stylesheet">' +
     '<style>@media print{body{margin:0}} body{margin:0;background:' + cream + ';font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}</style>' +
     '</head><body>' +
-    '<div style="background:#2a2420;color:' + cream + ';padding:28px 40px">' +
-      '<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#c9a76a;margin-bottom:6px">North Star Historic Conservancy</div>' +
-      '<div style="font-family:\'Cardo\',Georgia,serif;font-size:34px;color:' + cream + '">' + esc(data.title || 'Event Plan') + '</div>' +
-      (metaLine ? '<div style="font-size:14px;color:#c9a76a;margin-top:8px">' + metaLine + '</div>' : '') +
-      (data.location ? '<div style="font-size:14px;color:' + cream + '">' + esc(data.location) + '</div>' : '') +
-    '</div>' +
-    (data.intro ? '<div style="padding:20px 40px 0;text-align:center;font-style:italic;color:#6b5f4d;font-size:13px;line-height:1.6">' + esc(data.intro).replace(/\n/g, '<br/>') + '</div>' : '') +
-    '<div style="padding:24px 40px 8px;display:flex;gap:32px;flex-wrap:wrap">' +
-      '<div style="flex:1;min-width:280px">' +
-        panelHead('Current Plan') +
-        '<div style="border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 6px 6px;padding:14px 16px">' +
-          card('Food', bulletList(data.food)) + card('Drinks', bulletList(data.drinks)) + card('Dessert', bulletList(data.dessert)) + card('Supplies', bulletList(data.supplies)) +
+    '<div style="max-width:760px;margin:0 auto;background:' + cream + '">' +
+      '<div style="height:10px;background:' + gold + '"></div>' +
+      '<div style="background:#fdfbf7;padding:36px 40px 28px;text-align:center;">' +
+        '<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:' + gold + ';margin-bottom:10px">North Star Historic Conservancy</div>' +
+        '<div style="font-family:\'Cardo\',Georgia,serif;font-size:34px;color:#2a2420">' + esc(data.title || 'Event Plan') + '</div>' +
+        '<div style="border-top:1px solid #e5ddcf;width:120px;margin:18px auto"></div>' +
+        (metaLine ? '<div style="font-size:14px;color:#6b5f4d">' + metaLine + '</div>' : '') +
+        (data.location ? '<div style="font-size:14px;color:#6b5f4d;margin-top:2px">' + esc(data.location) + '</div>' : '') +
+      '</div>' +
+      (data.intro ? '<div style="padding:20px 40px 0;text-align:center;font-style:italic;color:#6b5f4d;font-size:13px;line-height:1.6">' + esc(data.intro).replace(/\n/g, '<br/>') + '</div>' : '') +
+      '<div style="padding:24px 40px 8px;display:flex;gap:32px;flex-wrap:wrap">' +
+        '<div style="flex:1;min-width:280px">' +
+          panelHead('Current Plan') +
+          '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:16px 16px 2px">' +
+            card('Food', bulletList(data.food), 'food') + card('Drinks', bulletList(data.drinks), 'drinks') + card('Dessert', bulletList(data.dessert), 'dessert') + card('Supplies', bulletList(data.supplies), 'supplies') +
+          '</div>' +
+        '</div>' +
+        '<div style="flex:1;min-width:280px">' +
+          panelHead('Setup & Cleanup') +
+          '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:16px 16px 2px;margin-bottom:16px">' +
+            card(data.setupTime || 'Setup', bulletList(data.setupPeople), 'setup') +
+            (data.setupNote ? '<div style="font-size:11.5px;font-style:italic;color:#8a7d68;margin:-10px 0 14px">' + esc(data.setupNote) + '</div>' : '') +
+            card('Cleanup', bulletList(data.cleanupPeople), 'cleanup') +
+            (data.cleanupNote ? '<div style="font-size:11.5px;font-style:italic;color:#8a7d68;margin-top:-10px">' + esc(data.cleanupNote) + '</div>' : '') +
+          '</div>' +
+          panelHead('Activities', 'activities') +
+          '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:16px">' + bulletList(data.activities) + '</div>' +
         '</div>' +
       '</div>' +
-      '<div style="flex:1;min-width:280px">' +
-        panelHead('Setup & Cleanup') +
-        '<div style="border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 6px 6px;padding:14px 16px;margin-bottom:16px">' +
-          card(data.setupTime || 'Setup', bulletList(data.setupPeople)) +
-          (data.setupNote ? '<div style="font-size:11.5px;font-style:italic;color:#8a7d68;margin:-10px 0 14px">' + esc(data.setupNote) + '</div>' : '') +
-          card('Cleanup', bulletList(data.cleanupPeople)) +
-          (data.cleanupNote ? '<div style="font-size:11.5px;font-style:italic;color:#8a7d68;margin-top:-10px">' + esc(data.cleanupNote) + '</div>' : '') +
+      '<div style="margin:8px 40px 24px;background:#fdfbf7;border:1px solid ' + gold + ';border-radius:10px;padding:18px 20px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">' +
+        '<div style="flex:1;min-width:220px">' +
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+            bubble('finalize', 32) +
+            '<div style="font-size:12px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:#2a2420">Still to Finalize</div>' +
+          '</div>' +
+          bulletList(data.stillToFinalize) +
         '</div>' +
-        panelHead('Activities') +
-        '<div style="border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 6px 6px;padding:14px 16px">' + bulletList(data.activities) + '</div>' +
+        (data.rsvpCount ? (
+          '<div style="text-align:center;min-width:150px">' +
+            bubble('rsvp', 36) +
+            '<div style="font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:' + gold + ';margin-top:6px">Current RSVP Count</div>' +
+            '<div style="font-size:34px;font-weight:700;color:#2a2420;font-family:\'Cardo\',Georgia,serif">' + esc(data.rsvpCount) + '</div>' +
+            (data.rsvpNote ? '<div style="font-size:11px;color:#8a7d68">' + esc(data.rsvpNote) + '</div>' : '') +
+          '</div>'
+        ) : '') +
       '</div>' +
+      (data.footerNote ? '<div style="background:#fdfbf7;border-top:1px solid #e5ddcf;text-align:center;font-style:italic;font-size:13px;color:#6b5f4d;padding:20px;font-family:Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
     '</div>' +
-    '<div style="margin:8px 40px 24px;background:#faf6ee;border:1px solid ' + gold + ';border-radius:8px;padding:16px 20px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">' +
-      '<div style="flex:1;min-width:220px">' +
-        '<div style="font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:' + gold + ';margin-bottom:6px">Still to Finalize</div>' +
-        bulletList(data.stillToFinalize) +
-      '</div>' +
-      (data.rsvpCount ? (
-        '<div style="text-align:center;min-width:140px">' +
-          '<div style="font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:' + gold + '">Current RSVP Count</div>' +
-          '<div style="font-size:34px;font-weight:700;color:#2a2420;font-family:\'Cardo\',Georgia,serif">' + esc(data.rsvpCount) + '</div>' +
-          (data.rsvpNote ? '<div style="font-size:11px;color:#8a7d68">' + esc(data.rsvpNote) + '</div>' : '') +
-        '</div>'
-      ) : '') +
-    '</div>' +
-    (data.footerNote ? '<div style="background:#2a2420;color:' + cream + ';text-align:center;font-style:italic;font-size:13px;padding:16px;font-family:\'Cardo\',Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
     '</body></html>'
   );
 }
