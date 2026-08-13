@@ -719,6 +719,12 @@ const typeColors = {
   const [vaEvent, setVaEvent] = useState(null);
   const [vaResponses, setVaResponses] = useState(null);
   const [vaShowDeclined, setVaShowDeclined] = useState(false);
+  const [openingPlan, setOpeningPlan] = useState(false);
+
+  function openAttachedPlan(planId) {
+    if (openingPlan) return;
+    openPlanPreview(planId, setOpeningPlan);
+  }
   var isMobile = React.useContext(MobileCtx);
   useEffect(function() {
     cachedSbFetch('Sponsors', ['id','Business Name','Main Contact','Donation','Fair Market Value','Area Supported','Acknowledged','NSH Contact','Notes','sponsor_status']).then(function(rows) {
@@ -776,7 +782,7 @@ const typeColors = {
       setActivity(Array.isArray(rows) ? rows : []);
     }).catch(function() { setActivity([]); });
     function loadVaRsvps() {
-      fetch(SUPABASE_URL + '/rest/v1/vol_events?title=ilike.*Appreciation*&select=id,title,date,time&order=date.desc&limit=1', {
+      fetch(SUPABASE_URL + '/rest/v1/vol_events?title=ilike.*Appreciation*&select=id,title,date,time,plan_id&order=date.desc&limit=1', {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
       }).then(function(r) { return r.json(); }).then(function(rows) {
         var ev = Array.isArray(rows) && rows[0] ? rows[0] : null;
@@ -880,6 +886,11 @@ const typeColors = {
                   <div style={{ fontSize: 20, fontWeight: 700, color: gold }}>{headcount}</div>
                   <div style={{ fontSize: 10, color: '#999', textTransform: 'uppercase', letterSpacing: 0.6 }}>Headcount</div>
                 </div>
+                {vaEvent.plan_id && (
+                  <button onClick={function() { openAttachedPlan(vaEvent.plan_id); }} disabled={openingPlan} style={{ alignSelf: 'center', background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, cursor: openingPlan ? 'default' : 'pointer', opacity: openingPlan ? 0.6 : 1, flexShrink: 0 }}>
+                    {openingPlan ? 'Opening…' : 'View Event Plan'}
+                  </button>
+                )}
               </div>
             </div>
             {declined.length > 0 && (
@@ -12606,6 +12617,17 @@ function AdminView({ navigate }) {
           Planning
         </div>
         <div
+          onClick={function() { navigate('event-overviews'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          </span>
+          Event Overviews
+        </div>
+        <div
           onClick={function() { navigate('acknowledgments-queue'); }}
           style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
           onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
@@ -14907,7 +14929,7 @@ function PlanningView({ navigate }) {
     }).catch(function() {});
   }
 
-  function saveAsTemplate() {
+  function saveAsTemplate(afterSave) {
     var existing = loadId ? savedTemplates.find(function(t) { return t.id === loadId; }) : null;
     var name = window.prompt('Save this plan as:', existing ? existing.name : (form.title || ''));
     if (!name || !name.trim()) return;
@@ -14927,6 +14949,7 @@ function PlanningView({ navigate }) {
           return next.slice().sort(function(a, b) { return a.name.localeCompare(b.name); });
         });
         setLoadId(saved.id);
+        if (afterSave) afterSave(saved);
       }
     }).catch(function(err) { setSaving(false); alert('Failed to save: ' + err.message); });
   }
@@ -15069,7 +15092,102 @@ function PlanningView({ navigate }) {
       <div style={sectionHead}>Footer</div>
       {Text('Footer note', 'footerNote')}
 
-      <button onClick={handleGeneratePdf} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 8 }}>Preview Plan</button>
+      <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+        <button onClick={handleGeneratePdf} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Preview Plan</button>
+        <button onClick={function() { saveAsTemplate(function() { navigate('event-overviews'); }); }} disabled={saving} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save to Event Overviews'}</button>
+      </div>
+    </div>
+  );
+}
+
+function EventOverviewsView({ navigate }) {
+  var [plans, setPlans] = useState(null);
+  var [openingId, setOpeningId] = useState(null);
+  var [attachingId, setAttachingId] = useState(null);
+
+  useEffect(function() { load(); }, []);
+
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/planning_templates?select=*&order=created_at.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setPlans(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setPlans([]); });
+  }
+
+  function handleView(p) {
+    setOpeningId(p.id);
+    openPlanPreview(p.id, function() { setOpeningId(null); });
+  }
+
+  function handleAttach(p) {
+    setAttachingId(p.id);
+    fetch(SUPABASE_URL + '/rest/v1/vol_events?title=ilike.*Appreciation*&select=id,title&order=date.desc&limit=1', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var ev = Array.isArray(rows) && rows[0];
+      if (!ev) {
+        setAttachingId(null);
+        alert('No upcoming Appreciation event found on the calendar to attach this plan to. Create the event first (in Events), then attach the plan.');
+        return;
+      }
+      return fetch(SUPABASE_URL + '/rest/v1/vol_events?id=eq.' + ev.id, {
+        method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan_id: p.id })
+      }).then(function() {
+        setAttachingId(null);
+        alert('Attached "' + p.name + '" to "' + ev.title + '" — a "View Event Plan" button will now show on the dashboard RSVP card.');
+      });
+    }).catch(function() { setAttachingId(null); alert('Could not attach the plan.'); });
+  }
+
+  function handleDelete(p) {
+    if (!window.confirm('Delete "' + p.name + '"? This can\'t be undone.')) return;
+    fetch(SUPABASE_URL + '/rest/v1/planning_templates?id=eq.' + p.id, {
+      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      setPlans(function(prev) { return prev.filter(function(x) { return x.id !== p.id; }); });
+    });
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#aaa', padding: 0 }}>←</button>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a' }}>Event Overviews</div>
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Saved event plans from the Planning tool</div>
+        </div>
+      </div>
+
+      {plans === null ? (
+        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
+      ) : plans.length === 0 ? (
+        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No saved plans yet. Build one in Planning, then "Save to Event Overviews".</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {plans.map(function(p) {
+            var d = p.data || {};
+            var metaBits = [d.dateLine, d.timeLine].filter(Boolean).join('  ·  ');
+            return (
+              <div key={p.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{p.name}</div>
+                  {(d.title && d.title !== p.name) && <div style={{ fontSize: 12, color: '#886c44', marginTop: 2 }}>{d.title}</div>}
+                  {metaBits && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{metaBits}</div>}
+                </div>
+                <button onClick={function() { handleView(p); }} disabled={openingId === p.id} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: openingId === p.id ? 'default' : 'pointer', opacity: openingId === p.id ? 0.6 : 1, flexShrink: 0 }}>
+                  {openingId === p.id ? 'Opening…' : 'View'}
+                </button>
+                <button onClick={function() { handleAttach(p); }} disabled={attachingId === p.id} title="Show a 'View Event Plan' button on the dashboard RSVP card for the current Appreciation event" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: attachingId === p.id ? 'default' : 'pointer', opacity: attachingId === p.id ? 0.6 : 1, flexShrink: 0 }}>
+                  {attachingId === p.id ? 'Attaching…' : 'Attach to Dashboard'}
+                </button>
+                <button onClick={function() { handleDelete(p); }} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 12, flexShrink: 0 }}>Delete</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -15096,6 +15214,7 @@ const views = {
   'quarter-workspace': QuarterWorkspaceView,
   admin: AdminView,
   planning: PlanningView,
+  'event-overviews': EventOverviewsView,
   'vol-email-lists': VolEmailListsView,
   'wix-forms': WixFormsView,
   'form-builder': FormBuilderView,
@@ -15363,6 +15482,41 @@ function buildPlanningPdfHtml(data) {
     '})();<\/script>' +
     '</body></html>'
   );
+}
+
+// Opens the exact same branded preview page (Print/JPEG toolbar included) that
+// the Planning form's "Preview Plan" button opens, given a saved plan's id.
+// Shared by the dashboard's "View Event Plan" button and the Event Overviews list.
+function openPlanPreview(planId, setLoading) {
+  if (!planId) return;
+  if (setLoading) setLoading(true);
+  var w = window.open('', '_blank');
+  if (w) { w.document.write('<title>Loading…</title><body style="font-family:system-ui,sans-serif;padding:40px;color:#999">Loading plan…</body>'); w.document.close(); }
+  Promise.all([
+    fetch(SUPABASE_URL + '/rest/v1/planning_templates?id=eq.' + planId + '&select=*', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }),
+    fetch('assets/logo.png').then(function(r) { return r.blob(); }).then(function(blob) {
+      return new Promise(function(resolve) {
+        var reader = new FileReader();
+        reader.onload = function() { resolve(reader.result); };
+        reader.onerror = function() { resolve(''); };
+        reader.readAsDataURL(blob);
+      });
+    }).catch(function() { return ''; })
+  ]).then(function(results) {
+    var row = Array.isArray(results[0]) && results[0][0];
+    if (setLoading) setLoading(false);
+    if (!row || !row.data) {
+      if (w && !w.closed) w.close();
+      alert('That plan could not be loaded — it may have been deleted.');
+      return;
+    }
+    var html = buildPlanningPdfHtml(Object.assign({}, row.data, { logoDataUrl: results[1] || '' }));
+    if (w && !w.closed) { w.document.open(); w.document.write(html); w.document.close(); w.focus(); }
+  }).catch(function() {
+    if (setLoading) setLoading(false);
+    if (w && !w.closed) w.close();
+    alert('Could not load the plan.');
+  });
 }
 
 // Reimbursements go to BOTH Wyn Spiller and that area's lead; all other
