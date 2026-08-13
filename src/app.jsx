@@ -15193,8 +15193,8 @@ var PLANNING_ICONS = {
 };
 
 function buildPlanningPdfHtml(data) {
-  var accent = '#93897a';
-  var accentDark = '#6f6a5e';
+  var accent = '#9c8a72';
+  var accentDark = '#786a52';
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function mdBold(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
   function lines(s) { return String(s || '').split('\n').map(function(l) { return l.trim(); }).filter(Boolean); }
