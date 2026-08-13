@@ -14948,7 +14948,8 @@ function PlanningView({ navigate }) {
     w.document.write(html);
     w.document.close();
     w.focus();
-    setTimeout(function() { w.print(); }, 400);
+    // Printing is triggered by the generated page's own script, after it
+    // measures and zooms itself to fit one printed page.
   }
 
   function handleParsePaste() {
@@ -15171,15 +15172,15 @@ function buildBoardNotificationEmailHtml(opts) {
 }
 
 var PLANNING_ICONS = {
-  food: '<path d="M12 3 3.5 19h17L12 3z"/><circle cx="12" cy="12.5" r="0.9" fill="#fff" stroke="none"/><circle cx="9.3" cy="16" r="0.9" fill="#fff" stroke="none"/><circle cx="14.7" cy="16" r="0.9" fill="#fff" stroke="none"/>',
-  drinks: '<path d="M8 2.5h8l-1 7.5a3 3 0 0 1-6 0L8 2.5z"/><path d="M12 13.5V20"/><path d="M8.5 20h7"/>',
-  dessert: '<path d="M12 3a4 4 0 0 1 4 4c0 2.3-4 3.2-4 3.2S8 9.3 8 7a4 4 0 0 1 4-4z"/><path d="M9 10.2 12 21l3-10.8"/>',
-  supplies: '<rect x="3.5" y="8" width="17" height="12" rx="1.5"/><path d="M3.5 8 12 3.5 20.5 8"/><path d="M9 12v4"/><path d="M15 12v4"/>',
-  setup: '<circle cx="9" cy="8" r="3"/><path d="M4.2 20v-1a4.8 4.8 0 0 1 4.8-4.8h0"/><circle cx="16.5" cy="9" r="2.4"/><path d="M13.8 20v-1a4 4 0 0 1 4-4h0.2"/>',
-  cleanup: '<path d="M18 3l-7 7"/><path d="M11 10 4.5 20h11L11 10z"/><path d="M8.3 20l1.4-4"/><path d="M12.3 20l1-4"/>',
-  activities: '<rect x="3.5" y="7" width="17" height="13" rx="2"/><path d="M8.5 7 10 4.5h4L15.5 7"/><circle cx="12" cy="13.7" r="3.4"/>',
-  finalize: '<rect x="6" y="3.5" width="12" height="17" rx="2"/><path d="M9 3.5V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v0.5"/><path d="M9 12l2 2 4-4.5"/>',
-  rsvp: '<circle cx="8.5" cy="8.5" r="3"/><circle cx="16" cy="9" r="2.5"/><path d="M2.8 20a5.8 5.8 0 0 1 11.4 0"/><path d="M13.8 20a5 5 0 0 1 7.4-4.4"/>',
+  food: '<path d="M6.7 2.2v6.3a1.4 1.4 0 0 0 2.8 0V2.2"/><path d="M8.1 2.2v19.6"/><path d="M15.8 2.2c-1.7 0-2.8 2.1-2.8 5.4s1.1 5 2.8 5"/><path d="M15.8 2.2v19.6"/>',
+  drinks: '<path d="M7.7 3h8.6l-0.9 6.3a3.4 3.4 0 0 1-6.8 0L7.7 3z"/><line x1="12" y1="12.6" x2="12" y2="19.5"/><line x1="8.3" y1="21.5" x2="15.7" y2="21.5"/>',
+  dessert: '<path d="M8 10.4c0-2.9 1.8-5.2 4-5.2s4 2.3 4 5.2c0 1.9-1.8 3.1-4 3.1s-4-1.2-4-3.1z"/><path d="M8.8 13 12 21.8l3.2-8.8"/>',
+  supplies: '<path d="M4 8.2 12 4l8 4.2v7.6L12 20l-8-4.2V8.2z"/><path d="M4 8.2 12 12.4l8-4.2"/><line x1="12" y1="12.4" x2="12" y2="20"/>',
+  setup: '<circle cx="8.6" cy="7.4" r="2.8"/><path d="M3.8 19.8v-1.1a4.6 4.6 0 0 1 4.6-4.6h0.4a4.6 4.6 0 0 1 4.6 4.6v0.3"/><circle cx="16.4" cy="8.6" r="2.3"/><path d="M13.5 19.8v-0.9a3.8 3.8 0 0 1 3.8-3.8h0.4a3.8 3.8 0 0 1 3.5 2.3"/>',
+  cleanup: '<path d="M18.2 2.8 11 10"/><path d="M11.4 10.4 4.5 20.5h13.4L11.4 10.4z"/><line x1="8.5" y1="20.5" x2="9.9" y2="16.3"/><line x1="12.6" y1="20.5" x2="13.6" y2="16.3"/>',
+  activities: '<path d="M8.6 7.4 10 4.6h4l1.4 2.8h3a1.6 1.6 0 0 1 1.6 1.6V19a1.6 1.6 0 0 1-1.6 1.6H5.6A1.6 1.6 0 0 1 4 19V9a1.6 1.6 0 0 1 1.6-1.6h3z"/><circle cx="12" cy="13.6" r="3.6"/><circle cx="17.3" cy="10.1" r="0.6" fill="#fff" stroke="none"/>',
+  finalize: '<rect x="5.5" y="3.4" width="13" height="18.2" rx="2"/><path d="M9 3.4v-0.6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v0.6"/><path d="M8.6 12.4 11 14.8l4.4-5"/>',
+  rsvp: '<circle cx="8.2" cy="8" r="3.1"/><circle cx="16.3" cy="9" r="2.5"/><path d="M2.4 20.3a5.9 5.9 0 0 1 11.6 0"/><path d="M13.9 20.3a5.1 5.1 0 0 1 7.7-4.5"/>',
 };
 
 function buildPlanningPdfHtml(data) {
@@ -15188,84 +15189,102 @@ function buildPlanningPdfHtml(data) {
   function lines(s) { return String(s || '').split('\n').map(function(l) { return l.trim(); }).filter(Boolean); }
   function bulletList(s) {
     var arr = lines(s);
-    if (!arr.length) return '<div style="font-size:12px;color:#c2b8a5;font-style:italic">—</div>';
-    return '<ul style="margin:0 0 14px;padding-left:18px;font-size:12.5px;color:#3a332a;line-height:1.65">' + arr.map(function(l) { return '<li>' + mdBold(l) + '</li>'; }).join('') + '</ul>';
+    if (!arr.length) return '<div style="font-size:11.5px;color:#c2b8a5;font-style:italic">—</div>';
+    return '<ul style="margin:0 0 10px;padding-left:17px;font-size:12px;color:#3a332a;line-height:1.5">' + arr.map(function(l) { return '<li>' + mdBold(l) + '</li>'; }).join('') + '</ul>';
   }
   function bubble(iconKey, size) {
     var d = size || 40;
-    return '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:50%;background:' + gold + ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">' +
-      '<svg width="' + Math.round(d * 0.5) + '" height="' + Math.round(d * 0.5) + '" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (PLANNING_ICONS[iconKey] || '') + '</svg>' +
+    return '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:50%;background:' + gold + ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:inset 0 -2px 4px rgba(0,0,0,0.12)">' +
+      '<svg width="' + Math.round(d * 0.52) + '" height="' + Math.round(d * 0.52) + '" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + (PLANNING_ICONS[iconKey] || '') + '</svg>' +
     '</div>';
   }
   function card(title, bodyHtml, iconKey) {
-    return '<div style="margin-bottom:16px">' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
-        (iconKey ? bubble(iconKey, 36) : '') +
-        '<div style="font-size:12px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:#2a2420">' + esc(title) + '</div>' +
+    return '<div style="margin-bottom:10px;break-inside:avoid">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+        (iconKey ? bubble(iconKey, 30) : '') +
+        '<div style="font-size:11.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#2a2420">' + esc(title) + '</div>' +
       '</div>' +
       bodyHtml +
     '</div>';
   }
   function panelHead(title, iconKey) {
-    return '<div style="background:#f2e9d8;color:#2a2420;padding:10px 14px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:10px">' +
-      (iconKey ? bubble(iconKey, 30) : '') +
-      '<div style="font-size:12px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase">' + esc(title) + '</div>' +
+    return '<div style="background:#f2e9d8;color:#2a2420;padding:8px 12px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px">' +
+      (iconKey ? bubble(iconKey, 26) : '') +
+      '<div style="font-size:11.5px;font-weight:700;letter-spacing:0.7px;text-transform:uppercase">' + esc(title) + '</div>' +
     '</div>';
   }
   var metaLine = [data.dateLine, data.timeLine].filter(Boolean).map(esc).join('&nbsp;&nbsp;|&nbsp;&nbsp;');
   return (
     '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(data.title || 'Event Plan') + '</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap" rel="stylesheet">' +
-    '<style>@media print{body{margin:0}} body{margin:0;background:' + cream + ';font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}</style>' +
+    '<style>' +
+      '@page{size:letter;margin:0.35in}' +
+      '@media print{body{margin:0}}' +
+      'body{margin:0;background:' + cream + ';font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}' +
+    '</style>' +
     '</head><body>' +
-    '<div style="max-width:760px;margin:0 auto;background:' + cream + '">' +
-      '<div style="height:10px;background:' + gold + '"></div>' +
-      '<div style="background:#fdfbf7;padding:36px 40px 28px;text-align:center;">' +
-        '<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:' + gold + ';margin-bottom:10px">North Star Historic Conservancy</div>' +
-        '<div style="font-family:\'Cardo\',Georgia,serif;font-size:34px;color:#2a2420">' + esc(data.title || 'Event Plan') + '</div>' +
-        '<div style="border-top:1px solid #e5ddcf;width:120px;margin:18px auto"></div>' +
-        (metaLine ? '<div style="font-size:14px;color:#6b5f4d">' + metaLine + '</div>' : '') +
-        (data.location ? '<div style="font-size:14px;color:#6b5f4d;margin-top:2px">' + esc(data.location) + '</div>' : '') +
+    '<div id="planningPage" style="max-width:720px;margin:0 auto;background:' + cream + ';transform-origin:top center">' +
+      '<div style="height:8px;background:' + gold + '"></div>' +
+      '<div style="background:#fdfbf7;padding:24px 36px 18px;text-align:center;">' +
+        '<div style="font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:' + gold + ';margin-bottom:8px">North Star Historic Conservancy</div>' +
+        '<div style="font-family:\'Cardo\',Georgia,serif;font-size:30px;color:#2a2420">' + esc(data.title || 'Event Plan') + '</div>' +
+        '<div style="border-top:1px solid #e5ddcf;width:110px;margin:14px auto"></div>' +
+        (metaLine ? '<div style="font-size:13px;color:#6b5f4d">' + metaLine + '</div>' : '') +
+        (data.location ? '<div style="font-size:13px;color:#6b5f4d;margin-top:2px">' + esc(data.location) + '</div>' : '') +
       '</div>' +
-      (data.intro ? '<div style="padding:20px 40px 0;text-align:center;font-style:italic;color:#6b5f4d;font-size:13px;line-height:1.6">' + esc(data.intro).replace(/\n/g, '<br/>') + '</div>' : '') +
-      '<div style="padding:24px 40px 8px;display:flex;gap:32px;flex-wrap:wrap">' +
+      (data.intro ? '<div style="padding:14px 36px 0;text-align:center;font-style:italic;color:#6b5f4d;font-size:12.5px;line-height:1.5">' + esc(data.intro).replace(/\n/g, '<br/>') + '</div>' : '') +
+      '<div style="padding:18px 36px 6px;display:flex;gap:22px;flex-wrap:wrap">' +
         '<div style="flex:1;min-width:280px">' +
           panelHead('Current Plan') +
-          '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:16px 16px 2px">' +
+          '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:12px 14px 2px">' +
             card('Food', bulletList(data.food), 'food') + card('Drinks', bulletList(data.drinks), 'drinks') + card('Dessert', bulletList(data.dessert), 'dessert') + card('Supplies', bulletList(data.supplies), 'supplies') +
           '</div>' +
         '</div>' +
         '<div style="flex:1;min-width:280px">' +
           panelHead('Setup & Cleanup') +
-          '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:16px 16px 2px;margin-bottom:16px">' +
+          '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:12px 14px 2px;margin-bottom:10px">' +
             card(data.setupTime || 'Setup', bulletList(data.setupPeople), 'setup') +
-            (data.setupNote ? '<div style="font-size:11.5px;font-style:italic;color:#8a7d68;margin:-10px 0 14px">' + esc(data.setupNote) + '</div>' : '') +
+            (data.setupNote ? '<div style="font-size:11px;font-style:italic;color:#8a7d68;margin:-8px 0 10px">' + esc(data.setupNote) + '</div>' : '') +
             card('Cleanup', bulletList(data.cleanupPeople), 'cleanup') +
-            (data.cleanupNote ? '<div style="font-size:11.5px;font-style:italic;color:#8a7d68;margin-top:-10px">' + esc(data.cleanupNote) + '</div>' : '') +
+            (data.cleanupNote ? '<div style="font-size:11px;font-style:italic;color:#8a7d68;margin-top:-8px">' + esc(data.cleanupNote) + '</div>' : '') +
           '</div>' +
           panelHead('Activities', 'activities') +
-          '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:16px">' + bulletList(data.activities) + '</div>' +
+          '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:12px 14px">' + bulletList(data.activities) + '</div>' +
         '</div>' +
       '</div>' +
-      '<div style="margin:8px 40px 24px;background:#fdfbf7;border:1px solid ' + gold + ';border-radius:10px;padding:18px 20px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">' +
+      '<div style="margin:6px 36px 16px;background:#fdfbf7;border:1px solid ' + gold + ';border-radius:10px;padding:14px 18px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;break-inside:avoid">' +
         '<div style="flex:1;min-width:220px">' +
-          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
-            bubble('finalize', 32) +
-            '<div style="font-size:12px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:#2a2420">Still to Finalize</div>' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+            bubble('finalize', 28) +
+            '<div style="font-size:11.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#2a2420">Still to Finalize</div>' +
           '</div>' +
           bulletList(data.stillToFinalize) +
         '</div>' +
         (data.rsvpCount ? (
-          '<div style="text-align:center;min-width:150px">' +
-            bubble('rsvp', 36) +
-            '<div style="font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:' + gold + ';margin-top:6px">Current RSVP Count</div>' +
-            '<div style="font-size:34px;font-weight:700;color:#2a2420;font-family:\'Cardo\',Georgia,serif">' + esc(data.rsvpCount) + '</div>' +
-            (data.rsvpNote ? '<div style="font-size:11px;color:#8a7d68">' + esc(data.rsvpNote) + '</div>' : '') +
+          '<div style="text-align:center;min-width:140px">' +
+            bubble('rsvp', 32) +
+            '<div style="font-size:10.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + gold + ';margin-top:5px">Current RSVP Count</div>' +
+            '<div style="font-size:30px;font-weight:700;color:#2a2420;font-family:\'Cardo\',Georgia,serif">' + esc(data.rsvpCount) + '</div>' +
+            (data.rsvpNote ? '<div style="font-size:10.5px;color:#8a7d68">' + esc(data.rsvpNote) + '</div>' : '') +
           '</div>'
         ) : '') +
       '</div>' +
-      (data.footerNote ? '<div style="background:#fdfbf7;border-top:1px solid #e5ddcf;text-align:center;font-style:italic;font-size:13px;color:#6b5f4d;padding:20px;font-family:Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
+      (data.footerNote ? '<div style="background:#fdfbf7;border-top:1px solid #e5ddcf;text-align:center;font-style:italic;font-size:12.5px;color:#6b5f4d;padding:14px;font-family:Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
     '</div>' +
+    '<script>(function(){' +
+      'function fit(){' +
+        'var el=document.getElementById("planningPage");if(!el)return;' +
+        'var pageH=(11-1.0)*96;' +
+        'var h=el.scrollHeight;' +
+        'if(h>pageH){var s=Math.max(0.5,pageH/h);el.style.zoom=s;}' +
+        'setTimeout(function(){window.print();},150);' +
+      '}' +
+      'function ready(){' +
+        'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){setTimeout(fit,100);});}' +
+        'else{setTimeout(fit,300);}' +
+      '}' +
+      'if(document.readyState==="complete"){ready();}else{window.addEventListener("load",ready);}' +
+    '})();<\/script>' +
     '</body></html>'
   );
 }
