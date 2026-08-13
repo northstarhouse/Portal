@@ -15199,10 +15199,13 @@ function buildPlanningPdfHtml(data) {
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function mdBold(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
   function lines(s) { return String(s || '').split('\n').map(function(l) { return l.trim(); }).filter(Boolean); }
-  function bulletList(s) {
+  function bulletList(s, big) {
     var arr = lines(s);
-    if (!arr.length) return '<div style="font-size:11.5px;color:#c2b8a5;font-style:italic">—</div>';
-    return '<ul style="margin:0 0 10px;padding-left:17px;font-size:12px;color:#3a332a;line-height:1.5">' + arr.map(function(l) { return '<li>' + mdBold(l) + '</li>'; }).join('') + '</ul>';
+    if (!arr.length) return '<div style="font-size:' + (big ? '13px' : '11.5px') + ';color:#c2b8a5;font-style:italic">—</div>';
+    var fs = big ? '14.5px' : '12px';
+    var lh = big ? '1.7' : '1.5';
+    var pad = big ? '20px' : '17px';
+    return '<ul style="margin:0 0 10px;padding-left:' + pad + ';font-size:' + fs + ';color:#3a332a;line-height:' + lh + '">' + arr.map(function(l) { return '<li>' + mdBold(l) + '</li>'; }).join('') + '</ul>';
   }
   function bubble(iconKey, size, onGold) {
     var d = size || 40;
@@ -15282,13 +15285,13 @@ function buildPlanningPdfHtml(data) {
           '</div>' +
         '</div>' +
       '</div>' +
-      '<div style="margin:6px 36px 16px;background:#fdfbf7;border-radius:12px;padding:14px 18px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;break-inside:avoid;box-shadow:0 1px 3px rgba(42,36,32,0.08),0 1px 2px rgba(42,36,32,0.05)">' +
+      '<div style="margin:6px 36px 16px;background:#fdfbf7;border-radius:12px;padding:18px 22px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;break-inside:avoid;box-shadow:0 1px 3px rgba(42,36,32,0.08),0 1px 2px rgba(42,36,32,0.05)">' +
         '<div style="flex:1;min-width:220px">' +
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
-            bubble('finalize', 28) +
-            '<div style="font-family:\'Cardo\',Georgia,serif;font-size:12.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#4a453e">Still to Finalize</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">' +
+            bubble('finalize', 34) +
+            '<div style="font-family:\'Cardo\',Georgia,serif;font-size:15px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:#4a453e">Still to Finalize</div>' +
           '</div>' +
-          bulletList(data.stillToFinalize) +
+          bulletList(data.stillToFinalize, true) +
         '</div>' +
         (data.rsvpCount ? (
           '<div style="text-align:center;min-width:140px">' +
