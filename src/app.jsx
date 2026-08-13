@@ -15245,7 +15245,10 @@ function buildPlanningPdfHtml(data) {
     '<link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap" rel="stylesheet">' +
     '<style>' +
       '@page{size:letter;margin:0.35in}' +
-      '@media print{body{margin:0}}' +
+      '@media print{' +
+        'body{margin:0;background:' + cream + '}' +
+        '#planningPage{margin:0!important;max-width:100%!important;border-radius:0!important;box-shadow:none!important}' +
+      '}' +
       'body{margin:0;background:#efe9de;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}' +
     '</style>' +
     '</head><body>' +
