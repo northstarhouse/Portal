@@ -15215,14 +15215,14 @@ function buildPlanningPdfHtml(data) {
     return '<div style="margin-bottom:10px;break-inside:avoid">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
         (iconKey ? bubble(iconKey, 30) : '') +
-        '<div style="font-family:\'Cardo\',Georgia,serif;font-size:12.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#2a2420">' + esc(title) + '</div>' +
+        '<div style="font-family:\'Cardo\',Georgia,serif;font-size:12.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#4a453e">' + esc(title) + '</div>' +
       '</div>' +
       bodyHtml +
     '</div>';
   }
   function panelHead(title, iconKey, dark) {
     var bg = dark ? accentDark : '#f2e9d8';
-    var color = dark ? cream : '#2a2420';
+    var color = dark ? cream : '#4a453e';
     var clip = dark ? ';clip-path:polygon(0 0,100% 0,calc(100% - 15px) 50%,100% 100%,0 100%)' : '';
     var pad = dark ? '9px 30px 9px 13px' : '9px 13px';
     return '<div style="background:' + bg + ';color:' + color + ';padding:' + pad + ';border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px' + clip + '">' +
@@ -15279,7 +15279,7 @@ function buildPlanningPdfHtml(data) {
         '<div style="flex:1;min-width:220px">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
             bubble('finalize', 28) +
-            '<div style="font-family:\'Cardo\',Georgia,serif;font-size:12.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#2a2420">Still to Finalize</div>' +
+            '<div style="font-family:\'Cardo\',Georgia,serif;font-size:12.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#4a453e">Still to Finalize</div>' +
           '</div>' +
           bulletList(data.stillToFinalize) +
         '</div>' +
