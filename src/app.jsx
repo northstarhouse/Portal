@@ -15301,7 +15301,7 @@ function buildPlanningPdfHtml(data) {
           bulletList(data.stillToFinalize, true) +
         '</div>' +
         (data.rsvpCount ? (
-          '<div style="text-align:center;min-width:140px">' +
+          '<div style="text-align:center;min-width:150px;border:1px solid #d9c49c;border-radius:10px;padding:12px 20px">' +
             bubble('rsvp', 32) +
             '<div style="font-family:\'Cardo\',Georgia,serif;font-size:11.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + accent + ';margin-top:5px">Current RSVP Count</div>' +
             '<div style="font-size:30px;font-weight:700;color:#2a2420;font-family:\'Cardo\',Georgia,serif">' + esc(data.rsvpCount) + '</div>' +
