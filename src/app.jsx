@@ -15227,7 +15227,7 @@ function buildPlanningPdfHtml(data) {
     var pad = dark ? '9px 30px 9px 13px' : '9px 13px';
     return '<div style="background:' + bg + ';color:' + color + ';padding:' + pad + ';border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px' + clip + '">' +
       (iconKey ? bubble(iconKey, 26, dark) : '') +
-      '<div style="font-family:\'Cardo\',Georgia,serif;font-size:12.5px;font-weight:700;letter-spacing:0.7px;text-transform:uppercase">' + esc(title) + '</div>' +
+      '<div style="font-family:\'Cardo\',Georgia,serif;font-size:13px;font-weight:700;letter-spacing:0.3px">' + esc(title) + '</div>' +
     '</div>';
   }
   var metaLine = [data.dateLine, data.timeLine].filter(Boolean).map(esc).join('&nbsp;&nbsp;|&nbsp;&nbsp;');
