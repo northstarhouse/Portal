@@ -15069,7 +15069,7 @@ function PlanningView({ navigate }) {
       <div style={sectionHead}>Footer</div>
       {Text('Footer note', 'footerNote')}
 
-      <button onClick={handleGeneratePdf} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 8 }}>Generate PDF</button>
+      <button onClick={handleGeneratePdf} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 8 }}>Preview Plan</button>
     </div>
   );
 }
@@ -15238,27 +15238,34 @@ function buildPlanningPdfHtml(data) {
   }
   var metaLine = [data.dateLine, data.timeLine].filter(Boolean).map(esc).join('&nbsp;&nbsp;|&nbsp;&nbsp;');
   var logoBlock = data.logoDataUrl
-    ? '<img src="' + data.logoDataUrl + '" alt="North Star House" style="height:28px;width:auto;display:block" />'
+    ? '<img src="' + data.logoDataUrl + '" alt="North Star House" style="height:42px;width:auto;display:block" />'
     : '<div style="font-family:\'Cardo\',Georgia,serif;font-size:15px;font-weight:700;color:' + cream + '">North Star House</div>';
+  var planFileSlug = (data.title || 'event-plan').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'event-plan';
   return (
     '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(data.title || 'Event Plan') + '</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap" rel="stylesheet">' +
+    '<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"><\/script>' +
     '<style>' +
       '@page{size:letter;margin:0.35in}' +
       '@media print{' +
         'body{margin:0;background:' + cream + '}' +
         '#planningPage{margin:0!important;max-width:100%!important;border-radius:0!important;box-shadow:none!important}' +
+        '.no-print{display:none!important}' +
       '}' +
       'body{margin:0;background:#efe9de;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}' +
     '</style>' +
     '</head><body>' +
+    '<div class="no-print" style="max-width:720px;margin:16px auto 0;display:flex;gap:10px;justify-content:center">' +
+      '<button id="btnPrint" style="background:' + accentDark + ';color:' + cream + ';border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Print / Save PDF</button>' +
+      '<button id="btnJpeg" style="background:#fff;color:' + accentDark + ';border:1px solid ' + accentDark + ';border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Save as JPEG</button>' +
+    '</div>' +
     '<div id="planningPage" style="max-width:720px;margin:10px auto;background:' + cream + ';border-radius:16px;overflow:hidden;box-shadow:0 6px 20px rgba(42,36,32,0.12),0 2px 6px rgba(42,36,32,0.06);transform-origin:top center">' +
       '<div style="height:7px;background:' + accentDark + '"></div>' +
       '<div style="background:' + accentDark + ';padding:22px 32px;display:flex;align-items:center;gap:20px">' +
-        '<div style="flex-shrink:0;display:flex;align-items:center;padding-right:20px;border-right:1px solid rgba(255,255,255,0.32)">' +
+        '<div style="flex-shrink:0;display:flex;align-items:center;padding-right:28px;border-right:1px solid rgba(255,255,255,0.32)">' +
           logoBlock +
         '</div>' +
-        '<div style="flex:1;min-width:0">' +
+        '<div style="flex:1;min-width:0;padding-left:8px">' +
           '<div style="font-family:\'Cardo\',Georgia,serif;font-size:27px;font-weight:700;color:' + cream + ';line-height:1.2">' + esc(data.title || 'Event Plan') + '</div>' +
           (metaLine ? '<div style="font-size:12.5px;color:rgba(255,255,255,0.88);margin-top:5px">' + metaLine + '</div>' : '') +
         '</div>' +
@@ -15304,7 +15311,7 @@ function buildPlanningPdfHtml(data) {
           bulletList(data.stillToFinalize, true) +
         '</div>' +
         (data.rsvpCount ? (
-          '<div style="text-align:center;min-width:150px;border:1px solid #d9c49c;border-radius:10px;padding:12px 20px">' +
+          '<div style="display:flex;flex-direction:column;align-items:center;text-align:center;min-width:150px;border:1px solid #d9c49c;border-radius:10px;padding:12px 20px">' +
             bubble('rsvp', 32) +
             '<div style="font-family:\'Cardo\',Georgia,serif;font-size:11.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + accent + ';margin-top:5px">Current RSVP Count</div>' +
             '<div style="font-size:30px;font-weight:700;color:#2a2420;font-family:\'Cardo\',Georgia,serif">' + esc(data.rsvpCount) + '</div>' +
@@ -15315,18 +15322,41 @@ function buildPlanningPdfHtml(data) {
       (data.footerNote ? '<div style="background:' + accentDark + ';text-align:center;font-style:italic;font-size:12.5px;color:' + cream + ';padding:14px;font-family:\'Cardo\',Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
     '</div>' +
     '<script>(function(){' +
-      'function fit(){' +
+      'function fitAndPrint(){' +
         'var el=document.getElementById("planningPage");if(!el)return;' +
         'var pageH=(11-1.0)*96;' +
         'var h=el.scrollHeight;' +
         'if(h>pageH){var s=Math.max(0.5,pageH/h);el.style.zoom=s;}' +
         'setTimeout(function(){window.print();},150);' +
       '}' +
-      'function ready(){' +
-        'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){setTimeout(fit,100);});}' +
-        'else{setTimeout(fit,300);}' +
+      'window.addEventListener("afterprint",function(){' +
+        'var el=document.getElementById("planningPage");if(el)el.style.zoom="";' +
+      '});' +
+      'function saveJpeg(){' +
+        'var btn=document.getElementById("btnJpeg");' +
+        'var el=document.getElementById("planningPage");' +
+        'if(!el||typeof html2canvas==="undefined")return;' +
+        'el.style.zoom="";' +
+        'btn.textContent="Rendering…";btn.disabled=true;' +
+        'setTimeout(function(){' +
+          'html2canvas(el,{scale:2,backgroundColor:"#ffffff",useCORS:true}).then(function(canvas){' +
+            'canvas.toBlob(function(blob){' +
+              'var url=URL.createObjectURL(blob);' +
+              'var a=document.createElement("a");' +
+              'a.href=url;' +
+              'a.download=' + JSON.stringify(planFileSlug) + '+".jpg";' +
+              'document.body.appendChild(a);a.click();document.body.removeChild(a);' +
+              'setTimeout(function(){URL.revokeObjectURL(url);},4000);' +
+              'btn.textContent="Save as JPEG";btn.disabled=false;' +
+            '},"image/jpeg",0.92);' +
+          '}).catch(function(){btn.textContent="Save as JPEG";btn.disabled=false;alert("Could not render JPEG. Try Print / Save PDF instead.");});' +
+        '},50);' +
       '}' +
-      'if(document.readyState==="complete"){ready();}else{window.addEventListener("load",ready);}' +
+      'function wire(){' +
+        'var p=document.getElementById("btnPrint");if(p)p.addEventListener("click",fitAndPrint);' +
+        'var j=document.getElementById("btnJpeg");if(j)j.addEventListener("click",saveJpeg);' +
+      '}' +
+      'if(document.readyState==="complete"){wire();}else{window.addEventListener("load",wire);}' +
     '})();<\/script>' +
     '</body></html>'
   );
