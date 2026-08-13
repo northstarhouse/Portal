@@ -15180,16 +15180,17 @@ function buildBoardNotificationEmailHtml(opts) {
   );
 }
 
+// Icon paths sourced verbatim from lucide-static (ISC license): utensils, wine,
+// ice-cream-cone, package, users (x2), brush, clipboard-check.
 var PLANNING_ICONS = {
-  food: '<path d="M6.7 2.2v6.3a1.4 1.4 0 0 0 2.8 0V2.2"/><path d="M8.1 2.2v19.6"/><path d="M15.8 2.2c-1.7 0-2.8 2.1-2.8 5.4s1.1 5 2.8 5"/><path d="M15.8 2.2v19.6"/>',
-  drinks: '<path d="M7.7 3h8.6l-0.9 6.3a3.4 3.4 0 0 1-6.8 0L7.7 3z"/><line x1="12" y1="12.6" x2="12" y2="19.5"/><line x1="8.3" y1="21.5" x2="15.7" y2="21.5"/>',
-  dessert: '<path d="M8 10.4c0-2.9 1.8-5.2 4-5.2s4 2.3 4 5.2c0 1.9-1.8 3.1-4 3.1s-4-1.2-4-3.1z"/><path d="M8.8 13 12 21.8l3.2-8.8"/>',
-  supplies: '<path d="M4 8.2 12 4l8 4.2v7.6L12 20l-8-4.2V8.2z"/><path d="M4 8.2 12 12.4l8-4.2"/><line x1="12" y1="12.4" x2="12" y2="20"/>',
-  setup: '<circle cx="8.6" cy="7.4" r="2.8"/><path d="M3.8 19.8v-1.1a4.6 4.6 0 0 1 4.6-4.6h0.4a4.6 4.6 0 0 1 4.6 4.6v0.3"/><circle cx="16.4" cy="8.6" r="2.3"/><path d="M13.5 19.8v-0.9a3.8 3.8 0 0 1 3.8-3.8h0.4a3.8 3.8 0 0 1 3.5 2.3"/>',
-  cleanup: '<path d="M18.2 2.8 11 10"/><path d="M11.4 10.4 4.5 20.5h13.4L11.4 10.4z"/><line x1="8.5" y1="20.5" x2="9.9" y2="16.3"/><line x1="12.6" y1="20.5" x2="13.6" y2="16.3"/>',
-  activities: '<path d="M8.6 7.4 10 4.6h4l1.4 2.8h3a1.6 1.6 0 0 1 1.6 1.6V19a1.6 1.6 0 0 1-1.6 1.6H5.6A1.6 1.6 0 0 1 4 19V9a1.6 1.6 0 0 1 1.6-1.6h3z"/><circle cx="12" cy="13.6" r="3.6"/><circle cx="17.3" cy="10.1" r="0.6" fill="#fff" stroke="none"/>',
-  finalize: '<rect x="5.5" y="3.4" width="13" height="18.2" rx="2"/><path d="M9 3.4v-0.6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v0.6"/><path d="M8.6 12.4 11 14.8l4.4-5"/>',
-  rsvp: '<circle cx="8.2" cy="8" r="3.1"/><circle cx="16.3" cy="9" r="2.5"/><path d="M2.4 20.3a5.9 5.9 0 0 1 11.6 0"/><path d="M13.9 20.3a5.1 5.1 0 0 1 7.7-4.5"/>',
+  food: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+  drinks: '<path d="M8 22h8"/><path d="M7 10h10"/><path d="M12 15v7"/><path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H9c-1.5 4-2 6-2 8a5 5 0 0 0 5 5Z"/>',
+  dessert: '<path d="m7 11 4.08 10.35a1 1 0 0 0 1.84 0L17 11"/><path d="M17 7A5 5 0 0 0 7 7"/><path d="M17 7a2 2 0 0 1 0 4H7a2 2 0 0 1 0-4"/>',
+  supplies: '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/><polyline points="3.29 7 12 12 20.71 7"/>',
+  setup: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/>',
+  cleanup: '<path d="m11 10 3 3"/><path d="M6.5 21A3.5 3.5 0 1 0 3 17.5a2.62 2.62 0 0 1-.708 1.792A1 1 0 0 0 3 21z"/><path d="M9.969 17.031 21.378 5.624a1 1 0 0 0-3.002-3.002L6.967 14.031"/>',
+  finalize: '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+  rsvp: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/>',
 };
 
 function buildPlanningPdfHtml(data) {
@@ -15208,7 +15209,7 @@ function buildPlanningPdfHtml(data) {
     var bg = onGold ? '#fdfbf7' : accent;
     var stroke = onGold ? accent : '#fff';
     return '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:50%;background:' + bg + ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:inset 0 -2px 4px rgba(0,0,0,0.12)">' +
-      '<svg width="' + Math.round(d * 0.52) + '" height="' + Math.round(d * 0.52) + '" viewBox="0 0 24 24" fill="none" stroke="' + stroke + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + (PLANNING_ICONS[iconKey] || '') + '</svg>' +
+      '<svg width="' + Math.round(d * 0.56) + '" height="' + Math.round(d * 0.56) + '" viewBox="0 0 24 24" fill="none" stroke="' + stroke + '" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + (PLANNING_ICONS[iconKey] || '') + '</svg>' +
     '</div>';
   }
   function card(title, bodyHtml, iconKey) {
@@ -15271,7 +15272,7 @@ function buildPlanningPdfHtml(data) {
             card('Cleanup', bulletList(data.cleanupPeople), 'cleanup') +
             (data.cleanupNote ? '<div style="font-size:11px;font-style:italic;color:#8a7d68;margin-top:-8px">' + esc(data.cleanupNote) + '</div>' : '') +
           '</div>' +
-          panelHead('Activities', 'activities') +
+          panelHead('Activities') +
           '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:12px 14px">' + bulletList(data.activities) + '</div>' +
         '</div>' +
       '</div>' +
