@@ -15192,10 +15192,12 @@ function buildPlanningPdfHtml(data) {
     if (!arr.length) return '<div style="font-size:11.5px;color:#c2b8a5;font-style:italic">—</div>';
     return '<ul style="margin:0 0 10px;padding-left:17px;font-size:12px;color:#3a332a;line-height:1.5">' + arr.map(function(l) { return '<li>' + mdBold(l) + '</li>'; }).join('') + '</ul>';
   }
-  function bubble(iconKey, size) {
+  function bubble(iconKey, size, onGold) {
     var d = size || 40;
-    return '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:50%;background:' + gold + ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:inset 0 -2px 4px rgba(0,0,0,0.12)">' +
-      '<svg width="' + Math.round(d * 0.52) + '" height="' + Math.round(d * 0.52) + '" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + (PLANNING_ICONS[iconKey] || '') + '</svg>' +
+    var bg = onGold ? '#fdfbf7' : gold;
+    var stroke = onGold ? gold : '#fff';
+    return '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:50%;background:' + bg + ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:inset 0 -2px 4px rgba(0,0,0,0.12)">' +
+      '<svg width="' + Math.round(d * 0.52) + '" height="' + Math.round(d * 0.52) + '" viewBox="0 0 24 24" fill="none" stroke="' + stroke + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + (PLANNING_ICONS[iconKey] || '') + '</svg>' +
     '</div>';
   }
   function card(title, bodyHtml, iconKey) {
@@ -15208,12 +15210,13 @@ function buildPlanningPdfHtml(data) {
     '</div>';
   }
   function panelHead(title, iconKey) {
-    return '<div style="background:#f2e9d8;color:#2a2420;padding:8px 12px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px">' +
-      (iconKey ? bubble(iconKey, 26) : '') +
+    return '<div style="background:' + gold + ';color:' + cream + ';padding:9px 30px 9px 13px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px;clip-path:polygon(0 0,100% 0,calc(100% - 15px) 50%,100% 100%,0 100%)">' +
+      (iconKey ? bubble(iconKey, 26, true) : '') +
       '<div style="font-size:11.5px;font-weight:700;letter-spacing:0.7px;text-transform:uppercase">' + esc(title) + '</div>' +
     '</div>';
   }
   var metaLine = [data.dateLine, data.timeLine].filter(Boolean).map(esc).join('&nbsp;&nbsp;|&nbsp;&nbsp;');
+  var starIcon = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="' + cream + '" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2.5l2.4 6.9 7.1.2-5.7 4.4 2.1 7-5.9-4.3-5.9 4.3 2.1-7-5.7-4.4 7.1-.2z"/></svg>';
   return (
     '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(data.title || 'Event Plan') + '</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap" rel="stylesheet">' +
@@ -15224,13 +15227,20 @@ function buildPlanningPdfHtml(data) {
     '</style>' +
     '</head><body>' +
     '<div id="planningPage" style="max-width:720px;margin:0 auto;background:' + cream + ';transform-origin:top center">' +
-      '<div style="height:8px;background:' + gold + '"></div>' +
-      '<div style="background:#fdfbf7;padding:24px 36px 18px;text-align:center;">' +
-        '<div style="font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:' + gold + ';margin-bottom:8px">North Star Historic Conservancy</div>' +
-        '<div style="font-family:\'Cardo\',Georgia,serif;font-size:30px;color:#2a2420">' + esc(data.title || 'Event Plan') + '</div>' +
-        '<div style="border-top:1px solid #e5ddcf;width:110px;margin:14px auto"></div>' +
-        (metaLine ? '<div style="font-size:13px;color:#6b5f4d">' + metaLine + '</div>' : '') +
-        (data.location ? '<div style="font-size:13px;color:#6b5f4d;margin-top:2px">' + esc(data.location) + '</div>' : '') +
+      '<div style="height:7px;background:#6f5636"></div>' +
+      '<div style="background:' + gold + ';padding:22px 32px;display:flex;align-items:center;gap:20px">' +
+        '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding-right:20px;border-right:1px solid rgba(255,255,255,0.32)">' +
+          starIcon +
+          '<div style="text-align:left">' +
+            '<div style="font-family:\'Cardo\',Georgia,serif;font-size:15px;font-weight:700;color:' + cream + ';letter-spacing:0.6px;line-height:1.2">North Star</div>' +
+            '<div style="font-size:8.5px;letter-spacing:1.3px;text-transform:uppercase;color:rgba(255,255,255,0.72);margin-top:1px">Historic Conservancy</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-family:\'Cardo\',Georgia,serif;font-size:27px;font-weight:700;color:' + cream + ';line-height:1.2">' + esc(data.title || 'Event Plan') + '</div>' +
+          (metaLine ? '<div style="font-size:12.5px;color:rgba(255,255,255,0.88);margin-top:5px">' + metaLine + '</div>' : '') +
+          (data.location ? '<div style="font-size:12.5px;color:rgba(255,255,255,0.88);margin-top:1px">' + esc(data.location) + '</div>' : '') +
+        '</div>' +
       '</div>' +
       (data.intro ? '<div style="padding:14px 36px 0;text-align:center;font-style:italic;color:#6b5f4d;font-size:12.5px;line-height:1.5">' + esc(data.intro).replace(/\n/g, '<br/>') + '</div>' : '') +
       '<div style="padding:18px 36px 6px;display:flex;gap:22px;flex-wrap:wrap">' +
@@ -15269,7 +15279,7 @@ function buildPlanningPdfHtml(data) {
           '</div>'
         ) : '') +
       '</div>' +
-      (data.footerNote ? '<div style="background:#fdfbf7;border-top:1px solid #e5ddcf;text-align:center;font-style:italic;font-size:12.5px;color:#6b5f4d;padding:14px;font-family:Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
+      (data.footerNote ? '<div style="background:' + gold + ';text-align:center;font-style:italic;font-size:12.5px;color:' + cream + ';padding:14px;font-family:\'Cardo\',Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
     '</div>' +
     '<script>(function(){' +
       'function fit(){' +
