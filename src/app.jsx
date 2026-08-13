@@ -15245,7 +15245,7 @@ function buildPlanningPdfHtml(data) {
     '</head><body>' +
     '<div id="planningPage" style="max-width:720px;margin:0 auto;background:' + cream + ';transform-origin:top center">' +
       '<div style="height:7px;background:' + accentDark + '"></div>' +
-      '<div style="background:' + accent + ';padding:22px 32px;display:flex;align-items:center;gap:20px">' +
+      '<div style="background:' + accentDark + ';padding:22px 32px;display:flex;align-items:center;gap:20px">' +
         '<div style="flex-shrink:0;display:flex;align-items:center;padding-right:20px;border-right:1px solid rgba(255,255,255,0.32)">' +
           logoBlock +
         '</div>' +
