@@ -14943,13 +14943,22 @@ function PlanningView({ navigate }) {
   }
 
   function handleGeneratePdf() {
-    var html = buildPlanningPdfHtml(form);
+    // Open the tab synchronously (on the click gesture) so popup blockers don't
+    // intervene, then fill it in once the logo has been inlined as a data URL --
+    // a plain relative <img src="assets/logo.png"> won't resolve correctly inside
+    // a window.open('', ...) + document.write() document.
     var w = window.open('', '_blank');
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    // Printing is triggered by the generated page's own script, after it
-    // measures and zooms itself to fit one printed page.
+    if (w) { w.document.write('<title>Preparing…</title><body style="font-family:system-ui,sans-serif;padding:40px;color:#999">Preparing PDF…</body>'); w.document.close(); }
+    function render(logoDataUrl) {
+      var html = buildPlanningPdfHtml(Object.assign({}, form, { logoDataUrl: logoDataUrl || '' }));
+      if (w && !w.closed) { w.document.open(); w.document.write(html); w.document.close(); w.focus(); }
+    }
+    fetch('assets/logo.png').then(function(r) { return r.blob(); }).then(function(blob) {
+      var reader = new FileReader();
+      reader.onload = function() { render(reader.result); };
+      reader.onerror = function() { render(''); };
+      reader.readAsDataURL(blob);
+    }).catch(function() { render(''); });
   }
 
   function handleParsePaste() {
@@ -15184,6 +15193,8 @@ var PLANNING_ICONS = {
 };
 
 function buildPlanningPdfHtml(data) {
+  var accent = '#93897a';
+  var accentDark = '#6f6a5e';
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function mdBold(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
   function lines(s) { return String(s || '').split('\n').map(function(l) { return l.trim(); }).filter(Boolean); }
@@ -15194,8 +15205,8 @@ function buildPlanningPdfHtml(data) {
   }
   function bubble(iconKey, size, onGold) {
     var d = size || 40;
-    var bg = onGold ? '#fdfbf7' : gold;
-    var stroke = onGold ? gold : '#fff';
+    var bg = onGold ? '#fdfbf7' : accent;
+    var stroke = onGold ? accent : '#fff';
     return '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:50%;background:' + bg + ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:inset 0 -2px 4px rgba(0,0,0,0.12)">' +
       '<svg width="' + Math.round(d * 0.52) + '" height="' + Math.round(d * 0.52) + '" viewBox="0 0 24 24" fill="none" stroke="' + stroke + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + (PLANNING_ICONS[iconKey] || '') + '</svg>' +
     '</div>';
@@ -15209,14 +15220,20 @@ function buildPlanningPdfHtml(data) {
       bodyHtml +
     '</div>';
   }
-  function panelHead(title, iconKey) {
-    return '<div style="background:' + gold + ';color:' + cream + ';padding:9px 30px 9px 13px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px;clip-path:polygon(0 0,100% 0,calc(100% - 15px) 50%,100% 100%,0 100%)">' +
-      (iconKey ? bubble(iconKey, 26, true) : '') +
+  function panelHead(title, iconKey, dark) {
+    var bg = dark ? accentDark : '#f2e9d8';
+    var color = dark ? cream : '#2a2420';
+    var clip = dark ? ';clip-path:polygon(0 0,100% 0,calc(100% - 15px) 50%,100% 100%,0 100%)' : '';
+    var pad = dark ? '9px 30px 9px 13px' : '9px 13px';
+    return '<div style="background:' + bg + ';color:' + color + ';padding:' + pad + ';border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px' + clip + '">' +
+      (iconKey ? bubble(iconKey, 26, dark) : '') +
       '<div style="font-size:11.5px;font-weight:700;letter-spacing:0.7px;text-transform:uppercase">' + esc(title) + '</div>' +
     '</div>';
   }
   var metaLine = [data.dateLine, data.timeLine].filter(Boolean).map(esc).join('&nbsp;&nbsp;|&nbsp;&nbsp;');
-  var starIcon = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="' + cream + '" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2.5l2.4 6.9 7.1.2-5.7 4.4 2.1 7-5.9-4.3-5.9 4.3 2.1-7-5.7-4.4 7.1-.2z"/></svg>';
+  var logoBlock = data.logoDataUrl
+    ? '<img src="' + data.logoDataUrl + '" alt="North Star House" style="height:28px;width:auto;display:block" />'
+    : '<div style="font-family:\'Cardo\',Georgia,serif;font-size:15px;font-weight:700;color:' + cream + '">North Star House</div>';
   return (
     '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(data.title || 'Event Plan') + '</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap" rel="stylesheet">' +
@@ -15227,14 +15244,11 @@ function buildPlanningPdfHtml(data) {
     '</style>' +
     '</head><body>' +
     '<div id="planningPage" style="max-width:720px;margin:0 auto;background:' + cream + ';transform-origin:top center">' +
-      '<div style="height:7px;background:#6f5636"></div>' +
-      '<div style="background:' + gold + ';padding:22px 32px;display:flex;align-items:center;gap:20px">' +
-        '<div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding-right:20px;border-right:1px solid rgba(255,255,255,0.32)">' +
-          starIcon +
-          '<div style="text-align:left">' +
-            '<div style="font-family:\'Cardo\',Georgia,serif;font-size:15px;font-weight:700;color:' + cream + ';letter-spacing:0.6px;line-height:1.2">North Star</div>' +
-            '<div style="font-size:8.5px;letter-spacing:1.3px;text-transform:uppercase;color:rgba(255,255,255,0.72);margin-top:1px">Historic Conservancy</div>' +
-          '</div>' +
+      '<div style="height:7px;background:' + accentDark + '"></div>' +
+      '<div style="background:' + accent + ';padding:22px 32px;display:flex;align-items:center;gap:20px">' +
+        '<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding-right:20px;border-right:1px solid rgba(255,255,255,0.32)">' +
+          logoBlock +
+          '<div style="font-size:8.5px;letter-spacing:1.3px;text-transform:uppercase;color:rgba(255,255,255,0.72)">Historic Conservancy</div>' +
         '</div>' +
         '<div style="flex:1;min-width:0">' +
           '<div style="font-family:\'Cardo\',Georgia,serif;font-size:27px;font-weight:700;color:' + cream + ';line-height:1.2">' + esc(data.title || 'Event Plan') + '</div>' +
@@ -15245,7 +15259,7 @@ function buildPlanningPdfHtml(data) {
       (data.intro ? '<div style="padding:14px 36px 0;text-align:center;font-style:italic;color:#6b5f4d;font-size:12.5px;line-height:1.5">' + esc(data.intro).replace(/\n/g, '<br/>') + '</div>' : '') +
       '<div style="padding:18px 36px 6px;display:flex;gap:22px;flex-wrap:wrap">' +
         '<div style="flex:1;min-width:280px">' +
-          panelHead('Current Plan') +
+          panelHead('Current Plan', null, true) +
           '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:12px 14px 2px">' +
             card('Food', bulletList(data.food), 'food') + card('Drinks', bulletList(data.drinks), 'drinks') + card('Dessert', bulletList(data.dessert), 'dessert') + card('Supplies', bulletList(data.supplies), 'supplies') +
           '</div>' +
@@ -15262,7 +15276,7 @@ function buildPlanningPdfHtml(data) {
           '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:12px 14px">' + bulletList(data.activities) + '</div>' +
         '</div>' +
       '</div>' +
-      '<div style="margin:6px 36px 16px;background:#fdfbf7;border:1px solid ' + gold + ';border-radius:10px;padding:14px 18px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;break-inside:avoid">' +
+      '<div style="margin:6px 36px 16px;background:#fdfbf7;border:1px solid ' + accent + ';border-radius:10px;padding:14px 18px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;break-inside:avoid">' +
         '<div style="flex:1;min-width:220px">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
             bubble('finalize', 28) +
@@ -15273,13 +15287,13 @@ function buildPlanningPdfHtml(data) {
         (data.rsvpCount ? (
           '<div style="text-align:center;min-width:140px">' +
             bubble('rsvp', 32) +
-            '<div style="font-size:10.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + gold + ';margin-top:5px">Current RSVP Count</div>' +
+            '<div style="font-size:10.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + accent + ';margin-top:5px">Current RSVP Count</div>' +
             '<div style="font-size:30px;font-weight:700;color:#2a2420;font-family:\'Cardo\',Georgia,serif">' + esc(data.rsvpCount) + '</div>' +
             (data.rsvpNote ? '<div style="font-size:10.5px;color:#8a7d68">' + esc(data.rsvpNote) + '</div>' : '') +
           '</div>'
         ) : '') +
       '</div>' +
-      (data.footerNote ? '<div style="background:' + gold + ';text-align:center;font-style:italic;font-size:12.5px;color:' + cream + ';padding:14px;font-family:\'Cardo\',Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
+      (data.footerNote ? '<div style="background:' + accent + ';text-align:center;font-style:italic;font-size:12.5px;color:' + cream + ';padding:14px;font-family:\'Cardo\',Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
     '</div>' +
     '<script>(function(){' +
       'function fit(){' +
