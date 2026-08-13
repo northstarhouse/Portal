@@ -15215,7 +15215,7 @@ function buildPlanningPdfHtml(data) {
     return '<div style="margin-bottom:10px;break-inside:avoid">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
         (iconKey ? bubble(iconKey, 30) : '') +
-        '<div style="font-size:11.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#2a2420">' + esc(title) + '</div>' +
+        '<div style="font-family:\'Cardo\',Georgia,serif;font-size:12.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#2a2420">' + esc(title) + '</div>' +
       '</div>' +
       bodyHtml +
     '</div>';
@@ -15227,7 +15227,7 @@ function buildPlanningPdfHtml(data) {
     var pad = dark ? '9px 30px 9px 13px' : '9px 13px';
     return '<div style="background:' + bg + ';color:' + color + ';padding:' + pad + ';border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px' + clip + '">' +
       (iconKey ? bubble(iconKey, 26, dark) : '') +
-      '<div style="font-size:11.5px;font-weight:700;letter-spacing:0.7px;text-transform:uppercase">' + esc(title) + '</div>' +
+      '<div style="font-family:\'Cardo\',Georgia,serif;font-size:12.5px;font-weight:700;letter-spacing:0.7px;text-transform:uppercase">' + esc(title) + '</div>' +
     '</div>';
   }
   var metaLine = [data.dateLine, data.timeLine].filter(Boolean).map(esc).join('&nbsp;&nbsp;|&nbsp;&nbsp;');
@@ -15246,9 +15246,8 @@ function buildPlanningPdfHtml(data) {
     '<div id="planningPage" style="max-width:720px;margin:0 auto;background:' + cream + ';transform-origin:top center">' +
       '<div style="height:7px;background:' + accentDark + '"></div>' +
       '<div style="background:' + accent + ';padding:22px 32px;display:flex;align-items:center;gap:20px">' +
-        '<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding-right:20px;border-right:1px solid rgba(255,255,255,0.32)">' +
+        '<div style="flex-shrink:0;display:flex;align-items:center;padding-right:20px;border-right:1px solid rgba(255,255,255,0.32)">' +
           logoBlock +
-          '<div style="font-size:8.5px;letter-spacing:1.3px;text-transform:uppercase;color:rgba(255,255,255,0.72)">Historic Conservancy</div>' +
         '</div>' +
         '<div style="flex:1;min-width:0">' +
           '<div style="font-family:\'Cardo\',Georgia,serif;font-size:27px;font-weight:700;color:' + cream + ';line-height:1.2">' + esc(data.title || 'Event Plan') + '</div>' +
@@ -15280,14 +15279,14 @@ function buildPlanningPdfHtml(data) {
         '<div style="flex:1;min-width:220px">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
             bubble('finalize', 28) +
-            '<div style="font-size:11.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#2a2420">Still to Finalize</div>' +
+            '<div style="font-family:\'Cardo\',Georgia,serif;font-size:12.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#2a2420">Still to Finalize</div>' +
           '</div>' +
           bulletList(data.stillToFinalize) +
         '</div>' +
         (data.rsvpCount ? (
           '<div style="text-align:center;min-width:140px">' +
             bubble('rsvp', 32) +
-            '<div style="font-size:10.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + accent + ';margin-top:5px">Current RSVP Count</div>' +
+            '<div style="font-family:\'Cardo\',Georgia,serif;font-size:11.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + accent + ';margin-top:5px">Current RSVP Count</div>' +
             '<div style="font-size:30px;font-weight:700;color:#2a2420;font-family:\'Cardo\',Georgia,serif">' + esc(data.rsvpCount) + '</div>' +
             (data.rsvpNote ? '<div style="font-size:10.5px;color:#8a7d68">' + esc(data.rsvpNote) + '</div>' : '') +
           '</div>'
