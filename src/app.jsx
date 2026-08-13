@@ -15205,7 +15205,8 @@ function buildPlanningPdfHtml(data) {
     var fs = big ? '14.5px' : '12px';
     var lh = big ? '1.7' : '1.5';
     var pad = big ? '20px' : '17px';
-    return '<ul style="margin:0 0 10px;padding-left:' + pad + ';font-size:' + fs + ';color:#3a332a;line-height:' + lh + '">' + arr.map(function(l) { return '<li>' + mdBold(l) + '</li>'; }).join('') + '</ul>';
+    var fw = big ? ';font-weight:600' : '';
+    return '<ul style="margin:0 0 10px;padding-left:' + pad + ';font-size:' + fs + ';color:#3a332a;line-height:' + lh + fw + '">' + arr.map(function(l) { return '<li>' + mdBold(l) + '</li>'; }).join('') + '</ul>';
   }
   function bubble(iconKey, size, onGold) {
     var d = size || 40;
