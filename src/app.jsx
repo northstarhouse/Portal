@@ -15206,10 +15206,11 @@ function buildPlanningPdfHtml(data) {
   }
   function bubble(iconKey, size, onGold) {
     var d = size || 40;
-    var bg = onGold ? '#fdfbf7' : accent;
-    var stroke = onGold ? accent : '#fff';
-    return '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:50%;background:' + bg + ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:inset 0 -2px 4px rgba(0,0,0,0.12)">' +
-      '<svg width="' + Math.round(d * 0.56) + '" height="' + Math.round(d * 0.56) + '" viewBox="0 0 24 24" fill="none" stroke="' + stroke + '" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + (PLANNING_ICONS[iconKey] || '') + '</svg>' +
+    var bg = onGold ? 'rgba(255,255,255,0.16)' : '#f1ece2';
+    var stroke = onGold ? '#fff' : accent;
+    var radius = Math.round(d * 0.32);
+    return '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:' + radius + 'px;background:' + bg + ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">' +
+      '<svg width="' + Math.round(d * 0.54) + '" height="' + Math.round(d * 0.54) + '" viewBox="0 0 24 24" fill="none" stroke="' + stroke + '" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + (PLANNING_ICONS[iconKey] || '') + '</svg>' +
     '</div>';
   }
   function card(title, bodyHtml, iconKey) {
@@ -15226,7 +15227,7 @@ function buildPlanningPdfHtml(data) {
     var color = dark ? cream : '#4a453e';
     var clip = dark ? ';clip-path:polygon(0 0,100% 0,calc(100% - 15px) 50%,100% 100%,0 100%)' : '';
     var pad = dark ? '9px 30px 9px 13px' : '9px 13px';
-    return '<div style="background:' + bg + ';color:' + color + ';padding:' + pad + ';border-radius:8px 8px 0 0;display:flex;align-items:center;gap:8px' + clip + '">' +
+    return '<div style="background:' + bg + ';color:' + color + ';padding:' + pad + ';border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px' + clip + '">' +
       (iconKey ? bubble(iconKey, 26, dark) : '') +
       '<div style="font-family:\'Cardo\',Georgia,serif;font-size:13px;font-weight:700;letter-spacing:0.3px">' + esc(title) + '</div>' +
     '</div>';
@@ -15241,10 +15242,10 @@ function buildPlanningPdfHtml(data) {
     '<style>' +
       '@page{size:letter;margin:0.35in}' +
       '@media print{body{margin:0}}' +
-      'body{margin:0;background:' + cream + ';font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}' +
+      'body{margin:0;background:#efe9de;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}' +
     '</style>' +
     '</head><body>' +
-    '<div id="planningPage" style="max-width:720px;margin:0 auto;background:' + cream + ';transform-origin:top center">' +
+    '<div id="planningPage" style="max-width:720px;margin:10px auto;background:' + cream + ';border-radius:16px;overflow:hidden;box-shadow:0 6px 20px rgba(42,36,32,0.12),0 2px 6px rgba(42,36,32,0.06);transform-origin:top center">' +
       '<div style="height:7px;background:' + accentDark + '"></div>' +
       '<div style="background:' + accentDark + ';padding:22px 32px;display:flex;align-items:center;gap:20px">' +
         '<div style="flex-shrink:0;display:flex;align-items:center;padding-right:20px;border-right:1px solid rgba(255,255,255,0.32)">' +
@@ -15253,30 +15254,35 @@ function buildPlanningPdfHtml(data) {
         '<div style="flex:1;min-width:0">' +
           '<div style="font-family:\'Cardo\',Georgia,serif;font-size:27px;font-weight:700;color:' + cream + ';line-height:1.2">' + esc(data.title || 'Event Plan') + '</div>' +
           (metaLine ? '<div style="font-size:12.5px;color:rgba(255,255,255,0.88);margin-top:5px">' + metaLine + '</div>' : '') +
-          (data.location ? '<div style="font-size:12.5px;color:rgba(255,255,255,0.88);margin-top:1px">' + esc(data.location) + '</div>' : '') +
         '</div>' +
       '</div>' +
       (data.intro ? '<div style="padding:14px 36px 0;text-align:center;font-style:italic;color:#6b5f4d;font-size:12.5px;line-height:1.5">' + esc(data.intro).replace(/\n/g, '<br/>') + '</div>' : '') +
       '<div style="padding:18px 36px 6px;display:flex;gap:22px;flex-wrap:wrap">' +
         '<div style="flex:1;min-width:280px">' +
-          panelHead('Current Plan', null, true) +
-          '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:12px 14px 2px">' +
-            card('Food', bulletList(data.food), 'food') + card('Drinks', bulletList(data.drinks), 'drinks') + card('Dessert', bulletList(data.dessert), 'dessert') + card('Supplies', bulletList(data.supplies), 'supplies') +
+          '<div style="box-shadow:0 1px 3px rgba(42,36,32,0.08),0 1px 2px rgba(42,36,32,0.05)">' +
+            panelHead('Current Plan', null, true) +
+            '<div style="background:#fff;border-radius:0 0 10px 10px;padding:12px 14px 2px">' +
+              card('Food', bulletList(data.food), 'food') + card('Drinks', bulletList(data.drinks), 'drinks') + card('Dessert', bulletList(data.dessert), 'dessert') + card('Supplies', bulletList(data.supplies), 'supplies') +
+            '</div>' +
           '</div>' +
         '</div>' +
         '<div style="flex:1;min-width:280px">' +
-          panelHead('Setup & Cleanup') +
-          '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:12px 14px 2px;margin-bottom:10px">' +
-            card(data.setupTime || 'Setup', bulletList(data.setupPeople), 'setup') +
-            (data.setupNote ? '<div style="font-size:11px;font-style:italic;color:#8a7d68;margin:-8px 0 10px">' + esc(data.setupNote) + '</div>' : '') +
-            card('Cleanup', bulletList(data.cleanupPeople), 'cleanup') +
-            (data.cleanupNote ? '<div style="font-size:11px;font-style:italic;color:#8a7d68;margin-top:-8px">' + esc(data.cleanupNote) + '</div>' : '') +
+          '<div style="box-shadow:0 1px 3px rgba(42,36,32,0.08),0 1px 2px rgba(42,36,32,0.05);margin-bottom:12px">' +
+            panelHead('Setup & Cleanup') +
+            '<div style="background:#fff;border-radius:0 0 10px 10px;padding:12px 14px 2px">' +
+              card(data.setupTime || 'Setup', bulletList(data.setupPeople), 'setup') +
+              (data.setupNote ? '<div style="font-size:11px;font-style:italic;color:#8a7d68;margin:-8px 0 10px">' + esc(data.setupNote) + '</div>' : '') +
+              card('Cleanup', bulletList(data.cleanupPeople), 'cleanup') +
+              (data.cleanupNote ? '<div style="font-size:11px;font-style:italic;color:#8a7d68;margin-top:-8px">' + esc(data.cleanupNote) + '</div>' : '') +
+            '</div>' +
           '</div>' +
-          panelHead('Activities') +
-          '<div style="background:#fff;border:0.5px solid #e0d8cc;border-top:none;border-radius:0 0 8px 8px;padding:12px 14px">' + bulletList(data.activities) + '</div>' +
+          '<div style="box-shadow:0 1px 3px rgba(42,36,32,0.08),0 1px 2px rgba(42,36,32,0.05)">' +
+            panelHead('Activities') +
+            '<div style="background:#fff;border-radius:0 0 10px 10px;padding:12px 14px">' + bulletList(data.activities) + '</div>' +
+          '</div>' +
         '</div>' +
       '</div>' +
-      '<div style="margin:6px 36px 16px;background:#fdfbf7;border:1px solid ' + accent + ';border-radius:10px;padding:14px 18px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;break-inside:avoid">' +
+      '<div style="margin:6px 36px 16px;background:#fdfbf7;border-radius:12px;padding:14px 18px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;break-inside:avoid;box-shadow:0 1px 3px rgba(42,36,32,0.08),0 1px 2px rgba(42,36,32,0.05)">' +
         '<div style="flex:1;min-width:220px">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
             bubble('finalize', 28) +
