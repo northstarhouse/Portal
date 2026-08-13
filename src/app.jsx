@@ -15339,7 +15339,10 @@ function buildPlanningPdfHtml(data) {
         'el.style.zoom="";' +
         'btn.textContent="Rendering…";btn.disabled=true;' +
         'setTimeout(function(){' +
-          'html2canvas(el,{scale:2,backgroundColor:"#ffffff",useCORS:true}).then(function(canvas){' +
+          'html2canvas(el,{scale:2,backgroundColor:"#ffffff",useCORS:true,onclone:function(doc){' +
+            'var ce=doc.getElementById("planningPage");' +
+            'if(ce){ce.style.borderRadius="0";ce.style.boxShadow="none";ce.style.margin="0";}' +
+          '}}).then(function(canvas){' +
             'canvas.toBlob(function(blob){' +
               'var url=URL.createObjectURL(blob);' +
               'var a=document.createElement("a");' +
