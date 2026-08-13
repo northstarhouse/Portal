@@ -15227,7 +15227,7 @@ function buildPlanningPdfHtml(data) {
     '</div>';
   }
   function panelHead(title, iconKey, dark) {
-    var bg = dark ? accentDark : '#f2e9d8';
+    var bg = dark ? accentDark : '#e9e6e0';
     var color = dark ? cream : '#4a453e';
     var clip = dark ? ';clip-path:polygon(0 0,100% 0,calc(100% - 15px) 50%,100% 100%,0 100%)' : '';
     var pad = dark ? '9px 30px 9px 13px' : '9px 13px';
