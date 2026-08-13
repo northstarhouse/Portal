@@ -15221,7 +15221,7 @@ function buildPlanningPdfHtml(data) {
     return '<div style="margin-bottom:10px;break-inside:avoid">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
         (iconKey ? bubble(iconKey, 30) : '') +
-        '<div style="font-family:\'Cardo\',Georgia,serif;font-size:12.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#4a453e">' + esc(title) + '</div>' +
+        '<div style="font-family:\'Cardo\',Georgia,serif;font-size:13.5px;font-weight:700;letter-spacing:0.2px;color:#4a453e">' + esc(title) + ':</div>' +
       '</div>' +
       bodyHtml +
     '</div>';
