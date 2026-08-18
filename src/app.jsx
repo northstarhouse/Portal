@@ -15395,8 +15395,8 @@ function buildPlanningPdfHtml(data) {
   }
   function bubble(iconKey, size, onGold) {
     var d = size || 40;
-    var bg = onGold ? 'rgba(255,255,255,0.16)' : '#f1ece2';
-    var stroke = onGold ? '#fff' : accent;
+    var bg = onGold ? 'var(--bubble-bg-gold)' : '#f1ece2';
+    var stroke = onGold ? 'var(--bubble-stroke-gold)' : accent;
     var radius = Math.round(d * 0.32);
     return '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:' + radius + 'px;background:' + bg + ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">' +
       '<svg width="' + Math.round(d * 0.54) + '" height="' + Math.round(d * 0.54) + '" viewBox="0 0 24 24" fill="none" stroke="' + stroke + '" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + (PLANNING_ICONS[iconKey] || '') + '</svg>' +
@@ -15412,11 +15412,12 @@ function buildPlanningPdfHtml(data) {
     '</div>';
   }
   function panelHead(title, iconKey, dark) {
-    var bg = dark ? accentDark : '#e9e6e0';
-    var color = dark ? cream : '#4a453e';
+    var bg = dark ? 'var(--chrome-bg)' : '#e9e6e0';
+    var color = dark ? 'var(--chrome-text)' : '#4a453e';
     var clip = dark ? ';clip-path:polygon(0 0,100% 0,calc(100% - 15px) 50%,100% 100%,0 100%)' : '';
     var pad = dark ? '9px 30px 9px 13px' : '9px 13px';
-    return '<div style="background:' + bg + ';color:' + color + ';padding:' + pad + ';border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px' + clip + '">' +
+    var line = dark ? ';box-shadow:inset 0 0 0 1px var(--chrome-line)' : '';
+    return '<div style="background:' + bg + ';color:' + color + ';padding:' + pad + ';border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px' + clip + line + '">' +
       (iconKey ? bubble(iconKey, 26, dark) : '') +
       '<div style="font-family:\'Cardo\',Georgia,serif;font-size:13px;font-weight:700;letter-spacing:0.3px">' + esc(title) + '</div>' +
     '</div>';
@@ -15424,7 +15425,7 @@ function buildPlanningPdfHtml(data) {
   var metaLine = [data.dateLine, data.timeLine].filter(Boolean).map(esc).join('&nbsp;&nbsp;|&nbsp;&nbsp;');
   var logoBlock = data.logoDataUrl
     ? '<img src="' + data.logoDataUrl + '" alt="North Star House" style="height:42px;width:auto;display:block" />'
-    : '<div style="font-family:\'Cardo\',Georgia,serif;font-size:15px;font-weight:700;color:' + cream + '">North Star House</div>';
+    : '<div style="font-family:\'Cardo\',Georgia,serif;font-size:15px;font-weight:700;color:var(--chrome-text)">North Star House</div>';
   var planFileSlug = (data.title || 'event-plan').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'event-plan';
   return (
     '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(data.title || 'Event Plan') + '</title>' +
@@ -15434,25 +15435,29 @@ function buildPlanningPdfHtml(data) {
       '@page{size:letter;margin:0.35in}' +
       '@media print{' +
         'body{margin:0;background:' + cream + '}' +
+        'body.pf{background:#fff}' +
         '#planningPage{margin:0!important;max-width:100%!important;border-radius:0!important;box-shadow:none!important}' +
         '.no-print{display:none!important}' +
       '}' +
       'body{margin:0;background:#efe9de;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}' +
+      '#planningPage{--page-bg:' + cream + ';--chrome-bg:' + accentDark + ';--chrome-text:' + cream + ';--chrome-sep:rgba(255,255,255,0.32);--chrome-line:transparent;--bubble-bg-gold:rgba(255,255,255,0.16);--bubble-stroke-gold:#fff;--meta-text:rgba(255,255,255,0.88)}' +
+      '#planningPage.pf{--page-bg:#ffffff;--chrome-bg:#ffffff;--chrome-text:' + gold + ';--chrome-sep:rgba(136,108,68,0.35);--chrome-line:' + gold + ';--bubble-bg-gold:rgba(136,108,68,0.12);--bubble-stroke-gold:' + gold + ';--meta-text:' + gold + '}' +
     '</style>' +
     '</head><body>' +
-    '<div class="no-print" style="max-width:720px;margin:16px auto 0;display:flex;gap:10px;justify-content:center">' +
+    '<div class="no-print" style="max-width:720px;margin:16px auto 0;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
       '<button id="btnPrint" style="background:' + accentDark + ';color:' + cream + ';border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Print / Save PDF</button>' +
       '<button id="btnJpeg" style="background:#fff;color:' + accentDark + ';border:1px solid ' + accentDark + ';border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Save as JPEG</button>' +
+      '<button id="btnPF" style="background:#fff;color:' + gold + ';border:1px solid ' + gold + ';border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Printer-Friendly (White)</button>' +
     '</div>' +
-    '<div id="planningPage" style="max-width:720px;margin:10px auto;background:' + cream + ';border-radius:16px;overflow:hidden;box-shadow:0 6px 20px rgba(42,36,32,0.12),0 2px 6px rgba(42,36,32,0.06);transform-origin:top center">' +
-      '<div style="height:7px;background:' + accentDark + '"></div>' +
-      '<div style="background:' + accentDark + ';padding:22px 32px;display:flex;align-items:center;gap:20px">' +
-        '<div style="flex-shrink:0;display:flex;align-items:center;padding-right:28px;border-right:1px solid rgba(255,255,255,0.32)">' +
+    '<div id="planningPage" style="max-width:720px;margin:10px auto;background:var(--page-bg);border-radius:16px;overflow:hidden;box-shadow:0 6px 20px rgba(42,36,32,0.12),0 2px 6px rgba(42,36,32,0.06);transform-origin:top center">' +
+      '<div style="height:7px;background:' + gold + '"></div>' +
+      '<div style="background:var(--chrome-bg);padding:22px 32px;display:flex;align-items:center;gap:20px;border-bottom:2px solid var(--chrome-line)">' +
+        '<div style="flex-shrink:0;display:flex;align-items:center;padding-right:28px;border-right:1px solid var(--chrome-sep)">' +
           logoBlock +
         '</div>' +
         '<div style="flex:1;min-width:0;padding-left:8px">' +
-          '<div style="font-family:\'Cardo\',Georgia,serif;font-size:27px;font-weight:700;color:' + cream + ';line-height:1.2">' + esc(data.title || 'Event Plan') + '</div>' +
-          (metaLine ? '<div style="font-size:12.5px;color:rgba(255,255,255,0.88);margin-top:5px">' + metaLine + '</div>' : '') +
+          '<div style="font-family:\'Cardo\',Georgia,serif;font-size:27px;font-weight:700;color:var(--chrome-text);line-height:1.2">' + esc(data.title || 'Event Plan') + '</div>' +
+          (metaLine ? '<div style="font-size:12.5px;color:var(--meta-text);margin-top:5px">' + metaLine + '</div>' : '') +
         '</div>' +
       '</div>' +
       (data.intro ? '<div style="padding:14px 36px 0;text-align:center;font-style:italic;color:#6b5f4d;font-size:12.5px;line-height:1.5">' + esc(data.intro).replace(/\n/g, '<br/>') + '</div>' : '') +
@@ -15504,7 +15509,7 @@ function buildPlanningPdfHtml(data) {
           '</div>'
         ) : '') +
       '</div>' +
-      (data.footerNote ? '<div style="background:' + accentDark + ';text-align:center;font-style:italic;font-size:12.5px;color:' + cream + ';padding:14px;font-family:\'Cardo\',Georgia,serif">' + esc(data.footerNote) + '</div>' : '') +
+      (data.footerNote ? '<div style="background:var(--chrome-bg);text-align:center;font-style:italic;font-size:12.5px;color:var(--chrome-text);padding:14px;font-family:\'Cardo\',Georgia,serif;border-top:2px solid var(--chrome-line)">' + esc(data.footerNote) + '</div>' : '') +
     '</div>' +
     '<script>(function(){' +
       'function fitAndPrint(){' +
@@ -15540,9 +15545,16 @@ function buildPlanningPdfHtml(data) {
           '}).catch(function(){btn.textContent="Save as JPEG";btn.disabled=false;alert("Could not render JPEG. Try Print / Save PDF instead.");});' +
         '},50);' +
       '}' +
+      'function togglePF(){' +
+        'var el=document.getElementById("planningPage");if(!el)return;' +
+        'var on=el.classList.toggle("pf");' +
+        'document.body.classList.toggle("pf",on);' +
+        'var btn=document.getElementById("btnPF");if(btn)btn.textContent=on?"Colorful View":"Printer-Friendly (White)";' +
+      '}' +
       'function wire(){' +
         'var p=document.getElementById("btnPrint");if(p)p.addEventListener("click",fitAndPrint);' +
         'var j=document.getElementById("btnJpeg");if(j)j.addEventListener("click",saveJpeg);' +
+        'var pf=document.getElementById("btnPF");if(pf)pf.addEventListener("click",togglePF);' +
       '}' +
       'if(document.readyState==="complete"){wire();}else{window.addEventListener("load",wire);}' +
     '})();<\/script>' +
