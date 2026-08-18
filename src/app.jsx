@@ -11303,7 +11303,7 @@ function suPublicLink(kind, id, title) {
 function suEmbedHtml(id, title) {
   var src = 'https://northstarhouse.github.io/NSH-forms/?view=form&id=' + id;
   var esc = (title || 'Form').replace(/"/g, '&quot;');
-  return '<iframe src="' + src + '" style="width:100%;min-height:900px;border:none;" title="' + esc + '"></iframe>';
+  return '<iframe src="' + src + '" style="width:100%;min-height:2000px;border:none;" title="' + esc + '"></iframe>';
 }
 
 function SuBuilderBack({ onBack, label }) {
