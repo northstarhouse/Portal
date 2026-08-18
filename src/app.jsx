@@ -15386,9 +15386,9 @@ function buildPlanningPdfHtml(data) {
   function lines(s) { return String(s || '').split('\n').map(function(l) { return l.trim(); }).filter(Boolean); }
   function bulletList(s, big) {
     var arr = lines(s);
-    if (!arr.length) return '<div style="font-size:' + (big ? '13px' : '11.5px') + ';color:#c2b8a5;font-style:italic">—</div>';
-    var fs = big ? '14.5px' : '12px';
-    var lh = big ? '1.7' : '1.5';
+    if (!arr.length) return '<div style="font-size:' + (big ? '15.5px' : '14px') + ';color:#c2b8a5;font-style:italic">—</div>';
+    var fs = big ? '17px' : '14.5px';
+    var lh = big ? '1.65' : '1.55';
     var pad = big ? '20px' : '17px';
     var fw = big ? ';font-weight:600' : '';
     return '<ul style="margin:0 0 10px;padding-left:' + pad + ';font-size:' + fs + ';color:#3a332a;line-height:' + lh + fw + '">' + arr.map(function(l) { return '<li>' + mdBold(l) + '</li>'; }).join('') + '</ul>';
@@ -15406,7 +15406,7 @@ function buildPlanningPdfHtml(data) {
     return '<div style="margin-bottom:10px;break-inside:avoid">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
         (iconKey ? bubble(iconKey, 30) : '') +
-        '<div style="font-family:\'Cardo\',Georgia,serif;font-size:13.5px;font-weight:700;letter-spacing:0.2px;color:#4a453e">' + esc(title) + ':</div>' +
+        '<div style="font-family:\'Cardo\',Georgia,serif;font-size:16px;font-weight:700;letter-spacing:0.2px;color:#4a453e">' + esc(title) + ':</div>' +
       '</div>' +
       bodyHtml +
     '</div>';
@@ -15419,13 +15419,13 @@ function buildPlanningPdfHtml(data) {
     var line = dark ? ';box-shadow:inset 0 0 0 1px var(--chrome-line)' : '';
     return '<div style="background:' + bg + ';color:' + color + ';padding:' + pad + ';border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px' + clip + line + '">' +
       (iconKey ? bubble(iconKey, 26, dark) : '') +
-      '<div style="font-family:\'Cardo\',Georgia,serif;font-size:13px;font-weight:700;letter-spacing:0.3px">' + esc(title) + '</div>' +
+      '<div style="font-family:\'Cardo\',Georgia,serif;font-size:15.5px;font-weight:700;letter-spacing:0.3px">' + esc(title) + '</div>' +
     '</div>';
   }
   var metaLine = [data.dateLine, data.timeLine].filter(Boolean).map(esc).join('&nbsp;&nbsp;|&nbsp;&nbsp;');
   var logoBlock = data.logoDataUrl
     ? '<img src="' + data.logoDataUrl + '" alt="North Star House" style="height:42px;width:auto;display:block" />'
-    : '<div style="font-family:\'Cardo\',Georgia,serif;font-size:15px;font-weight:700;color:var(--chrome-text)">North Star House</div>';
+    : '<div style="font-family:\'Cardo\',Georgia,serif;font-size:17px;font-weight:700;color:var(--chrome-text)">North Star House</div>';
   var planFileSlug = (data.title || 'event-plan').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'event-plan';
   return (
     '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(data.title || 'Event Plan') + '</title>' +
@@ -15456,11 +15456,11 @@ function buildPlanningPdfHtml(data) {
           logoBlock +
         '</div>' +
         '<div style="flex:1;min-width:0;padding-left:8px">' +
-          '<div style="font-family:\'Cardo\',Georgia,serif;font-size:27px;font-weight:700;color:var(--chrome-text);line-height:1.2">' + esc(data.title || 'Event Plan') + '</div>' +
-          (metaLine ? '<div style="font-size:12.5px;color:var(--meta-text);margin-top:5px">' + metaLine + '</div>' : '') +
+          '<div style="font-family:\'Cardo\',Georgia,serif;font-size:31px;font-weight:700;color:var(--chrome-text);line-height:1.2">' + esc(data.title || 'Event Plan') + '</div>' +
+          (metaLine ? '<div style="font-size:14.5px;color:var(--meta-text);margin-top:5px">' + metaLine + '</div>' : '') +
         '</div>' +
       '</div>' +
-      (data.intro ? '<div style="padding:14px 36px 0;text-align:center;font-style:italic;color:#6b5f4d;font-size:12.5px;line-height:1.5">' + esc(data.intro).replace(/\n/g, '<br/>') + '</div>' : '') +
+      (data.intro ? '<div style="padding:14px 36px 0;text-align:center;font-style:italic;color:#6b5f4d;font-size:14.5px;line-height:1.55">' + esc(data.intro).replace(/\n/g, '<br/>') + '</div>' : '') +
       '<div style="padding:18px 36px 6px;display:flex;gap:22px;flex-wrap:wrap">' +
         '<div style="flex:1;min-width:280px">' +
           '<div style="box-shadow:0 1px 3px rgba(42,36,32,0.08),0 1px 2px rgba(42,36,32,0.05)">' +
@@ -15477,13 +15477,13 @@ function buildPlanningPdfHtml(data) {
               '<div style="margin-bottom:16px;break-inside:avoid">' +
                 '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">' +
                   bubble('setup', 30) +
-                  '<div style="font-size:13.5px;line-height:1.4;color:#3a332a"><b style="font-family:\'Cardo\',Georgia,serif;color:#4a453e">Setup:</b> ' + esc(data.setupTime || 'TBD') + '</div>' +
+                  '<div style="font-size:16px;line-height:1.45;color:#3a332a"><b style="font-family:\'Cardo\',Georgia,serif;color:#4a453e">Setup:</b> ' + esc(data.setupTime || 'TBD') + '</div>' +
                 '</div>' +
                 bulletList(data.setupPeople) +
               '</div>' +
-              (data.setupNote ? '<div style="font-size:11.5px;font-style:italic;color:#8a7d68;margin:0 0 18px">' + esc(data.setupNote) + '</div>' : '') +
+              (data.setupNote ? '<div style="font-size:13.5px;font-style:italic;color:#8a7d68;margin:0 0 18px">' + esc(data.setupNote) + '</div>' : '') +
               card('Cleanup', bulletList(data.cleanupPeople), 'cleanup') +
-              (data.cleanupNote ? '<div style="font-size:11.5px;font-style:italic;color:#8a7d68;margin-top:2px">' + esc(data.cleanupNote) + '</div>' : '') +
+              (data.cleanupNote ? '<div style="font-size:13.5px;font-style:italic;color:#8a7d68;margin-top:2px">' + esc(data.cleanupNote) + '</div>' : '') +
             '</div>' +
           '</div>' +
           '<div style="box-shadow:0 1px 3px rgba(42,36,32,0.08),0 1px 2px rgba(42,36,32,0.05)">' +
@@ -15496,20 +15496,20 @@ function buildPlanningPdfHtml(data) {
         '<div style="flex:1;min-width:220px">' +
           '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px">' +
             bubble('finalize', 34) +
-            '<div style="font-family:\'Cardo\',Georgia,serif;font-size:15px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:#4a453e">Still to Finalize</div>' +
+            '<div style="font-family:\'Cardo\',Georgia,serif;font-size:17px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:#4a453e">Still to Finalize</div>' +
           '</div>' +
           bulletList(data.stillToFinalize, true) +
         '</div>' +
         (data.rsvpCount ? (
           '<div style="display:flex;flex-direction:column;align-items:center;text-align:center;min-width:150px;border:1px solid #d9c49c;border-radius:10px;padding:12px 20px">' +
             bubble('rsvp', 32) +
-            '<div style="font-family:\'Cardo\',Georgia,serif;font-size:11.5px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + accent + ';margin-top:5px">Current RSVP Count</div>' +
-            '<div style="font-size:30px;font-weight:700;color:#2a2420;font-family:\'Cardo\',Georgia,serif">' + esc(data.rsvpCount) + '</div>' +
-            (data.rsvpNote ? '<div style="font-size:10.5px;color:#8a7d68">' + esc(data.rsvpNote) + '</div>' : '') +
+            '<div style="font-family:\'Cardo\',Georgia,serif;font-size:13px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:' + accent + ';margin-top:5px">Current RSVP Count</div>' +
+            '<div style="font-size:34px;font-weight:700;color:#2a2420;font-family:\'Cardo\',Georgia,serif">' + esc(data.rsvpCount) + '</div>' +
+            (data.rsvpNote ? '<div style="font-size:12px;color:#8a7d68">' + esc(data.rsvpNote) + '</div>' : '') +
           '</div>'
         ) : '') +
       '</div>' +
-      (data.footerNote ? '<div style="background:var(--chrome-bg);text-align:center;font-style:italic;font-size:12.5px;color:var(--chrome-text);padding:14px;font-family:\'Cardo\',Georgia,serif;border-top:2px solid var(--chrome-line)">' + esc(data.footerNote) + '</div>' : '') +
+      (data.footerNote ? '<div style="background:var(--chrome-bg);text-align:center;font-style:italic;font-size:14.5px;color:var(--chrome-text);padding:14px;font-family:\'Cardo\',Georgia,serif;border-top:2px solid var(--chrome-line)">' + esc(data.footerNote) + '</div>' : '') +
     '</div>' +
     '<script>(function(){' +
       'function fitAndPrint(){' +
