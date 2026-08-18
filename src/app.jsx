@@ -11334,23 +11334,14 @@ function suPublicLink(kind, id, title) {
 function suEmbedHtml(id, title) {
   var src = 'https://northstarhouse.github.io/NSH-forms/?view=form&id=' + id;
   var esc = (title || 'Form').replace(/"/g, '&quot;');
-  var elId = 'nsh-form-' + id.replace(/[^a-zA-Z0-9]/g, '');
-  // The form page posts its real content height back via postMessage (see
-  // useReportHeightToParent in NSH-forms' src/App.jsx) so the iframe can be
-  // sized to fit exactly -- a fixed guessed height is either too short (cuts
-  // long forms off) or, for short forms, leaves a big blank void below the
-  // form with nothing to show but a scrollbar down into empty space.
-  return (
-    '<iframe id="' + elId + '" src="' + src + '" style="width:100%;min-height:500px;border:none;display:block" title="' + esc + '"></iframe>' +
-    '<script>(function(){' +
-      'var ifr=document.getElementById(' + JSON.stringify(elId) + ');if(!ifr)return;' +
-      'window.addEventListener("message",function(e){' +
-        'if(!e.data||typeof e.data.nshFormHeight!=="number")return;' +
-        'if(e.source!==ifr.contentWindow)return;' +
-        'ifr.style.height=Math.max(300,e.data.nshFormHeight)+"px";' +
-      '});' +
-    '})();<\/script>'
-  );
+  // Wix's HTML embed widget has a genuinely fixed box height set in its own
+  // Settings panel -- there's no way for content inside the iframe to resize
+  // it, so a dynamic auto-resize script here just fights the platform.
+  // Simplest reliable approach: a single generous static height. Set the
+  // Wix embed element's own Height (in its Settings panel) to something at
+  // least this tall too -- if Wix's box ends up taller than the form,
+  // that's just blank space; if shorter, the form gets clipped.
+  return '<iframe src="' + src + '" style="width:100%;min-height:2200px;border:none;" title="' + esc + '"></iframe>';
 }
 
 function SuBuilderBack({ onBack, label }) {
