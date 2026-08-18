@@ -11334,7 +11334,23 @@ function suPublicLink(kind, id, title) {
 function suEmbedHtml(id, title) {
   var src = 'https://northstarhouse.github.io/NSH-forms/?view=form&id=' + id;
   var esc = (title || 'Form').replace(/"/g, '&quot;');
-  return '<iframe src="' + src + '" style="width:100%;min-height:2000px;border:none;" title="' + esc + '"></iframe>';
+  var elId = 'nsh-form-' + id.replace(/[^a-zA-Z0-9]/g, '');
+  // The form page posts its real content height back via postMessage (see
+  // useReportHeightToParent in NSH-forms' src/App.jsx) so the iframe can be
+  // sized to fit exactly -- a fixed guessed height is either too short (cuts
+  // long forms off) or, for short forms, leaves a big blank void below the
+  // form with nothing to show but a scrollbar down into empty space.
+  return (
+    '<iframe id="' + elId + '" src="' + src + '" style="width:100%;min-height:500px;border:none;display:block" title="' + esc + '"></iframe>' +
+    '<script>(function(){' +
+      'var ifr=document.getElementById(' + JSON.stringify(elId) + ');if(!ifr)return;' +
+      'window.addEventListener("message",function(e){' +
+        'if(!e.data||typeof e.data.nshFormHeight!=="number")return;' +
+        'if(e.source!==ifr.contentWindow)return;' +
+        'ifr.style.height=Math.max(300,e.data.nshFormHeight)+"px";' +
+      '});' +
+    '})();<\/script>'
+  );
 }
 
 function SuBuilderBack({ onBack, label }) {
