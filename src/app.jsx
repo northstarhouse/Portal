@@ -15412,12 +15412,12 @@ function buildPlanningPdfHtml(data) {
     '</div>';
   }
   function panelHead(title, iconKey, dark) {
-    var bg = dark ? 'var(--chrome-bg)' : '#e9e6e0';
-    var color = dark ? 'var(--chrome-text)' : '#4a453e';
+    var bg = dark ? 'var(--flag-bg)' : '#e9e6e0';
+    var color = dark ? 'var(--flag-text)' : '#4a453e';
     var clip = dark ? ';clip-path:polygon(0 0,100% 0,calc(100% - 15px) 50%,100% 100%,0 100%)' : '';
     var pad = dark ? '9px 30px 9px 13px' : '9px 13px';
-    var line = dark ? ';box-shadow:inset 0 0 0 1px var(--chrome-line)' : '';
-    return '<div style="background:' + bg + ';color:' + color + ';padding:' + pad + ';border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px' + clip + line + '">' +
+    var shadow = dark ? ';box-shadow:0 1px 3px rgba(42,36,32,0.18)' : '';
+    return '<div style="background:' + bg + ';color:' + color + ';padding:' + pad + ';border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px' + clip + shadow + '">' +
       (iconKey ? bubble(iconKey, 26, dark) : '') +
       '<div style="font-family:\'Cardo\',Georgia,serif;font-size:15.5px;font-weight:700;letter-spacing:0.3px">' + esc(title) + '</div>' +
     '</div>';
@@ -15440,8 +15440,8 @@ function buildPlanningPdfHtml(data) {
         '.no-print{display:none!important}' +
       '}' +
       'body{margin:0;background:#efe9de;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}' +
-      '#planningPage{--page-bg:' + cream + ';--chrome-bg:' + accentDark + ';--chrome-text:' + cream + ';--chrome-sep:rgba(255,255,255,0.32);--chrome-line:transparent;--bubble-bg-gold:rgba(255,255,255,0.16);--bubble-stroke-gold:#fff;--meta-text:rgba(255,255,255,0.88)}' +
-      '#planningPage.pf{--page-bg:#ffffff;--chrome-bg:#ffffff;--chrome-text:' + gold + ';--chrome-sep:rgba(136,108,68,0.35);--chrome-line:' + gold + ';--bubble-bg-gold:rgba(136,108,68,0.12);--bubble-stroke-gold:' + gold + ';--meta-text:' + gold + '}' +
+      '#planningPage{--page-bg:' + cream + ';--chrome-bg:' + accentDark + ';--chrome-text:' + cream + ';--chrome-sep:rgba(255,255,255,0.32);--chrome-line:transparent;--bubble-bg-gold:rgba(255,255,255,0.16);--bubble-stroke-gold:#fff;--meta-text:rgba(255,255,255,0.88);--flag-bg:' + accentDark + ';--flag-text:' + cream + '}' +
+      '#planningPage.pf{--page-bg:#ffffff;--chrome-bg:#ffffff;--chrome-text:' + gold + ';--chrome-sep:rgba(136,108,68,0.35);--chrome-line:' + gold + ';--bubble-bg-gold:rgba(136,108,68,0.12);--bubble-stroke-gold:' + gold + ';--meta-text:' + gold + ';--flag-bg:' + gold + ';--flag-text:#ffffff}' +
     '</style>' +
     '</head><body class="pf">' +
     '<div class="no-print" style="width:8.5in;max-width:94vw;margin:16px auto 0;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
