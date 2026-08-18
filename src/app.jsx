@@ -12066,14 +12066,65 @@ function suAnswerEntries(field, answer) {
   return (answer === undefined || answer === '' || answer === null || (Array.isArray(answer) && answer.length === 0)) ? [] : [{ label: field.label, value: answer }];
 }
 
+var DOCENT_TOUR_FORM_ID = '0635cd26-b0c7-4076-b9b1-bd25d1949467';
+
 function SuFormResponses({ form }) {
   var [responses, setResponses] = useState([]);
   var [loading, setLoading] = useState(true);
+  var [notifying, setNotifying] = useState({});
+  var [notified, setNotified] = useState({});
   useEffect(function() {
     if (!form) { setLoading(false); return; }
     fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?form_id=eq.' + form.id + '&select=*&order=created_at.desc', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
       .then(function(r) { return r.json(); }).then(function(rows) { setResponses(Array.isArray(rows) ? rows : []); setLoading(false); }).catch(function() { setLoading(false); });
   }, [form && form.id]);
+
+  function notifyDocents(r) {
+    if (notifying[r.id] || notified[r.id]) return;
+    setNotifying(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
+    var a = r.answers || {};
+    var requesterName = ((a.dt_first || '') + ' ' + (a.dt_last || '')).trim() || 'Someone';
+    var requesterEmail = a.dt_email || '';
+    var preferredDates = a.dt_dates || 'Not specified';
+    var participantCount = a.dt_count || 'Not specified';
+    var notes = a.dt_notes || '';
+
+    function clearNotifying() { setNotifying(function(prev) { var n = Object.assign({}, prev); delete n[r.id]; return n; }); }
+
+    cachedSbFetch('2026 Volunteers', ['Email', 'Team', 'Event Tags', 'Status']).then(function(rows) {
+      var emails = (Array.isArray(rows) ? rows : []).filter(function(v) {
+        var status = (v['Status'] || '').trim().toLowerCase();
+        var team = v['Team'] || '';
+        var tags = v['Event Tags'] || '';
+        return status === 'active' && v['Email'] && (/docent/i.test(team) || /docent/i.test(tags));
+      }).map(function(v) { return v['Email'].trim(); });
+      if (!emails.length) { alert('No active docents with an email on file.'); clearNotifying(); return; }
+
+      var subtext = '<b>' + requesterName + '</b> requested a tour.<br/><br/>' +
+        'Preferred dates: ' + preferredDates + '<br/>' +
+        'Participants: ' + participantCount +
+        (notes ? '<br/>Notes: ' + notes : '');
+      var html = buildBoardNotificationEmailHtml({
+        headline: 'New Docent Tour Request',
+        subtext: subtext,
+        buttonText: 'View in Portal',
+        buttonUrl: PORTAL_URL
+      });
+      var text = 'New Docent Tour Request\n\nFrom: ' + requesterName + ' <' + requesterEmail + '>\n' +
+        'Preferred dates: ' + preferredDates + '\nParticipants: ' + participantCount +
+        (notes ? '\nNotes: ' + notes : '') + '\n\nView in Portal: ' + PORTAL_URL;
+
+      return fetch(SUPABASE_URL + '/functions/v1/send-email', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: emails, subject: 'New Docent Tour Request', body: text, html: html })
+      }).then(function(res) {
+        clearNotifying();
+        if (res.ok) setNotified(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
+        else alert('Failed to send notification.');
+      });
+    }).catch(function() { clearNotifying(); alert('Failed to send notification.'); });
+  }
 
   if (!form) return null;
   if (loading) return <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>;
@@ -12089,7 +12140,15 @@ function SuFormResponses({ form }) {
         {responses.map(function(r) {
           return (
             <div key={r.id} style={{ paddingBottom: 20, borderBottom: '0.5px solid #f5f0e8' }}>
-              <div style={{ fontSize: 11, color: '#bbb', marginBottom: 10 }}>{new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+                <div style={{ fontSize: 11, color: '#bbb' }}>{new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+                {form.id === DOCENT_TOUR_FORM_ID && (
+                  <button onClick={function() { notifyDocents(r); }} disabled={notifying[r.id] || notified[r.id]}
+                    style={{ background: notified[r.id] ? '#eef7ee' : '#fff', color: notified[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (notified[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: (notifying[r.id] || notified[r.id]) ? 'default' : 'pointer', opacity: notifying[r.id] ? 0.6 : 1, flexShrink: 0 }}>
+                    {notified[r.id] ? '✓ Docents notified' : notifying[r.id] ? 'Sending…' : 'Notify Docents'}
+                  </button>
+                )}
+              </div>
               {groups.map(function(g, gi) {
                 if (!g.section) {
                   var q = g.fields[0];
