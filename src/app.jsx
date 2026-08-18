@@ -12096,17 +12096,16 @@ function SuFormResponses({ form }) {
     var participantCount = a.dt_count || '';
     var notes = a.dt_notes || '';
 
-    var subtext = '<b>' + esc(requesterName) + '</b> requested a docent tour.<br/><br/>' +
-      '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9">' +
-        'Contact Name: ' + esc(requesterName) + '<br/>' +
-        'Email: ' + esc(requesterEmail) + '<br/>' +
-        'Phone Number: ' + esc(phone) + '<br/>' +
-        'Preferred Dates: ' + esc(preferredDates) + '<br/>' +
-        'Number Of Participants: ' + esc(participantCount) + '<br/>' +
-        'Message: ' + esc(notes) +
+    var subtext = '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9">' +
+        '<b>Contact Name:</b> ' + esc(requesterName) + '<br/>' +
+        '<b>Email:</b> ' + esc(requesterEmail) + '<br/>' +
+        '<b>Phone Number:</b> ' + esc(phone) + '<br/>' +
+        '<b>Preferred Dates:</b> ' + esc(preferredDates) + '<br/>' +
+        '<b>Number Of Participants:</b> ' + esc(participantCount) + '<br/>' +
+        '<b>Message:</b> ' + esc(notes) +
       '</div>';
     var html = buildBoardNotificationEmailHtml({
-      headline: 'New Docent Tour Request',
+      headline: '"' + esc(requesterName) + '" submitted a tour request',
       subtext: subtext,
       footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
     });

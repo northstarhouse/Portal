@@ -62,17 +62,16 @@ begin
     '<div style="max-width:560px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">' ||
       '<div style="height:14px;background:#886c44;"></div>' ||
       '<div style="padding:48px 40px 32px;text-align:center;">' ||
-        '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">New Docent Tour Request</h1>' ||
+        '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">"' || coalesce(requester_name, 'Someone') || '" submitted a tour request</h1>' ||
         '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>' ||
         '<p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;">' ||
-          '<b>' || coalesce(requester_name, 'Someone') || '</b> requested a docent tour.<br/><br/>' ||
           '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9">' ||
-            'Contact Name: ' || coalesce(requester_name, '—') || '<br/>' ||
-            'Email: ' || coalesce(nullif(requester_email, ''), '—') || '<br/>' ||
-            'Phone Number: ' || coalesce(nullif(phone, ''), '—') || '<br/>' ||
-            'Preferred Dates: ' || coalesce(nullif(preferred_dates, ''), '—') || '<br/>' ||
-            'Number Of Participants: ' || coalesce(nullif(participant_count, ''), '—') || '<br/>' ||
-            'Message: ' || coalesce(nullif(notes, ''), '—') ||
+            '<b>Contact Name:</b> ' || coalesce(requester_name, '—') || '<br/>' ||
+            '<b>Email:</b> ' || coalesce(nullif(requester_email, ''), '—') || '<br/>' ||
+            '<b>Phone Number:</b> ' || coalesce(nullif(phone, ''), '—') || '<br/>' ||
+            '<b>Preferred Dates:</b> ' || coalesce(nullif(preferred_dates, ''), '—') || '<br/>' ||
+            '<b>Number Of Participants:</b> ' || coalesce(nullif(participant_count, ''), '—') || '<br/>' ||
+            '<b>Message:</b> ' || coalesce(nullif(notes, ''), '—') ||
           '</div>' ||
         '</p>' ||
       '</div>' ||
