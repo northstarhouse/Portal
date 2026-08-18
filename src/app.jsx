@@ -15395,10 +15395,11 @@ function buildPlanningPdfHtml(data) {
   }
   function bubble(iconKey, size, onGold) {
     var d = size || 40;
-    var bg = onGold ? 'var(--bubble-bg-gold)' : '#f1ece2';
-    var stroke = onGold ? 'var(--bubble-stroke-gold)' : accent;
+    var bg = onGold ? 'var(--bubble-bg-gold)' : 'var(--icon-bg)';
+    var stroke = onGold ? 'var(--bubble-stroke-gold)' : 'var(--icon-stroke)';
+    var border = onGold ? '' : ';box-shadow:inset 0 0 0 1.5px var(--icon-border)';
     var radius = Math.round(d * 0.32);
-    return '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:' + radius + 'px;background:' + bg + ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">' +
+    return '<div style="width:' + d + 'px;height:' + d + 'px;border-radius:' + radius + 'px;background:' + bg + ';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0' + border + '">' +
       '<svg width="' + Math.round(d * 0.54) + '" height="' + Math.round(d * 0.54) + '" viewBox="0 0 24 24" fill="none" stroke="' + stroke + '" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + (PLANNING_ICONS[iconKey] || '') + '</svg>' +
     '</div>';
   }
@@ -15443,8 +15444,8 @@ function buildPlanningPdfHtml(data) {
         '.no-print{display:none!important}' +
       '}' +
       'body{margin:0;background:#efe9de;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}' +
-      '#planningPage{--page-bg:' + cream + ';--chrome-bg:' + accentDark + ';--chrome-text:' + cream + ';--chrome-sep:rgba(255,255,255,0.32);--chrome-line:transparent;--bubble-bg-gold:rgba(255,255,255,0.16);--bubble-stroke-gold:#fff;--meta-text:rgba(255,255,255,0.88);--flag-border:' + accentDark + ';--flag-fill:' + accentDark + ';--flag-text:' + cream + '}' +
-      '#planningPage.pf{--page-bg:#ffffff;--chrome-bg:#ffffff;--chrome-text:' + gold + ';--chrome-sep:rgba(136,108,68,0.35);--chrome-line:' + gold + ';--bubble-bg-gold:rgba(136,108,68,0.12);--bubble-stroke-gold:' + gold + ';--meta-text:' + gold + ';--flag-border:' + gold + ';--flag-fill:#ffffff;--flag-text:' + gold + '}' +
+      '#planningPage{--page-bg:' + cream + ';--chrome-bg:' + accentDark + ';--chrome-text:' + cream + ';--chrome-sep:rgba(255,255,255,0.32);--chrome-line:transparent;--bubble-bg-gold:rgba(255,255,255,0.16);--bubble-stroke-gold:#fff;--meta-text:rgba(255,255,255,0.88);--flag-border:' + accentDark + ';--flag-fill:' + accentDark + ';--flag-text:' + cream + ';--icon-bg:#f1ece2;--icon-stroke:' + accent + ';--icon-border:transparent}' +
+      '#planningPage.pf{--page-bg:#ffffff;--chrome-bg:#ffffff;--chrome-text:' + gold + ';--chrome-sep:rgba(136,108,68,0.35);--chrome-line:' + gold + ';--bubble-bg-gold:rgba(136,108,68,0.12);--bubble-stroke-gold:' + gold + ';--meta-text:' + gold + ';--flag-border:' + gold + ';--flag-fill:#ffffff;--flag-text:' + gold + ';--icon-bg:transparent;--icon-stroke:#4a453e;--icon-border:#4a453e}' +
     '</style>' +
     '</head><body class="pf">' +
     '<div class="no-print" style="width:8.5in;max-width:94vw;margin:16px auto 0;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
