@@ -12107,7 +12107,7 @@ function SuFormResponses({ form }) {
         '<b>Message:</b><br/>' + esc(notes) +
       '</div>';
     var html = buildBoardNotificationEmailHtml({
-      headline: '"' + esc(requesterName) + '" submitted a tour request',
+      headline: esc(requesterName) + ' submitted a tour request',
       subtext: subtext,
       footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
     });

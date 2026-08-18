@@ -62,7 +62,7 @@ begin
     '<div style="max-width:560px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">' ||
       '<div style="height:14px;background:#886c44;"></div>' ||
       '<div style="padding:48px 40px 32px;text-align:center;">' ||
-        '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">"' || coalesce(requester_name, 'Someone') || '" submitted a tour request</h1>' ||
+        '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">' || coalesce(requester_name, 'Someone') || ' submitted a tour request</h1>' ||
         '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>' ||
         '<p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;">' ||
           '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9">' ||
