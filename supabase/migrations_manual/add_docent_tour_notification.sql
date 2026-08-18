@@ -70,8 +70,10 @@ begin
             '<b>Email:</b> ' || coalesce(nullif(requester_email, ''), '—') || '<br/>' ||
             '<b>Phone Number:</b> ' || coalesce(nullif(phone, ''), '—') || '<br/>' ||
             '<b>Preferred Dates:</b> ' || coalesce(nullif(preferred_dates, ''), '—') || '<br/>' ||
-            '<b>Number Of Participants:</b> ' || coalesce(nullif(participant_count, ''), '—') || '<br/>' ||
-            '<b>Message:</b> ' || coalesce(nullif(notes, ''), '—') ||
+            '<b>Number Of Participants:</b> ' || coalesce(nullif(participant_count, ''), '—') ||
+          '</div>' ||
+          '<div style="text-align:left;background:#f5f0e8;border-radius:8px;padding:14px 16px;margin-top:16px;font-size:14px;line-height:1.6;color:#3a332a">' ||
+            '<b>Message:</b><br/>' || coalesce(nullif(notes, ''), '—') ||
           '</div>' ||
         '</p>' ||
       '</div>' ||

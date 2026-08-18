@@ -12101,8 +12101,10 @@ function SuFormResponses({ form }) {
         '<b>Email:</b> ' + esc(requesterEmail) + '<br/>' +
         '<b>Phone Number:</b> ' + esc(phone) + '<br/>' +
         '<b>Preferred Dates:</b> ' + esc(preferredDates) + '<br/>' +
-        '<b>Number Of Participants:</b> ' + esc(participantCount) + '<br/>' +
-        '<b>Message:</b> ' + esc(notes) +
+        '<b>Number Of Participants:</b> ' + esc(participantCount) +
+      '</div>' +
+      '<div style="text-align:left;background:#f5f0e8;border-radius:8px;padding:14px 16px;margin-top:16px;font-size:14px;line-height:1.6;color:#3a332a">' +
+        '<b>Message:</b><br/>' + esc(notes) +
       '</div>';
     var html = buildBoardNotificationEmailHtml({
       headline: '"' + esc(requesterName) + '" submitted a tour request',
