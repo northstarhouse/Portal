@@ -12079,15 +12079,41 @@ function SuFormResponses({ form }) {
       .then(function(r) { return r.json(); }).then(function(rows) { setResponses(Array.isArray(rows) ? rows : []); setLoading(false); }).catch(function() { setLoading(false); });
   }, [form && form.id]);
 
-  function notifyDocents(r) {
-    if (notifying[r.id] || notified[r.id]) return;
-    setNotifying(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
+  function buildDocentEmail(r) {
     var a = r.answers || {};
     var requesterName = ((a.dt_first || '') + ' ' + (a.dt_last || '')).trim() || 'Someone';
     var requesterEmail = a.dt_email || '';
     var preferredDates = a.dt_dates || 'Not specified';
     var participantCount = a.dt_count || 'Not specified';
     var notes = a.dt_notes || '';
+    var subtext = '<b>' + requesterName + '</b> requested a tour.<br/><br/>' +
+      'Preferred dates: ' + preferredDates + '<br/>' +
+      'Participants: ' + participantCount +
+      (notes ? '<br/>Notes: ' + notes : '');
+    var html = buildBoardNotificationEmailHtml({
+      headline: 'New Docent Tour Request',
+      subtext: subtext,
+      buttonText: 'View in Portal',
+      buttonUrl: PORTAL_URL
+    });
+    var text = 'New Docent Tour Request\n\nFrom: ' + requesterName + ' <' + requesterEmail + '>\n' +
+      'Preferred dates: ' + preferredDates + '\nParticipants: ' + participantCount +
+      (notes ? '\nNotes: ' + notes : '') + '\n\nView in Portal: ' + PORTAL_URL;
+    return { html: html, text: text };
+  }
+
+  function previewDocentEmail(r) {
+    var email = buildDocentEmail(r);
+    var w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Email Preview — New Docent Tour Request</title></head><body style="margin:0">' + email.html + '</body></html>');
+    w.document.close();
+  }
+
+  function notifyDocents(r) {
+    if (notifying[r.id] || notified[r.id]) return;
+    setNotifying(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
+    var email = buildDocentEmail(r);
 
     function clearNotifying() { setNotifying(function(prev) { var n = Object.assign({}, prev); delete n[r.id]; return n; }); }
 
@@ -12100,24 +12126,10 @@ function SuFormResponses({ form }) {
       }).map(function(v) { return v['Email'].trim(); });
       if (!emails.length) { alert('No active docents with an email on file.'); clearNotifying(); return; }
 
-      var subtext = '<b>' + requesterName + '</b> requested a tour.<br/><br/>' +
-        'Preferred dates: ' + preferredDates + '<br/>' +
-        'Participants: ' + participantCount +
-        (notes ? '<br/>Notes: ' + notes : '');
-      var html = buildBoardNotificationEmailHtml({
-        headline: 'New Docent Tour Request',
-        subtext: subtext,
-        buttonText: 'View in Portal',
-        buttonUrl: PORTAL_URL
-      });
-      var text = 'New Docent Tour Request\n\nFrom: ' + requesterName + ' <' + requesterEmail + '>\n' +
-        'Preferred dates: ' + preferredDates + '\nParticipants: ' + participantCount +
-        (notes ? '\nNotes: ' + notes : '') + '\n\nView in Portal: ' + PORTAL_URL;
-
       return fetch(SUPABASE_URL + '/functions/v1/send-email', {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: emails, bcc: [ADMIN_NOTIFY_BCC], subject: 'New Docent Tour Request', body: text, html: html })
+        body: JSON.stringify({ to: emails, bcc: [ADMIN_NOTIFY_BCC], subject: 'New Docent Tour Request', body: email.text, html: email.html })
       }).then(function(res) {
         clearNotifying();
         if (res.ok) setNotified(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
@@ -12143,10 +12155,16 @@ function SuFormResponses({ form }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
                 <div style={{ fontSize: 11, color: '#bbb' }}>{new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
                 {form.id === DOCENT_TOUR_FORM_ID && (
-                  <button onClick={function() { notifyDocents(r); }} disabled={notifying[r.id] || notified[r.id]}
-                    style={{ background: notified[r.id] ? '#eef7ee' : '#fff', color: notified[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (notified[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: (notifying[r.id] || notified[r.id]) ? 'default' : 'pointer', opacity: notifying[r.id] ? 0.6 : 1, flexShrink: 0 }}>
-                    {notified[r.id] ? '✓ Docents notified' : notifying[r.id] ? 'Sending…' : 'Notify Docents'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button onClick={function() { previewDocentEmail(r); }}
+                      style={{ background: '#fff', color: '#888', border: '1px solid #e0d8cc', borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                      Preview Email
+                    </button>
+                    <button onClick={function() { notifyDocents(r); }} disabled={notifying[r.id] || notified[r.id]}
+                      style={{ background: notified[r.id] ? '#eef7ee' : '#fff', color: notified[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (notified[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: (notifying[r.id] || notified[r.id]) ? 'default' : 'pointer', opacity: notifying[r.id] ? 0.6 : 1 }}>
+                      {notified[r.id] ? '✓ Docents notified' : notifying[r.id] ? 'Sending…' : 'Notify Docents'}
+                    </button>
+                  </div>
                 )}
               </div>
               {groups.map(function(g, gi) {
