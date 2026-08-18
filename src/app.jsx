@@ -12096,7 +12096,7 @@ function SuFormResponses({ form }) {
     var participantCount = a.dt_count || '';
     var notes = a.dt_notes || '';
 
-    var subtext = '<div style="text-align:right;font-family:Helvetica,Arial,sans-serif">' +
+    var subtext = '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif">' +
         '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9;font-family:Helvetica,Arial,sans-serif">' +
           '<b>Contact Name:</b> ' + esc(requesterName) + '<br/>' +
           '<b>Email:</b> ' + esc(requesterEmail) + '<br/>' +

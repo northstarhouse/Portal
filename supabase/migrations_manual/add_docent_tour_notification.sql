@@ -65,7 +65,7 @@ begin
         '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">' || coalesce(requester_name, 'Someone') || ' submitted a tour request</h1>' ||
         '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>' ||
         '<p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;">' ||
-          '<div style="text-align:right;font-family:Helvetica,Arial,sans-serif">' ||
+          '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif">' ||
             '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9;font-family:Helvetica,Arial,sans-serif">' ||
               '<b>Contact Name:</b> ' || coalesce(requester_name, '—') || '<br/>' ||
               '<b>Email:</b> ' || coalesce(nullif(requester_email, ''), '—') || '<br/>' ||
