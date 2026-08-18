@@ -15445,7 +15445,7 @@ function buildPlanningPdfHtml(data) {
       '}' +
       'body{margin:0;background:#efe9de;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}' +
       '#planningPage{--page-bg:' + cream + ';--chrome-bg:' + accentDark + ';--chrome-text:' + cream + ';--chrome-sep:rgba(255,255,255,0.32);--chrome-line:transparent;--bubble-bg-gold:rgba(255,255,255,0.16);--bubble-stroke-gold:#fff;--meta-text:rgba(255,255,255,0.88);--flag-border:' + accentDark + ';--flag-fill:' + accentDark + ';--flag-text:' + cream + ';--icon-bg:#f1ece2;--icon-stroke:' + accent + ';--icon-border:transparent}' +
-      '#planningPage.pf{--page-bg:#ffffff;--chrome-bg:#ffffff;--chrome-text:' + gold + ';--chrome-sep:rgba(136,108,68,0.35);--chrome-line:' + gold + ';--bubble-bg-gold:rgba(136,108,68,0.12);--bubble-stroke-gold:' + gold + ';--meta-text:' + gold + ';--flag-border:' + gold + ';--flag-fill:#ffffff;--flag-text:' + gold + ';--icon-bg:transparent;--icon-stroke:#4a453e;--icon-border:#4a453e}' +
+      '#planningPage.pf{--page-bg:#ffffff;--chrome-bg:#ffffff;--chrome-text:' + gold + ';--chrome-sep:rgba(136,108,68,0.35);--chrome-line:' + gold + ';--bubble-bg-gold:rgba(136,108,68,0.12);--bubble-stroke-gold:' + gold + ';--meta-text:' + gold + ';--flag-border:' + gold + ';--flag-fill:#ffffff;--flag-text:' + gold + ';--icon-bg:transparent;--icon-stroke:' + gold + ';--icon-border:' + gold + '}' +
     '</style>' +
     '</head><body class="pf">' +
     '<div class="no-print" style="width:8.5in;max-width:94vw;margin:16px auto 0;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
