@@ -11723,7 +11723,15 @@ function SuFormPanel({ form, defaultCategory, templates, onSaved, onCancel }) {
     var req = isEdit
       ? fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=eq.' + form.id, { method: 'PATCH', headers: hdrs, body: JSON.stringify(payload) })
       : fetch(SUPABASE_URL + '/rest/v1/nsh_forms', { method: 'POST', headers: hdrs, body: JSON.stringify(payload) });
-    req.then(function() { setSaving(false); onSaved(); }).catch(function() { setSaving(false); });
+    req.then(function(r) {
+      setSaving(false);
+      if (!r.ok) {
+        return r.json().catch(function() { return {}; }).then(function(err) {
+          alert('Failed to save form: ' + (err.message || err.hint || r.status));
+        });
+      }
+      onSaved();
+    }).catch(function() { setSaving(false); alert('Failed to save form: network error.'); });
   }
   return (
     <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '20px 24px' }}>
