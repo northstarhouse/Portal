@@ -21,6 +21,7 @@ declare
   docent_emails text[];
   requester_name text;
   requester_email text;
+  phone text;
   preferred_dates text;
   participant_count text;
   notes text;
@@ -42,18 +43,20 @@ begin
     return new;
   end if;
 
-  requester_name := trim(coalesce(new.answers->>'dt_first', '') || ' ' || coalesce(new.answers->>'dt_last', ''));
+  requester_name := nullif(trim(coalesce(new.answers->>'dt_first', '') || ' ' || coalesce(new.answers->>'dt_last', '')), '');
   requester_email := coalesce(new.answers->>'dt_email', '');
-  preferred_dates := coalesce(nullif(new.answers->>'dt_dates', ''), 'Not specified');
-  participant_count := coalesce(nullif(new.answers->>'dt_count', ''), 'Not specified');
+  phone := coalesce(new.answers->>'dt_phone', '');
+  preferred_dates := coalesce(new.answers->>'dt_dates', '');
+  participant_count := coalesce(new.answers->>'dt_count', '');
   notes := coalesce(new.answers->>'dt_notes', '');
 
   text_body := 'New Docent Tour Request'
-    || E'\n\nFrom: ' || requester_name || ' <' || requester_email || '>'
-    || E'\nPreferred dates: ' || preferred_dates
-    || E'\nParticipants: ' || participant_count
-    || (case when notes <> '' then E'\nNotes: ' || notes else '' end)
-    || E'\n\nView in Portal: https://northstarhouse.github.io/Portal/';
+    || E'\n\nContact Name: ' || coalesce(requester_name, '—')
+    || E'\nEmail: ' || coalesce(nullif(requester_email, ''), '—')
+    || E'\nPhone Number: ' || coalesce(nullif(phone, ''), '—')
+    || E'\nPreferred Dates: ' || coalesce(nullif(preferred_dates, ''), '—')
+    || E'\nNumber Of Participants: ' || coalesce(nullif(participant_count, ''), '—')
+    || E'\nMessage: ' || coalesce(nullif(notes, ''), '—');
 
   html := '<div style="background:#d9cdb8;padding:32px 16px;font-family:Georgia,''Times New Roman'',serif;">' ||
     '<div style="max-width:560px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">' ||
@@ -61,14 +64,25 @@ begin
       '<div style="padding:48px 40px 32px;text-align:center;">' ||
         '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">New Docent Tour Request</h1>' ||
         '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>' ||
-        '<p style="margin:0 0 8px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;"><b>' || requester_name || '</b> requested a tour.</p>' ||
-        '<p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#777;line-height:1.6;text-align:left;display:inline-block;">' ||
-          'Preferred dates: ' || preferred_dates || '<br/>' ||
-          'Participants: ' || participant_count ||
-          (case when notes <> '' then '<br/>Notes: ' || notes else '' end) ||
-        '</p><br/>' ||
-        '<a href="https://northstarhouse.github.io/Portal/" style="display:inline-block;background:#886c44;color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:16px;padding:16px 32px;border-radius:6px;margin-bottom:8px;">View in Portal</a>' ||
+        '<p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;">' ||
+          '<b>' || coalesce(requester_name, 'Someone') || '</b> requested a docent tour.<br/><br/>' ||
+          '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9">' ||
+            'Contact Name: ' || coalesce(requester_name, '—') || '<br/>' ||
+            'Email: ' || coalesce(nullif(requester_email, ''), '—') || '<br/>' ||
+            'Phone Number: ' || coalesce(nullif(phone, ''), '—') || '<br/>' ||
+            'Preferred Dates: ' || coalesce(nullif(preferred_dates, ''), '—') || '<br/>' ||
+            'Number Of Participants: ' || coalesce(nullif(participant_count, ''), '—') || '<br/>' ||
+            'Message: ' || coalesce(nullif(notes, ''), '—') ||
+          '</div>' ||
+        '</p>' ||
       '</div>' ||
+      '<table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #e5ddcf;">' ||
+        '<tr>' ||
+          '<td style="width:33.33%;text-align:center;padding:14px 8px;border-right:1px solid #e5ddcf;"><a href="https://calendar.google.com/calendar/u/0?cid=dGhlbm9ydGhzdGFyaG91c2VAZ21haWwuY29t" style="color:#886c44;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">Calendar</a></td>' ||
+          '<td style="width:33.33%;text-align:center;padding:14px 8px;border-right:1px solid #e5ddcf;"><a href="https://northstarhouse.github.io/volunteerhub/" style="color:#886c44;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">Volunteer Hub</a></td>' ||
+          '<td style="width:33.33%;text-align:center;padding:14px 8px;"><a href="https://thenorthstarhouse.org" style="color:#886c44;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">Website</a></td>' ||
+        '</tr>' ||
+      '</table>' ||
     '</div>' ||
   '</div>';
 

@@ -12087,25 +12087,36 @@ function SuFormResponses({ form }) {
   }, [form && form.id]);
 
   function buildDocentEmail(r) {
+    function esc(s) { return String(s == null || s === '' ? '—' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
     var a = r.answers || {};
     var requesterName = ((a.dt_first || '') + ' ' + (a.dt_last || '')).trim() || 'Someone';
     var requesterEmail = a.dt_email || '';
-    var preferredDates = a.dt_dates || 'Not specified';
-    var participantCount = a.dt_count || 'Not specified';
+    var phone = a.dt_phone || '';
+    var preferredDates = a.dt_dates || '';
+    var participantCount = a.dt_count || '';
     var notes = a.dt_notes || '';
-    var subtext = '<b>' + requesterName + '</b> requested a tour.<br/><br/>' +
-      'Preferred dates: ' + preferredDates + '<br/>' +
-      'Participants: ' + participantCount +
-      (notes ? '<br/>Notes: ' + notes : '');
+
+    var subtext = '<b>' + esc(requesterName) + '</b> requested a docent tour.<br/><br/>' +
+      '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9">' +
+        'Contact Name: ' + esc(requesterName) + '<br/>' +
+        'Email: ' + esc(requesterEmail) + '<br/>' +
+        'Phone Number: ' + esc(phone) + '<br/>' +
+        'Preferred Dates: ' + esc(preferredDates) + '<br/>' +
+        'Number Of Participants: ' + esc(participantCount) + '<br/>' +
+        'Message: ' + esc(notes) +
+      '</div>';
     var html = buildBoardNotificationEmailHtml({
       headline: 'New Docent Tour Request',
       subtext: subtext,
-      buttonText: 'View in Portal',
-      buttonUrl: PORTAL_URL
+      footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
     });
-    var text = 'New Docent Tour Request\n\nFrom: ' + requesterName + ' <' + requesterEmail + '>\n' +
-      'Preferred dates: ' + preferredDates + '\nParticipants: ' + participantCount +
-      (notes ? '\nNotes: ' + notes : '') + '\n\nView in Portal: ' + PORTAL_URL;
+    var text = 'New Docent Tour Request\n\n' +
+      'Contact Name: ' + (requesterName || '—') + '\n' +
+      'Email: ' + (requesterEmail || '—') + '\n' +
+      'Phone Number: ' + (phone || '—') + '\n' +
+      'Preferred Dates: ' + (preferredDates || '—') + '\n' +
+      'Number Of Participants: ' + (participantCount || '—') + '\n' +
+      'Message: ' + (notes || '—');
     return { html: html, text: text };
   }
 
@@ -15505,7 +15516,7 @@ function buildBoardNotificationEmailHtml(opts) {
           '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">' + headline + '</h1>' +
           '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>' +
           '<p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;">' + subtext + '</p>' +
-          '<a href="' + buttonUrl + '" style="display:inline-block;background:' + gold + ';color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:16px;padding:16px 32px;border-radius:6px;margin-bottom:8px;">' + buttonText + '</a>' +
+          (buttonUrl ? '<a href="' + buttonUrl + '" style="display:inline-block;background:' + gold + ';color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:16px;padding:16px 32px;border-radius:6px;margin-bottom:8px;">' + buttonText + '</a>' : '') +
           (note ? '<p style="margin:20px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>' + note + '</i></p>' : '') +
         '</div>' +
         '<table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #e5ddcf;">' +
