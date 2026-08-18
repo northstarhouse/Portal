@@ -81,6 +81,7 @@ begin
     ),
     body := jsonb_build_object(
       'to', to_jsonb(docent_emails),
+      'bcc', jsonb_build_array('media@thenorthstarhouse.org'),
       'subject', 'New Docent Tour Request',
       'body', text_body,
       'html', html

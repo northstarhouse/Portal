@@ -12117,7 +12117,7 @@ function SuFormResponses({ form }) {
       return fetch(SUPABASE_URL + '/functions/v1/send-email', {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: emails, subject: 'New Docent Tour Request', body: text, html: html })
+        body: JSON.stringify({ to: emails, bcc: [ADMIN_NOTIFY_BCC], subject: 'New Docent Tour Request', body: text, html: html })
       }).then(function(res) {
         clearNotifying();
         if (res.ok) setNotified(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
