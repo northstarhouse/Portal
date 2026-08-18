@@ -426,6 +426,37 @@ var ACTIVITY_TAG_COLORS = {
   'General - Voicemail': { bg: '#f0ece6', color: '#888' },
 };
 
+// Tracks, per browser, when this device last looked at a given form's
+// responses -- used to badge "unread" submissions since form_responses
+// itself has no per-admin read state (the Portal has one shared login,
+// not per-user accounts).
+var FORM_SEEN_KEY = 'nsh_form_resp_seen';
+function getFormSeenMap() {
+  try { return JSON.parse(localStorage.getItem(FORM_SEEN_KEY) || '{}'); } catch (e) { return {}; }
+}
+function markFormResponsesSeen(formId) {
+  var map = getFormSeenMap();
+  map[formId] = new Date().toISOString();
+  try { localStorage.setItem(FORM_SEEN_KEY, JSON.stringify(map)); } catch (e) {}
+}
+// The very first time this device sees the seen-map (nothing recorded yet),
+// stamp every known form as "seen now" so existing/already-reviewed responses
+// don't all flood in as "unread" -- only submissions from here on count.
+function initFormSeenIfEmpty(formIds) {
+  var seen = getFormSeenMap();
+  if (Object.keys(seen).length > 0) return seen;
+  var now = new Date().toISOString();
+  formIds.forEach(function(id) { seen[id] = now; });
+  try { localStorage.setItem(FORM_SEEN_KEY, JSON.stringify(seen)); } catch (e) {}
+  return seen;
+}
+function countUnreadResponses(responses, formId) {
+  var seen = getFormSeenMap()[formId];
+  if (!Array.isArray(responses)) return 0;
+  if (!seen) return responses.length;
+  return responses.filter(function(r) { return new Date(r.created_at) > new Date(seen); }).length;
+}
+
 // ─── Sign-ups (Form Builder / Form Responses) shared helpers ──────────────────
 // Ported from the NSH-forms app's shared.jsx — kept byte-for-byte so the
 // answer/section schema already stored in Supabase for existing forms keeps
@@ -11312,11 +11343,14 @@ function SuBuilderBack({ onBack, label }) {
 function SuEmpty({ text }) {
   return <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>{text}</div>;
 }
-function SuListRow({ title, subtitle, meta, onClick, onCopyLink, copied, onDelete }) {
+function SuListRow({ title, subtitle, meta, unread, onClick, onCopyLink, copied, onDelete }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '0.5px solid #f0ece6' }}>
       <div onClick={onClick} style={{ flex: 1, minWidth: 0, cursor: onClick ? 'pointer' : 'default' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{title || '(untitled)'}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{title || '(untitled)'}</div>
+          {!!unread && <span style={{ background: '#c0392b', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 20, padding: '1px 7px', flexShrink: 0 }}>{'+' + unread}</span>}
+        </div>
         {subtitle && <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{subtitle}</div>}
         {meta && <div style={{ fontSize: 11, color: gold, marginTop: 2, fontWeight: 600 }}>{meta}</div>}
       </div>
@@ -12110,15 +12144,22 @@ function FormResponsesView({ navigate }) {
     Promise.all([
       fetch(SUPABASE_URL + '/rest/v1/vol_events?select=*,vol_event_responses(count),vol_shift_slots(count)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
       fetch(SUPABASE_URL + '/rest/v1/vol_polls?select=*,vol_poll_votes(count)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
-      fetch(SUPABASE_URL + '/rest/v1/nsh_forms?select=*,nsh_form_responses(count)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/nsh_forms?select=*,nsh_form_responses(created_at)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
     ]).then(function(res) {
       setEvents(Array.isArray(res[0]) ? res[0] : []);
       setPolls(Array.isArray(res[1]) ? res[1] : []);
-      setForms(Array.isArray(res[2]) ? res[2] : []);
+      var formsRes = Array.isArray(res[2]) ? res[2] : [];
+      initFormSeenIfEmpty(formsRes.map(function(fm) { return fm.id; }));
+      setForms(formsRes);
       setLoading(false);
     }).catch(function() { setLoading(false); });
   }
   useEffect(function() { fetchAll(); }, []);
+
+  function openForm(fm) {
+    markFormResponsesSeen(fm.id);
+    setSelected({ type: 'forms', id: fm.id });
+  }
 
   if (selected) {
     return (
@@ -12153,8 +12194,10 @@ function FormResponsesView({ navigate }) {
               return <SuListRow key={pl.id} title={pl.question} meta={meta} onClick={function() { setSelected({ type: 'polls', id: pl.id }); }} />;
             }))}
             {tab === 'forms' && (forms.length === 0 ? <SuEmpty text="No forms yet." /> : forms.map(function(fm) {
-              var meta = ((fm.nsh_form_responses && fm.nsh_form_responses[0] && fm.nsh_form_responses[0].count) || 0) + ' responses';
-              return <SuListRow key={fm.id} title={fm.title} meta={meta} onClick={function() { setSelected({ type: 'forms', id: fm.id }); }} />;
+              var responses = fm.nsh_form_responses || [];
+              var meta = responses.length + ' responses';
+              var unread = countUnreadResponses(responses, fm.id);
+              return <SuListRow key={fm.id} title={fm.title} meta={meta} unread={unread} onClick={function() { openForm(fm); }} />;
             }))}
           </div>
         )}
@@ -12541,7 +12584,22 @@ function AdminToolCard(props) {
 function AdminView({ navigate }) {
   var [uploadingMail, setUploadingMail] = useState(false);
   var [mailUploadResult, setMailUploadResult] = useState(null);
+  var [formsUnread, setFormsUnread] = useState(0);
   var mailFileInputRef = React.useRef(null);
+
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?select=form_id,created_at', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (!Array.isArray(rows)) return;
+      var seen = initFormSeenIfEmpty(rows.map(function(r) { return r.form_id; }));
+      var count = rows.filter(function(r) {
+        var s = seen[r.form_id];
+        return !s || new Date(r.created_at) > new Date(s);
+      }).length;
+      setFormsUnread(count);
+    }).catch(function() {});
+  }, []);
 
   function handleMailFileChosen(e) {
     var file = e.target.files[0];
@@ -12670,6 +12728,7 @@ function AdminView({ navigate }) {
         >
           <span style={{ color: '#b5a185', flexShrink: 0 }}>{suClipboardIcon}</span>
           Form Responses
+          {formsUnread > 0 && <span style={{ background: '#c0392b', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 20, padding: '1px 7px', marginLeft: 2 }}>{'+' + formsUnread}</span>}
         </div>
         <div
           onClick={function() { navigate('maintenance-request'); }}
