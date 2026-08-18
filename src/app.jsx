@@ -15443,13 +15443,13 @@ function buildPlanningPdfHtml(data) {
       '#planningPage{--page-bg:' + cream + ';--chrome-bg:' + accentDark + ';--chrome-text:' + cream + ';--chrome-sep:rgba(255,255,255,0.32);--chrome-line:transparent;--bubble-bg-gold:rgba(255,255,255,0.16);--bubble-stroke-gold:#fff;--meta-text:rgba(255,255,255,0.88)}' +
       '#planningPage.pf{--page-bg:#ffffff;--chrome-bg:#ffffff;--chrome-text:' + gold + ';--chrome-sep:rgba(136,108,68,0.35);--chrome-line:' + gold + ';--bubble-bg-gold:rgba(136,108,68,0.12);--bubble-stroke-gold:' + gold + ';--meta-text:' + gold + '}' +
     '</style>' +
-    '</head><body>' +
+    '</head><body class="pf">' +
     '<div class="no-print" style="max-width:720px;margin:16px auto 0;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
       '<button id="btnPrint" style="background:' + accentDark + ';color:' + cream + ';border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Print / Save PDF</button>' +
       '<button id="btnJpeg" style="background:#fff;color:' + accentDark + ';border:1px solid ' + accentDark + ';border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Save as JPEG</button>' +
-      '<button id="btnPF" style="background:#fff;color:' + gold + ';border:1px solid ' + gold + ';border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Printer-Friendly (White)</button>' +
+      '<button id="btnPF" style="background:#fff;color:' + gold + ';border:1px solid ' + gold + ';border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Colorful View</button>' +
     '</div>' +
-    '<div id="planningPage" style="max-width:720px;margin:10px auto;background:var(--page-bg);border-radius:16px;overflow:hidden;box-shadow:0 6px 20px rgba(42,36,32,0.12),0 2px 6px rgba(42,36,32,0.06);transform-origin:top center">' +
+    '<div id="planningPage" class="pf" style="max-width:720px;margin:10px auto;background:var(--page-bg);border-radius:16px;overflow:hidden;box-shadow:0 6px 20px rgba(42,36,32,0.12),0 2px 6px rgba(42,36,32,0.06);transform-origin:top center">' +
       '<div style="height:7px;background:' + gold + '"></div>' +
       '<div style="background:var(--chrome-bg);padding:22px 32px;display:flex;align-items:center;gap:20px;border-bottom:2px solid var(--chrome-line)">' +
         '<div style="flex-shrink:0;display:flex;align-items:center;padding-right:28px;border-right:1px solid var(--chrome-sep)">' +
