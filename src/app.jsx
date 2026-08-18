@@ -12096,15 +12096,17 @@ function SuFormResponses({ form }) {
     var participantCount = a.dt_count || '';
     var notes = a.dt_notes || '';
 
-    var subtext = '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9">' +
-        '<b>Contact Name:</b> ' + esc(requesterName) + '<br/>' +
-        '<b>Email:</b> ' + esc(requesterEmail) + '<br/>' +
-        '<b>Phone Number:</b> ' + esc(phone) + '<br/>' +
-        '<b>Preferred Dates:</b> ' + esc(preferredDates) + '<br/>' +
-        '<b>Number Of Participants:</b> ' + esc(participantCount) +
-      '</div>' +
-      '<div style="text-align:left;background:#f5f0e8;border-radius:8px;padding:14px 16px;margin-top:16px;font-size:14px;line-height:1.6;color:#3a332a">' +
-        '<b>Message:</b><br/>' + esc(notes) +
+    var subtext = '<div style="text-align:right;font-family:Helvetica,Arial,sans-serif">' +
+        '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9;font-family:Helvetica,Arial,sans-serif">' +
+          '<b>Contact Name:</b> ' + esc(requesterName) + '<br/>' +
+          '<b>Email:</b> ' + esc(requesterEmail) + '<br/>' +
+          '<b>Phone Number:</b> ' + esc(phone) + '<br/>' +
+          '<b>Preferred Dates:</b> ' + esc(preferredDates) + '<br/>' +
+          '<b>Number Of Participants:</b> ' + esc(participantCount) +
+        '</div>' +
+        '<div style="text-align:left;background:#f5f0e8;border-radius:8px;padding:14px 16px;margin-top:16px;font-size:14px;line-height:1.6;color:#3a332a;font-family:Helvetica,Arial,sans-serif">' +
+          '<b>Message:</b><br/>' + esc(notes) +
+        '</div>' +
       '</div>';
     var html = buildBoardNotificationEmailHtml({
       headline: esc(requesterName) + ' submitted a tour request',
