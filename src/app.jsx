@@ -14976,7 +14976,7 @@ function PlanningView({ navigate }) {
       var html = buildPlanningPdfHtml(Object.assign({}, form, { logoDataUrl: logoDataUrl || '' }));
       if (w && !w.closed) { w.document.open(); w.document.write(html); w.document.close(); w.focus(); }
     }
-    fetch('assets/logo.png').then(function(r) { return r.blob(); }).then(function(blob) {
+    fetch('assets/logo-plan.png').then(function(r) { return r.blob(); }).then(function(blob) {
       var reader = new FileReader();
       reader.onload = function() { render(reader.result); };
       reader.onerror = function() { render(''); };
@@ -15222,7 +15222,7 @@ function EventPlanLinkView({ navigate }) {
     setError(false);
     Promise.all([
       fetch(SUPABASE_URL + '/rest/v1/planning_templates?id=eq.' + id + '&select=*', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }),
-      fetch('assets/logo.png').then(function(r) { return r.blob(); }).then(function(blob) {
+      fetch('assets/logo-plan.png').then(function(r) { return r.blob(); }).then(function(blob) {
         return new Promise(function(resolve) {
           var reader = new FileReader();
           reader.onload = function() { resolve(reader.result); };
@@ -15572,7 +15572,7 @@ function openPlanPreview(planId, setLoading) {
   if (w) { w.document.write('<title>Loading…</title><body style="font-family:system-ui,sans-serif;padding:40px;color:#999">Loading plan…</body>'); w.document.close(); }
   Promise.all([
     fetch(SUPABASE_URL + '/rest/v1/planning_templates?id=eq.' + planId + '&select=*', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }),
-    fetch('assets/logo.png').then(function(r) { return r.blob(); }).then(function(blob) {
+    fetch('assets/logo-plan.png').then(function(r) { return r.blob(); }).then(function(blob) {
       return new Promise(function(resolve) {
         var reader = new FileReader();
         reader.onload = function() { resolve(reader.result); };
