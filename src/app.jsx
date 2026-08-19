@@ -554,6 +554,7 @@ var NAV_ICONS = {
   reviews: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
   marketing: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
   admin: '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M20 20c0-3-2-5.5-4-6.5"/>',
+  'meeting-reports': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
 };
 
 function NavIcon({ id, active }) {
@@ -572,6 +573,7 @@ const modules = [
   { id: "donors", label: "Donations" },
   { id: "sponsors", label: "Sponsors" },
   { id: "board", label: "Board Voting" },
+  { id: "meeting-reports", label: "Meeting & Board Reports" },
   { id: "strategy", label: "Strategic Goal Progress" },
   { id: "venue", label: "Venue Rentals" },
   { id: "ideas", label: "Ideas & Initiatives" },
@@ -14933,6 +14935,126 @@ function AnnouncementsView({ navigate }) {
   );
 }
 
+function MeetingBoardReportsView() {
+  var isMobile = React.useContext(MobileCtx);
+  var emptyForm = { title: '', meeting_date: '', url: '', notes: '' };
+  var [reports, setReports] = useState(null);
+  var [showAdd, setShowAdd] = useState(false);
+  var [form, setForm] = useState(emptyForm);
+  var [saving, setSaving] = useState(false);
+  var [deletingId, setDeletingId] = useState(null);
+
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/meeting_board_reports?select=*&order=meeting_date.desc.nullslast,created_at.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setReports(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setReports([]); });
+  }
+  useEffect(function() { load(); }, []);
+
+  function handleAdd() {
+    if (!form.title.trim() || saving) return;
+    setSaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/meeting_board_reports', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        title: form.title.trim(),
+        meeting_date: form.meeting_date || null,
+        url: form.url.trim() || null,
+        notes: form.notes.trim() || null
+      })
+    }).then(function(r) {
+      setSaving(false);
+      if (!r.ok) { r.json().then(function(err) { alert('Failed to save: ' + (err.message || err.hint || r.status)); }).catch(function() { alert('Failed to save.'); }); return; }
+      setForm(emptyForm);
+      setShowAdd(false);
+      load();
+    }).catch(function() { setSaving(false); alert('Failed to save: network error.'); });
+  }
+
+  function handleDelete(id) {
+    if (!window.confirm('Delete this report?')) return;
+    setDeletingId(id);
+    fetch(SUPABASE_URL + '/rest/v1/meeting_board_reports?id=eq.' + id, {
+      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      setDeletingId(null);
+      setReports(function(prev) { return prev.filter(function(x) { return x.id !== id; }); });
+    }).catch(function() { setDeletingId(null); });
+  }
+
+  function fmtDate(d) { if (!d) return ''; return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+
+  var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
+  var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 };
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Meeting & Board Reports</div>
+          <div style={{ fontSize: 13, color: '#999', marginTop: 2 }}>Minutes, board reports, and related documents.</div>
+        </div>
+        <button onClick={function() { setShowAdd(function(v) { return !v; }); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+          {showAdd ? 'Cancel' : '+ Add Report'}
+        </button>
+      </div>
+
+      {showAdd && (
+        <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <label style={lb}>Title</label>
+            <input value={form.title} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { title: e.target.value }); }); }} placeholder="e.g. August Board Meeting Minutes" style={inpSt} />
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 160px' }}>
+              <label style={lb}>Meeting Date</label>
+              <input type="date" value={form.meeting_date} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { meeting_date: e.target.value }); }); }} style={inpSt} />
+            </div>
+            <div style={{ flex: '2 1 260px' }}>
+              <label style={lb}>Link (Google Drive, PDF, etc.)</label>
+              <input value={form.url} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { url: e.target.value }); }); }} placeholder="https://…" style={inpSt} />
+            </div>
+          </div>
+          <div>
+            <label style={lb}>Notes (optional)</label>
+            <textarea value={form.notes} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={2} style={Object.assign({}, inpSt, { resize: 'vertical' })} />
+          </div>
+          <button onClick={handleAdd} disabled={saving || !form.title.trim()} style={{ alignSelf: 'flex-start', background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (saving || !form.title.trim()) ? 0.5 : 1 }}>
+            {saving ? 'Saving…' : 'Save Report'}
+          </button>
+        </div>
+      )}
+
+      {reports === null ? (
+        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
+      ) : reports.length === 0 ? (
+        <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>No reports added yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {reports.map(function(rep) {
+            return (
+              <div key={rep.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{rep.title}</div>
+                  {rep.meeting_date && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{fmtDate(rep.meeting_date)}</div>}
+                  {rep.notes && <div style={{ fontSize: 12, color: '#777', marginTop: 4 }}>{rep.notes}</div>}
+                </div>
+                {rep.url && <a href={rep.url} target="_blank" rel="noopener noreferrer" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>Open</a>}
+                <button onClick={function() { handleDelete(rep.id); }} disabled={deletingId === rep.id} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 12, flexShrink: 0 }}>
+                  {deletingId === rep.id ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 var PLANNING_EMPTY_FORM = {
   title: '', dateLine: '', timeLine: '', location: 'North Star House', intro: '',
   food: '', drinks: '', dessert: '', supplies: '',
@@ -15432,6 +15554,7 @@ const views = {
   marketing: MarketingView,
   'marketing-posting-schedule': MarketingPostingScheduleView,
   board: BoardView,
+  'meeting-reports': MeetingBoardReportsView,
   sponsors: SponsorsView,
   strategy: StrategyView,
   venue: VenueRentalsView,
