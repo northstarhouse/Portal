@@ -14941,8 +14941,11 @@ function MeetingBoardReportsView() {
   var [reports, setReports] = useState(null);
   var [showAdd, setShowAdd] = useState(false);
   var [form, setForm] = useState(emptyForm);
+  var [attachFile, setAttachFile] = useState(null);
+  var [uploading, setUploading] = useState(false);
   var [saving, setSaving] = useState(false);
   var [deletingId, setDeletingId] = useState(null);
+  var fileInputRef = React.useRef(null);
 
   function load() {
     fetch(SUPABASE_URL + '/rest/v1/meeting_board_reports?select=*&order=meeting_date.desc.nullslast,created_at.desc', {
@@ -14953,25 +14956,46 @@ function MeetingBoardReportsView() {
   }
   useEffect(function() { load(); }, []);
 
-  function handleAdd() {
-    if (!form.title.trim() || saving) return;
-    setSaving(true);
+  function saveReport(url) {
     fetch(SUPABASE_URL + '/rest/v1/meeting_board_reports', {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify({
         title: form.title.trim(),
         meeting_date: form.meeting_date || null,
-        url: form.url.trim() || null,
+        url: url || null,
         notes: form.notes.trim() || null
       })
     }).then(function(r) {
       setSaving(false);
       if (!r.ok) { r.json().then(function(err) { alert('Failed to save: ' + (err.message || err.hint || r.status)); }).catch(function() { alert('Failed to save.'); }); return; }
       setForm(emptyForm);
+      setAttachFile(null);
       setShowAdd(false);
       load();
     }).catch(function() { setSaving(false); alert('Failed to save: network error.'); });
+  }
+
+  function handleAdd() {
+    if (!form.title.trim() || saving || uploading) return;
+    setSaving(true);
+    if (!attachFile) { saveReport(form.url.trim() || null); return; }
+    setUploading(true);
+    var reader = new FileReader();
+    reader.onload = function() {
+      var base64 = reader.result.split(',')[1];
+      fetch(SUPABASE_URL + '/functions/v1/upload-meeting-report', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: attachFile.name, mimeType: attachFile.type || 'application/octet-stream', base64: base64 })
+      }).then(function(r) { return r.json(); }).then(function(res) {
+        setUploading(false);
+        if (!res.success) { setSaving(false); alert('Failed to upload attachment: ' + (res.error || 'Unknown error')); return; }
+        saveReport(res.url);
+      }).catch(function() { setUploading(false); setSaving(false); alert('Failed to upload attachment: network error.'); });
+    };
+    reader.onerror = function() { setUploading(false); setSaving(false); alert('Failed to read the selected file.'); };
+    reader.readAsDataURL(attachFile);
   }
 
   function handleDelete(id) {
@@ -15015,15 +15039,25 @@ function MeetingBoardReportsView() {
             </div>
             <div style={{ flex: '2 1 260px' }}>
               <label style={lb}>Link (Google Drive, PDF, etc.)</label>
-              <input value={form.url} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { url: e.target.value }); }); }} placeholder="https://…" style={inpSt} />
+              <input value={form.url} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { url: e.target.value }); }); }} placeholder="https://…" disabled={!!attachFile} style={Object.assign({}, inpSt, attachFile ? { opacity: 0.5 } : {})} />
             </div>
+          </div>
+          <div>
+            <label style={lb}>Or Upload a File (goes to the "Meeting & Board Reports" Drive folder)</label>
+            <input ref={fileInputRef} type="file" onChange={function(e) { setAttachFile(e.target.files[0] || null); }} style={{ fontSize: 12 }} />
+            {attachFile && (
+              <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                {attachFile.name}
+                <button type="button" onClick={function() { setAttachFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 12, marginLeft: 8, padding: 0 }}>Remove</button>
+              </div>
+            )}
           </div>
           <div>
             <label style={lb}>Notes (optional)</label>
             <textarea value={form.notes} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={2} style={Object.assign({}, inpSt, { resize: 'vertical' })} />
           </div>
-          <button onClick={handleAdd} disabled={saving || !form.title.trim()} style={{ alignSelf: 'flex-start', background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (saving || !form.title.trim()) ? 0.5 : 1 }}>
-            {saving ? 'Saving…' : 'Save Report'}
+          <button onClick={handleAdd} disabled={saving || uploading || !form.title.trim()} style={{ alignSelf: 'flex-start', background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (saving || uploading || !form.title.trim()) ? 0.5 : 1 }}>
+            {uploading ? 'Uploading…' : saving ? 'Saving…' : 'Save Report'}
           </button>
         </div>
       )}
