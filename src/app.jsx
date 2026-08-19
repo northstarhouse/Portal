@@ -14935,6 +14935,13 @@ function AnnouncementsView({ navigate }) {
   );
 }
 
+var MEETING_REPORT_CATEGORIES = ['Planning', 'Events', 'Development'];
+var MEETING_REPORT_CATEGORY_COLORS = {
+  Planning: { bg: '#e3f2fd', color: '#1565c0' },
+  Events: { bg: '#e8f5e9', color: '#2e7d32' },
+  Development: { bg: '#f3e5f5', color: '#6a1b9a' },
+};
+
 function MeetingBoardReportsView() {
   var isMobile = React.useContext(MobileCtx);
   var emptyForm = { title: '', meeting_date: '', url: '', notes: '' };
@@ -14945,7 +14952,10 @@ function MeetingBoardReportsView() {
   var [uploading, setUploading] = useState(false);
   var [saving, setSaving] = useState(false);
   var [deletingId, setDeletingId] = useState(null);
+  var [quickUploading, setQuickUploading] = useState(null); // monthKey + ':' + category, while that button's upload is in flight
   var fileInputRef = React.useRef(null);
+  var quickFileInputRef = React.useRef(null);
+  var quickTargetRef = React.useRef(null); // { monthKey, category } for whichever quick-upload button was just clicked
 
   function load() {
     fetch(SUPABASE_URL + '/rest/v1/meeting_board_reports?select=*&order=meeting_date.desc.nullslast,created_at.desc', {
@@ -14998,6 +15008,46 @@ function MeetingBoardReportsView() {
     reader.readAsDataURL(attachFile);
   }
 
+  // Per-category quick upload: click "+ Planning" (etc.) under a given month,
+  // pick a file, and it's uploaded + saved immediately -- no separate save
+  // step. Each category can hold any number of attachments; clicking again
+  // just adds another one alongside the existing ones for that month.
+  function triggerQuickUpload(monthKey, category) {
+    quickTargetRef.current = { monthKey: monthKey, category: category };
+    if (quickFileInputRef.current) { quickFileInputRef.current.value = ''; quickFileInputRef.current.click(); }
+  }
+
+  function handleQuickFileChosen(e) {
+    var file = e.target.files[0];
+    var target = quickTargetRef.current;
+    if (!file || !target) return;
+    var key = target.monthKey + ':' + target.category;
+    setQuickUploading(key);
+    var reader = new FileReader();
+    reader.onload = function() {
+      var base64 = reader.result.split(',')[1];
+      fetch(SUPABASE_URL + '/functions/v1/upload-meeting-report', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, mimeType: file.type || 'application/octet-stream', base64: base64 })
+      }).then(function(r) { return r.json(); }).then(function(res) {
+        if (!res.success) { setQuickUploading(null); alert('Failed to upload: ' + (res.error || 'Unknown error')); return; }
+        var titleGuess = file.name.replace(/\.[^.\/]+$/, '');
+        return fetch(SUPABASE_URL + '/rest/v1/meeting_board_reports', {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ title: titleGuess, meeting_date: target.monthKey + '-01', url: res.url, category: target.category, notes: null })
+        }).then(function(r) {
+          setQuickUploading(null);
+          if (!r.ok) { alert('Uploaded to Drive, but failed to save the entry.'); return; }
+          load();
+        });
+      }).catch(function() { setQuickUploading(null); alert('Failed to upload: network error.'); });
+    };
+    reader.onerror = function() { setQuickUploading(null); alert('Failed to read the selected file.'); };
+    reader.readAsDataURL(file);
+  }
+
   function handleDelete(id) {
     if (!window.confirm('Delete this report?')) return;
     setDeletingId(id);
@@ -15010,19 +15060,35 @@ function MeetingBoardReportsView() {
   }
 
   function fmtDate(d) { if (!d) return ''; return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+  function monthKeyOf(d) { return (d || '').slice(0, 7); } // 'YYYY-MM'
+  function monthLabel(monthKey) { return new Date(monthKey + '-15T12:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); }
 
   var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
   var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 };
 
+  // Group reports by month (meeting_date, falling back to created_at), and
+  // always include the current month even if it has nothing yet, so the
+  // quick-upload buttons for "this month's" Board Meeting are always there.
+  var currentMonthKey = new Date().toISOString().slice(0, 7);
+  var monthMap = {};
+  monthMap[currentMonthKey] = [];
+  (reports || []).forEach(function(rep) {
+    var key = monthKeyOf(rep.meeting_date) || monthKeyOf(rep.created_at) || currentMonthKey;
+    if (!monthMap[key]) monthMap[key] = [];
+    monthMap[key].push(rep);
+  });
+  var monthKeys = Object.keys(monthMap).sort().reverse();
+
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 760 }}>
+      <input ref={quickFileInputRef} type="file" onChange={handleQuickFileChosen} style={{ display: 'none' }} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Meeting & Board Reports</div>
-          <div style={{ fontSize: 13, color: '#999', marginTop: 2 }}>Minutes, board reports, and related documents.</div>
+          <div style={{ fontSize: 13, color: '#999', marginTop: 2 }}>Click a category under a month to upload straight to it.</div>
         </div>
-        <button onClick={function() { setShowAdd(function(v) { return !v; }); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-          {showAdd ? 'Cancel' : '+ Add Report'}
+        <button onClick={function() { setShowAdd(function(v) { return !v; }); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+          {showAdd ? 'Cancel' : '+ Add Custom Report'}
         </button>
       </div>
 
@@ -15064,22 +15130,81 @@ function MeetingBoardReportsView() {
 
       {reports === null ? (
         <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
-      ) : reports.length === 0 ? (
-        <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>No reports added yet.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {reports.map(function(rep) {
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {monthKeys.map(function(monthKey) {
+            var items = monthMap[monthKey];
+            var byCategory = {};
+            var uncategorized = [];
+            items.forEach(function(rep) {
+              if (rep.category && MEETING_REPORT_CATEGORIES.indexOf(rep.category) !== -1) {
+                if (!byCategory[rep.category]) byCategory[rep.category] = [];
+                byCategory[rep.category].push(rep);
+              } else {
+                uncategorized.push(rep);
+              }
+            });
             return (
-              <div key={rep.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 200 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{rep.title}</div>
-                  {rep.meeting_date && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{fmtDate(rep.meeting_date)}</div>}
-                  {rep.notes && <div style={{ fontSize: 12, color: '#777', marginTop: 4 }}>{rep.notes}</div>}
+              <div key={monthKey} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', background: '#faf8f4', borderBottom: '0.5px solid #f0ece6', fontSize: 14, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>
+                  Board Meeting {monthLabel(monthKey)}
                 </div>
-                {rep.url && <a href={rep.url} target="_blank" rel="noopener noreferrer" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>Open</a>}
-                <button onClick={function() { handleDelete(rep.id); }} disabled={deletingId === rep.id} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 12, flexShrink: 0 }}>
-                  {deletingId === rep.id ? 'Deleting…' : 'Delete'}
-                </button>
+                <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {MEETING_REPORT_CATEGORIES.map(function(cat) {
+                      var busy = quickUploading === (monthKey + ':' + cat);
+                      var cc = MEETING_REPORT_CATEGORY_COLORS[cat];
+                      return (
+                        <button key={cat} onClick={function() { triggerQuickUpload(monthKey, cat); }} disabled={busy}
+                          style={{ background: cc.bg, color: cc.color, border: 'none', borderRadius: 20, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>
+                          {busy ? 'Uploading…' : '+ ' + cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {MEETING_REPORT_CATEGORIES.filter(function(cat) { return byCategory[cat] && byCategory[cat].length; }).map(function(cat) {
+                    var cc = MEETING_REPORT_CATEGORY_COLORS[cat];
+                    return (
+                      <div key={cat}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: cc.color, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>{cat}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {byCategory[cat].map(function(rep) {
+                            return (
+                              <div key={rep.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', flexWrap: 'wrap' }}>
+                                <div style={{ flex: 1, minWidth: 160, fontSize: 13, color: '#2a2a2a' }}>{rep.title}</div>
+                                {rep.url && <a href={rep.url} target="_blank" rel="noopener noreferrer" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>Open</a>}
+                                <button onClick={function() { handleDelete(rep.id); }} disabled={deletingId === rep.id} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 11, flexShrink: 0 }}>
+                                  {deletingId === rep.id ? 'Deleting…' : 'Delete'}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {uncategorized.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>Other</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {uncategorized.map(function(rep) {
+                          return (
+                            <div key={rep.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', flexWrap: 'wrap' }}>
+                              <div style={{ flex: 1, minWidth: 160 }}>
+                                <div style={{ fontSize: 13, color: '#2a2a2a' }}>{rep.title}</div>
+                                {rep.notes && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{rep.notes}</div>}
+                              </div>
+                              {rep.url && <a href={rep.url} target="_blank" rel="noopener noreferrer" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>Open</a>}
+                              <button onClick={function() { handleDelete(rep.id); }} disabled={deletingId === rep.id} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 11, flexShrink: 0 }}>
+                                {deletingId === rep.id ? 'Deleting…' : 'Delete'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}
