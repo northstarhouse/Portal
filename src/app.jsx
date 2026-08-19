@@ -14935,6 +14935,7 @@ function AnnouncementsView({ navigate }) {
   );
 }
 
+var MEETING_REPORTS_START_MONTH = '2026-08';
 var MEETING_REPORT_CATEGORIES = ['Planning', 'Events', 'Development'];
 var MEETING_REPORT_CATEGORY_COLORS = {
   Planning: { bg: '#e3f2fd', color: '#1565c0' },
@@ -15066,12 +15067,25 @@ function MeetingBoardReportsView() {
   var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
   var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 };
 
-  // Group reports by month (meeting_date, falling back to created_at), and
-  // always include the current month even if it has nothing yet, so the
-  // quick-upload buttons for "this month's" Board Meeting are always there.
+  // Group reports by month (meeting_date, falling back to created_at).
+  // Board meetings are monthly, so pre-populate every month's card from
+  // MEETING_REPORTS_START_MONTH through the current month (even ones with
+  // nothing uploaded yet) rather than only creating a card once something
+  // lands in it -- keeps every upcoming month's quick-upload buttons ready
+  // ahead of time, and it grows on its own each month with no editing.
   var currentMonthKey = new Date().toISOString().slice(0, 7);
   var monthMap = {};
-  monthMap[currentMonthKey] = [];
+  (function() {
+    var cursor = MEETING_REPORTS_START_MONTH;
+    while (cursor <= currentMonthKey) {
+      monthMap[cursor] = [];
+      var parts = cursor.split('-');
+      var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+      m += 1;
+      if (m > 12) { m = 1; y += 1; }
+      cursor = y + '-' + (m < 10 ? '0' + m : m);
+    }
+  })();
   (reports || []).forEach(function(rep) {
     var key = monthKeyOf(rep.meeting_date) || monthKeyOf(rep.created_at) || currentMonthKey;
     if (!monthMap[key]) monthMap[key] = [];
