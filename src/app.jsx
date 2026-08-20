@@ -14961,7 +14961,8 @@ function MeetingBoardReportsView({ navigate }) {
   var [deletingId, setDeletingId] = useState(null);
   var [quickUploading, setQuickUploading] = useState(null); // monthKey + ':' + category, while that button's upload is in flight
   var [voteItemsByMonth, setVoteItemsByMonth] = useState({}); // monthKey -> [{ item, tally }]
-  var [openingPacket, setOpeningPacket] = useState(null); // monthKey while resolving that month's Drive folder link
+  var [openingPacket, setOpeningPacket] = useState(null); // monthKey while merging that month's packet
+  var [packetModal, setPacketModal] = useState(null); // { monthKey, blobUrl } while the packet viewer is open
   var fileInputRef = React.useRef(null);
   var quickFileInputRef = React.useRef(null);
   var quickTargetRef = React.useRef(null); // { monthKey, category } for whichever quick-upload button was just clicked
@@ -15100,25 +15101,57 @@ function MeetingBoardReportsView({ navigate }) {
     }).catch(function() { setDeletingId(null); });
   }
 
-  // "View / Download Full Packet": opens that month's actual Drive folder
-  // (created on demand if nothing's been uploaded to it yet) so staff can
-  // browse everything at once or select-all and download it as one zip --
-  // opened synchronously so popup blockers don't intervene, then redirected
-  // once the folder link comes back.
+  function driveFileIdFromUrl(url) {
+    var m = /\/file\/d\/([^/]+)/.exec(url || '');
+    return m ? m[1] : null;
+  }
+
+  // Builds the ordered {fileId, title, category} list for one month, in the
+  // same category order the cards render in, for the merge endpoint.
+  function getPacketFiles(monthKey) {
+    var items = (reports || []).filter(function(rep) {
+      var key = monthKeyOf(rep.meeting_date) || monthKeyOf(rep.created_at);
+      return key === monthKey;
+    });
+    var ordered = [];
+    MEETING_REPORT_CATEGORIES.forEach(function(cat) {
+      items.filter(function(r) { return r.category === cat; }).forEach(function(r) {
+        var fid = driveFileIdFromUrl(r.url);
+        if (fid) ordered.push({ fileId: fid, title: r.title, category: cat });
+      });
+    });
+    items.filter(function(r) { return !r.category || MEETING_REPORT_CATEGORIES.indexOf(r.category) === -1; }).forEach(function(r) {
+      var fid = driveFileIdFromUrl(r.url);
+      if (fid) ordered.push({ fileId: fid, title: r.title, category: 'Other' });
+    });
+    return ordered;
+  }
+
+  // "View / Download Full Packet": merges every attachment for the month
+  // into one combined PDF (server-side, see merge-meeting-packet) and shows
+  // it in an in-app modal instead of sending staff off to browse a Drive
+  // folder file by file.
   function handleOpenPacket(monthKey) {
     if (openingPacket) return;
+    var files = getPacketFiles(monthKey);
+    if (!files.length) { alert('Nothing uploaded yet for ' + monthLabel(monthKey) + '.'); return; }
     setOpeningPacket(monthKey);
-    var w = window.open('', '_blank');
-    if (w) { w.document.write('<title>Loading…</title><body style="font-family:system-ui,sans-serif;padding:40px;color:#999">Opening folder…</body>'); w.document.close(); }
-    fetch(SUPABASE_URL + '/functions/v1/upload-meeting-report', {
+    fetch(SUPABASE_URL + '/functions/v1/merge-meeting-packet', {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ monthLabel: monthLabel(monthKey), resolveOnly: true })
-    }).then(function(r) { return r.json(); }).then(function(res) {
+      body: JSON.stringify({ monthLabel: monthLabel(monthKey), files: files })
+    }).then(function(r) {
+      if (!r.ok) return r.json().then(function(err) { throw new Error(err.error || ('HTTP ' + r.status)); });
+      return r.blob();
+    }).then(function(blob) {
       setOpeningPacket(null);
-      if (!res.success) { if (w) w.close(); alert('Could not open that month\'s folder: ' + (res.error || 'Unknown error')); return; }
-      if (w && !w.closed) w.location.href = res.folderUrl; else window.open(res.folderUrl, '_blank');
-    }).catch(function() { setOpeningPacket(null); if (w) w.close(); alert('Could not open that month\'s folder: network error.'); });
+      var blobUrl = URL.createObjectURL(blob);
+      setPacketModal({ monthKey: monthKey, blobUrl: blobUrl });
+    }).catch(function(err) { setOpeningPacket(null); alert('Could not build the packet: ' + err.message); });
+  }
+
+  function closePacketModal() {
+    setPacketModal(function(prev) { if (prev && prev.blobUrl) URL.revokeObjectURL(prev.blobUrl); return null; });
   }
 
   function fmtDate(d) { if (!d) return ''; return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
@@ -15309,6 +15342,21 @@ function MeetingBoardReportsView({ navigate }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {packetModal && (
+        <div onClick={closePacketModal} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: isMobile ? 0 : 24 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: isMobile ? 0 : 12, width: '100%', maxWidth: 900, height: isMobile ? '100%' : '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #e8e0d5', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Board Agenda — {monthLabel(packetModal.monthKey)} — Full Packet</div>
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                <a href={packetModal.blobUrl} download={monthLabel(packetModal.monthKey) + ' - Full Packet.pdf'} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Download PDF</a>
+                <button onClick={closePacketModal} style={{ background: 'none', border: '1px solid #e0d8cc', borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#666' }}>Close</button>
+              </div>
+            </div>
+            <iframe src={packetModal.blobUrl} title="Full Packet" style={{ flex: 1, border: 'none', width: '100%' }} />
+          </div>
         </div>
       )}
     </div>
