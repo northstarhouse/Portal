@@ -15159,11 +15159,12 @@ function MeetingBoardReportsView({ navigate }) {
       body: JSON.stringify({ monthLabel: monthLabel(monthKey), files: files })
     }).then(function(r) {
       if (!r.ok) return r.json().then(function(err) { throw new Error(err.error || ('HTTP ' + r.status)); });
-      return r.blob();
-    }).then(function(blob) {
+      var driveUrl = r.headers.get('X-Packet-Drive-Url') || '';
+      return r.blob().then(function(blob) { return { blob: blob, driveUrl: driveUrl }; });
+    }).then(function(res) {
       setOpeningPacket(null);
-      var blobUrl = URL.createObjectURL(blob);
-      setPacketModal({ monthKey: monthKey, blobUrl: blobUrl });
+      var blobUrl = URL.createObjectURL(res.blob);
+      setPacketModal({ monthKey: monthKey, blobUrl: blobUrl, driveUrl: res.driveUrl });
     }).catch(function(err) { setOpeningPacket(null); alert('Could not build the packet: ' + err.message); });
   }
 
@@ -15401,7 +15402,8 @@ function MeetingBoardReportsView({ navigate }) {
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: isMobile ? 0 : 12, width: '100%', maxWidth: 900, height: isMobile ? '100%' : '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #e8e0d5', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Board Agenda — {monthLabel(packetModal.monthKey)} — Full Packet</div>
-              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+                {packetModal.driveUrl && <a href={packetModal.driveUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#886c44', textDecoration: 'underline' }}>Saved to Drive</a>}
                 <a href={packetModal.blobUrl} download={monthLabel(packetModal.monthKey) + ' - Full Packet.pdf'} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Download PDF</a>
                 <button onClick={closePacketModal} style={{ background: 'none', border: '1px solid #e0d8cc', borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#666' }}>Close</button>
               </div>

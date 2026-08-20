@@ -2,24 +2,33 @@
 // "packet" -- called from the Meeting & Board Reports tab's "View / Download
 // Full Packet" button so staff see one combined document in-app instead of
 // browsing a Drive folder file by file. Just the documents back to back --
-// no cover page, no divider pages between sections.
+// no cover page, no divider pages between sections. The merged PDF is also
+// saved (or overwritten, if regenerated) as an actual file in that month's
+// Drive folder -- "<Month Year> - Board Packet.pdf" -- so it persists there
+// as one file alongside the individual attachments.
 //
 // POST body: {
+//   monthLabel: string,   // e.g. "August 2026" -- names the saved packet file
 //   files: Array<{ fileId: string, title: string, category: string }>
 //          -- in the exact order they should appear in the packet
 // }
 //
-// Response: on success, the raw merged PDF bytes (Content-Type: application/pdf).
+// Response: on success, the raw merged PDF bytes (Content-Type: application/pdf),
+// with the Drive file's link in an X-Packet-Drive-Url header.
 // On failure, JSON { success: false, error }.
 
 import { PDFDocument } from "npm:pdf-lib@1.17.1";
 
 const GOOGLE_SERVICE_ACCOUNT_KEY = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY")!;
 
+// Same Shared Drive root Meeting & Board Reports lives in (see upload-meeting-report).
+const MEETING_REPORTS_PARENT_FOLDER_ID = "1M4p35h-L_V0Ikgz2YNJh5eklp62Dp0wx";
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-app-token",
+  "Access-Control-Expose-Headers": "X-Packet-Drive-Url",
 };
 
 function json(body: unknown, status = 200) {
@@ -56,7 +65,7 @@ async function getDriveAccessToken(): Promise<string> {
   const header = { alg: "RS256", typ: "JWT" };
   const claims = {
     iss: sa.client_email,
-    scope: "https://www.googleapis.com/auth/drive.readonly",
+    scope: "https://www.googleapis.com/auth/drive",
     aud: "https://oauth2.googleapis.com/token",
     iat: now,
     exp: now + 3600,
@@ -105,6 +114,73 @@ async function downloadBytes(url: string, token: string): Promise<Uint8Array> {
 
 const GOOGLE_NATIVE_PREFIX = "application/vnd.google-apps.";
 
+// ---------- Drive folder + save-back ----------
+
+async function driveFindOrCreateFolder(name: string, parentId: string, token: string) {
+  const escaped = name.replace(/'/g, "\\'");
+  const q = `name='${escaped}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
+  const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&includeItemsFromAllDrives=true&supportsAllDrives=true&fields=files(id,name)`;
+  const listRes = await fetch(listUrl, { headers: { Authorization: `Bearer ${token}` } });
+  if (!listRes.ok) throw new Error(`Drive folder lookup failed: ${listRes.status} ${await listRes.text()}`);
+  const found = await listRes.json();
+  if (found.files && found.files.length > 0) return found.files[0].id as string;
+
+  const createRes = await fetch("https://www.googleapis.com/drive/v3/files?supportsAllDrives=true", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder", parents: [parentId] }),
+  });
+  if (!createRes.ok) throw new Error(`Drive folder create failed: ${createRes.status} ${await createRes.text()}`);
+  const created = await createRes.json();
+  return created.id as string;
+}
+
+async function findFileInFolder(name: string, folderId: string, token: string): Promise<string | null> {
+  const escaped = name.replace(/'/g, "\\'");
+  const q = `name='${escaped}' and '${folderId}' in parents and trashed=false`;
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&includeItemsFromAllDrives=true&supportsAllDrives=true&fields=files(id)`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) throw new Error(`Drive file lookup failed: ${res.status} ${await res.text()}`);
+  const found = await res.json();
+  return found.files && found.files.length > 0 ? found.files[0].id : null;
+}
+
+// Saves the merged PDF into the month's folder -- replacing the previous
+// packet file of the same name if this is a regeneration, so re-running it
+// doesn't pile up duplicates.
+async function savePacketToDrive(monthLabel: string, filename: string, bytes: Uint8Array, token: string): Promise<{ id: string; webViewLink: string }> {
+  const rootId = await driveFindOrCreateFolder("Meeting & Board Reports", MEETING_REPORTS_PARENT_FOLDER_ID, token);
+  const folderId = await driveFindOrCreateFolder(monthLabel, rootId, token);
+  const existingId = await findFileInFolder(filename, folderId, token);
+
+  if (existingId) {
+    const res = await fetch(
+      `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=media&supportsAllDrives=true&fields=id,webViewLink`,
+      { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/pdf" }, body: bytes },
+    );
+    if (!res.ok) throw new Error(`Drive packet update failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
+
+  const metadata = { name: filename, parents: [folderId] };
+  const boundary = `nsh-${crypto.randomUUID()}`;
+  const encoder = new TextEncoder();
+  const parts: Uint8Array[] = [
+    encoder.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`),
+    encoder.encode(`--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`),
+    bytes,
+    encoder.encode(`\r\n--${boundary}--`),
+  ];
+  const res = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink",
+    { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` }, body: new Blob(parts) },
+  );
+  if (!res.ok) throw new Error(`Drive packet create failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
 // ---------- Packet assembly ----------
 // Just the documents, concatenated in order -- no cover page, no divider
 // pages between sections. Files that can't be embedded (unsupported type,
@@ -117,7 +193,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { files } = body as { files: Array<{ fileId: string; title: string; category: string }> };
+    const { monthLabel, files } = body as { monthLabel?: string; files: Array<{ fileId: string; title: string; category: string }> };
     if (!Array.isArray(files) || files.length === 0) return json({ success: false, error: "Nothing to merge -- no attachments for this month." }, 400);
 
     const token = await getDriveAccessToken();
@@ -166,7 +242,22 @@ Deno.serve(async (req) => {
     if (includedCount === 0) return json({ success: false, error: "None of this month's attachments could be included in the packet." }, 400);
 
     const outBytes = await merged.save();
-    return new Response(outBytes, { status: 200, headers: { "Content-Type": "application/pdf", ...CORS_HEADERS } });
+
+    let driveUrl = "";
+    if (monthLabel) {
+      try {
+        const saved = await savePacketToDrive(monthLabel, `${monthLabel} - Board Packet.pdf`, outBytes, token);
+        driveUrl = saved.webViewLink || "";
+      } catch {
+        // The in-app view/download still works even if saving the copy to
+        // Drive fails -- don't fail the whole request over it.
+      }
+    }
+
+    return new Response(outBytes, {
+      status: 200,
+      headers: { "Content-Type": "application/pdf", ...(driveUrl ? { "X-Packet-Drive-Url": driveUrl } : {}), ...CORS_HEADERS },
+    });
   } catch (err: any) {
     return json({ success: false, error: err.message || String(err) }, 500);
   }
