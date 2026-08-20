@@ -14936,8 +14936,11 @@ function AnnouncementsView({ navigate }) {
 }
 
 var MEETING_REPORTS_START_MONTH = '2026-08';
-var MEETING_REPORT_CATEGORIES = ['Planning', 'Events', 'Development', 'Custom'];
+var MEETING_REPORT_CATEGORIES = ['Agenda', 'Previous Minutes', 'Docents', 'Planning', 'Events', 'Development', 'Custom'];
 var MEETING_REPORT_CATEGORY_COLORS = {
+  Agenda: { bg: '#fff3e0', color: '#c46a1a' },
+  'Previous Minutes': { bg: '#e0f2f1', color: '#00695c' },
+  Docents: { bg: '#fbe9e7', color: '#8d3d2b' },
   Planning: { bg: '#e3f2fd', color: '#1565c0' },
   Events: { bg: '#e8f5e9', color: '#2e7d32' },
   Development: { bg: '#f3e5f5', color: '#6a1b9a' },
