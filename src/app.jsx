@@ -14961,6 +14961,7 @@ function MeetingBoardReportsView({ navigate }) {
   var [deletingId, setDeletingId] = useState(null);
   var [quickUploading, setQuickUploading] = useState(null); // monthKey + ':' + category, while that button's upload is in flight
   var [voteItemsByMonth, setVoteItemsByMonth] = useState({}); // monthKey -> [{ item, tally }]
+  var [openingPacket, setOpeningPacket] = useState(null); // monthKey while resolving that month's Drive folder link
   var fileInputRef = React.useRef(null);
   var quickFileInputRef = React.useRef(null);
   var quickTargetRef = React.useRef(null); // { monthKey, category } for whichever quick-upload button was just clicked
@@ -15099,6 +15100,27 @@ function MeetingBoardReportsView({ navigate }) {
     }).catch(function() { setDeletingId(null); });
   }
 
+  // "View / Download Full Packet": opens that month's actual Drive folder
+  // (created on demand if nothing's been uploaded to it yet) so staff can
+  // browse everything at once or select-all and download it as one zip --
+  // opened synchronously so popup blockers don't intervene, then redirected
+  // once the folder link comes back.
+  function handleOpenPacket(monthKey) {
+    if (openingPacket) return;
+    setOpeningPacket(monthKey);
+    var w = window.open('', '_blank');
+    if (w) { w.document.write('<title>Loading…</title><body style="font-family:system-ui,sans-serif;padding:40px;color:#999">Opening folder…</body>'); w.document.close(); }
+    fetch(SUPABASE_URL + '/functions/v1/upload-meeting-report', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ monthLabel: monthLabel(monthKey), resolveOnly: true })
+    }).then(function(r) { return r.json(); }).then(function(res) {
+      setOpeningPacket(null);
+      if (!res.success) { if (w) w.close(); alert('Could not open that month\'s folder: ' + (res.error || 'Unknown error')); return; }
+      if (w && !w.closed) w.location.href = res.folderUrl; else window.open(res.folderUrl, '_blank');
+    }).catch(function() { setOpeningPacket(null); if (w) w.close(); alert('Could not open that month\'s folder: network error.'); });
+  }
+
   function fmtDate(d) { if (!d) return ''; return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
   function monthKeyOf(d) { return (d || '').slice(0, 7); } // 'YYYY-MM'
   function monthLabel(monthKey) { return new Date(monthKey + '-15T12:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); }
@@ -15199,7 +15221,12 @@ function MeetingBoardReportsView({ navigate }) {
             });
             return (
               <div key={monthKey}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 8 }}>Board Agenda — {monthLabel(monthKey)}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Board Agenda — {monthLabel(monthKey)}</div>
+                  <button onClick={function() { handleOpenPacket(monthKey); }} disabled={openingPacket === monthKey} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: openingPacket === monthKey ? 'default' : 'pointer', opacity: openingPacket === monthKey ? 0.6 : 1, flexShrink: 0 }}>
+                    {openingPacket === monthKey ? 'Opening…' : 'View / Download Full Packet'}
+                  </button>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
                   {MEETING_REPORT_CATEGORIES.map(function(cat) {
                     var busy = quickUploading === (monthKey + ':' + cat);

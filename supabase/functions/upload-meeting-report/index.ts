@@ -222,9 +222,19 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { filename, mimeType, base64, monthLabel } = body;
-    if (!filename || !mimeType || !base64) return json({ error: "filename, mimeType, and base64 are required" }, 400);
+    const { filename, mimeType, base64, monthLabel, resolveOnly } = body;
     if (!monthLabel) return json({ error: "monthLabel is required (e.g. \"August 2026\")" }, 400);
+
+    // Used by the "View / Download Full Packet" button -- just resolves
+    // (creating if needed) that month's Drive folder and hands back a link,
+    // no file involved.
+    if (resolveOnly) {
+      const token = await getDriveAccessToken();
+      const folderId = await resolveMonthFolder(monthLabel, token);
+      return json({ success: true, folderUrl: `https://drive.google.com/drive/folders/${folderId}` });
+    }
+
+    if (!filename || !mimeType || !base64) return json({ error: "filename, mimeType, and base64 are required" }, 400);
 
     let bytes = base64ToBytes(base64);
     const token = await getDriveAccessToken();
