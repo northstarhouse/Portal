@@ -15067,7 +15067,7 @@ function AnnouncementsView({ navigate }) {
 }
 
 var MEETING_REPORTS_START_MONTH = '2026-08';
-var MEETING_REPORT_CATEGORIES = ['Agenda', 'Previous Minutes', 'Financials', 'Docents', 'Grounds', 'Planning', 'Events', 'Development', 'Custom'];
+var MEETING_REPORT_CATEGORIES = ['Agenda', 'Previous Minutes', 'Financials', 'Docents', 'Grounds', 'Planning', 'Events', 'Development', 'Custom', 'Submitted for Review'];
 var MEETING_REPORT_CATEGORY_COLORS = {
   Agenda: { bg: '#fff3e0', color: '#c46a1a' },
   'Previous Minutes': { bg: '#e0f2f1', color: '#00695c' },
@@ -15078,6 +15078,7 @@ var MEETING_REPORT_CATEGORY_COLORS = {
   Events: { bg: '#e8f5e9', color: '#2e7d32' },
   Development: { bg: '#f3e5f5', color: '#6a1b9a' },
   Custom: { bg: '#fdf3d9', color: '#8a6d3b' },
+  'Submitted for Review': { bg: '#e0f7fa', color: '#00838f' },
 };
 var BOARD_VOTING_CARD_COLOR = { bg: '#ede7f6', color: '#4527a0' };
 
