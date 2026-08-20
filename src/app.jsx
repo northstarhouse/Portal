@@ -12800,6 +12800,15 @@ function AdminView({ navigate }) {
           Venue Rentals
         </div>
         <div
+          onClick={function() { navigate('operational-budgets'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{cashIcon}</span>
+          Operational Budgets
+        </div>
+        <div
           onClick={function() { navigate('planning'); }}
           style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
           onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
@@ -14804,6 +14813,99 @@ function VenueRentalsView({ navigate }) {
   );
 }
 
+function OperationalBudgetsView({ navigate }) {
+  var [rows, setRows] = useState(null);
+  var [forms, setForms] = useState({}); // area -> { lead, lead_email, budget }
+  var [savingArea, setSavingArea] = useState(null);
+
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/operational_area_budgets?select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      var byArea = {};
+      (Array.isArray(data) ? data : []).forEach(function(r) { byArea[r.area] = r; });
+      setRows(byArea);
+      var f = {};
+      OPERATIONAL_AREAS.forEach(function(area) {
+        var r = byArea[area] || {};
+        f[area] = { lead: r.lead || '', lead_email: r.lead_email || '', budget: r.budget != null ? String(r.budget) : '' };
+      });
+      setForms(f);
+    }).catch(function() { setRows({}); });
+  }
+  useEffect(function() { load(); }, []);
+
+  function setField(area, key, value) {
+    setForms(function(prev) { var n = Object.assign({}, prev); n[area] = Object.assign({}, n[area], { [key]: value }); return n; });
+  }
+
+  function handleSave(area) {
+    setSavingArea(area);
+    var f = forms[area];
+    var payload = {
+      area: area,
+      lead: f.lead.trim() || null,
+      lead_email: f.lead_email.trim() || null,
+      budget: f.budget.trim() === '' ? null : parseFloat(f.budget)
+    };
+    fetch(SUPABASE_URL + '/rest/v1/operational_area_budgets', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(payload)
+    }).then(function(r) {
+      setSavingArea(null);
+      if (!r.ok) { r.json().then(function(err) { alert('Failed to save: ' + (err.message || err.hint || r.status)); }).catch(function() { alert('Failed to save.'); }); return; }
+      if (!AREA_DEFAULTS[area]) AREA_DEFAULTS[area] = { lead: '', budget: null, pic: '', leadEmail: '' };
+      AREA_DEFAULTS[area].lead = payload.lead || '';
+      AREA_DEFAULTS[area].leadEmail = payload.lead_email || '';
+      AREA_DEFAULTS[area].budget = payload.budget;
+    }).catch(function() { setSavingArea(null); alert('Failed to save: network error.'); });
+  }
+
+  var inpSt = { width: '100%', padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
+  var lb = { fontSize: 10, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 3 };
+
+  return (
+    <div style={{ maxWidth: 680 }}>
+      <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
+      <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Operational Budgets</div>
+      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Edit each Operational Area's lead, lead email, and annual budget.</div>
+
+      {rows === null ? (
+        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {OPERATIONAL_AREAS.map(function(area) {
+            var f = forms[area] || { lead: '', lead_email: '', budget: '' };
+            return (
+              <div key={area} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', marginBottom: 10 }}>{area}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px', gap: 10, alignItems: 'end' }}>
+                  <div>
+                    <label style={lb}>Lead</label>
+                    <input value={f.lead} onChange={function(e) { setField(area, 'lead', e.target.value); }} placeholder="Name…" style={inpSt} />
+                  </div>
+                  <div>
+                    <label style={lb}>Lead Email</label>
+                    <input value={f.lead_email} onChange={function(e) { setField(area, 'lead_email', e.target.value); }} placeholder="email@…" style={inpSt} />
+                  </div>
+                  <div>
+                    <label style={lb}>Budget ($)</label>
+                    <input type="number" value={f.budget} onChange={function(e) { setField(area, 'budget', e.target.value); }} placeholder="0" style={inpSt} />
+                  </div>
+                </div>
+                <button onClick={function() { handleSave(area); }} disabled={savingArea === area} style={{ marginTop: 10, background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: savingArea === area ? 'default' : 'pointer', opacity: savingArea === area ? 0.6 : 1 }}>
+                  {savingArea === area ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AnnouncementsView({ navigate }) {
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -15951,6 +16053,7 @@ const views = {
   'marketing-posting-schedule': MarketingPostingScheduleView,
   board: BoardView,
   'meeting-reports': MeetingBoardReportsView,
+  'operational-budgets': OperationalBudgetsView,
   sponsors: SponsorsView,
   strategy: StrategyView,
   venue: VenueRentalsView,
@@ -15988,6 +16091,26 @@ var AREA_DEFAULTS = {
   'Marketing':     { lead: 'Haley Wright',     budget: 1000,  pic: 'https://drive.google.com/file/d/17Tse_3jiKZwmkVTTKMtt64zDghfZ8WrV/view?usp=drive_link', leadEmail: '' },
   'Venue':         { lead: 'Staff',            budget: null,  pic: '', leadEmail: '' },
 };
+
+// AREA_DEFAULTS above are just fallbacks -- Admin -> Operational Budgets
+// edits operational_area_budgets in Supabase, which this fetch layers on
+// top (mutating the shared object in place, so anything that reads
+// AREA_DEFAULTS[area] after this resolves sees the current values).
+function loadOperationalAreaBudgets() {
+  fetch(SUPABASE_URL + '/rest/v1/operational_area_budgets?select=*', {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    if (!Array.isArray(rows)) return;
+    rows.forEach(function(row) {
+      if (!AREA_DEFAULTS[row.area]) AREA_DEFAULTS[row.area] = { lead: '', budget: null, pic: '', leadEmail: '' };
+      AREA_DEFAULTS[row.area].lead = row.lead || '';
+      AREA_DEFAULTS[row.area].leadEmail = row.lead_email || '';
+      AREA_DEFAULTS[row.area].budget = row.budget;
+      AREA_DEFAULTS[row.area].pic = row.pic || '';
+    });
+  }).catch(function() {});
+}
+loadOperationalAreaBudgets();
 
 // Board notification routing: reimbursements go to Wyn Spiller; all other
 // budget-category items go to that area's lead (AREA_DEFAULTS[area].leadEmail).
