@@ -15362,6 +15362,17 @@ function PlanningView({ navigate }) {
 
   useEffect(function() { loadList(); }, []);
 
+  // Arriving from Event Overviews' "Edit" button lands here via a
+  // #planning/edit/<id> hash (rather than navigate(), which only ever sets
+  // the hash to a bare module id) -- pick up the id once, load that plan
+  // into the form, then clean the URL back to a plain #planning.
+  useEffect(function() {
+    var m = window.location.hash.match(/^#planning\/edit\/([^/?#]+)/);
+    if (!m) return;
+    handleLoadTemplate(m[1]);
+    window.history.replaceState(null, '', window.location.pathname + '#planning');
+  }, []);
+
   function loadList() {
     fetch(SUPABASE_URL + '/rest/v1/planning_templates?select=id,name&order=name.asc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -15577,6 +15588,10 @@ function EventOverviewsView({ navigate }) {
     openPlanPreview(p.id, function() { setOpeningId(null); });
   }
 
+  function handleEdit(p) {
+    window.location.hash = 'planning/edit/' + p.id;
+  }
+
   function handleCopyLink(p) {
     var link = window.location.origin + window.location.pathname + '#event-plan/' + p.id;
     function done() { setCopiedId(p.id); setTimeout(function() { setCopiedId(null); }, 2000); }
@@ -15645,6 +15660,9 @@ function EventOverviewsView({ navigate }) {
                 </div>
                 <button onClick={function() { handleView(p); }} disabled={openingId === p.id} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: openingId === p.id ? 'default' : 'pointer', opacity: openingId === p.id ? 0.6 : 1, flexShrink: 0 }}>
                   {openingId === p.id ? 'Opening…' : 'View'}
+                </button>
+                <button onClick={function() { handleEdit(p); }} title="Edit this plan in Planning" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                  Edit
                 </button>
                 <button onClick={function() { handleCopyLink(p); }} title="Copy a shareable link straight to this plan" style={{ background: '#fff', color: '#886c44', border: '1px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
                   {copiedId === p.id ? 'Copied!' : 'Copy Link'}
@@ -16162,6 +16180,7 @@ var validModuleIds = Object.keys(views);
 function hashToModule() {
   var h = window.location.hash.replace(/^#/, '');
   if (h.indexOf('event-plan/') === 0) return 'event-plan';
+  if (h.indexOf('planning/edit/') === 0) return 'planning';
   return validModuleIds.indexOf(h) !== -1 ? h : 'home';
 }
 
