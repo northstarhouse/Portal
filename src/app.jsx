@@ -5238,6 +5238,11 @@ function BoardView() {
     return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  function fmtFullDate(ts) {
+    if (!ts) return '';
+    return new Date(ts).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
   var bInp = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 3, fontSize: 12, marginTop: 4, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', background: '#fff' };
   var bLbl = { fontSize: 12, color: '#666', fontWeight: 500 };
   var bGrp = { marginBottom: 14 };
@@ -5338,7 +5343,7 @@ function BoardView() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>{item.title}</div>
                   <div style={{ fontSize: 12, color: '#777' }}>
-                    {item.submitted_by ? <span>Submitted by {item.submitted_by}{item.due_date ? ' · ' : ''}</span> : null}
+                    {item.submitted_by ? <span>Submitted by {item.submitted_by}{item.created_at ? ' on ' + fmtFullDate(item.created_at) : ''}{item.due_date ? ' · ' : ''}</span> : null}
                     {item.due_date ? <span>Due {fmtDate(item.due_date)}</span> : null}
                     {item.meeting_date ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null}
                   </div>

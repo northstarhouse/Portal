@@ -1,10 +1,10 @@
 // Merges every attachment for one month's Board Agenda into a single PDF
 // "packet" -- called from the Meeting & Board Reports tab's "View / Download
 // Full Packet" button so staff see one combined document in-app instead of
-// browsing a Drive folder file by file.
+// browsing a Drive folder file by file. Just the documents back to back --
+// no cover page, no divider pages between sections.
 //
 // POST body: {
-//   monthLabel: string,   // e.g. "August 2026" -- used in the cover page title
 //   files: Array<{ fileId: string, title: string, category: string }>
 //          -- in the exact order they should appear in the packet
 // }
@@ -12,7 +12,7 @@
 // Response: on success, the raw merged PDF bytes (Content-Type: application/pdf).
 // On failure, JSON { success: false, error }.
 
-import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
+import { PDFDocument } from "npm:pdf-lib@1.17.1";
 
 const GOOGLE_SERVICE_ACCOUNT_KEY = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY")!;
 
@@ -106,15 +106,10 @@ async function downloadBytes(url: string, token: string): Promise<Uint8Array> {
 const GOOGLE_NATIVE_PREFIX = "application/vnd.google-apps.";
 
 // ---------- Packet assembly ----------
-
-function addDividerPage(doc: PDFDocument, font: any, category: string, title: string, note?: string) {
-  const page = doc.addPage([612, 792]); // US Letter
-  page.drawText(category.toUpperCase(), { x: 56, y: 700, size: 12, font, color: rgb(0.53, 0.42, 0.27) });
-  page.drawLine({ start: { x: 56, y: 690 }, end: { x: 556, y: 690 }, thickness: 1, color: rgb(0.85, 0.8, 0.7) });
-  page.drawText(title, { x: 56, y: 660, size: 18, font, color: rgb(0.16, 0.14, 0.13), maxWidth: 500 });
-  if (note) page.drawText(note, { x: 56, y: 630, size: 11, font, color: rgb(0.5, 0.5, 0.5), maxWidth: 500 });
-  return page;
-}
+// Just the documents, concatenated in order -- no cover page, no divider
+// pages between sections. Files that can't be embedded (unsupported type,
+// fetch/convert failure) are silently skipped rather than replaced with a
+// placeholder page.
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
@@ -122,25 +117,12 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { monthLabel, files } = body as { monthLabel: string; files: Array<{ fileId: string; title: string; category: string }> };
-    if (!monthLabel) return json({ success: false, error: "monthLabel is required" }, 400);
+    const { files } = body as { files: Array<{ fileId: string; title: string; category: string }> };
     if (!Array.isArray(files) || files.length === 0) return json({ success: false, error: "Nothing to merge -- no attachments for this month." }, 400);
 
     const token = await getDriveAccessToken();
     const merged = await PDFDocument.create();
-    const font = await merged.embedFont(StandardFonts.HelveticaBold);
-    const bodyFont = await merged.embedFont(StandardFonts.Helvetica);
-
-    // Cover page
-    const cover = merged.addPage([612, 792]);
-    cover.drawText("Board Agenda", { x: 56, y: 700, size: 26, font, color: rgb(0.16, 0.14, 0.13) });
-    cover.drawText(monthLabel, { x: 56, y: 668, size: 16, font: bodyFont, color: rgb(0.53, 0.42, 0.27) });
-    cover.drawLine({ start: { x: 56, y: 650 }, end: { x: 556, y: 650 }, thickness: 1, color: rgb(0.85, 0.8, 0.7) });
-    files.forEach((f, i) => {
-      const y = 610 - i * 20;
-      if (y < 60) return;
-      cover.drawText(`${f.category} — ${f.title}`, { x: 56, y, size: 11, font: bodyFont, color: rgb(0.3, 0.3, 0.3), maxWidth: 500 });
-    });
+    let includedCount = 0;
 
     for (const f of files) {
       try {
@@ -162,24 +144,26 @@ Deno.serve(async (req) => {
         }
 
         if (pdfBytes) {
-          addDividerPage(merged, font, f.category, f.title);
           const srcDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
           const pages = await merged.copyPages(srcDoc, srcDoc.getPageIndices());
           pages.forEach((p) => merged.addPage(p));
+          includedCount++;
         } else if (imageBytes && imageKind) {
-          const page = addDividerPage(merged, font, f.category, f.title);
           const img = imageKind === "jpg" ? await merged.embedJpg(imageBytes) : await merged.embedPng(imageBytes);
-          const maxW = 500, maxH = 560;
+          const maxW = 612, maxH = 792; // cap page size at Letter even if the photo is huge
           const scale = Math.min(maxW / img.width, maxH / img.height, 1);
           const w = img.width * scale, h = img.height * scale;
-          page.drawImage(img, { x: 56, y: 600 - h, width: w, height: h });
-        } else {
-          addDividerPage(merged, font, f.category, f.title, `(${meta.name} — this file type can't be embedded here; open it separately in Drive.)`);
+          const page = merged.addPage([w, h]);
+          page.drawImage(img, { x: 0, y: 0, width: w, height: h });
+          includedCount++;
         }
-      } catch (fileErr: any) {
-        addDividerPage(merged, font, f.category, f.title, `(Could not include this file: ${fileErr.message || fileErr})`);
+        // Anything else (unsupported type) is silently skipped.
+      } catch {
+        // Fetch/convert failure for this one file -- skip it, keep going.
       }
     }
+
+    if (includedCount === 0) return json({ success: false, error: "None of this month's attachments could be included in the packet." }, 400);
 
     const outBytes = await merged.save();
     return new Response(outBytes, { status: 200, headers: { "Content-Type": "application/pdf", ...CORS_HEADERS } });
