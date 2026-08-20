@@ -15888,6 +15888,40 @@ function buildPlanningPdfHtml(data) {
     ? '<img src="' + data.logoDataUrl + '" alt="North Star House" style="height:42px;width:auto;display:block" />'
     : '<div style="font-family:\'Cardo\',Georgia,serif;font-size:17px;font-weight:700;color:var(--chrome-text)">North Star House</div>';
   var planFileSlug = (data.title || 'event-plan').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'event-plan';
+
+  // Shopping List -- a second, separately-printable page compiled from the
+  // Food/Drinks/Dessert/Supplies fields as a plain checklist, always in the
+  // white/gold/black look regardless of the main page's colorful/pf toggle.
+  function checklist(items) {
+    if (!items.length) return '<div style="font-size:14px;color:#c2b8a5;font-style:italic;padding:6px 0">—</div>';
+    return items.map(function(l) {
+      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid #f0ece0;break-inside:avoid">' +
+        '<div style="width:16px;height:16px;border:2px solid ' + gold + ';border-radius:3px;flex-shrink:0;margin-top:2px"></div>' +
+        '<div style="font-size:15px;color:#2a2420;line-height:1.4">' + mdBold(l) + '</div>' +
+      '</div>';
+    }).join('');
+  }
+  var shoppingListBody = [
+    { label: 'Food', value: data.food },
+    { label: 'Drinks', value: data.drinks },
+    { label: 'Dessert', value: data.dessert },
+    { label: 'Supplies', value: data.supplies },
+  ].map(function(sec) {
+    return '<div style="margin-bottom:22px;break-inside:avoid">' +
+      '<div style="font-family:\'Cardo\',Georgia,serif;font-size:18px;font-weight:700;color:' + gold + ';border-bottom:2px solid ' + gold + ';padding-bottom:6px;margin-bottom:4px">' + esc(sec.label) + '</div>' +
+      checklist(lines(sec.value)) +
+    '</div>';
+  }).join('');
+  var shoppingListPageHtml =
+    '<div id="shoppingListPage" style="width:8.5in;max-width:94vw;min-height:11in;box-sizing:border-box;margin:20px auto 10px;background:#fff;overflow:hidden;box-shadow:0 6px 20px rgba(42,36,32,0.12),0 2px 6px rgba(42,36,32,0.06)">' +
+      '<div style="height:7px;background:' + gold + '"></div>' +
+      '<div style="padding:28px 36px 10px;text-align:center">' +
+        '<div style="font-family:\'Cardo\',Georgia,serif;font-size:28px;font-weight:700;color:#2a2420">Shopping List</div>' +
+        '<div style="font-size:14px;color:#8a7d68;margin-top:4px">' + esc(data.title || 'Event Plan') + (metaLine ? '&nbsp;&nbsp;·&nbsp;&nbsp;' + metaLine : '') + '</div>' +
+      '</div>' +
+      '<div style="padding:10px 36px 30px">' + shoppingListBody + '</div>' +
+    '</div>';
+
   return (
     '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(data.title || 'Event Plan') + '</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Cardo:wght@400;700&display=swap" rel="stylesheet">' +
@@ -15898,6 +15932,9 @@ function buildPlanningPdfHtml(data) {
         'body{margin:0;background:' + cream + '}' +
         'body.pf{background:#fff}' +
         '#planningPage{margin:0!important;max-width:100%!important;border-radius:0!important;box-shadow:none!important}' +
+        '#shoppingListPage{margin:0!important;max-width:100%!important;box-shadow:none!important;page-break-before:always}' +
+        'body.shopping-only #planningPage{display:none!important}' +
+        'body.shopping-only #shoppingListPage{page-break-before:auto!important}' +
         '.no-print{display:none!important}' +
       '}' +
       'body{margin:0;background:#efe9de;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif;color:#3a332a}' +
@@ -15909,6 +15946,7 @@ function buildPlanningPdfHtml(data) {
       '<button id="btnPrint" style="background:' + accentDark + ';color:' + cream + ';border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Print / Save PDF</button>' +
       '<button id="btnJpeg" style="background:#fff;color:' + accentDark + ';border:1px solid ' + accentDark + ';border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Save as JPEG</button>' +
       '<button id="btnPF" style="background:#fff;color:' + gold + ';border:1px solid ' + gold + ';border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Colorful View</button>' +
+      '<button id="btnPrintShopping" style="background:#fff;color:' + gold + ';border:1px solid ' + gold + ';border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Calibri,\'Segoe UI\',system-ui,sans-serif">Print Shopping List</button>' +
     '</div>' +
     '<div id="planningPage" class="pf" style="width:8.5in;max-width:94vw;min-height:11in;box-sizing:border-box;margin:10px auto;background:var(--page-bg);border-radius:0;overflow:hidden;box-shadow:0 6px 20px rgba(42,36,32,0.12),0 2px 6px rgba(42,36,32,0.06);transform-origin:top center">' +
       '<div style="height:7px;background:' + gold + '"></div>' +
@@ -15972,6 +16010,7 @@ function buildPlanningPdfHtml(data) {
       '</div>' +
       (data.footerNote ? '<div style="background:var(--chrome-bg);text-align:center;font-style:italic;font-size:14.5px;color:var(--chrome-text);padding:14px;font-family:\'Cardo\',Georgia,serif;border-top:2px solid var(--chrome-line)">' + esc(data.footerNote) + '</div>' : '') +
     '</div>' +
+    shoppingListPageHtml +
     '<script>(function(){' +
       'function fitAndPrint(){' +
         'var el=document.getElementById("planningPage");if(!el)return;' +
@@ -16012,10 +16051,18 @@ function buildPlanningPdfHtml(data) {
         'document.body.classList.toggle("pf",on);' +
         'var btn=document.getElementById("btnPF");if(btn)btn.textContent=on?"Colorful View":"Printer-Friendly (White)";' +
       '}' +
+      'function printShoppingOnly(){' +
+        'document.body.classList.add("shopping-only");' +
+        'setTimeout(function(){window.print();},50);' +
+      '}' +
+      'window.addEventListener("afterprint",function(){' +
+        'document.body.classList.remove("shopping-only");' +
+      '});' +
       'function wire(){' +
         'var p=document.getElementById("btnPrint");if(p)p.addEventListener("click",fitAndPrint);' +
         'var j=document.getElementById("btnJpeg");if(j)j.addEventListener("click",saveJpeg);' +
         'var pf=document.getElementById("btnPF");if(pf)pf.addEventListener("click",togglePF);' +
+        'var s=document.getElementById("btnPrintShopping");if(s)s.addEventListener("click",printShoppingOnly);' +
       '}' +
       'if(document.readyState==="complete"){wire();}else{window.addEventListener("load",wire);}' +
     '})();<\/script>' +
