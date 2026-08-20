@@ -574,7 +574,7 @@ const modules = [
   { id: "sponsors", label: "Sponsors" },
   { id: "board", label: "Board Voting" },
   { id: "meeting-reports", label: "Meeting & Board Reports" },
-  { id: "strategy", label: "Strategic Goal Progress" },
+  { id: "strategy", label: "Strategic Goal Progress", hidden: true },
   { id: "venue", label: "Venue Rentals", hidden: true },
   { id: "ideas", label: "Ideas & Initiatives" },
   { id: "operational", label: "Operational Areas", hidden: true },
@@ -6004,7 +6004,7 @@ function BoardSlidesModal({ onClose }) {
   );
 }
 
-function StrategyView() {
+function StrategyView({ navigate }) {
   const { useState: useS, useEffect: useE } = React;
   var isMobile = React.useContext(MobileCtx);
   const [goals, setGoals] = useS([]);
@@ -6118,6 +6118,7 @@ function StrategyView() {
       {showBoardSlides && <BoardSlidesModal onClose={function() { setShowBoardSlides(false); }} />}
       {!activeCat ? (
         <div>
+          <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div style={{ fontSize: 13, color: '#888', lineHeight: 1.6 }}>
               View progress across strategic goals at a glance. Click any progress line to see more details for that focus area.
@@ -12755,6 +12756,17 @@ function AdminView({ navigate }) {
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Tools</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 28 }}>
+        <div
+          onClick={function() { navigate('strategy'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+          </span>
+          Strategic Goal Progress
+        </div>
         {ADMIN_TOOLS.map(function(tool) {
           return <AdminToolCard key={tool.label} tool={tool} icon={tool.icon} />;
         })}
