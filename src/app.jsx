@@ -575,7 +575,7 @@ const modules = [
   { id: "board", label: "Board Voting" },
   { id: "meeting-reports", label: "Meeting & Board Reports" },
   { id: "strategy", label: "Strategic Goal Progress" },
-  { id: "venue", label: "Venue Rentals" },
+  { id: "venue", label: "Venue Rentals", hidden: true },
   { id: "ideas", label: "Ideas & Initiatives" },
   { id: "operational", label: "Operational Areas", hidden: true },
   { id: "financials", label: "Reimbursements", hidden: true },
@@ -12777,6 +12777,17 @@ function AdminView({ navigate }) {
           Events
         </div>
         <div
+          onClick={function() { navigate('venue'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/><path d="M9 2v4"/><path d="M15 2v4"/></svg>
+          </span>
+          Venue Rentals
+        </div>
+        <div
           onClick={function() { navigate('planning'); }}
           style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
           onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
@@ -14489,7 +14500,7 @@ function BirthdaysView({ navigate }) {
   );
 }
 
-function VenueRentalsView() {
+function VenueRentalsView({ navigate }) {
   const { useState: useS, useEffect: useE, useRef: useR } = React;
   const [weddings, setWeddings] = useS([]);
   const [tracking, setTracking] = useS({});
@@ -14731,6 +14742,7 @@ function VenueRentalsView() {
 
   return (
     <div>
+      <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
       <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 6 }}>Venue Rentals</div>
       <div style={{ fontSize: 13, color: '#aaa', marginBottom: 16 }}>Wedding tracking and post-event checklist</div>
 
