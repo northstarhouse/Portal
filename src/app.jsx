@@ -14936,11 +14936,12 @@ function AnnouncementsView({ navigate }) {
 }
 
 var MEETING_REPORTS_START_MONTH = '2026-08';
-var MEETING_REPORT_CATEGORIES = ['Planning', 'Events', 'Development'];
+var MEETING_REPORT_CATEGORIES = ['Planning', 'Events', 'Development', 'Custom'];
 var MEETING_REPORT_CATEGORY_COLORS = {
   Planning: { bg: '#e3f2fd', color: '#1565c0' },
   Events: { bg: '#e8f5e9', color: '#2e7d32' },
   Development: { bg: '#f3e5f5', color: '#6a1b9a' },
+  Custom: { bg: '#fdf3d9', color: '#8a6d3b' },
 };
 
 function MeetingBoardReportsView() {
@@ -15160,7 +15161,7 @@ function MeetingBoardReportsView() {
             });
             return (
               <div key={monthKey}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>{monthLabel(monthKey)}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 8 }}>Board Agenda — {monthLabel(monthKey)}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
                   {MEETING_REPORT_CATEGORIES.map(function(cat) {
                     var busy = quickUploading === (monthKey + ':' + cat);
