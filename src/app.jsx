@@ -15204,6 +15204,22 @@ function MeetingBoardReportsView({ navigate }) {
   });
   var monthKeys = Object.keys(monthMap).sort().reverse();
 
+  // Board meetings are always the third Thursday of the month. Once that
+  // date has passed, the upload cards for that month disappear -- it moves
+  // into "Previous Meeting Packets" as a single row (title + the same Full
+  // Packet button), instead of staying cluttered with buttons for a meeting
+  // that's already happened.
+  function thirdThursday(monthKey) {
+    var parts = monthKey.split('-');
+    var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1;
+    var first = new Date(y, m, 1);
+    var firstThursday = 1 + ((4 - first.getDay() + 7) % 7);
+    return new Date(y, m, firstThursday + 14, 23, 59, 59, 999);
+  }
+  function isMeetingOver(monthKey) { return new Date() > thirdThursday(monthKey); }
+  var activeMonthKeys = monthKeys.filter(function(k) { return !isMeetingOver(k); });
+  var pastMonthKeys = monthKeys.filter(isMeetingOver);
+
   return (
     <div style={{ maxWidth: 760 }}>
       <input ref={quickFileInputRef} type="file" onChange={handleQuickFileChosen} style={{ display: 'none' }} />
@@ -15257,7 +15273,7 @@ function MeetingBoardReportsView({ navigate }) {
         <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {monthKeys.map(function(monthKey) {
+          {activeMonthKeys.map(function(monthKey) {
             var items = monthMap[monthKey];
             var byCategory = {};
             var uncategorized = [];
@@ -15359,6 +15375,24 @@ function MeetingBoardReportsView({ navigate }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {pastMonthKeys.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Previous Meeting Packets</div>
+          <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
+            {pastMonthKeys.map(function(monthKey, i) {
+              return (
+                <div key={monthKey} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', borderBottom: i < pastMonthKeys.length - 1 ? '0.5px solid #f0ece6' : 'none', flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{monthLabel(monthKey)} Board Packet</div>
+                  <button onClick={function() { handleOpenPacket(monthKey); }} disabled={openingPacket === monthKey} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: openingPacket === monthKey ? 'default' : 'pointer', opacity: openingPacket === monthKey ? 0.6 : 1, flexShrink: 0 }}>
+                    {openingPacket === monthKey ? 'Opening…' : 'View / Download Full Packet'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
