@@ -14936,18 +14936,20 @@ function AnnouncementsView({ navigate }) {
 }
 
 var MEETING_REPORTS_START_MONTH = '2026-08';
-var MEETING_REPORT_CATEGORIES = ['Agenda', 'Previous Minutes', 'Docents', 'Planning', 'Events', 'Development', 'Custom'];
+var MEETING_REPORT_CATEGORIES = ['Agenda', 'Previous Minutes', 'Docents', 'Grounds', 'Planning', 'Events', 'Development', 'Custom'];
 var MEETING_REPORT_CATEGORY_COLORS = {
   Agenda: { bg: '#fff3e0', color: '#c46a1a' },
   'Previous Minutes': { bg: '#e0f2f1', color: '#00695c' },
   Docents: { bg: '#fbe9e7', color: '#8d3d2b' },
+  Grounds: { bg: '#efebe9', color: '#5d4037' },
   Planning: { bg: '#e3f2fd', color: '#1565c0' },
   Events: { bg: '#e8f5e9', color: '#2e7d32' },
   Development: { bg: '#f3e5f5', color: '#6a1b9a' },
   Custom: { bg: '#fdf3d9', color: '#8a6d3b' },
 };
+var BOARD_VOTING_CARD_COLOR = { bg: '#ede7f6', color: '#4527a0' };
 
-function MeetingBoardReportsView() {
+function MeetingBoardReportsView({ navigate }) {
   var isMobile = React.useContext(MobileCtx);
   var emptyForm = { title: '', meeting_date: '', url: '', notes: '' };
   var [reports, setReports] = useState(null);
@@ -14958,9 +14960,41 @@ function MeetingBoardReportsView() {
   var [saving, setSaving] = useState(false);
   var [deletingId, setDeletingId] = useState(null);
   var [quickUploading, setQuickUploading] = useState(null); // monthKey + ':' + category, while that button's upload is in flight
+  var [voteItemsByMonth, setVoteItemsByMonth] = useState({}); // monthKey -> [{ item, tally }]
   var fileInputRef = React.useRef(null);
   var quickFileInputRef = React.useRef(null);
   var quickTargetRef = React.useRef(null); // { monthKey, category } for whichever quick-upload button was just clicked
+
+  // Board Voting items auto-populate here, grouped by their meeting_date's
+  // month -- read-only (no upload button), just a snapshot of what's up for
+  // a vote that month, with a link through to the real Board Voting page.
+  function loadVoteItems() {
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Board Voting Items') + '?select=*', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Board-Votes') + '?select=*', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function(r) { return r.json(); })
+    ]).then(function(res) {
+      var items = Array.isArray(res[0]) ? res[0] : [];
+      var votes = Array.isArray(res[1]) ? res[1] : [];
+      var byMonth = {};
+      items.forEach(function(it) {
+        if (!it.meeting_date) return;
+        var key = monthKeyOf(it.meeting_date);
+        var iv = votes.filter(function(v) { return v.topicId === it.title; });
+        var tally = {
+          yes: iv.filter(function(v) { return v.choice === 'Yes'; }).length,
+          no: iv.filter(function(v) { return v.choice === 'No'; }).length,
+          abstain: iv.filter(function(v) { return v.choice === 'Abstain'; }).length
+        };
+        if (!byMonth[key]) byMonth[key] = [];
+        byMonth[key].push({ item: it, tally: tally });
+      });
+      setVoteItemsByMonth(byMonth);
+    }).catch(function() {});
+  }
 
   function load() {
     fetch(SUPABASE_URL + '/rest/v1/meeting_board_reports?select=*&order=meeting_date.desc.nullslast,created_at.desc', {
@@ -14969,7 +15003,7 @@ function MeetingBoardReportsView() {
       setReports(Array.isArray(rows) ? rows : []);
     }).catch(function() { setReports([]); });
   }
-  useEffect(function() { load(); }, []);
+  useEffect(function() { load(); loadVoteItems(); }, []);
 
   function saveReport(url) {
     fetch(SUPABASE_URL + '/rest/v1/meeting_board_reports', {
@@ -14999,10 +15033,11 @@ function MeetingBoardReportsView() {
     var reader = new FileReader();
     reader.onload = function() {
       var base64 = reader.result.split(',')[1];
+      var targetMonthKey = form.meeting_date ? monthKeyOf(form.meeting_date) : new Date().toISOString().slice(0, 7);
       fetch(SUPABASE_URL + '/functions/v1/upload-meeting-report', {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: attachFile.name, mimeType: attachFile.type || 'application/octet-stream', base64: base64 })
+        body: JSON.stringify({ filename: attachFile.name, mimeType: attachFile.type || 'application/octet-stream', base64: base64, monthLabel: monthLabel(targetMonthKey) })
       }).then(function(r) { return r.json(); }).then(function(res) {
         setUploading(false);
         if (!res.success) { setSaving(false); alert('Failed to upload attachment: ' + (res.error || 'Unknown error')); return; }
@@ -15034,7 +15069,7 @@ function MeetingBoardReportsView() {
       fetch(SUPABASE_URL + '/functions/v1/upload-meeting-report', {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, mimeType: file.type || 'application/octet-stream', base64: base64 })
+        body: JSON.stringify({ filename: file.name, mimeType: file.type || 'application/octet-stream', base64: base64, monthLabel: monthLabel(target.monthKey) })
       }).then(function(r) { return r.json(); }).then(function(res) {
         if (!res.success) { setQuickUploading(null); alert('Failed to upload: ' + (res.error || 'Unknown error')); return; }
         var titleGuess = file.name.replace(/\.[^.\/]+$/, '');
@@ -15196,6 +15231,32 @@ function MeetingBoardReportsView() {
                       </div>
                     );
                   })}
+                  {(function() {
+                    var votes = voteItemsByMonth[monthKey] || [];
+                    return (
+                      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
+                        <div style={{ padding: '10px 14px', background: BOARD_VOTING_CARD_COLOR.bg, borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: BOARD_VOTING_CARD_COLOR.color, fontFamily: "'Cardo', serif" }}>Board Voting</div>
+                          <button onClick={function() { navigate('board'); }} style={{ background: '#fff', color: BOARD_VOTING_CARD_COLOR.color, border: '1px solid ' + BOARD_VOTING_CARD_COLOR.color, borderRadius: 20, padding: '4px 11px', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                            Open
+                          </button>
+                        </div>
+                        <div style={{ padding: votes.length ? '10px 12px' : '16px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {votes.length === 0 && <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>Nothing up for a vote this month.</div>}
+                          {votes.map(function(v) {
+                            return (
+                              <div key={v.item.row_id} style={{ background: '#faf8f4', borderRadius: 8, padding: '7px 10px' }}>
+                                <div style={{ fontSize: 12, color: '#2a2a2a', fontWeight: 600 }}>{v.item.title}</div>
+                                <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                                  {v.item.status || 'Open'} &nbsp;·&nbsp; Yes {v.tally.yes} · No {v.tally.no} · Abstain {v.tally.abstain}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 {uncategorized.length > 0 && (
                   <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', marginTop: 10 }}>

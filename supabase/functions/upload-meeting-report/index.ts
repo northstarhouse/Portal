@@ -1,10 +1,17 @@
-// Uploads a meeting minutes / board report attachment into a "Meeting &
-// Board Reports" folder living alongside the Mail/Checks folders inside the
-// same Acknowledgement Templates Shared Drive (same service account already
-// configured for the Donor Acknowledgment system) -- see upload-mail for the
-// identical pattern.
+// Uploads a meeting minutes / board report attachment into a
+// "Meeting & Board Reports / <Month Year>" folder living alongside the
+// Mail/Checks folders inside the same Acknowledgement Templates Shared
+// Drive (same service account already configured for the Donor
+// Acknowledgment system) -- see upload-mail for the base pattern.
 //
-// POST body: { filename: string, mimeType: string, base64: string }
+// Word documents (.doc/.docx) are auto-converted to PDF before landing in
+// Drive: Drive itself does the conversion (import the file as a temporary
+// Google Doc, export that as PDF, delete the temporary Doc).
+//
+// POST body: {
+//   filename: string, mimeType: string, base64: string,
+//   monthLabel: string,   // e.g. "August 2026" -- the subfolder to upload into
+// }
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -12,6 +19,11 @@ const GOOGLE_SERVICE_ACCOUNT_KEY = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY")!;
 
 // Same Shared Drive root the Acknowledgement Templates / Checks / Mail folders live in.
 const MEETING_REPORTS_PARENT_FOLDER_ID = "1M4p35h-L_V0Ikgz2YNJh5eklp62Dp0wx";
+
+const WORD_MIME_TYPES = new Set([
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -93,8 +105,9 @@ async function getDriveAccessToken(): Promise<string> {
 // ---------- Drive folder + upload ----------
 
 // Warm cache: survives across invocations of the same function instance, so a
-// batch of uploads back-to-back only resolves the folder once.
-let warmFolderId: string | null = null;
+// batch of uploads back-to-back only resolves each folder once.
+let warmRootFolderId: string | null = null;
+const warmMonthFolderIds = new Map<string, string>();
 
 async function driveFindOrCreateFolder(name: string, parentId: string, token: string) {
   const escaped = name.replace(/'/g, "\\'");
@@ -115,14 +128,22 @@ async function driveFindOrCreateFolder(name: string, parentId: string, token: st
   return created.id as string;
 }
 
-async function resolveMeetingReportsFolder(token: string) {
-  if (warmFolderId) return warmFolderId;
-  warmFolderId = await driveFindOrCreateFolder("Meeting & Board Reports", MEETING_REPORTS_PARENT_FOLDER_ID, token);
-  return warmFolderId;
+// Resolves (creating as needed) Meeting & Board Reports/<monthLabel>, e.g.
+// Meeting & Board Reports/August 2026 -- a fresh folder appears automatically
+// the first time anything is uploaded for a given month.
+async function resolveMonthFolder(monthLabel: string, token: string) {
+  const cached = warmMonthFolderIds.get(monthLabel);
+  if (cached) return cached;
+  if (!warmRootFolderId) {
+    warmRootFolderId = await driveFindOrCreateFolder("Meeting & Board Reports", MEETING_REPORTS_PARENT_FOLDER_ID, token);
+  }
+  const folderId = await driveFindOrCreateFolder(monthLabel, warmRootFolderId, token);
+  warmMonthFolderIds.set(monthLabel, folderId);
+  return folderId;
 }
 
 async function driveUploadFile(filename: string, bytes: Uint8Array, mimeType: string, folderId: string, token: string) {
-  const metadata = { name: filename, parents: [folderId] };
+  const metadata: Record<string, unknown> = { name: filename, parents: [folderId] };
   const boundary = `nsh-${crypto.randomUUID()}`;
   const encoder = new TextEncoder();
   const parts: Uint8Array[] = [
@@ -145,6 +166,47 @@ async function driveUploadFile(filename: string, bytes: Uint8Array, mimeType: st
   return res.json() as Promise<{ id: string; webViewLink: string }>;
 }
 
+// Imports a Word doc as a Google Doc (Drive auto-converts on import when the
+// target mimeType differs from the source), exports it as PDF bytes, then
+// discards the temporary Google Doc. Uploaded into a scratch spot in the
+// same shared drive (not the visible month folder) since it never needs to
+// be seen -- only the resulting PDF does.
+async function convertWordToPdf(filename: string, bytes: Uint8Array, mimeType: string, scratchFolderId: string, token: string): Promise<Uint8Array> {
+  const metadata = { name: filename, parents: [scratchFolderId], mimeType: "application/vnd.google-apps.document" };
+  const boundary = `nsh-${crypto.randomUUID()}`;
+  const encoder = new TextEncoder();
+  const parts: Uint8Array[] = [
+    encoder.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`),
+    encoder.encode(`--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`),
+    bytes,
+    encoder.encode(`\r\n--${boundary}--`),
+  ];
+  const uploadRes = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+      body: new Blob(parts),
+    },
+  );
+  if (!uploadRes.ok) throw new Error(`Word->Doc import failed for ${filename}: ${uploadRes.status} ${await uploadRes.text()}`);
+  const { id: tempDocId } = await uploadRes.json();
+
+  try {
+    const exportRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${tempDocId}/export?mimeType=application/pdf`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!exportRes.ok) throw new Error(`Doc->PDF export failed for ${filename}: ${exportRes.status} ${await exportRes.text()}`);
+    return new Uint8Array(await exportRes.arrayBuffer());
+  } finally {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${tempDocId}?supportsAllDrives=true`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {});
+  }
+}
+
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
@@ -160,24 +222,35 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { filename, mimeType, base64 } = body;
+    const { filename, mimeType, base64, monthLabel } = body;
     if (!filename || !mimeType || !base64) return json({ error: "filename, mimeType, and base64 are required" }, 400);
+    if (!monthLabel) return json({ error: "monthLabel is required (e.g. \"August 2026\")" }, 400);
 
-    const bytes = base64ToBytes(base64);
+    let bytes = base64ToBytes(base64);
     const token = await getDriveAccessToken();
-    const folderId = await resolveMeetingReportsFolder(token);
-    const uploaded = await driveUploadFile(filename, bytes, mimeType, folderId, token);
+    const folderId = await resolveMonthFolder(monthLabel, token);
+
+    let finalFilename = filename;
+    let finalMimeType = mimeType;
+    const isWordDoc = WORD_MIME_TYPES.has(mimeType) || /\.docx?$/i.test(filename);
+    if (isWordDoc) {
+      bytes = await convertWordToPdf(filename, bytes, mimeType, folderId, token);
+      finalFilename = filename.replace(/\.docx?$/i, "") + ".pdf";
+      finalMimeType = "application/pdf";
+    }
+
+    const uploaded = await driveUploadFile(finalFilename, bytes, finalMimeType, folderId, token);
 
     await fetch(`${SUPABASE_URL}/rest/v1/activity_log`, {
       method: "POST",
       headers: sbHeaders({ Prefer: "return=minimal" }),
       body: JSON.stringify({
-        description: "Meeting/board report uploaded: " + filename,
+        description: "Meeting/board report uploaded: " + finalFilename,
         action: "meeting_report_uploaded",
       }),
     }).catch(() => {});
 
-    return json({ success: true, url: uploaded.webViewLink, fileId: uploaded.id });
+    return json({ success: true, url: uploaded.webViewLink, fileId: uploaded.id, filename: finalFilename });
   } catch (err: any) {
     return json({ success: false, error: err.message || String(err) }, 500);
   }
