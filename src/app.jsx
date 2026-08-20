@@ -14965,10 +14965,11 @@ function AnnouncementsView({ navigate }) {
 }
 
 var MEETING_REPORTS_START_MONTH = '2026-08';
-var MEETING_REPORT_CATEGORIES = ['Agenda', 'Previous Minutes', 'Docents', 'Grounds', 'Planning', 'Events', 'Development', 'Custom'];
+var MEETING_REPORT_CATEGORIES = ['Agenda', 'Previous Minutes', 'Financials', 'Docents', 'Grounds', 'Planning', 'Events', 'Development', 'Custom'];
 var MEETING_REPORT_CATEGORY_COLORS = {
   Agenda: { bg: '#fff3e0', color: '#c46a1a' },
   'Previous Minutes': { bg: '#e0f2f1', color: '#00695c' },
+  Financials: { bg: '#e8eaf6', color: '#3949ab' },
   Docents: { bg: '#fbe9e7', color: '#8d3d2b' },
   Grounds: { bg: '#efebe9', color: '#5d4037' },
   Planning: { bg: '#e3f2fd', color: '#1565c0' },
@@ -15430,7 +15431,7 @@ function MeetingBoardReportsView({ navigate }) {
 
 var PLANNING_EMPTY_FORM = {
   title: '', dateLine: '', timeLine: '', location: 'North Star House', intro: '',
-  food: '', drinks: '', dessert: '', supplies: '',
+  food: '', drinks: '', dessert: '', supplies: '', shoppingList: '',
   setupTime: '', setupPeople: '', setupNote: '',
   cleanupPeople: '', cleanupNote: '',
   activities: '', stillToFinalize: '',
@@ -15734,6 +15735,10 @@ function PlanningView({ navigate }) {
         {Area('Dessert', 'dessert', 'Ice cream + toppings: **Ken**')}
         {Area('Supplies', 'supplies', 'Plates, napkins, cups, etc. — already in-house')}
       </div>
+
+      <div style={sectionHead}>Shopping List</div>
+      {Area('Specific items to buy (optional, one per line)', 'shoppingList', 'e.g. 2 bags of ice\n1 case of sparkling water — Costco brand\nExtra-large trash bags (contractor size)', 4)}
+      <div style={{ fontSize: 11.5, color: '#999', marginTop: -6, marginBottom: 10 }}>Printed on its own checklist page alongside Food/Drinks/Dessert/Supplies — use this for anything that needs more detail (brand, quantity, size) than those fields.</div>
 
       <div style={sectionHead}>Setup & Cleanup</div>
       {Text('Setup heading', 'setupTime', 'e.g. Setup begins around 3:00 p.m.')}
@@ -16128,7 +16133,8 @@ function buildPlanningPdfHtml(data) {
     { label: 'Drinks', value: data.drinks },
     { label: 'Dessert', value: data.dessert },
     { label: 'Supplies', value: data.supplies },
-  ].map(function(sec) {
+    { label: 'Additional Items', value: data.shoppingList },
+  ].filter(function(sec) { return lines(sec.value).length > 0; }).map(function(sec) {
     return '<div style="margin-bottom:22px;break-inside:avoid">' +
       '<div style="font-family:\'Cardo\',Georgia,serif;font-size:18px;font-weight:700;color:' + gold + ';border-bottom:2px solid ' + gold + ';padding-bottom:6px;margin-bottom:4px">' + esc(sec.label) + '</div>' +
       checklist(lines(sec.value)) +
