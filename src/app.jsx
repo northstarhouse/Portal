@@ -15092,6 +15092,7 @@ function MeetingBoardReportsView({ navigate }) {
   var [uploading, setUploading] = useState(false);
   var [saving, setSaving] = useState(false);
   var [deletingId, setDeletingId] = useState(null);
+  var [reviewingId, setReviewingId] = useState(null); // report id while an Accept/Deny/Next Meeting action is in flight
   var [quickUploading, setQuickUploading] = useState(null); // monthKey + ':' + category, while that button's upload is in flight
   var [voteItemsByMonth, setVoteItemsByMonth] = useState({}); // monthKey -> [{ item, tally }]
   var [openingPacket, setOpeningPacket] = useState(null); // monthKey while merging that month's packet
@@ -15232,6 +15233,37 @@ function MeetingBoardReportsView({ navigate }) {
       setDeletingId(null);
       setReports(function(prev) { return prev.filter(function(x) { return x.id !== id; }); });
     }).catch(function() { setDeletingId(null); });
+  }
+
+  function nextMonthKey(monthKey) {
+    var parts = monthKey.split('-');
+    var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) + 1;
+    if (m > 12) { m = 1; y += 1; }
+    return y + '-' + (m < 10 ? '0' + m : m);
+  }
+
+  // Accept/Deny just mark the item's review outcome in place. "Next
+  // Meeting" defers it -- moves it into next month's Agenda category so it
+  // automatically shows up on next meeting's agenda without retyping it.
+  function handleReviewAction(rep, action) {
+    if (reviewingId) return;
+    setReviewingId(rep.id);
+    var patch;
+    if (action === 'accept') patch = { review_status: 'Accepted' };
+    else if (action === 'deny') patch = { review_status: 'Denied' };
+    else {
+      var curKey = monthKeyOf(rep.meeting_date) || monthKeyOf(rep.created_at) || currentMonthKey;
+      patch = { category: 'Agenda', meeting_date: nextMonthKey(curKey) + '-01', review_status: null };
+    }
+    fetch(SUPABASE_URL + '/rest/v1/meeting_board_reports?id=eq.' + rep.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(patch)
+    }).then(function(r) {
+      setReviewingId(null);
+      if (!r.ok) { alert('Failed to update.'); return; }
+      load();
+    }).catch(function() { setReviewingId(null); alert('Failed to update: network error.'); });
   }
 
   function driveFileIdFromUrl(url) {
@@ -15427,10 +15459,22 @@ function MeetingBoardReportsView({ navigate }) {
                         <div style={{ padding: catItems.length ? '10px 12px' : '16px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                           {catItems.length === 0 && <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>Nothing uploaded yet.</div>}
                           {catItems.map(function(rep) {
+                            var busyReview = reviewingId === rep.id;
                             return (
                               <div key={rep.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#faf8f4', borderRadius: 8, padding: '7px 10px', flexWrap: 'wrap' }}>
-                                <div style={{ flex: 1, minWidth: 100, fontSize: 12, color: '#2a2a2a' }}>{rep.title}</div>
+                                <div style={{ flex: 1, minWidth: 100, fontSize: 12, color: '#2a2a2a' }}>
+                                  {rep.title}
+                                  {rep.review_status === 'Accepted' && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#2e7d32' }}>✓ Accepted</span>}
+                                  {rep.review_status === 'Denied' && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#a04545' }}>✕ Denied</span>}
+                                </div>
                                 {rep.url && <a href={rep.url} target="_blank" rel="noopener noreferrer" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '4px 10px', fontSize: 11, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>Open</a>}
+                                {cat === 'Submitted for Review' && (
+                                  <React.Fragment>
+                                    <button onClick={function() { handleReviewAction(rep, 'accept'); }} disabled={busyReview} title="Accept" style={{ background: 'none', border: '1px solid #2e7d32', color: '#2e7d32', borderRadius: 7, padding: '4px 9px', fontSize: 11, fontWeight: 600, cursor: busyReview ? 'default' : 'pointer', opacity: busyReview ? 0.5 : 1, flexShrink: 0 }}>Accept</button>
+                                    <button onClick={function() { handleReviewAction(rep, 'deny'); }} disabled={busyReview} title="Deny" style={{ background: 'none', border: '1px solid #a04545', color: '#a04545', borderRadius: 7, padding: '4px 9px', fontSize: 11, fontWeight: 600, cursor: busyReview ? 'default' : 'pointer', opacity: busyReview ? 0.5 : 1, flexShrink: 0 }}>Deny</button>
+                                    <button onClick={function() { handleReviewAction(rep, 'next'); }} disabled={busyReview} title="Move to next meeting's Agenda" style={{ background: 'none', border: '1px solid ' + gold, color: gold, borderRadius: 7, padding: '4px 9px', fontSize: 11, fontWeight: 600, cursor: busyReview ? 'default' : 'pointer', opacity: busyReview ? 0.5 : 1, flexShrink: 0 }}>Next Meeting</button>
+                                  </React.Fragment>
+                                )}
                                 <button onClick={function() { handleDelete(rep.id); }} disabled={deletingId === rep.id} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 11, flexShrink: 0 }}>
                                   {deletingId === rep.id ? 'Deleting…' : 'Delete'}
                                 </button>
