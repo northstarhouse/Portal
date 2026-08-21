@@ -10766,12 +10766,12 @@ function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSa
         </div>
         {formData.status === 'Active' && <div><label style={lb}>Total Budget ($)</label><input type="number" step="0.01" min="0" value={formData.budget || ''} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { budget: e.target.value }); }); }} style={inpSt} placeholder="0.00" /></div>}
       </div>
-      <div style={{ marginBottom: 12 }}><label style={lb}>Notes — why it matters, context, ideas</label><textarea value={formData.notes} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Why this matters, background context, related ideas…" /></div>
+      <div style={{ marginBottom: 12 }}><label style={lb}>Notes — why it matters, context, ideas</label><textarea value={formData.notes} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={5} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Why this matters, background context, related ideas…" /></div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
-        <div><label style={{ fontSize: 11, color: '#b45309', fontWeight: 600, display: 'block', marginBottom: 4 }}>Blockers — what's in the way</label><textarea value={formData.blockers} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { blockers: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Obstacles, constraints, risks…" /></div>
-        <div><label style={{ fontSize: 11, color: '#1565c0', fontWeight: 600, display: 'block', marginBottom: 4 }}>Gaps — what's missing</label><textarea value={formData.gaps} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { gaps: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Resources, knowledge, support needed…" /></div>
+        <div><label style={{ fontSize: 11, color: '#b45309', fontWeight: 600, display: 'block', marginBottom: 4 }}>Blockers — what's in the way</label><textarea value={formData.blockers} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { blockers: e.target.value }); }); }} rows={4} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Obstacles, constraints, risks…" /></div>
+        <div><label style={{ fontSize: 11, color: '#1565c0', fontWeight: 600, display: 'block', marginBottom: 4 }}>Gaps — what's missing</label><textarea value={formData.gaps} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { gaps: e.target.value }); }); }} rows={4} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Resources, knowledge, support needed…" /></div>
       </div>
-      <div style={{ marginBottom: 12 }}><label style={lb}>Updates — latest progress</label><textarea value={formData.updates || ''} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { updates: e.target.value }); }); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Latest progress, recent changes…" /></div>
+      <div style={{ marginBottom: 12 }}><label style={{ fontSize: 11, color: '#2e7d32', fontWeight: 600, display: 'block', marginBottom: 4 }}>Updates — latest progress</label><textarea value={formData.updates || ''} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { updates: e.target.value }); }); }} rows={5} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Latest progress, recent changes…" /></div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="submit" disabled={isSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving…' : submitLabel}</button>
         <button type="button" onClick={onCancel} style={{ padding: '9px 18px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
@@ -10802,7 +10802,7 @@ function IdeasView() {
   var [showAdd, setShowAdd] = useState(false);
   var [editing, setEditing] = useState(false);
   var emptyForm = { title: '', status: 'Exploring', submitted_by: '', notes: '', blockers: '', gaps: '', budget: '', updates: '' };
-  var [showUpdates, setShowUpdates] = useState(false);
+  var [showUpdates, setShowUpdates] = useState(true);
   var [form, setForm] = useState(emptyForm);
   var [editForm, setEditForm] = useState({});
   var [saving, setSaving] = useState(false);
@@ -11030,7 +11030,7 @@ function IdeasView() {
                   var sc = STATUS_COLORS[idea.status] || { bg: '#f5f5f5', color: '#888' };
                   var isSel = selected && selected.id === idea.id;
                   return (
-                    <div key={idea.id} onClick={function() { setSelected(isSel ? null : idea); setEditing(false); setShowUpdates(false); }}
+                    <div key={idea.id} onClick={function() { setSelected(isSel ? null : idea); setEditing(false); setShowUpdates(true); }}
                       style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb', cursor: 'pointer', background: isSel ? sc.bg : '#fff', borderLeft: '3px solid ' + (isSel ? sc.color : 'transparent'), transition: 'all 0.12s' }}
                       onMouseEnter={function(e) { if (!isSel) e.currentTarget.style.background = '#faf8f5'; }}
                       onMouseLeave={function(e) { if (!isSel) e.currentTarget.style.background = '#fff'; }}>
@@ -11039,6 +11039,7 @@ function IdeasView() {
                         <span style={{ fontSize: 10, fontWeight: 700, background: sc.bg, color: sc.color, border: '0.5px solid ' + sc.color + '44', borderRadius: 10, padding: '1px 7px' }}>{idea.status}</span>
                         {idea.submitted_by && <span style={{ fontSize: 11, color: '#aaa' }}>{idea.submitted_by}</span>}
                       </div>
+                      {idea.updates && <div style={{ fontSize: 11, color: '#2e7d32', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↳ {idea.updates}</div>}
                     </div>
                   );
                 })
@@ -11091,16 +11092,16 @@ function IdeasView() {
                       )}
                     </div>
                     {showUpdates && (
-                      <div style={{ marginTop: 16, paddingTop: 14, borderTop: '0.5px solid #f0ece6' }}>
-                        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 6 }}>Updates</div>
+                      <div style={{ marginTop: 16, background: '#eef6ee', border: '1px solid #cfe4cf', borderRadius: 10, padding: '12px 16px' }}>
+                        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#2e7d32', fontWeight: 700, marginBottom: 6 }}>Latest Updates</div>
                         {selected.updates
-                          ? <div style={{ fontSize: 13, color: '#555', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{selected.updates}</div>
-                          : <div style={{ fontSize: 13, color: '#ccc', fontStyle: 'italic' }}>No updates yet.</div>}
+                          ? <div style={{ fontSize: 13.5, color: '#3a4a3a', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{selected.updates}</div>
+                          : <div style={{ fontSize: 13, color: '#8ba38b', fontStyle: 'italic' }}>No updates yet.</div>}
                       </div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                       <button onClick={function() { setShowUpdates(function(v) { return !v; }); }}
-                        style={{ fontSize: 11, color: '#aaa', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', textDecoration: 'underline' }}>
+                        style={{ fontSize: 11, color: '#888', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', textDecoration: 'underline' }}>
                         {showUpdates ? 'Hide Updates' : 'View Updates'}
                       </button>
                     </div>
