@@ -10949,7 +10949,7 @@ function IdeaUpdatesSection({ ideaId }) {
               );
             }
             return (
-              <div key={item.id} style={{ background: '#fff', border: '1px solid #dcebdc', borderRadius: 8, padding: '9px 12px' }}>
+              <div key={item.id} style={{ background: '#dcebdc', border: '1px solid #c3ddc3', borderRadius: 8, padding: '9px 12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#5a8a5a' }}>{fmtFullDate(item.update_date)}</div>
                   <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
