@@ -12549,7 +12549,6 @@ function ActivityLogView({ navigate }) {
           {adminAuthed ? 'Admin (unlocked)' : 'Admin'}
         </button>
       </div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Activity Log</div>
       <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Everything that's happened, grouped by month.</div>
 
       {showAdmin && (
@@ -12703,7 +12702,6 @@ function MaintenanceRequestView({ navigate }) {
   return (
     <div style={{ maxWidth: 900 }}>
       <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
-      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Maintenance Request</div>
       <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Logs straight to the Activity Log, tagged Maintenance.</div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
@@ -12807,7 +12805,6 @@ function DevLogView({ navigate }) {
   return (
     <div style={{ maxWidth: 640 }}>
       <button onClick={function() { navigate('operational'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Back</button>
-      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Dev Log</div>
       <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>What's changed in Portal, and when.</div>
 
       {entries === null ? (
@@ -14966,7 +14963,6 @@ function VenueRentalsView({ navigate }) {
   return (
     <div>
       <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
-      <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 6 }}>Venue Rentals</div>
       <div style={{ fontSize: 13, color: '#aaa', marginBottom: 16 }}>
         {nextUpcoming ? ('Next up: ' + nextUpcoming.title + ' — ' + nextUpcoming.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) : 'Wedding & rental tracking'}
       </div>
@@ -15860,10 +15856,7 @@ function MeetingBoardReportsView({ navigate }) {
     <div style={{ maxWidth: 760 }}>
       <input ref={quickFileInputRef} type="file" onChange={handleQuickFileChosen} style={{ display: 'none' }} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Meeting & Board Reports</div>
-          <div style={{ fontSize: 13, color: '#999', marginTop: 2 }}>Click a category under a month to upload straight to it.</div>
-        </div>
+        <div style={{ fontSize: 13, color: '#999', marginTop: 2 }}>Click a category under a month to upload straight to it.</div>
         <button onClick={function() { setShowAdd(function(v) { return !v; }); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
           {showAdd ? 'Cancel' : '+ Add Custom Report'}
         </button>
