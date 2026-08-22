@@ -1,0 +1,2523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Treasury Reports — North Star House</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; padding: 0; -webkit-font-smoothing: antialiased; background: light-dark(#f4f1e9,#171816); }
+  .backbar { display: flex; align-items: center; padding: 12px 28px 0; }
+  .backbar a { color: #886c44; font-size: 13px; font-weight: 600; text-decoration: none; }
+  .backbar a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="backbar"><a href="index.html">← Back to Portal</a></div>
+
+<div id="nsh-fin" class="nsh-root">
+<style>
+#nsh-fin{background:light-dark(#f4f1e9,#171816);color:light-dark(#24251f,#f1efe7);padding:28px;font-family:'Calibri','Segoe UI',ui-sans-serif,system-ui,sans-serif;border-radius:0;min-width:0}
+#nsh-fin *{box-sizing:border-box}
+.nsh-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px}
+.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;opacity:.58}
+.period{font-size:14px;opacity:.7;margin-top:5px}
+.navwrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tabs,.reporttabs{display:flex;gap:6px;background:light-dark(#e5e0d5,#242620);padding:4px;border-radius:10px}
+.tab,.reporttab{border:0;background:transparent;color:inherit;padding:10px 14px;border-radius:7px;font-weight:700;cursor:pointer;min-height:44px}
+.tab.active,.reporttab.active{background:light-dark(#fff,#34372f);box-shadow:0 1px 3px rgba(0,0,0,.12);color:#886c44}
+.reportbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+.adminbtn{border:1px solid light-dark(#aaa293,#505348);background:transparent;color:inherit;padding:10px 14px;border-radius:10px;font-weight:800;cursor:pointer;min-height:44px}
+.adminbtn.active{background:#886c44;color:#fff;border-color:#886c44}
+.view,.reportview,.adminpanel{display:none}
+.view.active,.reportview.active,.adminpanel.active{display:block}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.card{background:light-dark(#fff,#22241f);border:1px solid light-dark(#e0d8cc,#35382f);border-radius:12px;padding:18px;min-width:0}
+.kpi-label{font-size:13px;font-weight:700;opacity:.64}
+.kpi-value{font-size:clamp(25px,4vw,38px);font-weight:800;letter-spacing:-.04em;margin:5px 0}
+.delta{font-size:13px;font-weight:700}
+.up{color:light-dark(#28744a,#75d49a)}
+.down{color:light-dark(#a34335,#f19a8c)}
+.story{margin:16px 0 22px;padding:18px 20px;border-left:5px solid #886c44;background:light-dark(#ebe5d8,#2b2b25);border-radius:0 12px 12px 0;font-size:16px;line-height:1.55}
+.story strong{font-weight:800}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.section-title{font-size:17px;font-weight:800;margin:0 0 4px}
+.section-sub{font-size:13px;opacity:.62;margin:0 0 18px}
+.barrow{display:grid;grid-template-columns:minmax(90px,1.2fr) minmax(90px,2fr) auto;align-items:center;gap:10px;margin:13px 0}
+.barlabel{font-size:13px;font-weight:650}
+.bartrack{height:10px;border-radius:99px;background:light-dark(#ece8de,#363830);overflow:hidden}
+.barfill{height:100%;border-radius:99px;background:light-dark(#77796e,#b5b9a7)}
+.barfill.income{background:light-dark(#886c44,#c9a876)}
+.barfill.asset{background:light-dark(#657b8d,#8ea8bb)}
+.amount{font-size:13px;font-weight:750;text-align:right}
+.drivers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
+.driver{padding:15px;border-radius:12px;background:light-dark(#fff,#22241f);border:1px solid light-dark(#e0d8cc,#35382f)}
+.driver h4{margin:0 0 9px;font-size:13px}
+.driver p{margin:0;font-size:13px;line-height:1.45;opacity:.76}
+.driver b{font-size:19px;display:block;margin-bottom:3px}
+.attention{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.signal{padding:17px;border-radius:13px;border:1px solid light-dark(#e0d8cc,#35382f);background:light-dark(#fff,#22241f)}
+.signal-title{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;opacity:.6;margin-bottom:8px}
+.signal p{margin:0;line-height:1.5;font-size:14px}
+.input-note{font-size:14px;line-height:1.55;max-width:760px;opacity:.72;margin-bottom:18px}
+.paste-wrap{margin:0 0 22px;padding:16px;border-radius:12px;background:light-dark(#f4f1e9,#292b25);border:1px solid light-dark(#e0d8cc,#35382f)}
+.paste-label{display:block;font-size:13px;font-weight:800;margin-bottom:8px}
+.pastebox{width:100%;min-height:150px;resize:vertical;border:1px solid light-dark(#cbc4b5,#484b40);background:light-dark(#fff,#20221d);color:inherit;border-radius:9px;padding:12px;font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
+.paste-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.parse-note{font-size:12px;opacity:.62}
+.input-grid{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:8px;align-items:center}
+.input-grid .head{font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:800;opacity:.55;padding:0 8px}
+.rowlabel{font-size:14px;font-weight:700;padding:8px}
+.money{width:100%;min-width:0;min-height:44px;border:1px solid light-dark(#cbc4b5,#484b40);background:light-dark(#fff,#292b25);color:inherit;border-radius:9px;padding:9px 11px;font-size:16px}
+.grouphead{grid-column:1/-1;margin-top:14px;padding:10px 8px 5px;font-size:13px;font-weight:850;border-bottom:1px solid light-dark(#d8d1c4,#3b3d35)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.btn{min-height:44px;border:0;border-radius:9px;padding:10px 16px;font-weight:800;cursor:pointer}
+.primary{background:#886c44;color:#fff}
+.secondary{background:transparent;color:inherit;border:1px solid light-dark(#bbb4a7,#4b4e43)}
+.mini{margin-top:17px;padding:14px;border-radius:10px;background:light-dark(#e9e5dc,#2c2e28);font-size:13px;line-height:1.5}
+.adjusted{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:16px;padding-top:15px;border-top:1px solid light-dark(#e0d8cc,#35382f)}
+.adjusted label{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:650}
+.adjusted input{width:18px;height:18px}
+.adj-result{margin-left:auto;font-weight:800;font-size:14px}
+.foot{font-size:11px;opacity:.52;margin-top:16px;line-height:1.45}
+
+@media(max-width:720px){
+  #nsh-fin{padding:18px}
+  .kpis,.grid2,.drivers,.attention{grid-template-columns:1fr}
+  .input-grid{grid-template-columns:1fr 1fr}
+  .input-grid .head:first-child{display:none}
+  .input-grid .head:nth-child(2),.input-grid .head:nth-child(3){text-align:center}
+  .rowlabel{grid-column:1/-1;padding-bottom:0}
+  .barrow{grid-template-columns:95px 1fr auto}
+  .adj-result{width:100%;margin-left:0}
+}
+</style>
+
+<div class="nsh-top">
+  <div>
+    <div class="eyebrow">North Star Historic Conservancy</div>
+    <div class="period" id="periodLabel">
+      Financial snapshot · January–July 2026 vs. 2025
+    </div>
+  </div>
+
+  <button class="adminbtn" id="adminBtn" type="button">Admin</button>
+</div>
+
+<div class="reportbar">
+  <div class="reporttabs" role="tablist">
+    <button class="reporttab active" type="button" data-report="pl">
+      Income &amp; Expenses
+    </button>
+    <button class="reporttab" type="button" data-report="bs">
+      Balance Sheet
+    </button>
+    <button class="reporttab" type="button" data-report="budget">
+      Budget vs Actual
+    </button>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" type="button" data-period="jul">Jul 31</button>
+    <button class="tab" type="button" data-period="aug">Aug 20</button>
+  </div>
+</div>
+
+<section id="dashboard" class="view active">
+
+  <!-- PROFIT & LOSS -->
+  <div id="plDashboard" class="reportview active">
+
+    <div class="kpis">
+      <div class="card">
+        <div class="kpi-label">Total Income</div>
+        <div class="kpi-value" id="incomeVal">$124,421</div>
+        <div class="delta up" id="incomeDelta">↑ 12.9% vs. last year</div>
+      </div>
+
+      <div class="card">
+        <div class="kpi-label">Total Expenses</div>
+        <div class="kpi-value" id="expenseVal">$152,377</div>
+        <div class="delta down" id="expenseDelta">↑ 41.1% vs. last year</div>
+      </div>
+
+      <div class="card">
+        <div class="kpi-label">Bottom Line</div>
+        <div class="kpi-value" id="netVal">−$27,955</div>
+        <div class="delta down" id="netDelta">$30,227 worse than 2025</div>
+      </div>
+    </div>
+
+    <div class="story" id="story">
+      <strong>The simple read:</strong>
+      Revenue is growing, but spending is growing much faster.
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3 class="section-title">Where the money came from</h3>
+        <p class="section-sub">Income grouped into understandable buckets</p>
+        <div id="incomeBars"></div>
+      </div>
+
+      <div class="card">
+        <h3 class="section-title">Where the money went</h3>
+        <p class="section-sub">Largest expense categories</p>
+        <div id="expenseBars"></div>
+
+        <div class="adjusted">
+          <label>
+            <input type="checkbox" id="excludeDep">
+            Exclude depreciation
+          </label>
+
+          <label>
+            <input type="checkbox" id="excludeCap">
+            Exclude restoration/capital
+          </label>
+
+          <div class="adj-result" id="adjResult"></div>
+        </div>
+
+        <div class="foot">
+          The adjusted view is analytical only. It does not change official accounting net income.
+        </div>
+      </div>
+    </div>
+
+    <div class="drivers">
+      <div class="driver">
+        <h4>Biggest revenue engine</h4>
+        <b id="eventDriver">$77,988</b>
+        <p>Events and weddings generate the majority of current income.</p>
+      </div>
+
+      <div class="driver">
+        <h4>Biggest cost driver</h4>
+        <b id="payrollDriver">$70,342</b>
+        <p>Payroll is the largest expense category.</p>
+      </div>
+
+      <div class="driver">
+        <h4>Core pressure</h4>
+        <b id="gapDriver">+28 pts</b>
+        <p id="gapText">
+          Expenses grew faster than income.
+        </p>
+      </div>
+    </div>
+
+    <div class="attention">
+      <div class="signal">
+        <div class="signal-title">Working</div>
+        <p id="workingText">
+          Event income is up, unrestricted donations are stronger, and overall revenue is higher.
+        </p>
+      </div>
+
+      <div class="signal">
+        <div class="signal-title">Needs attention</div>
+        <p id="watchText">
+          Expense growth is outpacing revenue.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- BALANCE SHEET -->
+  <div id="bsDashboard" class="reportview">
+
+    <div class="kpis">
+      <div class="card">
+        <div class="kpi-label">Total Assets</div>
+        <div class="kpi-value" id="bsAssetsVal">$862,056</div>
+        <div class="delta" id="bsAssetsDelta">↓ 0.4% vs. last year</div>
+      </div>
+
+      <div class="card">
+        <div class="kpi-label">Cash</div>
+        <div class="kpi-value" id="bsCashVal">$172,207</div>
+        <div class="delta" id="bsCashDelta">↓ 5.3% vs. last year</div>
+      </div>
+
+      <div class="card">
+        <div class="kpi-label">Total Liabilities</div>
+        <div class="kpi-value" id="bsLiabVal">$11,352</div>
+        <div class="delta" id="bsLiabDelta">↑ 475.5% vs. last year</div>
+      </div>
+    </div>
+
+    <div class="story" id="bsStory">
+      <strong>The simple read:</strong>
+      Most of the balance sheet is held in property and fixed assets.
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3 class="section-title">What North Star House owns</h3>
+        <p class="section-sub">Assets grouped into major categories</p>
+        <div id="bsAssetBars"></div>
+      </div>
+
+      <div class="card">
+        <h3 class="section-title">What sits against those assets</h3>
+        <p class="section-sub">Liabilities and equity at a glance</p>
+        <div id="bsFundingBars"></div>
+      </div>
+    </div>
+
+    <div class="drivers">
+      <div class="driver">
+        <h4>Current assets</h4>
+        <b id="bsCurrentDriver">$119,429</b>
+        <p>Cash, receivables, and other short-term resources.</p>
+      </div>
+
+      <div class="driver">
+        <h4>Fixed assets</h4>
+        <b id="bsFixedDriver">$742,626</b>
+        <p>Land, buildings, improvements, and equipment.</p>
+      </div>
+
+      <div class="driver">
+        <h4>Current liabilities</h4>
+        <b id="bsCurrentLiabDriver">$11,352</b>
+        <p>Short-term obligations currently recorded.</p>
+      </div>
+    </div>
+
+    <div class="attention">
+      <div class="signal">
+        <div class="signal-title">Liquidity</div>
+        <p id="bsLiquidityText"></p>
+      </div>
+
+      <div class="signal">
+        <div class="signal-title">Needs attention</div>
+        <p id="bsWatchText"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUDGET -->
+  <div id="budgetDashboard" class="reportview">
+
+    <div class="kpis">
+      <div class="card">
+        <div class="kpi-label">Actual Income</div>
+        <div class="kpi-value" id="budgetIncomeVal">$64,306</div>
+        <div class="delta" id="budgetIncomeDelta">33.3% of cash budget</div>
+      </div>
+
+      <div class="card">
+        <div class="kpi-label">Actual Expenses</div>
+        <div class="kpi-value" id="budgetExpenseVal">$152,377</div>
+        <div class="delta" id="budgetExpenseDelta">73.9% of cash budget</div>
+      </div>
+
+      <div class="card">
+        <div class="kpi-label">Actual Net</div>
+        <div class="kpi-value" id="budgetNetVal">−$27,955</div>
+        <div class="delta down" id="budgetNetDelta">$14,835 below budgeted net</div>
+      </div>
+    </div>
+
+    <div class="story" id="budgetStory"></div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3 class="section-title">Income: actual vs cash budget</h3>
+        <p class="section-sub">How much of each budgeted income category has been recorded</p>
+        <div id="budgetIncomeBars"></div>
+      </div>
+
+      <div class="card">
+        <h3 class="section-title">Expenses: actual vs cash budget</h3>
+        <p class="section-sub">Actual spending compared with budget</p>
+        <div id="budgetExpenseBars"></div>
+      </div>
+    </div>
+
+    <div class="drivers">
+      <div class="driver">
+        <h4>Income budget used</h4>
+        <b id="budgetIncomePct">33%</b>
+        <p id="budgetIncomeText">Based on the Total Income figures shown.</p>
+      </div>
+
+      <div class="driver">
+        <h4>Expense budget used</h4>
+        <b id="budgetExpensePct">74%</b>
+        <p id="budgetExpenseText">Actual expenses compared with full cash budget.</p>
+      </div>
+
+      <div class="driver">
+        <h4>Net position vs budget</h4>
+        <b id="budgetNetGap">−$14,835</b>
+        <p id="budgetNetGapText"></p>
+      </div>
+    </div>
+
+    <div class="attention">
+      <div class="signal">
+        <div class="signal-title">Source note</div>
+        <p id="budgetSourceNote"></p>
+      </div>
+
+      <div class="signal">
+        <div class="signal-title">Budget watch</div>
+        <p id="budgetWatchText"></p>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ADMIN -->
+<section id="input" class="view">
+
+  <!-- P&L ADMIN -->
+  <div id="plAdmin" class="adminpanel">
+    <div class="card">
+
+      <h3 class="section-title">Income &amp; Expense data</h3>
+
+      <p class="input-note">
+        Paste QuickBooks-style P&amp;L text below and the dashboard will identify major totals.
+      </p>
+
+      <div class="paste-wrap">
+        <label class="paste-label" for="pasteData">Paste P&amp;L text</label>
+
+        <textarea
+          id="pasteData"
+          class="pastebox"
+          placeholder="Paste copied P&amp;L text here…"></textarea>
+
+        <div class="paste-actions">
+          <button class="btn primary" id="parseBtn" type="button">
+            Parse P&amp;L
+          </button>
+
+          <button class="btn secondary" id="clearPasteBtn" type="button">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <div class="input-grid">
+
+        <div class="head">Category</div>
+        <div class="head">2026</div>
+        <div class="head">2025</div>
+
+        <div class="grouphead">Summary</div>
+
+        <div class="rowlabel">Total Income</div>
+        <input class="money" id="in_total26">
+        <input class="money" id="in_total25">
+
+        <div class="rowlabel">Total Expenses</div>
+        <input class="money" id="ex_total26">
+        <input class="money" id="ex_total25">
+
+        <div class="grouphead">Income Categories</div>
+
+        <div class="rowlabel">Events &amp; Weddings</div>
+        <input class="money" id="events26">
+        <input class="money" id="events25">
+
+        <div class="rowlabel">Donations</div>
+        <input class="money" id="don26">
+        <input class="money" id="don25">
+
+        <div class="rowlabel">Memberships &amp; Sponsorships</div>
+        <input class="money" id="mem26">
+        <input class="money" id="mem25">
+
+        <div class="rowlabel">Other Income</div>
+        <input class="money" id="other26">
+        <input class="money" id="other25">
+
+        <div class="rowlabel">Bricks</div>
+        <input class="money" id="bricks26">
+        <input class="money" id="bricks25">
+
+        <div class="grouphead">Major Expense Categories</div>
+
+        <div class="rowlabel">Payroll</div>
+        <input class="money" id="pay26">
+        <input class="money" id="pay25">
+
+        <div class="rowlabel">Capital / Restoration</div>
+        <input class="money" id="cap26">
+        <input class="money" id="cap25">
+
+        <div class="rowlabel">Depreciation</div>
+        <input class="money" id="dep26">
+        <input class="money" id="dep25">
+
+        <div class="rowlabel">Insurance</div>
+        <input class="money" id="ins26">
+        <input class="money" id="ins25">
+
+        <div class="rowlabel">Cleaning</div>
+        <input class="money" id="clean26">
+        <input class="money" id="clean25">
+
+        <div class="rowlabel">Utilities</div>
+        <input class="money" id="util26">
+        <input class="money" id="util25">
+
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="updateBtn" type="button">
+          Update P&amp;L Dashboard
+        </button>
+
+        <button class="btn secondary" id="resetBtn" type="button">
+          Restore Current Report
+        </button>
+      </div>
+
+      <div class="mini" id="inputStatus"></div>
+
+    </div>
+  </div>
+
+  <!-- BALANCE SHEET ADMIN -->
+  <div id="bsAdmin" class="adminpanel">
+    <div class="card">
+
+      <h3 class="section-title">Balance Sheet data</h3>
+
+      <p class="input-note">
+        Paste a QuickBooks-style Balance Sheet here.
+      </p>
+
+      <div class="paste-wrap">
+        <label class="paste-label" for="bsPasteData">
+          Paste Balance Sheet text
+        </label>
+
+        <textarea
+          id="bsPasteData"
+          class="pastebox"
+          placeholder="Paste copied Balance Sheet text here…"></textarea>
+
+        <div class="paste-actions">
+          <button class="btn primary" id="bsParseBtn" type="button">
+            Parse Balance Sheet
+          </button>
+
+          <button class="btn secondary" id="bsClearPasteBtn" type="button">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <div class="input-grid">
+
+        <div class="head">Category</div>
+        <div class="head">2026</div>
+        <div class="head">2025</div>
+
+        <div class="grouphead">Assets</div>
+
+        <div class="rowlabel">Cash</div>
+        <input class="money" id="bs_cash26">
+        <input class="money" id="bs_cash25">
+
+        <div class="rowlabel">Accounts Receivable</div>
+        <input class="money" id="bs_ar26">
+        <input class="money" id="bs_ar25">
+
+        <div class="rowlabel">Other Current Assets</div>
+        <input class="money" id="bs_othercur26">
+        <input class="money" id="bs_othercur25">
+
+        <div class="rowlabel">Total Current Assets</div>
+        <input class="money" id="bs_current26">
+        <input class="money" id="bs_current25">
+
+        <div class="rowlabel">Total Fixed Assets</div>
+        <input class="money" id="bs_fixed26">
+        <input class="money" id="bs_fixed25">
+
+        <div class="rowlabel">Total Assets</div>
+        <input class="money" id="bs_assets26">
+        <input class="money" id="bs_assets25">
+
+        <div class="grouphead">Liabilities &amp; Equity</div>
+
+        <div class="rowlabel">Accounts Payable</div>
+        <input class="money" id="bs_ap26">
+        <input class="money" id="bs_ap25">
+
+        <div class="rowlabel">Credit Cards</div>
+        <input class="money" id="bs_cc26">
+        <input class="money" id="bs_cc25">
+
+        <div class="rowlabel">Other Current Liabilities</div>
+        <input class="money" id="bs_otherliab26">
+        <input class="money" id="bs_otherliab25">
+
+        <div class="rowlabel">Total Current Liabilities</div>
+        <input class="money" id="bs_currentliab26">
+        <input class="money" id="bs_currentliab25">
+
+        <div class="rowlabel">Total Liabilities</div>
+        <input class="money" id="bs_liab26">
+        <input class="money" id="bs_liab25">
+
+        <div class="rowlabel">Net Assets</div>
+        <input class="money" id="bs_netassets26">
+        <input class="money" id="bs_netassets25">
+
+        <div class="rowlabel">Retained Earnings</div>
+        <input class="money" id="bs_retained26">
+        <input class="money" id="bs_retained25">
+
+        <div class="rowlabel">Net Income</div>
+        <input class="money" id="bs_netincome26">
+        <input class="money" id="bs_netincome25">
+
+        <div class="rowlabel">Total Equity</div>
+        <input class="money" id="bs_equity26">
+        <input class="money" id="bs_equity25">
+
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="bsUpdateBtn" type="button">
+          Update Balance Sheet
+        </button>
+
+        <button class="btn secondary" id="bsResetBtn" type="button">
+          Restore Current Report
+        </button>
+      </div>
+
+      <div class="mini" id="bsInputStatus"></div>
+
+    </div>
+  </div>
+
+  <!-- BUDGET ADMIN -->
+  <div id="budgetAdmin" class="adminpanel">
+    <div class="card">
+
+      <h3 class="section-title">Budget vs Actual data</h3>
+
+      <p class="input-note">
+        Paste the Budget to Actual report here. The first two numeric columns are interpreted as Actual and Cash Budget.
+      </p>
+
+      <div class="paste-wrap">
+        <label class="paste-label" for="budgetPasteData">
+          Paste Budget to Actual text
+        </label>
+
+        <textarea
+          id="budgetPasteData"
+          class="pastebox"
+          placeholder="Paste copied Budget to Actual text here…"></textarea>
+
+        <div class="paste-actions">
+          <button class="btn primary" id="budgetParseBtn" type="button">
+            Parse Budget Report
+          </button>
+
+          <button class="btn secondary" id="budgetClearPasteBtn" type="button">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <div class="input-grid">
+
+        <div class="head">Category</div>
+        <div class="head">Actual</div>
+        <div class="head">Cash Budget</div>
+
+        <div class="grouphead">Summary</div>
+
+        <div class="rowlabel">Total Income</div>
+        <input class="money" id="bud_income_actual">
+        <input class="money" id="bud_income_budget">
+
+        <div class="rowlabel">Total Expense</div>
+        <input class="money" id="bud_expense_actual">
+        <input class="money" id="bud_expense_budget">
+
+        <div class="rowlabel">Net Ordinary Income</div>
+        <input class="money" id="bud_net_actual">
+        <input class="money" id="bud_net_budget">
+
+        <div class="grouphead">Income Categories</div>
+
+        <div class="rowlabel">Donations</div>
+        <input class="money" id="bud_don_actual">
+        <input class="money" id="bud_don_budget">
+
+        <div class="rowlabel">Bricks</div>
+        <input class="money" id="bud_bricks_actual">
+        <input class="money" id="bud_bricks_budget">
+
+        <div class="rowlabel">Event Income</div>
+        <input class="money" id="bud_events_actual">
+        <input class="money" id="bud_events_budget">
+
+        <div class="rowlabel">Memberships &amp; Sponsorships</div>
+        <input class="money" id="bud_mem_actual">
+        <input class="money" id="bud_mem_budget">
+
+        <div class="rowlabel">Other Income</div>
+        <input class="money" id="bud_other_actual">
+        <input class="money" id="bud_other_budget">
+
+        <div class="grouphead">Expense Categories</div>
+
+        <div class="rowlabel">Capital / Restoration</div>
+        <input class="money" id="bud_cap_actual">
+        <input class="money" id="bud_cap_budget">
+
+        <div class="rowlabel">Cleaning</div>
+        <input class="money" id="bud_clean_actual">
+        <input class="money" id="bud_clean_budget">
+
+        <div class="rowlabel">Events Expenses</div>
+        <input class="money" id="bud_eventexp_actual">
+        <input class="money" id="bud_eventexp_budget">
+
+        <div class="rowlabel">Insurance</div>
+        <input class="money" id="bud_ins_actual">
+        <input class="money" id="bud_ins_budget">
+
+        <div class="rowlabel">Payroll</div>
+        <input class="money" id="bud_pay_actual">
+        <input class="money" id="bud_pay_budget">
+
+        <div class="rowlabel">R&amp;M Grounds</div>
+        <input class="money" id="bud_ground_actual">
+        <input class="money" id="bud_ground_budget">
+
+        <div class="rowlabel">R&amp;M House</div>
+        <input class="money" id="bud_house_actual">
+        <input class="money" id="bud_house_budget">
+
+        <div class="rowlabel">Utilities</div>
+        <input class="money" id="bud_util_actual">
+        <input class="money" id="bud_util_budget">
+
+        <div class="rowlabel">Volunteer Expenses</div>
+        <input class="money" id="bud_vol_actual">
+        <input class="money" id="bud_vol_budget">
+
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="budgetUpdateBtn" type="button">
+          Update Budget Dashboard
+        </button>
+
+        <button class="btn secondary" id="budgetResetBtn" type="button">
+          Restore July Budget Report
+        </button>
+      </div>
+
+      <div class="mini" id="budgetInputStatus"></div>
+
+    </div>
+  </div>
+
+</section>
+
+<script>
+(() => {
+
+const root = document.getElementById("nsh-fin");
+if (root.dataset.ready) return;
+root.dataset.ready = "1";
+
+const datasets = {
+
+  jul: {
+    label: "Financial snapshot · January–July 2026 vs. 2025",
+    data: {
+      in_total26:124421.46,
+      in_total25:110243.74,
+      ex_total26:152376.75,
+      ex_total25:107972.09,
+
+      events26:77988.16,
+      events25:64371.71,
+
+      don26:20741.93,
+      don25:15227.26,
+
+      mem26:12850,
+      mem25:13352.53,
+
+      other26:10744.37,
+      other25:15792.24,
+
+      bricks26:2097,
+      bricks25:1500,
+
+      pay26:70342.46,
+      pay25:41231.48,
+
+      cap26:15096.41,
+      cap25:5228.18,
+
+      dep26:11103.05,
+      dep25:13041,
+
+      ins26:8285.76,
+      ins25:6891.04,
+
+      clean26:7050,
+      clean25:5450,
+
+      util26:6424.48,
+      util25:8007.06
+    }
+  },
+
+  aug: {
+    label: "Financial snapshot · January 1–August 20, 2026 vs. 2025",
+    data: {
+      in_total26:126911.12,
+      in_total25:119198.74,
+      ex_total26:169314.92,
+      ex_total25:117430.09,
+
+      events26:77988.16,
+      events25:69321.71,
+
+      don26:21791.59,
+      don25:15727.26,
+
+      mem26:12850,
+      mem25:15102.53,
+
+      other26:12184.37,
+      other25:17232.24,
+
+      bricks26:2097,
+      bricks25:1815,
+
+      pay26:82283.94,
+      pay25:47954.71,
+
+      cap26:15096.41,
+      cap25:5311.55,
+
+      dep26:11103.05,
+      dep25:13041,
+
+      ins26:8613.01,
+      ins25:8858.94,
+
+      clean26:7750,
+      clean25:6125,
+
+      util26:6424.48,
+      util25:8007.06
+    }
+  }
+
+};
+
+const balanceDatasets = {
+
+  jul: {
+    label: "Balance Sheet · As of July 31, 2026 vs. July 31, 2025",
+    data: {
+      bs_cash26:172206.67,
+      bs_cash25:181904.39,
+
+      bs_ar26:-56277.59,
+      bs_ar25:-63799.78,
+
+      bs_othercur26:3500,
+      bs_othercur25:4749.19,
+
+      bs_current26:119429.08,
+      bs_current25:122853.80,
+
+      bs_fixed26:742626.45,
+      bs_fixed25:742762.15,
+
+      bs_assets26:862055.53,
+      bs_assets25:865615.95,
+
+      bs_ap26:-165.61,
+      bs_ap25:-165.61,
+
+      bs_cc26:167.60,
+      bs_cc25:1010.67,
+
+      bs_otherliab26:11350.20,
+      bs_otherliab25:1127.43,
+
+      bs_currentliab26:11352.19,
+      bs_currentliab25:1972.49,
+
+      bs_liab26:11352.19,
+      bs_liab25:1972.49,
+
+      bs_netassets26:816755.16,
+      bs_netassets25:816902.44,
+
+      bs_retained26:61903.47,
+      bs_retained25:44469.37,
+
+      bs_netincome26:-27955.29,
+      bs_netincome25:2271.65,
+
+      bs_equity26:850703.34,
+      bs_equity25:863643.46
+    }
+  },
+
+  aug: {
+    label: "Balance Sheet · As of August 20, 2026 vs. August 20, 2025",
+    data: {
+      bs_cash26:156680.96,
+      bs_cash25:178354.40,
+
+      bs_ar26:-56152.59,
+      bs_ar25:-61804.78,
+
+      bs_othercur26:3500,
+      bs_othercur25:4749.19,
+
+      bs_current26:104028.37,
+      bs_current25:121298.81,
+
+      bs_fixed26:742626.45,
+      bs_fixed25:742762.15,
+
+      bs_assets26:846654.82,
+      bs_assets25:864060.96,
+
+      bs_ap26:-165.61,
+      bs_ap25:-165.61,
+
+      bs_cc26:167.60,
+      bs_cc25:-203.89,
+
+      bs_otherliab26:10398,
+      bs_otherliab25:1290,
+
+      bs_currentliab26:10399.99,
+      bs_currentliab25:920.50,
+
+      bs_liab26:10399.99,
+      bs_liab25:920.50,
+
+      bs_netassets26:816755.16,
+      bs_netassets25:816902.44,
+
+      bs_retained26:61903.47,
+      bs_retained25:44469.37,
+
+      bs_netincome26:-42403.80,
+      bs_netincome25:1768.65,
+
+      bs_equity26:836254.83,
+      bs_equity25:863140.46
+    }
+  }
+
+};
+
+const budgetDataset = {
+
+  label: "Budget vs Actual · Actual 7.31.26 vs. Cash Budget",
+
+  data: {
+    bud_income_actual:64306,
+    bud_income_budget:193080,
+
+    bud_expense_actual:152377,
+    bud_expense_budget:206200,
+
+    bud_net_actual:-27955,
+    bud_net_budget:-13120,
+
+    bud_don_actual:20742,
+    bud_don_budget:10000,
+
+    bud_bricks_actual:2097,
+    bud_bricks_budget:2500,
+
+    bud_events_actual:77988,
+    bud_events_budget:131100,
+
+    bud_mem_actual:12850,
+    bud_mem_budget:30000,
+
+    bud_other_actual:10744,
+    bud_other_budget:19480,
+
+    bud_cap_actual:15096,
+    bud_cap_budget:12000,
+
+    bud_clean_actual:7050,
+    bud_clean_budget:10000,
+
+    bud_eventexp_actual:5543,
+    bud_eventexp_budget:10000,
+
+    bud_ins_actual:8286,
+    bud_ins_budget:20000,
+
+    bud_pay_actual:70342,
+    bud_pay_budget:99500,
+
+    bud_ground_actual:5893,
+    bud_ground_budget:14000,
+
+    bud_house_actual:2467,
+    bud_house_budget:4200,
+
+    bud_util_actual:6424,
+    bud_util_budget:14000,
+
+    bud_vol_actual:1491,
+    bud_vol_budget:600
+  }
+
+};
+
+let activePeriod = "jul";
+let activeReport = "pl";
+
+const $ = id => root.querySelector("#" + id);
+
+const money = n =>
+  new Intl.NumberFormat("en-US", {
+    style:"currency",
+    currency:"USD",
+    maximumFractionDigits:0
+  }).format(Math.abs(n));
+
+const signed = n =>
+  (n < 0 ? "−" : "") + money(n);
+
+const num = id => {
+  const element = $(id);
+
+  if (!element) return 0;
+
+  const v = parseFloat(
+    element.value.replace(/[$,\s]/g,"")
+  );
+
+  return Number.isFinite(v) ? v : 0;
+};
+
+function pct(a,b){
+  return b === 0
+    ? (a === 0 ? 0 : 100)
+    : ((a-b) / Math.abs(b)) * 100;
+}
+
+function loadPeriod(key){
+
+  if(activeReport === "budget"){
+    key = "jul";
+  }
+
+  activePeriod = key;
+
+  const selected =
+    activeReport === "pl"
+      ? datasets[key]
+      : activeReport === "bs"
+      ? balanceDatasets[key]
+      : budgetDataset;
+
+  Object.entries(selected.data).forEach(([k,v]) => {
+    if($(k)){
+      $(k).value = v.toFixed(2);
+    }
+  });
+
+  $("periodLabel").textContent = selected.label;
+
+  root.querySelectorAll(".tab").forEach(button => {
+
+    button.classList.toggle(
+      "active",
+      button.dataset.period === key
+    );
+
+    button.disabled =
+      activeReport === "budget" &&
+      button.dataset.period !== "jul";
+
+    button.title =
+      button.disabled
+      ? "Only the July 31 Budget to Actual report is loaded"
+      : "";
+
+  });
+
+  $("adminBtn").classList.remove("active");
+  $("input").classList.remove("active");
+  $("dashboard").classList.add("active");
+
+  showReport();
+
+  if(activeReport === "pl"){
+    render();
+  }
+  else if(activeReport === "bs"){
+    renderBalance();
+  }
+  else{
+    renderBudget();
+  }
+}
+
+function showReport(){
+
+  root.querySelectorAll(".reportview")
+    .forEach(view => view.classList.remove("active"));
+
+  const target =
+    activeReport === "pl"
+      ? "plDashboard"
+      : activeReport === "bs"
+      ? "bsDashboard"
+      : "budgetDashboard";
+
+  $(target).classList.add("active");
+
+  root.querySelectorAll(".reporttab")
+    .forEach(button => {
+      button.classList.toggle(
+        "active",
+        button.dataset.report === activeReport
+      );
+    });
+}
+
+function barHTML(items,cls){
+
+  const max = Math.max(
+    ...items.map(x => Math.abs(x.v)),
+    1
+  );
+
+  return items.map(x => {
+
+    const width =
+      Math.max(2, Math.abs(x.v) / max * 100);
+
+    return `
+      <div class="barrow">
+        <div class="barlabel">${x.n}</div>
+
+        <div class="bartrack">
+          <div
+            class="barfill ${cls}"
+            style="width:${width}%">
+          </div>
+        </div>
+
+        <div class="amount">${money(x.v)}</div>
+      </div>
+    `;
+
+  }).join("");
+}
+
+/* =========================
+   PROFIT & LOSS
+========================= */
+
+function render(){
+
+  const inc = num("in_total26");
+  const inc25 = num("in_total25");
+
+  const exp = num("ex_total26");
+  const exp25 = num("ex_total25");
+
+  const net = inc - exp;
+  const net25 = inc25 - exp25;
+
+  const ip = pct(inc,inc25);
+  const ep = pct(exp,exp25);
+
+  $("incomeVal").textContent = money(inc);
+  $("expenseVal").textContent = money(exp);
+  $("netVal").textContent = signed(net);
+
+  $("incomeDelta").textContent =
+    (ip >= 0 ? "↑ " : "↓ ") +
+    Math.abs(ip).toFixed(1) +
+    "% vs. last year";
+
+  $("incomeDelta").className =
+    "delta " + (ip >= 0 ? "up" : "down");
+
+  $("expenseDelta").textContent =
+    (ep >= 0 ? "↑ " : "↓ ") +
+    Math.abs(ep).toFixed(1) +
+    "% vs. last year";
+
+  $("expenseDelta").className =
+    "delta " + (ep > ip ? "down" : "up");
+
+  const nd = net - net25;
+
+  $("netDelta").textContent =
+    money(nd) +
+    " " +
+    (nd >= 0 ? "better" : "worse") +
+    " than 2025";
+
+  $("netDelta").className =
+    "delta " + (nd >= 0 ? "up" : "down");
+
+  const incDiff = inc - inc25;
+  const expDiff = exp - exp25;
+
+  $("story").innerHTML = `
+    <strong>The simple read:</strong>
+    Income ${incDiff >= 0 ? "increased" : "decreased"}
+    about ${money(incDiff)}, while expenses
+    ${expDiff >= 0 ? "increased" : "decreased"}
+    about ${money(expDiff)}.
+    That leaves a
+    ${net < 0 ? "deficit" : "surplus"}
+    of <strong>${money(net)}</strong>.
+  `;
+
+  const incomes = [
+    ["Events & Weddings","events26"],
+    ["Donations","don26"],
+    ["Memberships / Sponsors","mem26"],
+    ["Other Income","other26"],
+    ["Bricks","bricks26"]
+  ]
+  .map(([n,id]) => ({
+    n,
+    v:num(id)
+  }))
+  .sort((a,b) => b.v-a.v);
+
+  $("incomeBars").innerHTML =
+    barHTML(incomes,"income");
+
+  let major = [
+    ["Payroll","pay26"],
+    ["Capital / Restoration","cap26"],
+    ["Depreciation","dep26"],
+    ["Insurance","ins26"],
+    ["Cleaning","clean26"],
+    ["Utilities","util26"]
+  ]
+  .map(([n,id]) => ({
+    n,
+    v:num(id)
+  }));
+
+  const majorSum =
+    major.reduce((sum,x) => sum+x.v,0);
+
+  major.push({
+    n:"All other expenses",
+    v:Math.max(0,exp-majorSum)
+  });
+
+  major.sort((a,b) => b.v-a.v);
+
+  $("expenseBars").innerHTML =
+    barHTML(major,"");
+
+  $("eventDriver").textContent =
+    money(num("events26"));
+
+  $("payrollDriver").textContent =
+    money(num("pay26"));
+
+  const gap = ep-ip;
+
+  $("gapDriver").textContent =
+    (gap >= 0 ? "+" : "") +
+    gap.toFixed(0) +
+    " pts";
+
+  $("gapText").textContent =
+    gap >= 0
+    ? `Expenses grew about ${gap.toFixed(0)} percentage points faster than income.`
+    : `Income growth exceeded expense growth by about ${Math.abs(gap).toFixed(0)} percentage points.`;
+
+  adjust();
+}
+
+function adjust(){
+
+  let n =
+    num("in_total26") -
+    num("ex_total26");
+
+  const parts = [];
+
+  if($("excludeDep").checked){
+    n += num("dep26");
+    parts.push("depreciation");
+  }
+
+  if($("excludeCap").checked){
+    n += num("cap26");
+    parts.push("capital/restoration");
+  }
+
+  $("adjResult").textContent =
+    parts.length
+    ? "Analytical result: " + signed(n)
+    : "Official net: " + signed(n);
+}
+
+/* =========================
+   BALANCE SHEET
+========================= */
+
+function renderBalance(){
+
+  const assets = num("bs_assets26");
+  const assets25 = num("bs_assets25");
+
+  const cash = num("bs_cash26");
+  const cash25 = num("bs_cash25");
+
+  const liab = num("bs_liab26");
+  const liab25 = num("bs_liab25");
+
+  const ap = pct(assets,assets25);
+  const cp = pct(cash,cash25);
+  const lp = pct(liab,liab25);
+
+  $("bsAssetsVal").textContent =
+    money(assets);
+
+  $("bsAssetsDelta").textContent =
+    (ap >= 0 ? "↑ " : "↓ ") +
+    Math.abs(ap).toFixed(1) +
+    "% vs. last year";
+
+  $("bsAssetsDelta").className =
+    "delta " + (ap >= 0 ? "up" : "down");
+
+  $("bsCashVal").textContent =
+    money(cash);
+
+  $("bsCashDelta").textContent =
+    (cp >= 0 ? "↑ " : "↓ ") +
+    Math.abs(cp).toFixed(1) +
+    "% vs. last year";
+
+  $("bsCashDelta").className =
+    "delta " + (cp >= 0 ? "up" : "down");
+
+  $("bsLiabVal").textContent =
+    money(liab);
+
+  $("bsLiabDelta").textContent =
+    (lp >= 0 ? "↑ " : "↓ ") +
+    Math.abs(lp).toFixed(1) +
+    "% vs. last year";
+
+  $("bsLiabDelta").className =
+    "delta " + (lp <= 0 ? "up" : "down");
+
+  const cashDiff =
+    cash-cash25;
+
+  const liabDiff =
+    liab-liab25;
+
+  $("bsStory").innerHTML = `
+    <strong>The simple read:</strong>
+    Total assets are
+    ${ap >= 0 ? "up" : "down"}
+    ${Math.abs(ap).toFixed(1)}%
+    from last year.
+    Cash is ${money(cashDiff)}
+    ${cashDiff >= 0 ? "higher" : "lower"},
+    while liabilities are
+    ${money(liabDiff)}
+    ${liabDiff >= 0 ? "higher" : "lower"}.
+  `;
+
+  const assetItems = [
+    {
+      n:"Fixed assets",
+      v:num("bs_fixed26")
+    },
+    {
+      n:"Cash",
+      v:num("bs_cash26")
+    },
+    {
+      n:"Other current assets",
+      v:num("bs_othercur26")
+    },
+    {
+      n:"Accounts receivable",
+      v:Math.abs(num("bs_ar26"))
+    }
+  ]
+  .sort((a,b) => b.v-a.v);
+
+  $("bsAssetBars").innerHTML =
+    barHTML(assetItems,"asset");
+
+  const funding = [
+    {
+      n:"Equity",
+      v:num("bs_equity26")
+    },
+    {
+      n:"Liabilities",
+      v:Math.abs(num("bs_liab26"))
+    }
+  ]
+  .sort((a,b) => b.v-a.v);
+
+  $("bsFundingBars").innerHTML =
+    barHTML(funding,"");
+
+  $("bsCurrentDriver").textContent =
+    money(num("bs_current26"));
+
+  $("bsFixedDriver").textContent =
+    money(num("bs_fixed26"));
+
+  $("bsCurrentLiabDriver").textContent =
+    money(num("bs_currentliab26"));
+
+  $("bsLiquidityText").textContent =
+    cp >= 0
+    ? `Cash is ${Math.abs(cp).toFixed(1)}% higher than the comparable 2025 balance.`
+    : `Cash is ${Math.abs(cp).toFixed(1)}% lower than the comparable 2025 balance.`;
+
+  $("bsWatchText").textContent =
+    lp > 0
+    ? `Total liabilities are ${Math.abs(lp).toFixed(1)}% higher than the comparable 2025 balance.`
+    : `Total liabilities are ${Math.abs(lp).toFixed(1)}% lower than the comparable 2025 balance.`;
+}
+
+/* =========================
+   BUDGET
+========================= */
+
+function budgetBarHTML(items){
+
+  return items.map(x => {
+
+    const ratio =
+      x.b === 0
+      ? 0
+      : (x.a/x.b)*100;
+
+    const width =
+      Math.max(
+        2,
+        Math.min(100,Math.abs(ratio))
+      );
+
+    const cls =
+      ratio > 100
+      ? "down"
+      : "income";
+
+    return `
+      <div class="barrow">
+
+        <div class="barlabel">
+          ${x.n}
+        </div>
+
+        <div class="bartrack">
+          <div
+            class="barfill ${cls}"
+            style="width:${width}%">
+          </div>
+        </div>
+
+        <div class="amount">
+          ${money(x.a)} / ${money(x.b)}
+        </div>
+
+      </div>
+    `;
+
+  }).join("");
+}
+
+function renderBudget(){
+
+  const inc =
+    num("bud_income_actual");
+
+  const incBud =
+    num("bud_income_budget");
+
+  const exp =
+    num("bud_expense_actual");
+
+  const expBud =
+    num("bud_expense_budget");
+
+  const net =
+    num("bud_net_actual");
+
+  const netBud =
+    num("bud_net_budget");
+
+  const incPct =
+    incBud
+    ? inc/incBud*100
+    : 0;
+
+  const expPct =
+    expBud
+    ? exp/expBud*100
+    : 0;
+
+  const netGap =
+    net-netBud;
+
+  $("budgetIncomeVal").textContent =
+    money(inc);
+
+  $("budgetIncomeDelta").textContent =
+    incPct.toFixed(1) +
+    "% of cash budget";
+
+  $("budgetExpenseVal").textContent =
+    money(exp);
+
+  $("budgetExpenseDelta").textContent =
+    expPct.toFixed(1) +
+    "% of cash budget";
+
+  $("budgetNetVal").textContent =
+    signed(net);
+
+  $("budgetNetDelta").textContent =
+    money(netGap) +
+    " " +
+    (netGap >= 0 ? "better" : "below") +
+    " budgeted net";
+
+  $("budgetNetDelta").className =
+    "delta " +
+    (netGap >= 0 ? "up" : "down");
+
+  $("budgetIncomePct").textContent =
+    incPct.toFixed(0) + "%";
+
+  $("budgetExpensePct").textContent =
+    expPct.toFixed(0) + "%";
+
+  $("budgetNetGap").textContent =
+    signed(netGap);
+
+  $("budgetNetGapText").textContent =
+    netGap >= 0
+    ? "Actual net income is better than the budgeted net position."
+    : "Actual net income is more negative than the budgeted net position.";
+
+  const incomeItems = [
+    {
+      n:"Events",
+      a:num("bud_events_actual"),
+      b:num("bud_events_budget")
+    },
+    {
+      n:"Donations",
+      a:num("bud_don_actual"),
+      b:num("bud_don_budget")
+    },
+    {
+      n:"Memberships",
+      a:num("bud_mem_actual"),
+      b:num("bud_mem_budget")
+    },
+    {
+      n:"Other income",
+      a:num("bud_other_actual"),
+      b:num("bud_other_budget")
+    },
+    {
+      n:"Bricks",
+      a:num("bud_bricks_actual"),
+      b:num("bud_bricks_budget")
+    }
+  ];
+
+  $("budgetIncomeBars").innerHTML =
+    budgetBarHTML(incomeItems);
+
+  const expenseItems = [
+    {
+      n:"Payroll",
+      a:num("bud_pay_actual"),
+      b:num("bud_pay_budget")
+    },
+    {
+      n:"Capital / Restoration",
+      a:num("bud_cap_actual"),
+      b:num("bud_cap_budget")
+    },
+    {
+      n:"Insurance",
+      a:num("bud_ins_actual"),
+      b:num("bud_ins_budget")
+    },
+    {
+      n:"Utilities",
+      a:num("bud_util_actual"),
+      b:num("bud_util_budget")
+    },
+    {
+      n:"R&M Grounds",
+      a:num("bud_ground_actual"),
+      b:num("bud_ground_budget")
+    },
+    {
+      n:"Cleaning",
+      a:num("bud_clean_actual"),
+      b:num("bud_clean_budget")
+    },
+    {
+      n:"Events",
+      a:num("bud_eventexp_actual"),
+      b:num("bud_eventexp_budget")
+    },
+    {
+      n:"R&M House",
+      a:num("bud_house_actual"),
+      b:num("bud_house_budget")
+    },
+    {
+      n:"Volunteer",
+      a:num("bud_vol_actual"),
+      b:num("bud_vol_budget")
+    }
+  ];
+
+  $("budgetExpenseBars").innerHTML =
+    budgetBarHTML(expenseItems);
+
+  const visibleIncome =
+    num("bud_don_actual") +
+    num("bud_bricks_actual") +
+    num("bud_events_actual") +
+    num("bud_mem_actual") +
+    num("bud_other_actual");
+
+  const sourceDiff =
+    visibleIncome-inc;
+
+  $("budgetStory").innerHTML = `
+    <strong>The simple read:</strong>
+    The source report shows ${money(inc)}
+    in Actual Total Income against a
+    ${money(incBud)} Cash Budget,
+    and ${money(exp)}
+    in Actual Total Expense against
+    a ${money(expBud)} Cash Budget.
+    Actual net ordinary income is
+    ${signed(net)} versus a budgeted
+    ${signed(netBud)}.
+  `;
+
+  $("budgetSourceNote").textContent =
+    Math.abs(sourceDiff) > 1
+    ? `The source report lists Actual Total Income as ${money(inc)}, while the visible actual income category totals sum to ${money(visibleIncome)}. The dashboard preserves the stated source total and flags the ${money(sourceDiff)} difference rather than correcting it.`
+    : "The source total income matches the visible income category sum.";
+
+  const over =
+    expenseItems
+    .filter(x => x.b > 0 && x.a > x.b)
+    .map(x => x.n);
+
+  const underIncome =
+    incomeItems
+    .filter(x => x.b > 0 && x.a/x.b < .6)
+    .map(x => x.n);
+
+  $("budgetWatchText").textContent =
+    `Over-budget expense lines: ${
+      over.length
+      ? over.join(", ")
+      : "none among the tracked categories"
+    }. Income categories below 60% of budget: ${
+      underIncome.length
+      ? underIncome.join(", ")
+      : "none among the tracked categories"
+    }.`;
+}
+
+/* =========================
+   P&L PARSER
+========================= */
+
+function parsePasted(){
+
+  const text =
+    $("pasteData").value.trim();
+
+  if(!text){
+    $("inputStatus").textContent =
+      "Paste P&L text first.";
+    return;
+  }
+
+  const aliases = [
+
+    {
+      keys:["total income"],
+      ids:["in_total26","in_total25"]
+    },
+
+    {
+      keys:["total expense","total expenses"],
+      ids:["ex_total26","ex_total25"]
+    },
+
+    {
+      keys:["total event income"],
+      ids:["events26","events25"]
+    },
+
+    {
+      keys:["total donations"],
+      ids:["don26","don25"]
+    },
+
+    {
+      keys:[
+        "total memberships and sponsorships",
+        "total memberships & sponsorships"
+      ],
+      ids:["mem26","mem25"]
+    },
+
+    {
+      keys:["total other income"],
+      ids:["other26","other25"]
+    },
+
+    {
+      keys:["bricks"],
+      ids:["bricks26","bricks25"],
+      exact:true
+    },
+
+    {
+      keys:[
+        "total payroll expenses",
+        "payroll expenses"
+      ],
+      ids:["pay26","pay25"]
+    },
+
+    {
+      keys:[
+        "total capital improvements/restore",
+        "total capital improvements",
+        "capital improvements/restore"
+      ],
+      ids:["cap26","cap25"]
+    },
+
+    {
+      keys:[
+        "depreciation & amortization",
+        "depreciation and amortization"
+      ],
+      ids:["dep26","dep25"]
+    },
+
+    {
+      keys:["total insurance"],
+      ids:["ins26","ins25"]
+    },
+
+    {
+      keys:["cleaning service"],
+      ids:["clean26","clean25"]
+    },
+
+    {
+      keys:["total utilities"],
+      ids:["util26","util25"]
+    }
+
+  ];
+
+  let found = 0;
+
+  const clean = s =>
+    s.toLowerCase()
+    .replace(/\s+/g," ")
+    .trim();
+
+  for(const line of text.split(/\r?\n/)){
+
+    const normalized =
+      clean(line);
+
+    const nums =
+      line.match(
+        /-?\$?\s*\d[\d,]*(?:\.\d+)?/g
+      );
+
+    if(!nums || nums.length < 2){
+      continue;
+    }
+
+    for(const a of aliases){
+
+      const match =
+        a.exact
+        ? a.keys.some(k =>
+            normalized.startsWith(k+" ") ||
+            normalized === k
+          )
+        : a.keys.some(k =>
+            normalized.includes(k)
+          );
+
+      if(!match){
+        continue;
+      }
+
+      const vals =
+        nums.slice(0,2).map(v =>
+          parseFloat(
+            v.replace(/[$,\s]/g,"")
+          )
+        );
+
+      if(vals.every(Number.isFinite)){
+
+        a.ids.forEach((id,i) => {
+          $(id).value =
+            vals[i].toFixed(2);
+        });
+
+        found++;
+        break;
+      }
+    }
+  }
+
+  render();
+
+  $("inputStatus").textContent =
+    found
+    ? `Parsed ${found} dashboard categories. Review the values below, then update the dashboard.`
+    : "No recognized P&L totals were found.";
+}
+
+/* =========================
+   BALANCE SHEET PARSER
+========================= */
+
+function parseBalance(){
+
+  const text =
+    $("bsPasteData").value.trim();
+
+  if(!text){
+
+    $("bsInputStatus").textContent =
+      "Paste Balance Sheet text first.";
+
+    return;
+  }
+
+  const aliases = [
+
+    {
+      keys:["total cash","total checking/savings"],
+      ids:["bs_cash26","bs_cash25"]
+    },
+
+    {
+      keys:[
+        "total accounts receivable",
+        "accounts receivable"
+      ],
+      ids:["bs_ar26","bs_ar25"]
+    },
+
+    {
+      keys:["total other current assets"],
+      ids:["bs_othercur26","bs_othercur25"]
+    },
+
+    {
+      keys:["total current assets"],
+      ids:["bs_current26","bs_current25"]
+    },
+
+    {
+      keys:["total fixed assets"],
+      ids:["bs_fixed26","bs_fixed25"]
+    },
+
+    {
+      keys:["total assets"],
+      ids:["bs_assets26","bs_assets25"]
+    },
+
+    {
+      keys:["total accounts payable"],
+      ids:["bs_ap26","bs_ap25"]
+    },
+
+    {
+      keys:["total credit cards"],
+      ids:["bs_cc26","bs_cc25"]
+    },
+
+    {
+      keys:["total other current liabilities"],
+      ids:["bs_otherliab26","bs_otherliab25"]
+    },
+
+    {
+      keys:["total current liabilities"],
+      ids:["bs_currentliab26","bs_currentliab25"]
+    },
+
+    {
+      keys:["total liabilities"],
+      ids:["bs_liab26","bs_liab25"]
+    },
+
+    {
+      keys:["total net assets"],
+      ids:["bs_netassets26","bs_netassets25"]
+    },
+
+    {
+      keys:[
+        "unrestricted(retained earnings)",
+        "retained earnings"
+      ],
+      ids:["bs_retained26","bs_retained25"]
+    },
+
+    {
+      keys:["net income"],
+      ids:["bs_netincome26","bs_netincome25"],
+      exact:true
+    },
+
+    {
+      keys:["total equity"],
+      ids:["bs_equity26","bs_equity25"]
+    }
+
+  ];
+
+  let found = 0;
+
+  const clean = s =>
+    s.toLowerCase()
+    .replace(/\s+/g," ")
+    .trim();
+
+  for(const line of text.split(/\r?\n/)){
+
+    const normalized =
+      clean(line);
+
+    const nums =
+      line.match(
+        /-?\$?\s*\d[\d,]*(?:\.\d+)?/g
+      );
+
+    if(!nums || nums.length < 2){
+      continue;
+    }
+
+    for(const a of aliases){
+
+      const match =
+        a.exact
+        ? a.keys.some(k =>
+            normalized.startsWith(k+" ") ||
+            normalized === k
+          )
+        : a.keys.some(k =>
+            normalized.includes(k)
+          );
+
+      if(!match){
+        continue;
+      }
+
+      const vals =
+        nums.slice(0,2).map(v =>
+          parseFloat(
+            v.replace(/[$,\s]/g,"")
+          )
+        );
+
+      if(vals.every(Number.isFinite)){
+
+        a.ids.forEach((id,i) => {
+          $(id).value =
+            vals[i].toFixed(2);
+        });
+
+        found++;
+        break;
+      }
+    }
+  }
+
+  renderBalance();
+
+  $("bsInputStatus").textContent =
+    found
+    ? `Parsed ${found} balance sheet categories. Review the values below, then update the dashboard.`
+    : "No recognized Balance Sheet totals were found.";
+}
+
+/* =========================
+   BUDGET PARSER
+========================= */
+
+function parseBudget(){
+
+  const text =
+    $("budgetPasteData").value.trim();
+
+  if(!text){
+
+    $("budgetInputStatus").textContent =
+      "Paste Budget to Actual text first.";
+
+    return;
+  }
+
+  const aliases = [
+
+    {
+      keys:["total income"],
+      ids:[
+        "bud_income_actual",
+        "bud_income_budget"
+      ]
+    },
+
+    {
+      keys:["total expense"],
+      ids:[
+        "bud_expense_actual",
+        "bud_expense_budget"
+      ]
+    },
+
+    {
+      keys:["net ordinary income"],
+      ids:[
+        "bud_net_actual",
+        "bud_net_budget"
+      ]
+    },
+
+    {
+      keys:["total donations"],
+      ids:[
+        "bud_don_actual",
+        "bud_don_budget"
+      ]
+    },
+
+    {
+      keys:["bricks"],
+      ids:[
+        "bud_bricks_actual",
+        "bud_bricks_budget"
+      ],
+      exact:true
+    },
+
+    {
+      keys:["total event income"],
+      ids:[
+        "bud_events_actual",
+        "bud_events_budget"
+      ]
+    },
+
+    {
+      keys:[
+        "memberships and sponsorships",
+        "memberships & sponsorships"
+      ],
+      ids:[
+        "bud_mem_actual",
+        "bud_mem_budget"
+      ]
+    },
+
+    {
+      keys:["total other income"],
+      ids:[
+        "bud_other_actual",
+        "bud_other_budget"
+      ]
+    },
+
+    {
+      keys:["total capital improvements/restore"],
+      ids:[
+        "bud_cap_actual",
+        "bud_cap_budget"
+      ]
+    },
+
+    {
+      keys:["cleaning service"],
+      ids:[
+        "bud_clean_actual",
+        "bud_clean_budget"
+      ]
+    },
+
+    {
+      keys:["total events expenses"],
+      ids:[
+        "bud_eventexp_actual",
+        "bud_eventexp_budget"
+      ]
+    },
+
+    {
+      keys:["total insurance"],
+      ids:[
+        "bud_ins_actual",
+        "bud_ins_budget"
+      ]
+    },
+
+    {
+      keys:["payroll expenses"],
+      ids:[
+        "bud_pay_actual",
+        "bud_pay_budget"
+      ]
+    },
+
+    {
+      keys:["total r&m grounds"],
+      ids:[
+        "bud_ground_actual",
+        "bud_ground_budget"
+      ]
+    },
+
+    {
+      keys:["total r&m house"],
+      ids:[
+        "bud_house_actual",
+        "bud_house_budget"
+      ]
+    },
+
+    {
+      keys:["utilities"],
+      ids:[
+        "bud_util_actual",
+        "bud_util_budget"
+      ],
+      exact:true
+    },
+
+    {
+      keys:["volunteer expenses"],
+      ids:[
+        "bud_vol_actual",
+        "bud_vol_budget"
+      ]
+    }
+
+  ];
+
+  let found = 0;
+
+  const clean = s =>
+    s.toLowerCase()
+    .replace(/\s+/g," ")
+    .trim();
+
+  for(const line of text.split(/\r?\n/)){
+
+    const normalized =
+      clean(line);
+
+    const nums =
+      line.match(
+        /-?\$?\s*\(?\s*\d[\d,]*(?:\.\d+)?\s*\)?/g
+      );
+
+    if(!nums || nums.length < 2){
+      continue;
+    }
+
+    for(const a of aliases){
+
+      const match =
+        a.exact
+        ? a.keys.some(k =>
+            normalized.startsWith(k+" ") ||
+            normalized === k
+          )
+        : a.keys.some(k =>
+            normalized.includes(k)
+          );
+
+      if(!match){
+        continue;
+      }
+
+      const vals =
+        nums.slice(0,2).map(v => {
+
+          const neg =
+            /\(/.test(v) ||
+            /^\s*-/.test(v);
+
+          const cleaned =
+            v
+            .replace(/,/g,"")
+            .replace(/[()$\s]/g,"");
+
+          const n =
+            parseFloat(cleaned);
+
+          return neg
+            ? -Math.abs(n)
+            : n;
+        });
+
+      if(vals.every(Number.isFinite)){
+
+        a.ids.forEach((id,i) => {
+          $(id).value =
+            vals[i].toFixed(2);
+        });
+
+        found++;
+        break;
+      }
+    }
+  }
+
+  renderBudget();
+
+  $("budgetInputStatus").textContent =
+    found
+    ? `Parsed ${found} budget categories. Review the values below, then update the dashboard.`
+    : "No recognized Budget to Actual totals were found.";
+}
+
+/* =========================
+   TAB EVENTS
+========================= */
+
+root.querySelectorAll(".tab")
+.forEach(button => {
+
+  button.addEventListener(
+    "click",
+    () => loadPeriod(
+      button.dataset.period
+    )
+  );
+
+});
+
+root.querySelectorAll(".reporttab")
+.forEach(button => {
+
+  button.addEventListener(
+    "click",
+    () => {
+
+      activeReport =
+        button.dataset.report;
+
+      loadPeriod(
+        activeReport === "budget"
+        ? "jul"
+        : activePeriod
+      );
+
+    }
+  );
+
+});
+
+/* =========================
+   ADMIN
+========================= */
+
+$("adminBtn")
+.addEventListener("click",() => {
+
+  root.querySelectorAll(".view")
+    .forEach(x =>
+      x.classList.remove("active")
+    );
+
+  $("adminBtn")
+    .classList.add("active");
+
+  $("input")
+    .classList.add("active");
+
+  root.querySelectorAll(".adminpanel")
+    .forEach(x =>
+      x.classList.remove("active")
+    );
+
+  const target =
+    activeReport === "pl"
+      ? "plAdmin"
+      : activeReport === "bs"
+      ? "bsAdmin"
+      : "budgetAdmin";
+
+  $(target)
+    .classList.add("active");
+
+  $("periodLabel").textContent =
+    activeReport === "pl"
+    ? "Admin · Income & Expense parser"
+    : activeReport === "bs"
+    ? "Admin · Balance Sheet parser"
+    : "Admin · Budget vs Actual parser";
+
+});
+
+/* =========================
+   P&L BUTTONS
+========================= */
+
+$("parseBtn")
+.addEventListener(
+  "click",
+  parsePasted
+);
+
+$("clearPasteBtn")
+.addEventListener("click",() => {
+
+  $("pasteData").value = "";
+
+  $("inputStatus").textContent =
+    "Paste area cleared.";
+
+});
+
+$("updateBtn")
+.addEventListener("click",() => {
+
+  render();
+
+  $("inputStatus").textContent =
+    "P&L dashboard updated.";
+
+  $("adminBtn")
+    .classList.remove("active");
+
+  $("input")
+    .classList.remove("active");
+
+  $("dashboard")
+    .classList.add("active");
+
+  showReport();
+
+  $("periodLabel").textContent =
+    "Custom parsed Income & Expense view";
+
+});
+
+$("resetBtn")
+.addEventListener("click",() => {
+
+  loadPeriod(activePeriod);
+
+  $("inputStatus").textContent =
+    "Current P&L values restored.";
+
+});
+
+/* =========================
+   BALANCE BUTTONS
+========================= */
+
+$("bsParseBtn")
+.addEventListener(
+  "click",
+  parseBalance
+);
+
+$("bsClearPasteBtn")
+.addEventListener("click",() => {
+
+  $("bsPasteData").value = "";
+
+  $("bsInputStatus").textContent =
+    "Paste area cleared.";
+
+});
+
+$("bsUpdateBtn")
+.addEventListener("click",() => {
+
+  renderBalance();
+
+  $("bsInputStatus").textContent =
+    "Balance Sheet dashboard updated.";
+
+  $("adminBtn")
+    .classList.remove("active");
+
+  $("input")
+    .classList.remove("active");
+
+  $("dashboard")
+    .classList.add("active");
+
+  showReport();
+
+  $("periodLabel").textContent =
+    "Custom parsed Balance Sheet view";
+
+});
+
+$("bsResetBtn")
+.addEventListener("click",() => {
+
+  loadPeriod(activePeriod);
+
+  $("bsInputStatus").textContent =
+    "Current Balance Sheet values restored.";
+
+});
+
+/* =========================
+   BUDGET BUTTONS
+========================= */
+
+$("budgetParseBtn")
+.addEventListener(
+  "click",
+  parseBudget
+);
+
+$("budgetClearPasteBtn")
+.addEventListener("click",() => {
+
+  $("budgetPasteData").value = "";
+
+  $("budgetInputStatus").textContent =
+    "Paste area cleared.";
+
+});
+
+$("budgetUpdateBtn")
+.addEventListener("click",() => {
+
+  renderBudget();
+
+  $("budgetInputStatus").textContent =
+    "Budget dashboard updated.";
+
+  $("adminBtn")
+    .classList.remove("active");
+
+  $("input")
+    .classList.remove("active");
+
+  $("dashboard")
+    .classList.add("active");
+
+  showReport();
+
+  $("periodLabel").textContent =
+    "Custom parsed Budget vs Actual view";
+
+});
+
+$("budgetResetBtn")
+.addEventListener("click",() => {
+
+  Object.entries(
+    budgetDataset.data
+  ).forEach(([k,v]) => {
+
+    if($(k)){
+      $(k).value =
+        v.toFixed(2);
+    }
+
+  });
+
+  renderBudget();
+
+  $("budgetInputStatus").textContent =
+    "July Budget to Actual values restored.";
+
+});
+
+/* =========================
+   ANALYTICAL TOGGLES
+========================= */
+
+$("excludeDep")
+.addEventListener(
+  "change",
+  adjust
+);
+
+$("excludeCap")
+.addEventListener(
+  "change",
+  adjust
+);
+
+/* INITIAL LOAD */
+loadPeriod("jul");
+
+})();
+</script>
+
+</div>
+</body>
+</html>
