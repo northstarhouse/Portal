@@ -9703,7 +9703,7 @@ function FinancialOverviewView({ navigate }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 13, color: '#888' }}>Combined view across donations, in-kind sponsorships, operational budgets, and office cash flow.</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={function() { window.open('treasury-reports.html', '_blank'); }} style={{ padding: '7px 14px', fontSize: 12, fontWeight: 600, border: 'none', borderRadius: 8, background: gold, color: '#fff', cursor: 'pointer', flexShrink: 0 }}>Treasury Reports</button>
+          <button onClick={function() { navigate('treasury-reports'); }} style={{ padding: '7px 14px', fontSize: 12, fontWeight: 600, border: 'none', borderRadius: 8, background: gold, color: '#fff', cursor: 'pointer', flexShrink: 0 }}>Treasury Reports</button>
           <select value={year} onChange={function(e) { setYear(parseInt(e.target.value)); }} style={{ padding: '7px 12px', borderRadius: 8, border: '0.5px solid #e0d8cc', fontSize: 13, background: '#fff' }}>
             {yearOptions.map(function(y) { return <option key={y} value={y}>{y}</option>; })}
           </select>
@@ -10103,6 +10103,37 @@ function FinancialOverviewView({ navigate }) {
 
         </div>
       )}
+    </div>
+  );
+}
+
+function TreasuryReportsView({ navigate }) {
+  var { useEffect, useRef } = React;
+  var containerRef = useRef(null);
+
+  useEffect(function() {
+    var container = containerRef.current;
+    var cancelled = false;
+    Promise.all([
+      fetch('assets/treasury-report.html').then(function(r) { return r.text(); }),
+      fetch('assets/treasury-report.js').then(function(r) { return r.text(); })
+    ]).then(function(res) {
+      if (cancelled || !container) return;
+      container.innerHTML = res[0];
+      var script = document.createElement('script');
+      script.textContent = res[1];
+      container.appendChild(script);
+    });
+    return function() {
+      cancelled = true;
+      if (container) container.innerHTML = '';
+    };
+  }, []);
+
+  return (
+    <div>
+      <button onClick={function() { navigate('financial-overview'); }} style={{ background: 'none', border: 'none', color: gold, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 12 }}>← Back to Financial Overview</button>
+      <div ref={containerRef} />
     </div>
   );
 }
@@ -16591,6 +16622,7 @@ const views = {
   financials: FinancialsView,
   'office-cash-flow': OfficeCashFlowView,
   'financial-overview': FinancialOverviewView,
+  'treasury-reports': TreasuryReportsView,
   reviews: ReviewsView,
   'quarter-workspace': QuarterWorkspaceView,
   admin: AdminView,
