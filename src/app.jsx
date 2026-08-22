@@ -257,6 +257,52 @@ function parseIcalDate(val) {
   return new Date(y + "-" + mo + "-" + d + "T" + h + ":" + mi + ":" + s + (val.endsWith("Z") ? "Z" : ""));
 }
 
+// Shared by the Venue Rentals dashboard and its Messages/Inquiries sub-pages
+// so every part of that feature agrees on which calendar entries count as
+// weddings/rentals.
+function fetchWeddings() {
+  return fetchCalendarEvents().then(function(events) {
+    return events.filter(function(e) {
+      return e.SUMMARY && e.SUMMARY.toLowerCase().indexOf('wedding') !== -1;
+    }).map(function(e) {
+      var dt = parseIcalDate(e['DTSTART'] || e['DTSTART;VALUE=DATE'] || '');
+      return { uid: e.UID || (e.SUMMARY + '_' + e.DTSTART), title: e.SUMMARY || 'Untitled', date: dt };
+    }).filter(function(w) { return w.date && w.date.getFullYear() >= 2026; })
+      .sort(function(a, b) { return a.date - b.date; });
+  });
+}
+
+// Best-effort guess at which Wix form submissions are venue-rental leads,
+// since there's no dedicated "inquiry" flag in the data yet — see the note
+// in VenueInquiriesView. Adjust this list if the real Wix form name(s)
+// don't match.
+var VENUE_INQUIRY_FORM_KEYWORDS = ['rental', 'wedding', 'venue', 'inquiry', 'booking'];
+
+function fetchVenueInquiries() {
+  return fetch(WIX_FORMS_URL).then(function(r) { return r.json(); }).then(function(json) {
+    var rawForms = (json.forms && json.forms.submissions) || [];
+    var matches = rawForms.filter(function(sub) {
+      var name = (sub.form_name || '').toLowerCase();
+      return VENUE_INQUIRY_FORM_KEYWORDS.some(function(k) { return name.indexOf(k) !== -1; });
+    });
+    var ids = matches.map(function(s) { return s.id; });
+    var overridesPromise = ids.length > 0
+      ? fetch(SUPABASE_URL + '/rest/v1/data_wix_forms?select=id,internal_notes,status&id=in.(' + ids.map(encodeURIComponent).join(',') + ')', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); })
+      : Promise.resolve([]);
+    return overridesPromise.then(function(overrides) {
+      var overrideMap = {};
+      (Array.isArray(overrides) ? overrides : []).forEach(function(row) { overrideMap[row.id] = row; });
+      return matches.map(function(sub) {
+        var ov = overrideMap[sub.id];
+        return Object.assign({}, sub, {
+          internal_notes: ov && ov.internal_notes != null ? ov.internal_notes : (sub.internal_notes || null),
+          status: ov && ov.status != null ? ov.status : sub.status,
+        });
+      }).sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+    });
+  }).catch(function() { return []; });
+}
+
 // ─── ICS recurrence (RRULE) expansion ──────────────────────────────────────
 // Our ICS parser only reads each VEVENT's literal DTSTART, which for a
 // recurring event is its very first occurrence (often months/years in the
@@ -10894,16 +10940,17 @@ function IdeasView() {
       method: 'PATCH',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify(editForm)
-    }).then(function() {
+    }).then(function(r) {
+      setEditSaving(false);
+      if (!r.ok) { r.json().then(function(err) { alert('Failed to save: ' + (err.message || err.hint || r.status)); }).catch(function() { alert('Failed to save.'); }); return; }
       var updated = Object.assign({}, selected, editForm);
       setIdeas(function(p) { return p.map(function(i) { return i.id === selected.id ? updated : i; }); });
       setSelected(updated);
       setEditing(false);
-      setEditSaving(false);
       var newStatus = editForm.status;
       setMainTab(['Active', 'On Hold', 'Completed', 'Inactive'].includes(newStatus) ? 'initiatives' : 'ideas');
       setFilterStatus('All');
-    }).catch(function() { setEditSaving(false); });
+    }).catch(function() { setEditSaving(false); alert('Failed to save: network error.'); });
   }
 
   function submitBudget(e) {
@@ -14530,45 +14577,30 @@ function VenueRentalsView({ navigate }) {
   const [calError, setCalError] = useS(null);
   const [savingUid, setSavingUid] = useS(null);
   const [editingField, setEditingField] = useS(null); // { uid, field: 'ig'|'album', val }
+  const [messages, setMessages] = useS(null); // null while loading, [] once loaded
+  const [inquiries, setInquiries] = useS(null);
   const debounceTimers = useR({});
 
   useE(function() {
-    // Fetch calendar + tracking in parallel
-    var proxy = 'https://corsproxy.io/?' + encodeURIComponent(CALENDAR_ICAL_URL);
-    var calPromise = fetch(proxy).then(function(r) { return r.text(); }).then(function(text) {
-      text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n[ \t]/g, '');
-      var events = [], current = null;
-      text.split('\n').forEach(function(line) {
-        if (line === 'BEGIN:VEVENT') { current = {}; }
-        else if (line === 'END:VEVENT') { if (current) events.push(current); current = null; }
-        else if (current) {
-          var ci = line.indexOf(':');
-          if (ci !== -1) { var k = line.slice(0, ci).split(';')[0]; current[k] = line.slice(ci + 1); }
-        }
-      });
-      return events;
-    });
     var trackPromise = fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking?select=*&order=event_date.asc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); });
 
-    Promise.all([calPromise, trackPromise]).then(function(results) {
-      var events = results[0];
+    Promise.all([fetchWeddings(), trackPromise]).then(function(results) {
+      var weds = results[0];
       var trackRows = Array.isArray(results[1]) ? results[1] : [];
-      // Filter weddings — any event with "wedding" in summary
-      var weds = events.filter(function(e) {
-        return e.SUMMARY && e.SUMMARY.toLowerCase().indexOf('wedding') !== -1;
-      }).map(function(e) {
-        var dt = parseIcalDate(e['DTSTART'] || e['DTSTART;VALUE=DATE'] || '');
-        return { uid: e.UID || (e.SUMMARY + '_' + e.DTSTART), title: e.SUMMARY || 'Untitled', date: dt };
-      }).filter(function(w) { return w.date && w.date.getFullYear() >= 2026; })
-        .sort(function(a, b) { return a.date - b.date; });
       setWeddings(weds);
       var map = {};
       trackRows.forEach(function(r) { map[r.event_uid] = r; });
       setTracking(map);
       setLoading(false);
     }).catch(function(err) { setCalError(err.message); setLoading(false); });
+
+    fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&order=created_at.desc&limit=50', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setMessages(Array.isArray(rows) ? rows : []); }).catch(function() { setMessages([]); });
+
+    fetchVenueInquiries().then(function(rows) { setInquiries(rows); });
   }, []);
 
   function getTrack(uid) {
@@ -14656,6 +14688,47 @@ function VenueRentalsView({ navigate }) {
   var visible = weddings.filter(function(w) { return !getTrack(w.uid).hidden; });
   var past = visible.filter(function(w) { return w.date < now; });
   var upcoming = visible.filter(function(w) { return w.date >= now; });
+
+  // Needs-attention items, all tied back to a real event date (or an
+  // inquiry's received date). Judgment call: only past events get flagged
+  // for missing after-event follow-through (pictures/blog/socials/etc.) —
+  // upcoming events aren't nagged about those yet since they haven't
+  // happened. Inquiries sitting unhandled for 3+ days also show up here,
+  // reusing the same "handled" status WixFormsView already uses.
+  var attentionItems = [];
+  past.forEach(function(w) {
+    var t = getTrack(w.uid);
+    var missing = [];
+    if (!t.pictures_done) missing.push('pictures');
+    if (!t.blog_done) missing.push('blog post');
+    if (!t.socials_done) missing.push('socials');
+    if (!t.photographer_link) missing.push('photographer IG');
+    if (!t.photo_album_link) missing.push('photo album link');
+    if (t.total_cost == null) missing.push('total cost');
+    if (missing.length) {
+      attentionItems.push({
+        key: 'wed_' + w.uid,
+        label: w.title,
+        detail: 'Missing: ' + missing.join(', '),
+        date: w.date,
+        onClick: null, // resolved inline via the Event Details checklist below
+      });
+    }
+  });
+  if (Array.isArray(inquiries)) {
+    var THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
+    inquiries.filter(function(s) { return s.status !== 'handled' && (now - new Date(s.created_at)) > THREE_DAYS; }).forEach(function(s) {
+      var days = Math.floor((now - new Date(s.created_at)) / (24 * 60 * 60 * 1000));
+      attentionItems.push({
+        key: 'inq_' + s.id,
+        label: s.form_name || 'Inquiry',
+        detail: 'Unhandled for ' + days + ' day' + (days !== 1 ? 's' : ''),
+        date: new Date(s.created_at),
+        onClick: function() { navigate('venue-inquiries'); },
+      });
+    });
+  }
+  attentionItems.sort(function(a, b) { return a.date - b.date; });
 
   function WeddingCard(w) {
     var t = getTrack(w.uid);
@@ -14762,11 +14835,43 @@ function VenueRentalsView({ navigate }) {
     );
   }
 
+  var nextUpcoming = upcoming.length ? upcoming[0] : null;
+
   return (
     <div>
       <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
       <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 6 }}>Venue Rentals</div>
-      <div style={{ fontSize: 13, color: '#aaa', marginBottom: 16 }}>Wedding tracking and post-event checklist</div>
+      <div style={{ fontSize: 13, color: '#aaa', marginBottom: 16 }}>
+        {nextUpcoming ? ('Next up: ' + nextUpcoming.title + ' — ' + nextUpcoming.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) : 'Wedding & rental tracking'}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 22 }}>
+        <VenueDashCard title="New Messages" onClick={function() { navigate('venue-messages'); }}
+          count={messages === null ? null : messages.length}
+          lines={messages === null ? [] : messages.slice(0, 3).map(function(m) { return (m.from_name || m.from_email || 'Unknown') + (m.subject ? ' — ' + m.subject : ''); })}
+          empty="No messages logged yet" />
+        <VenueDashCard title="Recent Inquiries" onClick={function() { navigate('venue-inquiries'); }}
+          count={inquiries === null ? null : inquiries.length}
+          lines={inquiries === null ? [] : inquiries.slice(0, 3).map(function(s) { var f = s.fields || {}; return [f['First Name'], f['Last Name']].filter(Boolean).join(' ') || f['Email'] || s.form_name; })}
+          empty="No inquiry-form submissions found — double-check VENUE_INQUIRY_FORM_KEYWORDS matches the real Wix form name" />
+        <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#888', marginBottom: 8 }}>Needs Attention {attentionItems.length > 0 && ('(' + attentionItems.length + ')')}</div>
+          {attentionItems.length === 0 ? (
+            <div style={{ fontSize: 12, color: '#bbb' }}>Nothing outstanding.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 130, overflowY: 'auto' }}>
+              {attentionItems.slice(0, 6).map(function(item) {
+                return (
+                  <div key={item.key} onClick={item.onClick || undefined} style={{ cursor: item.onClick ? 'pointer' : 'default' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#c62828' }}>{item.label}</div>
+                    <div style={{ fontSize: 11, color: '#c62828', opacity: 0.85 }}>{item.detail}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
       {!loading && !calError && (function() {
         var SECURITY_DEPOSIT = 800;
@@ -14792,21 +14897,276 @@ function VenueRentalsView({ navigate }) {
       {calError && <div style={{ color: '#c62828', fontSize: 12, background: '#ffebee', borderRadius: 8, padding: 16 }}>Could not load calendar: {calError}</div>}
 
       {!loading && !calError && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {upcoming.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', marginBottom: 10 }}>Upcoming Weddings ({upcoming.length})</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{upcoming.map(WeddingCard)}</div>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 2 }}>Event Details</div>
+          <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>After-event survey: pictures, blog, socials, cost, and photographer/album links for each wedding.</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {upcoming.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', marginBottom: 10 }}>Upcoming Weddings ({upcoming.length})</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{upcoming.map(WeddingCard)}</div>
+              </div>
+            )}
+            {past.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', marginBottom: 10 }}>Past Weddings ({past.length})</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{past.sort(function(a,b){return b.date-a.date;}).map(WeddingCard)}</div>
+              </div>
+            )}
+            {weddings.length === 0 && (
+              <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>No weddings found in the calendar.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VenueDashCard({ title, count, lines, empty, onClick }) {
+  return (
+    <div onClick={onClick} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 16, cursor: 'pointer', transition: 'border-color 0.15s' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#888' }}>{title}</div>
+        <div style={{ fontSize: 11, color: gold, fontWeight: 600 }}>View all →</div>
+      </div>
+      {count === null ? (
+        <div style={{ fontSize: 12, color: '#ccc' }}>Loading…</div>
+      ) : count === 0 ? (
+        <div style={{ fontSize: 12, color: '#bbb' }}>{empty}</div>
+      ) : (
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', marginBottom: 6 }}>{count}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {lines.map(function(l, i) { return <div key={i} style={{ fontSize: 12, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l}</div>; })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Manual, staff-logged correspondence — there's no live inbox/CRM feed to
+// pull from yet, so this is a place to jot down "called the Smiths back,
+// they want the garden ceremony option" style notes tied to a wedding.
+function VenueMessagesView({ navigate }) {
+  const [messages, setMessages] = useState(null);
+  const [weddings, setWeddings] = useState([]);
+  const [form, setForm] = useState({ event_uid: '', subject: '', body: '', from_name: '', from_email: '', direction: 'incoming' });
+  const [saving, setSaving] = useState(false);
+
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&order=created_at.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setMessages(Array.isArray(rows) ? rows : []); }).catch(function() { setMessages([]); });
+  }
+  useEffect(function() {
+    load();
+    fetchWeddings().then(setWeddings);
+  }, []);
+
+  function handleSave() {
+    if (!form.body.trim() || saving) return;
+    setSaving(true);
+    var wed = weddings.find(function(w) { return w.uid === form.event_uid; });
+    fetch(SUPABASE_URL + '/rest/v1/venue_messages', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event_uid: form.event_uid || null, event_title: wed ? wed.title : null,
+        subject: form.subject.trim() || null, body: form.body.trim(),
+        from_name: form.from_name.trim() || null, from_email: form.from_email.trim() || null,
+        direction: form.direction,
+      })
+    }).then(function() {
+      setForm({ event_uid: '', subject: '', body: '', from_name: '', from_email: '', direction: 'incoming' });
+      load();
+    }).finally(function() { setSaving(false); });
+  }
+
+  var inputStyle = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', outline: 'none' };
+
+  return (
+    <div>
+      <button onClick={function() { navigate('venue'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Venue Rentals</button>
+      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Messages</div>
+      <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>Manually logged correspondence about venue/wedding rentals — not yet connected to a live inbox.</div>
+
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18, marginBottom: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 12 }}>Log a message</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <input value={form.from_name} onChange={function(e) { setForm(Object.assign({}, form, { from_name: e.target.value })); }} placeholder="From (name)" style={inputStyle} />
+          <input value={form.from_email} onChange={function(e) { setForm(Object.assign({}, form, { from_email: e.target.value })); }} placeholder="From (email)" style={inputStyle} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <select value={form.event_uid} onChange={function(e) { setForm(Object.assign({}, form, { event_uid: e.target.value })); }} style={inputStyle}>
+            <option value="">No linked event</option>
+            {weddings.map(function(w) { return <option key={w.uid} value={w.uid}>{w.title} — {w.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</option>; })}
+          </select>
+          <select value={form.direction} onChange={function(e) { setForm(Object.assign({}, form, { direction: e.target.value })); }} style={inputStyle}>
+            <option value="incoming">Incoming (they contacted us)</option>
+            <option value="outgoing">Outgoing (we contacted them)</option>
+          </select>
+        </div>
+        <input value={form.subject} onChange={function(e) { setForm(Object.assign({}, form, { subject: e.target.value })); }} placeholder="Subject (optional)" style={Object.assign({}, inputStyle, { marginBottom: 10 })} />
+        <textarea value={form.body} onChange={function(e) { setForm(Object.assign({}, form, { body: e.target.value })); }} placeholder="What was said…" rows={3} style={Object.assign({}, inputStyle, { marginBottom: 10, resize: 'vertical' })} />
+        <button onClick={handleSave} disabled={saving || !form.body.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (saving || !form.body.trim()) ? 0.6 : 1 }}>
+          {saving ? 'Saving…' : 'Log Message'}
+        </button>
+      </div>
+
+      {messages === null ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
+      ) : messages.length === 0 ? (
+        <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>No messages logged yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {messages.map(function(m) {
+            return (
+              <div key={m.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '12px 16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{m.from_name || m.from_email || 'Unknown sender'}{m.subject ? ' — ' + m.subject : ''}</div>
+                  <div style={{ fontSize: 11, color: '#bbb', flexShrink: 0 }}>{new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                </div>
+                {m.event_title && <div style={{ fontSize: 11, color: gold, fontWeight: 600, marginBottom: 4 }}>{m.event_title}</div>}
+                <div style={{ fontSize: 13, color: '#555', whiteSpace: 'pre-wrap' }}>{m.body}</div>
+                <div style={{ fontSize: 10, color: '#ccc', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>{m.direction}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Reuses the same Wix-forms data source as WixFormsView, filtered to forms
+// that look like venue/rental leads (see VENUE_INQUIRY_FORM_KEYWORDS). This
+// is a best-effort guess, not a confirmed dedicated "inquiry" form — flag
+// to Haley if the real intake form has a different name.
+function VenueInquiriesView({ navigate }) {
+  const [rows, setRows] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [notesDraft, setNotesDraft] = useState('');
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [handlingId, setHandlingId] = useState(null);
+
+  function load() { fetchVenueInquiries().then(function(r) { setRows(r); }); }
+  useEffect(function() { load(); }, []);
+  useEffect(function() { setNotesDraft(selected ? (selected.internal_notes || '') : ''); }, [selected]);
+
+  function upsertOverride(sub, patch) {
+    return fetch(SUPABASE_URL + '/rest/v1/data_wix_forms', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(Object.assign({
+        id: sub.id, form_id: sub.form_id, form_name: (sub.form_name || '').trim(),
+        status: sub.status || '', created_at: sub.created_at, fields: sub.fields,
+        internal_notes: sub.internal_notes || null,
+      }, patch))
+    });
+  }
+
+  function toggleHandled(sub) {
+    if (handlingId === sub.id) return;
+    setHandlingId(sub.id);
+    var newStatus = sub.status === 'handled' ? '' : 'handled';
+    upsertOverride(sub, { status: newStatus }).then(function(r) {
+      if (r.ok) {
+        setRows(function(prev) { return prev.map(function(s) { return s.id === sub.id ? Object.assign({}, s, { status: newStatus }) : s; }); });
+        setSelected(function(prev) { return prev && prev.id === sub.id ? Object.assign({}, prev, { status: newStatus }) : prev; });
+      }
+    }).finally(function() { setHandlingId(null); });
+  }
+
+  function saveNotes() {
+    if (!selected) return;
+    setNotesSaving(true);
+    var noteValue = notesDraft.trim() || null;
+    upsertOverride(selected, { internal_notes: noteValue }).then(function(r) {
+      if (r.ok) {
+        setSelected(function(prev) { return prev ? Object.assign({}, prev, { internal_notes: noteValue }) : prev; });
+        setRows(function(prev) { return prev.map(function(s) { return s.id === selected.id ? Object.assign({}, s, { internal_notes: noteValue }) : s; }); });
+      }
+    }).finally(function() { setNotesSaving(false); });
+  }
+
+  function fmtTs(ts) { return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+
+  return (
+    <div>
+      <button onClick={function() { navigate('venue'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Venue Rentals</button>
+      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Recent Inquiries</div>
+      <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>Wix form submissions whose form name matches a venue/rental keyword — check off once handled.</div>
+
+      {rows === null ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
+      ) : rows.length === 0 ? (
+        <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>
+          No matching submissions found. If there's a dedicated venue/rental inquiry form on the website, its name may not contain one of: {VENUE_INQUIRY_FORM_KEYWORDS.join(', ')} — worth confirming the exact form name.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+          <div style={{ flex: 1, minWidth: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+            {rows.map(function(sub, i) {
+              var fields = sub.fields || {};
+              var first = fields['First Name'] || '';
+              var last = fields['Last Name'] || '';
+              var email = fields['Email'] || fields['Email Address'] || '';
+              var preview = [first, last].filter(Boolean).join(' ') || email || (Object.values(fields).filter(Boolean)[0]) || '';
+              var isHandled = sub.status === 'handled';
+              return (
+                <div key={sub.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: i < rows.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
+                  <input type="checkbox" title="Mark as handled" checked={isHandled} disabled={handlingId === sub.id}
+                    onChange={function() { toggleHandled(sub); }}
+                    style={{ marginTop: 3, width: 15, height: 15, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0, opacity: handlingId === sub.id ? 0.5 : 1 }} />
+                  <button onClick={function() { setSelected(function(prev) { return prev && prev.id === sub.id ? null : sub; }); }}
+                    style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 10, color: gold, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>{sub.form_name}</div>
+                        {preview && <div style={{ fontSize: 13, color: isHandled ? '#aaa' : '#2a2a2a' }}>{preview}</div>}
+                        {email && email !== preview && <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{email}</div>}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#bbb', flexShrink: 0, whiteSpace: 'nowrap' }}>{fmtTs(sub.created_at)}</div>
+                    </div>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {selected && (
+            <div style={{ width: 320, flexShrink: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 16 }}>✕</button>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gold, marginBottom: 3 }}>{selected.form_name}</div>
+                <div style={{ fontSize: 11, color: '#aaa' }}>{fmtTs(selected.created_at)}</div>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Internal Notes</label>
+                <textarea rows={4} value={notesDraft} onChange={function(e) { setNotesDraft(e.target.value); }} disabled={notesSaving}
+                  placeholder="Add internal notes" style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', resize: 'none' }} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <button onClick={saveNotes} disabled={notesSaving} style={{ padding: '7px 16px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: notesSaving ? 'not-allowed' : 'pointer', opacity: notesSaving ? 0.6 : 1 }}>
+                    {notesSaving ? 'Saving…' : 'Save Notes'}
+                  </button>
+                </div>
+              </div>
+              {Object.keys(selected.fields || {}).length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {Object.entries(selected.fields).map(function(entry) {
+                    return (
+                      <div key={entry[0]}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>{entry[0]}</div>
+                        <div style={{ fontSize: 13, color: '#2a2a2a', whiteSpace: 'pre-wrap' }}>{entry[1]}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-          {past.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', marginBottom: 10 }}>Past Weddings ({past.length})</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{past.sort(function(a,b){return b.date-a.date;}).map(WeddingCard)}</div>
-            </div>
-          )}
-          {weddings.length === 0 && (
-            <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>No weddings found in the calendar.</div>
           )}
         </div>
       )}
@@ -16103,6 +16463,8 @@ const views = {
   sponsors: SponsorsView,
   strategy: StrategyView,
   venue: VenueRentalsView,
+  'venue-messages': VenueMessagesView,
+  'venue-inquiries': VenueInquiriesView,
   ideas: IdeasView,
   operational: OperationalView,
   financials: FinancialsView,
