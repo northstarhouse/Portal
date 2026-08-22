@@ -11076,14 +11076,15 @@ function IdeasView() {
   function saveEdit() {
     if (!selected) return;
     setEditSaving(true);
+    var payload = Object.assign({}, editForm, { budget: editForm.budget ? parseFloat(editForm.budget) : null });
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas') + '?id=eq.' + selected.id, {
       method: 'PATCH',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify(editForm)
+      body: JSON.stringify(payload)
     }).then(function(r) {
       setEditSaving(false);
       if (!r.ok) { r.json().then(function(err) { alert('Failed to save: ' + (err.message || err.hint || r.status)); }).catch(function() { alert('Failed to save.'); }); return; }
-      var updated = Object.assign({}, selected, editForm);
+      var updated = Object.assign({}, selected, payload);
       setIdeas(function(p) { return p.map(function(i) { return i.id === selected.id ? updated : i; }); });
       setSelected(updated);
       setEditing(false);
