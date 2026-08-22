@@ -4,260 +4,40 @@ const root = document.getElementById("nsh-fin");
 if (root.dataset.ready) return;
 root.dataset.ready = "1";
 
-const datasets = {
+const CFG = window.__nshTreasuryConfig || {};
+const SB_URL = CFG.url || "";
+const SB_KEY = CFG.key || "";
 
-  jul: {
-    label: "Financial snapshot · January–July 2026 vs. 2025",
-    data: {
-      in_total26:124421.46,
-      in_total25:110243.74,
-      ex_total26:152376.75,
-      ex_total25:107972.09,
+function sbHeaders(extra){
+  const h = { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY };
+  return extra ? Object.assign(h, extra) : h;
+}
 
-      events26:77988.16,
-      events25:64371.71,
+function fetchReports(){
+  return fetch(
+    SB_URL + "/rest/v1/treasury_reports?select=report_type,period_key,tab_label,full_label,as_of_date,data&order=as_of_date.asc,period_key.asc",
+    { headers: sbHeaders() }
+  ).then(r => r.json());
+}
 
-      don26:20741.93,
-      don25:15227.26,
-
-      mem26:12850,
-      mem25:13352.53,
-
-      other26:10744.37,
-      other25:15792.24,
-
-      bricks26:2097,
-      bricks25:1500,
-
-      pay26:70342.46,
-      pay25:41231.48,
-
-      cap26:15096.41,
-      cap25:5228.18,
-
-      dep26:11103.05,
-      dep25:13041,
-
-      ins26:8285.76,
-      ins25:6891.04,
-
-      clean26:7050,
-      clean25:5450,
-
-      util26:6424.48,
-      util25:8007.06
+function upsertReport(row){
+  return fetch(
+    SB_URL + "/rest/v1/treasury_reports?on_conflict=report_type,period_key",
+    {
+      method: "POST",
+      headers: sbHeaders({ "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" }),
+      body: JSON.stringify([row])
     }
-  },
+  ).then(r => r.json());
+}
 
-  aug: {
-    label: "Financial snapshot · January 1–August 20, 2026 vs. 2025",
-    data: {
-      in_total26:126911.12,
-      in_total25:119198.74,
-      ex_total26:169314.92,
-      ex_total25:117430.09,
-
-      events26:77988.16,
-      events25:69321.71,
-
-      don26:21791.59,
-      don25:15727.26,
-
-      mem26:12850,
-      mem25:15102.53,
-
-      other26:12184.37,
-      other25:17232.24,
-
-      bricks26:2097,
-      bricks25:1815,
-
-      pay26:82283.94,
-      pay25:47954.71,
-
-      cap26:15096.41,
-      cap25:5311.55,
-
-      dep26:11103.05,
-      dep25:13041,
-
-      ins26:8613.01,
-      ins25:8858.94,
-
-      clean26:7750,
-      clean25:6125,
-
-      util26:6424.48,
-      util25:8007.06
-    }
-  }
-
+const state = {
+  pl: {}, plOrder: [],
+  bs: {}, bsOrder: [],
+  budget: null
 };
 
-const balanceDatasets = {
-
-  jul: {
-    label: "Balance Sheet · As of July 31, 2026 vs. July 31, 2025",
-    data: {
-      bs_cash26:172206.67,
-      bs_cash25:181904.39,
-
-      bs_ar26:-56277.59,
-      bs_ar25:-63799.78,
-
-      bs_othercur26:3500,
-      bs_othercur25:4749.19,
-
-      bs_current26:119429.08,
-      bs_current25:122853.80,
-
-      bs_fixed26:742626.45,
-      bs_fixed25:742762.15,
-
-      bs_assets26:862055.53,
-      bs_assets25:865615.95,
-
-      bs_ap26:-165.61,
-      bs_ap25:-165.61,
-
-      bs_cc26:167.60,
-      bs_cc25:1010.67,
-
-      bs_otherliab26:11350.20,
-      bs_otherliab25:1127.43,
-
-      bs_currentliab26:11352.19,
-      bs_currentliab25:1972.49,
-
-      bs_liab26:11352.19,
-      bs_liab25:1972.49,
-
-      bs_netassets26:816755.16,
-      bs_netassets25:816902.44,
-
-      bs_retained26:61903.47,
-      bs_retained25:44469.37,
-
-      bs_netincome26:-27955.29,
-      bs_netincome25:2271.65,
-
-      bs_equity26:850703.34,
-      bs_equity25:863643.46
-    }
-  },
-
-  aug: {
-    label: "Balance Sheet · As of August 20, 2026 vs. August 20, 2025",
-    data: {
-      bs_cash26:156680.96,
-      bs_cash25:178354.40,
-
-      bs_ar26:-56152.59,
-      bs_ar25:-61804.78,
-
-      bs_othercur26:3500,
-      bs_othercur25:4749.19,
-
-      bs_current26:104028.37,
-      bs_current25:121298.81,
-
-      bs_fixed26:742626.45,
-      bs_fixed25:742762.15,
-
-      bs_assets26:846654.82,
-      bs_assets25:864060.96,
-
-      bs_ap26:-165.61,
-      bs_ap25:-165.61,
-
-      bs_cc26:167.60,
-      bs_cc25:-203.89,
-
-      bs_otherliab26:10398,
-      bs_otherliab25:1290,
-
-      bs_currentliab26:10399.99,
-      bs_currentliab25:920.50,
-
-      bs_liab26:10399.99,
-      bs_liab25:920.50,
-
-      bs_netassets26:816755.16,
-      bs_netassets25:816902.44,
-
-      bs_retained26:61903.47,
-      bs_retained25:44469.37,
-
-      bs_netincome26:-42403.80,
-      bs_netincome25:1768.65,
-
-      bs_equity26:836254.83,
-      bs_equity25:863140.46
-    }
-  }
-
-};
-
-const budgetDataset = {
-
-  label: "Budget vs Actual · Actual 7.31.26 vs. Cash Budget",
-
-  data: {
-    bud_income_actual:64306,
-    bud_income_budget:193080,
-
-    bud_expense_actual:152377,
-    bud_expense_budget:206200,
-
-    bud_net_actual:-27955,
-    bud_net_budget:-13120,
-
-    bud_don_actual:20742,
-    bud_don_budget:10000,
-
-    bud_bricks_actual:2097,
-    bud_bricks_budget:2500,
-
-    bud_events_actual:77988,
-    bud_events_budget:131100,
-
-    bud_mem_actual:12850,
-    bud_mem_budget:30000,
-
-    bud_other_actual:10744,
-    bud_other_budget:19480,
-
-    bud_cap_actual:15096,
-    bud_cap_budget:12000,
-
-    bud_clean_actual:7050,
-    bud_clean_budget:10000,
-
-    bud_eventexp_actual:5543,
-    bud_eventexp_budget:10000,
-
-    bud_ins_actual:8286,
-    bud_ins_budget:20000,
-
-    bud_pay_actual:70342,
-    bud_pay_budget:99500,
-
-    bud_ground_actual:5893,
-    bud_ground_budget:14000,
-
-    bud_house_actual:2467,
-    bud_house_budget:4200,
-
-    bud_util_actual:6424,
-    bud_util_budget:14000,
-
-    bud_vol_actual:1491,
-    bud_vol_budget:600
-  }
-
-};
-
-let activePeriod = "jul";
+let activePeriod = null;
 let activeReport = "pl";
 
 const $ = id => root.querySelector("#" + id);
@@ -290,46 +70,124 @@ function pct(a,b){
     : ((a-b) / Math.abs(b)) * 100;
 }
 
-function loadPeriod(key){
+function panelIdFor(report){
+  return report === "pl" ? "plAdmin" : report === "bs" ? "bsAdmin" : "budgetAdmin";
+}
 
-  if(activeReport === "budget"){
-    key = "jul";
+function moneyIds(panelId){
+  return Array.from(root.querySelectorAll("#" + panelId + " .money")).map(el => el.id);
+}
+
+function clearInputs(panelId){
+  moneyIds(panelId).forEach(id => { if ($(id)) $(id).value = "0.00"; });
+}
+
+function applyRecord(panelId, rec){
+  const data = (rec && rec.data) || {};
+  moneyIds(panelId).forEach(id => {
+    $(id).value = (parseFloat(data[id]) || 0).toFixed(2);
+  });
+}
+
+/* =========================
+   LOAD FROM SUPABASE
+========================= */
+
+function loadFromSupabase(){
+  return fetchReports().then(rows => {
+    state.pl = {}; state.plOrder = [];
+    state.bs = {}; state.bsOrder = [];
+    state.budget = null;
+
+    (Array.isArray(rows) ? rows : []).forEach(r => {
+      if (r.report_type === "pl") {
+        state.pl[r.period_key] = r;
+        state.plOrder.push(r.period_key);
+      } else if (r.report_type === "bs") {
+        state.bs[r.period_key] = r;
+        state.bsOrder.push(r.period_key);
+      } else if (r.report_type === "budget") {
+        state.budget = r;
+      }
+    });
+  }).catch(() => {});
+}
+
+function renderTabs(){
+
+  const tabsEl = $("periodTabs");
+  tabsEl.innerHTML = "";
+
+  if (activeReport === "budget") {
+    tabsEl.style.display = "none";
+    return;
   }
 
-  activePeriod = key;
+  const order = activeReport === "pl" ? state.plOrder : state.bsOrder;
+  const store = activeReport === "pl" ? state.pl : state.bs;
 
-  const selected =
-    activeReport === "pl"
-      ? datasets[key]
-      : activeReport === "bs"
-      ? balanceDatasets[key]
-      : budgetDataset;
+  if (!order.length) {
+    tabsEl.style.display = "none";
+    return;
+  }
 
-  Object.entries(selected.data).forEach(([k,v]) => {
-    if($(k)){
-      $(k).value = v.toFixed(2);
+  tabsEl.style.display = "flex";
+
+  order.forEach(key => {
+    const rec = store[key];
+    const btn = document.createElement("button");
+    btn.className = "tab" + (key === activePeriod ? " active" : "");
+    btn.type = "button";
+    btn.dataset.period = key;
+    btn.textContent = rec.tab_label || key;
+    btn.addEventListener("click", () => loadPeriod(key));
+    tabsEl.appendChild(btn);
+  });
+}
+
+function loadPeriod(key){
+
+  if (activeReport === "budget") {
+
+    activePeriod = "current";
+    const panelId = "budgetAdmin";
+
+    if (state.budget) {
+      applyRecord(panelId, state.budget);
+      $("periodLabel").textContent = state.budget.full_label || "Budget vs Actual";
+      $("emptyState").style.display = "none";
+    } else {
+      clearInputs(panelId);
+      $("periodLabel").textContent = "Budget vs Actual — no report saved yet";
+      $("emptyState").style.display = "block";
     }
-  });
 
-  $("periodLabel").textContent = selected.label;
+  } else {
 
-  root.querySelectorAll(".tab").forEach(button => {
+    const order = activeReport === "pl" ? state.plOrder : state.bsOrder;
+    const store = activeReport === "pl" ? state.pl : state.bs;
+    const panelId = activeReport === "pl" ? "plAdmin" : "bsAdmin";
 
-    button.classList.toggle(
-      "active",
-      button.dataset.period === key
-    );
+    const resolvedKey = key && store[key] ? key : order[order.length - 1];
+    activePeriod = resolvedKey || null;
 
-    button.disabled =
-      activeReport === "budget" &&
-      button.dataset.period !== "jul";
+    const rec = resolvedKey ? store[resolvedKey] : null;
 
-    button.title =
-      button.disabled
-      ? "Only the July 31 Budget to Actual report is loaded"
-      : "";
+    if (rec) {
+      applyRecord(panelId, rec);
+      $("periodLabel").textContent = rec.full_label || rec.tab_label || "";
+      $("emptyState").style.display = "none";
+    } else {
+      clearInputs(panelId);
+      $("periodLabel").textContent =
+        activeReport === "pl"
+        ? "Income & Expenses — no report saved yet"
+        : "Balance Sheet — no report saved yet";
+      $("emptyState").style.display = "block";
+    }
+  }
 
-  });
+  renderTabs();
 
   $("adminBtn").classList.remove("active");
   $("input").classList.remove("active");
@@ -1093,7 +951,7 @@ function parsePasted(){
 
   $("inputStatus").textContent =
     found
-    ? `Parsed ${found} dashboard categories. Review the values below, then update the dashboard.`
+    ? `Parsed ${found} dashboard categories. Review the values below, then Save & Update.`
     : "No recognized P&L totals were found.";
 }
 
@@ -1261,7 +1119,7 @@ function parseBalance(){
 
   $("bsInputStatus").textContent =
     found
-    ? `Parsed ${found} balance sheet categories. Review the values below, then update the dashboard.`
+    ? `Parsed ${found} balance sheet categories. Review the values below, then Save & Update.`
     : "No recognized Balance Sheet totals were found.";
 }
 
@@ -1501,25 +1359,13 @@ function parseBudget(){
 
   $("budgetInputStatus").textContent =
     found
-    ? `Parsed ${found} budget categories. Review the values below, then update the dashboard.`
+    ? `Parsed ${found} budget categories. Review the values below, then Save & Update.`
     : "No recognized Budget to Actual totals were found.";
 }
 
 /* =========================
-   TAB EVENTS
+   REPORT TABS
 ========================= */
-
-root.querySelectorAll(".tab")
-.forEach(button => {
-
-  button.addEventListener(
-    "click",
-    () => loadPeriod(
-      button.dataset.period
-    )
-  );
-
-});
 
 root.querySelectorAll(".reporttab")
 .forEach(button => {
@@ -1531,11 +1377,7 @@ root.querySelectorAll(".reporttab")
       activeReport =
         button.dataset.report;
 
-      loadPeriod(
-        activeReport === "budget"
-        ? "jul"
-        : activePeriod
-      );
+      loadPeriod(activePeriod);
 
     }
   );
@@ -1545,6 +1387,25 @@ root.querySelectorAll(".reporttab")
 /* =========================
    ADMIN
 ========================= */
+
+function prefillMeta(){
+
+  if (activeReport === "pl") {
+    const rec = activePeriod ? state.pl[activePeriod] : null;
+    $("pl_period_key").value = rec ? activePeriod : "";
+    $("pl_tab_label").value = rec ? (rec.tab_label || "") : "";
+    $("pl_full_label").value = rec ? (rec.full_label || "") : "";
+    $("pl_as_of_date").value = rec && rec.as_of_date ? rec.as_of_date : "";
+  } else if (activeReport === "bs") {
+    const rec = activePeriod ? state.bs[activePeriod] : null;
+    $("bs_period_key").value = rec ? activePeriod : "";
+    $("bs_tab_label").value = rec ? (rec.tab_label || "") : "";
+    $("bs_full_label").value = rec ? (rec.full_label || "") : "";
+    $("bs_as_of_date").value = rec && rec.as_of_date ? rec.as_of_date : "";
+  } else {
+    $("budget_full_label").value = state.budget ? (state.budget.full_label || "") : "";
+  }
+}
 
 $("adminBtn")
 .addEventListener("click",() => {
@@ -1565,15 +1426,12 @@ $("adminBtn")
       x.classList.remove("active")
     );
 
-  const target =
-    activeReport === "pl"
-      ? "plAdmin"
-      : activeReport === "bs"
-      ? "bsAdmin"
-      : "budgetAdmin";
+  const target = panelIdFor(activeReport);
 
   $(target)
     .classList.add("active");
+
+  prefillMeta();
 
   $("periodLabel").textContent =
     activeReport === "pl"
@@ -1607,34 +1465,56 @@ $("clearPasteBtn")
 $("updateBtn")
 .addEventListener("click",() => {
 
-  render();
+  const periodKey = $("pl_period_key").value.trim();
 
-  $("inputStatus").textContent =
-    "P&L dashboard updated.";
+  if(!periodKey){
+    $("inputStatus").textContent =
+      "Enter a period key before saving (e.g. aug26).";
+    return;
+  }
 
-  $("adminBtn")
-    .classList.remove("active");
+  const row = {
+    report_type: "pl",
+    period_key: periodKey,
+    tab_label: $("pl_tab_label").value.trim() || periodKey,
+    full_label: $("pl_full_label").value.trim() || null,
+    as_of_date: $("pl_as_of_date").value || null,
+    data: Object.fromEntries(
+      moneyIds("plAdmin").map(id => [id, num(id)])
+    )
+  };
 
-  $("input")
-    .classList.remove("active");
+  $("inputStatus").textContent = "Saving…";
 
-  $("dashboard")
-    .classList.add("active");
+  upsertReport(row).then(() => loadFromSupabase()).then(() => {
 
-  showReport();
+    activeReport = "pl";
+    activePeriod = periodKey;
 
-  $("periodLabel").textContent =
-    "Custom parsed Income & Expense view";
+    $("inputStatus").textContent =
+      "P&L dashboard saved and updated.";
+
+    $("adminBtn").classList.remove("active");
+    $("input").classList.remove("active");
+    $("dashboard").classList.add("active");
+
+    loadPeriod(periodKey);
+
+  }).catch(() => {
+    $("inputStatus").textContent =
+      "Could not save — check your connection and try again.";
+  });
 
 });
 
 $("resetBtn")
 .addEventListener("click",() => {
 
-  loadPeriod(activePeriod);
-
-  $("inputStatus").textContent =
-    "Current P&L values restored.";
+  loadFromSupabase().then(() => {
+    loadPeriod(activePeriod);
+    $("inputStatus").textContent =
+      "Saved values restored.";
+  });
 
 });
 
@@ -1661,34 +1541,56 @@ $("bsClearPasteBtn")
 $("bsUpdateBtn")
 .addEventListener("click",() => {
 
-  renderBalance();
+  const periodKey = $("bs_period_key").value.trim();
 
-  $("bsInputStatus").textContent =
-    "Balance Sheet dashboard updated.";
+  if(!periodKey){
+    $("bsInputStatus").textContent =
+      "Enter a period key before saving (e.g. aug26).";
+    return;
+  }
 
-  $("adminBtn")
-    .classList.remove("active");
+  const row = {
+    report_type: "bs",
+    period_key: periodKey,
+    tab_label: $("bs_tab_label").value.trim() || periodKey,
+    full_label: $("bs_full_label").value.trim() || null,
+    as_of_date: $("bs_as_of_date").value || null,
+    data: Object.fromEntries(
+      moneyIds("bsAdmin").map(id => [id, num(id)])
+    )
+  };
 
-  $("input")
-    .classList.remove("active");
+  $("bsInputStatus").textContent = "Saving…";
 
-  $("dashboard")
-    .classList.add("active");
+  upsertReport(row).then(() => loadFromSupabase()).then(() => {
 
-  showReport();
+    activeReport = "bs";
+    activePeriod = periodKey;
 
-  $("periodLabel").textContent =
-    "Custom parsed Balance Sheet view";
+    $("bsInputStatus").textContent =
+      "Balance Sheet dashboard saved and updated.";
+
+    $("adminBtn").classList.remove("active");
+    $("input").classList.remove("active");
+    $("dashboard").classList.add("active");
+
+    loadPeriod(periodKey);
+
+  }).catch(() => {
+    $("bsInputStatus").textContent =
+      "Could not save — check your connection and try again.";
+  });
 
 });
 
 $("bsResetBtn")
 .addEventListener("click",() => {
 
-  loadPeriod(activePeriod);
-
-  $("bsInputStatus").textContent =
-    "Current Balance Sheet values restored.";
+  loadFromSupabase().then(() => {
+    loadPeriod(activePeriod);
+    $("bsInputStatus").textContent =
+      "Saved values restored.";
+  });
 
 });
 
@@ -1715,45 +1617,47 @@ $("budgetClearPasteBtn")
 $("budgetUpdateBtn")
 .addEventListener("click",() => {
 
-  renderBudget();
+  const row = {
+    report_type: "budget",
+    period_key: "current",
+    tab_label: null,
+    full_label: $("budget_full_label").value.trim() || null,
+    as_of_date: null,
+    data: Object.fromEntries(
+      moneyIds("budgetAdmin").map(id => [id, num(id)])
+    )
+  };
 
-  $("budgetInputStatus").textContent =
-    "Budget dashboard updated.";
+  $("budgetInputStatus").textContent = "Saving…";
 
-  $("adminBtn")
-    .classList.remove("active");
+  upsertReport(row).then(() => loadFromSupabase()).then(() => {
 
-  $("input")
-    .classList.remove("active");
+    activeReport = "budget";
 
-  $("dashboard")
-    .classList.add("active");
+    $("budgetInputStatus").textContent =
+      "Budget dashboard saved and updated.";
 
-  showReport();
+    $("adminBtn").classList.remove("active");
+    $("input").classList.remove("active");
+    $("dashboard").classList.add("active");
 
-  $("periodLabel").textContent =
-    "Custom parsed Budget vs Actual view";
+    loadPeriod(null);
+
+  }).catch(() => {
+    $("budgetInputStatus").textContent =
+      "Could not save — check your connection and try again.";
+  });
 
 });
 
 $("budgetResetBtn")
 .addEventListener("click",() => {
 
-  Object.entries(
-    budgetDataset.data
-  ).forEach(([k,v]) => {
-
-    if($(k)){
-      $(k).value =
-        v.toFixed(2);
-    }
-
+  loadFromSupabase().then(() => {
+    loadPeriod(null);
+    $("budgetInputStatus").textContent =
+      "Saved values restored.";
   });
-
-  renderBudget();
-
-  $("budgetInputStatus").textContent =
-    "July Budget to Actual values restored.";
 
 });
 
@@ -1774,6 +1678,6 @@ $("excludeCap")
 );
 
 /* INITIAL LOAD */
-loadPeriod("jul");
+loadFromSupabase().then(() => loadPeriod(null));
 
 })();

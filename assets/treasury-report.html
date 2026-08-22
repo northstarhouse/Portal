@@ -63,10 +63,15 @@
 .adjusted input{width:18px;height:18px}
 .adj-result{margin-left:auto;font-weight:800;font-size:14px}
 .foot{font-size:11px;opacity:.52;margin-top:16px;line-height:1.45}
+.meta-row{display:grid;grid-template-columns:1fr 1fr 1.6fr 1fr;gap:10px;margin-bottom:18px}
+.meta-field label{display:block;font-size:12px;font-weight:800;margin-bottom:6px;opacity:.7}
+.meta-field input{width:100%;min-height:40px;border:1px solid light-dark(#cbc4b5,#484b40);background:light-dark(#fff,#292b25);color:inherit;border-radius:9px;padding:8px 10px;font-size:14px}
+.meta-hint{font-size:12px;opacity:.6;margin:-10px 0 16px}
 
 @media(max-width:720px){
   #nsh-fin{padding:18px}
   .kpis,.grid2,.drivers,.attention{grid-template-columns:1fr}
+  .meta-row{grid-template-columns:1fr 1fr}
   .input-grid{grid-template-columns:1fr 1fr}
   .input-grid .head:first-child{display:none}
   .input-grid .head:nth-child(2),.input-grid .head:nth-child(3){text-align:center}
@@ -100,10 +105,11 @@
     </button>
   </div>
 
-  <div class="tabs" role="tablist">
-    <button class="tab active" type="button" data-period="jul">Jul 31</button>
-    <button class="tab" type="button" data-period="aug">Aug 20</button>
-  </div>
+  <div class="tabs" role="tablist" id="periodTabs"></div>
+</div>
+
+<div class="mini" id="emptyState" style="display:none">
+  No reports have been entered yet. Use <b>Admin</b> to paste in a report and save the first snapshot.
 </div>
 
 <section id="dashboard" class="view active">
@@ -369,6 +375,26 @@
         Paste QuickBooks-style P&amp;L text below and the dashboard will identify major totals.
       </p>
 
+      <div class="meta-row">
+        <div class="meta-field">
+          <label for="pl_period_key">Period key</label>
+          <input id="pl_period_key" placeholder="e.g. aug26">
+        </div>
+        <div class="meta-field">
+          <label for="pl_tab_label">Tab label</label>
+          <input id="pl_tab_label" placeholder="e.g. Aug 20">
+        </div>
+        <div class="meta-field">
+          <label for="pl_full_label">Full label</label>
+          <input id="pl_full_label" placeholder="e.g. Financial snapshot · Jan 1–Aug 20, 2026 vs. 2025">
+        </div>
+        <div class="meta-field">
+          <label for="pl_as_of_date">As of date</label>
+          <input id="pl_as_of_date" type="date">
+        </div>
+      </div>
+      <p class="meta-hint">Period key identifies this snapshot. Reuse an existing key to overwrite it, or enter a new one to add another period tab.</p>
+
       <div class="paste-wrap">
         <label class="paste-label" for="pasteData">Paste P&amp;L text</label>
 
@@ -456,11 +482,11 @@
 
       <div class="actions">
         <button class="btn primary" id="updateBtn" type="button">
-          Update P&amp;L Dashboard
+          Save &amp; Update P&amp;L
         </button>
 
         <button class="btn secondary" id="resetBtn" type="button">
-          Restore Current Report
+          Discard Changes
         </button>
       </div>
 
@@ -478,6 +504,26 @@
       <p class="input-note">
         Paste a QuickBooks-style Balance Sheet here.
       </p>
+
+      <div class="meta-row">
+        <div class="meta-field">
+          <label for="bs_period_key">Period key</label>
+          <input id="bs_period_key" placeholder="e.g. aug26">
+        </div>
+        <div class="meta-field">
+          <label for="bs_tab_label">Tab label</label>
+          <input id="bs_tab_label" placeholder="e.g. Aug 20">
+        </div>
+        <div class="meta-field">
+          <label for="bs_full_label">Full label</label>
+          <input id="bs_full_label" placeholder="e.g. Balance Sheet · As of August 20, 2026 vs. 2025">
+        </div>
+        <div class="meta-field">
+          <label for="bs_as_of_date">As of date</label>
+          <input id="bs_as_of_date" type="date">
+        </div>
+      </div>
+      <p class="meta-hint">Period key identifies this snapshot. Reuse an existing key to overwrite it, or enter a new one to add another period tab.</p>
 
       <div class="paste-wrap">
         <label class="paste-label" for="bsPasteData">
@@ -574,11 +620,11 @@
 
       <div class="actions">
         <button class="btn primary" id="bsUpdateBtn" type="button">
-          Update Balance Sheet
+          Save &amp; Update Balance Sheet
         </button>
 
         <button class="btn secondary" id="bsResetBtn" type="button">
-          Restore Current Report
+          Discard Changes
         </button>
       </div>
 
@@ -594,8 +640,15 @@
       <h3 class="section-title">Budget vs Actual data</h3>
 
       <p class="input-note">
-        Paste the Budget to Actual report here. The first two numeric columns are interpreted as Actual and Cash Budget.
+        Paste the Budget to Actual report here. The first two numeric columns are interpreted as Actual and Cash Budget. There is a single, always-current Budget vs Actual snapshot — saving here replaces it.
       </p>
+
+      <div class="meta-row" style="grid-template-columns:1fr">
+        <div class="meta-field">
+          <label for="budget_full_label">Report label</label>
+          <input id="budget_full_label" placeholder="e.g. Budget vs Actual · Actual 8.20.26 vs. Cash Budget">
+        </div>
+      </div>
 
       <div class="paste-wrap">
         <label class="paste-label" for="budgetPasteData">
@@ -702,11 +755,11 @@
 
       <div class="actions">
         <button class="btn primary" id="budgetUpdateBtn" type="button">
-          Update Budget Dashboard
+          Save &amp; Update Budget
         </button>
 
         <button class="btn secondary" id="budgetResetBtn" type="button">
-          Restore July Budget Report
+          Discard Changes
         </button>
       </div>
 

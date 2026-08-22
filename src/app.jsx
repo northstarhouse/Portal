@@ -10120,6 +10120,7 @@ function TreasuryReportsView({ navigate }) {
     ]).then(function(res) {
       if (cancelled || !container) return;
       container.innerHTML = res[0];
+      window.__nshTreasuryConfig = { url: SUPABASE_URL, key: SUPABASE_KEY };
       var script = document.createElement('script');
       script.textContent = res[1];
       container.appendChild(script);
