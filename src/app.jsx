@@ -10817,12 +10817,153 @@ function IdeaForm({ formData, setFormData, onSubmit, onCancel, submitLabel, isSa
         <div><label style={{ fontSize: 11, color: '#b45309', fontWeight: 600, display: 'block', marginBottom: 4 }}>Blockers — what's in the way</label><textarea value={formData.blockers} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { blockers: e.target.value }); }); }} rows={4} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Obstacles, constraints, risks…" /></div>
         <div><label style={{ fontSize: 11, color: '#1565c0', fontWeight: 600, display: 'block', marginBottom: 4 }}>Gaps — what's missing</label><textarea value={formData.gaps} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { gaps: e.target.value }); }); }} rows={4} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Resources, knowledge, support needed…" /></div>
       </div>
-      <div style={{ marginBottom: 12 }}><label style={{ fontSize: 11, color: '#2e7d32', fontWeight: 600, display: 'block', marginBottom: 4 }}>Updates — latest progress</label><textarea value={formData.updates || ''} onChange={function(e) { setFormData(function(f) { return Object.assign({}, f, { updates: e.target.value }); }); }} rows={5} style={Object.assign({}, inpSt, { resize: 'vertical' })} placeholder="Latest progress, recent changes…" /></div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="submit" disabled={isSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving…' : submitLabel}</button>
         <button type="button" onClick={onCancel} style={{ padding: '9px 18px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
       </div>
     </form>
+  );
+}
+
+// Multiple, individually-dated, individually-editable update entries for one
+// idea -- replaces the old single free-text "updates" column. Each entry has
+// its own Edit button (enters edit mode for just that entry, date + text
+// both editable) rather than everything being always-editable inline.
+function IdeaUpdatesSection({ ideaId }) {
+  var [items, setItems] = useState(null);
+  var [adding, setAdding] = useState(false);
+  var [newText, setNewText] = useState('');
+  var [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10));
+  var [savingNew, setSavingNew] = useState(false);
+  var [editingId, setEditingId] = useState(null);
+  var [editText, setEditText] = useState('');
+  var [editDate, setEditDate] = useState('');
+  var [savingEditId, setSavingEditId] = useState(null);
+  var [deletingId, setDeletingId] = useState(null);
+
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/idea_updates?idea_id=eq.' + ideaId + '&select=*&order=update_date.desc,created_at.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setItems(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setItems([]); });
+  }
+  useEffect(function() { load(); setAdding(false); setEditingId(null); }, [ideaId]);
+
+  function fmtFullDate(d) {
+    if (!d) return '';
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  function handleAddClick() {
+    setNewText('');
+    setNewDate(new Date().toISOString().slice(0, 10));
+    setAdding(true);
+  }
+
+  function handleSaveNew() {
+    if (!newText.trim() || savingNew) return;
+    setSavingNew(true);
+    fetch(SUPABASE_URL + '/rest/v1/idea_updates', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ idea_id: ideaId, update_date: newDate, text: newText.trim() })
+    }).then(function(r) {
+      setSavingNew(false);
+      if (!r.ok) { alert('Failed to save update.'); return; }
+      setAdding(false);
+      load();
+    }).catch(function() { setSavingNew(false); alert('Failed to save update: network error.'); });
+  }
+
+  function handleEditClick(item) {
+    setEditingId(item.id);
+    setEditText(item.text);
+    setEditDate(item.update_date);
+  }
+
+  function handleSaveEdit(id) {
+    if (!editText.trim() || savingEditId) return;
+    setSavingEditId(id);
+    fetch(SUPABASE_URL + '/rest/v1/idea_updates?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ update_date: editDate, text: editText.trim() })
+    }).then(function(r) {
+      setSavingEditId(null);
+      if (!r.ok) { alert('Failed to save update.'); return; }
+      setEditingId(null);
+      load();
+    }).catch(function() { setSavingEditId(null); alert('Failed to save update: network error.'); });
+  }
+
+  function handleDelete(id) {
+    if (!window.confirm('Delete this update?')) return;
+    setDeletingId(id);
+    fetch(SUPABASE_URL + '/rest/v1/idea_updates?id=eq.' + id, {
+      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      setDeletingId(null);
+      setItems(function(prev) { return prev.filter(function(x) { return x.id !== id; }); });
+    }).catch(function() { setDeletingId(null); });
+  }
+
+  var inpSt = { width: '100%', padding: '7px 9px', border: '0.5px solid #cfe4cf', borderRadius: 6, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
+
+  return (
+    <div style={{ marginTop: 16, background: '#eef6ee', border: '1px solid #cfe4cf', borderRadius: 10, padding: '12px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#2e7d32', fontWeight: 700 }}>Updates</div>
+        {!adding && <button onClick={handleAddClick} style={{ background: '#2e7d32', color: '#fff', border: 'none', borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>+ Add Update</button>}
+      </div>
+
+      {adding && (
+        <div style={{ background: '#fff', border: '1px solid #cfe4cf', borderRadius: 8, padding: 10, marginBottom: 10 }}>
+          <input type="date" value={newDate} onChange={function(e) { setNewDate(e.target.value); }} style={Object.assign({}, inpSt, { marginBottom: 6, maxWidth: 180 })} />
+          <textarea autoFocus value={newText} onChange={function(e) { setNewText(e.target.value); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical', marginBottom: 8 })} placeholder="What's new…" />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handleSaveNew} disabled={savingNew || !newText.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (savingNew || !newText.trim()) ? 0.5 : 1 }}>{savingNew ? 'Saving…' : 'Save'}</button>
+            <button onClick={function() { setAdding(false); }} style={{ background: 'none', border: '1px solid #cfe4cf', borderRadius: 7, padding: '6px 14px', fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {items === null ? (
+        <div style={{ fontSize: 12, color: '#8ba38b' }}>Loading…</div>
+      ) : items.length === 0 && !adding ? (
+        <div style={{ fontSize: 13, color: '#8ba38b', fontStyle: 'italic' }}>No updates yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {items.map(function(item) {
+            var isEditing = editingId === item.id;
+            if (isEditing) {
+              return (
+                <div key={item.id} style={{ background: '#fff', border: '1px solid #cfe4cf', borderRadius: 8, padding: 10 }}>
+                  <input type="date" value={editDate} onChange={function(e) { setEditDate(e.target.value); }} style={Object.assign({}, inpSt, { marginBottom: 6, maxWidth: 180 })} />
+                  <textarea autoFocus value={editText} onChange={function(e) { setEditText(e.target.value); }} rows={3} style={Object.assign({}, inpSt, { resize: 'vertical', marginBottom: 8 })} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={function() { handleSaveEdit(item.id); }} disabled={savingEditId === item.id || !editText.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (savingEditId === item.id || !editText.trim()) ? 0.5 : 1 }}>{savingEditId === item.id ? 'Saving…' : 'Save'}</button>
+                    <button onClick={function() { setEditingId(null); }} style={{ background: 'none', border: '1px solid #cfe4cf', borderRadius: 7, padding: '6px 14px', fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <div key={item.id} style={{ background: '#fff', border: '1px solid #dcebdc', borderRadius: 8, padding: '9px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#5a8a5a' }}>{fmtFullDate(item.update_date)}</div>
+                  <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+                    <button onClick={function() { handleEditClick(item); }} style={{ background: 'none', border: 'none', color: '#2e7d32', cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: 0 }}>Edit</button>
+                    <button onClick={function() { handleDelete(item.id); }} disabled={deletingId === item.id} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 11, padding: 0 }}>{deletingId === item.id ? 'Deleting…' : 'Delete'}</button>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13.5, color: '#3a4a3a', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{item.text}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -10847,8 +10988,7 @@ function IdeasView() {
   var [filterStatus, setFilterStatus] = useState('Active');
   var [showAdd, setShowAdd] = useState(false);
   var [editing, setEditing] = useState(false);
-  var emptyForm = { title: '', status: 'Exploring', submitted_by: '', notes: '', blockers: '', gaps: '', budget: '', updates: '' };
-  var [showUpdates, setShowUpdates] = useState(true);
+  var emptyForm = { title: '', status: 'Exploring', submitted_by: '', notes: '', blockers: '', gaps: '', budget: '' };
   var [form, setForm] = useState(emptyForm);
   var [editForm, setEditForm] = useState({});
   var [saving, setSaving] = useState(false);
@@ -10911,7 +11051,7 @@ function IdeasView() {
     e.preventDefault();
     if (!form.title) return;
     setSaving(true);
-    var payload = { title: form.title, status: form.status, submitted_by: form.submitted_by || null, notes: form.notes || null, blockers: form.blockers || null, gaps: form.gaps || null, budget: form.budget ? parseFloat(form.budget) : null, updates: form.updates || null };
+    var payload = { title: form.title, status: form.status, submitted_by: form.submitted_by || null, notes: form.notes || null, blockers: form.blockers || null, gaps: form.gaps || null, budget: form.budget ? parseFloat(form.budget) : null };
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Ideas'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -11077,7 +11217,7 @@ function IdeasView() {
                   var sc = STATUS_COLORS[idea.status] || { bg: '#f5f5f5', color: '#888' };
                   var isSel = selected && selected.id === idea.id;
                   return (
-                    <div key={idea.id} onClick={function() { setSelected(isSel ? null : idea); setEditing(false); setShowUpdates(true); }}
+                    <div key={idea.id} onClick={function() { setSelected(isSel ? null : idea); setEditing(false); }}
                       style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb', cursor: 'pointer', background: isSel ? sc.bg : '#fff', borderLeft: '3px solid ' + (isSel ? sc.color : 'transparent'), transition: 'all 0.12s' }}
                       onMouseEnter={function(e) { if (!isSel) e.currentTarget.style.background = '#faf8f5'; }}
                       onMouseLeave={function(e) { if (!isSel) e.currentTarget.style.background = '#fff'; }}>
@@ -11086,7 +11226,6 @@ function IdeasView() {
                         <span style={{ fontSize: 10, fontWeight: 700, background: sc.bg, color: sc.color, border: '0.5px solid ' + sc.color + '44', borderRadius: 10, padding: '1px 7px' }}>{idea.status}</span>
                         {idea.submitted_by && <span style={{ fontSize: 11, color: '#aaa' }}>{idea.submitted_by}</span>}
                       </div>
-                      {idea.updates && <div style={{ fontSize: 11, color: '#2e7d32', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↳ {idea.updates}</div>}
                     </div>
                   );
                 })
@@ -11113,7 +11252,7 @@ function IdeasView() {
                           <div style={{ fontSize: 13, fontWeight: 700, color: budgetTotal > parseFloat(selected.budget) ? '#c62828' : '#2e7d32' }}>{fmtMoney(parseFloat(selected.budget) - budgetTotal)} remaining</div>
                         </div>
                       )}
-                      <button onClick={function() { setEditing(true); setEditForm({ title: selected.title, status: selected.status, submitted_by: selected.submitted_by || '', notes: selected.notes || '', blockers: selected.blockers || '', gaps: selected.gaps || '', budget: selected.budget || '', updates: selected.updates || '' }); }}
+                      <button onClick={function() { setEditing(true); setEditForm({ title: selected.title, status: selected.status, submitted_by: selected.submitted_by || '', notes: selected.notes || '', blockers: selected.blockers || '', gaps: selected.gaps || '', budget: selected.budget || '' }); }}
                         style={{ background: '#fff', border: '0.5px solid ' + sc.color + '66', borderRadius: 7, padding: '5px 12px', fontSize: 12, color: sc.color, cursor: 'pointer', fontWeight: 500 }}>Edit</button>
                     </div>
                   </div>
@@ -11138,20 +11277,7 @@ function IdeasView() {
                         </div>
                       )}
                     </div>
-                    {showUpdates && (
-                      <div style={{ marginTop: 16, background: '#eef6ee', border: '1px solid #cfe4cf', borderRadius: 10, padding: '12px 16px' }}>
-                        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#2e7d32', fontWeight: 700, marginBottom: 6 }}>Latest Updates</div>
-                        {selected.updates
-                          ? <div style={{ fontSize: 13.5, color: '#3a4a3a', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{selected.updates}</div>
-                          : <div style={{ fontSize: 13, color: '#8ba38b', fontStyle: 'italic' }}>No updates yet.</div>}
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                      <button onClick={function() { setShowUpdates(function(v) { return !v; }); }}
-                        style={{ fontSize: 11, color: '#888', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', textDecoration: 'underline' }}>
-                        {showUpdates ? 'Hide Updates' : 'View Updates'}
-                      </button>
-                    </div>
+                    <IdeaUpdatesSection ideaId={selected.id} />
                   </div>
                 </div>
 
