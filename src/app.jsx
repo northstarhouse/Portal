@@ -11173,20 +11173,19 @@ function IdeasView() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ New Idea</button>
-      </div>
-
-      <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '1px solid #e8e0d5' }}>
-        {[{ id: 'initiatives', label: 'Active Initiatives' }, { id: 'ideas', label: 'Idea Stage' }].map(function(t) {
-          var isOn = mainTab === t.id;
-          return (
-            <button key={t.id} onClick={function() { setMainTab(t.id); setFilterStatus('All'); setSelected(null); }}
-              style={{ padding: '8px 20px', fontSize: 13, fontWeight: isOn ? 700 : 400, color: isOn ? gold : '#aaa', background: 'none', border: 'none', borderBottom: '2px solid ' + (isOn ? gold : 'transparent'), cursor: 'pointer', marginBottom: -1 }}>
-              {t.label}
-            </button>
-          );
-        })}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20, borderBottom: '1px solid #e8e0d5' }}>
+        <div style={{ display: 'flex', gap: 0 }}>
+          {[{ id: 'initiatives', label: 'Active Initiatives' }, { id: 'ideas', label: 'Idea Stage' }].map(function(t) {
+            var isOn = mainTab === t.id;
+            return (
+              <button key={t.id} onClick={function() { setMainTab(t.id); setFilterStatus('All'); setSelected(null); }}
+                style={{ padding: '8px 20px', fontSize: 13, fontWeight: isOn ? 700 : 400, color: isOn ? gold : '#aaa', background: 'none', border: 'none', borderBottom: '2px solid ' + (isOn ? gold : 'transparent'), cursor: 'pointer', marginBottom: -1 }}>
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+        <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', marginBottom: 8 }}>+ New Idea</button>
       </div>
       {mainTab === 'initiatives' && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
