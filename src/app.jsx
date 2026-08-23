@@ -9703,7 +9703,9 @@ function FinancialOverviewView({ navigate }) {
     <div style={{ paddingBottom: 60 }}>
       <TreasuryReportsView />
 
-      <div style={{ fontSize: 19, fontWeight: 700, color: '#2a2a2a', margin: '32px 0 4px' }}>Financial Tracking from Staff</div>
+      <div style={{ borderTop: '3px solid rgba(136,108,68,0.35)', margin: '40px 0 24px' }} />
+
+      <div style={{ fontSize: 19, fontWeight: 700, color: '#2a2a2a', margin: '0 0 4px' }}>Financial Tracking from Staff</div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 13, color: '#888' }}>Combined view across donations, in-kind sponsorships, operational budgets, and office cash flow.</div>
