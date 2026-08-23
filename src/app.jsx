@@ -11890,10 +11890,12 @@ function suEmbedHtml(id, title) {
   // Settings panel -- there's no way for content inside the iframe to resize
   // it, so a dynamic auto-resize script here just fights the platform.
   // Simplest reliable approach: a single generous static height. Set the
-  // Wix embed element's own Height (in its Settings panel) to something at
-  // least this tall too -- if Wix's box ends up taller than the form,
-  // that's just blank space; if shorter, the form gets clipped.
-  return '<iframe src="' + src + '" style="width:100%;min-height:2200px;border:none;" title="' + esc + '"></iframe>';
+  // Wix embed element's own Height (in its Settings panel) to match this
+  // specific form's actual rendered height -- if Wix's box ends up taller
+  // than the form, that's just blank space; if shorter, the form gets
+  // clipped. 1400px fits most forms; open the public link and check before
+  // publishing a long one.
+  return '<iframe src="' + src + '" style="width:100%;min-height:1400px;border:none;" title="' + esc + '"></iframe>';
 }
 
 function SuBuilderBack({ onBack, label }) {
