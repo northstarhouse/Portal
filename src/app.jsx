@@ -4107,6 +4107,11 @@ function DonorsView({ navigate }) {
     return '';
   }
 
+  function isLikelyDuplicate(matchedDonor,date,amount){
+    if(!matchedDonor||!date)return false;
+    return (matchedDonor.donations||[]).some(function(d){return d.date===date&&Math.abs((parseFloat(d.amount)||0)-amount)<0.01;});
+  }
+
   function parseImportRows(){
     var lines=importText.split(/\r?\n/).filter(function(l){return l.trim();});
     var out=[];
@@ -4123,6 +4128,7 @@ function DonorsView({ navigate }) {
       var paymentType=cols[4]||'';
       var notes=cols[5]||'';
       var matched=donors.find(function(d){return normDonorName(d.formal_name)===normDonorName(name);});
+      var dup=isLikelyDuplicate(matched,date,amount);
       out.push({
         key:i+'-'+name,
         raw:line,
@@ -4132,13 +4138,127 @@ function DonorsView({ navigate }) {
         type:DONATION_TYPES.indexOf(type)>=0?type:'Donation',
         payment_type:PAYMENT_TYPES.indexOf(paymentType)>=0?paymentType:'',
         notes:notes,
-        include:true,
+        include:!dup,
+        possibleDuplicate:dup,
         donorId:matched?matched.id:null,
         matchQuery:''
       });
     });
     setImportRows(out);
     setImportStatus(out.length?('Parsed '+out.length+' row(s). Review the matches below, then Import Selected.'):'No rows found — check the pasted text.');
+  }
+
+  function parseCsvText(text){
+    text=text.replace(/^﻿/,'');
+    var rows=[],row=[],field='',inQuotes=false;
+    for(var i=0;i<text.length;i++){
+      var c=text[i];
+      if(inQuotes){
+        if(c==='"'){
+          if(text[i+1]==='"'){field+='"';i++;}
+          else inQuotes=false;
+        }else field+=c;
+      }else{
+        if(c==='"')inQuotes=true;
+        else if(c===','){row.push(field);field='';}
+        else if(c==='\r'){/* skip */}
+        else if(c==='\n'){row.push(field);rows.push(row);row=[];field='';}
+        else field+=c;
+      }
+    }
+    if(field.length||row.length){row.push(field);rows.push(row);}
+    return rows;
+  }
+
+  function parseImportCsvRows(text){
+    var table=parseCsvText(text);
+    if(!table.length)return [];
+    var headerRow=table[1]||[];
+    var isPaymentsExport=headerRow.some(function(h){return (h||'').indexOf('Payment Date')===0;})&&headerRow.indexOf('Transaction Status')>=0;
+
+    if(isPaymentsExport){
+      var dateIdx=headerRow.findIndex(function(h){return (h||'').indexOf('Payment Date')===0;});
+      var firstNameIdx=headerRow.indexOf('First Name');
+      var lastNameIdx=headerRow.indexOf('Last Name');
+      var amountIdx=headerRow.indexOf('Amount');
+      var statusIdx=headerRow.indexOf('Transaction Status');
+      var productIdx=headerRow.indexOf('Name');
+      var out=[];
+      table.slice(2).forEach(function(r,i){
+        if(!r||r.length<2)return;
+        var status=(r[statusIdx]||'').trim();
+        if(status&&status!=='Successful')return;
+        var first=(r[firstNameIdx]||'').trim();
+        var last=(r[lastNameIdx]||'').trim();
+        var name=(first+' '+last).trim();
+        if(!name)return;
+        var amount=parseFloat((r[amountIdx]||'').replace(/[^0-9.\-]/g,''))||0;
+        if(!amount)return;
+        var dateRaw=(r[dateIdx]||'').split(',')[0].trim();
+        var date=normalizeImportDate(dateRaw);
+        var product=(r[productIdx]||'').trim();
+        var type=/^commemorative brick/i.test(product)?'Brick Purchase':'Donation';
+        var matched=donors.find(function(d){return normDonorName(d.formal_name)===normDonorName(name);});
+        var dup=isLikelyDuplicate(matched,date,amount);
+        out.push({
+          key:'csv-'+i+'-'+name,
+          raw:r.join(', '),
+          name:name,
+          amount:amount,
+          date:date,
+          type:type,
+          payment_type:'Website',
+          notes:product,
+          include:!dup,
+          possibleDuplicate:dup,
+          donorId:matched?matched.id:null,
+          matchQuery:''
+        });
+      });
+      return out;
+    }
+
+    var startIdx=0;
+    var first=table[0];
+    if(first&&first[0]&&isNaN(parseFloat(first[1])))startIdx=1;
+    var out2=[];
+    table.slice(startIdx).forEach(function(r,i){
+      if(!r||!r[0])return;
+      var name=(r[0]||'').trim();
+      var amount=parseFloat((r[1]||'').replace(/[^0-9.\-]/g,''))||0;
+      var date=normalizeImportDate(r[2]||'');
+      var type=r[3]||'Donation';
+      var paymentType=r[4]||'';
+      var notes=r[5]||'';
+      var matched=donors.find(function(d){return normDonorName(d.formal_name)===normDonorName(name);});
+      var dup=isLikelyDuplicate(matched,date,amount);
+      out2.push({
+        key:'csv-'+i+'-'+name,
+        raw:r.join(', '),
+        name:name,
+        amount:amount,
+        date:date,
+        type:DONATION_TYPES.indexOf(type)>=0?type:'Donation',
+        payment_type:PAYMENT_TYPES.indexOf(paymentType)>=0?paymentType:'',
+        notes:notes,
+        include:!dup,
+        possibleDuplicate:dup,
+        donorId:matched?matched.id:null,
+        matchQuery:''
+      });
+    });
+    return out2;
+  }
+
+  function handleCsvFile(file){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var text=String((e.target&&e.target.result)||'');
+      var rows=parseImportCsvRows(text);
+      setImportRows(rows);
+      setImportStatus(rows.length?('Parsed '+rows.length+' row(s) from '+file.name+'. Review the matches below, then Import Selected.'):'No usable rows found in that CSV.');
+    };
+    reader.readAsText(file);
   }
 
   function updateImportRow(key,patch){
@@ -4813,6 +4933,14 @@ function DonorsView({ navigate }) {
                   <button onClick={parseImportRows} disabled={!importText.trim()} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer',opacity:importText.trim()?1:0.5}}>Parse</button>
                   <button onClick={function(){setShowImport(false);}} style={{flex:1,padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer',fontWeight:500}}>Cancel</button>
                 </div>
+                <div style={{display:'flex',alignItems:'center',gap:10,margin:'18px 0'}}>
+                  <div style={{flex:1,height:1,background:'#f0ece6'}} />
+                  <span style={{fontSize:11,color:'#bbb'}}>or</span>
+                  <div style={{flex:1,height:1,background:'#f0ece6'}} />
+                </div>
+                <label style={lStyle}>Upload a CSV file</label>
+                <input type="file" accept=".csv,text/csv" onChange={function(e){var f=e.target.files[0];if(f)handleCsvFile(f);e.target.value='';}} style={Object.assign({},iStyle,{padding:'6px 8px'})} />
+                <p style={{fontSize:11,color:'#aaa',marginTop:6,lineHeight:1.5}}>Understands payment processor exports (Wix Payments / PayPal "payments.csv") — pulls payer name, amount, and date automatically, and tags Commemorative Brick line items as Brick Purchase. A simple Name, Amount, Date CSV also works.</p>
               </div>
             ) : (
               <div>
@@ -4826,6 +4954,7 @@ function DonorsView({ navigate }) {
                         <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,fontWeight:600,marginBottom:10,cursor:'pointer'}}>
                           <input type="checkbox" checked={row.include} onChange={function(e){updateImportRow(row.key,{include:e.target.checked});}} />
                           {row.name}
+                          {row.possibleDuplicate && <span style={{fontSize:10,fontWeight:600,color:'#a34335',background:'#fbe9e5',padding:'2px 7px',borderRadius:99,textTransform:'uppercase',letterSpacing:0.3}}>Already on file</span>}
                         </label>
                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                           <div><label style={lStyle}>Amount</label><input value={row.amount} onChange={function(e){updateImportRow(row.key,{amount:parseFloat(e.target.value.replace(/[^0-9.\-]/g,''))||0});}} style={iStyle} /></div>
