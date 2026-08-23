@@ -933,6 +933,12 @@ function parsePasted(){
     const normalized =
       cleanLine(line);
 
+    // For exact-match aliases, compare against just the label text (everything
+    // before the first digit) so a short label like "Bricks" can't accidentally
+    // match a longer one like "Bricks Campaign" just because it's a prefix.
+    const label =
+      cleanLine(line.replace(/\d[\s\S]*$/, ""));
+
     const nums =
       line.match(
         /-?\$?\s*\d[\d,]*(?:\.\d+)?/g
@@ -946,10 +952,7 @@ function parsePasted(){
 
       const match =
         a.exact
-        ? a.keys.some(k =>
-            normalized.startsWith(k+" ") ||
-            normalized === k
-          )
+        ? a.keys.some(k => label === k)
         : a.keys.some(k =>
             normalized.includes(k)
           );
@@ -1096,6 +1099,12 @@ function parseBalance(){
     const normalized =
       cleanLine(line);
 
+    // For exact-match aliases, compare against just the label text (everything
+    // before the first digit) so a short label like "Bricks" can't accidentally
+    // match a longer one like "Bricks Campaign" just because it's a prefix.
+    const label =
+      cleanLine(line.replace(/\d[\s\S]*$/, ""));
+
     const nums =
       line.match(
         /-?\$?\s*\d[\d,]*(?:\.\d+)?/g
@@ -1109,10 +1118,7 @@ function parseBalance(){
 
       const match =
         a.exact
-        ? a.keys.some(k =>
-            normalized.startsWith(k+" ") ||
-            normalized === k
-          )
+        ? a.keys.some(k => label === k)
         : a.keys.some(k =>
             normalized.includes(k)
           );
@@ -1318,6 +1324,12 @@ function parseBudget(){
     const normalized =
       cleanLine(line);
 
+    // For exact-match aliases, compare against just the label text (everything
+    // before the first digit) so a short label like "Bricks" can't accidentally
+    // match a longer one like "Bricks Campaign" just because it's a prefix.
+    const label =
+      cleanLine(line.replace(/[\d(][\s\S]*$/, ""));
+
     const nums =
       line.match(
         /-?\$?\s*\(?\s*\d[\d,]*(?:\.\d+)?\s*\)?/g
@@ -1331,10 +1343,7 @@ function parseBudget(){
 
       const match =
         a.exact
-        ? a.keys.some(k =>
-            normalized.startsWith(k+" ") ||
-            normalized === k
-          )
+        ? a.keys.some(k => label === k)
         : a.keys.some(k =>
             normalized.includes(k)
           );
