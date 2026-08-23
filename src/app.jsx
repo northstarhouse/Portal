@@ -601,7 +601,6 @@ var NAV_ICONS = {
   marketing: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
   admin: '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M20 20c0-3-2-5.5-4-6.5"/>',
   'meeting-reports': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
-  'treasury-reports': '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
 };
 
 function NavIcon({ id, active }) {
@@ -9701,14 +9700,15 @@ function FinancialOverviewView({ navigate }) {
 
   return (
     <div style={{ paddingBottom: 60 }}>
+      <TreasuryReportsView />
+
+      <div style={{ fontSize: 19, fontWeight: 700, color: '#2a2a2a', margin: '32px 0 4px' }}>Financial Tracking from Staff</div>
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 13, color: '#888' }}>Combined view across donations, in-kind sponsorships, operational budgets, and office cash flow.</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={function() { navigate('treasury-reports'); }} style={{ padding: '7px 14px', fontSize: 12, fontWeight: 600, border: 'none', borderRadius: 8, background: gold, color: '#fff', cursor: 'pointer', flexShrink: 0 }}>Treasury Reports</button>
-          <select value={year} onChange={function(e) { setYear(parseInt(e.target.value)); }} style={{ padding: '7px 12px', borderRadius: 8, border: '0.5px solid #e0d8cc', fontSize: 13, background: '#fff' }}>
-            {yearOptions.map(function(y) { return <option key={y} value={y}>{y}</option>; })}
-          </select>
-        </div>
+        <select value={year} onChange={function(e) { setYear(parseInt(e.target.value)); }} style={{ padding: '7px 12px', borderRadius: 8, border: '0.5px solid #e0d8cc', fontSize: 13, background: '#fff' }}>
+          {yearOptions.map(function(y) { return <option key={y} value={y}>{y}</option>; })}
+        </select>
       </div>
 
       {loading ? (
@@ -10108,7 +10108,7 @@ function FinancialOverviewView({ navigate }) {
   );
 }
 
-function TreasuryReportsView({ navigate }) {
+function TreasuryReportsView() {
   var { useEffect, useRef } = React;
   var containerRef = useRef(null);
 
@@ -10133,10 +10133,7 @@ function TreasuryReportsView({ navigate }) {
   }, []);
 
   return (
-    <div>
-      <button onClick={function() { navigate('financial-overview'); }} style={{ background: 'none', border: 'none', color: gold, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 12 }}>← Back to Financial Overview</button>
-      <div ref={containerRef} />
-    </div>
+    <div ref={containerRef} />
   );
 }
 
@@ -16624,7 +16621,6 @@ const views = {
   financials: FinancialsView,
   'office-cash-flow': OfficeCashFlowView,
   'financial-overview': FinancialOverviewView,
-  'treasury-reports': TreasuryReportsView,
   reviews: ReviewsView,
   'quarter-workspace': QuarterWorkspaceView,
   admin: AdminView,
@@ -17284,7 +17280,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "treasury-reports" ? "Treasury Reports" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
