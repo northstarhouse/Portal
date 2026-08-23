@@ -3622,6 +3622,11 @@ function DonorsView({ navigate }) {
   const [bulkFillResult, setBulkFillResult] = useState(null);
   const [downloadingDocKey, setDownloadingDocKey] = useState(null);
   const [uploadingCheckId, setUploadingCheckId] = useState(null);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importRows, setImportRows] = useState(null);
+  const [importSaving, setImportSaving] = useState(false);
+  const [importStatus, setImportStatus] = useState('');
   const checkFileInputRef = React.useRef(null);
   const [checkUploadForDon, setCheckUploadForDon] = useState(null);
   const [ackDonation, setAckDonation] = useState(null);
@@ -4086,6 +4091,109 @@ function DonorsView({ navigate }) {
   var lStyle={fontSize:12,color:'#666',fontWeight:500};
   var sec={fontSize:11,textTransform:'uppercase',letterSpacing:1.2,color:'#888',fontWeight:600,marginBottom:6,marginTop:16,display:'block'};
 
+  function normDonorName(s){return (s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+
+  function pad2(n){n=String(n);return n.length<2?'0'+n:n;}
+
+  function normalizeImportDate(s){
+    s=(s||'').trim();
+    if(!s)return '';
+    var m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if(m)return m[1]+'-'+pad2(m[2])+'-'+pad2(m[3]);
+    m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if(m){var yr=m[3];if(yr.length===2)yr=(parseInt(yr,10)<50?'20':'19')+yr;return yr+'-'+pad2(m[1])+'-'+pad2(m[2]);}
+    var d=new Date(s+' 12:00:00');
+    if(!isNaN(d.getTime()))return d.toISOString().slice(0,10);
+    return '';
+  }
+
+  function parseImportRows(){
+    var lines=importText.split(/\r?\n/).filter(function(l){return l.trim();});
+    var out=[];
+    lines.forEach(function(line,i){
+      var cols=line.indexOf('\t')>=0?line.split('\t'):line.split(',');
+      cols=cols.map(function(c){return (c||'').trim().replace(/^"|"$/g,'');});
+      if(!cols[0])return;
+      var lowerFirst=cols[0].toLowerCase();
+      if(i===0&&['name','donor','donor name'].indexOf(lowerFirst)>=0)return;
+      var name=cols[0];
+      var amount=parseFloat((cols[1]||'').replace(/[^0-9.\-]/g,''))||0;
+      var date=normalizeImportDate(cols[2]||'');
+      var type=cols[3]||'Donation';
+      var paymentType=cols[4]||'';
+      var notes=cols[5]||'';
+      var matched=donors.find(function(d){return normDonorName(d.formal_name)===normDonorName(name);});
+      out.push({
+        key:i+'-'+name,
+        raw:line,
+        name:name,
+        amount:amount,
+        date:date,
+        type:DONATION_TYPES.indexOf(type)>=0?type:'Donation',
+        payment_type:PAYMENT_TYPES.indexOf(paymentType)>=0?paymentType:'',
+        notes:notes,
+        include:true,
+        donorId:matched?matched.id:null,
+        matchQuery:''
+      });
+    });
+    setImportRows(out);
+    setImportStatus(out.length?('Parsed '+out.length+' row(s). Review the matches below, then Import Selected.'):'No rows found — check the pasted text.');
+  }
+
+  function updateImportRow(key,patch){
+    setImportRows(function(rows){return (rows||[]).map(function(r){return r.key===key?Object.assign({},r,patch):r;});});
+  }
+
+  function runImportRows(){
+    var toImport=(importRows||[]).filter(function(r){return r.include;});
+    if(!toImport.length)return;
+    setImportSaving(true);
+    var successCount=0,failCount=0;
+    var chain=Promise.resolve();
+    toImport.forEach(function(row){
+      chain=chain.then(function(){
+        var donorIdPromise=row.donorId
+          ?Promise.resolve(row.donorId)
+          :fetch(SUPABASE_URL+'/rest/v1/donors?formal_name=ilike.'+encodeURIComponent(row.name)+'&limit=1&select=id',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}})
+            .then(function(r){return r.json();}).then(function(existing){
+              if(Array.isArray(existing)&&existing.length>0)return existing[0].id;
+              return fetch(SUPABASE_URL+'/rest/v1/donors',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},
+                body:JSON.stringify({formal_name:row.name,historical_lifetime_giving:0,historical_donation_count:0})})
+                .then(function(r){return r.json();}).then(function(rows){return rows[0].id;});
+            });
+        return donorIdPromise.then(function(donorId){
+          return fetch(SUPABASE_URL+'/rest/v1/donations',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},
+            body:JSON.stringify({donor_id:donorId,amount:row.amount,date:row.date||null,type:row.type,payment_type:row.payment_type||null,acknowledged:false,donation_notes:row.notes||null})})
+            .then(function(r){return r.json();}).then(function(donRows){
+              var newDon=Array.isArray(donRows)?donRows[0]:donRows;
+              return fetch(SUPABASE_URL+'/rest/v1/donors?id=eq.'+donorId+'&select=*',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}})
+                .then(function(r){return r.json();}).then(function(dr){
+                  var donorRow=Array.isArray(dr)?dr[0]:dr;
+                  setDonors(function(prev){
+                    var exists=prev.some(function(x){return x.id===donorRow.id;});
+                    if(exists)return prev.map(function(x){if(x.id!==donorRow.id)return x;return buildDonor(Object.assign({},x),x.donations.concat([newDon]));});
+                    return [buildDonor(donorRow,[newDon])].concat(prev);
+                  });
+                  logActivity('Imported donation of $'+(parseFloat(newDon.amount)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' from '+(donorRow.formal_name||'a donor'),'donation_added');
+                  successCount++;
+                });
+            });
+        });
+      }).catch(function(){failCount++;});
+    });
+    chain.then(function(){
+      setImportSaving(false);
+      if(failCount===0){
+        setImportStatus('Imported '+successCount+' donation(s).');
+        setImportRows(null);
+        setImportText('');
+      }else{
+        setImportStatus('Imported '+successCount+' donation(s), '+failCount+' failed — check the values and try again.');
+      }
+    });
+  }
+
   function getDonsByYear(dons){
     var byY={};
     (dons||[]).forEach(function(d){var yr=d.date?d.date.slice(0,4):'?';if(!byY[yr])byY[yr]=[];byY[yr].push(d);});
@@ -4137,6 +4245,7 @@ function DonorsView({ navigate }) {
           {navigate && <button onClick={function(){navigate('acknowledgments-queue');}} style={{padding:'5px 10px',background:'none',border:'0.5px solid #e0d8cc',color:'#888',borderRadius:6,fontSize:11,fontWeight:500,cursor:'pointer'}}>Acknowledgments to Process</button>}
           <button onClick={bulkFillAddresses} disabled={bulkFilling} title="Fill blank structured mailing address fields from each donor's existing Address field" style={{padding:'5px 10px',background:'none',border:'0.5px solid #e0d8cc',color:'#888',borderRadius:6,fontSize:11,fontWeight:500,cursor:'pointer',opacity:bulkFilling?0.7:1}}>{bulkFilling?'Filling…':'Bulk-Fill Addresses'}</button>
           <button onClick={exportCSV} style={{padding:'5px 10px',background:'none',border:'0.5px solid #e0d8cc',color:'#888',borderRadius:6,fontSize:11,fontWeight:500,cursor:'pointer'}}>↓ CSV</button>
+          <button onClick={function(){setImportText('');setImportRows(null);setImportStatus('');setShowImport(true);}} style={{padding:'5px 10px',background:'none',border:'0.5px solid #e0d8cc',color:'#888',borderRadius:6,fontSize:11,fontWeight:500,cursor:'pointer'}}>Import Donations</button>
           <button onClick={function(){setAddForm(emptyAddForm);setAddGiftForm(emptyGiftForm);setAddExistingDonor(null);setAddSearchQuery('');setAddMode('search');setShowAdd(true);}} style={{padding:'6px 12px',background:gold,color:'#fff',border:'none',borderRadius:6,fontSize:11,fontWeight:600,cursor:'pointer'}}>+ Add Donation</button>
         </div>
         <input ref={checkFileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleCheckFileChosen} />
@@ -4680,6 +4789,103 @@ function DonorsView({ navigate }) {
                   <button type="button" onClick={function(){setShowAdd(false);}} style={{flex:1,padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer',fontWeight:500}}>Cancel</button>
                 </div>
               </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showImport && (
+        <div onClick={function(){if(!importSaving)setShowImport(false);}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.32)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:20}}>
+          <div onClick={function(e){e.stopPropagation();}} style={{background:'#fff',borderRadius:16,padding:28,maxWidth:860,width:'100%',boxShadow:'0 8px 40px rgba(0,0,0,0.18)',maxHeight:'90vh',overflowY:'auto'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
+              <div style={{fontSize:17,fontWeight:600,color:'#2a2a2a',flex:1}}>Import Donations</div>
+              <button onClick={function(){if(!importSaving)setShowImport(false);}} style={{background:'none',border:'none',fontSize:18,cursor:'pointer',color:'#bbb'}}>×</button>
+            </div>
+
+            {!importRows ? (
+              <div>
+                <p style={{fontSize:12,color:'#888',lineHeight:1.5,marginTop:0}}>
+                  Paste rows copied from a spreadsheet or report, one donation per line. Expected column order: <b>Name, Amount, Date</b>, then optionally Type, Payment Type, Notes.
+                  Each name is checked against existing donors so you can see their prior gifts before deciding whether this is a new donation or a duplicate with a different date.
+                </p>
+                <textarea value={importText} onChange={function(e){setImportText(e.target.value);}} rows={10} placeholder={'Lois Hensel\t250.00\t3/14/2026\nJohn Smith\t100.00\t3/15/2026'} style={Object.assign({},iStyle,{resize:'vertical',fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace'})} />
+                <div style={{display:'flex',gap:10,marginTop:14}}>
+                  <button onClick={parseImportRows} disabled={!importText.trim()} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer',opacity:importText.trim()?1:0.5}}>Parse</button>
+                  <button onClick={function(){setShowImport(false);}} style={{flex:1,padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer',fontWeight:500}}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                {importStatus && <div style={{fontSize:12,color:'#886c44',marginBottom:14,padding:'8px 12px',background:'#faf6ee',borderRadius:8}}>{importStatus}</div>}
+                {importRows.map(function(row){
+                  var matchedDonor=donors.find(function(d){return d.id===row.donorId;});
+                  var searchResults=row.matchQuery.trim()?donors.filter(function(d){return (d.formal_name||'').toLowerCase().includes(row.matchQuery.toLowerCase());}).slice(0,6):[];
+                  return (
+                    <div key={row.key} style={{border:'0.5px solid #e0d8cc',borderRadius:10,padding:14,marginBottom:12,display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+                      <div>
+                        <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,fontWeight:600,marginBottom:10,cursor:'pointer'}}>
+                          <input type="checkbox" checked={row.include} onChange={function(e){updateImportRow(row.key,{include:e.target.checked});}} />
+                          {row.name}
+                        </label>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                          <div><label style={lStyle}>Amount</label><input value={row.amount} onChange={function(e){updateImportRow(row.key,{amount:parseFloat(e.target.value.replace(/[^0-9.\-]/g,''))||0});}} style={iStyle} /></div>
+                          <div><label style={lStyle}>Date</label><input type="date" value={row.date} onChange={function(e){updateImportRow(row.key,{date:e.target.value});}} style={iStyle} /></div>
+                        </div>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:8}}>
+                          <div><label style={lStyle}>Type</label>
+                            <select value={row.type} onChange={function(e){updateImportRow(row.key,{type:e.target.value});}} style={iStyle}>
+                              {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                            </select>
+                          </div>
+                          <div><label style={lStyle}>Payment Type</label>
+                            <select value={row.payment_type} onChange={function(e){updateImportRow(row.key,{payment_type:e.target.value});}} style={iStyle}>
+                              <option value="">—</option>
+                              {PAYMENT_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                            </select>
+                          </div>
+                        </div>
+                        <div style={{marginTop:8}}><label style={lStyle}>Notes</label><textarea value={row.notes} onChange={function(e){updateImportRow(row.key,{notes:e.target.value});}} rows={1} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                        <div style={{marginTop:10}}>
+                          <label style={lStyle}>Link to a different donor</label>
+                          <input value={row.matchQuery} onChange={function(e){updateImportRow(row.key,{matchQuery:e.target.value});}} placeholder="Search donors…" style={iStyle} />
+                          {searchResults.length>0 && (
+                            <div style={{border:'0.5px solid #e0d8cc',borderRadius:8,marginTop:4,maxHeight:130,overflowY:'auto'}}>
+                              {searchResults.map(function(d){
+                                return <div key={d.id} onClick={function(){updateImportRow(row.key,{donorId:d.id,matchQuery:''});}} style={{padding:'7px 10px',cursor:'pointer',fontSize:12,borderBottom:'0.5px solid #f5f0ea'}}>{d.formal_name}</div>;
+                              })}
+                              <div onClick={function(){updateImportRow(row.key,{donorId:null,matchQuery:''});}} style={{padding:'7px 10px',cursor:'pointer',fontSize:12,color:'#888'}}>— Create as new donor instead —</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:1,color:'#888',fontWeight:600,marginBottom:8}}>
+                          {matchedDonor?('Existing donations for '+matchedDonor.formal_name):'No matching donor found'}
+                        </div>
+                        {matchedDonor ? (
+                          (matchedDonor.donations||[]).length===0 ? (
+                            <div style={{fontSize:12,color:'#bbb'}}>No prior donations on file.</div>
+                          ) : matchedDonor.donations.slice().sort(function(a,b){return (b.date||'')>(a.date||'')?1:-1;}).map(function(don){
+                            return (
+                              <div key={don.id} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'6px 0',borderBottom:'0.5px solid #f0ece6',fontSize:12}}>
+                                <span style={{color:'#888'}}>{fmtDate(don.date)}</span>
+                                <span style={{fontWeight:600}}>{fmtAmtFull(don.amount)}</span>
+                                <span style={{color:'#aaa'}}>{don.type||''}</span>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div style={{fontSize:12,color:'#886c44',lineHeight:1.5}}>Will create a new donor record for "{row.name}" unless you link it to an existing donor on the left.</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div style={{display:'flex',gap:10,marginTop:6}}>
+                  <button onClick={runImportRows} disabled={importSaving||!importRows.some(function(r){return r.include;})} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:8,padding:10,fontSize:12,fontWeight:500,cursor:'pointer',opacity:importSaving?0.7:1}}>{importSaving?'Importing…':'Import Selected ('+importRows.filter(function(r){return r.include;}).length+')'}</button>
+                  <button onClick={function(){setImportRows(null);}} disabled={importSaving} style={{flex:1,padding:10,background:'#f5f0ea',border:'none',borderRadius:8,fontSize:12,color:'#666',cursor:'pointer',fontWeight:500}}>Back to Paste</button>
+                </div>
+              </div>
             )}
           </div>
         </div>
