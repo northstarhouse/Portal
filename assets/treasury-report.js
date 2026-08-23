@@ -34,8 +34,16 @@ function upsertReport(row){
 const state = {
   pl: {}, plOrder: [],
   bs: {}, bsOrder: [],
-  budget: null
+  budget: {}, budgetOrder: []
 };
+
+function storeFor(report){
+  return report === "pl" ? state.pl : report === "bs" ? state.bs : state.budget;
+}
+
+function orderFor(report){
+  return report === "pl" ? state.plOrder : report === "bs" ? state.bsOrder : state.budgetOrder;
+}
 
 let activePeriod = null;
 let activeReport = "pl";
@@ -133,17 +141,14 @@ function loadFromSupabase(){
   return fetchReports().then(rows => {
     state.pl = {}; state.plOrder = [];
     state.bs = {}; state.bsOrder = [];
-    state.budget = null;
+    state.budget = {}; state.budgetOrder = [];
 
     (Array.isArray(rows) ? rows : []).forEach(r => {
-      if (r.report_type === "pl") {
-        state.pl[r.period_key] = r;
-        state.plOrder.push(r.period_key);
-      } else if (r.report_type === "bs") {
-        state.bs[r.period_key] = r;
-        state.bsOrder.push(r.period_key);
-      } else if (r.report_type === "budget") {
-        state.budget = r;
+      const store = storeFor(r.report_type);
+      const order = orderFor(r.report_type);
+      if (store && order) {
+        store[r.period_key] = r;
+        order.push(r.period_key);
       }
     });
   }).catch(() => {});
@@ -154,13 +159,8 @@ function renderTabs(){
   const tabsEl = $("periodTabs");
   tabsEl.innerHTML = "";
 
-  if (activeReport === "budget") {
-    tabsEl.style.display = "none";
-    return;
-  }
-
-  const order = activeReport === "pl" ? state.plOrder : state.bsOrder;
-  const store = activeReport === "pl" ? state.pl : state.bs;
+  const order = orderFor(activeReport);
+  const store = storeFor(activeReport);
 
   if (!order.length) {
     tabsEl.style.display = "none";
@@ -181,46 +181,31 @@ function renderTabs(){
   });
 }
 
+const EMPTY_LABEL = {
+  pl: "Income & Expenses — no report saved yet",
+  bs: "Balance Sheet — no report saved yet",
+  budget: "Budget vs Actual — no report saved yet"
+};
+
 function loadPeriod(key){
 
-  if (activeReport === "budget") {
+  const order = orderFor(activeReport);
+  const store = storeFor(activeReport);
+  const panelId = panelIdFor(activeReport);
 
-    activePeriod = "current";
-    const panelId = "budgetAdmin";
+  const resolvedKey = key && store[key] ? key : order[order.length - 1];
+  activePeriod = resolvedKey || null;
 
-    if (state.budget) {
-      applyRecord(panelId, state.budget);
-      $("periodLabel").textContent = state.budget.full_label || "Budget vs Actual";
-      $("emptyState").style.display = "none";
-    } else {
-      clearInputs(panelId);
-      $("periodLabel").textContent = "Budget vs Actual — no report saved yet";
-      $("emptyState").style.display = "block";
-    }
+  const rec = resolvedKey ? store[resolvedKey] : null;
 
+  if (rec) {
+    applyRecord(panelId, rec);
+    $("periodLabel").textContent = rec.full_label || rec.tab_label || "";
+    $("emptyState").style.display = "none";
   } else {
-
-    const order = activeReport === "pl" ? state.plOrder : state.bsOrder;
-    const store = activeReport === "pl" ? state.pl : state.bs;
-    const panelId = activeReport === "pl" ? "plAdmin" : "bsAdmin";
-
-    const resolvedKey = key && store[key] ? key : order[order.length - 1];
-    activePeriod = resolvedKey || null;
-
-    const rec = resolvedKey ? store[resolvedKey] : null;
-
-    if (rec) {
-      applyRecord(panelId, rec);
-      $("periodLabel").textContent = rec.full_label || rec.tab_label || "";
-      $("emptyState").style.display = "none";
-    } else {
-      clearInputs(panelId);
-      $("periodLabel").textContent =
-        activeReport === "pl"
-        ? "Income & Expenses — no report saved yet"
-        : "Balance Sheet — no report saved yet";
-      $("emptyState").style.display = "block";
-    }
+    clearInputs(panelId);
+    $("periodLabel").textContent = EMPTY_LABEL[activeReport];
+    $("emptyState").style.display = "block";
   }
 
   renderTabs();
@@ -1418,23 +1403,18 @@ root.querySelectorAll(".reporttab")
    ADMIN
 ========================= */
 
+const META_PREFIX = { pl: "pl", bs: "bs", budget: "budget" };
+
 function prefillMeta(){
 
-  if (activeReport === "pl") {
-    const rec = activePeriod ? state.pl[activePeriod] : null;
-    $("pl_period_key").value = rec ? activePeriod : "";
-    $("pl_tab_label").value = rec ? (rec.tab_label || "") : "";
-    $("pl_full_label").value = rec ? (rec.full_label || "") : "";
-    $("pl_as_of_date").value = rec && rec.as_of_date ? rec.as_of_date : "";
-  } else if (activeReport === "bs") {
-    const rec = activePeriod ? state.bs[activePeriod] : null;
-    $("bs_period_key").value = rec ? activePeriod : "";
-    $("bs_tab_label").value = rec ? (rec.tab_label || "") : "";
-    $("bs_full_label").value = rec ? (rec.full_label || "") : "";
-    $("bs_as_of_date").value = rec && rec.as_of_date ? rec.as_of_date : "";
-  } else {
-    $("budget_full_label").value = state.budget ? (state.budget.full_label || "") : "";
-  }
+  const prefix = META_PREFIX[activeReport];
+  const store = storeFor(activeReport);
+  const rec = activePeriod ? store[activePeriod] : null;
+
+  $(prefix + "_period_key").value = rec ? activePeriod : "";
+  $(prefix + "_tab_label").value = rec ? (rec.tab_label || "") : "";
+  $(prefix + "_full_label").value = rec ? (rec.full_label || "") : "";
+  $(prefix + "_as_of_date").value = rec && rec.as_of_date ? rec.as_of_date : "";
 }
 
 $("adminBtn")
@@ -1647,12 +1627,20 @@ $("budgetClearPasteBtn")
 $("budgetUpdateBtn")
 .addEventListener("click",() => {
 
+  const periodKey = $("budget_period_key").value.trim();
+
+  if(!periodKey){
+    $("budgetInputStatus").textContent =
+      "Enter a period key before saving (e.g. aug26).";
+    return;
+  }
+
   const row = {
     report_type: "budget",
-    period_key: "current",
-    tab_label: null,
+    period_key: periodKey,
+    tab_label: $("budget_tab_label").value.trim() || periodKey,
     full_label: $("budget_full_label").value.trim() || null,
-    as_of_date: null,
+    as_of_date: $("budget_as_of_date").value || null,
     data: Object.fromEntries(
       moneyIds("budgetAdmin").map(id => [id, num(id)])
     )
@@ -1663,6 +1651,7 @@ $("budgetUpdateBtn")
   upsertReport(row).then(() => loadFromSupabase()).then(() => {
 
     activeReport = "budget";
+    activePeriod = periodKey;
 
     $("budgetInputStatus").textContent =
       "Budget dashboard saved and updated.";
@@ -1671,7 +1660,7 @@ $("budgetUpdateBtn")
     $("input").classList.remove("active");
     $("dashboard").classList.add("active");
 
-    loadPeriod(null);
+    loadPeriod(periodKey);
 
   }).catch(() => {
     $("budgetInputStatus").textContent =
@@ -1684,7 +1673,7 @@ $("budgetResetBtn")
 .addEventListener("click",() => {
 
   loadFromSupabase().then(() => {
-    loadPeriod(null);
+    loadPeriod(activePeriod);
     $("budgetInputStatus").textContent =
       "Saved values restored.";
   });

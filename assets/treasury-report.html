@@ -640,15 +640,28 @@
       <h3 class="section-title">Budget vs Actual data</h3>
 
       <p class="input-note">
-        Paste the Budget to Actual report here. The first two numeric columns are interpreted as Actual and Cash Budget. There is a single, always-current Budget vs Actual snapshot — saving here replaces it.
+        Paste the Budget to Actual report here. The first two numeric columns are interpreted as Actual and Cash Budget.
       </p>
 
-      <div class="meta-row" style="grid-template-columns:1fr">
+      <div class="meta-row">
         <div class="meta-field">
-          <label for="budget_full_label">Report label</label>
+          <label for="budget_period_key">Period key</label>
+          <input id="budget_period_key" placeholder="e.g. aug26">
+        </div>
+        <div class="meta-field">
+          <label for="budget_tab_label">Tab label</label>
+          <input id="budget_tab_label" placeholder="e.g. Aug 20">
+        </div>
+        <div class="meta-field">
+          <label for="budget_full_label">Full label</label>
           <input id="budget_full_label" placeholder="e.g. Budget vs Actual · Actual 8.20.26 vs. Cash Budget">
         </div>
+        <div class="meta-field">
+          <label for="budget_as_of_date">As of date</label>
+          <input id="budget_as_of_date" type="date">
+        </div>
       </div>
+      <p class="meta-hint">Period key identifies this snapshot. Reuse an existing key to overwrite it, or enter a new one to add another period tab.</p>
 
       <div class="paste-wrap">
         <label class="paste-label" for="budgetPasteData">
