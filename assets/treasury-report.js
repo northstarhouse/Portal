@@ -70,6 +70,42 @@ function pct(a,b){
     : ((a-b) / Math.abs(b)) * 100;
 }
 
+const cleanLine = s =>
+  s.toLowerCase()
+  .replace(/["]/g,"")
+  .replace(/\s+/g," ")
+  .trim();
+
+// Spreadsheet exports often wrap a category label in a quoted, multi-line
+// cell (e.g. a `"Bricks` line followed by a line holding just its numbers).
+// Pasted as plain text that splits the label from its numbers onto separate
+// lines, so a label-only line gets folded into the next line that has digits
+// before alias matching runs.
+function mergeWrappedLines(text){
+  const rawLines = text.split(/\r?\n/);
+  const merged = [];
+  let buffer = "";
+
+  rawLines.forEach(line => {
+    const hasNum = /\d/.test(line);
+    if(buffer){
+      buffer += " " + line.trim();
+      if(hasNum){
+        merged.push(buffer);
+        buffer = "";
+      }
+    } else if(hasNum){
+      merged.push(line);
+    } else if(line.trim()){
+      buffer = line.trim();
+    }
+  });
+
+  if(buffer) merged.push(buffer);
+
+  return merged;
+}
+
 function panelIdFor(report){
   return report === "pl" ? "plAdmin" : report === "bs" ? "bsAdmin" : "budgetAdmin";
 }
@@ -892,15 +928,10 @@ function parsePasted(){
 
   let found = 0;
 
-  const clean = s =>
-    s.toLowerCase()
-    .replace(/\s+/g," ")
-    .trim();
-
-  for(const line of text.split(/\r?\n/)){
+  for(const line of mergeWrappedLines(text)){
 
     const normalized =
-      clean(line);
+      cleanLine(line);
 
     const nums =
       line.match(
@@ -1060,15 +1091,10 @@ function parseBalance(){
 
   let found = 0;
 
-  const clean = s =>
-    s.toLowerCase()
-    .replace(/\s+/g," ")
-    .trim();
-
-  for(const line of text.split(/\r?\n/)){
+  for(const line of mergeWrappedLines(text)){
 
     const normalized =
-      clean(line);
+      cleanLine(line);
 
     const nums =
       line.match(
@@ -1287,15 +1313,10 @@ function parseBudget(){
 
   let found = 0;
 
-  const clean = s =>
-    s.toLowerCase()
-    .replace(/\s+/g," ")
-    .trim();
-
-  for(const line of text.split(/\r?\n/)){
+  for(const line of mergeWrappedLines(text)){
 
     const normalized =
-      clean(line);
+      cleanLine(line);
 
     const nums =
       line.match(
