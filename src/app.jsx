@@ -9618,7 +9618,7 @@ function FinancialOverviewView({ navigate }) {
     return { all: all, monthRows: monthRows, duplicateCount: all.filter(function(r) { return r.possibleDuplicate; }).length };
   }, [budget, cashLog, year]);
 
-  var card = { background: '#faf8f5', borderRadius: 10, padding: '14px 16px' };
+  var card = { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px' };
   var cardLabel = { fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 };
   var cardValue = { fontSize: 19, fontWeight: 700, marginTop: 5 };
   var yearOptions = [thisYear];
