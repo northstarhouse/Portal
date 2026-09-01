@@ -215,7 +215,9 @@ function logActivity(description, action) {
   }).catch(function() {});
 }
 
-const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthstarhouse%40gmail.com/private-06287b2ca0d9ee6acd4f49f9d4d0d2da/basic.ics";
+// The private ICS feed URL itself now lives only in the fetch-calendar edge
+// function (supabase/functions/fetch-calendar) -- keeping it out of the
+// client bundle entirely, rather than just routing it through a proxy.
 
 // Kick off critical fetches immediately so data is ready when views mount
 (function prefetch() {
@@ -227,8 +229,17 @@ const CALENDAR_ICAL_URL = "https://calendar.google.com/calendar/ical/thenorthsta
 })();
 
 function fetchCalendarEvents() {
-  var proxy = "https://corsproxy.io/?" + encodeURIComponent(CALENDAR_ICAL_URL);
-  return fetch(proxy).then(function(r) { return r.text(); }).then(function(text) {
+  // Routed through our own Supabase Edge Function (fetch-calendar) instead of
+  // corsproxy.io -- that free public proxy had no uptime/rate-limit
+  // guarantees and would silently fail, leaving Home's "Happening Soon"
+  // section (and the Venue Rentals wedding list) empty with no error shown.
+  // The edge function fetches the ICS feed server-side, sidestepping CORS
+  // entirely rather than relying on a third-party middleman.
+  var endpoint = SUPABASE_URL + "/functions/v1/fetch-calendar";
+  return fetch(endpoint, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.text();
+  }).then(function(text) {
     // Unfold continuation lines
     text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n[ \t]/g, "");
     var events = [], current = null;
@@ -777,6 +788,7 @@ const typeColors = {
   const [donationTotal, setDonationTotal] = useState(null);
   const [activeVols, setActiveVols] = useState(null);
   const [calEvents, setCalEvents] = useState(null);
+  const [calEventsError, setCalEventsError] = useState(null);
   const [birthdays, setBirthdays] = useState(null);
   const [ootNotices, setOotNotices] = useState(null);
   const [sponsors, setSponsors] = useState(null);
@@ -889,7 +901,7 @@ const typeColors = {
       // two weeks and were crowding out Docent Tours/Planning Meetings entirely.
       // The list scrolls instead (see render) so nothing gets silently dropped.
       setCalEvents(filtered);
-    }).catch(function() { setCalEvents([]); });
+    }).catch(function(err) { setCalEvents([]); setCalEventsError(err.message || 'Failed to load'); });
     return function() { clearInterval(vaInterval); };
   }, []);
   return (
@@ -1009,7 +1021,8 @@ const typeColors = {
             Happening This Week at North Star House
           </div>
           {calEvents === null && <div style={{ fontSize: 12, color: "#777" }}>Loading…</div>}
-          {calEvents !== null && calEvents.length === 0 && <div style={{ fontSize: 12, color: "#777" }}>No upcoming events in the next 2 weeks.</div>}
+          {calEventsError && <div style={{ fontSize: 12, color: "#c62828", marginBottom: 8 }}>Could not load calendar: {calEventsError}</div>}
+          {calEvents !== null && !calEventsError && calEvents.length === 0 && <div style={{ fontSize: 12, color: "#777" }}>No upcoming events in the next 2 weeks.</div>}
           <div style={{ maxHeight: 420, overflowY: 'auto' }}>
           {calEvents !== null && calEvents.map(function(ev, i) {
             var start = ev._occStart || parseIcalDate(ev['DTSTART']);
@@ -17024,8 +17037,9 @@ var PORTAL_URL = 'https://northstarhouse.github.io/Portal/';
 var ADMIN_NOTIFY_BCC = 'media@thenorthstarhouse.org';
 var VOLUNTEER_HUB_URL = 'https://northstarhouse.github.io/volunteerhub/';
 var WEBSITE_URL = 'https://thenorthstarhouse.org';
-// Public (shareable) Google Calendar view -- distinct from CALENDAR_ICAL_URL
-// above, which is a private feed URL and must never go in an outgoing email.
+// Public (shareable) Google Calendar view -- distinct from the private ICS
+// feed URL (see fetch-calendar edge function), which must never go in an
+// outgoing email.
 var CALENDAR_PUBLIC_URL = 'https://calendar.google.com/calendar/u/0?cid=dGhlbm9ydGhzdGFyaG91c2VAZ21haWwuY29t';
 // Volunteers don't have Portal access, so the Template Email tool's footer
 // swaps Portal for Calendar (board/staff emails keep the default Portal link).
