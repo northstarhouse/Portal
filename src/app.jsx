@@ -13345,6 +13345,15 @@ function AdminView({ navigate }) {
           Events
         </div>
         <div
+          onClick={function() { navigate('website-payments'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{cashIcon}</span>
+          Website Payments
+        </div>
+        <div
           onClick={function() { navigate('venue'); }}
           style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
           onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
@@ -16952,10 +16961,171 @@ function EventPlanLinkView({ navigate }) {
   );
 }
 
+function WebsitePaymentsView({ navigate }) {
+  var [orders, setOrders] = useState(null);
+  var [err, setErr] = useState(false);
+  var [eventFilter, setEventFilter] = useState('all');
+  var [kindFilter, setKindFilter] = useState('all');
+
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/ticket_orders?select=*&order=created_at.desc&limit=5000', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) {
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    }).then(function(rows) {
+      setOrders(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setErr(true); setOrders([]); });
+  }, []);
+
+  function money(n) {
+    return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  var all = orders || [];
+  var events = [];
+  var seenEv = {};
+  all.forEach(function(o) {
+    var k = o.event_title || o.event_slug;
+    if (k && !seenEv[k]) { seenEv[k] = true; events.push(k); }
+  });
+
+  var filtered = all.filter(function(o) {
+    if (eventFilter !== 'all' && (o.event_title || o.event_slug) !== eventFilter) return false;
+    if (kindFilter !== 'all' && o.kind !== kindFilter) return false;
+    return true;
+  });
+
+  var now = new Date();
+  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  var paid = all.filter(function(o) { return o.kind === 'paid'; });
+  var totalRevenue = paid.reduce(function(s, o) { return s + Number(o.amount || 0); }, 0);
+  var monthRevenue = paid.filter(function(o) { return new Date(o.created_at) >= monthStart; })
+    .reduce(function(s, o) { return s + Number(o.amount || 0); }, 0);
+  var ticketCount = paid.reduce(function(s, o) { return s + Number(o.quantity || 0); }, 0);
+  var rsvpCount = all.filter(function(o) { return o.kind === 'rsvp'; })
+    .reduce(function(s, o) { return s + Number(o.quantity || 0); }, 0);
+
+  var byEvent = {};
+  all.forEach(function(o) {
+    var k = o.event_title || o.event_slug || '—';
+    if (!byEvent[k]) byEvent[k] = { name: k, date: o.event_date || '', orders: 0, qty: 0, revenue: 0, rsvps: 0 };
+    var e = byEvent[k];
+    e.orders += 1;
+    if (o.kind === 'rsvp') { e.rsvps += Number(o.quantity || 0); }
+    else { e.qty += Number(o.quantity || 0); e.revenue += Number(o.amount || 0); }
+  });
+  var eventRows = Object.keys(byEvent).map(function(k) { return byEvent[k]; })
+    .sort(function(a, b) { return b.revenue - a.revenue; });
+
+  function exportCsv() {
+    var head = ['Date', 'Kind', 'Name', 'Email', 'Phone', 'Event', 'Event Date', 'Tickets', 'Qty', 'Amount', 'Currency', 'PayPal Order', 'PayPal Capture'];
+    var lines = [head.join(',')];
+    filtered.forEach(function(o) {
+      var tix = (o.tickets || []).map(function(t) { return t.qty + 'x ' + t.tier + ' @' + t.price; }).join(' | ');
+      var row = [
+        new Date(o.created_at).toLocaleString('en-US'),
+        o.kind, o.buyer_name, o.buyer_email, o.buyer_phone || '',
+        o.event_title || o.event_slug, o.event_date || '',
+        tix, o.quantity, o.amount, o.currency,
+        o.paypal_order_id || '', o.paypal_capture_id || ''
+      ].map(function(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; });
+      lines.push(row.join(','));
+    });
+    var blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'website-payments-' + (eventFilter === 'all' ? 'all' : eventFilter.replace(/[^a-z0-9]+/gi, '-').toLowerCase()) + '.csv';
+    a.click();
+  }
+
+  return (
+    <div style={{ maxWidth: 980 }}>
+      <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>&larr; Admin</button>
+
+      {err && (
+        <div style={{ background: '#fff3e0', border: '0.5px solid #e8c9a0', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#8a5a1a', marginBottom: 16 }}>
+          Couldn&rsquo;t load <code>ticket_orders</code> &mdash; the table may not exist yet. Run the ticketing migration in Supabase.
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+        <StatCard label="Total revenue" value={orders === null ? '…' : money(totalRevenue)} sub={paid.length + ' paid orders'} />
+        <StatCard label="This month" value={orders === null ? '…' : money(monthRevenue)} />
+        <StatCard label="Tickets sold" value={orders === null ? '…' : ticketCount} />
+        <StatCard label="RSVPs" value={orders === null ? '…' : rsvpCount} />
+      </div>
+
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, margin: '4px 0 10px' }}>By event</div>
+      <div style={{ marginBottom: 24 }}>
+        <Table
+          cols={['Event', 'Date', 'Orders', 'Tickets', 'RSVPs', 'Revenue']}
+          rows={eventRows}
+          renderRow={function(e) {
+            return [
+              <td key="n" style={{ padding: '8px 10px', fontWeight: 500 }}>{e.name}</td>,
+              <td key="d" style={{ padding: '8px 10px', color: '#777' }}>{e.date}</td>,
+              <td key="o" style={{ padding: '8px 10px' }}>{e.orders}</td>,
+              <td key="q" style={{ padding: '8px 10px' }}>{e.qty}</td>,
+              <td key="r" style={{ padding: '8px 10px' }}>{e.rsvps || ''}</td>,
+              <td key="v" style={{ padding: '8px 10px', fontWeight: 500 }}>{money(e.revenue)}</td>
+            ];
+          }}
+        />
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2 }}>Orders &amp; attendees</div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <select value={eventFilter} onChange={function(e) { setEventFilter(e.target.value); }} style={{ fontSize: 12, border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 8px' }}>
+            <option value="all">All events</option>
+            {events.map(function(ev) { return <option key={ev} value={ev}>{ev}</option>; })}
+          </select>
+          <select value={kindFilter} onChange={function(e) { setKindFilter(e.target.value); }} style={{ fontSize: 12, border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 8px' }}>
+            <option value="all">Paid + RSVP</option>
+            <option value="paid">Paid</option>
+            <option value="rsvp">RSVP</option>
+          </select>
+          <button onClick={exportCsv} disabled={!filtered.length} style={{ fontSize: 12, fontWeight: 600, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: filtered.length ? 'pointer' : 'default', opacity: filtered.length ? 1 : 0.5 }}>Export CSV</button>
+        </div>
+      </div>
+
+      {orders === null ? (
+        <div style={{ fontSize: 12, color: '#aaa' }}>Loading&hellip;</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ fontSize: 12, color: '#aaa' }}>No orders yet.</div>
+      ) : (
+        <Table
+          cols={['When', 'Type', 'Name', 'Email', 'Event', 'Tickets', 'Amount']}
+          rows={filtered}
+          renderRow={function(o) {
+            return [
+              <td key="w" style={{ padding: '8px 10px', color: '#777', whiteSpace: 'nowrap' }}>{new Date(o.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>,
+              <td key="k" style={{ padding: '8px 10px' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '2px 8px', background: o.kind === 'paid' ? '#eafaf0' : '#eaf1fb', color: o.kind === 'paid' ? '#2e7d32' : '#3a6ea5' }}>{o.kind === 'paid' ? 'PAID' : 'RSVP'}</span>
+              </td>,
+              <td key="n" style={{ padding: '8px 10px', fontWeight: 500 }}>{o.buyer_name}</td>,
+              <td key="e" style={{ padding: '8px 10px', color: '#555' }}>{o.buyer_email}</td>,
+              <td key="ev" style={{ padding: '8px 10px', color: '#555' }}>{(o.event_title || o.event_slug)}{o.event_date ? ' · ' + o.event_date : ''}</td>,
+              <td key="t" style={{ padding: '8px 10px', color: '#555' }}>{(o.tickets || []).map(function(t) { return t.qty + 'x ' + t.tier; }).join(', ')}</td>,
+              <td key="a" style={{ padding: '8px 10px', fontWeight: 500, whiteSpace: 'nowrap' }}>{o.kind === 'paid' ? money(o.amount) : '—'}</td>
+            ];
+          }}
+        />
+      )}
+
+      <div style={{ marginTop: 16, fontSize: 11, color: '#aaa' }}>
+        Live from <code>ticket_orders</code>. Every purchase also writes to the <a onClick={function() { navigate('activity-log'); }} style={{ color: gold, textDecoration: 'underline', cursor: 'pointer' }}>Activity Log</a>. PayPal is the record of truth for money.
+      </div>
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
   birthdays: BirthdaysView,
   events: EventsView,
+  'website-payments': WebsitePaymentsView,
   quarterly: QuarterlyView,
   volunteers: VolunteersView,
   donors: DonorsView,
@@ -17634,7 +17804,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
