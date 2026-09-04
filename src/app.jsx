@@ -12886,6 +12886,7 @@ var SU_RESP_TABS = [
 
 function FormResponsesView({ navigate }) {
   var [tab, setTab] = useState('events');
+  var [formCategory, setFormCategory] = useState('All');
   var [events, setEvents] = useState([]);
   var [polls, setPolls] = useState([]);
   var [forms, setForms] = useState([]);
@@ -12937,6 +12938,14 @@ function FormResponsesView({ navigate }) {
         })}
       </div>
       <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden' }}>
+        {tab === 'forms' && (
+          <div style={{ display: 'flex', gap: 4, padding: '14px 16px 14px', borderBottom: '0.5px solid #f0ece6', flexWrap: 'wrap' }}>
+            {SU_FORM_CATEGORY_TABS.map(function(c) {
+              var active = formCategory === c;
+              return <button key={c} onClick={function() { setFormCategory(c); }} style={{ padding: '4px 11px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: active ? '#f0ece6' : 'transparent', color: active ? '#2a2a2a' : '#999', border: 'none' }}>{c}</button>;
+            })}
+          </div>
+        )}
         {loading ? <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div> : (
           <div>
             {tab === 'events' && (events.length === 0 ? <SuEmpty text="No events yet." /> : events.map(function(ev) {
@@ -12947,12 +12956,16 @@ function FormResponsesView({ navigate }) {
               var meta = ((pl.vol_poll_votes && pl.vol_poll_votes[0] && pl.vol_poll_votes[0].count) || 0) + ' votes';
               return <SuListRow key={pl.id} title={pl.question} meta={meta} onClick={function() { setSelected({ type: 'polls', id: pl.id }); }} />;
             }))}
-            {tab === 'forms' && (forms.length === 0 ? <SuEmpty text="No forms yet." /> : forms.map(function(fm) {
-              var responses = fm.nsh_form_responses || [];
-              var meta = responses.length + ' responses';
-              var unread = countUnreadResponses(responses, fm.id);
-              return <SuListRow key={fm.id} title={fm.title} meta={meta} unread={unread} onClick={function() { openForm(fm); }} />;
-            }))}
+            {tab === 'forms' && (function() {
+              var visible = formCategory === 'All' ? forms : forms.filter(function(fm) { return fm.category === formCategory; });
+              if (visible.length === 0) return <SuEmpty text={formCategory === 'All' ? 'No forms yet.' : 'No ' + formCategory + ' forms yet.'} />;
+              return visible.map(function(fm) {
+                var responses = fm.nsh_form_responses || [];
+                var meta = responses.length + ' responses';
+                var unread = countUnreadResponses(responses, fm.id);
+                return <SuListRow key={fm.id} title={fm.title} meta={meta} unread={unread} onClick={function() { openForm(fm); }} />;
+              });
+            })()}
           </div>
         )}
       </div>
