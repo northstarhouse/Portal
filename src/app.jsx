@@ -12879,13 +12879,13 @@ function SuFormResponses({ form }) {
 }
 
 var SU_RESP_TABS = [
+  { key: 'forms', label: 'Forms' },
   { key: 'events', label: 'Events' },
   { key: 'polls', label: 'Polls' },
-  { key: 'forms', label: 'Forms' },
 ];
 
 function FormResponsesView({ navigate }) {
-  var [tab, setTab] = useState('events');
+  var [tab, setTab] = useState('forms');
   var [formCategory, setFormCategory] = useState('All');
   var [events, setEvents] = useState([]);
   var [polls, setPolls] = useState([]);
