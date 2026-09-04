@@ -32,7 +32,7 @@ Enter through the courtyard to arrive at the front door of the estate — your c
 
 const TOUR_EMAIL_FOOTER_LINKS = [
   { label: 'Website', url: `${WEBSITE_URL}/` },
-  { label: 'Weddings', url: `${WEBSITE_URL}/weddings` },
+  { label: 'Reschedule', url: 'mailto:info@northstarhouse.org?subject=Reschedule%20My%20Estate%20Tour' },
   { label: 'Directions', url: `${WEBSITE_URL}/directions-parking` },
 ]
 
