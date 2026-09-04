@@ -12649,11 +12649,61 @@ function SuFormResponses({ form }) {
   var [loading, setLoading] = useState(true);
   var [notifying, setNotifying] = useState({});
   var [notified, setNotified] = useState({});
+  var [handlingId, setHandlingId] = useState(null);
+  var [deletingId, setDeletingId] = useState(null);
+  var [notesDraft, setNotesDraft] = useState({});
+  var [savingNotesId, setSavingNotesId] = useState(null);
   useEffect(function() {
     if (!form) { setLoading(false); return; }
     fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?form_id=eq.' + form.id + '&select=*&order=created_at.desc', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
-      .then(function(r) { return r.json(); }).then(function(rows) { setResponses(Array.isArray(rows) ? rows : []); setLoading(false); }).catch(function() { setLoading(false); });
+      .then(function(r) { return r.json(); }).then(function(rows) {
+        rows = Array.isArray(rows) ? rows : [];
+        setResponses(rows);
+        var drafts = {};
+        rows.forEach(function(r) { drafts[r.id] = r.internal_notes || ''; });
+        setNotesDraft(drafts);
+        setLoading(false);
+      }).catch(function() { setLoading(false); });
   }, [form && form.id]);
+
+  function toggleHandled(r) {
+    if (handlingId === r.id) return;
+    setHandlingId(r.id);
+    var newStatus = r.status === 'handled' ? null : 'handled';
+    fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?id=eq.' + r.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: newStatus })
+    }).then(function(res) {
+      if (res.ok) setResponses(function(prev) { return prev.map(function(x) { return x.id === r.id ? Object.assign({}, x, { status: newStatus }) : x; }); });
+    }).finally(function() { setHandlingId(null); });
+  }
+
+  function saveNotes(r) {
+    if (savingNotesId === r.id) return;
+    setSavingNotesId(r.id);
+    var noteValue = (notesDraft[r.id] || '').trim() || null;
+    fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?id=eq.' + r.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ internal_notes: noteValue })
+    }).then(function(res) {
+      if (res.ok) setResponses(function(prev) { return prev.map(function(x) { return x.id === r.id ? Object.assign({}, x, { internal_notes: noteValue }) : x; }); });
+    }).finally(function() { setSavingNotesId(null); });
+  }
+
+  function deleteResponse(r) {
+    if (deletingId === r.id) return;
+    if (!window.confirm('Delete this response? This cannot be undone.')) return;
+    setDeletingId(r.id);
+    fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?id=eq.' + r.id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(res) {
+      if (res.ok) setResponses(function(prev) { return prev.filter(function(x) { return x.id !== r.id; }); });
+      else setDeletingId(null);
+    }).catch(function() { setDeletingId(null); });
+  }
 
   function buildDocentEmail(r) {
     function esc(s) { return String(s == null || s === '' ? '—' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -12741,21 +12791,35 @@ function SuFormResponses({ form }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {responses.map(function(r) {
           return (
-            <div key={r.id} style={{ paddingBottom: 20, borderBottom: '0.5px solid #f5f0e8' }}>
+            <div key={r.id} style={{ paddingBottom: 20, borderBottom: '0.5px solid #f5f0e8', opacity: deletingId === r.id ? 0.4 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
-                <div style={{ fontSize: 11, color: '#bbb' }}>{new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
-                {form.id === DOCENT_TOUR_FORM_ID && (
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button onClick={function() { previewDocentEmail(r); }}
-                      style={{ background: '#fff', color: '#888', border: '1px solid #e0d8cc', borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                      Preview Email
-                    </button>
-                    <button onClick={function() { notifyDocents(r); }} disabled={notifying[r.id] || notified[r.id]}
-                      style={{ background: notified[r.id] ? '#eef7ee' : '#fff', color: notified[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (notified[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: (notifying[r.id] || notified[r.id]) ? 'default' : 'pointer', opacity: notifying[r.id] ? 0.6 : 1 }}>
-                      {notified[r.id] ? '✓ Docents notified' : notifying[r.id] ? 'Sending…' : 'Notify Docents'}
-                    </button>
-                  </div>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: handlingId === r.id ? 'default' : 'pointer' }}>
+                    <input type="checkbox" title="Mark as handled" checked={r.status === 'handled'} disabled={handlingId === r.id}
+                      onChange={function() { toggleHandled(r); }}
+                      style={{ width: 14, height: 14, accentColor: '#2e7d32', cursor: handlingId === r.id ? 'default' : 'pointer', opacity: handlingId === r.id ? 0.5 : 1 }} />
+                    <span style={{ fontSize: 11, color: r.status === 'handled' ? '#2e7d32' : '#bbb', fontWeight: r.status === 'handled' ? 600 : 400 }}>{r.status === 'handled' ? 'Handled' : 'Mark handled'}</span>
+                  </label>
+                  <div style={{ fontSize: 11, color: '#bbb' }}>{new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+                  {form.id === DOCENT_TOUR_FORM_ID && (
+                    <React.Fragment>
+                      <button onClick={function() { previewDocentEmail(r); }}
+                        style={{ background: '#fff', color: '#888', border: '1px solid #e0d8cc', borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                        Preview Email
+                      </button>
+                      <button onClick={function() { notifyDocents(r); }} disabled={notifying[r.id] || notified[r.id]}
+                        style={{ background: notified[r.id] ? '#eef7ee' : '#fff', color: notified[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (notified[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: (notifying[r.id] || notified[r.id]) ? 'default' : 'pointer', opacity: notifying[r.id] ? 0.6 : 1 }}>
+                        {notified[r.id] ? '✓ Docents notified' : notifying[r.id] ? 'Sending…' : 'Notify Docents'}
+                      </button>
+                    </React.Fragment>
+                  )}
+                  <button onClick={function() { deleteResponse(r); }} disabled={deletingId === r.id}
+                    style={{ background: '#fff', color: '#c0392b', border: '1px solid #f0d5d0', borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: deletingId === r.id ? 'default' : 'pointer', opacity: deletingId === r.id ? 0.6 : 1 }}>
+                    {deletingId === r.id ? 'Deleting…' : 'Delete'}
+                  </button>
+                </div>
               </div>
               {groups.map(function(g, gi) {
                 if (!g.section) {
@@ -12783,6 +12847,17 @@ function SuFormResponses({ form }) {
                   </div>
                 );
               })}
+              <div style={{ marginTop: 10 }}>
+                <textarea rows={2} value={notesDraft[r.id] || ''} placeholder="Internal notes…" disabled={savingNotesId === r.id}
+                  onChange={function(e) { var v = e.target.value; setNotesDraft(function(prev) { var n = Object.assign({}, prev); n[r.id] = v; return n; }); }}
+                  style={{ width: '100%', padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', outline: 'none', background: '#fbfaf7', resize: 'vertical' }} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                  <button onClick={function() { saveNotes(r); }} disabled={savingNotesId === r.id || (notesDraft[r.id] || '') === (r.internal_notes || '')}
+                    style={{ padding: '5px 12px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: (savingNotesId === r.id || (notesDraft[r.id] || '') === (r.internal_notes || '')) ? 0.5 : 1 }}>
+                    {savingNotesId === r.id ? 'Saving…' : 'Save Notes'}
+                  </button>
+                </div>
+              </div>
             </div>
           );
         })}
