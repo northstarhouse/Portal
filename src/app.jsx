@@ -11919,7 +11919,7 @@ function SuBuilderBack({ onBack, label }) {
 function SuEmpty({ text }) {
   return <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>{text}</div>;
 }
-function SuListRow({ title, subtitle, meta, unread, onClick, onCopyLink, copied, onDelete }) {
+function SuListRow({ title, subtitle, meta, unread, onClick, onViewResponses, onCopyLink, copied, onDelete }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '0.5px solid #f0ece6' }}>
       <div onClick={onClick} style={{ flex: 1, minWidth: 0, cursor: onClick ? 'pointer' : 'default' }}>
@@ -11930,6 +11930,7 @@ function SuListRow({ title, subtitle, meta, unread, onClick, onCopyLink, copied,
         {subtitle && <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{subtitle}</div>}
         {meta && <div style={{ fontSize: 11, color: gold, marginTop: 2, fontWeight: 600 }}>{meta}</div>}
       </div>
+      {onViewResponses && <button onClick={onViewResponses} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#888', flexShrink: 0 }}>Responses</button>}
       {onCopyLink && <button onClick={onCopyLink} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: copied ? '#2e7d32' : '#888', flexShrink: 0 }}>{copied ? '✓ Copied' : 'Copy link'}</button>}
       {onDelete && <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#c88', cursor: 'pointer', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Delete</button>}
     </div>
@@ -12399,6 +12400,7 @@ function FormBuilderView({ navigate }) {
   var [loading, setLoading] = useState(true);
   var [editing, setEditing] = useState(null);
   var [copiedId, setCopiedId] = useState(null);
+  var [viewingResponses, setViewingResponses] = useState(null);
 
   function fetchAll() {
     setLoading(true);
@@ -12427,6 +12429,15 @@ function FormBuilderView({ navigate }) {
     navigator.clipboard.writeText(suPublicLink(kind, id, title));
     setCopiedId(kind + id);
     setTimeout(function() { setCopiedId(null); }, 2000);
+  }
+
+  if (viewingResponses) {
+    return (
+      <div style={{ maxWidth: 640 }}>
+        <SuBuilderBack onBack={function() { setViewingResponses(null); fetchAll(); }} />
+        <SuFormResponses form={forms.find(function(f) { return f.id === viewingResponses.id; })} />
+      </div>
+    );
   }
 
   if (editing) {
@@ -12489,6 +12500,7 @@ function FormBuilderView({ navigate }) {
                 var meta = (((fm.nsh_form_responses && fm.nsh_form_responses[0] && fm.nsh_form_responses[0].count) || 0) + ' responses') + (fm.show_responses === false ? ' · private' : '');
                 return <SuListRow key={fm.id} title={fm.title} subtitle={fm.internal_note} meta={meta}
                   onClick={function() { setEditing({ type: 'forms', id: fm.id }); }}
+                  onViewResponses={function() { setViewingResponses(fm); }}
                   onCopyLink={function() { handleCopyLink('form', fm.id, fm.title); }} copied={copiedId === 'form' + fm.id}
                   onDelete={function() { handleDelete('form', fm.id, 'nsh_forms'); }} />;
               });
