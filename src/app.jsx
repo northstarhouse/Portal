@@ -12655,6 +12655,10 @@ function suAnswerEntries(field, answer) {
 }
 
 var DOCENT_TOUR_FORM_ID = '0635cd26-b0c7-4076-b9b1-bd25d1949467';
+// The public site's "Wedding Inquiry" form (nsh_forms) -- also the form
+// whose answers get carried onto estate_tours.inquiry_answers when a
+// visitor's tour request originates from it. Shown inline on Venue Rentals.
+var WEDDING_INQUIRY_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
 
 function SuFormResponses({ form }) {
   var [responses, setResponses] = useState([]);
@@ -15198,7 +15202,17 @@ function VenueRentalsView({ navigate }) {
   const [editingField, setEditingField] = useS(null); // { uid, field: 'ig'|'album', val }
   const [messages, setMessages] = useS(null); // null while loading, [] once loaded
   const [inquiries, setInquiries] = useS(null);
+  const [tours, setTours] = useS(null); // booked/requested estate_tours rows
+  const [weddingInquiryForm, setWeddingInquiryForm] = useS(null);
+  const [showWeddingInquiries, setShowWeddingInquiries] = useS(false);
+  const [scheduleOpen, setScheduleOpen] = useS(false);
   const debounceTimers = useR({});
+
+  function loadTours() {
+    fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&status=in.(booked,requested)&order=date.asc.nullslast&limit=100', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setTours(Array.isArray(rows) ? rows : []); }).catch(function() { setTours([]); });
+  }
 
   useE(function() {
     var trackPromise = fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking?select=*&order=event_date.asc', {
@@ -15220,6 +15234,12 @@ function VenueRentalsView({ navigate }) {
     }).then(function(r) { return r.json(); }).then(function(rows) { setMessages(Array.isArray(rows) ? rows : []); }).catch(function() { setMessages([]); });
 
     fetchVenueInquiries().then(function(rows) { setInquiries(rows); });
+
+    loadTours();
+
+    fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=eq.' + WEDDING_INQUIRY_FORM_ID + '&select=*,nsh_form_responses(count)', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setWeddingInquiryForm(Array.isArray(rows) && rows[0] ? rows[0] : null); }).catch(function() { setWeddingInquiryForm(null); });
   }, []);
 
   function getTrack(uid) {
@@ -15459,8 +15479,13 @@ function VenueRentalsView({ navigate }) {
   return (
     <div>
       <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
-      <div style={{ fontSize: 13, color: '#aaa', marginBottom: 16 }}>
-        {nextUpcoming ? ('Next up: ' + nextUpcoming.title + ' — ' + nextUpcoming.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) : 'Wedding & rental tracking'}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 13, color: '#aaa' }}>
+          {nextUpcoming ? ('Next up: ' + nextUpcoming.title + ' — ' + nextUpcoming.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) : 'Wedding & rental tracking'}
+        </div>
+        <button onClick={function() { setScheduleOpen(true); }} style={{ flexShrink: 0, padding: '7px 14px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          + Schedule a Tour
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 22 }}>
@@ -15472,6 +15497,14 @@ function VenueRentalsView({ navigate }) {
           count={inquiries === null ? null : inquiries.length}
           lines={inquiries === null ? [] : inquiries.slice(0, 3).map(function(s) { var f = s.fields || {}; return [f['First Name'], f['Last Name']].filter(Boolean).join(' ') || f['Email'] || s.form_name; })}
           empty="No inquiry-form submissions found — double-check VENUE_INQUIRY_FORM_KEYWORDS matches the real Wix form name" />
+        <VenueDashCard title="Wedding Inquiry Form" onClick={function() { setShowWeddingInquiries(function(v) { return !v; }); }}
+          count={weddingInquiryForm ? ((weddingInquiryForm.nsh_form_responses && weddingInquiryForm.nsh_form_responses[0] && weddingInquiryForm.nsh_form_responses[0].count) || 0) : null}
+          lines={showWeddingInquiries ? ['Click to hide responses below ↓'] : ['Click to view responses below ↓']}
+          empty="Wedding Inquiry form not found" />
+        <VenueDashCard title="Booked Tours" onClick={function() { navigate('estate-tours'); }}
+          count={tours === null ? null : tours.length}
+          lines={tours === null ? [] : tours.slice(0, 3).map(function(t) { return (t.visitor_name || '(no name)') + (t.status === 'requested' ? ' — pending' : t.date ? ' — ' + t.date : ''); })}
+          empty="No tours booked or requested yet" />
         <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#888', marginBottom: 8 }}>Needs Attention {attentionItems.length > 0 && ('(' + attentionItems.length + ')')}</div>
           {attentionItems.length === 0 ? (
@@ -15490,6 +15523,12 @@ function VenueRentalsView({ navigate }) {
           )}
         </div>
       </div>
+
+      {showWeddingInquiries && weddingInquiryForm && (
+        <div style={{ marginBottom: 22 }}>
+          <SuFormResponses form={weddingInquiryForm} />
+        </div>
+      )}
 
       {!loading && !calError && (function() {
         var SECURITY_DEPOSIT = 800;
@@ -15536,6 +15575,10 @@ function VenueRentalsView({ navigate }) {
             )}
           </div>
         </div>
+      )}
+
+      {scheduleOpen && (
+        <ScheduleTourModal onClose={function() { setScheduleOpen(false); }} onScheduled={function() { loadTours(); }} />
       )}
     </div>
   );
@@ -15803,6 +15846,97 @@ function VenueInquiriesView({ navigate }) {
 // The public site (nsh-bcopy) only ever reads 'open' rows and atomically
 // claims one server-side -- this view is where staff manage the calendar and
 // see who's booked.
+// Shared by EstateToursView and VenueRentalsView so "schedule a tour" means
+// exactly one thing everywhere: claim an existing 'open' row in estate_tours
+// and fill in the visitor's details -- the same table + status transition
+// (open -> booked) the public site's own booking widget uses, so a
+// staff-scheduled tour is indistinguishable from one a visitor booked
+// themselves (same reminder emails, same calendar).
+function ScheduleTourModal({ onClose, onScheduled, prefill }) {
+  var [slots, setSlots] = useState(null);
+  var [slotId, setSlotId] = useState('');
+  var [name, setName] = useState((prefill && prefill.visitor_name) || '');
+  var [email, setEmail] = useState((prefill && prefill.visitor_email) || '');
+  var [phone, setPhone] = useState((prefill && prefill.visitor_phone) || '');
+  var [saving, setSaving] = useState(false);
+  var [error, setError] = useState('');
+
+  useEffect(function() {
+    var todayKey = new Date().toISOString().slice(0, 10);
+    fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&status=eq.open&date=gte.' + todayKey + '&order=date.asc,start_time.asc&limit=200', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setSlots(Array.isArray(rows) ? rows : []); }).catch(function() { setSlots([]); });
+  }, []);
+
+  function fmtDate(d) { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+  function fmtTime(t) { return t ? new Date('2000-01-01T' + t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''; }
+
+  function submit() {
+    if (!slotId) { setError('Pick a time slot.'); return; }
+    if (!name.trim() || !email.trim()) { setError('Name and email are required.'); return; }
+    setSaving(true);
+    setError('');
+    var patch = { status: 'booked', visitor_name: name.trim(), visitor_email: email.trim(), visitor_phone: phone.trim() || null };
+    if (prefill && prefill.inquiry_form_id) patch.inquiry_form_id = prefill.inquiry_form_id;
+    if (prefill && prefill.inquiry_answers) patch.inquiry_answers = prefill.inquiry_answers;
+    sbPatchById('estate_tours', slotId, patch).then(function(r) {
+      setSaving(false);
+      if (Array.isArray(r) && r.length) {
+        logActivity('Booked an estate tour for ' + name.trim(), 'tour_booked');
+        if (onScheduled) onScheduled(r[0]);
+        onClose();
+      } else {
+        setError((r && (r.message || r.error || r.hint)) || 'Could not book that slot — it may have just been taken.');
+      }
+    }).catch(function() { setSaving(false); setError('Network error.'); });
+  }
+
+  var cardStyle = { background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12 };
+  var inputStyle = { padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', width: '100%' };
+  var labelStyle = { fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 };
+
+  return (
+    <div onClick={function() { if (!saving) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}>
+      <div onClick={function(e) { e.stopPropagation(); }} style={Object.assign({}, cardStyle, { width: '100%', maxWidth: 440, padding: 22, maxHeight: '85vh', overflowY: 'auto' })}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Schedule a Tour</div>
+        <div style={{ fontSize: 12, color: '#999', marginBottom: 16 }}>Claims an open slot on the same calendar the public site's tour booking uses.</div>
+
+        <label style={labelStyle}>Time Slot</label>
+        {slots === null ? (
+          <div style={{ fontSize: 12, color: '#aaa', marginBottom: 12 }}>Loading open slots…</div>
+        ) : slots.length === 0 ? (
+          <div style={{ fontSize: 12, color: '#c0392b', marginBottom: 12 }}>No open slots — add one in Estate Tours first.</div>
+        ) : (
+          <select value={slotId} onChange={function(e) { setSlotId(e.target.value); }} style={Object.assign({}, inputStyle, { marginBottom: 12 })}>
+            <option value="">Choose a slot…</option>
+            {slots.map(function(s) {
+              return <option key={s.id} value={s.id}>{fmtDate(s.date)} at {fmtTime(s.start_time)}{s.guide_name && s.guide_name !== 'default' ? ' · ' + s.guide_name : ''}</option>;
+            })}
+          </select>
+        )}
+
+        <label style={labelStyle}>Visitor Name</label>
+        <input value={name} onChange={function(e) { setName(e.target.value); }} placeholder="Full name" style={Object.assign({}, inputStyle, { marginBottom: 12 })} />
+
+        <label style={labelStyle}>Email</label>
+        <input type="email" value={email} onChange={function(e) { setEmail(e.target.value); }} placeholder="visitor@example.com" style={Object.assign({}, inputStyle, { marginBottom: 12 })} />
+
+        <label style={labelStyle}>Phone (optional)</label>
+        <input value={phone} onChange={function(e) { setPhone(e.target.value); }} placeholder="(555) 555-5555" style={Object.assign({}, inputStyle, { marginBottom: 16 })} />
+
+        {error && <div style={{ fontSize: 12, color: '#c0392b', marginBottom: 12 }}>{error}</div>}
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} disabled={saving} style={{ padding: '8px 16px', background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#888', cursor: 'pointer' }}>Cancel</button>
+          <button onClick={submit} disabled={saving} style={{ padding: '8px 16px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Booking…' : 'Schedule Tour'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EstateToursView() {
   const [rows, setRows] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -15815,6 +15949,7 @@ function EstateToursView() {
   const [emailModal, setEmailModal] = useState(null); // { tour, to, subject, body }
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   function load() {
     fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&order=created_at.desc&limit=500', {
@@ -15896,7 +16031,12 @@ function EstateToursView() {
   return (
     <div>
       {/* --- Upcoming tours (booked + requested) --- */}
-      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Upcoming Estate Tours</div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Upcoming Estate Tours</div>
+        <button onClick={function() { setScheduleOpen(true); }} style={{ flexShrink: 0, padding: '7px 14px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          + Schedule a Tour
+        </button>
+      </div>
       <div style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>Booked from the weddings inquiry form, plus anyone who asked for a different date.</div>
 
       {upcoming.length === 0 ? (
@@ -16015,6 +16155,10 @@ function EstateToursView() {
             </div>
           </div>
         </div>
+      )}
+
+      {scheduleOpen && (
+        <ScheduleTourModal onClose={function() { setScheduleOpen(false); }} onScheduled={function() { load(); }} />
       )}
     </div>
   );
