@@ -13,6 +13,15 @@
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
+const WEBSITE_URL = 'https://www.northstarhouse.org'
+const GOLD = '#886c44'
+
+// <br>-separated (not <p>) — gets embedded inside buildBrandedEmailHtml's own
+// single <p> wrapper, so nested block tags would be invalid HTML.
+const TOUR_DIRECTIONS_HTML_INLINE =
+  `When you arrive, please enter through the main gate on Auburn Road and disregard any event parking signs. You're welcome to park directly in front of the house for your tour.<br><br>` +
+  `<strong>Apple Maps users:</strong> Make sure your directions are taking you to Auburn Road, not Allison Ranch Road — that route is incorrect and won't lead to the proper entrance. We have been working with Maps to correct this.<br><br>` +
+  `Enter through the courtyard to arrive at the front door of the estate — your coordinator will meet you in this general area.`
 
 const TOUR_DIRECTIONS_TEXT = `When you arrive, please enter through the main gate on Auburn Road and disregard any event parking signs. You're welcome to park directly in front of the house for your tour.
 
@@ -20,7 +29,43 @@ Apple Maps users: Make sure your directions are taking you to Auburn Road, not A
 
 Enter through the courtyard to arrive at the front door of the estate — your coordinator will meet you in this general area.`
 
-const TOUR_DIRECTIONS_HTML = `<p>When you arrive, please enter through the main gate on Auburn Road and disregard any event parking signs. You're welcome to park directly in front of the house for your tour.</p><p><strong>Apple Maps users:</strong> Make sure your directions are taking you to Auburn Road, not Allison Ranch Road — that route is incorrect and won't lead to the proper entrance. We have been working with Maps to correct this.</p><p>Enter through the courtyard to arrive at the front door of the estate — your coordinator will meet you in this general area.</p>`
+const TOUR_EMAIL_FOOTER_LINKS = [
+  { label: 'Website', url: `${WEBSITE_URL}/` },
+  { label: 'Weddings', url: `${WEBSITE_URL}/weddings` },
+  { label: 'Directions', url: `${WEBSITE_URL}/directions-parking` },
+]
+
+// Branded HTML shell matching north-star-portal's own template (gold top bar,
+// serif headline, gold CTA button, footer links) — ported from
+// buildBoardNotificationEmailHtml in src/app.jsx so every email the org sends
+// looks the same regardless of which app sent it.
+function buildBrandedEmailHtml(opts: { headline: string; subtext: string; buttonText?: string; buttonUrl?: string; note?: string }) {
+  const { headline, subtext, buttonText, buttonUrl, note } = opts
+  const links = TOUR_EMAIL_FOOTER_LINKS
+  const footerCells = links
+    .map((l, i) => {
+      const border = i < links.length - 1 ? 'border-right:1px solid #e5ddcf;' : ''
+      return `<td style="width:${(100 / links.length).toFixed(2)}%;text-align:center;padding:14px 8px;${border}"><a href="${l.url}" style="color:${GOLD};text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">${l.label}</a></td>`
+    })
+    .join('')
+  return (
+    `<div style="background:#d9cdb8;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;">` +
+    `<div style="max-width:560px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">` +
+    `<div style="height:14px;background:${GOLD};"></div>` +
+    `<div style="padding:48px 40px 32px;text-align:center;">` +
+    `<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">${headline}</h1>` +
+    `<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>` +
+    `<p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;text-align:left;">${subtext}</p>` +
+    (buttonUrl ? `<a href="${buttonUrl}" style="display:inline-block;background:${GOLD};color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:16px;padding:16px 32px;border-radius:6px;margin-bottom:8px;">${buttonText}</a>` : '') +
+    (note ? `<p style="margin:20px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>${note}</i></p>` : '') +
+    `</div>` +
+    `<table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #e5ddcf;">` +
+    `<tr>${footerCells}</tr>` +
+    `</table>` +
+    `</div>` +
+    `</div>`
+  )
+}
 
 function esc(s: string) {
   return String(s || '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string))
@@ -65,7 +110,13 @@ async function run24h(): Promise<number> {
       t.visitor_email,
       `Reminder: your North Star House tour is tomorrow — ${when}`,
       `Hi ${t.visitor_name},\n\nJust a reminder — your estate tour is tomorrow, ${when} (about 45 minutes).\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you then!\nNorth Star House`,
-      `<p>Hi ${esc(t.visitor_name)},</p><p>Just a reminder — your estate tour is tomorrow, <strong>${esc(when)}</strong> (about 45 minutes).</p>${TOUR_DIRECTIONS_HTML}<p>See you then!<br>North Star House</p>`
+      buildBrandedEmailHtml({
+        headline: 'Your Tour is Tomorrow',
+        subtext:
+          `Hi ${esc(t.visitor_name)}, just a reminder — your estate tour is tomorrow:<br><br>` +
+          `<strong>${esc(when)}</strong> (about 45 minutes)<br><br>` +
+          TOUR_DIRECTIONS_HTML_INLINE,
+      })
     )
     if (ok) {
       await sb(`/rest/v1/estate_tours?id=eq.${t.id}`, {
@@ -88,7 +139,13 @@ async function run1h(): Promise<number> {
       t.visitor_email,
       `Your North Star House tour is in about an hour`,
       `Hi ${t.visitor_name},\n\nYour estate tour is coming up shortly — ${when} (about 45 minutes).\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you soon!\nNorth Star House`,
-      `<p>Hi ${esc(t.visitor_name)},</p><p>Your estate tour is coming up shortly — <strong>${esc(when)}</strong> (about 45 minutes).</p>${TOUR_DIRECTIONS_HTML}<p>See you soon!<br>North Star House</p>`
+      buildBrandedEmailHtml({
+        headline: 'See You Soon!',
+        subtext:
+          `Hi ${esc(t.visitor_name)}, your estate tour is coming up shortly:<br><br>` +
+          `<strong>${esc(when)}</strong> (about 45 minutes)<br><br>` +
+          TOUR_DIRECTIONS_HTML_INLINE,
+      })
     )
     if (ok) {
       await sb(`/rest/v1/estate_tours?id=eq.${t.id}`, {
