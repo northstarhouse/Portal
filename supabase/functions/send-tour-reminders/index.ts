@@ -15,6 +15,7 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
 const WEBSITE_URL = 'https://www.northstarhouse.org'
 const GOLD = '#886c44'
+const TOUR_ADDRESS = '12075 Auburn Rd. Grass Valley, CA 95949'
 
 // <br>-separated (not <p>) — gets embedded inside buildBrandedEmailHtml's own
 // single <p> wrapper, so nested block tags would be invalid HTML.
@@ -109,12 +110,13 @@ async function run24h(): Promise<number> {
     const ok = await sendMail(
       t.visitor_email,
       `Reminder: your North Star House tour is tomorrow — ${when}`,
-      `Hi ${t.visitor_name},\n\nJust a reminder — your estate tour is tomorrow, ${when} (about 45 minutes).\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you then!\nNorth Star House`,
+      `Hi ${t.visitor_name},\n\nJust a reminder — your estate tour is tomorrow.\n\nTour Date & Time: ${when}\nAddress: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you then!\nNorth Star House`,
       buildBrandedEmailHtml({
         headline: 'Your Tour is Tomorrow',
         subtext:
           `Hi ${esc(t.visitor_name)}, just a reminder — your estate tour is tomorrow:<br><br>` +
-          `<strong>${esc(when)}</strong> (about 45 minutes)<br><br>` +
+          `Tour Date &amp; Time: <strong>${esc(when)}</strong><br>` +
+          `Address: <strong>${esc(TOUR_ADDRESS)}</strong><br><br>` +
           TOUR_DIRECTIONS_HTML_INLINE,
       })
     )
@@ -138,12 +140,13 @@ async function run1h(): Promise<number> {
     const ok = await sendMail(
       t.visitor_email,
       `Your North Star House tour is in about an hour`,
-      `Hi ${t.visitor_name},\n\nYour estate tour is coming up shortly — ${when} (about 45 minutes).\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you soon!\nNorth Star House`,
+      `Hi ${t.visitor_name},\n\nYour estate tour is coming up shortly.\n\nTour Date & Time: ${when}\nAddress: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you soon!\nNorth Star House`,
       buildBrandedEmailHtml({
         headline: 'See You Soon!',
         subtext:
           `Hi ${esc(t.visitor_name)}, your estate tour is coming up shortly:<br><br>` +
-          `<strong>${esc(when)}</strong> (about 45 minutes)<br><br>` +
+          `Tour Date &amp; Time: <strong>${esc(when)}</strong><br>` +
+          `Address: <strong>${esc(TOUR_ADDRESS)}</strong><br><br>` +
           TOUR_DIRECTIONS_HTML_INLINE,
       })
     )
