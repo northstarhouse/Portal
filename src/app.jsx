@@ -607,6 +607,7 @@ var NAV_ICONS = {
   sponsors: '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>',
   financials: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
   venue: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/><path d="M9 2v4"/><path d="M15 2v4"/>',
+  'estate-tours': '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
   ideas: '<path d="M9 21h6"/><path d="M9 17.5h6"/><path d="M12 2a7 7 0 0 1 4.9 11.9l-.1.1c-.4.4-.8 1-1.1 1.5H8.3c-.3-.5-.7-1.1-1.1-1.5l-.1-.1A7 7 0 0 1 12 2z"/>',
   reviews: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
   marketing: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
@@ -634,6 +635,7 @@ const modules = [
   { id: "meeting-reports", label: "Meeting & Board Reports" },
   { id: "strategy", label: "Strategic Goal Progress", hidden: true },
   { id: "venue", label: "Venue Rentals", hidden: true },
+  { id: "estate-tours", label: "Estate Tours" },
   { id: "ideas", label: "Ideas & Initiatives" },
   { id: "operational", label: "Operational Areas", hidden: true },
   { id: "financials", label: "Reimbursements", hidden: true },
@@ -15690,6 +15692,234 @@ function VenueInquiriesView({ navigate }) {
   );
 }
 
+// Estate tour scheduling. Rows in estate_tours are either:
+//   'open'/'blocked'  -- calendar slots (the default Mon/Tue/Thu rotation,
+//                        auto-refilled by a Supabase cron job, plus any ad hoc
+//                        slots staff add for Sierra's random Fri/Sat/Sun tours)
+//   'booked'          -- a visitor claimed a slot on the public site
+//   'requested'       -- no open slot worked for them; up to 3 preferred
+//                        date/time options are in requested_slots for staff
+//                        to follow up on manually
+// The public site (nsh-bcopy) only ever reads 'open' rows and atomically
+// claims one server-side -- this view is where staff manage the calendar and
+// see who's booked.
+function EstateToursView() {
+  const [rows, setRows] = useState(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addDate, setAddDate] = useState('');
+  const [addTime, setAddTime] = useState('');
+  const [addGuide, setAddGuide] = useState('Sierra');
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState('');
+  const [busyId, setBusyId] = useState(null);
+  const [emailModal, setEmailModal] = useState(null); // { tour, to, subject, body }
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState(null);
+
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&order=created_at.desc&limit=500', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(data) { setRows(Array.isArray(data) ? data : []); });
+  }
+  useEffect(function() { load(); }, []);
+
+  function fmtDate(d) { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+  function fmtTime(t) { return t ? new Date('2000-01-01T' + t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''; }
+
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const all = rows || [];
+  const upcoming = all
+    .filter(function(t) { return t.status === 'booked' || t.status === 'requested'; })
+    .sort(function(a, b) { return (a.date || '9999-99-99') < (b.date || '9999-99-99') ? -1 : 1; });
+  const slots = all
+    .filter(function(t) { return (t.status === 'open' || t.status === 'blocked') && t.date >= todayKey; })
+    .sort(function(a, b) { return (a.date + a.start_time) < (b.date + b.start_time) ? -1 : 1; });
+  const byDate = {};
+  slots.forEach(function(s) { (byDate[s.date] = byDate[s.date] || []).push(s); });
+  const slotDates = Object.keys(byDate).sort();
+
+  function toggleBlock(slot) {
+    if (busyId) return;
+    setBusyId(slot.id);
+    const next = slot.status === 'open' ? 'blocked' : 'open';
+    sbPatchById('estate_tours', slot.id, { status: next }).then(function() { load(); }).finally(function() { setBusyId(null); });
+  }
+
+  function addSlot(e) {
+    e.preventDefault();
+    if (!addDate || !addTime) { setAddError('Date and time are required.'); return; }
+    setAddSaving(true);
+    setAddError('');
+    sbInsert('estate_tours', { date: addDate, start_time: addTime, guide_name: addGuide.trim() || 'Sierra', status: 'open' }).then(function(r) {
+      if (Array.isArray(r) && r.length) {
+        setAddDate(''); setAddTime(''); setAddOpen(false);
+        load();
+      } else {
+        setAddError((r && (r.message || r.error || (r.hint))) || 'Could not add that slot — it may already exist.');
+      }
+    }).finally(function() { setAddSaving(false); });
+  }
+
+  function openEmailModal(tour) {
+    const when = tour.date ? (fmtDate(tour.date) + ' at ' + fmtTime(tour.start_time)) : 'a date to be confirmed';
+    const subject = 'Estate tour — ' + (tour.visitor_name || 'a visitor') + (tour.date ? ' — ' + when : '');
+    const contact = [tour.visitor_name, tour.visitor_email, tour.visitor_phone].filter(Boolean).join(' · ');
+    const prefLines = (tour.requested_slots || []).map(function(s) { return '  - ' + s.date + (s.time_label ? ' (' + s.time_label + ')' : ''); }).join('\n');
+    const body = 'Hi,\n\nCan you lead a tour for ' + (tour.visitor_name || 'a visitor') + '?\n\n'
+      + 'Contact: ' + contact + '\n'
+      + (tour.date ? 'When: ' + when + '\n' : 'Preferred dates (not yet confirmed):\n' + prefLines + '\n')
+      + '\nThanks!\nNorth Star House';
+    setEmailModal({ tour: tour, to: '', subject: subject, body: body });
+    setSendError(null);
+  }
+
+  function sendGuideEmail() {
+    if (!emailModal || !emailModal.to.trim()) { setSendError("Enter the guide's email."); return; }
+    setSending(true);
+    setSendError(null);
+    fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + SUPABASE_KEY },
+      body: JSON.stringify({ to: emailModal.to.trim(), subject: emailModal.subject, body: emailModal.body, sender: 'Estate Tours' })
+    }).then(function(r) { return r.json().then(function(j) { return { ok: r.ok, json: j }; }); }).then(function(res) {
+      if (!res.ok) throw new Error(res.json.error || 'Send failed');
+      logActivity('Emailed tour guide (' + emailModal.to.trim() + ') about ' + (emailModal.tour.visitor_name || 'a tour'), 'tour_guide_emailed');
+      setEmailModal(null);
+    }).catch(function(err) { setSendError(err.message || 'Unknown error'); }).finally(function() { setSending(false); });
+  }
+
+  const cardStyle = { background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12 };
+  const inputStyle = { padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' };
+
+  if (rows === null) return <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>;
+
+  return (
+    <div>
+      {/* --- Upcoming tours (booked + requested) --- */}
+      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Upcoming Estate Tours</div>
+      <div style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>Booked from the weddings inquiry form, plus anyone who asked for a different date.</div>
+
+      {upcoming.length === 0 ? (
+        <div style={{ ...cardStyle, padding: 30, textAlign: 'center', color: '#bbb', fontSize: 13, marginBottom: 28 }}>No tours booked or requested yet.</div>
+      ) : (
+        <div style={{ ...cardStyle, overflow: 'hidden', marginBottom: 28 }}>
+          {upcoming.map(function(t, i) {
+            const isRequested = t.status === 'requested';
+            return (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 16px', borderBottom: i < upcoming.length - 1 ? '0.5px solid #f5f1eb' : 'none' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{t.visitor_name || '(no name)'}</span>
+                    <Badge status={isRequested ? 'Pending' : 'Confirmed'} />
+                  </div>
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{t.visitor_email}{t.visitor_phone ? ' · ' + t.visitor_phone : ''}</div>
+                  {isRequested ? (
+                    <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                      Preferred: {(t.requested_slots || []).map(function(s) { return s.date + (s.time_label ? ' (' + s.time_label + ')' : ''); }).join('  ·  ')}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{fmtDate(t.date)} at {fmtTime(t.start_time)} · {t.guide_name}</div>
+                  )}
+                </div>
+                <button onClick={function() { openEmailModal(t); }} style={{ flexShrink: 0, padding: '7px 14px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  Email Guide
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* --- Availability calendar --- */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Availability</div>
+        <button onClick={function() { setAddOpen(function(o) { return !o; }); }} style={{ padding: '7px 14px', background: addOpen ? '#f0ece6' : gold, color: addOpen ? '#666' : '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          {addOpen ? 'Cancel' : '+ Add a Slot'}
+        </button>
+      </div>
+      <div style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>
+        The default Mon/Tue/Thu 9–12 schedule refills automatically. Click a time below to block or reopen it. Use "Add a Slot" for Sierra's random Fri/Sat/Sun tours.
+      </div>
+
+      {addOpen && (
+        <form onSubmit={addSlot} style={{ ...cardStyle, padding: 16, marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>Date</label>
+            <input type="date" value={addDate} onChange={function(e) { setAddDate(e.target.value); }} style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>Time</label>
+            <input type="time" value={addTime} onChange={function(e) { setAddTime(e.target.value); }} style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>Guide</label>
+            <input type="text" value={addGuide} onChange={function(e) { setAddGuide(e.target.value); }} placeholder="Sierra" style={inputStyle} />
+          </div>
+          <button type="submit" disabled={addSaving} style={{ padding: '9px 16px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', opacity: addSaving ? 0.6 : 1 }}>
+            {addSaving ? 'Adding…' : 'Add'}
+          </button>
+          {addError && <div style={{ width: '100%', fontSize: 12, color: '#c0392b' }}>{addError}</div>}
+        </form>
+      )}
+
+      {slotDates.length === 0 ? (
+        <div style={{ ...cardStyle, padding: 30, textAlign: 'center', color: '#bbb', fontSize: 13 }}>No upcoming slots — the default schedule refills daily; check back or add one above.</div>
+      ) : (
+        <div style={{ ...cardStyle, padding: 16 }}>
+          {slotDates.map(function(d, i) {
+            return (
+              <div key={d} style={{ marginBottom: i < slotDates.length - 1 ? 14 : 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#2a2a2a', marginBottom: 6 }}>{fmtDate(d)}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {byDate[d].map(function(s) {
+                    const blocked = s.status === 'blocked';
+                    return (
+                      <button key={s.id} onClick={function() { toggleBlock(s); }} disabled={busyId === s.id}
+                        title={blocked ? 'Blocked — click to reopen' : 'Open — click to block'}
+                        style={{
+                          padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: busyId === s.id ? 'not-allowed' : 'pointer',
+                          border: blocked ? '1px solid #f3d9d9' : '1px solid #d8ead9',
+                          background: blocked ? '#fdf2f2' : '#f2f9f3',
+                          color: blocked ? '#c0392b' : '#2e7d32',
+                          textDecoration: blocked ? 'line-through' : 'none',
+                          opacity: busyId === s.id ? 0.5 : 1,
+                        }}>
+                        {fmtTime(s.start_time)}{s.guide_name !== 'default' ? ' · ' + s.guide_name : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* --- Email the tour guide --- */}
+      {emailModal && (
+        <div onClick={function() { if (!sending) setEmailModal(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ ...cardStyle, width: '100%', maxWidth: 480, padding: 22 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 14 }}>Email Tour Guide</div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>To</label>
+            <input type="email" value={emailModal.to} onChange={function(e) { setEmailModal(Object.assign({}, emailModal, { to: e.target.value })); }} placeholder="guide@example.com" style={{ ...inputStyle, width: '100%', marginBottom: 12 }} />
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>Subject</label>
+            <input type="text" value={emailModal.subject} onChange={function(e) { setEmailModal(Object.assign({}, emailModal, { subject: e.target.value })); }} style={{ ...inputStyle, width: '100%', marginBottom: 12 }} />
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>Message</label>
+            <textarea rows={7} value={emailModal.body} onChange={function(e) { setEmailModal(Object.assign({}, emailModal, { body: e.target.value })); }} style={{ ...inputStyle, width: '100%', marginBottom: 12, resize: 'vertical', fontFamily: 'inherit' }} />
+            {sendError && <div style={{ fontSize: 12, color: '#c0392b', marginBottom: 10 }}>{sendError}</div>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={function() { setEmailModal(null); }} disabled={sending} style={{ padding: '8px 16px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={sendGuideEmail} disabled={sending} style={{ padding: '8px 18px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: sending ? 'not-allowed' : 'pointer', opacity: sending ? 0.6 : 1 }}>
+                {sending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OperationalBudgetsView({ navigate }) {
   var [rows, setRows] = useState(null);
   var [forms, setForms] = useState({}); // area -> { lead, lead_email, budget }
@@ -17139,6 +17369,7 @@ const views = {
   venue: VenueRentalsView,
   'venue-messages': VenueMessagesView,
   'venue-inquiries': VenueInquiriesView,
+  'estate-tours': EstateToursView,
   ideas: IdeasView,
   operational: OperationalView,
   financials: FinancialsView,
