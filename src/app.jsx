@@ -12803,7 +12803,7 @@ function SuFormResponses({ form }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {responses.map(function(r) {
           return (
-            <div key={r.id} style={{ paddingBottom: 20, borderBottom: '0.5px solid #f5f0e8', opacity: deletingId === r.id ? 0.4 : 1 }}>
+            <div key={r.id} style={{ paddingBottom: 20, borderBottom: '0.5px solid #f5f0e8', opacity: deletingId === r.id ? 0.4 : (r.status === 'handled' ? 0.5 : 1) }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: handlingId === r.id ? 'default' : 'pointer' }}>
