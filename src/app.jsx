@@ -915,7 +915,7 @@ const typeColors = {
             <span style={{ color: '#777', fontSize: 13 }}>—</span>
             <span style={{ fontSize: 13, color: "#888" }}>Here's your organization at a glance.</span>
           </div>
-          <a href="https://northstarhouse.github.io/volunteerhub/" target="_blank" rel="noreferrer"
+          <a href="https://volunteerhub.northstarhouse.org/" target="_blank" rel="noreferrer"
             style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', flexShrink: 0 }}>
             Volunteer Hub
           </a>
@@ -17680,7 +17680,7 @@ var PORTAL_URL = 'https://northstarhouse.github.io/Portal/';
 // Reused as the bcc on every admin-facing notification (board votes, mail
 // uploads, etc.) so the sender always has a copy of what went out.
 var ADMIN_NOTIFY_BCC = 'media@thenorthstarhouse.org';
-var VOLUNTEER_HUB_URL = 'https://northstarhouse.github.io/volunteerhub/';
+var VOLUNTEER_HUB_URL = 'https://volunteerhub.northstarhouse.org/';
 var WEBSITE_URL = 'https://thenorthstarhouse.org';
 // Public (shareable) Google Calendar view -- distinct from the private ICS
 // feed URL (see fetch-calendar edge function), which must never go in an
