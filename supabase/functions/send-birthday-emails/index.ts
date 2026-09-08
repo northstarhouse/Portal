@@ -20,7 +20,10 @@ const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
 const GOLD = '#886c44'
 const WEBSITE_URL = 'https://thenorthstarhouse.org'
 const VOLUNTEER_HUB_URL = 'https://northstarhouse.github.io/volunteerhub/'
-const CALENDAR_PUBLIC_URL = 'https://calendar.google.com/calendar/u/0?cid=dGhlbm9ydGhzdGFyaG91c2VAZ21haWwuY29t'
+// /calendar/embed?src= form, not /calendar/u/0?cid= -- the latter is
+// Google's "add to my calendar" link and redirects anyone not logged into
+// an authorized Google account to a sign-in page instead of the calendar.
+const CALENDAR_PUBLIC_URL = 'https://calendar.google.com/calendar/embed?src=thenorthstarhouse%40gmail.com'
 
 // Same three links the app's other volunteer-facing emails use (see
 // TEMPLATE_EMAIL_FOOTER_LINKS in src/app.jsx) -- volunteers don't have

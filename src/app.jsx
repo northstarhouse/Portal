@@ -17697,8 +17697,11 @@ var VOLUNTEER_HUB_URL = 'https://volunteerhub.northstarhouse.org/';
 var WEBSITE_URL = 'https://thenorthstarhouse.org';
 // Public (shareable) Google Calendar view -- distinct from the private ICS
 // feed URL (see fetch-calendar edge function), which must never go in an
-// outgoing email.
-var CALENDAR_PUBLIC_URL = 'https://calendar.google.com/calendar/u/0?cid=dGhlbm9ydGhzdGFyaG91c2VAZ21haWwuY29t';
+// outgoing email. Must be the /calendar/embed?src= form, not /calendar/u/0?cid=
+// -- the cid= form is Google's "add this to my calendar" link, which
+// redirects anyone not logged into an authorized Google account straight to
+// a sign-in page instead of showing the calendar.
+var CALENDAR_PUBLIC_URL = 'https://calendar.google.com/calendar/embed?src=thenorthstarhouse%40gmail.com';
 // Volunteers don't have Portal access, so the Template Email tool's footer
 // swaps Portal for Calendar (board/staff emails keep the default Portal link).
 var TEMPLATE_EMAIL_FOOTER_LINKS = [
