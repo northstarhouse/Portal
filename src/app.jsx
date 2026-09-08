@@ -228,6 +228,16 @@ function logActivity(description, action) {
   cachedFetchAll('Board-Votes');
 })();
 
+// Legacy-format JWT anon key for this one call only -- Portal's own
+// SUPABASE_KEY (the newer sb_publishable_... format) consistently got a
+// browser-side CORS error hitting fetch-events/fetch-calendar, even though
+// server-to-server testing of the exact same URL+key always succeeded and
+// volunteerhub (which still uses this legacy JWT key everywhere) never had
+// the problem against the identical endpoint. Root cause unconfirmed, but
+// switching just this call to the proven-working key format fixed it.
+// Same project, same anon-level access -- not a different secret.
+var CALENDAR_FETCH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2endoaHd6ZWxhZWxmaGZrdmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMzI4OTksImV4cCI6MjA4OTYwODg5OX0.xw5n0MGm69u_FOiZHxbLNUCNQHehIJliO_s4YbTyfh8';
+
 function fetchCalendarEvents() {
   // Routed through our own Supabase Edge Function (fetch-events) instead of
   // corsproxy.io -- that free public proxy had no uptime/rate-limit
@@ -235,12 +245,8 @@ function fetchCalendarEvents() {
   // section (and the Venue Rentals wedding list) empty with no error shown.
   // The edge function fetches the ICS feed server-side, sidestepping CORS
   // entirely rather than relying on a third-party middleman.
-  // Named fetch-events, not fetch-calendar -- some real browsers reported a
-  // CORS error hitting a URL with "calendar" in the path even though direct
-  // testing of that same endpoint was always clean, consistent with a
-  // network-level filter targeting calendar-embed URLs.
   var endpoint = SUPABASE_URL + "/functions/v1/fetch-events";
-  return fetch(endpoint, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) {
+  return fetch(endpoint, { headers: { apikey: CALENDAR_FETCH_KEY, Authorization: 'Bearer ' + CALENDAR_FETCH_KEY } }).then(function(r) {
     if (!r.ok) throw new Error("HTTP " + r.status);
     return r.text();
   }).then(function(text) {
