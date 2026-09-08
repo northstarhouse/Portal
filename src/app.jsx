@@ -15995,6 +15995,17 @@ function EstateToursView() {
     }).finally(function() { setAddSaving(false); });
   }
 
+  function deleteTour(t) {
+    if (busyId) return;
+    var label = t.status === 'requested' ? 'request' : 'booking';
+    if (!window.confirm('Delete this ' + label + ' for ' + (t.visitor_name || 'this visitor') + '? This cannot be undone.')) return;
+    setBusyId(t.id);
+    fetch(SUPABASE_URL + '/rest/v1/estate_tours?id=eq.' + t.id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() { load(); }).finally(function() { setBusyId(null); });
+  }
+
   function openEmailModal(tour) {
     const when = tour.date ? (fmtDate(tour.date) + ' at ' + fmtTime(tour.start_time)) : 'a date to be confirmed';
     const subject = 'Estate tour — ' + (tour.visitor_name || 'a visitor') + (tour.date ? ' — ' + when : '');
@@ -16061,9 +16072,15 @@ function EstateToursView() {
                     <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{fmtDate(t.date)} at {fmtTime(t.start_time)} · {t.guide_name}</div>
                   )}
                 </div>
-                <button onClick={function() { openEmailModal(t); }} style={{ flexShrink: 0, padding: '7px 14px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                  Email Guide
-                </button>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button onClick={function() { openEmailModal(t); }} style={{ padding: '7px 14px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                    Email Guide
+                  </button>
+                  <button onClick={function() { deleteTour(t); }} disabled={busyId === t.id}
+                    style={{ padding: '7px 14px', background: '#fff', color: '#c0392b', border: '1px solid #f0d5d0', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: busyId === t.id ? 'default' : 'pointer', opacity: busyId === t.id ? 0.6 : 1 }}>
+                    Delete
+                  </button>
+                </div>
               </div>
             );
           })}
