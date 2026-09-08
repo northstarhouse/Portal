@@ -228,45 +228,27 @@ function logActivity(description, action) {
   cachedFetchAll('Board-Votes');
 })();
 
-// Legacy-format JWT anon key for this one call only -- Portal's own
-// SUPABASE_KEY (the newer sb_publishable_... format) consistently got a
-// browser-side CORS error hitting fetch-events/fetch-calendar, even though
-// server-to-server testing of the exact same URL+key always succeeded and
-// volunteerhub (which still uses this legacy JWT key everywhere) never had
-// the problem against the identical endpoint. Root cause unconfirmed, but
-// switching just this call to the proven-working key format fixed it.
-// Same project, same anon-level access -- not a different secret.
-var CALENDAR_FETCH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2endoaHd6ZWxhZWxmaGZrdmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMzI4OTksImV4cCI6MjA4OTYwODg5OX0.xw5n0MGm69u_FOiZHxbLNUCNQHehIJliO_s4YbTyfh8';
-
 function fetchCalendarEvents() {
-  // Routed through our own Supabase Edge Function (fetch-events) instead of
-  // corsproxy.io -- that free public proxy had no uptime/rate-limit
-  // guarantees and would silently fail, leaving Home's "Happening Soon"
-  // section (and the Venue Rentals wedding list) empty with no error shown.
-  // The edge function fetches the ICS feed server-side, sidestepping CORS
-  // entirely rather than relying on a third-party middleman.
-  var endpoint = SUPABASE_URL + "/functions/v1/fetch-events";
-  return fetch(endpoint, { headers: { apikey: CALENDAR_FETCH_KEY, Authorization: 'Bearer ' + CALENDAR_FETCH_KEY } }).then(function(r) {
+  // Every /functions/v1/* call (this one included, under its prior names
+  // fetch-calendar and fetch-events) consistently gets a CORS error from
+  // Portal's specific browser context -- confirmed it's not calendar- or
+  // key-format-specific: the Estate Tours delete button (a different edge
+  // function) fails the same way, while curl against the exact same
+  // URLs+keys always succeeds and Volunteer Hub's browser calling the
+  // identical fetch-events function never has the problem. Root cause
+  // unconfirmed (something about Portal's requests specifically to the
+  // Functions gateway), so this routes around it entirely: a pg_cron job
+  // fetches+parses the ICS feed server-side every 15 min into
+  // calendar_events_cache (see add_calendar_events_cache.sql /
+  // refresh-calendar-cache), and this just does a plain REST read of that
+  // table -- the gateway that's confirmed working fine in Portal's browser.
+  return fetch(SUPABASE_URL + "/rest/v1/calendar_events_cache?select=events&id=eq.1", {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+  }).then(function(r) {
     if (!r.ok) throw new Error("HTTP " + r.status);
-    return r.text();
-  }).then(function(text) {
-    // Unfold continuation lines
-    text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n[ \t]/g, "");
-    var events = [], current = null;
-    text.split("\n").forEach(function(line) {
-      if (line === "BEGIN:VEVENT") { current = {}; }
-      else if (line === "END:VEVENT") { if (current) events.push(current); current = null; }
-      else if (current) {
-        var ci = line.indexOf(":");
-        if (ci !== -1) {
-          var rawKey = line.slice(0, ci);
-          var val = line.slice(ci + 1);
-          var baseKey = rawKey.split(";")[0];
-          current[baseKey] = val;
-        }
-      }
-    });
-    return events;
+    return r.json();
+  }).then(function(rows) {
+    return (Array.isArray(rows) && rows[0] && Array.isArray(rows[0].events)) ? rows[0].events : [];
   });
 }
 
