@@ -16000,10 +16000,17 @@ function EstateToursView() {
     var label = t.status === 'requested' ? 'request' : 'booking';
     if (!window.confirm('Delete this ' + label + ' for ' + (t.visitor_name || 'this visitor') + '? This cannot be undone.')) return;
     setBusyId(t.id);
-    fetch(SUPABASE_URL + '/rest/v1/estate_tours?id=eq.' + t.id, {
-      method: 'DELETE',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function() { load(); }).finally(function() { setBusyId(null); });
+    // estate_tours' RLS allows the anon key to insert/update (for the public
+    // booking flow) but not delete, so this goes through a service-role
+    // edge function instead of a direct REST DELETE.
+    fetch(SUPABASE_URL + '/functions/v1/delete-estate-tour', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: t.id })
+    }).then(function(r) { return r.json().then(function(j) { return { ok: r.ok, json: j }; }); }).then(function(res) {
+      if (!res.ok) { alert('Could not delete: ' + (res.json && res.json.error ? JSON.stringify(res.json.error) : 'unknown error')); return; }
+      load();
+    }).catch(function() { alert('Could not delete — network error.'); }).finally(function() { setBusyId(null); });
   }
 
   function openEmailModal(tour) {
