@@ -229,13 +229,17 @@ function logActivity(description, action) {
 })();
 
 function fetchCalendarEvents() {
-  // Routed through our own Supabase Edge Function (fetch-calendar) instead of
+  // Routed through our own Supabase Edge Function (fetch-events) instead of
   // corsproxy.io -- that free public proxy had no uptime/rate-limit
   // guarantees and would silently fail, leaving Home's "Happening Soon"
   // section (and the Venue Rentals wedding list) empty with no error shown.
   // The edge function fetches the ICS feed server-side, sidestepping CORS
   // entirely rather than relying on a third-party middleman.
-  var endpoint = SUPABASE_URL + "/functions/v1/fetch-calendar";
+  // Named fetch-events, not fetch-calendar -- some real browsers reported a
+  // CORS error hitting a URL with "calendar" in the path even though direct
+  // testing of that same endpoint was always clean, consistent with a
+  // network-level filter targeting calendar-embed URLs.
+  var endpoint = SUPABASE_URL + "/functions/v1/fetch-events";
   return fetch(endpoint, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) {
     if (!r.ok) throw new Error("HTTP " + r.status);
     return r.text();
