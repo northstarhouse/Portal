@@ -16925,7 +16925,7 @@ function MeetingBoardReportsView({ navigate }) {
 }
 
 var PLANNING_EMPTY_FORM = {
-  title: '', dateLine: '', timeLine: '', location: 'North Star House', intro: '',
+  title: '', dateLine: '', timeLine: '', intro: '',
   food: '', drinks: '', dessert: '', supplies: '', shoppingList: '',
   setupTime: '', setupPeople: '', setupNote: '',
   cleanupPeople: '', cleanupNote: '',
@@ -16943,7 +16943,6 @@ var PLANNING_FIELD_PREFIXES = [
   { key: 'title', re: /^(?:title|event)\s*:\s*(.+)$/i },
   { key: 'dateLine', re: /^date\s*:\s*(.+)$/i },
   { key: 'timeLine', re: /^time\s*:\s*(.+)$/i },
-  { key: 'location', re: /^location\s*:\s*(.+)$/i },
   { key: 'intro', re: /^(?:intro|goal)\s*:\s*(.+)$/i },
   { key: 'setupTime', re: /^setup(?:\s*heading)?\s*:\s*(.+)$/i },
   { key: 'setupNote', re: /^setup note\s*:\s*(.+)$/i },
@@ -16956,7 +16955,6 @@ var PLANNING_TIME_RE = /\d{1,2}(:\d{2})?\s*[ap]\.?m\.?/i;
 var PLANNING_PASTE_TEMPLATE = 'Title: \n' +
   'Date: \n' +
   'Time: \n' +
-  'Location: \n' +
   'Intro: \n' +
   '\n' +
   'Food:\n' +
@@ -17039,7 +17037,6 @@ function parsePlanningText(raw) {
     }
     if (!result.dateLine && PLANNING_MONTH_RE.test(content) && content.length < 60) { result.dateLine = content; return; }
     if (!result.timeLine && PLANNING_TIME_RE.test(content) && content.length < 40) { result.timeLine = content; return; }
-    if (result.dateLine && result.timeLine && !result.location && !sawAnySection) { result.location = content; return; }
 
     if (!result.title && !sawAnySection && !result.dateLine) { result.title = content; return; }
 
@@ -17220,7 +17217,6 @@ function PlanningView({ navigate }) {
         {Text('Date', 'dateLine', 'e.g. Sunday, August 23, 2026')}
         {Text('Time', 'timeLine', 'e.g. 4:00–7:00 p.m.')}
       </div>
-      {Text('Location', 'location')}
       {Area('Intro / goal statement (optional)', 'intro', 'e.g. The goal is to keep this year\'s party simple and relaxed…', 2)}
 
       <div style={sectionHead}>Current Plan</div>
