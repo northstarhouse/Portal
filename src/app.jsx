@@ -18414,6 +18414,22 @@ function Dashboard() {
             </div>
           </div>
         )}
+        {active === "events" ? (
+          // EventsView renders its own complete header (back button, icon,
+          // title, subtitle) -- the generic bar below has no icon/title for
+          // this route (it's not in the sidebar `modules` list), so showing
+          // it here was just an empty icon bubble + blank title + a divider
+          // line above EventsView's real header. Skipped entirely on
+          // desktop; kept as a bare hamburger-only bar on mobile so the nav
+          // menu stays reachable.
+          isMobile && (
+            <div style={{ background: "#fdfcfb", padding: "12px 16px 10px", borderBottom: "3px solid rgba(136,108,68,0.35)", position: "sticky", top: 0, zIndex: 10 }}>
+              <button onClick={function() { setMobileMenuOpen(true); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#888', display: 'flex', alignItems: 'center' }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              </button>
+            </div>
+          )
+        ) : (
         <div style={{ background: "#fdfcfb", padding: isMobile ? "12px 16px 10px" : "24px 32px 18px", borderBottom: "3px solid rgba(136,108,68,0.35)", position: "sticky", top: 0, zIndex: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14 }}>
             {isMobile && (
@@ -18432,6 +18448,7 @@ function Dashboard() {
             )}
           </div>
         </div>
+        )}
         <div style={{ flex: 1, padding: isMobile ? "16px 14px" : "28px 32px", paddingBottom: isMobile ? 64 : 96 }}>
           <div style={{ maxWidth: 900 }}>
             <View navigate={navigate} opArea={opArea} navigateOp={function(a) { setOpArea(a); navigate('operational'); }} quarterlyArea={quarterlyArea} navigateToQuarterly={function(a) { setQuarterlyArea(a); navigate('quarterly'); }} />
