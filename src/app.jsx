@@ -1784,10 +1784,7 @@ const typeColors = {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
                 <div>
                   <label style={fieldLbl}>Event Name (applies to all)</label>
-                  <select value={bulkEventName} onChange={function(e) { setBulkEventName(e.target.value); }} style={fieldSt}>
-                    <option value="">Select an event…</option>
-                    {eventNameOptions.map(function(n) { return <option key={n} value={n}>{n}</option>; })}
-                  </select>
+                  <input value={bulkEventName} onChange={function(e) { setBulkEventName(e.target.value); }} list="events-hub-event-options" style={fieldSt} placeholder="e.g. Spring Gala, or type a new name" />
                 </div>
                 <div>
                   <label style={fieldLbl}>Source (applies to all)</label>
