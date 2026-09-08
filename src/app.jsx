@@ -1270,6 +1270,13 @@ const typeColors = {
   var [editFeedbackForm, setEditFeedbackForm] = useState(null);
   var [savingFeedbackEdit, setSavingFeedbackEdit] = useState(false);
   var [expandedFeedback, setExpandedFeedback] = useState({});
+  var [showBulkFeedback, setShowBulkFeedback] = useState(false);
+  var [bulkPasteText, setBulkPasteText] = useState('');
+  var [bulkParsed, setBulkParsed] = useState(null);
+  var [bulkEventName, setBulkEventName] = useState('');
+  var [bulkSource, setBulkSource] = useState('');
+  var [bulkDate, setBulkDate] = useState(todayStr);
+  var [bulkSaving, setBulkSaving] = useState(false);
   var [showAddEarning, setShowAddEarning] = useState(false);
   var [earningForm, setEarningForm] = useState({ event: '', earning_source: '', amount: '', notes: '', date: todayStr });
   var [savingEarning, setSavingEarning] = useState(false);
@@ -1443,6 +1450,52 @@ const typeColors = {
     });
   }
 
+  // Splits a pasted block of multiple survey responses (e.g. exported from a
+  // form tool) into one feedback entry per "Response N" section, so a whole
+  // batch can be logged in one paste instead of retyping each one by hand.
+  // The full Q&A text of each block becomes that entry's feedback body
+  // (preserves context like email/answers that don't have their own
+  // column); Name/Craft are pulled out into the name/role fields when
+  // present, everything else stays in the feedback text.
+  function parseBulkPaste() {
+    var parts = bulkPasteText.split(/Response\s+\d+\s*\n+/i);
+    var blocks = parts.map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
+    var parsed = blocks.map(function(block) {
+      var nameMatch = block.match(/Name:\s*(.+)/i);
+      var craftMatch = block.match(/Craft:\s*(.+)/i);
+      return { name: nameMatch ? nameMatch[1].trim() : '', role: craftMatch ? craftMatch[1].trim() : '', feedback: block };
+    });
+    setBulkParsed(parsed);
+  }
+
+  function updateBulkParsedField(i, field, val) {
+    setBulkParsed(function(prev) { var next = prev.slice(); next[i] = Object.assign({}, next[i], (function() { var o = {}; o[field] = val; return o; })()); return next; });
+  }
+
+  function removeBulkParsedItem(i) {
+    setBulkParsed(function(prev) { return prev.filter(function(_, idx) { return idx !== i; }); });
+  }
+
+  function saveBulkFeedback() {
+    if (!bulkParsed || !bulkParsed.length || bulkSaving) return;
+    setBulkSaving(true);
+    var payloads = bulkParsed.map(function(p) {
+      return { event_name: bulkEventName || null, source: bulkSource || null, name: p.name || null, role: p.role || null, feedback: p.feedback, date: bulkDate || null };
+    });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Event Feedback'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payloads)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setBulkSaving(false);
+      if (rows && rows.code) { alert('Add failed: ' + (rows.message || rows.code)); return; }
+      clearCache('Event Feedback');
+      if (Array.isArray(rows)) setFeedback(function(prev) { return rows.concat(prev); });
+      setBulkPasteText(''); setBulkParsed(null); setBulkEventName(''); setBulkSource('');
+      setShowBulkFeedback(false);
+    }).catch(function() { setBulkSaving(false); alert('Add failed: network error.'); });
+  }
+
   function addFeedback(e) {
     e.preventDefault();
     setSavingFeedback(true);
@@ -1523,7 +1576,10 @@ const typeColors = {
           <button onClick={function() { setShowAddExpense(function(s) { return !s; }); setShowAddEarning(false); }} style={{ fontSize: 12, background: showAddExpense ? '#f5f0ea' : gold, color: showAddExpense ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddExpense ? 'Cancel' : '+ Log Expense'}</button>
         )}
         {tab === 'feedback' && (
-          <button onClick={function() { setShowAddFeedback(function(s) { return !s; }); }} style={{ fontSize: 12, background: showAddFeedback ? '#f5f0ea' : gold, color: showAddFeedback ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddFeedback ? 'Cancel' : '+ Add Feedback'}</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={function() { setShowBulkFeedback(function(s) { return !s; }); setShowAddFeedback(false); }} style={{ fontSize: 12, background: showBulkFeedback ? '#f5f0ea' : '#fff', color: showBulkFeedback ? '#666' : gold, border: '1px solid ' + (showBulkFeedback ? '#e0d8cc' : gold), borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showBulkFeedback ? 'Cancel' : '📋 Paste Multiple'}</button>
+            <button onClick={function() { setShowAddFeedback(function(s) { return !s; }); setShowBulkFeedback(false); }} style={{ fontSize: 12, background: showAddFeedback ? '#f5f0ea' : gold, color: showAddFeedback ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddFeedback ? 'Cancel' : '+ Add Feedback'}</button>
+          </div>
         )}
       </div>
 
@@ -1712,6 +1768,59 @@ const typeColors = {
           })}
         </div>
       ))}
+
+      {tab === 'feedback' && showBulkFeedback && (
+        <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: '#999', marginBottom: 10 }}>
+            Paste a batch of survey responses (each starting with "Response 1", "Response 2", etc). Each one becomes its own review, filed under the event you pick below — Name/Craft get pulled into the name/role fields when present; everything else stays as the review text.
+          </div>
+          {!bulkParsed ? (
+            <div>
+              <textarea value={bulkPasteText} onChange={function(e) { setBulkPasteText(e.target.value); }} rows={8} style={Object.assign({}, fieldSt, { minHeight: 140, resize: 'vertical', fontFamily: 'inherit', marginBottom: 10 })} placeholder="Paste the full block of responses here…" />
+              <button onClick={parseBulkPaste} disabled={!bulkPasteText.trim()} style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: bulkPasteText.trim() ? 'pointer' : 'not-allowed', fontWeight: 600, opacity: bulkPasteText.trim() ? 1 : 0.5 }}>Parse Responses</button>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div>
+                  <label style={fieldLbl}>Event Name (applies to all)</label>
+                  <select value={bulkEventName} onChange={function(e) { setBulkEventName(e.target.value); }} style={fieldSt}>
+                    <option value="">Select an event…</option>
+                    {eventNameOptions.map(function(n) { return <option key={n} value={n}>{n}</option>; })}
+                  </select>
+                </div>
+                <div>
+                  <label style={fieldLbl}>Source (applies to all)</label>
+                  <input value={bulkSource} onChange={function(e) { setBulkSource(e.target.value); }} list="events-hub-feedback-source-options" style={fieldSt} placeholder="e.g. Creative Exchange survey" />
+                </div>
+                <div>
+                  <label style={fieldLbl}>Date (applies to all)</label>
+                  <input type="date" value={bulkDate} onChange={function(e) { setBulkDate(e.target.value); }} style={fieldSt} />
+                </div>
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>{bulkParsed.length} response{bulkParsed.length !== 1 ? 's' : ''} parsed</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14, maxHeight: 320, overflowY: 'auto' }}>
+                {bulkParsed.map(function(p, i) {
+                  return (
+                    <div key={i} style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: 10 }}>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                        <input value={p.name} onChange={function(e) { updateBulkParsedField(i, 'name', e.target.value); }} placeholder="Name" style={Object.assign({}, fieldSt, { flex: 1 })} />
+                        <input value={p.role} onChange={function(e) { updateBulkParsedField(i, 'role', e.target.value); }} placeholder="Craft / role" style={Object.assign({}, fieldSt, { flex: 1 })} />
+                        <button onClick={function() { removeBulkParsedItem(i); }} title="Remove" style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 14, padding: '0 4px' }}>×</button>
+                      </div>
+                      <textarea value={p.feedback} onChange={function(e) { updateBulkParsedField(i, 'feedback', e.target.value); }} rows={3} style={Object.assign({}, fieldSt, { resize: 'vertical', fontFamily: 'inherit', fontSize: 11 })} />
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={saveBulkFeedback} disabled={bulkSaving || !bulkParsed.length} style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 600, opacity: (bulkSaving || !bulkParsed.length) ? 0.5 : 1 }}>{bulkSaving ? 'Adding…' : 'Add ' + bulkParsed.length + ' Review' + (bulkParsed.length !== 1 ? 's' : '')}</button>
+                <button onClick={function() { setBulkParsed(null); }} disabled={bulkSaving} style={{ fontSize: 12, background: '#f0ece6', border: 'none', borderRadius: 8, padding: '8px 16px', color: '#666', cursor: 'pointer' }}>Back</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {tab === 'feedback' && showAddFeedback && (
         <form onSubmit={addFeedback} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, marginBottom: 20 }}>
