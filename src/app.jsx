@@ -1458,7 +1458,10 @@ const typeColors = {
   // column); Name/Craft are pulled out into the name/role fields when
   // present, everything else stays in the feedback text.
   function parseBulkPaste() {
-    var parts = bulkPasteText.split(/Response\s+\d+\s*\n+/i);
+    // "Response N" may stand alone on its own line, or have a title on the
+    // same line ("Response 1: Steve - Woodworker") -- match up to end of
+    // that line either way, not just a bare newline right after the number.
+    var parts = bulkPasteText.split(/Response\s+\d+[^\n]*\n+/i);
     var blocks = parts.map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
     var parsed = blocks.map(function(block) {
       var nameMatch = block.match(/Name:\s*(.+)/i);
@@ -1562,7 +1565,10 @@ const typeColors = {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Events</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Event Overviews</div>
+          </div>
           <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Earnings & expenses by event, pulled from the Events operational area</div>
         </div>
         {tab === 'pnl' && (
