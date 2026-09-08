@@ -3,6 +3,11 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-app-token',
 }
 
+// Every email this function sends gets this bcc'd in, regardless of what
+// the caller passes -- so admin always has a copy of every outgoing email
+// without every call site having to remember to add it.
+const ADMIN_BCC = 'media@thenorthstarhouse.org'
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -19,9 +24,10 @@ Deno.serve(async (req) => {
       })
     }
 
-    const bccList: string[] = bcc
+    const callerBcc: string[] = bcc
       ? (Array.isArray(bcc) ? bcc : String(bcc).split(',').map((e: string) => e.trim()).filter(Boolean))
       : []
+    const bccList: string[] = Array.from(new Set([ADMIN_BCC, ...callerBcc]))
 
     const fromName = sender ? `${sender} · North Star House` : 'North Star House'
 
