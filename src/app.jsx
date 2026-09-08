@@ -1269,7 +1269,7 @@ const typeColors = {
   var [editingFeedbackId, setEditingFeedbackId] = useState(null);
   var [editFeedbackForm, setEditFeedbackForm] = useState(null);
   var [savingFeedbackEdit, setSavingFeedbackEdit] = useState(false);
-  var [expandedFeedback, setExpandedFeedback] = useState({});
+  var [expandedEventGroups, setExpandedEventGroups] = useState({});
   var [showBulkFeedback, setShowBulkFeedback] = useState(false);
   var [bulkPasteText, setBulkPasteText] = useState('');
   var [bulkParsed, setBulkParsed] = useState(null);
@@ -1546,10 +1546,6 @@ const typeColors = {
       clearCache('Event Feedback');
       setFeedback(function(prev) { return prev.filter(function(f) { return f.id !== id; }); });
     });
-  }
-
-  function toggleFeedback(id) {
-    setExpandedFeedback(function(prev) { var n = Object.assign({}, prev); n[id] = !n[id]; return n; });
   }
 
   var fieldSt = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' };
@@ -1871,18 +1867,22 @@ const typeColors = {
             byEvent[key].items.push(f);
           });
           return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {groups.map(function(g) {
+              var isGroupOpen = !!expandedEventGroups[g.event];
               return (
-                <div key={g.event}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
-                    {g.event} <span style={{ color: '#ccc', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>({g.items.length})</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {g.items.map(function(f) {
+                <div key={g.event} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+                  <button onClick={function() { setExpandedEventGroups(function(prev) { var n = Object.assign({}, prev); n[g.event] = !n[g.event]; return n; }); }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '14px 16px' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>{g.event} <span style={{ color: '#aaa', fontWeight: 500 }}>({g.items.length})</span></span>
+                    <span style={{ fontSize: 12, color: '#ccc', flexShrink: 0 }}>{isGroupOpen ? '▲' : '▼'}</span>
+                  </button>
+                  {isGroupOpen && (
+                    <div style={{ borderTop: '0.5px solid #f0ece6' }}>
+                    {g.items.map(function(f, fi) {
               if (editingFeedbackId === f.id && editFeedbackForm) {
                 return (
-                  <div key={f.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 14 }}>
+                  <div key={f.id} style={{ padding: 14, borderBottom: fi < g.items.length - 1 ? '0.5px solid #f5f0e8' : 'none' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
                       <select value={editFeedbackForm.event_name} onChange={function(e) { setEditFeedbackForm(function(ff) { return Object.assign({}, ff, { event_name: e.target.value }); }); }} style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' }}>
                         <option value="">Select an event…</option>
@@ -1901,30 +1901,29 @@ const typeColors = {
                   </div>
                 );
               }
-              var isFeedbackOpen = !!expandedFeedback[f.id];
               return (
-                <div key={f.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px' }}>
-                    <button onClick={function() { toggleFeedback(f.id); }} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, minWidth: 0 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{f.name || 'Anonymous'}{f.role ? ' - ' + f.role : ''}</div>
-                        {f.source && <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>{f.source}</div>}
+                <div key={f.id} style={{ padding: '12px 16px', borderBottom: fi < g.items.length - 1 ? '0.5px solid #f5f0e8' : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{f.name || 'Anonymous'}{f.role ? ' - ' + f.role : ''}</span>
+                        {f.source && <span style={{ fontSize: 11, color: '#aaa' }}>{f.source}</span>}
+                        {f.date && <span style={{ fontSize: 11, color: '#ccc' }}>{new Date(f.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
                       </div>
-                      {f.date && <span style={{ fontSize: 11, color: '#ccc', flexShrink: 0 }}>{new Date(f.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
-                      <span style={{ fontSize: 12, color: '#ccc', flexShrink: 0 }}>{isFeedbackOpen ? '▲' : '▼'}</span>
-                    </button>
-                    <button onClick={function() { startEditFeedback(f); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    </button>
-                    <button onClick={function() { deleteFeedback(f.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '0 2px', flexShrink: 0 }}>×</button>
+                      <div style={{ fontSize: 13, color: '#555', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginTop: 6 }}>{f.feedback}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <button onClick={function() { startEditFeedback(f); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>
+                      <button onClick={function() { deleteFeedback(f.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '0 2px' }}>×</button>
+                    </div>
                   </div>
-                  {isFeedbackOpen && (
-                    <div style={{ padding: '0 16px 14px', fontSize: 13, color: '#555', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{f.feedback}</div>
-                  )}
                 </div>
               );
                     })}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
