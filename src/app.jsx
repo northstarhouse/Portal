@@ -1753,9 +1753,27 @@ const typeColors = {
           <div style={{ textAlign: 'center', padding: 48, color: '#aaa', fontSize: 13 }}>Loading…</div>
         ) : feedback.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 48, color: '#ccc', fontSize: 13 }}>No feedback recorded yet.</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {feedback.map(function(f) {
+        ) : (function() {
+          // feedback is already sorted date.desc,id.desc, so grouping in
+          // encounter order naturally puts the most-recently-reviewed event
+          // first, with each event's own reviews in recency order too.
+          var groups = [];
+          var byEvent = {};
+          feedback.forEach(function(f) {
+            var key = (f.event_name || '').trim() || 'Unlinked';
+            if (!byEvent[key]) { byEvent[key] = { event: key, items: [] }; groups.push(byEvent[key]); }
+            byEvent[key].items.push(f);
+          });
+          return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {groups.map(function(g) {
+              return (
+                <div key={g.event}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
+                    {g.event} <span style={{ color: '#ccc', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>({g.items.length})</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {g.items.map(function(f) {
               if (editingFeedbackId === f.id && editFeedbackForm) {
                 return (
                   <div key={f.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 14 }}>
@@ -1784,11 +1802,7 @@ const typeColors = {
                     <button onClick={function() { toggleFeedback(f.id); }} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, minWidth: 0 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{f.name || 'Anonymous'}{f.role ? ' - ' + f.role : ''}</div>
-                        {(f.event_name || f.source) && (
-                          <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>
-                            {f.event_name}{f.event_name && f.source ? ' · ' : ''}{f.source}
-                          </div>
-                        )}
+                        {f.source && <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>{f.source}</div>}
                       </div>
                       {f.date && <span style={{ fontSize: 11, color: '#ccc', flexShrink: 0 }}>{new Date(f.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
                       <span style={{ fontSize: 12, color: '#ccc', flexShrink: 0 }}>{isFeedbackOpen ? '▲' : '▼'}</span>
@@ -1803,9 +1817,14 @@ const typeColors = {
                   )}
                 </div>
               );
+                    })}
+                  </div>
+                </div>
+              );
             })}
           </div>
-        )
+          );
+        })()
       )}
     </div>
   );
