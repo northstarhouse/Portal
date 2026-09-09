@@ -607,6 +607,7 @@ var NAV_ICONS = {
   'meeting-reports': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
   'financial-overview': '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
   events: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  'event-overviews': '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
 };
 
 function NavIcon({ id, active }) {
@@ -1255,7 +1256,10 @@ const typeColors = {
   );
 }function EventsView({ navigate }) {
   var { useState, useEffect, useMemo } = React;
-  var [tab, setTab] = useState('pnl');
+  // Arriving via the #event-overviews hash (the old standalone Event
+  // Overviews page, now merged in here as a tab) opens straight to PDF
+  // Overview instead of the default Profit & Loss tab.
+  var [tab, setTab] = useState(function() { return window.location.hash.replace(/^#/, '') === 'event-overviews' ? 'pdf' : 'pnl'; });
   var [loading, setLoading] = useState(true);
   var [budgetRows, setBudgetRows] = useState([]);
   var [earningsRows, setEarningsRows] = useState([]);
@@ -1278,6 +1282,10 @@ const typeColors = {
   var [bulkSource, setBulkSource] = useState('');
   var [bulkDate, setBulkDate] = useState(todayStr);
   var [bulkSaving, setBulkSaving] = useState(false);
+  var [plans, setPlans] = useState(null);
+  var [openingPlanId, setOpeningPlanId] = useState(null);
+  var [attachingPlanId, setAttachingPlanId] = useState(null);
+  var [copiedPlanId, setCopiedPlanId] = useState(null);
   var [showAddEarning, setShowAddEarning] = useState(false);
   var [earningForm, setEarningForm] = useState({ event: '', earning_source: '', amount: '', notes: '', date: todayStr });
   var [savingEarning, setSavingEarning] = useState(false);
@@ -1307,7 +1315,65 @@ const typeColors = {
       setFeedback(Array.isArray(rows) ? rows : []);
       setFeedbackLoading(false);
     }).catch(function() { setFeedbackLoading(false); });
+    loadPlans();
   }, []);
+
+  function loadPlans() {
+    fetch(SUPABASE_URL + '/rest/v1/planning_templates?select=*&order=created_at.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setPlans(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setPlans([]); });
+  }
+
+  function handleViewPlan(p) {
+    setOpeningPlanId(p.id);
+    openPlanPreview(p.id, function() { setOpeningPlanId(null); });
+  }
+
+  function handleEditPlan(p) {
+    window.location.hash = 'planning/edit/' + p.id;
+  }
+
+  function handleCopyPlanLink(p) {
+    var link = window.location.origin + window.location.pathname + '#event-plan/' + p.id;
+    function done() { setCopiedPlanId(p.id); setTimeout(function() { setCopiedPlanId(null); }, 2000); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(done).catch(function() { window.prompt('Copy this link:', link); });
+    } else {
+      window.prompt('Copy this link:', link);
+    }
+  }
+
+  function handleAttachPlan(p) {
+    setAttachingPlanId(p.id);
+    fetch(SUPABASE_URL + '/rest/v1/vol_events?title=ilike.*Appreciation*&select=id,title&order=date.desc&limit=1', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var ev = Array.isArray(rows) && rows[0];
+      if (!ev) {
+        setAttachingPlanId(null);
+        alert('No upcoming Appreciation event found on the calendar to attach this plan to. Create the event first, then attach the plan.');
+        return;
+      }
+      return fetch(SUPABASE_URL + '/rest/v1/vol_events?id=eq.' + ev.id, {
+        method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan_id: p.id })
+      }).then(function() {
+        setAttachingPlanId(null);
+        alert('Attached "' + p.name + '" to "' + ev.title + '" — a "View Event Plan" button will now show on the dashboard RSVP card.');
+      });
+    }).catch(function() { setAttachingPlanId(null); alert('Could not attach the plan.'); });
+  }
+
+  function handleDeletePlan(p) {
+    if (!window.confirm('Delete "' + p.name + '"? This can\'t be undone.')) return;
+    fetch(SUPABASE_URL + '/rest/v1/planning_templates?id=eq.' + p.id, {
+      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      setPlans(function(prev) { return prev.filter(function(x) { return x.id !== p.id; }); });
+    });
+  }
 
   function fmt(n) { return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -1585,6 +1651,7 @@ const typeColors = {
       <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '0.5px solid #e8dece' }}>
         <button onClick={function() { setTab('pnl'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'pnl' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, fontSize: 13, fontWeight: tab === 'pnl' ? 600 : 400, color: tab === 'pnl' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Profit & Loss</button>
         <button onClick={function() { setTab('feedback'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'feedback' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, marginLeft: 16, fontSize: 13, fontWeight: tab === 'feedback' ? 600 : 400, color: tab === 'feedback' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Reviews & Feedback{feedback.length > 0 ? ' (' + feedback.length + ')' : ''}</button>
+        <button onClick={function() { setTab('pdf'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'pdf' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, marginLeft: 16, fontSize: 13, fontWeight: tab === 'pdf' ? 600 : 400, color: tab === 'pdf' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>PDF Overview{plans && plans.length > 0 ? ' (' + plans.length + ')' : ''}</button>
       </div>
 
       {tab === 'pnl' && showAddEarning && (
@@ -1933,6 +2000,43 @@ const typeColors = {
           </div>
           );
         })()
+      )}
+
+      {tab === 'pdf' && (
+        plans === null ? (
+          <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
+        ) : plans.length === 0 ? (
+          <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No saved plans yet. Build one in Planning, then "Save to Event Overviews".</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {plans.map(function(p) {
+              var d = p.data || {};
+              var metaBits = [d.dateLine, d.timeLine].filter(Boolean).join('  ·  ');
+              return (
+                <div key={p.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{p.name}</div>
+                    {(d.title && d.title !== p.name) && <div style={{ fontSize: 12, color: '#886c44', marginTop: 2 }}>{d.title}</div>}
+                    {metaBits && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{metaBits}</div>}
+                  </div>
+                  <button onClick={function() { handleViewPlan(p); }} disabled={openingPlanId === p.id} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: openingPlanId === p.id ? 'default' : 'pointer', opacity: openingPlanId === p.id ? 0.6 : 1, flexShrink: 0 }}>
+                    {openingPlanId === p.id ? 'Opening…' : 'View'}
+                  </button>
+                  <button onClick={function() { handleEditPlan(p); }} title="Edit this plan in Planning" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                    Edit
+                  </button>
+                  <button onClick={function() { handleCopyPlanLink(p); }} title="Copy a shareable link straight to this plan" style={{ background: '#fff', color: '#886c44', border: '1px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                    {copiedPlanId === p.id ? 'Copied!' : 'Copy Link'}
+                  </button>
+                  <button onClick={function() { handleAttachPlan(p); }} disabled={attachingPlanId === p.id} title="Show a 'View Event Plan' button on the dashboard RSVP card for the current Appreciation event" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: attachingPlanId === p.id ? 'default' : 'pointer', opacity: attachingPlanId === p.id ? 0.6 : 1, flexShrink: 0 }}>
+                    {attachingPlanId === p.id ? 'Attaching…' : 'Attach to Dashboard'}
+                  </button>
+                  <button onClick={function() { handleDeletePlan(p); }} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 12, flexShrink: 0 }}>Delete</button>
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
     </div>
   );
@@ -17410,118 +17514,6 @@ function PlanningView({ navigate }) {
   );
 }
 
-function EventOverviewsView({ navigate }) {
-  var [plans, setPlans] = useState(null);
-  var [openingId, setOpeningId] = useState(null);
-  var [attachingId, setAttachingId] = useState(null);
-  var [copiedId, setCopiedId] = useState(null);
-
-  useEffect(function() { load(); }, []);
-
-  function load() {
-    fetch(SUPABASE_URL + '/rest/v1/planning_templates?select=*&order=created_at.desc', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      setPlans(Array.isArray(rows) ? rows : []);
-    }).catch(function() { setPlans([]); });
-  }
-
-  function handleView(p) {
-    setOpeningId(p.id);
-    openPlanPreview(p.id, function() { setOpeningId(null); });
-  }
-
-  function handleEdit(p) {
-    window.location.hash = 'planning/edit/' + p.id;
-  }
-
-  function handleCopyLink(p) {
-    var link = window.location.origin + window.location.pathname + '#event-plan/' + p.id;
-    function done() { setCopiedId(p.id); setTimeout(function() { setCopiedId(null); }, 2000); }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(link).then(done).catch(function() { window.prompt('Copy this link:', link); });
-    } else {
-      window.prompt('Copy this link:', link);
-    }
-  }
-
-  function handleAttach(p) {
-    setAttachingId(p.id);
-    fetch(SUPABASE_URL + '/rest/v1/vol_events?title=ilike.*Appreciation*&select=id,title&order=date.desc&limit=1', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      var ev = Array.isArray(rows) && rows[0];
-      if (!ev) {
-        setAttachingId(null);
-        alert('No upcoming Appreciation event found on the calendar to attach this plan to. Create the event first (in Events), then attach the plan.');
-        return;
-      }
-      return fetch(SUPABASE_URL + '/rest/v1/vol_events?id=eq.' + ev.id, {
-        method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan_id: p.id })
-      }).then(function() {
-        setAttachingId(null);
-        alert('Attached "' + p.name + '" to "' + ev.title + '" — a "View Event Plan" button will now show on the dashboard RSVP card.');
-      });
-    }).catch(function() { setAttachingId(null); alert('Could not attach the plan.'); });
-  }
-
-  function handleDelete(p) {
-    if (!window.confirm('Delete "' + p.name + '"? This can\'t be undone.')) return;
-    fetch(SUPABASE_URL + '/rest/v1/planning_templates?id=eq.' + p.id, {
-      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function() {
-      setPlans(function(prev) { return prev.filter(function(x) { return x.id !== p.id; }); });
-    });
-  }
-
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#aaa', padding: 0 }}>←</button>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a' }}>Event Overviews</div>
-          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Saved event plans from the Planning tool</div>
-        </div>
-      </div>
-
-      {plans === null ? (
-        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
-      ) : plans.length === 0 ? (
-        <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No saved plans yet. Build one in Planning, then "Save to Event Overviews".</div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {plans.map(function(p) {
-            var d = p.data || {};
-            var metaBits = [d.dateLine, d.timeLine].filter(Boolean).join('  ·  ');
-            return (
-              <div key={p.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 200 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{p.name}</div>
-                  {(d.title && d.title !== p.name) && <div style={{ fontSize: 12, color: '#886c44', marginTop: 2 }}>{d.title}</div>}
-                  {metaBits && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{metaBits}</div>}
-                </div>
-                <button onClick={function() { handleView(p); }} disabled={openingId === p.id} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: openingId === p.id ? 'default' : 'pointer', opacity: openingId === p.id ? 0.6 : 1, flexShrink: 0 }}>
-                  {openingId === p.id ? 'Opening…' : 'View'}
-                </button>
-                <button onClick={function() { handleEdit(p); }} title="Edit this plan in Planning" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-                  Edit
-                </button>
-                <button onClick={function() { handleCopyLink(p); }} title="Copy a shareable link straight to this plan" style={{ background: '#fff', color: '#886c44', border: '1px solid #e0d8cc', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-                  {copiedId === p.id ? 'Copied!' : 'Copy Link'}
-                </button>
-                <button onClick={function() { handleAttach(p); }} disabled={attachingId === p.id} title="Show a 'View Event Plan' button on the dashboard RSVP card for the current Appreciation event" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: attachingId === p.id ? 'default' : 'pointer', opacity: attachingId === p.id ? 0.6 : 1, flexShrink: 0 }}>
-                  {attachingId === p.id ? 'Attaching…' : 'Attach to Dashboard'}
-                </button>
-                <button onClick={function() { handleDelete(p); }} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 12, flexShrink: 0 }}>Delete</button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // Lands directly on a single saved plan's branded preview when someone opens a
 // shared "#event-plan/<id>" link -- no click-through needed, unlike the popup
@@ -17762,7 +17754,7 @@ const views = {
   'quarter-workspace': QuarterWorkspaceView,
   admin: AdminView,
   planning: PlanningView,
-  'event-overviews': EventOverviewsView,
+  'event-overviews': EventsView, // alias -- EventsView opens on its "PDF Overview" tab for this hash, see EventsView's tab initializer
   'event-plan': EventPlanLinkView,
   'vol-email-lists': VolEmailListsView,
   'wix-forms': WixFormsView,
@@ -18421,7 +18413,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "events" ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
