@@ -155,6 +155,12 @@ Deno.serve(async (req) => {
           description: contactLines || undefined,
           start: { dateTime: startDateTime, timeZone: TIME_ZONE },
           end: { dateTime: endDateTime, timeZone: TIME_ZONE },
+          // organizer.email can't be changed to an identity this service
+          // account doesn't control (Calendar silently keeps the real
+          // one), but displayName is a friendly label Calendar does let
+          // you override -- trying it here; the response below reports
+          // back what Google actually assigned either way.
+          organizer: { displayName: "North Star House" },
         }),
       },
     );
@@ -166,7 +172,7 @@ Deno.serve(async (req) => {
 
     await sbPatch(`estate_tours?id=eq.${encodeURIComponent(id)}`, { gcal_event_id: event.id });
 
-    return new Response(JSON.stringify({ ok: true, eventId: event.id }), { headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true, eventId: event.id, organizer: event.organizer, creator: event.creator }), { headers: { "Content-Type": "application/json" } });
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
   }
