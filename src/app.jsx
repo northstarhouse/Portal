@@ -291,33 +291,48 @@ function fetchWeddings() {
   });
 }
 
-// Best-effort guess at which Wix form submissions are venue-rental leads,
-// since there's no dedicated "inquiry" flag in the data yet — see the note
-// in VenueInquiriesView. Adjust this list if the real Wix form name(s)
-// don't match.
-var VENUE_INQUIRY_FORM_KEYWORDS = ['rental', 'wedding', 'venue', 'inquiry', 'booking'];
+// The real rental/event-booking lead forms (nsh_forms), replacing the old
+// best-effort Wix-form-name keyword guess. Event Inquiry Form covers
+// weddings, private events, memorials, non-profit events, and public
+// events all through one "what kind of event" dropdown, so it alone plus
+// the dedicated Wedding Inquiry form and the further-along Pre Booking
+// Information Form (filled out once a date's been discussed with the
+// venue coordinator) cover the venue's actual inquiry funnel.
+var EVENT_INQUIRY_FORM_ID = 'a87b86b0-94cd-4d28-b57e-00b79b5f1fee';
+var PRE_BOOKING_FORM_ID = 'a3a383f7-e1db-4344-9dec-ea879ad3406d';
+var RENTAL_INQUIRY_FORM_IDS = [WEDDING_INQUIRY_FORM_ID, EVENT_INQUIRY_FORM_ID, PRE_BOOKING_FORM_ID];
+
+// Best guess at a response's headline name/email, since each of the three
+// forms uses its own field ids -- matches on the field *label* instead
+// (every one of them has some "...Name..."/"...Email..." field).
+function inquiryPreviewFields(inq) {
+  var fields = inq.fields || [];
+  var nameField = fields.find(function(f) { return /name/i.test(f.label) && !/partner/i.test(f.label); });
+  var emailField = fields.find(function(f) { return /email/i.test(f.label); });
+  var answers = inq.answers || {};
+  return {
+    name: nameField ? answers[nameField.id] : null,
+    email: emailField ? answers[emailField.id] : null,
+  };
+}
 
 function fetchVenueInquiries() {
-  return fetch(WIX_FORMS_URL).then(function(r) { return r.json(); }).then(function(json) {
-    var rawForms = (json.forms && json.forms.submissions) || [];
-    var matches = rawForms.filter(function(sub) {
-      var name = (sub.form_name || '').toLowerCase();
-      return VENUE_INQUIRY_FORM_KEYWORDS.some(function(k) { return name.indexOf(k) !== -1; });
-    });
-    var ids = matches.map(function(s) { return s.id; });
-    var overridesPromise = ids.length > 0
-      ? fetch(SUPABASE_URL + '/rest/v1/data_wix_forms?select=id,internal_notes,status&id=in.(' + ids.map(encodeURIComponent).join(',') + ')', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); })
-      : Promise.resolve([]);
-    return overridesPromise.then(function(overrides) {
-      var overrideMap = {};
-      (Array.isArray(overrides) ? overrides : []).forEach(function(row) { overrideMap[row.id] = row; });
-      return matches.map(function(sub) {
-        var ov = overrideMap[sub.id];
-        return Object.assign({}, sub, {
-          internal_notes: ov && ov.internal_notes != null ? ov.internal_notes : (sub.internal_notes || null),
-          status: ov && ov.status != null ? ov.status : sub.status,
-        });
-      }).sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+  var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+  var idFilter = 'in.(' + RENTAL_INQUIRY_FORM_IDS.join(',') + ')';
+  return Promise.all([
+    fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=' + idFilter + '&select=id,title,fields', { headers: hdrs }).then(function(r) { return r.json(); }),
+    fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?form_id=' + idFilter + '&select=*&order=created_at.desc&limit=200', { headers: hdrs }).then(function(r) { return r.json(); }),
+  ]).then(function(res) {
+    var forms = Array.isArray(res[0]) ? res[0] : [];
+    var formById = {};
+    forms.forEach(function(f) { formById[f.id] = f; });
+    var rows = Array.isArray(res[1]) ? res[1] : [];
+    return rows.map(function(r) {
+      var form = formById[r.form_id];
+      return {
+        id: r.id, form_id: r.form_id, form_name: form ? form.title : 'Inquiry', fields: form ? (form.fields || []) : [],
+        created_at: r.created_at, status: r.status, internal_notes: r.internal_notes, answers: r.answers || {},
+      };
     });
   }).catch(function() { return []; });
 }
@@ -15664,7 +15679,7 @@ function VenueRentalsView({ navigate }) {
   }, []);
 
   function getTrack(uid) {
-    return tracking[uid] || { pictures_done: false, blog_done: false, socials_done: false, photographer_link: '', photo_album_link: '', total_cost: null };
+    return tracking[uid] || { pictures_done: false, blog_done: false, socials_done: false, photographer_link: '', photo_album_link: '', total_cost: null, contract_signed: false, deposit_paid: false, final_payment_received: false };
   }
 
   function saveTrack(uid, title, date, patch) {
@@ -15686,7 +15701,7 @@ function VenueRentalsView({ navigate }) {
       fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking', {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-        body: JSON.stringify({ event_uid: uid, event_title: title, event_date: dateStr, pictures_done: merged.pictures_done, blog_done: merged.blog_done, socials_done: merged.socials_done, photographer_link: merged.photographer_link || null, photo_album_link: merged.photo_album_link || null, total_cost: merged.total_cost != null ? merged.total_cost : null })
+        body: JSON.stringify({ event_uid: uid, event_title: title, event_date: dateStr, pictures_done: merged.pictures_done, blog_done: merged.blog_done, socials_done: merged.socials_done, photographer_link: merged.photographer_link || null, photo_album_link: merged.photo_album_link || null, total_cost: merged.total_cost != null ? merged.total_cost : null, contract_signed: merged.contract_signed, deposit_paid: merged.deposit_paid, final_payment_received: merged.final_payment_received })
       }).then(function(r) { return r.json(); }).then(function(rows) {
         if (Array.isArray(rows) && rows[0]) setTracking(function(prev) { return Object.assign({}, prev, { [uid]: rows[0] }); });
         setSavingUid(null);
@@ -15749,22 +15764,19 @@ function VenueRentalsView({ navigate }) {
   var past = visible.filter(function(w) { return w.date < now; });
   var upcoming = visible.filter(function(w) { return w.date >= now; });
 
-  // Needs-attention items, all tied back to a real event date (or an
-  // inquiry's received date). Judgment call: only past events get flagged
-  // for missing after-event follow-through (pictures/blog/socials/etc.) —
-  // upcoming events aren't nagged about those yet since they haven't
-  // happened. Inquiries sitting unhandled for 3+ days also show up here,
-  // reusing the same "handled" status WixFormsView already uses.
+  // Needs-attention is strictly the paperwork/money side of a booked
+  // wedding -- contract signed, deposit paid, final payment received --
+  // not after-event follow-through (that's tracked separately below, in
+  // the Event Details checklist, and isn't urgent the way unpaid money is).
+  // Only upcoming weddings are flagged: a past one still missing final
+  // payment is a collections problem, not a "needs attention today" one.
   var attentionItems = [];
-  past.forEach(function(w) {
+  upcoming.forEach(function(w) {
     var t = getTrack(w.uid);
     var missing = [];
-    if (!t.pictures_done) missing.push('pictures');
-    if (!t.blog_done) missing.push('blog post');
-    if (!t.socials_done) missing.push('socials');
-    if (!t.photographer_link) missing.push('photographer IG');
-    if (!t.photo_album_link) missing.push('photo album link');
-    if (t.total_cost == null) missing.push('total cost');
+    if (!t.contract_signed) missing.push('contract');
+    if (!t.deposit_paid) missing.push('deposit');
+    if (!t.final_payment_received) missing.push('final payment');
     if (missing.length) {
       attentionItems.push({
         key: 'wed_' + w.uid,
@@ -15775,19 +15787,6 @@ function VenueRentalsView({ navigate }) {
       });
     }
   });
-  if (Array.isArray(inquiries)) {
-    var THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
-    inquiries.filter(function(s) { return s.status !== 'handled' && (now - new Date(s.created_at)) > THREE_DAYS; }).forEach(function(s) {
-      var days = Math.floor((now - new Date(s.created_at)) / (24 * 60 * 60 * 1000));
-      attentionItems.push({
-        key: 'inq_' + s.id,
-        label: s.form_name || 'Inquiry',
-        detail: 'Unhandled for ' + days + ' day' + (days !== 1 ? 's' : ''),
-        date: new Date(s.created_at),
-        onClick: function() { navigate('venue-inquiries'); },
-      });
-    });
-  }
   attentionItems.sort(function(a, b) { return a.date - b.date; });
 
   function WeddingCard(w) {
@@ -15882,13 +15881,25 @@ function VenueRentalsView({ navigate }) {
               )}
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 2 }}>
-            <Checkbox checked={!!t.pictures_done} label="Pictures" color="#7c3aed"
-              onChange={function() { saveTrack(w.uid, w.title, w.date, { pictures_done: !t.pictures_done }); }} />
-            <Checkbox checked={!!t.blog_done} label="Blog" color={gold}
-              onChange={function() { saveTrack(w.uid, w.title, w.date, { blog_done: !t.blog_done }); }} />
-            <Checkbox checked={!!t.socials_done} label="Socials" color="#e91e8c"
-              onChange={function() { saveTrack(w.uid, w.title, w.date, { socials_done: !t.socials_done }); }} />
+          <div style={{ display: 'flex', gap: 20, paddingTop: 2 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#bbb', textTransform: 'uppercase', letterSpacing: 0.6 }}>Paperwork</div>
+              <Checkbox checked={!!t.contract_signed} label="Contract" color="#3a5068"
+                onChange={function() { saveTrack(w.uid, w.title, w.date, { contract_signed: !t.contract_signed }); }} />
+              <Checkbox checked={!!t.deposit_paid} label="Deposit" color="#2e7d32"
+                onChange={function() { saveTrack(w.uid, w.title, w.date, { deposit_paid: !t.deposit_paid }); }} />
+              <Checkbox checked={!!t.final_payment_received} label="Final Payment" color="#2e7d32"
+                onChange={function() { saveTrack(w.uid, w.title, w.date, { final_payment_received: !t.final_payment_received }); }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#bbb', textTransform: 'uppercase', letterSpacing: 0.6 }}>After Event</div>
+              <Checkbox checked={!!t.pictures_done} label="Pictures" color="#7c3aed"
+                onChange={function() { saveTrack(w.uid, w.title, w.date, { pictures_done: !t.pictures_done }); }} />
+              <Checkbox checked={!!t.blog_done} label="Blog" color={gold}
+                onChange={function() { saveTrack(w.uid, w.title, w.date, { blog_done: !t.blog_done }); }} />
+              <Checkbox checked={!!t.socials_done} label="Socials" color="#e91e8c"
+                onChange={function() { saveTrack(w.uid, w.title, w.date, { socials_done: !t.socials_done }); }} />
+            </div>
           </div>
         </div>
       </div>
@@ -15916,15 +15927,15 @@ function VenueRentalsView({ navigate }) {
           empty="No messages logged yet" />
         <VenueDashCard title="Recent Inquiries" onClick={function() { navigate('venue-inquiries'); }}
           count={inquiries === null ? null : inquiries.length}
-          lines={inquiries === null ? [] : inquiries.slice(0, 3).map(function(s) { var f = s.fields || {}; return [f['First Name'], f['Last Name']].filter(Boolean).join(' ') || f['Email'] || s.form_name; })}
-          empty="No inquiry-form submissions found — double-check VENUE_INQUIRY_FORM_KEYWORDS matches the real Wix form name" />
+          lines={inquiries === null ? [] : inquiries.slice(0, 3).map(function(s) { var p = inquiryPreviewFields(s); return (p.name || p.email || 'Unknown') + ' — ' + s.form_name; })}
+          empty="No inquiry-form submissions found yet" />
         <VenueDashCard title="Wedding Inquiry Form" onClick={function() { setShowWeddingInquiries(function(v) { return !v; }); }}
           count={weddingInquiryForm ? ((weddingInquiryForm.nsh_form_responses && weddingInquiryForm.nsh_form_responses[0] && weddingInquiryForm.nsh_form_responses[0].count) || 0) : null}
           lines={showWeddingInquiries ? ['Click to hide responses below ↓'] : ['Click to view responses below ↓']}
           empty="Wedding Inquiry form not found" />
         <VenueDashCard title="Booked Tours" onClick={function() { navigate('estate-tours'); }}
           count={tours === null ? null : tours.length}
-          lines={tours === null ? [] : tours.slice(0, 3).map(function(t) { return (t.visitor_name || '(no name)') + (t.status === 'requested' ? ' — pending' : t.date ? ' — ' + t.date : ''); })}
+          lines={[]}
           empty="No tours booked or requested yet" />
         <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#888', marginBottom: 8 }}>Needs Attention {attentionItems.length > 0 && ('(' + attentionItems.length + ')')}</div>
@@ -15977,7 +15988,7 @@ function VenueRentalsView({ navigate }) {
       {!loading && !calError && (
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 2 }}>Event Details</div>
-          <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>After-event survey: pictures, blog, socials, cost, and photographer/album links for each wedding.</div>
+          <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>Paperwork (contract, deposit, final payment) and after-event follow-up (pictures, blog, socials, cost, photographer/album links) for each wedding.</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             {upcoming.length > 0 && (
               <div>
@@ -16122,10 +16133,11 @@ function VenueMessagesView({ navigate }) {
   );
 }
 
-// Reuses the same Wix-forms data source as WixFormsView, filtered to forms
-// that look like venue/rental leads (see VENUE_INQUIRY_FORM_KEYWORDS). This
-// is a best-effort guess, not a confirmed dedicated "inquiry" form — flag
-// to Haley if the real intake form has a different name.
+// The venue's real rental/event lead forms -- Wedding Inquiry, Event
+// Inquiry Form (weddings/private/memorial/non-profit/public via its own
+// dropdown), and Pre Booking Information Form (see RENTAL_INQUIRY_FORM_IDS
+// / fetchVenueInquiries). Handled/notes live directly on nsh_form_responses,
+// same as SuFormResponses -- no separate override table needed here.
 function VenueInquiriesView({ navigate }) {
   const [rows, setRows] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -16137,23 +16149,19 @@ function VenueInquiriesView({ navigate }) {
   useEffect(function() { load(); }, []);
   useEffect(function() { setNotesDraft(selected ? (selected.internal_notes || '') : ''); }, [selected]);
 
-  function upsertOverride(sub, patch) {
-    return fetch(SUPABASE_URL + '/rest/v1/data_wix_forms', {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
-      body: JSON.stringify(Object.assign({
-        id: sub.id, form_id: sub.form_id, form_name: (sub.form_name || '').trim(),
-        status: sub.status || '', created_at: sub.created_at, fields: sub.fields,
-        internal_notes: sub.internal_notes || null,
-      }, patch))
+  function patchResponse(sub, patch) {
+    return fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?id=eq.' + sub.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(patch)
     });
   }
 
   function toggleHandled(sub) {
     if (handlingId === sub.id) return;
     setHandlingId(sub.id);
-    var newStatus = sub.status === 'handled' ? '' : 'handled';
-    upsertOverride(sub, { status: newStatus }).then(function(r) {
+    var newStatus = sub.status === 'handled' ? null : 'handled';
+    patchResponse(sub, { status: newStatus }).then(function(r) {
       if (r.ok) {
         setRows(function(prev) { return prev.map(function(s) { return s.id === sub.id ? Object.assign({}, s, { status: newStatus }) : s; }); });
         setSelected(function(prev) { return prev && prev.id === sub.id ? Object.assign({}, prev, { status: newStatus }) : prev; });
@@ -16165,7 +16173,7 @@ function VenueInquiriesView({ navigate }) {
     if (!selected) return;
     setNotesSaving(true);
     var noteValue = notesDraft.trim() || null;
-    upsertOverride(selected, { internal_notes: noteValue }).then(function(r) {
+    patchResponse(selected, { internal_notes: noteValue }).then(function(r) {
       if (r.ok) {
         setSelected(function(prev) { return prev ? Object.assign({}, prev, { internal_notes: noteValue }) : prev; });
         setRows(function(prev) { return prev.map(function(s) { return s.id === selected.id ? Object.assign({}, s, { internal_notes: noteValue }) : s; }); });
@@ -16179,23 +16187,20 @@ function VenueInquiriesView({ navigate }) {
     <div>
       <button onClick={function() { navigate('venue'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Venue Rentals</button>
       <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Recent Inquiries</div>
-      <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>Wix form submissions whose form name matches a venue/rental keyword — check off once handled.</div>
+      <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>Wedding Inquiry, Event Inquiry, and Pre Booking form submissions — check off once handled.</div>
 
       {rows === null ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
       ) : rows.length === 0 ? (
         <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>
-          No matching submissions found. If there's a dedicated venue/rental inquiry form on the website, its name may not contain one of: {VENUE_INQUIRY_FORM_KEYWORDS.join(', ')} — worth confirming the exact form name.
+          No submissions yet.
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           <div style={{ flex: 1, minWidth: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
             {rows.map(function(sub, i) {
-              var fields = sub.fields || {};
-              var first = fields['First Name'] || '';
-              var last = fields['Last Name'] || '';
-              var email = fields['Email'] || fields['Email Address'] || '';
-              var preview = [first, last].filter(Boolean).join(' ') || email || (Object.values(fields).filter(Boolean)[0]) || '';
+              var p = inquiryPreviewFields(sub);
+              var preview = p.name || p.email || 'Unknown';
               var isHandled = sub.status === 'handled';
               return (
                 <div key={sub.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: i < rows.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
@@ -16208,7 +16213,7 @@ function VenueInquiriesView({ navigate }) {
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 10, color: gold, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>{sub.form_name}</div>
                         {preview && <div style={{ fontSize: 13, color: isHandled ? '#aaa' : '#2a2a2a' }}>{preview}</div>}
-                        {email && email !== preview && <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{email}</div>}
+                        {p.email && p.email !== preview && <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{p.email}</div>}
                       </div>
                       <div style={{ fontSize: 11, color: '#bbb', flexShrink: 0, whiteSpace: 'nowrap' }}>{fmtTs(sub.created_at)}</div>
                     </div>
@@ -16236,15 +16241,19 @@ function VenueInquiriesView({ navigate }) {
                   </button>
                 </div>
               </div>
-              {Object.keys(selected.fields || {}).length > 0 && (
+              {(selected.fields || []).length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {Object.entries(selected.fields).map(function(entry) {
-                    return (
-                      <div key={entry[0]}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>{entry[0]}</div>
-                        <div style={{ fontSize: 13, color: '#2a2a2a', whiteSpace: 'pre-wrap' }}>{entry[1]}</div>
-                      </div>
-                    );
+                  {suGroupFieldsBySection(selected.fields).map(function(g, gi) {
+                    return g.fields.map(function(q) {
+                      return suAnswerEntries(q, selected.answers ? selected.answers[q.id] : undefined).map(function(en, ei) {
+                        return (
+                          <div key={q.id + '_' + ei}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>{en.label}</div>
+                            <div style={{ fontSize: 13, color: '#2a2a2a', whiteSpace: 'pre-wrap' }}>{Array.isArray(en.value) ? en.value.join(', ') : String(en.value)}</div>
+                          </div>
+                        );
+                      });
+                    });
                   })}
                 </div>
               )}
