@@ -260,6 +260,22 @@ function parseIcalDate(val) {
   return new Date(y + "-" + mo + "-" + d + "T" + h + ":" + mi + ":" + s + (val.endsWith("Z") ? "Z" : ""));
 }
 
+// Which calendar day (at the venue, Pacific time) an ICS DTSTART value falls
+// on, as "YYYY-MM-DD" -- used to match a wedding inquiry's requested date
+// against what's already on the calendar. All-day values (8 digits, no
+// time/Z) have no timezone to convert since they're already a bare date;
+// timed values are real UTC instants that need converting to the venue's
+// local day, since a booking's wall-clock time is what a couple means by
+// "that date."
+function icalDateKey(val) {
+  if (!val) return null;
+  var raw = val.replace(/[^0-9TZ]/g, "");
+  if (raw.length === 8) return raw.slice(0,4) + "-" + raw.slice(4,6) + "-" + raw.slice(6,8);
+  var d = parseIcalDate(val);
+  if (!d || isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+
 // Shared by the Venue Rentals dashboard and its Messages/Inquiries sub-pages
 // so every part of that feature agrees on which calendar entries count as
 // weddings/rentals.
@@ -12900,6 +12916,7 @@ function SuFormResponses({ form }) {
   var [composeBody, setComposeBody] = useState('');
   var [sendingFollowUpId, setSendingFollowUpId] = useState(null);
   var [sentFollowUp, setSentFollowUp] = useState({});
+  var [calendarEvents, setCalendarEvents] = useState(null); // null = not loaded yet; only fetched for the Wedding Inquiry form
   useEffect(function() {
     if (!form) { setLoading(false); return; }
     fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?form_id=eq.' + form.id + '&select=*&order=created_at.desc', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
@@ -12911,6 +12928,16 @@ function SuFormResponses({ form }) {
         setNotesDraft(drafts);
         setLoading(false);
       }).catch(function() { setLoading(false); });
+  }, [form && form.id]);
+
+  // Requested wedding dates are checked against the same Google Calendar
+  // cache the Calendar view reads (see fetchCalendarEvents / add_calendar_
+  // events_cache.sql) -- it already carries real bookings, soft holds, and
+  // rehearsals, so no separate "availability" table is needed.
+  useEffect(function() {
+    if (form && form.id === WEDDING_INQUIRY_FORM_ID) {
+      fetchCalendarEvents().then(function(events) { setCalendarEvents(events); }).catch(function() { setCalendarEvents([]); });
+    }
   }, [form && form.id]);
 
   function toggleHandled(r) {
@@ -13218,6 +13245,19 @@ function SuFormResponses({ form }) {
                   )}
                 </div>
               )}
+              {form.id === WEDDING_INQUIRY_FORM_ID && r.answers && r.answers.w_date && (function() {
+                var dateStr = r.answers.w_date;
+                var dispDate;
+                try { dispDate = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); } catch (e) { dispDate = dateStr; }
+                if (calendarEvents === null) {
+                  return <div style={{ fontSize: 12, color: '#bbb', marginBottom: 10 }}>📅 {dispDate} — checking availability…</div>;
+                }
+                var conflicts = calendarEvents.filter(function(e) { return icalDateKey(e.DTSTART || e['DTSTART;VALUE=DATE']) === dateStr; });
+                if (!conflicts.length) {
+                  return <div style={{ fontSize: 12, fontWeight: 600, color: '#2e7d32', background: '#eef7ee', border: '1px solid #bfe0bf', borderRadius: 7, padding: '6px 10px', marginBottom: 10, display: 'inline-block' }}>📅 {dispDate} — ✓ Available</div>;
+                }
+                return <div style={{ fontSize: 12, fontWeight: 600, color: '#a15c00', background: '#fdf3e3', border: '1px solid #f0d9a8', borderRadius: 7, padding: '6px 10px', marginBottom: 10 }}>📅 {dispDate} — ⚠ Already on the calendar: {conflicts.map(function(c) { return c.SUMMARY || 'Untitled'; }).join(', ')}</div>;
+              })()}
               {groups.map(function(g, gi) {
                 if (!g.section) {
                   var q = g.fields[0];
