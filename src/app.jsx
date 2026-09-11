@@ -12892,6 +12892,14 @@ function SuFormResponses({ form }) {
   var [deletingId, setDeletingId] = useState(null);
   var [notesDraft, setNotesDraft] = useState({});
   var [savingNotesId, setSavingNotesId] = useState(null);
+  var [copiedPromptId, setCopiedPromptId] = useState(null);
+  var [composingId, setComposingId] = useState(null);
+  var [composeStep, setComposeStep] = useState('paste'); // 'paste' | 'edit'
+  var [composePaste, setComposePaste] = useState('');
+  var [composeSubject, setComposeSubject] = useState('');
+  var [composeBody, setComposeBody] = useState('');
+  var [sendingFollowUpId, setSendingFollowUpId] = useState(null);
+  var [sentFollowUp, setSentFollowUp] = useState({});
   useEffect(function() {
     if (!form) { setLoading(false); return; }
     fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?form_id=eq.' + form.id + '&select=*&order=created_at.desc', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
@@ -13017,6 +13025,107 @@ function SuFormResponses({ form }) {
     }).catch(function() { clearNotifying(); alert('Failed to send notification.'); });
   }
 
+  // Wedding Inquiry follow-up: they saw the site, could've booked a tour on
+  // the spot but didn't, and we want to follow up referencing their actual
+  // message. Rather than write the email copy ourselves, this hands off a
+  // ready-made prompt (with their real details filled in) to paste into
+  // whatever AI tool staff already use, then pastes the result back in to
+  // send through the branded template -- staff still writes/approves the
+  // actual words, this just avoids re-typing their name/date/guest count/
+  // message into the AI tool by hand each time.
+  var TOUR_BOOKING_URL = 'https://thenorthstarhouse.org/weddings';
+
+  function buildInquiryFollowUpPrompt(r) {
+    var a = r.answers || {};
+    return 'Write a warm, friendly follow-up email from North Star House (a historic house venue) to someone who submitted our website\'s wedding inquiry form.\n\n' +
+      'Their details:\n' +
+      'Name: ' + (a.w_name || 'Unknown') + '\n' +
+      'Preferred date: ' + (a.w_date || 'Not given') + '\n' +
+      'Guest count: ' + (a.w_guests || 'Not given') + '\n' +
+      'Their message: "' + (a.w_message || '(no message left)') + '"\n\n' +
+      'Context: they found us through our website and, right there on the same page, had the option to book a property tour on the spot -- but they didn\'t complete that step, for whatever reason. We\'re following up warmly, referencing what they actually wrote in their message (not just a generic template), letting them know we\'d still love to have them, and gently inviting them to check our tour availability and schedule a visit whenever works for them. Keep it warm, personal, concise, and not pushy -- no hard sell.\n\n' +
+      'Output format: first line "Subject: <subject line>", then a blank line, then just the email body (no greeting/sign-off needed -- those get added automatically). Plain text only, no markdown.';
+  }
+
+  function copyFollowUpPrompt(r) {
+    var text = buildInquiryFollowUpPrompt(r);
+    function done() { setCopiedPromptId(r.id); setTimeout(function() { setCopiedPromptId(null); }, 2000); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function() { window.prompt('Copy this prompt:', text); });
+    } else {
+      window.prompt('Copy this prompt:', text);
+    }
+  }
+
+  function startCompose(r) {
+    if (composingId === r.id) { setComposingId(null); return; }
+    setComposingId(r.id);
+    setComposeStep('paste');
+    setComposePaste('');
+    var a = r.answers || {};
+    setComposeSubject('Following up, ' + (a.w_name || 'there') + '!');
+    setComposeBody('');
+  }
+
+  function parseFollowUpPaste() {
+    var text = composePaste;
+    var lines = text.split('\n');
+    var subjectLine = lines.find(function(l) { return /^subject:\s*/i.test(l.trim()); });
+    if (subjectLine) {
+      setComposeSubject(subjectLine.replace(/^\s*subject:\s*/i, '').trim());
+      setComposeBody(lines.filter(function(l) { return l !== subjectLine; }).join('\n').trim());
+    } else {
+      setComposeBody(text.trim());
+    }
+    setComposeStep('edit');
+  }
+
+  function buildFollowUpEmail(r) {
+    function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    var a = r.answers || {};
+    var firstName = (a.w_name || '').split(' ')[0] || 'there';
+    var bodyHtml = esc(composeBody).replace(/\n/g, '<br>');
+    var html = buildBoardNotificationEmailHtml({
+      headline: 'Happy to Hear From You, ' + esc(firstName) + '!',
+      subtext: bodyHtml,
+      buttons: [
+        { text: 'View Calendar Availability', url: CALENDAR_PUBLIC_URL },
+        { text: 'Schedule a Tour', url: TOUR_BOOKING_URL },
+      ],
+      footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
+    });
+    var text = composeBody + '\n\nView our calendar availability: ' + CALENDAR_PUBLIC_URL + '\nSchedule a tour: ' + TOUR_BOOKING_URL;
+    return { html: html, text: text, subject: composeSubject, to: a.w_email };
+  }
+
+  function previewFollowUp(r) {
+    var email = buildFollowUpEmail(r);
+    var w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Email Preview — ' + email.subject + '</title></head><body style="margin:0">' + email.html + '</body></html>');
+    w.document.close();
+  }
+
+  function sendFollowUp(r) {
+    var email = buildFollowUpEmail(r);
+    if (!email.to) { alert('No email address on file for this inquiry.'); return; }
+    if (sendingFollowUpId) return;
+    setSendingFollowUpId(r.id);
+    fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: email.to, bcc: [ADMIN_NOTIFY_BCC], subject: email.subject, body: email.text, html: email.html, sender: 'North Star House' })
+    }).then(function(res) {
+      setSendingFollowUpId(null);
+      if (res.ok) {
+        setSentFollowUp(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
+        setComposingId(null);
+      } else {
+        alert('Failed to send follow-up email.');
+      }
+    }).catch(function() { setSendingFollowUpId(null); alert('Failed to send follow-up email.'); });
+  }
+
   if (!form) return null;
   if (loading) return <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>;
 
@@ -13054,12 +13163,61 @@ function SuFormResponses({ form }) {
                       </button>
                     </React.Fragment>
                   )}
+                  {form.id === WEDDING_INQUIRY_FORM_ID && (
+                    <React.Fragment>
+                      <button onClick={function() { copyFollowUpPrompt(r); }} title="Copy an AI prompt for a follow-up email, pre-filled with this person's details"
+                        style={{ background: copiedPromptId === r.id ? '#eef7ee' : '#fff', color: copiedPromptId === r.id ? '#2e7d32' : '#888', border: '1px solid ' + (copiedPromptId === r.id ? '#bfe0bf' : '#e0d8cc'), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                        {copiedPromptId === r.id ? '✓ Copied' : '✂️ Copy Prompt'}
+                      </button>
+                      <button onClick={function() { startCompose(r); }} disabled={sentFollowUp[r.id]}
+                        style={{ background: sentFollowUp[r.id] ? '#eef7ee' : (composingId === r.id ? '#f5f0ea' : '#fff'), color: sentFollowUp[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (sentFollowUp[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: sentFollowUp[r.id] ? 'default' : 'pointer' }}>
+                        {sentFollowUp[r.id] ? '✓ Follow-up sent' : (composingId === r.id ? 'Close' : '✉️ Follow Up')}
+                      </button>
+                    </React.Fragment>
+                  )}
                   <button onClick={function() { deleteResponse(r); }} disabled={deletingId === r.id}
                     style={{ background: '#fff', color: '#c0392b', border: '1px solid #f0d5d0', borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: deletingId === r.id ? 'default' : 'pointer', opacity: deletingId === r.id ? 0.6 : 1 }}>
                     {deletingId === r.id ? 'Deleting…' : 'Delete'}
                   </button>
                 </div>
               </div>
+
+              {form.id === WEDDING_INQUIRY_FORM_ID && composingId === r.id && (
+                <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 14, marginBottom: 10 }}>
+                  {composeStep === 'paste' ? (
+                    <div>
+                      <div style={{ fontSize: 11, color: '#999', marginBottom: 8 }}>
+                        Paste your AI tool's output here (it should start with "Subject: ..." if you used the copied prompt).
+                      </div>
+                      <textarea value={composePaste} onChange={function(e) { setComposePaste(e.target.value); }} rows={6}
+                        style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 8 }}
+                        placeholder="Subject: ...&#10;&#10;Hi ..." />
+                      <button onClick={parseFollowUpPaste} disabled={!composePaste.trim()}
+                        style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 11, fontWeight: 600, cursor: composePaste.trim() ? 'pointer' : 'not-allowed', opacity: composePaste.trim() ? 1 : 0.5 }}>
+                        Parse
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', marginBottom: 4 }}>Subject</label>
+                      <input value={composeSubject} onChange={function(e) { setComposeSubject(e.target.value); }}
+                        style={{ width: '100%', padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, boxSizing: 'border-box', marginBottom: 10 }} />
+                      <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', marginBottom: 4 }}>Body</label>
+                      <textarea value={composeBody} onChange={function(e) { setComposeBody(e.target.value); }} rows={7}
+                        style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 6 }} />
+                      <div style={{ fontSize: 10, color: '#bbb', marginBottom: 10 }}>"View Calendar Availability" and "Schedule a Tour" buttons are added automatically below this.</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={function() { setComposeStep('paste'); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 11, fontWeight: 600, color: '#666', cursor: 'pointer' }}>← Back</button>
+                        <button onClick={function() { previewFollowUp(r); }} style={{ background: '#fff', color: '#888', border: '1px solid #e0d8cc', borderRadius: 7, padding: '6px 14px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Preview</button>
+                        <button onClick={function() { sendFollowUp(r); }} disabled={sendingFollowUpId === r.id || !composeBody.trim()}
+                          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: (sendingFollowUpId === r.id || !composeBody.trim()) ? 0.6 : 1 }}>
+                          {sendingFollowUpId === r.id ? 'Sending…' : 'Send'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {groups.map(function(g, gi) {
                 if (!g.section) {
                   var q = g.fields[0];
@@ -17848,6 +18006,10 @@ function buildBoardNotificationEmailHtml(opts) {
   var subtext = opts.subtext;
   var buttonText = opts.buttonText;
   var buttonUrl = opts.buttonUrl;
+  // Optional: more than one CTA button (e.g. "View Calendar" + "Schedule a
+  // Tour"). Falls back to the single buttonText/buttonUrl pair above when
+  // omitted, so every existing caller is unaffected.
+  var buttons = opts.buttons || (buttonUrl ? [{ text: buttonText, url: buttonUrl }] : []);
   var note = opts.note || '';
   var footerLinks = opts.footerLinks || [
     { label: 'Portal', url: PORTAL_URL },
@@ -17866,7 +18028,7 @@ function buildBoardNotificationEmailHtml(opts) {
           '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">' + headline + '</h1>' +
           '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>' +
           '<p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;">' + subtext + '</p>' +
-          (buttonUrl ? '<a href="' + buttonUrl + '" style="display:inline-block;background:' + gold + ';color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:16px;padding:16px 32px;border-radius:6px;margin-bottom:8px;">' + buttonText + '</a>' : '') +
+          buttons.map(function(b) { return '<a href="' + b.url + '" style="display:inline-block;background:' + gold + ';color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:15px;padding:14px 26px;border-radius:6px;margin:0 6px 8px;">' + b.text + '</a>'; }).join('') +
           (note ? '<p style="margin:20px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>' + note + '</i></p>' : '') +
         '</div>' +
         '<table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #e5ddcf;">' +
