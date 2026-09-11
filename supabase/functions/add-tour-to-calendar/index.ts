@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          summary: `Estate Tour — ${tour.visitor_name || "Visitor"}`,
+          summary: `Estate Tour with ${tour.visitor_name || "a Visitor"}`,
           description: contactLines || undefined,
           start: { dateTime: startDateTime, timeZone: TIME_ZONE },
           end: { dateTime: endDateTime, timeZone: TIME_ZONE },
