@@ -293,12 +293,14 @@ function fetchWeddings() {
 
 // The public site's "Wedding Inquiry" form (nsh_forms) -- also the form
 // whose answers get carried onto estate_tours.inquiry_answers when a
-// visitor's tour request originates from it. Shown inline on Venue Rentals.
-// Declared here (rather than down by DOCENT_TOUR_FORM_ID, where it used to
-// live) because RENTAL_INQUIRY_FORM_IDS below needs its value immediately --
-// with `var`, referencing a not-yet-assigned later declaration silently
-// evaluates to undefined instead of throwing, which had been baking a bad
-// "undefined" UUID into every Recent Inquiries query.
+// visitor's tour request originates from it, and the only one of the three
+// RENTAL_INQUIRY_FORM_IDS with its own AI follow-up tool on the Inquiries
+// page (VenueInquiriesView). Declared here (rather than down by
+// DOCENT_TOUR_FORM_ID, where it used to live) because RENTAL_INQUIRY_FORM_IDS
+// below needs its value immediately -- with `var`, referencing a
+// not-yet-assigned later declaration silently evaluates to undefined instead
+// of throwing, which had been baking a bad "undefined" UUID into every
+// Inquiries query.
 var WEDDING_INQUIRY_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
 // The real rental/event-booking lead forms (nsh_forms), replacing the old
 // best-effort Wix-form-name keyword guess. Event Inquiry Form covers
@@ -15664,8 +15666,6 @@ function VenueRentalsView({ navigate }) {
   const [messages, setMessages] = useS(null); // null while loading, [] once loaded
   const [inquiries, setInquiries] = useS(null);
   const [tours, setTours] = useS(null); // booked/requested estate_tours rows
-  const [weddingInquiryForm, setWeddingInquiryForm] = useS(null);
-  const [showWeddingInquiries, setShowWeddingInquiries] = useS(false);
   const [scheduleOpen, setScheduleOpen] = useS(false);
   const debounceTimers = useR({});
 
@@ -15697,10 +15697,6 @@ function VenueRentalsView({ navigate }) {
     fetchVenueInquiries().then(function(rows) { setInquiries(rows); });
 
     loadTours();
-
-    fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=eq.' + WEDDING_INQUIRY_FORM_ID + '&select=*,nsh_form_responses(count)', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) { setWeddingInquiryForm(Array.isArray(rows) && rows[0] ? rows[0] : null); }).catch(function() { setWeddingInquiryForm(null); });
   }, []);
 
   function getTrack(uid) {
@@ -15950,14 +15946,10 @@ function VenueRentalsView({ navigate }) {
           count={messages === null ? null : messages.length}
           lines={messages === null ? [] : messages.slice(0, 3).map(function(m) { return (m.from_name || m.from_email || 'Unknown') + (m.subject ? ' — ' + m.subject : ''); })}
           empty="No messages logged yet" />
-        <VenueDashCard title="Recent Inquiries" onClick={function() { navigate('venue-inquiries'); }}
+        <VenueDashCard title="Inquiries" onClick={function() { navigate('venue-inquiries'); }}
           count={inquiries === null ? null : inquiries.length}
           lines={inquiries === null ? [] : inquiries.slice(0, 3).map(function(s) { var p = inquiryPreviewFields(s); return (p.name || p.email || 'Unknown') + ' — ' + s.form_name; })}
           empty="No inquiry-form submissions found yet" />
-        <VenueDashCard title="Wedding Inquiry Form" onClick={function() { setShowWeddingInquiries(function(v) { return !v; }); }}
-          count={weddingInquiryForm ? ((weddingInquiryForm.nsh_form_responses && weddingInquiryForm.nsh_form_responses[0] && weddingInquiryForm.nsh_form_responses[0].count) || 0) : null}
-          lines={showWeddingInquiries ? ['Click to hide responses below ↓'] : ['Click to view responses below ↓']}
-          empty="Wedding Inquiry form not found" />
         <VenueDashCard title="Booked Tours" onClick={function() { navigate('estate-tours'); }}
           count={tours === null ? null : tours.length}
           lines={[]}
@@ -15981,11 +15973,6 @@ function VenueRentalsView({ navigate }) {
         </div>
       </div>
 
-      {showWeddingInquiries && weddingInquiryForm && (
-        <div style={{ marginBottom: 22 }}>
-          <SuFormResponses form={weddingInquiryForm} />
-        </div>
-      )}
 
       {!loading && !calError && (function() {
         var SECURITY_DEPOSIT = 800;
@@ -16360,7 +16347,7 @@ function VenueInquiriesView({ navigate }) {
   return (
     <div>
       <button onClick={function() { navigate('venue'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Venue Rentals</button>
-      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Recent Inquiries</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Inquiries</div>
       <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>Wedding Inquiry, Event Inquiry, and Pre Booking form submissions — check off once handled.</div>
 
       {rows === null ? (
