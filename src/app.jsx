@@ -13227,8 +13227,11 @@ function SuFormResponses({ form }) {
                           : <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>}
                       </button>
                       <button onClick={function() { startCompose(r); }} disabled={sentFollowUp[r.id]}
-                        style={{ background: sentFollowUp[r.id] ? '#eef7ee' : (composingId === r.id ? '#f5f0ea' : '#fff'), color: sentFollowUp[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (sentFollowUp[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: sentFollowUp[r.id] ? 'default' : 'pointer' }}>
-                        {sentFollowUp[r.id] ? '✓ Follow-up sent' : (composingId === r.id ? 'Close' : '✉️ Follow Up')}
+                        title={sentFollowUp[r.id] ? 'Follow-up sent' : (composingId === r.id ? 'Close' : 'Follow up')}
+                        style={{ background: sentFollowUp[r.id] ? '#eef7ee' : (composingId === r.id ? '#f5f0ea' : '#fff'), color: sentFollowUp[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (sentFollowUp[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '6px 9px', cursor: sentFollowUp[r.id] ? 'default' : 'pointer', display: 'flex', alignItems: 'center' }}>
+                        {sentFollowUp[r.id]
+                          ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          : <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 7L2 7"/></svg>}
                       </button>
                     </React.Fragment>
                   )}
@@ -16422,8 +16425,11 @@ function VenueInquiriesView({ navigate }) {
                       : <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>}
                   </button>
                   <button onClick={function() { startCompose(selected); }} disabled={sentFollowUp[selected.id]}
-                    style={{ background: sentFollowUp[selected.id] ? '#eef7ee' : (composingId === selected.id ? '#f5f0ea' : '#fff'), color: sentFollowUp[selected.id] ? '#2e7d32' : gold, border: '1px solid ' + (sentFollowUp[selected.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: sentFollowUp[selected.id] ? 'default' : 'pointer' }}>
-                    {sentFollowUp[selected.id] ? '✓ Follow-up sent' : (composingId === selected.id ? 'Close' : '✉️ Follow Up')}
+                    title={sentFollowUp[selected.id] ? 'Follow-up sent' : (composingId === selected.id ? 'Close' : 'Follow up')}
+                    style={{ background: sentFollowUp[selected.id] ? '#eef7ee' : (composingId === selected.id ? '#f5f0ea' : '#fff'), color: sentFollowUp[selected.id] ? '#2e7d32' : gold, border: '1px solid ' + (sentFollowUp[selected.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '6px 9px', cursor: sentFollowUp[selected.id] ? 'default' : 'pointer', display: 'flex', alignItems: 'center' }}>
+                    {sentFollowUp[selected.id]
+                      ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      : <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 7L2 7"/></svg>}
                   </button>
                 </div>
               )}
