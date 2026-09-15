@@ -16191,6 +16191,10 @@ function VenueInquiriesView({ navigate }) {
     return tours.find(function(t) { return (t.visitor_email || '').trim().toLowerCase() === email; }) || null;
   }
   function fmtTourWhen(t) {
+    if (t.status === 'requested') {
+      var prefs = (t.requested_slots || []).map(function(s) { return s.date + (s.time_label ? ' (' + s.time_label + ')' : ''); });
+      return prefs.length ? 'Preferred: ' + prefs.join('  ·  ') : 'No preferred dates given';
+    }
     var d;
     try { d = new Date(t.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (e) { d = t.date; }
     return t.start_time ? d + ' at ' + t.start_time : d;
