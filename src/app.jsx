@@ -16187,9 +16187,13 @@ function VenueInquiriesView({ navigate }) {
     if (!email) return null;
     return tours.find(function(t) { return (t.visitor_email || '').trim().toLowerCase() === email; }) || null;
   }
+  function fmtPreferredDate(dateStr) {
+    try { return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); }
+    catch (e) { return dateStr; }
+  }
   function fmtTourWhen(t) {
     if (t.status === 'requested') {
-      var prefs = (t.requested_slots || []).map(function(s) { return s.date + (s.time_label ? ' (' + s.time_label + ')' : ''); });
+      var prefs = (t.requested_slots || []).map(function(s) { return fmtPreferredDate(s.date) + (s.time_label ? ' (' + s.time_label + ')' : ''); });
       return prefs.length ? 'Preferred: ' + prefs.join('  ·  ') : 'No preferred dates given';
     }
     var d;
@@ -16635,6 +16639,10 @@ function EstateToursView() {
 
   function fmtDate(d) { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
   function fmtTime(t) { return t ? new Date('2000-01-01T' + t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''; }
+  // Full weekday/month/year for a visitor's *preferred* (not yet confirmed)
+  // tour dates specifically -- confirmed/booked tour dates keep the terser
+  // fmtDate above.
+  function fmtPreferredDate(d) { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); }
 
   const todayKey = new Date().toISOString().slice(0, 10);
   const all = rows || [];
@@ -16692,7 +16700,7 @@ function EstateToursView() {
     const when = tour.date ? (fmtDate(tour.date) + ' at ' + fmtTime(tour.start_time)) : 'a date to be confirmed';
     const subject = 'Estate tour — ' + (tour.visitor_name || 'a visitor') + (tour.date ? ' — ' + when : '');
     const contact = [tour.visitor_name, tour.visitor_email, tour.visitor_phone].filter(Boolean).join(' · ');
-    const prefLines = (tour.requested_slots || []).map(function(s) { return '  - ' + s.date + (s.time_label ? ' (' + s.time_label + ')' : ''); }).join('\n');
+    const prefLines = (tour.requested_slots || []).map(function(s) { return '  - ' + fmtPreferredDate(s.date) + (s.time_label ? ' (' + s.time_label + ')' : ''); }).join('\n');
     const body = 'Hi,\n\nCan you lead a tour for ' + (tour.visitor_name || 'a visitor') + '?\n\n'
       + 'Contact: ' + contact + '\n'
       + (tour.date ? 'When: ' + when + '\n' : 'Preferred dates (not yet confirmed):\n' + prefLines + '\n')
@@ -16748,7 +16756,7 @@ function EstateToursView() {
                   <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{t.visitor_email}{t.visitor_phone ? ' · ' + t.visitor_phone : ''}</div>
                   {isRequested ? (
                     <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                      Preferred: {(t.requested_slots || []).map(function(s) { return s.date + (s.time_label ? ' (' + s.time_label + ')' : ''); }).join('  ·  ')}
+                      Preferred: {(t.requested_slots || []).map(function(s) { return fmtPreferredDate(s.date) + (s.time_label ? ' (' + s.time_label + ')' : ''); }).join('  ·  ')}
                     </div>
                   ) : (
                     <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{fmtDate(t.date)} at {fmtTime(t.start_time)} · {t.guide_name}</div>
