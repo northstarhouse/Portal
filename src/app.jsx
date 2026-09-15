@@ -13079,13 +13079,26 @@ function SuFormResponses({ form }) {
 
   function buildInquiryFollowUpPrompt(r) {
     var a = r.answers || {};
+    var dateStr = a.w_date;
+    var availability = 'Not given';
+    if (dateStr) {
+      if (calendarEvents === null) {
+        availability = 'Unknown (venue calendar still loading)';
+      } else {
+        var conflicts = calendarEvents.filter(function(e) { return icalDateKey(e.DTSTART || e['DTSTART;VALUE=DATE']) === dateStr; });
+        availability = conflicts.length
+          ? 'Already booked -- conflicts with: ' + conflicts.map(function(c) { return c.SUMMARY || 'Untitled'; }).join(', ')
+          : 'Available';
+      }
+    }
     return 'Write a warm, friendly follow-up email from North Star House (a historic house venue) to someone who submitted our website\'s wedding inquiry form.\n\n' +
       'Their details:\n' +
       'Name: ' + (a.w_name || 'Unknown') + '\n' +
       'Preferred date: ' + (a.w_date || 'Not given') + '\n' +
+      'Date availability: ' + availability + '\n' +
       'Guest count: ' + (a.w_guests || 'Not given') + '\n' +
       'Their message: "' + (a.w_message || '(no message left)') + '"\n\n' +
-      'Context: they found us through our website and, right there on the same page, had the option to book a property tour on the spot -- but they didn\'t complete that step, for whatever reason. We\'re following up warmly, referencing what they actually wrote in their message (not just a generic template), letting them know we\'d still love to have them, and gently inviting them to check our tour availability and schedule a visit whenever works for them. Keep it warm, personal, concise, and not pushy -- no hard sell.\n\n' +
+      'Context: they found us through our website and, right there on the same page, had the option to book a property tour on the spot -- but they didn\'t complete that step, for whatever reason. We\'re following up warmly, referencing what they actually wrote in their message (not just a generic template), letting them know we\'d still love to have them, and gently inviting them to check our tour availability and schedule a visit whenever works for them. Keep it warm, personal, concise, and not pushy -- no hard sell. If their preferred date is already booked, do not imply it\'s open -- warmly note we\'ll help them find a date that works instead.\n\n' +
       'Output format: first line "Subject: <subject line>", then a blank line, then just the email body (no greeting/sign-off needed -- those get added automatically). Plain text only, no markdown.';
   }
 
@@ -13207,9 +13220,11 @@ function SuFormResponses({ form }) {
                   )}
                   {form.id === WEDDING_INQUIRY_FORM_ID && (
                     <React.Fragment>
-                      <button onClick={function() { copyFollowUpPrompt(r); }} title="Copy an AI prompt for a follow-up email, pre-filled with this person's details"
-                        style={{ background: copiedPromptId === r.id ? '#eef7ee' : '#fff', color: copiedPromptId === r.id ? '#2e7d32' : '#888', border: '1px solid ' + (copiedPromptId === r.id ? '#bfe0bf' : '#e0d8cc'), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                        {copiedPromptId === r.id ? '✓ Copied' : '✂️ Copy Prompt'}
+                      <button onClick={function() { copyFollowUpPrompt(r); }} title={copiedPromptId === r.id ? 'Copied!' : "Copy an AI prompt for a follow-up email, pre-filled with this person's details"}
+                        style={{ background: copiedPromptId === r.id ? '#eef7ee' : '#fff', color: copiedPromptId === r.id ? '#2e7d32' : '#888', border: '1px solid ' + (copiedPromptId === r.id ? '#bfe0bf' : '#e0d8cc'), borderRadius: 7, padding: '6px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                        {copiedPromptId === r.id
+                          ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          : <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>}
                       </button>
                       <button onClick={function() { startCompose(r); }} disabled={sentFollowUp[r.id]}
                         style={{ background: sentFollowUp[r.id] ? '#eef7ee' : (composingId === r.id ? '#f5f0ea' : '#fff'), color: sentFollowUp[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (sentFollowUp[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: sentFollowUp[r.id] ? 'default' : 'pointer' }}>
@@ -16145,9 +16160,154 @@ function VenueInquiriesView({ navigate }) {
   const [notesSaving, setNotesSaving] = useState(false);
   const [handlingId, setHandlingId] = useState(null);
 
+  // AI-assisted follow-up (Wedding Inquiry only) -- ported from the old
+  // SuFormResponses browser, which this view replaced for day-to-day use but
+  // never inherited this feature.
+  const [composingId, setComposingId] = useState(null);
+  const [composeStep, setComposeStep] = useState('paste');
+  const [composePaste, setComposePaste] = useState('');
+  const [composeSubject, setComposeSubject] = useState('');
+  const [composeBody, setComposeBody] = useState('');
+  const [copiedPromptId, setCopiedPromptId] = useState(null);
+  const [sentFollowUp, setSentFollowUp] = useState({});
+  const [sendingFollowUpId, setSendingFollowUpId] = useState(null);
+  const [calendarEvents, setCalendarEvents] = useState(null);
+  // booked/requested estate_tours rows, matched to inquiries by email so
+  // staff can see at a glance whether someone who submitted an inquiry form
+  // has already booked (or requested) a property tour.
+  const [tours, setTours] = useState(null);
+
   function load() { fetchVenueInquiries().then(function(r) { setRows(r); }); }
   useEffect(function() { load(); }, []);
-  useEffect(function() { setNotesDraft(selected ? (selected.internal_notes || '') : ''); }, [selected]);
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&status=in.(booked,requested)&order=date.asc.nullslast&limit=200', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setTours(Array.isArray(rows) ? rows : []); }).catch(function() { setTours([]); });
+  }, []);
+  function matchedTour(sub) {
+    if (!tours || !tours.length) return null;
+    var email = (inquiryPreviewFields(sub).email || '').trim().toLowerCase();
+    if (!email) return null;
+    return tours.find(function(t) { return (t.visitor_email || '').trim().toLowerCase() === email; }) || null;
+  }
+  function fmtTourWhen(t) {
+    var d;
+    try { d = new Date(t.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (e) { d = t.date; }
+    return t.start_time ? d + ' at ' + t.start_time : d;
+  }
+  useEffect(function() {
+    setNotesDraft(selected ? (selected.internal_notes || '') : '');
+    setComposingId(null);
+  }, [selected]);
+  useEffect(function() {
+    if (selected && selected.form_id === WEDDING_INQUIRY_FORM_ID && calendarEvents === null) {
+      fetchCalendarEvents().then(function(events) { setCalendarEvents(events); }).catch(function() { setCalendarEvents([]); });
+    }
+  }, [selected && selected.form_id]);
+
+  function buildInquiryFollowUpPrompt(r) {
+    var a = r.answers || {};
+    var dateStr = a.w_date;
+    var availability = 'Not given';
+    if (dateStr) {
+      if (calendarEvents === null) {
+        availability = 'Unknown (venue calendar still loading)';
+      } else {
+        var conflicts = calendarEvents.filter(function(e) { return icalDateKey(e.DTSTART || e['DTSTART;VALUE=DATE']) === dateStr; });
+        availability = conflicts.length
+          ? 'Already booked -- conflicts with: ' + conflicts.map(function(c) { return c.SUMMARY || 'Untitled'; }).join(', ')
+          : 'Available';
+      }
+    }
+    return 'Write a warm, friendly follow-up email from North Star House (a historic house venue) to someone who submitted our website\'s wedding inquiry form.\n\n' +
+      'Their details:\n' +
+      'Name: ' + (a.w_name || 'Unknown') + '\n' +
+      'Preferred date: ' + (a.w_date || 'Not given') + '\n' +
+      'Date availability: ' + availability + '\n' +
+      'Guest count: ' + (a.w_guests || 'Not given') + '\n' +
+      'Their message: "' + (a.w_message || '(no message left)') + '"\n\n' +
+      'Context: they found us through our website and, right there on the same page, had the option to book a property tour on the spot -- but they didn\'t complete that step, for whatever reason. We\'re following up warmly, referencing what they actually wrote in their message (not just a generic template), letting them know we\'d still love to have them, and gently inviting them to check our tour availability and schedule a visit whenever works for them. Keep it warm, personal, concise, and not pushy -- no hard sell. If their preferred date is already booked, do not imply it\'s open -- warmly note we\'ll help them find a date that works instead.\n\n' +
+      'Output format: first line "Subject: <subject line>", then a blank line, then just the email body (no greeting/sign-off needed -- those get added automatically). Plain text only, no markdown.';
+  }
+
+  function copyFollowUpPrompt(r) {
+    var text = buildInquiryFollowUpPrompt(r);
+    function done() { setCopiedPromptId(r.id); setTimeout(function() { setCopiedPromptId(null); }, 2000); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function() { window.prompt('Copy this prompt:', text); });
+    } else {
+      window.prompt('Copy this prompt:', text);
+    }
+  }
+
+  function startCompose(r) {
+    if (composingId === r.id) { setComposingId(null); return; }
+    setComposingId(r.id);
+    setComposeStep('paste');
+    setComposePaste('');
+    var a = r.answers || {};
+    setComposeSubject('Following up, ' + (a.w_name || 'there') + '!');
+    setComposeBody('');
+  }
+
+  function parseFollowUpPaste() {
+    var text = composePaste;
+    var lines = text.split('\n');
+    var subjectLine = lines.find(function(l) { return /^subject:\s*/i.test(l.trim()); });
+    if (subjectLine) {
+      setComposeSubject(subjectLine.replace(/^\s*subject:\s*/i, '').trim());
+      setComposeBody(lines.filter(function(l) { return l !== subjectLine; }).join('\n').trim());
+    } else {
+      setComposeBody(text.trim());
+    }
+    setComposeStep('edit');
+  }
+
+  function buildFollowUpEmail(r) {
+    function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    var a = r.answers || {};
+    var firstName = (a.w_name || '').split(' ')[0] || 'there';
+    var bodyHtml = esc(composeBody).replace(/\n/g, '<br>');
+    var html = buildBoardNotificationEmailHtml({
+      headline: 'Happy to Hear From You, ' + esc(firstName) + '!',
+      subtext: bodyHtml,
+      buttons: [
+        { text: 'View Calendar Availability', url: CALENDAR_PUBLIC_URL },
+        { text: 'Schedule a Tour', url: TOUR_BOOKING_URL },
+      ],
+      footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
+    });
+    var text = composeBody + '\n\nView our calendar availability: ' + CALENDAR_PUBLIC_URL + '\nSchedule a tour: ' + TOUR_BOOKING_URL;
+    return { html: html, text: text, subject: composeSubject, to: a.w_email };
+  }
+
+  function previewFollowUp(r) {
+    var email = buildFollowUpEmail(r);
+    var w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Email Preview — ' + email.subject + '</title></head><body style="margin:0">' + email.html + '</body></html>');
+    w.document.close();
+  }
+
+  function sendFollowUp(r) {
+    var email = buildFollowUpEmail(r);
+    if (!email.to) { alert('No email address on file for this inquiry.'); return; }
+    if (sendingFollowUpId) return;
+    setSendingFollowUpId(r.id);
+    fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: email.to, bcc: [ADMIN_NOTIFY_BCC], subject: email.subject, body: email.text, html: email.html, sender: 'North Star House' })
+    }).then(function(res) {
+      setSendingFollowUpId(null);
+      if (res.ok) {
+        setSentFollowUp(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
+        setComposingId(null);
+      } else {
+        alert('Failed to send follow-up email.');
+      }
+    }).catch(function() { setSendingFollowUpId(null); alert('Failed to send follow-up email.'); });
+  }
 
   function patchResponse(sub, patch) {
     return fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?id=eq.' + sub.id, {
@@ -16202,6 +16362,7 @@ function VenueInquiriesView({ navigate }) {
               var p = inquiryPreviewFields(sub);
               var preview = p.name || p.email || 'Unknown';
               var isHandled = sub.status === 'handled';
+              var tour = matchedTour(sub);
               return (
                 <div key={sub.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: i < rows.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
                   <input type="checkbox" title="Mark as handled" checked={isHandled} disabled={handlingId === sub.id}
@@ -16211,7 +16372,15 @@ function VenueInquiriesView({ navigate }) {
                     style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 10, color: gold, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>{sub.form_name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <div style={{ fontSize: 10, color: gold, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{sub.form_name}</div>
+                          {tour && (
+                            <div title={(tour.status === 'booked' ? 'Tour booked: ' : 'Tour requested: ') + fmtTourWhen(tour)}
+                              style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '1px 6px', borderRadius: 5, color: tour.status === 'booked' ? '#2e7d32' : '#a15c00', background: tour.status === 'booked' ? '#eafaf0' : '#fdf3e3' }}>
+                              {tour.status === 'booked' ? 'Tour booked' : 'Tour requested'}
+                            </div>
+                          )}
+                        </div>
                         {preview && <div style={{ fontSize: 13, color: isHandled ? '#aaa' : '#2a2a2a' }}>{preview}</div>}
                         {p.email && p.email !== preview && <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{p.email}</div>}
                       </div>
@@ -16224,13 +16393,85 @@ function VenueInquiriesView({ navigate }) {
           </div>
           {selected && (
             <div style={{ width: 320, flexShrink: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gold, marginBottom: 3 }}>{selected.form_name}</div>
+                  <div style={{ fontSize: 11, color: '#aaa' }}>{fmtTs(selected.created_at)}</div>
+                </div>
                 <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 16 }}>✕</button>
               </div>
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gold, marginBottom: 3 }}>{selected.form_name}</div>
-                <div style={{ fontSize: 11, color: '#aaa' }}>{fmtTs(selected.created_at)}</div>
-              </div>
+              {matchedTour(selected) && (function() {
+                var tour = matchedTour(selected);
+                var booked = tour.status === 'booked';
+                return (
+                  <div style={{ fontSize: 12, fontWeight: 600, color: booked ? '#2e7d32' : '#a15c00', background: booked ? '#eafaf0' : '#fdf3e3', border: '1px solid ' + (booked ? '#bfe0bf' : '#f0d9a8'), borderRadius: 7, padding: '6px 10px', marginBottom: 12 }}>
+                    🗓 {booked ? 'Tour booked' : 'Tour requested'} — {fmtTourWhen(tour)}
+                  </div>
+                );
+              })()}
+              {selected.form_id === WEDDING_INQUIRY_FORM_ID && (
+                <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                  <button onClick={function() { copyFollowUpPrompt(selected); }} title={copiedPromptId === selected.id ? 'Copied!' : "Copy an AI prompt for a follow-up email, pre-filled with this person's details"}
+                    style={{ background: copiedPromptId === selected.id ? '#eef7ee' : '#fff', color: copiedPromptId === selected.id ? '#2e7d32' : '#888', border: '1px solid ' + (copiedPromptId === selected.id ? '#bfe0bf' : '#e0d8cc'), borderRadius: 7, padding: '6px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                    {copiedPromptId === selected.id
+                      ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      : <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>}
+                  </button>
+                  <button onClick={function() { startCompose(selected); }} disabled={sentFollowUp[selected.id]}
+                    style={{ background: sentFollowUp[selected.id] ? '#eef7ee' : (composingId === selected.id ? '#f5f0ea' : '#fff'), color: sentFollowUp[selected.id] ? '#2e7d32' : gold, border: '1px solid ' + (sentFollowUp[selected.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: sentFollowUp[selected.id] ? 'default' : 'pointer' }}>
+                    {sentFollowUp[selected.id] ? '✓ Follow-up sent' : (composingId === selected.id ? 'Close' : '✉️ Follow Up')}
+                  </button>
+                </div>
+              )}
+              {selected.form_id === WEDDING_INQUIRY_FORM_ID && composingId === selected.id && (
+                <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 14, marginBottom: 12 }}>
+                  {composeStep === 'paste' ? (
+                    <div>
+                      <div style={{ fontSize: 11, color: '#999', marginBottom: 8 }}>
+                        Paste your AI tool's output here (it should start with "Subject: ..." if you used the copied prompt).
+                      </div>
+                      <textarea value={composePaste} onChange={function(e) { setComposePaste(e.target.value); }} rows={6}
+                        style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 8 }}
+                        placeholder="Subject: ...&#10;&#10;Hi ..." />
+                      <button onClick={parseFollowUpPaste} disabled={!composePaste.trim()}
+                        style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 11, fontWeight: 600, cursor: composePaste.trim() ? 'pointer' : 'not-allowed', opacity: composePaste.trim() ? 1 : 0.5 }}>
+                        Parse
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', marginBottom: 4 }}>Subject</label>
+                      <input value={composeSubject} onChange={function(e) { setComposeSubject(e.target.value); }}
+                        style={{ width: '100%', padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, boxSizing: 'border-box', marginBottom: 10 }} />
+                      <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 0.8, display: 'block', marginBottom: 4 }}>Body</label>
+                      <textarea value={composeBody} onChange={function(e) { setComposeBody(e.target.value); }} rows={7}
+                        style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', marginBottom: 6 }} />
+                      <div style={{ fontSize: 10, color: '#bbb', marginBottom: 10 }}>"View Calendar Availability" and "Schedule a Tour" buttons are added automatically below this.</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={function() { setComposeStep('paste'); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 11, fontWeight: 600, color: '#666', cursor: 'pointer' }}>← Back</button>
+                        <button onClick={function() { previewFollowUp(selected); }} style={{ background: '#fff', color: '#888', border: '1px solid #e0d8cc', borderRadius: 7, padding: '6px 14px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Preview</button>
+                        <button onClick={function() { sendFollowUp(selected); }} disabled={sendingFollowUpId === selected.id || !composeBody.trim()}
+                          style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: (sendingFollowUpId === selected.id || !composeBody.trim()) ? 0.6 : 1 }}>
+                          {sendingFollowUpId === selected.id ? 'Sending…' : 'Send'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {selected.form_id === WEDDING_INQUIRY_FORM_ID && selected.answers && selected.answers.w_date && (function() {
+                var dateStr = selected.answers.w_date;
+                var dispDate;
+                try { dispDate = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); } catch (e) { dispDate = dateStr; }
+                if (calendarEvents === null) {
+                  return <div style={{ fontSize: 12, color: '#bbb', marginBottom: 12 }}>📅 {dispDate} — checking availability…</div>;
+                }
+                var conflicts = calendarEvents.filter(function(e) { return icalDateKey(e.DTSTART || e['DTSTART;VALUE=DATE']) === dateStr; });
+                if (!conflicts.length) {
+                  return <div style={{ fontSize: 12, fontWeight: 600, color: '#2e7d32', background: '#eef7ee', border: '1px solid #bfe0bf', borderRadius: 7, padding: '6px 10px', marginBottom: 12, display: 'inline-block' }}>📅 {dispDate} — ✓ Available</div>;
+                }
+                return <div style={{ fontSize: 12, fontWeight: 600, color: '#a15c00', background: '#fdf3e3', border: '1px solid #f0d9a8', borderRadius: 7, padding: '6px 10px', marginBottom: 12 }}>📅 {dispDate} — ⚠ Already on the calendar: {conflicts.map(function(c) { return c.SUMMARY || 'Untitled'; }).join(', ')}</div>;
+              })()}
               <div style={{ marginBottom: 16 }}>
                 <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Internal Notes</label>
                 <textarea rows={4} value={notesDraft} onChange={function(e) { setNotesDraft(e.target.value); }} disabled={notesSaving}
