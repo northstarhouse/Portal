@@ -291,6 +291,15 @@ function fetchWeddings() {
   });
 }
 
+// The public site's "Wedding Inquiry" form (nsh_forms) -- also the form
+// whose answers get carried onto estate_tours.inquiry_answers when a
+// visitor's tour request originates from it. Shown inline on Venue Rentals.
+// Declared here (rather than down by DOCENT_TOUR_FORM_ID, where it used to
+// live) because RENTAL_INQUIRY_FORM_IDS below needs its value immediately --
+// with `var`, referencing a not-yet-assigned later declaration silently
+// evaluates to undefined instead of throwing, which had been baking a bad
+// "undefined" UUID into every Recent Inquiries query.
+var WEDDING_INQUIRY_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
 // The real rental/event-booking lead forms (nsh_forms), replacing the old
 // best-effort Wix-form-name keyword guess. Event Inquiry Form covers
 // weddings, private events, memorials, non-profit events, and public
@@ -12909,10 +12918,8 @@ function suAnswerEntries(field, answer) {
 }
 
 var DOCENT_TOUR_FORM_ID = '0635cd26-b0c7-4076-b9b1-bd25d1949467';
-// The public site's "Wedding Inquiry" form (nsh_forms) -- also the form
-// whose answers get carried onto estate_tours.inquiry_answers when a
-// visitor's tour request originates from it. Shown inline on Venue Rentals.
-var WEDDING_INQUIRY_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
+// WEDDING_INQUIRY_FORM_ID now declared up near RENTAL_INQUIRY_FORM_IDS (see
+// comment there).
 
 function SuFormResponses({ form }) {
   var [responses, setResponses] = useState([]);
