@@ -1417,8 +1417,7 @@ function prefillMeta(){
   $(prefix + "_as_of_date").value = rec && rec.as_of_date ? rec.as_of_date : "";
 }
 
-$("adminBtn")
-.addEventListener("click",() => {
+function openAdmin(){
 
   root.querySelectorAll(".view")
     .forEach(x =>
@@ -1441,6 +1440,13 @@ $("adminBtn")
   $(target)
     .classList.add("active");
 
+}
+
+$("adminBtn")
+.addEventListener("click",() => {
+
+  openAdmin();
+
   prefillMeta();
 
   $("periodLabel").textContent =
@@ -1449,6 +1455,33 @@ $("adminBtn")
     : activeReport === "bs"
     ? "Admin · Balance Sheet parser"
     : "Admin · Budget vs Actual parser";
+
+});
+
+// Opens the same Admin parser as the Admin button, but for a brand-new,
+// blank snapshot instead of prefilling whichever period is currently on
+// screen -- clicking Admin directly while viewing a saved period reuses its
+// period key/values, which silently overwrites that period on save unless
+// every field is hand-cleared first.
+$("newTabBtn")
+.addEventListener("click",() => {
+
+  openAdmin();
+
+  const prefix = META_PREFIX[activeReport];
+  $(prefix + "_period_key").value = "";
+  $(prefix + "_tab_label").value = "";
+  $(prefix + "_full_label").value = "";
+  $(prefix + "_as_of_date").value = "";
+
+  clearInputs(panelIdFor(activeReport));
+
+  $("periodLabel").textContent =
+    activeReport === "pl"
+    ? "Admin · New Income & Expense report"
+    : activeReport === "bs"
+    ? "Admin · New Balance Sheet report"
+    : "Admin · New Budget vs Actual report";
 
 });
 
