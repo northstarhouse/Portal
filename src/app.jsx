@@ -12121,14 +12121,6 @@ function IdeasView() {
 
 var ADMIN_FORMS = [
   { label: "Printable Forms", url: "https://drive.google.com/drive/folders/1m7RLU9lwPS_0N-qqwP2aNJaz6fp6UXQt?dmr=1&ec=wgc-drive-%5Bmodule%5D-goto" },
-];
-
-var ADMIN_TOOLS = [
-  {
-    label: "Voicemails",
-    url: "https://docs.google.com/spreadsheets/d/1kqVXngOaf_X1lrB6Nbi5U_3NJ4_P_fGMqxhyqdfuDT0/edit?gid=0#gid=0",
-    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.36 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.11 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 5.61 5.61l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
-  },
   {
     label: "Archives",
     url: "https://northstarhouse.github.io/north-star-archives/",
@@ -12138,6 +12130,14 @@ var ADMIN_TOOLS = [
     label: "Kiosk",
     url: "https://northstarhouse.github.io/northstar-kiosk/",
     icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
+  },
+];
+
+var ADMIN_TOOLS = [
+  {
+    label: "Voicemails",
+    url: "https://docs.google.com/spreadsheets/d/1kqVXngOaf_X1lrB6Nbi5U_3NJ4_P_fGMqxhyqdfuDT0/edit?gid=0#gid=0",
+    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.36 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.11 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 5.61 5.61l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
   },
 ];
 
@@ -13867,7 +13867,6 @@ function AdminView({ navigate }) {
           }).catch(function() {});
         }
         setMailUploadResult({ ok: true, text: 'Uploaded as "' + filename + '".' + (WYN_EMAIL ? ' Wyn notified.' : ' (No email on file for Wyn — notification not sent.)'), url: res.url });
-        logActivity('New mail uploaded: ' + filename, 'mail_uploaded');
       }).catch(function(err) { setUploadingMail(false); setMailUploadResult({ ok: false, text: err.message || 'Upload failed.' }); });
     };
     reader.readAsDataURL(file);
@@ -14041,10 +14040,10 @@ function AdminView({ navigate }) {
           {mailUploadResult.text}{mailUploadResult.ok && mailUploadResult.url && <a href={mailUploadResult.url} target="_blank" rel="noreferrer" style={{ color: gold, marginLeft: 6 }}>View →</a>}
         </div>
       )}
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Forms & Outreach</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Other Applications & Outside Tools</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {ADMIN_FORMS.map(function(form) {
-          return <AdminToolCard key={form.label} tool={form} icon={docIcon} />;
+          return <AdminToolCard key={form.label} tool={form} icon={form.icon || docIcon} />;
         })}
       </div>
     </div>
