@@ -11389,9 +11389,6 @@ function FinancialsView({ navigate }) {
                       </div>
 
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                        {b.status === 'Submitted' && (
-                          <button disabled={isMarking} onClick={function() { updateReimbursementStatus(b.id, 'Pending Review'); }} style={{ fontSize: 11, background: '#f5f0ea', color: '#666', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>Start Review</button>
-                        )}
                         {(b.status === 'Submitted' || b.status === 'Pending Review') && (
                           <>
                             <button disabled={isMarking} onClick={function() { updateReimbursementStatus(b.id, 'Approved', ''); }} style={{ fontSize: 11, background: '#e3f6ec', color: '#15803d', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>Approve</button>
