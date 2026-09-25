@@ -3,14 +3,16 @@
 // folder matches the file's kind:
 //   photo    -> ARCHIVAL_PHOTOS_ROOT_FOLDER_ID   ("Archival Photos")
 //   document -> ARCHIVAL_DOCUMENTS_ROOT_FOLDER_ID ("Archival Documents")
+//   general  -> GENERAL_INFO_ROOT_FOLDER_ID      ("General Information") --
+//               no year/month nesting, just `subfolder` directly (e.g. Event Flyers)
 // Folders are found-or-created by name so repeat uploads into the same
 // year/month land in the same folder instead of creating duplicates.
 //
 // POST body: {
 //   filename: string, mimeType: string, base64: string,
-//   kind: 'photo' | 'document',
-//   year?: number,           // omit entirely for "use today's date"
-//   month?: number,          // 1-12; omit for "year known, month unknown"
+//   kind: 'photo' | 'document' | 'general',
+//   year?: number,           // omit entirely for "use today's date" (ignored for 'general')
+//   month?: number,          // 1-12; omit for "year known, month unknown" (ignored for 'general')
 //   driveDescription?: string, // written into the Drive file's description
 //                               // field so Drive search-by-name/keyword finds it
 // }
@@ -21,6 +23,9 @@ const GOOGLE_SERVICE_ACCOUNT_KEY = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY")!;
 
 const ARCHIVAL_PHOTOS_ROOT_FOLDER_ID = "1sQmw-Gw65-SSp786cZG9-zNFEsz8jb5e";
 const ARCHIVAL_DOCUMENTS_ROOT_FOLDER_ID = "1AGCE-jvZxgytP63lLjvdUYAkB-aOuTMO";
+// "General Information" shared drive -- kind: "general" files land directly
+// in a named subfolder here (no year/month nesting), e.g. .../Event Flyers.
+const GENERAL_INFO_ROOT_FOLDER_ID = "0APwSBOLKgKU2Uk9PVA";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -138,6 +143,13 @@ const RECENT_YEARS_GROUP_NAME = "2024+";
 // A `subfolder` name (e.g. "Announcements") replaces the month folder
 // entirely, nesting under the current year instead: .../2026/Announcements.
 async function resolveArchiveFolder(kind: string, year: number | undefined, month: number | undefined, token: string, subfolder?: string) {
+  // "general" skips year/month nesting entirely -- just the named subfolder
+  // directly under the General Information shared drive.
+  if (kind === "general") {
+    if (!subfolder) return GENERAL_INFO_ROOT_FOLDER_ID;
+    return driveFindOrCreateFolder(subfolder, GENERAL_INFO_ROOT_FOLDER_ID, token);
+  }
+
   const rootId = kind === "document" ? ARCHIVAL_DOCUMENTS_ROOT_FOLDER_ID : ARCHIVAL_PHOTOS_ROOT_FOLDER_ID;
 
   const now = new Date();

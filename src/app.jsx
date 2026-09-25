@@ -1296,12 +1296,16 @@ const typeColors = {
 
     </div>
   );
-}function EventsView({ navigate }) {
+}
+
+var DEFAULT_EVENT_CHECKLIST = ['Flyer designed', 'Posted on social media', 'Newsletter mention', 'Tickets / RSVP page live', 'Reminder sent'].map(function(l) { return { label: l, done: false }; });
+
+function EventsView({ navigate }) {
   var { useState, useEffect, useMemo } = React;
-  // Arriving via the #event-overviews hash (the old standalone Event
-  // Overviews page, now merged in here as a tab) opens straight to PDF
-  // Overview instead of the default Profit & Loss tab.
-  var [tab, setTab] = useState(function() { return window.location.hash.replace(/^#/, '') === 'event-overviews' ? 'pdf' : 'pnl'; });
+  // Event Overviews opens on the card-based Events tab, except when arriving
+  // via the "Save to Event Overviews" flow (event-overviews/plans), which
+  // should land straight on the plan the user just saved.
+  var [tab, setTab] = useState(function() { return window.location.hash.replace(/^#/, '').indexOf('event-overviews/plans') === 0 ? 'plans' : 'overview'; });
   var [loading, setLoading] = useState(true);
   var [budgetRows, setBudgetRows] = useState([]);
   var [earningsRows, setEarningsRows] = useState([]);
@@ -1340,6 +1344,31 @@ const typeColors = {
   var [editingExpenseId, setEditingExpenseId] = useState(null);
   var [editExpenseForm, setEditExpenseForm] = useState(null);
   var [savingExpenseEdit, setSavingExpenseEdit] = useState(false);
+  var [overviewCards, setOverviewCards] = useState(null);
+  var [selectedEvent, setSelectedEvent] = useState(null);
+  var [showNewEvent, setShowNewEvent] = useState(false);
+  var [newEventForm, setNewEventForm] = useState({ name: '', date: todayStr });
+  var [savingNewEvent, setSavingNewEvent] = useState(false);
+  var [uploadingFlyerFor, setUploadingFlyerFor] = useState(null);
+  var [newChecklistItem, setNewChecklistItem] = useState('');
+  var [ticketOrders, setTicketOrders] = useState(null);
+  var flyerInputRef = React.useRef(null);
+
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/event_overview_cards?select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setOverviewCards(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setOverviewCards([]); });
+    // Real website ticket sales -- may not exist yet on installs that haven't
+    // run the ticketing migration, so a failure here just means "no ticket
+    // data to show" rather than a broken page (same handling as WebsitePaymentsView).
+    fetch(SUPABASE_URL + '/rest/v1/ticket_orders?select=event_title,event_slug,event_date,kind,quantity,amount,paypal_fee,net_amount&limit=5000', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); }).then(function(rows) {
+      setTicketOrders(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setTicketOrders([]); });
+  }, []);
 
   useEffect(function() {
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
@@ -1454,6 +1483,179 @@ const typeColors = {
   var totalCosts = groups.reduce(function(s, r) { return s + r.costs; }, 0);
   var eventNameOptions = groups.map(function(g) { return g.event; }).filter(function(n) { return n && n !== 'Uncategorized'; });
   var feedbackSourceOptions = Array.from(new Set(feedback.map(function(f) { return (f.source || '').trim(); }).filter(Boolean))).sort();
+
+  function keyOfName(n) { return (n || '').trim().toLowerCase(); }
+
+  function findCardMeta(name) {
+    if (!overviewCards) return null;
+    var key = keyOfName(name);
+    return overviewCards.find(function(c) { return keyOfName(c.event_name) === key; }) || null;
+  }
+
+  // Upserts (by event_name) into event_overview_cards -- only the columns
+  // passed in `patch` are written, so this doubles as a partial update
+  // (e.g. image-only, or checklist-only) as well as first-time creation.
+  function upsertCardMeta(eventName, patch, cb) {
+    var existing = findCardMeta(eventName);
+    var body = Object.assign({ event_name: existing ? existing.event_name : eventName.trim() }, patch, { updated_at: new Date().toISOString() });
+    fetch(SUPABASE_URL + '/rest/v1/event_overview_cards?on_conflict=event_name', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(body)
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var updated = Array.isArray(rows) ? rows[0] : rows;
+      if (updated && updated.id) {
+        setOverviewCards(function(prev) {
+          var list = prev || [];
+          var idx = list.findIndex(function(c) { return c.id === updated.id; });
+          if (idx === -1) return list.concat([updated]);
+          var next = list.slice(); next[idx] = updated; return next;
+        });
+      }
+      if (cb) cb(updated && updated.id ? updated : null);
+    }).catch(function() { if (cb) cb(null); });
+  }
+
+  function uploadFlyer(eventName, file) {
+    if (!file) return;
+    setUploadingFlyerFor(eventName);
+    var reader = new FileReader();
+    reader.onload = function() {
+      var base64 = reader.result.split(',')[1];
+      var ext = (file.name.match(/\.[a-zA-Z0-9]+$/) || [''])[0];
+      var safeName = eventName.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'Event';
+      var filename = safeName + ' Flyer ' + Date.now() + ext;
+      fetch(SUPABASE_URL + '/functions/v1/upload-archive-file', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: filename,
+          mimeType: file.type || 'application/octet-stream',
+          base64: base64,
+          kind: 'general',
+          subfolder: 'Event Flyers',
+          makePublic: true,
+          driveDescription: 'Flyer for ' + eventName
+        })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        setUploadingFlyerFor(null);
+        if (!data.success) { alert('Upload failed: ' + (data.error || 'unknown error')); return; }
+        upsertCardMeta(eventName, { image_url: data.url, image_drive_file_id: data.fileId, image_drive_folder_url: data.folderUrl });
+      }).catch(function(err) { setUploadingFlyerFor(null); alert('Upload error: ' + err.message); });
+    };
+    reader.onerror = function() { setUploadingFlyerFor(null); alert('Failed to read file.'); };
+    reader.readAsDataURL(file);
+  }
+
+  function toggleChecklistItem(eventName, idx) {
+    var meta = findCardMeta(eventName);
+    var list = (meta && Array.isArray(meta.checklist)) ? meta.checklist.slice() : [];
+    if (!list[idx]) return;
+    list[idx] = Object.assign({}, list[idx], { done: !list[idx].done });
+    upsertCardMeta(eventName, { checklist: list });
+  }
+
+  function addChecklistItem(eventName, label) {
+    if (!label.trim()) return;
+    var meta = findCardMeta(eventName);
+    var list = (meta && Array.isArray(meta.checklist)) ? meta.checklist.slice() : [];
+    list.push({ label: label.trim(), done: false });
+    upsertCardMeta(eventName, { checklist: list });
+    setNewChecklistItem('');
+  }
+
+  function removeChecklistItem(eventName, idx) {
+    var meta = findCardMeta(eventName);
+    var list = (meta && Array.isArray(meta.checklist)) ? meta.checklist.slice() : [];
+    list.splice(idx, 1);
+    upsertCardMeta(eventName, { checklist: list });
+  }
+
+  function createNewEvent(e) {
+    e.preventDefault();
+    if (!newEventForm.name.trim() || savingNewEvent) return;
+    setSavingNewEvent(true);
+    upsertCardMeta(newEventForm.name.trim(), { event_date: newEventForm.date || null, checklist: DEFAULT_EVENT_CHECKLIST }, function(updated) {
+      setSavingNewEvent(false);
+      if (updated) {
+        setShowNewEvent(false);
+        var createdName = updated.event_name;
+        setNewEventForm({ name: '', date: todayStr });
+        setSelectedEvent(createdName);
+      } else {
+        alert('Could not create the event.');
+      }
+    });
+  }
+
+  // Merges three sources, all keyed by free-text event name, so nothing
+  // already tracked anywhere disappears from the card view and a brand-new
+  // event can be created here before any money moves:
+  //  - groups: manually-logged P&L (Op Earnings / Op Budget)
+  //  - ticket_orders: real website ticket/RSVP sales
+  //  - event_overview_cards: flyer image, checklist, an explicit date
+  var eventCards = useMemo(function() {
+    var byKey = {};
+    function ensure(name) {
+      var k = keyOfName(name);
+      if (!byKey[k]) byKey[k] = { name: name, date: null, earnings: 0, costs: 0, net: 0, earningsRows: [], expenseRows: [], image_url: null, checklist: [], ticketQty: 0, ticketRevenue: 0, ticketFees: 0, ticketNet: 0, rsvpQty: 0 };
+      return byKey[k];
+    }
+    groups.forEach(function(g) {
+      if (g.event === 'Uncategorized') return;
+      var b = ensure(g.event);
+      b.date = g.date; b.earnings = g.earnings; b.costs = g.costs; b.net = g.net; b.earningsRows = g.earningsRows; b.expenseRows = g.expenseRows;
+    });
+    (ticketOrders || []).forEach(function(o) {
+      var name = o.event_title || o.event_slug;
+      if (!name) return;
+      var b = ensure(name);
+      b.date = b.date || o.event_date || null;
+      if (o.kind === 'rsvp') {
+        b.rsvpQty += Number(o.quantity || 0);
+      } else {
+        b.ticketQty += Number(o.quantity || 0);
+        b.ticketRevenue += Number(o.amount || 0);
+        b.ticketFees += Number(o.paypal_fee || 0);
+        b.ticketNet += Number(o.net_amount != null ? o.net_amount : (o.amount || 0));
+      }
+    });
+    (overviewCards || []).forEach(function(c) {
+      var b = ensure(c.event_name);
+      b.date = c.event_date || b.date;
+      b.image_url = c.image_url || null;
+      b.checklist = Array.isArray(c.checklist) ? c.checklist : [];
+    });
+    return Object.keys(byKey).map(function(k) { return byKey[k]; });
+  }, [groups, overviewCards, ticketOrders]);
+
+  var todayForBuckets = new Date(); todayForBuckets.setHours(0, 0, 0, 0);
+  var upcomingCards = eventCards.filter(function(c) { return c.date && new Date(c.date + 'T00:00:00') >= todayForBuckets; })
+    .sort(function(a, b) { return new Date(a.date) - new Date(b.date); });
+  var pastCards = eventCards.filter(function(c) { return !c.date || new Date(c.date + 'T00:00:00') < todayForBuckets; })
+    .sort(function(a, b) { if (a.date && b.date) return new Date(b.date) - new Date(a.date); if (a.date) return -1; if (b.date) return 1; return 0; });
+  var selectedEventCard = selectedEvent ? eventCards.find(function(c) { return keyOfName(c.name) === keyOfName(selectedEvent); }) : null;
+
+  function renderEventCard(c) {
+    var dateStr = c.date ? new Date(c.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+    return (
+      <div key={c.name} onClick={function() { setSelectedEvent(c.name); }}
+        style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', transition: 'box-shadow 0.15s, transform 0.15s' }}
+        onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+        onMouseLeave={function(e) { e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.05)'; e.currentTarget.style.transform = 'none'; }}
+      >
+        <div style={{ width: '100%', aspectRatio: '16/10', backgroundColor: '#f0ebe2', backgroundImage: c.image_url ? 'url(' + c.image_url + ')' : 'linear-gradient(135deg,#f0ebe2,#e4d9c6)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
+        <div style={{ padding: '12px 14px' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+          <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{dateStr || 'No date set'}</div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 11 }}>
+            <span style={{ color: '#5a8a5a', fontWeight: 600 }}>{fmt(c.earnings + c.ticketRevenue)}</span>
+            <span style={{ color: '#c07040', fontWeight: 600 }}>-{fmt(c.costs)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   function addEarning(e) {
     e.preventDefault();
@@ -1674,7 +1876,12 @@ const typeColors = {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: '#aaa' }}>Earnings & expenses by event, pulled from the Events operational area</div>
+          <div style={{ fontSize: 11, color: '#aaa' }}>
+            {tab === 'overview' ? 'Click an event for ticket sales, its marketing checklist, and expenses'
+              : tab === 'pnl' ? 'Earnings & expenses by event, pulled from the Events operational area'
+              : tab === 'feedback' ? 'Guest and volunteer feedback by event'
+              : 'Plans built in Planning, saved for reuse'}
+          </div>
         </div>
         {tab === 'pnl' && (
           <button onClick={function() { setShowAddEarning(function(s) { return !s; }); setShowAddExpense(false); }} style={{ fontSize: 12, background: showAddEarning ? '#f5f0ea' : gold, color: showAddEarning ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddEarning ? 'Cancel' : '+ Log Earning'}</button>
@@ -1691,9 +1898,10 @@ const typeColors = {
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '0.5px solid #e8dece' }}>
-        <button onClick={function() { setTab('pnl'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'pnl' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, fontSize: 13, fontWeight: tab === 'pnl' ? 600 : 400, color: tab === 'pnl' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Profit & Loss</button>
+        <button onClick={function() { setTab('overview'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'overview' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, fontSize: 13, fontWeight: tab === 'overview' ? 600 : 400, color: tab === 'overview' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Events</button>
+        <button onClick={function() { setTab('pnl'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'pnl' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, marginLeft: 16, fontSize: 13, fontWeight: tab === 'pnl' ? 600 : 400, color: tab === 'pnl' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Profit & Loss</button>
         <button onClick={function() { setTab('feedback'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'feedback' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, marginLeft: 16, fontSize: 13, fontWeight: tab === 'feedback' ? 600 : 400, color: tab === 'feedback' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Reviews & Feedback{feedback.length > 0 ? ' (' + feedback.length + ')' : ''}</button>
-        <button onClick={function() { setTab('pdf'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'pdf' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, marginLeft: 16, fontSize: 13, fontWeight: tab === 'pdf' ? 600 : 400, color: tab === 'pdf' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>PDF Overview{plans && plans.length > 0 ? ' (' + plans.length + ')' : ''}</button>
+        <button onClick={function() { setTab('plans'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'plans' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, marginLeft: 16, fontSize: 13, fontWeight: tab === 'plans' ? 600 : 400, color: tab === 'plans' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Saved Plans{plans && plans.length > 0 ? ' (' + plans.length + ')' : ''}</button>
       </div>
 
       {tab === 'pnl' && showAddEarning && (
@@ -2044,7 +2252,150 @@ const typeColors = {
         })()
       )}
 
-      {tab === 'pdf' && (
+      {tab === 'overview' && (
+        selectedEventCard ? (function() {
+          var c = selectedEventCard;
+          var dateStr = c.date ? new Date(c.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'No date set';
+          var checklist = c.checklist || [];
+          var doneCount = checklist.filter(function(i) { return i.done; }).length;
+          return (
+            <div>
+              <button onClick={function() { setSelectedEvent(null); }} style={{ background: 'none', border: 'none', color: gold, fontSize: 13, fontWeight: 500, cursor: 'pointer', padding: 0, marginBottom: 16 }}>← All Events</button>
+
+              <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden', marginBottom: 20 }}>
+                <div style={{ width: '100%', height: 220, backgroundColor: '#f0ebe2', backgroundImage: c.image_url ? 'url(' + c.image_url + ')' : 'linear-gradient(135deg,#f0ebe2,#e4d9c6)', backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
+                  <input ref={flyerInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={function(e) { var f = e.target.files[0]; if (f) uploadFlyer(c.name, f); e.target.value = ''; }} />
+                  <button onClick={function() { flyerInputRef.current && flyerInputRef.current.click(); }} disabled={uploadingFlyerFor === c.name}
+                    style={{ position: 'absolute', bottom: 12, right: 12, background: 'rgba(255,255,255,0.92)', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, color: gold, cursor: uploadingFlyerFor === c.name ? 'default' : 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                    {uploadingFlyerFor === c.name ? 'Uploading…' : (c.image_url ? 'Replace Flyer' : '+ Upload Flyer')}
+                  </button>
+                </div>
+                <div style={{ padding: '16px 18px' }}>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a' }}>{c.name}</div>
+                  <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{dateStr}</div>
+                  {c.link && <a href={c.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: gold, textDecoration: 'none' }}>Event details ↗</a>}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+                <StatCard label="Ticket Sales" value={fmt(c.ticketRevenue)} sub={c.ticketQty + ' sold' + (c.rsvpQty > 0 ? ', ' + c.rsvpQty + ' RSVP' : '')} />
+                <StatCard label="Other Earnings" value={fmt(c.earnings)} />
+                <StatCard label="Expenses" value={fmt(c.costs)} />
+                <StatCard label="Net" value={fmt(c.ticketNet + c.net)} />
+              </div>
+
+              <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>Marketing Checklist</div>
+                  <div style={{ fontSize: 11, color: '#999' }}>{doneCount}/{checklist.length} done</div>
+                </div>
+                {checklist.map(function(item, idx) {
+                  return (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                      <input type="checkbox" checked={!!item.done} onChange={function() { toggleChecklistItem(c.name, idx); }} style={{ width: 15, height: 15, accentColor: gold, cursor: 'pointer' }} />
+                      <span style={{ flex: 1, fontSize: 13, color: item.done ? '#aaa' : '#333', textDecoration: item.done ? 'line-through' : 'none' }}>{item.label}</span>
+                      <button onClick={function() { removeChecklistItem(c.name, idx); }} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                    </div>
+                  );
+                })}
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <input value={newChecklistItem} onChange={function(e) { setNewChecklistItem(e.target.value); }} placeholder="Add a checklist item…" style={fieldSt}
+                    onKeyDown={function(e) { if (e.key === 'Enter') { e.preventDefault(); addChecklistItem(c.name, newChecklistItem); } }} />
+                  <button onClick={function() { addChecklistItem(c.name, newChecklistItem); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>Add</button>
+                </div>
+              </div>
+
+              <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>Website Ticket Sales</div>
+                  <a onClick={function() { navigate('website-payments'); }} style={{ fontSize: 11, color: gold, textDecoration: 'underline', cursor: 'pointer' }}>View orders ↗</a>
+                </div>
+                {(c.ticketQty === 0 && c.rsvpQty === 0) ? (
+                  <div style={{ fontSize: 12, color: '#aaa' }}>No website ticket orders for this event yet.</div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 18, fontSize: 12, color: '#555' }}>
+                    <span><b style={{ color: '#2a2a2a' }}>{c.ticketQty}</b> tickets sold</span>
+                    {c.rsvpQty > 0 && <span><b style={{ color: '#2a2a2a' }}>{c.rsvpQty}</b> RSVPs</span>}
+                    <span>Gross <b style={{ color: '#5a8a5a' }}>{fmt(c.ticketRevenue)}</b></span>
+                    <span>Fees <b style={{ color: '#c07040' }}>{fmt(c.ticketFees)}</b></span>
+                    <span>Net <b style={{ color: '#2a2a2a' }}>{fmt(c.ticketNet)}</b></span>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginBottom: 10 }}>Other Earnings</div>
+                {c.earningsRows.length === 0 ? <div style={{ fontSize: 12, color: '#aaa' }}>No earnings logged yet.</div> : c.earningsRows.map(function(e, i) {
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                      <span style={{ color: '#555' }}>{e.earning_source || 'Earning'}{e.notes ? ' — ' + e.notes : ''}</span>
+                      <span style={{ color: '#5a8a5a', fontWeight: 600 }}>{fmt(e.amount)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '16px 18px' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginBottom: 10 }}>Expenses & Reimbursements</div>
+                {c.expenseRows.length === 0 ? <div style={{ fontSize: 12, color: '#aaa' }}>No expenses logged yet.</div> : c.expenseRows.map(function(b, i) {
+                  var who = b.purchased_by || b.volunteer_name;
+                  var reimbLabel = b.needs_reimbursement ? (b.volunteer_auth_user_id ? (b.status || 'Submitted') : 'Pending') : null;
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                      <span style={{ color: '#555' }}>{b.description}{who ? ' — ' + who : ''}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {reimbLabel && <span style={{ fontSize: 10, background: '#fef3c7', color: '#b45309', padding: '2px 7px', borderRadius: 10, fontWeight: 600 }}>{reimbLabel}</span>}
+                        <span style={{ color: '#c07040', fontWeight: 600 }}>{fmt(b.amount)}</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })() : (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+              <button onClick={function() { setShowNewEvent(function(s) { return !s; }); }} style={{ fontSize: 12, background: showNewEvent ? '#f5f0ea' : gold, color: showNewEvent ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showNewEvent ? 'Cancel' : '+ New Event'}</button>
+            </div>
+            {showNewEvent && (
+              <form onSubmit={createNewEvent} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 12 }}>
+                  <div>
+                    <label style={fieldLbl}>Event Name</label>
+                    <input required value={newEventForm.name} onChange={function(e) { setNewEventForm(function(f) { return Object.assign({}, f, { name: e.target.value }); }); }} list="events-hub-event-options" style={fieldSt} placeholder="e.g. Fall Fundraiser" />
+                  </div>
+                  <div>
+                    <label style={fieldLbl}>Date</label>
+                    <input type="date" value={newEventForm.date} onChange={function(e) { setNewEventForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={fieldSt} />
+                  </div>
+                </div>
+                <button type="submit" disabled={savingNewEvent} style={{ fontSize: 12, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 600, opacity: savingNewEvent ? 0.5 : 1 }}>{savingNewEvent ? 'Creating…' : 'Create Event'}</button>
+              </form>
+            )}
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 }}>Upcoming Events</div>
+            {upcomingCards.length === 0 ? (
+              <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '24px 0', marginBottom: 28 }}>No upcoming events yet.</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14, marginBottom: 28 }}>
+                {upcomingCards.map(renderEventCard)}
+              </div>
+            )}
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 }}>Past Events</div>
+            {pastCards.length === 0 ? (
+              <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>No past events yet.</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
+                {pastCards.map(renderEventCard)}
+              </div>
+            )}
+          </div>
+        )
+      )}
+
+      {tab === 'plans' && (
         plans === null ? (
           <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
         ) : plans.length === 0 ? (
@@ -13080,8 +13431,9 @@ function SuFormResponses({ form }) {
   // whatever AI tool staff already use, then pastes the result back in to
   // send through the branded template -- staff still writes/approves the
   // actual words, this just avoids re-typing their name/date/guest count/
-  // message into the AI tool by hand each time.
-  var TOUR_BOOKING_URL = 'https://thenorthstarhouse.org/weddings';
+  // message into the AI tool by hand each time. (TOUR_BOOKING_URL is declared
+  // at module scope, near CALENDAR_PUBLIC_URL, since VenueInquiriesView's
+  // copy of this same follow-up flow needs it too.)
 
   function buildInquiryFollowUpPrompt(r) {
     var a = r.answers || {};
@@ -17980,7 +18332,7 @@ function PlanningView({ navigate }) {
 
       <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
         <button onClick={handleGeneratePdf} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Preview Plan</button>
-        <button onClick={function() { saveAsTemplate(function() { navigate('event-overviews'); }); }} disabled={saving} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save to Event Overviews'}</button>
+        <button onClick={function() { saveAsTemplate(function() { navigate('event-overviews/plans'); }); }} disabled={saving} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save to Event Overviews'}</button>
       </div>
     </div>
   );
@@ -18239,7 +18591,7 @@ const views = {
   'quarter-workspace': QuarterWorkspaceView,
   admin: AdminView,
   planning: PlanningView,
-  'event-overviews': EventsView, // alias -- EventsView opens on its "PDF Overview" tab for this hash, see EventsView's tab initializer
+  'event-overviews': EventsView, // alias -- EventsView always opens on its card-based "Events" tab
   'event-plan': EventPlanLinkView,
   'vol-email-lists': VolEmailListsView,
   'wix-forms': WixFormsView,
@@ -18305,6 +18657,13 @@ var WEBSITE_URL = 'https://thenorthstarhouse.org';
 // redirects anyone not logged into an authorized Google account straight to
 // a sign-in page instead of showing the calendar.
 var CALENDAR_PUBLIC_URL = 'https://calendar.google.com/calendar/embed?src=thenorthstarhouse%40gmail.com';
+// Used by the Wedding Inquiry follow-up composer in both SuFormResponses and
+// VenueInquiriesView -- module scope so both can reach it (it used to be
+// declared with `var` inside SuFormResponses only, which threw
+// "TOUR_BOOKING_URL is not defined" from VenueInquiriesView's copy of the
+// same follow-up code, since a function-scoped `var` in one component isn't
+// visible from another).
+var TOUR_BOOKING_URL = 'https://thenorthstarhouse.org/weddings';
 // Volunteers don't have Portal access, so the Template Email tool's footer
 // swaps Portal for Calendar (board/staff emails keep the default Portal link).
 var TEMPLATE_EMAIL_FOOTER_LINKS = [
@@ -18695,6 +19054,7 @@ function hashToModule() {
   var h = window.location.hash.replace(/^#/, '');
   if (h.indexOf('event-plan/') === 0) return 'event-plan';
   if (h.indexOf('planning/edit/') === 0) return 'planning';
+  if (h.indexOf('event-overviews/') === 0) return 'event-overviews';
   return validModuleIds.indexOf(h) !== -1 ? h : 'home';
 }
 
