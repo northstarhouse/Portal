@@ -1644,7 +1644,7 @@ function EventsView({ navigate }) {
         onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
         onMouseLeave={function(e) { e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.05)'; e.currentTarget.style.transform = 'none'; }}
       >
-        <div style={{ width: '100%', aspectRatio: '16/10', backgroundColor: '#f0ebe2', backgroundImage: c.image_url ? 'url(' + c.image_url + ')' : 'linear-gradient(135deg,#f0ebe2,#e4d9c6)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
+        <div style={{ width: '100%', aspectRatio: '4/3', backgroundColor: '#f0ebe2', backgroundImage: c.image_url ? 'url(' + c.image_url + ')' : 'linear-gradient(135deg,#f0ebe2,#e4d9c6)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
         <div style={{ padding: '12px 14px' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
           <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{dateStr || 'No date set'}</div>
@@ -2262,26 +2262,30 @@ function EventsView({ navigate }) {
             <div>
               <button onClick={function() { setSelectedEvent(null); }} style={{ background: 'none', border: 'none', color: gold, fontSize: 13, fontWeight: 500, cursor: 'pointer', padding: 0, marginBottom: 16 }}>← All Events</button>
 
-              <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden', marginBottom: 20 }}>
-                <div style={{ width: '100%', height: 220, backgroundColor: '#f0ebe2', backgroundImage: c.image_url ? 'url(' + c.image_url + ')' : 'linear-gradient(135deg,#f0ebe2,#e4d9c6)', backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' }}>
+              <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden', marginBottom: 20, display: 'flex', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 240, padding: '18px 20px' }}>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a' }}>{c.name}</div>
+                  <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{dateStr}</div>
+                  {c.link && <a href={c.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: gold, textDecoration: 'none', marginTop: 4, display: 'inline-block' }}>Event details ↗</a>}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
+                    <StatCard label="Ticket Sales" value={fmt(c.ticketRevenue)} sub={c.ticketQty + ' sold' + (c.rsvpQty > 0 ? ', ' + c.rsvpQty + ' RSVP' : '')} />
+                    <StatCard label="Other Earnings" value={fmt(c.earnings)} />
+                    <StatCard label="Expenses" value={fmt(c.costs)} />
+                    <StatCard label="Net" value={fmt(c.ticketNet + c.net)} />
+                  </div>
+                </div>
+                <div style={{ width: 260, flexShrink: 0, background: '#faf8f4', borderLeft: '0.5px solid #e8e0d5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16, gap: 10 }}>
+                  {c.image_url ? (
+                    <img src={c.image_url} alt="Event flyer" style={{ maxWidth: '100%', maxHeight: 360, objectFit: 'contain', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} />
+                  ) : (
+                    <div style={{ width: '100%', height: 200, borderRadius: 8, backgroundImage: 'linear-gradient(135deg,#f0ebe2,#e4d9c6)' }} />
+                  )}
                   <input ref={flyerInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={function(e) { var f = e.target.files[0]; if (f) uploadFlyer(c.name, f); e.target.value = ''; }} />
                   <button onClick={function() { flyerInputRef.current && flyerInputRef.current.click(); }} disabled={uploadingFlyerFor === c.name}
-                    style={{ position: 'absolute', bottom: 12, right: 12, background: 'rgba(255,255,255,0.92)', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, color: gold, cursor: uploadingFlyerFor === c.name ? 'default' : 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                    style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, color: gold, cursor: uploadingFlyerFor === c.name ? 'default' : 'pointer' }}>
                     {uploadingFlyerFor === c.name ? 'Uploading…' : (c.image_url ? 'Replace Flyer' : '+ Upload Flyer')}
                   </button>
                 </div>
-                <div style={{ padding: '16px 18px' }}>
-                  <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a' }}>{c.name}</div>
-                  <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{dateStr}</div>
-                  {c.link && <a href={c.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: gold, textDecoration: 'none' }}>Event details ↗</a>}
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-                <StatCard label="Ticket Sales" value={fmt(c.ticketRevenue)} sub={c.ticketQty + ' sold' + (c.rsvpQty > 0 ? ', ' + c.rsvpQty + ' RSVP' : '')} />
-                <StatCard label="Other Earnings" value={fmt(c.earnings)} />
-                <StatCard label="Expenses" value={fmt(c.costs)} />
-                <StatCard label="Net" value={fmt(c.ticketNet + c.net)} />
               </div>
 
               <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
@@ -13268,6 +13272,10 @@ function suAnswerEntries(field, answer) {
 }
 
 var DOCENT_TOUR_FORM_ID = '0635cd26-b0c7-4076-b9b1-bd25d1949467';
+// "Volunteer Sign Up" -- the public site's Volunteer Interest Form. Its
+// checkboxes field (v_interest) lets someone pick more than one area, so
+// everything below treats "the area" as a list rather than a single value.
+var VOLUNTEER_INTEREST_FORM_ID = '11342c74-d0f0-4cb3-9b9e-57f30b4ae3a7';
 // WEDDING_INQUIRY_FORM_ID now declared up near RENTAL_INQUIRY_FORM_IDS (see
 // comment there).
 
@@ -13276,6 +13284,10 @@ function SuFormResponses({ form }) {
   var [loading, setLoading] = useState(true);
   var [notifying, setNotifying] = useState({});
   var [notified, setNotified] = useState({});
+  var [sendingLead, setSendingLead] = useState({});
+  var [sentLead, setSentLead] = useState({});
+  var [sendingVol, setSendingVol] = useState({});
+  var [sentVol, setSentVol] = useState({});
   var [handlingId, setHandlingId] = useState(null);
   var [deletingId, setDeletingId] = useState(null);
   var [notesDraft, setNotesDraft] = useState({});
@@ -13422,6 +13434,125 @@ function SuFormResponses({ form }) {
         else alert('Failed to send notification.');
       });
     }).catch(function() { clearNotifying(); alert('Failed to send notification.'); });
+  }
+
+  // Volunteer Interest Form ("Volunteer Sign Up"): resolves each checked
+  // area-of-interest option to its Operational Area lead/schedule, so the
+  // response record can show "who owns this" and the two email buttons
+  // below know who to write to.
+  function volunteerAreaEntries(r) {
+    var raw = (r.answers || {}).v_interest;
+    var areas = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+    return areas.map(function(formArea) {
+      var canonicalArea = VOLUNTEER_INTEREST_AREA_MAP.hasOwnProperty(formArea) ? VOLUNTEER_INTEREST_AREA_MAP[formArea] : null;
+      var def = canonicalArea ? AREA_DEFAULTS[canonicalArea] : null;
+      return { formArea: formArea, canonicalArea: canonicalArea, lead: def ? def.lead : '', leadEmail: def ? def.leadEmail : '', schedule: def ? def.schedule : '' };
+    });
+  }
+
+  function buildVolunteerAreaLeadEmail(r) {
+    function esc(s) { return String(s == null || s === '' ? '—' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    var a = r.answers || {};
+    var name = ((a.v_first || '') + ' ' + (a.v_last || '')).trim() || 'Someone';
+    var email = a.v_email || '';
+    var phone = a.v_phone || '';
+    var about = a.v_about || '';
+    var areaEntries = volunteerAreaEntries(r);
+    var areaNames = areaEntries.map(function(e) { return e.formArea; }).join(', ');
+
+    var subtext = '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif">' +
+        '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9;font-family:Helvetica,Arial,sans-serif">' +
+          '<b>Name:</b> ' + esc(name) + '<br/>' +
+          '<b>Email:</b> ' + esc(email) + '<br/>' +
+          '<b>Phone:</b> ' + esc(phone) + '<br/>' +
+          '<b>Area(s) of Interest:</b> ' + esc(areaNames) +
+        '</div>' +
+        (about ? '<div style="text-align:left;background:#f5f0e8;border-radius:8px;padding:14px 16px;margin-top:16px;font-size:14px;line-height:1.6;color:#3a332a;font-family:Helvetica,Arial,sans-serif"><b>About:</b><br/>' + esc(about) + '</div>' : '') +
+      '</div>';
+    var html = buildBoardNotificationEmailHtml({
+      headline: esc(name) + ' is interested in volunteering',
+      subtext: subtext,
+      footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
+    });
+    var text = 'New Volunteer Interest\n\n' +
+      'Name: ' + (name || '—') + '\n' +
+      'Email: ' + (email || '—') + '\n' +
+      'Phone: ' + (phone || '—') + '\n' +
+      'Area(s) of Interest: ' + (areaNames || '—') +
+      (about ? '\nAbout: ' + about : '');
+    return { html: html, text: text, name: name, areaEntries: areaEntries };
+  }
+
+  function sendVolunteerAreaLeadEmail(r) {
+    if (sendingLead[r.id] || sentLead[r.id]) return;
+    var built = buildVolunteerAreaLeadEmail(r);
+    var leadEmails = Array.from(new Set(built.areaEntries.map(function(e) { return e.leadEmail; }).filter(Boolean)));
+    if (!leadEmails.length) { alert('No lead email on file for the selected area(s). Add one in Admin → Operational Budgets.'); return; }
+    setSendingLead(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
+    fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: leadEmails, bcc: [ADMIN_NOTIFY_BCC], subject: 'New Volunteer Interest: ' + built.name, body: built.text, html: built.html })
+    }).then(function(res) {
+      setSendingLead(function(prev) { var n = Object.assign({}, prev); delete n[r.id]; return n; });
+      if (res.ok) setSentLead(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
+      else alert('Failed to send email.');
+    }).catch(function() { setSendingLead(function(prev) { var n = Object.assign({}, prev); delete n[r.id]; return n; }); alert('Failed to send email.'); });
+  }
+
+  function buildVolunteerThankYouEmail(r) {
+    function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    var a = r.answers || {};
+    var firstName = (a.v_first || '').trim() || 'there';
+    var areaEntries = volunteerAreaEntries(r);
+
+    function areaLine(e) {
+      return e.canonicalArea && e.lead
+        ? e.formArea + ' — led by ' + e.lead + (e.schedule ? '. ' + e.schedule : '')
+        : e.formArea + ' — a member of our volunteer team will reach out to find the best fit';
+    }
+
+    var areaBlocksHtml = areaEntries.map(function(e) {
+      return '<div style="margin-bottom:10px"><b>' + esc(e.formArea) + '</b>' +
+        (e.canonicalArea && e.lead
+          ? ' — led by ' + esc(e.lead) + (e.schedule ? '. ' + esc(e.schedule) : '')
+          : ' — a member of our volunteer team will reach out to find the best fit.') +
+        '</div>';
+    }).join('');
+
+    var subtext = '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.7;color:#3a332a">' +
+        '<p>Thank you so much for your interest in volunteering at North Star House! We\'re so glad you reached out.</p>' +
+        '<p>Here\'s who will be in touch:</p>' +
+        areaBlocksHtml +
+        '<p>Thanks again for wanting to be part of our community — we can\'t wait to have you!</p>' +
+      '</div>';
+    var html = buildBoardNotificationEmailHtml({
+      headline: 'Thanks for Your Interest, ' + esc(firstName) + '!',
+      subtext: subtext,
+      footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
+    });
+    var text = 'Thank you so much for your interest in volunteering at North Star House! We\'re so glad you reached out.\n\n' +
+      'Here\'s who will be in touch:\n' +
+      areaEntries.map(areaLine).join('\n') +
+      '\n\nThanks again for wanting to be part of our community — we can\'t wait to have you!';
+    return { html: html, text: text };
+  }
+
+  function sendVolunteerThankYouEmail(r) {
+    if (sendingVol[r.id] || sentVol[r.id]) return;
+    var toEmail = (r.answers || {}).v_email;
+    if (!toEmail) { alert('No email on file for this volunteer.'); return; }
+    var built = buildVolunteerThankYouEmail(r);
+    setSendingVol(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
+    fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: toEmail, bcc: [ADMIN_NOTIFY_BCC], subject: 'Thanks for your interest in volunteering at North Star House!', body: built.text, html: built.html })
+    }).then(function(res) {
+      setSendingVol(function(prev) { var n = Object.assign({}, prev); delete n[r.id]; return n; });
+      if (res.ok) setSentVol(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
+      else alert('Failed to send email.');
+    }).catch(function() { setSendingVol(function(prev) { var n = Object.assign({}, prev); delete n[r.id]; return n; }); alert('Failed to send email.'); });
   }
 
   // Wedding Inquiry follow-up: they saw the site, could've booked a tour on
@@ -13593,6 +13724,20 @@ function SuFormResponses({ form }) {
                       </button>
                     </React.Fragment>
                   )}
+                  {form.id === VOLUNTEER_INTEREST_FORM_ID && (
+                    <React.Fragment>
+                      <button onClick={function() { sendVolunteerAreaLeadEmail(r); }} disabled={sendingLead[r.id] || sentLead[r.id]}
+                        title="Email the lead(s) for the area(s) this person selected"
+                        style={{ background: sentLead[r.id] ? '#eef7ee' : '#fff', color: sentLead[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (sentLead[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: (sendingLead[r.id] || sentLead[r.id]) ? 'default' : 'pointer', opacity: sendingLead[r.id] ? 0.6 : 1 }}>
+                        {sentLead[r.id] ? '✓ Lead emailed' : sendingLead[r.id] ? 'Sending…' : 'Email Area Lead'}
+                      </button>
+                      <button onClick={function() { sendVolunteerThankYouEmail(r); }} disabled={sendingVol[r.id] || sentVol[r.id]}
+                        title="Thank the volunteer and let them know who will be reaching out"
+                        style={{ background: sentVol[r.id] ? '#eef7ee' : '#fff', color: sentVol[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (sentVol[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: (sendingVol[r.id] || sentVol[r.id]) ? 'default' : 'pointer', opacity: sendingVol[r.id] ? 0.6 : 1 }}>
+                        {sentVol[r.id] ? '✓ Volunteer emailed' : sendingVol[r.id] ? 'Sending…' : 'Email Volunteer'}
+                      </button>
+                    </React.Fragment>
+                  )}
                   <button onClick={function() { deleteResponse(r); }} disabled={deletingId === r.id}
                     style={{ background: '#fff', color: '#c0392b', border: '1px solid #f0d5d0', borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: deletingId === r.id ? 'default' : 'pointer', opacity: deletingId === r.id ? 0.6 : 1 }}>
                     {deletingId === r.id ? 'Deleting…' : 'Delete'}
@@ -13648,6 +13793,23 @@ function SuFormResponses({ form }) {
                   return <div style={{ fontSize: 12, fontWeight: 600, color: '#2e7d32', background: '#eef7ee', border: '1px solid #bfe0bf', borderRadius: 7, padding: '6px 10px', marginBottom: 10, display: 'inline-block' }}>📅 {dispDate} — ✓ Available</div>;
                 }
                 return <div style={{ fontSize: 12, fontWeight: 600, color: '#a15c00', background: '#fdf3e3', border: '1px solid #f0d9a8', borderRadius: 7, padding: '6px 10px', marginBottom: 10 }}>📅 {dispDate} — ⚠ Already on the calendar: {conflicts.map(function(c) { return c.SUMMARY || 'Untitled'; }).join(', ')}</div>;
+              })()}
+              {form.id === VOLUNTEER_INTEREST_FORM_ID && (function() {
+                var areaEntries = volunteerAreaEntries(r);
+                if (!areaEntries.length) return null;
+                return (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                    {areaEntries.map(function(e, i) {
+                      return (
+                        <div key={i} style={{ fontSize: 12, background: '#f5f0e8', border: '0.5px solid #e8dece', borderRadius: 8, padding: '6px 10px' }}>
+                          <b style={{ color: '#2a2a2a' }}>{e.formArea}</b>
+                          <span style={{ color: '#999' }}> · Lead: </span>
+                          <span style={{ color: e.lead ? '#2a2a2a' : '#c0392b', fontWeight: 600 }}>{e.lead || 'Unassigned'}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
               })()}
               {groups.map(function(g, gi) {
                 if (!g.section) {
@@ -17250,7 +17412,7 @@ function OperationalBudgetsView({ navigate }) {
       var f = {};
       OPERATIONAL_AREAS.forEach(function(area) {
         var r = byArea[area] || {};
-        f[area] = { lead: r.lead || '', lead_email: r.lead_email || '', budget: r.budget != null ? String(r.budget) : '' };
+        f[area] = { lead: r.lead || '', lead_email: r.lead_email || '', budget: r.budget != null ? String(r.budget) : '', schedule: r.schedule || '' };
       });
       setForms(f);
     }).catch(function() { setRows({}); });
@@ -17268,7 +17430,8 @@ function OperationalBudgetsView({ navigate }) {
       area: area,
       lead: f.lead.trim() || null,
       lead_email: f.lead_email.trim() || null,
-      budget: f.budget.trim() === '' ? null : parseFloat(f.budget)
+      budget: f.budget.trim() === '' ? null : parseFloat(f.budget),
+      schedule: f.schedule.trim() || null
     };
     fetch(SUPABASE_URL + '/rest/v1/operational_area_budgets', {
       method: 'POST',
@@ -17277,10 +17440,11 @@ function OperationalBudgetsView({ navigate }) {
     }).then(function(r) {
       setSavingArea(null);
       if (!r.ok) { r.json().then(function(err) { alert('Failed to save: ' + (err.message || err.hint || r.status)); }).catch(function() { alert('Failed to save.'); }); return; }
-      if (!AREA_DEFAULTS[area]) AREA_DEFAULTS[area] = { lead: '', budget: null, pic: '', leadEmail: '' };
+      if (!AREA_DEFAULTS[area]) AREA_DEFAULTS[area] = { lead: '', budget: null, pic: '', leadEmail: '', schedule: '' };
       AREA_DEFAULTS[area].lead = payload.lead || '';
       AREA_DEFAULTS[area].leadEmail = payload.lead_email || '';
       AREA_DEFAULTS[area].budget = payload.budget;
+      AREA_DEFAULTS[area].schedule = payload.schedule || '';
     }).catch(function() { setSavingArea(null); alert('Failed to save: network error.'); });
   }
 
@@ -17298,11 +17462,11 @@ function OperationalBudgetsView({ navigate }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {OPERATIONAL_AREAS.map(function(area) {
-            var f = forms[area] || { lead: '', lead_email: '', budget: '' };
+            var f = forms[area] || { lead: '', lead_email: '', budget: '', schedule: '' };
             return (
               <div key={area} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px' }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', marginBottom: 10 }}>{area}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px', gap: 10, alignItems: 'end' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px', gap: 10, alignItems: 'end', marginBottom: 10 }}>
                   <div>
                     <label style={lb}>Lead</label>
                     <input value={f.lead} onChange={function(e) { setField(area, 'lead', e.target.value); }} placeholder="Name…" style={inpSt} />
@@ -17316,7 +17480,11 @@ function OperationalBudgetsView({ navigate }) {
                     <input type="number" value={f.budget} onChange={function(e) { setField(area, 'budget', e.target.value); }} placeholder="0" style={inpSt} />
                   </div>
                 </div>
-                <button onClick={function() { handleSave(area); }} disabled={savingArea === area} style={{ marginTop: 10, background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: savingArea === area ? 'default' : 'pointer', opacity: savingArea === area ? 0.6 : 1 }}>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={lb}>Schedule (shown to volunteers, e.g. "Every Tuesday & Thursday, 9am–12pm")</label>
+                  <input value={f.schedule} onChange={function(e) { setField(area, 'schedule', e.target.value); }} placeholder="When this team meets…" style={inpSt} />
+                </div>
+                <button onClick={function() { handleSave(area); }} disabled={savingArea === area} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: savingArea === area ? 'default' : 'pointer', opacity: savingArea === area ? 0.6 : 1 }}>
                   {savingArea === area ? 'Saving…' : 'Save'}
                 </button>
               </div>
@@ -18607,14 +18775,27 @@ const views = {
 
 var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];
 var AREA_DEFAULTS = {
-  'Construction':  { lead: 'Rick Panos',       budget: 12000, pic: 'https://drive.google.com/file/d/1hbFJxUUQEsuhoWnTDeARg6peSHCpiBFH/view?usp=drive_link', leadEmail: '' },
-  'Grounds':       { lead: 'Paula Campbell',   budget: 14000, pic: 'https://drive.google.com/file/d/17J0cF_okHkAs_HCRjuYm0TnpM0v8Ek5-/view?usp=sharing', leadEmail: '' },
-  'Interiors':     { lead: 'Bec Freeman',      budget: 2500,  pic: 'https://drive.google.com/file/d/1PsjDfGQLqDF9BVc5wuBd-Qx9D5E0Hvf4/view?usp=drive_link', leadEmail: '' },
-  'Docents':       { lead: 'Rich Hill',        budget: 1000,  pic: 'https://drive.google.com/file/d/1gBzqnzekKkTLn8mnn2mxt-PqAeeMZSJs/view?usp=drive_link', leadEmail: '' },
-  'Fundraising':   { lead: 'Kaelen Jennings',  budget: null,  pic: '', leadEmail: '' },
-  'Events':        { lead: 'Barb Kusha',       budget: 7500,  pic: '', leadEmail: '' },
-  'Marketing':     { lead: 'Haley Wright',     budget: 1000,  pic: 'https://drive.google.com/file/d/17Tse_3jiKZwmkVTTKMtt64zDghfZ8WrV/view?usp=drive_link', leadEmail: '' },
-  'Venue':         { lead: 'Staff',            budget: null,  pic: '', leadEmail: '' },
+  'Construction':  { lead: 'Rick Panos',       budget: 12000, pic: 'https://drive.google.com/file/d/1hbFJxUUQEsuhoWnTDeARg6peSHCpiBFH/view?usp=drive_link', leadEmail: '', schedule: '' },
+  'Grounds':       { lead: 'Paula Campbell',   budget: 14000, pic: 'https://drive.google.com/file/d/17J0cF_okHkAs_HCRjuYm0TnpM0v8Ek5-/view?usp=sharing', leadEmail: '', schedule: '' },
+  'Interiors':     { lead: 'Bec Freeman',      budget: 2500,  pic: 'https://drive.google.com/file/d/1PsjDfGQLqDF9BVc5wuBd-Qx9D5E0Hvf4/view?usp=drive_link', leadEmail: '', schedule: '' },
+  'Docents':       { lead: 'Rich Hill',        budget: 1000,  pic: 'https://drive.google.com/file/d/1gBzqnzekKkTLn8mnn2mxt-PqAeeMZSJs/view?usp=drive_link', leadEmail: '', schedule: '' },
+  'Fundraising':   { lead: 'Kaelen Jennings',  budget: null,  pic: '', leadEmail: '', schedule: '' },
+  'Events':        { lead: 'Barb Kusha',       budget: 7500,  pic: '', leadEmail: '', schedule: '' },
+  'Marketing':     { lead: 'Haley Wright',     budget: 1000,  pic: 'https://drive.google.com/file/d/17Tse_3jiKZwmkVTTKMtt64zDghfZ8WrV/view?usp=drive_link', leadEmail: '', schedule: '' },
+  'Venue':         { lead: 'Staff',            budget: null,  pic: '', leadEmail: '', schedule: '' },
+};
+
+// Maps the checkbox options on the Volunteer Interest Form ("Volunteer Sign
+// Up", nsh_forms) to the canonical Operational Area whose lead/schedule
+// should be used. null means "no specific area lead" (e.g. "Other").
+var VOLUNTEER_INTEREST_AREA_MAP = {
+  'Restoration': 'Construction',
+  'Garden & Landscape': 'Grounds',
+  'Docent Tours': 'Docents',
+  'Event Planning': 'Events',
+  'Fundraising': 'Fundraising',
+  'Marketing Support': 'Marketing',
+  'Other': null
 };
 
 // AREA_DEFAULTS above are just fallbacks -- Admin -> Operational Budgets
@@ -18627,11 +18808,12 @@ function loadOperationalAreaBudgets() {
   }).then(function(r) { return r.json(); }).then(function(rows) {
     if (!Array.isArray(rows)) return;
     rows.forEach(function(row) {
-      if (!AREA_DEFAULTS[row.area]) AREA_DEFAULTS[row.area] = { lead: '', budget: null, pic: '', leadEmail: '' };
+      if (!AREA_DEFAULTS[row.area]) AREA_DEFAULTS[row.area] = { lead: '', budget: null, pic: '', leadEmail: '', schedule: '' };
       AREA_DEFAULTS[row.area].lead = row.lead || '';
       AREA_DEFAULTS[row.area].leadEmail = row.lead_email || '';
       AREA_DEFAULTS[row.area].budget = row.budget;
       AREA_DEFAULTS[row.area].pic = row.pic || '';
+      AREA_DEFAULTS[row.area].schedule = row.schedule || '';
     });
   }).catch(function() {});
 }
