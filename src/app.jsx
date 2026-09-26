@@ -13516,13 +13516,11 @@ function SuFormResponses({ form }) {
     function scheduleLine(e) { return e.volunteerMessage || 'Contact the lead for current details'; }
 
     var areaBlocksHtml = areaEntries.map(function(e) {
-      return '<p style="margin:0 0 14px">' +
-        '<b>Lead of ' + esc(e.formArea) + ':</b> ' + esc(leadLine(e)) + '<br/>' +
-        '<b>Schedule for ' + esc(e.formArea) + ':</b> ' + esc(scheduleLine(e)) +
-      '</p>';
+      return '<p style="margin:0 0 4px"><b>Lead of ' + esc(e.formArea) + ':</b> ' + esc(leadLine(e)) + '</p>' +
+        '<p style="margin:0 0 14px"><b>Schedule for ' + esc(e.formArea) + ':</b> ' + esc(scheduleLine(e)) + '</p>';
     }).join('');
     var areaBlocksText = areaEntries.map(function(e) {
-      return 'Lead of ' + e.formArea + ': ' + leadLine(e) + '\n' +
+      return 'Lead of ' + e.formArea + ': ' + leadLine(e) + '\n\n' +
         'Schedule for ' + e.formArea + ': ' + scheduleLine(e);
     }).join('\n\n');
 
