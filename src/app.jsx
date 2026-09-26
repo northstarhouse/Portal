@@ -13538,6 +13538,14 @@ function SuFormResponses({ form }) {
     return { html: html, text: text };
   }
 
+  function previewVolunteerThankYouEmail(r) {
+    var email = buildVolunteerThankYouEmail(r);
+    var w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Email Preview — Thanks for Your Interest</title></head><body style="margin:0">' + email.html + '</body></html>');
+    w.document.close();
+  }
+
   function sendVolunteerThankYouEmail(r) {
     if (sendingVol[r.id] || sentVol[r.id]) return;
     var toEmail = (r.answers || {}).v_email;
@@ -13730,6 +13738,10 @@ function SuFormResponses({ form }) {
                         title="Email the lead(s) for the area(s) this person selected"
                         style={{ background: sentLead[r.id] ? '#eef7ee' : '#fff', color: sentLead[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (sentLead[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: (sendingLead[r.id] || sentLead[r.id]) ? 'default' : 'pointer', opacity: sendingLead[r.id] ? 0.6 : 1 }}>
                         {sentLead[r.id] ? '✓ Lead emailed' : sendingLead[r.id] ? 'Sending…' : 'Email Area Lead'}
+                      </button>
+                      <button onClick={function() { previewVolunteerThankYouEmail(r); }} title="Preview the volunteer thank-you email"
+                        style={{ background: '#fff', color: '#888', border: '1px solid #e0d8cc', borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                        Preview
                       </button>
                       <button onClick={function() { sendVolunteerThankYouEmail(r); }} disabled={sendingVol[r.id] || sentVol[r.id]}
                         title="Thank the volunteer and let them know who will be reaching out"
