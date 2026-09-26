@@ -13446,7 +13446,7 @@ function SuFormResponses({ form }) {
     return areas.map(function(formArea) {
       var canonicalArea = VOLUNTEER_INTEREST_AREA_MAP.hasOwnProperty(formArea) ? VOLUNTEER_INTEREST_AREA_MAP[formArea] : null;
       var def = canonicalArea ? AREA_DEFAULTS[canonicalArea] : null;
-      return { formArea: formArea, canonicalArea: canonicalArea, lead: def ? def.lead : '', leadEmail: def ? def.leadEmail : '', schedule: def ? def.schedule : '' };
+      return { formArea: formArea, canonicalArea: canonicalArea, lead: def ? def.lead : '', leadEmail: def ? def.leadEmail : '', volunteerMessage: def ? def.volunteerMessage : '' };
     });
   }
 
@@ -13508,14 +13508,14 @@ function SuFormResponses({ form }) {
 
     function areaLine(e) {
       return e.canonicalArea && e.lead
-        ? e.formArea + ' — led by ' + e.lead + (e.schedule ? '. ' + e.schedule : '')
+        ? e.formArea + ' — led by ' + e.lead + (e.volunteerMessage ? '\n' + e.volunteerMessage : '')
         : e.formArea + ' — a member of our volunteer team will reach out to find the best fit';
     }
 
     var areaBlocksHtml = areaEntries.map(function(e) {
-      return '<div style="margin-bottom:10px"><b>' + esc(e.formArea) + '</b>' +
+      return '<div style="margin-bottom:14px"><b>' + esc(e.formArea) + '</b>' +
         (e.canonicalArea && e.lead
-          ? ' — led by ' + esc(e.lead) + (e.schedule ? '. ' + esc(e.schedule) : '')
+          ? ' — led by ' + esc(e.lead) + (e.volunteerMessage ? '<br/>' + esc(e.volunteerMessage).replace(/\n/g, '<br/>') : '')
           : ' — a member of our volunteer team will reach out to find the best fit.') +
         '</div>';
     }).join('');
@@ -17424,7 +17424,7 @@ function OperationalBudgetsView({ navigate }) {
       var f = {};
       OPERATIONAL_AREAS.forEach(function(area) {
         var r = byArea[area] || {};
-        f[area] = { lead: r.lead || '', lead_email: r.lead_email || '', budget: r.budget != null ? String(r.budget) : '', schedule: r.schedule || '' };
+        f[area] = { lead: r.lead || '', lead_email: r.lead_email || '', budget: r.budget != null ? String(r.budget) : '', volunteer_message: r.volunteer_message || '' };
       });
       setForms(f);
     }).catch(function() { setRows({}); });
@@ -17443,7 +17443,7 @@ function OperationalBudgetsView({ navigate }) {
       lead: f.lead.trim() || null,
       lead_email: f.lead_email.trim() || null,
       budget: f.budget.trim() === '' ? null : parseFloat(f.budget),
-      schedule: f.schedule.trim() || null
+      volunteer_message: f.volunteer_message.trim() || null
     };
     fetch(SUPABASE_URL + '/rest/v1/operational_area_budgets', {
       method: 'POST',
@@ -17452,11 +17452,11 @@ function OperationalBudgetsView({ navigate }) {
     }).then(function(r) {
       setSavingArea(null);
       if (!r.ok) { r.json().then(function(err) { alert('Failed to save: ' + (err.message || err.hint || r.status)); }).catch(function() { alert('Failed to save.'); }); return; }
-      if (!AREA_DEFAULTS[area]) AREA_DEFAULTS[area] = { lead: '', budget: null, pic: '', leadEmail: '', schedule: '' };
+      if (!AREA_DEFAULTS[area]) AREA_DEFAULTS[area] = { lead: '', budget: null, pic: '', leadEmail: '', volunteerMessage: '' };
       AREA_DEFAULTS[area].lead = payload.lead || '';
       AREA_DEFAULTS[area].leadEmail = payload.lead_email || '';
       AREA_DEFAULTS[area].budget = payload.budget;
-      AREA_DEFAULTS[area].schedule = payload.schedule || '';
+      AREA_DEFAULTS[area].volunteerMessage = payload.volunteer_message || '';
     }).catch(function() { setSavingArea(null); alert('Failed to save: network error.'); });
   }
 
@@ -17467,14 +17467,14 @@ function OperationalBudgetsView({ navigate }) {
     <div style={{ maxWidth: 680 }}>
       <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
       <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Operational Budgets</div>
-      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Edit each Operational Area's lead, lead email, and annual budget.</div>
+      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Edit each Operational Area's lead, lead email, annual budget, and the welcome message sent to new volunteers interested in that area.</div>
 
       {rows === null ? (
         <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {OPERATIONAL_AREAS.map(function(area) {
-            var f = forms[area] || { lead: '', lead_email: '', budget: '', schedule: '' };
+            var f = forms[area] || { lead: '', lead_email: '', budget: '', volunteer_message: '' };
             return (
               <div key={area} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px' }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', marginBottom: 10 }}>{area}</div>
@@ -17493,8 +17493,8 @@ function OperationalBudgetsView({ navigate }) {
                   </div>
                 </div>
                 <div style={{ marginBottom: 10 }}>
-                  <label style={lb}>Schedule (shown to volunteers, e.g. "Every Tuesday & Thursday, 9am–12pm")</label>
-                  <input value={f.schedule} onChange={function(e) { setField(area, 'schedule', e.target.value); }} placeholder="When this team meets…" style={inpSt} />
+                  <label style={lb}>Volunteer Welcome Message (used in the "Email Volunteer" reply on the Volunteer Sign Up form — e.g. when this team meets, what the work involves)</label>
+                  <textarea rows={3} value={f.volunteer_message} onChange={function(e) { setField(area, 'volunteer_message', e.target.value); }} placeholder="e.g. We meet every Tuesday & Thursday from 9am-12pm restoring the historic woodwork and windows — no experience necessary!" style={Object.assign({}, inpSt, { resize: 'vertical', fontFamily: 'system-ui, sans-serif' })} />
                 </div>
                 <button onClick={function() { handleSave(area); }} disabled={savingArea === area} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: savingArea === area ? 'default' : 'pointer', opacity: savingArea === area ? 0.6 : 1 }}>
                   {savingArea === area ? 'Saving…' : 'Save'}
@@ -18787,19 +18787,19 @@ const views = {
 
 var OPERATIONAL_AREAS = ['Construction','Grounds','Interiors','Docents','Fundraising','Events','Marketing','Venue'];
 var AREA_DEFAULTS = {
-  'Construction':  { lead: 'Rick Panos',       budget: 12000, pic: 'https://drive.google.com/file/d/1hbFJxUUQEsuhoWnTDeARg6peSHCpiBFH/view?usp=drive_link', leadEmail: '', schedule: '' },
-  'Grounds':       { lead: 'Paula Campbell',   budget: 14000, pic: 'https://drive.google.com/file/d/17J0cF_okHkAs_HCRjuYm0TnpM0v8Ek5-/view?usp=sharing', leadEmail: '', schedule: '' },
-  'Interiors':     { lead: 'Bec Freeman',      budget: 2500,  pic: 'https://drive.google.com/file/d/1PsjDfGQLqDF9BVc5wuBd-Qx9D5E0Hvf4/view?usp=drive_link', leadEmail: '', schedule: '' },
-  'Docents':       { lead: 'Rich Hill',        budget: 1000,  pic: 'https://drive.google.com/file/d/1gBzqnzekKkTLn8mnn2mxt-PqAeeMZSJs/view?usp=drive_link', leadEmail: '', schedule: '' },
-  'Fundraising':   { lead: 'Kaelen Jennings',  budget: null,  pic: '', leadEmail: '', schedule: '' },
-  'Events':        { lead: 'Barb Kusha',       budget: 7500,  pic: '', leadEmail: '', schedule: '' },
-  'Marketing':     { lead: 'Haley Wright',     budget: 1000,  pic: 'https://drive.google.com/file/d/17Tse_3jiKZwmkVTTKMtt64zDghfZ8WrV/view?usp=drive_link', leadEmail: '', schedule: '' },
-  'Venue':         { lead: 'Staff',            budget: null,  pic: '', leadEmail: '', schedule: '' },
+  'Construction':  { lead: 'Rick Panos',       budget: 12000, pic: 'https://drive.google.com/file/d/1hbFJxUUQEsuhoWnTDeARg6peSHCpiBFH/view?usp=drive_link', leadEmail: '', volunteerMessage: '' },
+  'Grounds':       { lead: 'Paula Campbell',   budget: 14000, pic: 'https://drive.google.com/file/d/17J0cF_okHkAs_HCRjuYm0TnpM0v8Ek5-/view?usp=sharing', leadEmail: '', volunteerMessage: '' },
+  'Interiors':     { lead: 'Bec Freeman',      budget: 2500,  pic: 'https://drive.google.com/file/d/1PsjDfGQLqDF9BVc5wuBd-Qx9D5E0Hvf4/view?usp=drive_link', leadEmail: '', volunteerMessage: '' },
+  'Docents':       { lead: 'Rich Hill',        budget: 1000,  pic: 'https://drive.google.com/file/d/1gBzqnzekKkTLn8mnn2mxt-PqAeeMZSJs/view?usp=drive_link', leadEmail: '', volunteerMessage: '' },
+  'Fundraising':   { lead: 'Kaelen Jennings',  budget: null,  pic: '', leadEmail: '', volunteerMessage: '' },
+  'Events':        { lead: 'Barb Kusha',       budget: 7500,  pic: '', leadEmail: '', volunteerMessage: '' },
+  'Marketing':     { lead: 'Haley Wright',     budget: 1000,  pic: 'https://drive.google.com/file/d/17Tse_3jiKZwmkVTTKMtt64zDghfZ8WrV/view?usp=drive_link', leadEmail: '', volunteerMessage: '' },
+  'Venue':         { lead: 'Staff',            budget: null,  pic: '', leadEmail: '', volunteerMessage: '' },
 };
 
 // Maps the checkbox options on the Volunteer Interest Form ("Volunteer Sign
-// Up", nsh_forms) to the canonical Operational Area whose lead/schedule
-// should be used. null means "no specific area lead" (e.g. "Other").
+// Up", nsh_forms) to the canonical Operational Area whose lead/volunteer
+// welcome message should be used. null means "no specific area lead" (e.g. "Other").
 var VOLUNTEER_INTEREST_AREA_MAP = {
   'Restoration': 'Construction',
   'Garden & Landscape': 'Grounds',
@@ -18820,12 +18820,12 @@ function loadOperationalAreaBudgets() {
   }).then(function(r) { return r.json(); }).then(function(rows) {
     if (!Array.isArray(rows)) return;
     rows.forEach(function(row) {
-      if (!AREA_DEFAULTS[row.area]) AREA_DEFAULTS[row.area] = { lead: '', budget: null, pic: '', leadEmail: '', schedule: '' };
+      if (!AREA_DEFAULTS[row.area]) AREA_DEFAULTS[row.area] = { lead: '', budget: null, pic: '', leadEmail: '', volunteerMessage: '' };
       AREA_DEFAULTS[row.area].lead = row.lead || '';
       AREA_DEFAULTS[row.area].leadEmail = row.lead_email || '';
       AREA_DEFAULTS[row.area].budget = row.budget;
       AREA_DEFAULTS[row.area].pic = row.pic || '';
-      AREA_DEFAULTS[row.area].schedule = row.schedule || '';
+      AREA_DEFAULTS[row.area].volunteerMessage = row.volunteer_message || '';
     });
   }).catch(function() {});
 }
