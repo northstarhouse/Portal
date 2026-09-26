@@ -13518,32 +13518,32 @@ function SuFormResponses({ form }) {
     var areaBlocksHtml = areaEntries.map(function(e) {
       return '<p style="margin:0 0 14px">' +
         '<b>Lead of ' + esc(e.formArea) + ':</b> ' + esc(leadLine(e)) + '<br/>' +
-        '<b>General Schedule for ' + esc(e.formArea) + ':</b> ' + esc(scheduleLine(e)) +
+        '<b>Schedule for ' + esc(e.formArea) + ':</b> ' + esc(scheduleLine(e)) +
       '</p>';
     }).join('');
     var areaBlocksText = areaEntries.map(function(e) {
       return 'Lead of ' + e.formArea + ': ' + leadLine(e) + '\n' +
-        'General Schedule for ' + e.formArea + ': ' + scheduleLine(e);
+        'Schedule for ' + e.formArea + ': ' + scheduleLine(e);
     }).join('\n\n');
 
     var subtext = '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.7;color:#3a332a">' +
         '<p>Hi ' + esc(firstName) + ',</p>' +
-        '<p>Thank you for your interest in volunteering with North Star House. We’re excited to hear you’re interested in getting involved with ' + esc(areaList) + '.</p>' +
+        '<p>We’re excited to hear you’re interested in getting involved with ' + esc(areaList) + ' here at North Star House.</p>' +
         '<p>Your information has been shared with the lead for that area who is going to follow up with you about current needs and next steps.</p>' +
         areaBlocksHtml +
-        '<p>Thank you so much for your interest in supporting the house!</p>' +
-        '<p>-North Star House Team</p>' +
+        '<p>We really appreciate that you want to support the house!</p>' +
+        '<p><b><i>-North Star House Team</i></b></p>' +
       '</div>';
     var html = buildBoardNotificationEmailHtml({
-      headline: 'Thank You for Your Interest!',
+      headline: 'Thank You for Your Interest in Volunteering!',
       subtext: subtext,
       footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
     });
     var text = 'Hi ' + firstName + ',\n\n' +
-      'Thank you for your interest in volunteering with North Star House. We’re excited to hear you’re interested in getting involved with ' + areaList + '.\n\n' +
+      'We’re excited to hear you’re interested in getting involved with ' + areaList + ' here at North Star House.\n\n' +
       'Your information has been shared with the lead for that area who is going to follow up with you about current needs and next steps.\n\n' +
       areaBlocksText +
-      '\n\nThank you so much for your interest in supporting the house!\n\n\n-North Star House Team';
+      '\n\nWe really appreciate that you want to support the house!\n\n\n-North Star House Team';
     return { html: html, text: text, subject: 'Thank You for Your Interest in Volunteering!' };
   }
 
@@ -17502,7 +17502,7 @@ function OperationalBudgetsView({ navigate }) {
                   </div>
                 </div>
                 <div style={{ marginBottom: 10 }}>
-                  <label style={lb}>General Schedule (fills the "General Schedule for {area}" line in the volunteer thank-you email)</label>
+                  <label style={lb}>Schedule (fills the "Schedule for {area}" line in the volunteer thank-you email)</label>
                   <textarea rows={3} value={f.volunteer_message} onChange={function(e) { setField(area, 'volunteer_message', e.target.value); }} placeholder="e.g. Every Tuesday & Thursday, 9am-12pm" style={Object.assign({}, inpSt, { resize: 'vertical', fontFamily: 'system-ui, sans-serif' })} />
                 </div>
                 <button onClick={function() { handleSave(area); }} disabled={savingArea === area} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: savingArea === area ? 'default' : 'pointer', opacity: savingArea === area ? 0.6 : 1 }}>
