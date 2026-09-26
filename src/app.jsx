@@ -13528,7 +13528,9 @@ function SuFormResponses({ form }) {
         '<p>Hi ' + esc(firstName) + ',</p>' +
         '<p>We’re excited to hear you’re interested in getting involved with ' + esc(areaList) + ' here at North Star House.</p>' +
         '<p>Your information has been shared with the lead for that area who is going to follow up with you about current needs and next steps.</p>' +
+        '<div style="border-top:1px solid #e5ddcf;margin:0 -40px 16px;"></div>' +
         areaBlocksHtml +
+        '<div style="border-top:1px solid #e5ddcf;margin:0 -40px 16px;"></div>' +
         '<p>We really appreciate that you want to support the house!</p>' +
         '<p><b><i>-North Star House Team</i></b></p>' +
       '</div>';

@@ -38,7 +38,7 @@ About: `+Se:"");return{html:M,text:le,name:O,areaEntries:qe}}function Pe(w){if(!
 
 Schedule for `+Te.formArea+": "+qe(Te)}).join(`
 
-`),M='<div style="text-align:left;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.7;color:#3a332a"><p>Hi '+H(O)+",</p><p>We\u2019re excited to hear you\u2019re interested in getting involved with "+H(ne)+" here at North Star House.</p><p>Your information has been shared with the lead for that area who is going to follow up with you about current needs and next steps.</p>"+we+"<p>We really appreciate that you want to support the house!</p><p><b><i>-North Star House Team</i></b></p></div>",le=An({headline:"Thank You for Your Interest in Volunteering!",subtext:M,footerLinks:qn}),Ce="Hi "+O+`,
+`),M='<div style="text-align:left;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.7;color:#3a332a"><p>Hi '+H(O)+",</p><p>We\u2019re excited to hear you\u2019re interested in getting involved with "+H(ne)+' here at North Star House.</p><p>Your information has been shared with the lead for that area who is going to follow up with you about current needs and next steps.</p><div style="border-top:1px solid #e5ddcf;margin:0 -40px 16px;"></div>'+we+'<div style="border-top:1px solid #e5ddcf;margin:0 -40px 16px;"></div><p>We really appreciate that you want to support the house!</p><p><b><i>-North Star House Team</i></b></p></div>',le=An({headline:"Thank You for Your Interest in Volunteering!",subtext:M,footerLinks:qn}),Ce="Hi "+O+`,
 
 We\u2019re excited to hear you\u2019re interested in getting involved with `+ne+` here at North Star House.
 
