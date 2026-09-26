@@ -18898,7 +18898,7 @@ function buildBoardNotificationEmailHtml(opts) {
     return '<td style="width:' + (100 / footerLinks.length).toFixed(2) + '%;text-align:center;padding:14px 8px;' + border + '"><a href="' + l.url + '" style="color:' + gold + ';text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">' + l.label + '</a></td>';
   }).join('');
   return (
-    '<div style="background:#e3e4e0;padding:32px 16px;font-family:Georgia,\'Times New Roman\',serif;">' +
+    '<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,\'Times New Roman\',serif;">' +
       '<div style="max-width:560px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">' +
         '<div style="height:14px;background:' + gold + ';"></div>' +
         '<div style="padding:48px 40px 32px;text-align:center;">' +
