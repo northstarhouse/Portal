@@ -13276,11 +13276,6 @@ var DOCENT_TOUR_FORM_ID = '0635cd26-b0c7-4076-b9b1-bd25d1949467';
 // checkboxes field (v_interest) lets someone pick more than one area, so
 // everything below treats "the area" as a list rather than a single value.
 var VOLUNTEER_INTEREST_FORM_ID = '11342c74-d0f0-4cb3-9b9e-57f30b4ae3a7';
-// Fallbacks for volunteer_interest_settings (Admin -> Operational Budgets)
-// if that row hasn't been customized yet. {{first_name}} is substituted
-// with the applicant's first name when the email is built.
-var VOLUNTEER_EMAIL_SUBJECT_DEFAULT = 'Thanks for your interest in volunteering at North Star House!';
-var VOLUNTEER_EMAIL_HEADER_DEFAULT = 'Thanks for your interest in volunteering at North Star House, {{first_name}}!';
 // WEDDING_INQUIRY_FORM_ID now declared up near RENTAL_INQUIRY_FORM_IDS (see
 // comment there).
 
@@ -13293,7 +13288,6 @@ function SuFormResponses({ form }) {
   var [sentLead, setSentLead] = useState({});
   var [sendingVol, setSendingVol] = useState({});
   var [sentVol, setSentVol] = useState({});
-  var [volunteerEmailSettings, setVolunteerEmailSettings] = useState({ subject: VOLUNTEER_EMAIL_SUBJECT_DEFAULT, header_title: VOLUNTEER_EMAIL_HEADER_DEFAULT });
   var [handlingId, setHandlingId] = useState(null);
   var [deletingId, setDeletingId] = useState(null);
   var [notesDraft, setNotesDraft] = useState({});
@@ -13330,14 +13324,6 @@ function SuFormResponses({ form }) {
     }
   }, [form && form.id]);
 
-  useEffect(function() {
-    if (!form || form.id !== VOLUNTEER_INTEREST_FORM_ID) return;
-    fetch(SUPABASE_URL + '/rest/v1/volunteer_interest_settings?select=*&limit=1', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
-      .then(function(r) { return r.json(); }).then(function(rows) {
-        var row = Array.isArray(rows) && rows[0];
-        if (row) setVolunteerEmailSettings({ subject: row.subject || VOLUNTEER_EMAIL_SUBJECT_DEFAULT, header_title: row.header_title || VOLUNTEER_EMAIL_HEADER_DEFAULT });
-      }).catch(function() {});
-  }, [form && form.id]);
 
   function toggleHandled(r) {
     if (handlingId === r.id) return;
@@ -13515,46 +13501,49 @@ function SuFormResponses({ form }) {
     }).catch(function() { setSendingLead(function(prev) { var n = Object.assign({}, prev); delete n[r.id]; return n; }); alert('Failed to send email.'); });
   }
 
+  // Fixed wording, per the exact template staff asked for -- the only
+  // per-submission "blanks" are the volunteer's name/area(s) and each area's
+  // lead name/email/message, all pulled straight from AREA_DEFAULTS (Admin ->
+  // Operational Budgets).
   function buildVolunteerThankYouEmail(r) {
     function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
     var a = r.answers || {};
     var firstName = (a.v_first || '').trim() || 'there';
     var areaEntries = volunteerAreaEntries(r);
-    var subjectTemplate = volunteerEmailSettings.subject || VOLUNTEER_EMAIL_SUBJECT_DEFAULT;
-    var headerTemplate = volunteerEmailSettings.header_title || VOLUNTEER_EMAIL_HEADER_DEFAULT;
-    var subject = subjectTemplate.replace(/\{\{first_name\}\}/g, firstName);
-    var headline = esc(headerTemplate).replace(/\{\{first_name\}\}/g, esc(firstName));
+    var areaList = areaEntries.map(function(e) { return e.formArea; }).join(', ') || 'volunteering with us';
 
-    function areaLine(e) {
-      return e.canonicalArea && e.lead
-        ? e.formArea + ' — led by ' + e.lead + (e.volunteerMessage ? '\n' + e.volunteerMessage : '')
-        : e.formArea + ' — a member of our volunteer team will reach out to find the best fit';
-    }
+    function leadLine(e) { return e.lead ? (e.lead + (e.leadEmail ? ' - ' + e.leadEmail : '')) : 'To be assigned'; }
+    function scheduleLine(e) { return e.volunteerMessage || 'Contact the lead for current details'; }
 
     var areaBlocksHtml = areaEntries.map(function(e) {
-      return '<div style="margin-bottom:14px"><b>' + esc(e.formArea) + '</b>' +
-        (e.canonicalArea && e.lead
-          ? ' — led by ' + esc(e.lead) + (e.volunteerMessage ? '<br/>' + esc(e.volunteerMessage).replace(/\n/g, '<br/>') : '')
-          : ' — a member of our volunteer team will reach out to find the best fit.') +
-        '</div>';
+      return '<p style="margin:0 0 14px">' +
+        '<b>Lead of ' + esc(e.formArea) + ':</b> ' + esc(leadLine(e)) + '<br/>' +
+        '<b>General Schedule for ' + esc(e.formArea) + ':</b> ' + esc(scheduleLine(e)) +
+      '</p>';
     }).join('');
+    var areaBlocksText = areaEntries.map(function(e) {
+      return 'Lead of ' + e.formArea + ': ' + leadLine(e) + '\n' +
+        'General Schedule for ' + e.formArea + ': ' + scheduleLine(e);
+    }).join('\n\n');
 
     var subtext = '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.7;color:#3a332a">' +
-        '<p>Thank you so much for your interest in volunteering at North Star House! We\'re so glad you reached out.</p>' +
-        '<p>Here\'s who will be in touch:</p>' +
+        '<p>Thank you for your interest in volunteering with North Star House. We’re excited to hear you’re interested in getting involved with ' + esc(areaList) + '.</p>' +
+        '<p>Your information has been shared with the lead for that area who is going to follow up with you about current needs and next steps.</p>' +
         areaBlocksHtml +
-        '<p>Thanks again for wanting to be part of our community — we can\'t wait to have you!</p>' +
+        '<p>Thank you so much for your interest in supporting the house!</p>' +
+        '<p>-North Star House Team</p>' +
       '</div>';
     var html = buildBoardNotificationEmailHtml({
-      headline: headline,
+      headline: 'Hi ' + esc(firstName) + ',',
       subtext: subtext,
       footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
     });
-    var text = 'Thank you so much for your interest in volunteering at North Star House! We\'re so glad you reached out.\n\n' +
-      'Here\'s who will be in touch:\n' +
-      areaEntries.map(areaLine).join('\n') +
-      '\n\nThanks again for wanting to be part of our community — we can\'t wait to have you!';
-    return { html: html, text: text, subject: subject };
+    var text = 'Hi ' + firstName + ',\n\n' +
+      'Thank you for your interest in volunteering with North Star House. We’re excited to hear you’re interested in getting involved with ' + areaList + '.\n\n' +
+      'Your information has been shared with the lead for that area who is going to follow up with you about current needs and next steps.\n\n' +
+      areaBlocksText +
+      '\n\nThank you so much for your interest in supporting the house!\n\n\n-North Star House Team';
+    return { html: html, text: text, subject: 'Thank You for Your Interest in Volunteering!' };
   }
 
   function previewVolunteerThankYouEmail(r) {
@@ -17432,9 +17421,6 @@ function OperationalBudgetsView({ navigate }) {
   var [rows, setRows] = useState(null);
   var [forms, setForms] = useState({}); // area -> { lead, lead_email, budget }
   var [savingArea, setSavingArea] = useState(null);
-  var [emailSettingsId, setEmailSettingsId] = useState(null);
-  var [emailSettingsForm, setEmailSettingsForm] = useState({ subject: '', header_title: '' });
-  var [savingEmailSettings, setSavingEmailSettings] = useState(false);
 
   function load() {
     fetch(SUPABASE_URL + '/rest/v1/operational_area_budgets?select=*', {
@@ -17450,33 +17436,8 @@ function OperationalBudgetsView({ navigate }) {
       });
       setForms(f);
     }).catch(function() { setRows({}); });
-    fetch(SUPABASE_URL + '/rest/v1/volunteer_interest_settings?select=*&limit=1', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      var row = Array.isArray(rows) && rows[0];
-      if (row) {
-        setEmailSettingsId(row.id);
-        setEmailSettingsForm({ subject: row.subject || '', header_title: row.header_title || '' });
-      }
-    }).catch(function() {});
   }
   useEffect(function() { load(); }, []);
-
-  function handleSaveEmailSettings() {
-    setSavingEmailSettings(true);
-    var payload = { subject: emailSettingsForm.subject.trim() || null, header_title: emailSettingsForm.header_title.trim() || null, updated_at: new Date().toISOString() };
-    var isNew = !emailSettingsId;
-    var url = SUPABASE_URL + '/rest/v1/volunteer_interest_settings' + (isNew ? '' : '?id=eq.' + emailSettingsId);
-    fetch(url, {
-      method: isNew ? 'POST' : 'PATCH',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify(payload)
-    }).then(function(r) { return r.json(); }).then(function(rows) {
-      setSavingEmailSettings(false);
-      var updated = Array.isArray(rows) ? rows[0] : rows;
-      if (updated && updated.id) setEmailSettingsId(updated.id);
-    }).catch(function() { setSavingEmailSettings(false); alert('Failed to save.'); });
-  }
 
   function setField(area, key, value) {
     setForms(function(prev) { var n = Object.assign({}, prev); n[area] = Object.assign({}, n[area], { [key]: value }); return n; });
@@ -17514,25 +17475,7 @@ function OperationalBudgetsView({ navigate }) {
     <div style={{ maxWidth: 680 }}>
       <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
       <div style={{ fontSize: 22, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Operational Budgets</div>
-      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Edit each Operational Area's lead, lead email, annual budget, and the welcome message sent to new volunteers interested in that area.</div>
-
-      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Volunteer Thank-You Email</div>
-        <div style={{ fontSize: 11, color: '#999', marginBottom: 10 }}>The subject line and header title on the "Email Volunteer" reply for the Volunteer Sign Up form. Use <code>{'{{first_name}}'}</code> anywhere you want their first name inserted.</div>
-        <div style={{ marginBottom: 10 }}>
-          <label style={lb}>Subject</label>
-          <input value={emailSettingsForm.subject} onChange={function(e) { setEmailSettingsForm(function(f) { return Object.assign({}, f, { subject: e.target.value }); }); }} placeholder={VOLUNTEER_EMAIL_SUBJECT_DEFAULT} style={inpSt} />
-          <div style={{ fontSize: 11, color: '#aaa', fontStyle: 'italic', marginTop: 4 }}>Preview: {(emailSettingsForm.subject || VOLUNTEER_EMAIL_SUBJECT_DEFAULT).replace(/\{\{first_name\}\}/g, 'Alex')}</div>
-        </div>
-        <div style={{ marginBottom: 10 }}>
-          <label style={lb}>Header Title</label>
-          <input value={emailSettingsForm.header_title} onChange={function(e) { setEmailSettingsForm(function(f) { return Object.assign({}, f, { header_title: e.target.value }); }); }} placeholder={VOLUNTEER_EMAIL_HEADER_DEFAULT} style={inpSt} />
-          <div style={{ fontSize: 11, color: '#aaa', fontStyle: 'italic', marginTop: 4 }}>Preview: {(emailSettingsForm.header_title || VOLUNTEER_EMAIL_HEADER_DEFAULT).replace(/\{\{first_name\}\}/g, 'Alex')}</div>
-        </div>
-        <button onClick={handleSaveEmailSettings} disabled={savingEmailSettings} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: savingEmailSettings ? 'default' : 'pointer', opacity: savingEmailSettings ? 0.6 : 1 }}>
-          {savingEmailSettings ? 'Saving…' : 'Save'}
-        </button>
-      </div>
+      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Edit each Operational Area's lead, lead email, annual budget, and general schedule — the lead/email/schedule are what fill in the volunteer thank-you email sent from the Volunteer Sign Up form.</div>
 
       {rows === null ? (
         <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>
@@ -17558,8 +17501,8 @@ function OperationalBudgetsView({ navigate }) {
                   </div>
                 </div>
                 <div style={{ marginBottom: 10 }}>
-                  <label style={lb}>Volunteer Welcome Message (used in the "Email Volunteer" reply on the Volunteer Sign Up form — e.g. when this team meets, what the work involves)</label>
-                  <textarea rows={3} value={f.volunteer_message} onChange={function(e) { setField(area, 'volunteer_message', e.target.value); }} placeholder="e.g. We meet every Tuesday & Thursday from 9am-12pm restoring the historic woodwork and windows — no experience necessary!" style={Object.assign({}, inpSt, { resize: 'vertical', fontFamily: 'system-ui, sans-serif' })} />
+                  <label style={lb}>General Schedule (fills the "General Schedule for {area}" line in the volunteer thank-you email)</label>
+                  <textarea rows={3} value={f.volunteer_message} onChange={function(e) { setField(area, 'volunteer_message', e.target.value); }} placeholder="e.g. Every Tuesday & Thursday, 9am-12pm" style={Object.assign({}, inpSt, { resize: 'vertical', fontFamily: 'system-ui, sans-serif' })} />
                 </div>
                 <button onClick={function() { handleSave(area); }} disabled={savingArea === area} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: savingArea === area ? 'default' : 'pointer', opacity: savingArea === area ? 0.6 : 1 }}>
                   {savingArea === area ? 'Saving…' : 'Save'}
