@@ -13527,6 +13527,7 @@ function SuFormResponses({ form }) {
     }).join('\n\n');
 
     var subtext = '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.7;color:#3a332a">' +
+        '<p>Hi ' + esc(firstName) + ',</p>' +
         '<p>Thank you for your interest in volunteering with North Star House. We’re excited to hear you’re interested in getting involved with ' + esc(areaList) + '.</p>' +
         '<p>Your information has been shared with the lead for that area who is going to follow up with you about current needs and next steps.</p>' +
         areaBlocksHtml +
@@ -13534,7 +13535,7 @@ function SuFormResponses({ form }) {
         '<p>-North Star House Team</p>' +
       '</div>';
     var html = buildBoardNotificationEmailHtml({
-      headline: 'Hi ' + esc(firstName) + ',',
+      headline: 'Thank You for Your Interest!',
       subtext: subtext,
       footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
     });
