@@ -13560,11 +13560,12 @@ function SuFormResponses({ form }) {
     var toEmail = (r.answers || {}).v_email;
     if (!toEmail) { alert('No email on file for this volunteer.'); return; }
     var built = buildVolunteerThankYouEmail(r);
+    var leadEmails = Array.from(new Set(volunteerAreaEntries(r).map(function(e) { return e.leadEmail; }).filter(Boolean)));
     setSendingVol(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: toEmail, bcc: [ADMIN_NOTIFY_BCC], subject: built.subject, body: built.text, html: built.html })
+      body: JSON.stringify({ to: toEmail, bcc: [ADMIN_NOTIFY_BCC].concat(leadEmails), subject: built.subject, body: built.text, html: built.html })
     }).then(function(res) {
       setSendingVol(function(prev) { var n = Object.assign({}, prev); delete n[r.id]; return n; });
       if (res.ok) setSentVol(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
@@ -18897,7 +18898,7 @@ function buildBoardNotificationEmailHtml(opts) {
     return '<td style="width:' + (100 / footerLinks.length).toFixed(2) + '%;text-align:center;padding:14px 8px;' + border + '"><a href="' + l.url + '" style="color:' + gold + ';text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">' + l.label + '</a></td>';
   }).join('');
   return (
-    '<div style="background:#d9cdb8;padding:32px 16px;font-family:Georgia,\'Times New Roman\',serif;">' +
+    '<div style="background:#e3e4e0;padding:32px 16px;font-family:Georgia,\'Times New Roman\',serif;">' +
       '<div style="max-width:560px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">' +
         '<div style="height:14px;background:' + gold + ';"></div>' +
         '<div style="padding:48px 40px 32px;text-align:center;">' +
