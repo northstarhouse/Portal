@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   try {
-    const { to, bcc, subject, body, html, sender } = await req.json()
+    const { to, cc, bcc, subject, body, html, sender } = await req.json()
 
     const recipients: string[] = Array.isArray(to)
       ? to
@@ -23,6 +23,10 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...CORS, 'Content-Type': 'application/json' },
       })
     }
+
+    const ccList: string[] = cc
+      ? (Array.isArray(cc) ? cc : String(cc).split(',').map((e: string) => e.trim()).filter(Boolean))
+      : []
 
     const callerBcc: string[] = bcc
       ? (Array.isArray(bcc) ? bcc : String(bcc).split(',').map((e: string) => e.trim()).filter(Boolean))
@@ -43,6 +47,7 @@ Deno.serve(async (req) => {
         subject,
         text: body || '',
         ...(html ? { html } : {}),
+        ...(ccList.length ? { cc: ccList } : {}),
         ...(bccList.length ? { bcc: bccList } : {}),
       }),
     })

@@ -13565,7 +13565,7 @@ function SuFormResponses({ form }) {
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: toEmail, bcc: [ADMIN_NOTIFY_BCC].concat(leadEmails), subject: built.subject, body: built.text, html: built.html })
+      body: JSON.stringify({ to: toEmail, cc: leadEmails, bcc: [ADMIN_NOTIFY_BCC], subject: built.subject, body: built.text, html: built.html })
     }).then(function(res) {
       setSendingVol(function(prev) { var n = Object.assign({}, prev); delete n[r.id]; return n; });
       if (res.ok) setSentVol(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
