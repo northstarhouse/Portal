@@ -13357,11 +13357,14 @@ function SuFormResponses({ form }) {
     setDeletingId(r.id);
     fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?id=eq.' + r.id, {
       method: 'DELETE',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, Prefer: 'return=representation' }
     }).then(function(res) {
-      if (res.ok) setResponses(function(prev) { return prev.filter(function(x) { return x.id !== r.id; }); });
-      else setDeletingId(null);
-    }).catch(function() { setDeletingId(null); });
+      return res.json().then(function(body) { return { res: res, body: body }; });
+    }).then(function(result) {
+      setDeletingId(null);
+      if (result.res.ok) setResponses(function(prev) { return prev.filter(function(x) { return x.id !== r.id; }); });
+      else alert('Failed to delete: ' + (result.body && (result.body.message || result.body.hint) || result.res.status));
+    }).catch(function(err) { setDeletingId(null); alert('Failed to delete: ' + err.message); });
   }
 
   function buildDocentEmail(r) {
@@ -15264,7 +15267,7 @@ function VolEmailListsView({ navigate }) {
             <button onClick={function() { downloadEmailsCsv(g.members, g.tag.replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '-emails.csv'); }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: '0.5px solid #e0d8cc', borderRadius: 7, background: '#fff', color: '#666', cursor: 'pointer' }}>
               ↓ CSV
             </button>
-            <button onClick={function() { openModal(g.tag, g.members); }} disabled={withEmail.length === 0} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: 'none', borderRadius: 7, background: gold, color: '#fff', fontWeight: 600, cursor: withEmail.length === 0 ? 'not-allowed' : 'pointer', opacity: withEmail.length === 0 ? 0.4 : 1 }}>
+            <button onClick={function() { openTemplateModalForGroup(g.tag, g.members); }} disabled={withEmail.length === 0} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', fontSize: 11, border: 'none', borderRadius: 7, background: gold, color: '#fff', fontWeight: 600, cursor: withEmail.length === 0 ? 'not-allowed' : 'pointer', opacity: withEmail.length === 0 ? 0.4 : 1 }}>
               ✉ Email group
             </button>
           </div>
@@ -15395,6 +15398,17 @@ function VolEmailListsView({ navigate }) {
     }).then(function(r) { return r.json(); }).then(function(rows) {
       setSavedTemplates(Array.isArray(rows) ? rows : []);
     }).catch(function() {});
+  }
+
+  // "Email group" now opens the same branded Template Email tool as the
+  // header button, just pre-selecting that group's members as recipients
+  // instead of starting from an empty search/pick list.
+  function openTemplateModalForGroup(tag, members) {
+    openTemplateModal();
+    var sel = {};
+    members.forEach(function(v) { if (v['Email'] && v['Email'].trim()) sel[String(v.id)] = true; });
+    setTplSelected(sel);
+    setTplSubject(tag + ' — ' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }));
   }
 
   function handleLoadTemplate(id) {
@@ -16901,16 +16915,18 @@ function VenueInquiriesView({ navigate }) {
     setDeletingId(sub.id);
     fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?id=eq.' + sub.id, {
       method: 'DELETE',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, Prefer: 'return=representation' }
     }).then(function(res) {
+      return res.json().then(function(body) { return { res: res, body: body }; });
+    }).then(function(result) {
       setDeletingId(null);
-      if (res.ok) {
+      if (result.res.ok) {
         setRows(function(prev) { return prev.filter(function(s) { return s.id !== sub.id; }); });
         setSelected(function(prev) { return prev && prev.id === sub.id ? null : prev; });
       } else {
-        alert('Failed to delete.');
+        alert('Failed to delete: ' + (result.body && (result.body.message || result.body.hint) || result.res.status));
       }
-    }).catch(function() { setDeletingId(null); alert('Failed to delete — network error.'); });
+    }).catch(function(err) { setDeletingId(null); alert('Failed to delete: ' + err.message); });
   }
 
   function fmtTs(ts) { return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
