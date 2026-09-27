@@ -14994,7 +14994,7 @@ function VolEmailListsView({ navigate }) {
     cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Email','Status','Team','Event Tags','Overview Notes','Phone Number']).then(function(data) {
       if (Array.isArray(data)) setVolunteers(data);
     });
-    fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=20', {
+    fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=10', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(data) {
       if (Array.isArray(data)) setLogs(data);
@@ -15375,7 +15375,7 @@ function VolEmailListsView({ navigate }) {
         body: JSON.stringify({ sent_at: new Date().toISOString(), team_tag: modal.tag, recipient_count: modal.members.length, recipients: modal.members.map(function(v) { return (v['First Name'] || '') + ' ' + (v['Last Name'] || '') + ' <' + v['Email'] + '>'; }), subject: subject })
       });
     }).then(function() {
-      return fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=20', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }).then(function(data) { if (Array.isArray(data)) setLogs(data); });
+      return fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=10', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }).then(function(data) { if (Array.isArray(data)) setLogs(data); });
     }).catch(function(err) {
       setSendError(err.message || 'Unknown error');
     }).finally(function() { setSending(false); });
@@ -15500,7 +15500,7 @@ function VolEmailListsView({ navigate }) {
         body: JSON.stringify({ sent_at: new Date().toISOString(), team_tag: 'Template', recipient_count: recipients.length, recipients: recipients.map(function(v) { return (v['First Name'] || '') + ' ' + (v['Last Name'] || '') + ' <' + v['Email'] + '>'; }), subject: tplSubject })
       });
     }).then(function() {
-      return fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=20', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }).then(function(data) { if (Array.isArray(data)) setLogs(data); });
+      return fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=10', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }).then(function(data) { if (Array.isArray(data)) setLogs(data); });
     }).catch(function(err) {
       setTplSendError(err.message || 'Unknown error');
     }).finally(function() { setTplSending(false); });
