@@ -13544,7 +13544,7 @@ function SuFormResponses({ form }) {
       'Your information has been shared with the lead for that area who is going to follow up with you about current needs and next steps.\n\n' +
       areaBlocksText +
       '\n\nWe really appreciate that you want to support the house!\n\n\n-North Star House Team';
-    return { html: html, text: text, subject: 'Thank You for Your Interest in Volunteering!' };
+    return { html: html, text: text, subject: 'Volunteering at North Star House' };
   }
 
   function previewVolunteerThankYouEmail(r) {
@@ -16704,6 +16704,7 @@ function VenueInquiriesView({ navigate }) {
   const [notesDraft, setNotesDraft] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
   const [handlingId, setHandlingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   // AI-assisted follow-up (Wedding Inquiry only) -- ported from the old
   // SuFormResponses browser, which this view replaced for day-to-day use but
@@ -16894,6 +16895,24 @@ function VenueInquiriesView({ navigate }) {
     }).finally(function() { setNotesSaving(false); });
   }
 
+  function deleteResponse(sub) {
+    if (deletingId === sub.id) return;
+    if (!window.confirm('Delete this response? This cannot be undone.')) return;
+    setDeletingId(sub.id);
+    fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?id=eq.' + sub.id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(res) {
+      setDeletingId(null);
+      if (res.ok) {
+        setRows(function(prev) { return prev.filter(function(s) { return s.id !== sub.id; }); });
+        setSelected(function(prev) { return prev && prev.id === sub.id ? null : prev; });
+      } else {
+        alert('Failed to delete.');
+      }
+    }).catch(function() { setDeletingId(null); alert('Failed to delete — network error.'); });
+  }
+
   function fmtTs(ts) { return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 
   return (
@@ -16951,7 +16970,13 @@ function VenueInquiriesView({ navigate }) {
                   <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gold, marginBottom: 3 }}>{selected.form_name}</div>
                   <div style={{ fontSize: 11, color: '#aaa' }}>{fmtTs(selected.created_at)}</div>
                 </div>
-                <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 16 }}>✕</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                  <button onClick={function() { deleteResponse(selected); }} disabled={deletingId === selected.id} title="Delete this response"
+                    style={{ background: 'none', border: 'none', color: '#c0392b', cursor: deletingId === selected.id ? 'default' : 'pointer', fontSize: 11, fontWeight: 600, opacity: deletingId === selected.id ? 0.6 : 1 }}>
+                    {deletingId === selected.id ? 'Deleting…' : 'Delete'}
+                  </button>
+                  <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 16 }}>✕</button>
+                </div>
               </div>
               {matchedTour(selected) && (function() {
                 var tour = matchedTour(selected);
