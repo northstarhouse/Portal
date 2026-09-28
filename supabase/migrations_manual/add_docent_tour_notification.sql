@@ -1,11 +1,19 @@
 -- Run this once in the Supabase SQL editor.
 -- Emails the active Docents team (Team or Event Tags containing "Docent",
 -- Status = Active in "2026 Volunteers") whenever someone submits the public
--- "Docent Tour Form" (id 0635cd26-b0c7-4076-b9b1-bd25d1949467), using the
--- same NSH branded email look as buildBoardNotificationEmailHtml in
--- src/app.jsx. Submissions land directly in nsh_form_responses from the
--- separate NSH-forms site, so this has to run as a DB trigger rather than
--- app code -- same pattern as add_activity_log_ntfy_push.sql.
+-- "Docent Tour Form" (id 0635cd26-b0c7-4076-b9b1-bd25d1949467). Submissions
+-- land directly in nsh_form_responses from the separate NSH-forms site, so
+-- this has to run as a DB trigger rather than app code -- same pattern as
+-- add_activity_log_ntfy_push.sql.
+--
+-- This replaces a version that had drifted live in the database: it dropped
+-- Phone entirely and only put Email in the plain-text body, never the HTML
+-- most people actually see -- fixed here to show every field, and to bcc
+-- the admin address like every other notification in the app.
+--
+-- The CTA button now points at Volunteer Hub's Docents area (which lists
+-- recent tour requests, since docents don't have Portal access) instead of
+-- Portal itself.
 --
 -- Requires the pg_net extension (bundled with every Supabase project).
 
@@ -43,49 +51,38 @@ begin
     return new;
   end if;
 
-  requester_name := nullif(trim(coalesce(new.answers->>'dt_first', '') || ' ' || coalesce(new.answers->>'dt_last', '')), '');
+  requester_name := coalesce(nullif(trim(coalesce(new.answers->>'dt_first', '') || ' ' || coalesce(new.answers->>'dt_last', '')), ''), 'Someone');
   requester_email := coalesce(new.answers->>'dt_email', '');
   phone := coalesce(new.answers->>'dt_phone', '');
-  preferred_dates := coalesce(new.answers->>'dt_dates', '');
-  participant_count := coalesce(new.answers->>'dt_count', '');
+  preferred_dates := coalesce(nullif(new.answers->>'dt_dates', ''), 'Not specified');
+  participant_count := coalesce(nullif(new.answers->>'dt_count', ''), 'Not specified');
   notes := coalesce(new.answers->>'dt_notes', '');
 
   text_body := 'New Docent Tour Request'
-    || E'\n\nContact Name: ' || coalesce(requester_name, '—')
-    || E'\nEmail: ' || coalesce(nullif(requester_email, ''), '—')
-    || E'\nPhone Number: ' || coalesce(nullif(phone, ''), '—')
-    || E'\nPreferred Dates: ' || coalesce(nullif(preferred_dates, ''), '—')
-    || E'\nNumber Of Participants: ' || coalesce(nullif(participant_count, ''), '—')
-    || E'\nMessage: ' || coalesce(nullif(notes, ''), '—');
+    || E'\n\nContact Name: ' || requester_name
+    || E'\nEmail: ' || coalesce(nullif(requester_email, ''), 'Not specified')
+    || E'\nPhone: ' || coalesce(nullif(phone, ''), 'Not specified')
+    || E'\nPreferred dates: ' || preferred_dates
+    || E'\nParticipants: ' || participant_count
+    || (case when notes <> '' then E'\nNotes: ' || notes else '' end)
+    || E'\n\nView in Volunteer Hub: https://volunteerhub.northstarhouse.org/#/areas';
 
   html := '<div style="background:#d9cdb8;padding:32px 16px;font-family:Georgia,''Times New Roman'',serif;">' ||
     '<div style="max-width:560px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">' ||
       '<div style="height:14px;background:#886c44;"></div>' ||
       '<div style="padding:48px 40px 32px;text-align:center;">' ||
-        '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">' || coalesce(requester_name, 'Someone') || ' submitted a tour request</h1>' ||
+        '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">New Docent Tour Request</h1>' ||
         '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>' ||
-        '<p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;">' ||
-          '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif">' ||
-            '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9;font-family:Helvetica,Arial,sans-serif">' ||
-              '<b>Contact Name:</b> ' || coalesce(requester_name, '—') || '<br/>' ||
-              '<b>Email:</b> ' || coalesce(nullif(requester_email, ''), '—') || '<br/>' ||
-              '<b>Phone Number:</b> ' || coalesce(nullif(phone, ''), '—') || '<br/>' ||
-              '<b>Preferred Dates:</b> ' || coalesce(nullif(preferred_dates, ''), '—') || '<br/>' ||
-              '<b>Number Of Participants:</b> ' || coalesce(nullif(participant_count, ''), '—') ||
-            '</div>' ||
-            '<div style="text-align:left;background:#f5f0e8;border-radius:8px;padding:14px 16px;margin-top:16px;font-size:14px;line-height:1.6;color:#3a332a;font-family:Helvetica,Arial,sans-serif">' ||
-              '<b>Message:</b><br/>' || coalesce(nullif(notes, ''), '—') ||
-            '</div>' ||
-          '</div>' ||
-        '</p>' ||
+        '<p style="margin:0 0 8px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;"><b>' || requester_name || '</b> requested a tour.</p>' ||
+        '<p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#777;line-height:1.6;text-align:left;display:inline-block;">' ||
+          'Email: ' || coalesce(nullif(requester_email, ''), 'Not specified') || '<br/>' ||
+          'Phone: ' || coalesce(nullif(phone, ''), 'Not specified') || '<br/>' ||
+          'Preferred dates: ' || preferred_dates || '<br/>' ||
+          'Participants: ' || participant_count ||
+          (case when notes <> '' then '<br/>Notes: ' || notes else '' end) ||
+        '</p><br/>' ||
+        '<a href="https://volunteerhub.northstarhouse.org/#/areas" style="display:inline-block;background:#886c44;color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:16px;padding:16px 32px;border-radius:6px;margin-bottom:8px;">View in Volunteer Hub</a>' ||
       '</div>' ||
-      '<table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #e5ddcf;">' ||
-        '<tr>' ||
-          '<td style="width:33.33%;text-align:center;padding:14px 8px;border-right:1px solid #e5ddcf;"><a href="https://calendar.google.com/calendar/u/0?cid=dGhlbm9ydGhzdGFyaG91c2VAZ21haWwuY29t" style="color:#886c44;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">Calendar</a></td>' ||
-          '<td style="width:33.33%;text-align:center;padding:14px 8px;border-right:1px solid #e5ddcf;"><a href="https://northstarhouse.github.io/volunteerhub/" style="color:#886c44;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">Volunteer Hub</a></td>' ||
-          '<td style="width:33.33%;text-align:center;padding:14px 8px;"><a href="https://thenorthstarhouse.org" style="color:#886c44;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">Website</a></td>' ||
-        '</tr>' ||
-      '</table>' ||
     '</div>' ||
   '</div>';
 
