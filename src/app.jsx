@@ -2938,10 +2938,51 @@ function VolunteersView({ navigate }) {
   const [donorLinkQuery, setDonorLinkQuery] = useState('');
   const [showDonorLinkDrop, setShowDonorLinkDrop] = useState(false);
   const [linkingDonor, setLinkingDonor] = useState(false);
+  const [ootNotices, setOotNoticesForVol] = useState([]);
+  const [showOotForm, setShowOotForm] = useState(false);
+  const [ootForm, setOotForm] = useState({ start_date: '', end_date: '', notes: '' });
+  const [ootSaving, setOotSaving] = useState(false);
+  const [ootErr, setOotErr] = useState('');
 
   useEffect(function() {
     cachedSbFetch('donors', ['id', 'formal_name']).then(function(data) { if (Array.isArray(data)) setDonorOptions(data); });
   }, []);
+
+  useEffect(function() {
+    setShowOotForm(false);
+    setOotErr('');
+    if (!selected) { setOotNoticesForVol([]); return; }
+    var fullName = ((selected['First Name'] || '') + ' ' + (selected['Last Name'] || '')).trim();
+    fetch(SUPABASE_URL + '/rest/v1/oot_notices?or=(volunteer_id.eq.' + selected.id + ',name.eq.' + encodeURIComponent(fullName) + ')&order=start_date.desc&select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setOotNoticesForVol(Array.isArray(rows) ? rows : []); }).catch(function() { setOotNoticesForVol([]); });
+  }, [selected && selected.id]);
+
+  function submitOotNotice(e) {
+    e.preventDefault();
+    if (!selected || !ootForm.start_date || !ootForm.end_date) { setOotErr('Both dates are required.'); return; }
+    if (ootForm.end_date < ootForm.start_date) { setOotErr('End date must be after start date.'); return; }
+    setOotSaving(true); setOotErr('');
+    var fullName = ((selected['First Name'] || '') + ' ' + (selected['Last Name'] || '')).trim();
+    sbInsert('oot_notices', {
+      name: fullName,
+      start_date: ootForm.start_date,
+      end_date: ootForm.end_date,
+      notes: ootForm.notes || null,
+      volunteer_id: selected.id,
+      auth_user_id: selected.auth_user_id || null
+    }).then(function(res) {
+      setOotSaving(false);
+      var inserted = Array.isArray(res) ? res[0] : res;
+      if (inserted && inserted.id) {
+        setOotNoticesForVol(function(prev) { return [inserted].concat(prev); });
+        setShowOotForm(false);
+        setOotForm({ start_date: '', end_date: '', notes: '' });
+      } else {
+        setOotErr((inserted && inserted.message) || 'Failed to save. Please try again.');
+      }
+    }).catch(function() { setOotSaving(false); setOotErr('Failed to save. Please try again.'); });
+  }
 
   function linkDonor(donorId) {
     if (!selected) return;
@@ -3084,7 +3125,7 @@ function VolunteersView({ navigate }) {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(function() {
-    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','Mid-Year Notes 2026','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day','donor_id'])
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','Mid-Year Notes 2026','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day','donor_id','auth_user_id'])
       .then(function(data) {
         if (Array.isArray(data)) {
           setVolunteers(data);
@@ -3734,6 +3775,51 @@ function VolunteersView({ navigate }) {
                   </div>
                 );
               })()}
+              <div style={{ marginBottom: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showOotForm ? 10 : 5 }}>
+                  <span style={volSecLabel}>Out of Town</span>
+                  {!showOotForm && <button onClick={function() { setOotForm({ start_date: '', end_date: '', notes: '' }); setOotErr(''); setShowOotForm(true); }} style={{ background: '#fff', border: '0.5px solid #ddd4c4', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: gold, cursor: 'pointer', fontWeight: 500 }}>Submit Out of Town Notice</button>}
+                </div>
+
+                {showOotForm && (
+                  <form onSubmit={submitOotNotice} style={{ background: '#faf8f4', borderRadius: 8, padding: '12px 14px', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Start Date</div>
+                        <input type="date" value={ootForm.start_date} onChange={function(e) { setOotForm(function(f) { return Object.assign({}, f, { start_date: e.target.value }); }); }} required style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, boxSizing: 'border-box' }} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>End Date</div>
+                        <input type="date" value={ootForm.end_date} onChange={function(e) { setOotForm(function(f) { return Object.assign({}, f, { end_date: e.target.value }); }); }} required style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, boxSizing: 'border-box' }} />
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Notes (optional)</div>
+                      <textarea value={ootForm.notes} onChange={function(e) { setOotForm(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={2} style={{ width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, boxSizing: 'border-box', resize: 'vertical' }} />
+                    </div>
+                    {ootErr && <div style={{ color: '#c0392b', fontSize: 11, marginBottom: 8 }}>{ootErr}</div>}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" onClick={function() { setShowOotForm(false); }} disabled={ootSaving} style={{ flex: 1, background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 7, padding: '7px', fontSize: 12, color: '#999', cursor: 'pointer' }}>Cancel</button>
+                      <button type="submit" disabled={ootSaving} style={{ flex: 1, background: gold, border: 'none', borderRadius: 7, padding: '7px', fontSize: 12, color: '#fff', fontWeight: 500, cursor: 'pointer', opacity: ootSaving ? 0.7 : 1 }}>{ootSaving ? 'Saving…' : 'Submit'}</button>
+                    </div>
+                  </form>
+                )}
+
+                {ootNotices.length === 0 ? (
+                  <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No out-of-town notices on file</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {ootNotices.map(function(n) {
+                      return (
+                        <div key={n.id} style={{ fontSize: 12, color: '#555', background: '#faf8f4', borderRadius: 8, padding: '7px 12px' }}>
+                          <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{n.start_date}</span> – <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{n.end_date}</span>
+                          {n.notes && <div style={{ marginTop: 2, fontStyle: 'italic', color: '#777' }}>{n.notes}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               <button onClick={function() { setSelected(null); }} style={{ marginTop: 16, width: '100%', padding: '9px', background: 'transparent', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#999', fontWeight: 500 }}>Close</button>
             </div>
           </div>
