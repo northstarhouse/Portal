@@ -69,29 +69,29 @@ Deno.serve(async (req) => {
       return json({ success: true, tempPassword });
     }
 
-    // No link yet -- an auth user might already exist for this email (e.g.
-    // they signed up once before the link table existed), so look it up
-    // rather than risk a duplicate-email error from createUser.
-    const lookupRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?email=${encodeURIComponent(email)}`, {
+    // No link yet. IMPORTANT: GoTrue's admin "list users" endpoint does NOT
+    // support filtering by email via a query param -- an earlier version of
+    // this function tried `?email=` here, which was silently ignored and
+    // returned the default (unfiltered) user list, so `users[0]` was some
+    // unrelated real account. That bug reset a real person's password and
+    // mis-linked their account before it was caught. Do not reintroduce an
+    // email-filtered list call here. createUser itself will fail with a
+    // clear "already registered" error if this email already has an
+    // account -- that's the correct, safe way to detect it.
+    const create = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+      method: 'POST',
       headers: adminHeaders,
+      body: JSON.stringify({ email, password: tempPassword, email_confirm: true, user_metadata: { must_change_password: true } }),
     });
-    const lookup = await lookupRes.json();
-    const foundUser = Array.isArray(lookup?.users) ? lookup.users[0] : Array.isArray(lookup) ? lookup[0] : null;
-
-    let authUserId: string;
-    if (foundUser?.id) {
-      authUserId = foundUser.id;
-      await setPassword(authUserId, tempPassword);
-    } else {
-      const create = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-        method: 'POST',
-        headers: adminHeaders,
-        body: JSON.stringify({ email, password: tempPassword, email_confirm: true, user_metadata: { must_change_password: true } }),
-      });
-      if (!create.ok) throw new Error(`Failed to create auth user: ${create.status} ${await create.text()}`);
-      const created = await create.json();
-      authUserId = created.id;
+    if (!create.ok) {
+      const errText = await create.text();
+      if (create.status === 422 || /already.*registered|already exists/i.test(errText)) {
+        return json({ success: false, error: 'An account with this email already exists but is not linked to this volunteer. Ask an admin to check volunteer_auth_links / auth.users for ' + email + ' and link it manually.' }, 409);
+      }
+      throw new Error(`Failed to create auth user: ${create.status} ${errText}`);
     }
+    const created = await create.json();
+    const authUserId: string = created.id;
 
     await fetch(`${SUPABASE_URL}/rest/v1/volunteer_auth_links?on_conflict=auth_user_id`, {
       method: 'POST',
