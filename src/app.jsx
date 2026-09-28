@@ -15430,7 +15430,7 @@ function VolEmailListsView({ navigate }) {
     setUiSearch('');
     setUiSendingId(null);
     setUiSentIds({});
-    var cols = ['id', 'First Name', 'Last Name', 'Email', 'Phone Number', 'Preferred Contact', 'Address', 'Birthday', 'Volunteer Anniversary', 'Emergency Contact', 'Allergies', 'Favorite Quote', 'NSH Future Vision'].map(encodeURIComponent).join(',');
+    var cols = ['id', 'First Name', 'Last Name', 'Email', 'Phone Number', 'Preferred Contact', 'Address', 'Birthday', 'Emergency Contact', 'Allergies'].map(encodeURIComponent).join(',');
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?select=' + cols + '&Status=eq.Active', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
@@ -15444,12 +15444,6 @@ function VolEmailListsView({ navigate }) {
     var d = new Date(dateStr + 'T00:00:00');
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  }
-  function uiFmtMonthYear(dateStr) {
-    if (!dateStr) return null;
-    var d = new Date(dateStr + 'T00:00:00');
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   }
   function uiFmtPreferred(val) {
     if (val === 'phone') return 'Phone';
@@ -15467,11 +15461,8 @@ function VolEmailListsView({ navigate }) {
       ['Preferred Contact Method', uiFmtPreferred(v['Preferred Contact'])],
       ['Mailing Address', uiFmtVal(v['Address'])],
       ['Birthday', uiFmtDate(v['Birthday'])],
-      ['NSH Anniversary', uiFmtMonthYear(v['Volunteer Anniversary'])],
       ['Emergency Contact', uiFmtVal(v['Emergency Contact'])],
       ['Allergies', uiFmtVal(v['Allergies'])],
-      ['Favorite Quote', uiFmtVal(v['Favorite Quote'])],
-      ['Envisioned Future of NSH', uiFmtVal(v['NSH Future Vision'])],
     ];
     var rowsHtml = rows.map(function(r) {
       var has = !!r[1];
@@ -15488,7 +15479,7 @@ function VolEmailListsView({ navigate }) {
         '<div>Temporary Password: <b>' + esc(tempPassword) + '</b></div>' +
         '<div style="margin-top:6px;color:#777;font-size:13px">You’ll be asked to create your own password the first time you log in.</div>' +
       '</div>';
-    var bookmarkTip = 'Tip: Once you’re logged in, bookmark the page so it’s easy to find next time — click the star icon in your browser’s address bar to save it.';
+    var bookmarkTip = 'Tip: Once you’re logged in, bookmark the page so it’s easy to find next time. Click the star icon in your browser’s address bar to save it.';
 
     var subtext = '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#3a332a">' +
         '<p>Hi ' + esc(firstName) + ',</p>' +
