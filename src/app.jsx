@@ -10005,8 +10005,10 @@ function ReviewsView({ navigate }) {
   var year = new Date().getFullYear();
   var quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
   var [submitted, setSubmitted] = useState(null);
+  var [goalsByKey, setGoalsByKey] = useState({}); // 'area:quarter' -> Op Quarter Goals row
   var [reviewed, setReviewed] = useState({});   // 'area:quarter' -> review row
   var [activeCell, setActiveCell] = useState(null); // {area, quarter}
+  var [viewingSubmission, setViewingSubmission] = useState(null); // {area, quarter} -- read-only view of what was submitted
   var emptyCcForm = { status: 'On track', discussion_focus: '', potential_actions: '', escalation: 'None', escalation_other: '', priority_confirmation: 'Approved', review_date: '' };
   var [ccForm, setCcForm] = useState(emptyCcForm);
   var [ccSaving, setCcSaving] = useState(false);
@@ -10152,7 +10154,7 @@ function ReviewsView({ navigate }) {
   }
 
   function loadData() {
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?year=eq.' + year + '&select=area,quarter,support_needed&order=date_submitted.desc', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?year=eq.' + year + '&select=*&order=date_submitted.desc', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
       .then(function(r) { return r.json(); }).then(function(rows) {
         var s = {};
         if (Array.isArray(rows)) rows.forEach(function(r) { if (!s[r.area + ':' + r.quarter]) s[r.area + ':' + r.quarter] = r; });
@@ -10163,6 +10165,12 @@ function ReviewsView({ navigate }) {
         var rv = {};
         if (Array.isArray(rows)) rows.forEach(function(r) { rv[r.area + ':' + r.quarter] = r; });
         setReviewed(rv);
+      });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?year=eq.' + year + '&select=*', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); }).then(function(rows) {
+        var g = {};
+        if (Array.isArray(rows)) rows.forEach(function(r) { g[r.area + ':' + r.quarter] = r; });
+        setGoalsByKey(g);
       });
   }
 
@@ -10241,7 +10249,7 @@ function ReviewsView({ navigate }) {
                               <svg width="20" height="20" viewBox="0 0 24 24" fill={gold} stroke={gold} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                             </button>
                           ) : hasReflection ? (
-                            <button onClick={function() { openCell(area, q); }} title="Reflection received — click to add review" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <button onClick={function() { setViewingSubmission({ area: area, quarter: q }); }} title="Reflection received — click to view submission" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#e8f5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                               </div>
@@ -10356,6 +10364,74 @@ function ReviewsView({ navigate }) {
           </div>
         </div>
       )}
+
+      {viewingSubmission && (function() {
+        var key = viewingSubmission.area + ':' + viewingSubmission.quarter;
+        var g = goalsByKey[key] || {};
+        var u = submitted[key] || {};
+        var entries = goalEntries(g, u);
+        var challengeOpts = ['Capacity or volunteer limitations','Budget or funding constraints','Scheduling or timing issues','Cross-area coordination gaps','External factors','Other'];
+        var supportOpts = ['Staff or volunteer help','Marketing or communications','Board guidance or decision','Funding or fundraising support','Facilities or logistics','Other'];
+        var vLbl = { fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4, marginTop: 12, display: 'block' };
+        var vVal = { fontSize: 13, color: '#2a2a2a', lineHeight: 1.5, whiteSpace: 'pre-wrap' };
+        var chipList = function(opts, checked) {
+          var arr = Array.isArray(checked) ? checked : [];
+          return (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {opts.filter(function(o) { return arr.indexOf(o) !== -1; }).map(function(o) {
+                return <span key={o} style={{ fontSize: 11, background: '#fdf3e3', color: '#a15c00', border: '1px solid #f0d9a8', borderRadius: 6, padding: '3px 8px' }}>{o}</span>;
+              })}
+              {arr.length === 0 && <span style={{ fontSize: 12, color: '#ccc' }}>None selected</span>}
+            </div>
+          );
+        };
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+            <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 560, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{viewingSubmission.area}</div>
+                  <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{viewingSubmission.quarter} {year} — Submitted Reflection{u.date_submitted ? ' · ' + u.date_submitted : ''}</div>
+                </div>
+                <button onClick={function() { setViewingSubmission(null); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>×</button>
+              </div>
+
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', marginTop: 18, borderBottom: '0.5px solid #f0ece6', paddingBottom: 6 }}>Quarterly Goals</div>
+              {g.primary_focus && (<React.Fragment><span style={vLbl}>Primary Focus</span><div style={vVal}>{g.primary_focus}</div></React.Fragment>)}
+              {entries.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#ccc', marginTop: 10 }}>No goals recorded for this quarter.</div>
+              ) : entries.map(function(entry, i) {
+                return (
+                  <div key={i} style={{ marginTop: 12, paddingTop: i > 0 ? 10 : 0, borderTop: i > 0 ? '0.5px solid #f5f1eb' : 'none' }}>
+                    <span style={vLbl}>Goal {i + 1}</span>
+                    <div style={vVal}>{entry.text}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div><span style={vLbl}>Status</span><div style={vVal}>{entry.status || '—'}</div></div>
+                      <div><span style={vLbl}>Summary</span><div style={vVal}>{entry.summary || '—'}</div></div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', marginTop: 22, borderBottom: '0.5px solid #f0ece6', paddingBottom: 6 }}>Quarterly Reflection</div>
+              <span style={vLbl}>What Went Well</span><div style={vVal}>{u.what_went_well || u.successes || '—'}</div>
+              <span style={vLbl}>Challenges</span>{chipList(challengeOpts, u.challenges)}
+              {u.challenges_details && <div style={Object.assign({}, vVal, { marginTop: 6 })}>{u.challenges_details}</div>}
+              <span style={vLbl}>Support Needed</span>{chipList(supportOpts, u.support_needed)}
+              {u.support_details && <div style={Object.assign({}, vVal, { marginTop: 6 })}>{u.support_details}</div>}
+              <span style={vLbl}>Other Notes</span><div style={vVal}>{u.other_notes || '—'}</div>
+              <span style={vLbl}>Next Quarter Focus</span><div style={vVal}>{u.next_focus || '—'}</div>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 22 }}>
+                <button onClick={function() { var a = viewingSubmission.area, q = viewingSubmission.quarter; setViewingSubmission(null); openCell(a, q); }} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                  {reviewed[key] ? 'Edit Review →' : 'Write Review →'}
+                </button>
+                <button onClick={function() { setViewingSubmission(null); }} style={{ padding: '10px 16px', background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Close</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
