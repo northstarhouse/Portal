@@ -14990,6 +14990,18 @@ function VolEmailListsView({ navigate }) {
   var [tplLoadId, setTplLoadId] = useS('');
   var [tplSavingTemplate, setTplSavingTemplate] = useS(false);
 
+  // "Update Info Reminder" — a personalized (not broadcast-identical) email
+  // to an active volunteer, showing what North Star House currently has on
+  // file for them, with a link into their Volunteer Hub profile (which
+  // already supports self-editing every one of these fields) to fix anything
+  // wrong. Sent one person at a time, by hand -- staff pick who and when,
+  // there's no "send to everyone" button.
+  var [showUpdateInfoModal, setShowUpdateInfoModal] = useS(false);
+  var [uiTargets, setUiTargets] = useS(null);
+  var [uiSearch, setUiSearch] = useS('');
+  var [uiSendingId, setUiSendingId] = useS(null);
+  var [uiSentIds, setUiSentIds] = useS({});
+
   useE(function() {
     cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Email','Status','Team','Event Tags','Overview Notes','Phone Number']).then(function(data) {
       if (Array.isArray(data)) setVolunteers(data);
@@ -15412,6 +15424,141 @@ function VolEmailListsView({ navigate }) {
     setTplSubject(tag + ' — ' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }));
   }
 
+  function openUpdateInfoModal() {
+    setShowUpdateInfoModal(true);
+    setUiTargets(null);
+    setUiSearch('');
+    setUiSendingId(null);
+    setUiSentIds({});
+    var cols = ['id', 'First Name', 'Last Name', 'Email', 'Phone Number', 'Preferred Contact', 'Address', 'Birthday', 'Volunteer Anniversary', 'Emergency Contact', 'Allergies', 'Favorite Quote', 'NSH Future Vision'].map(encodeURIComponent).join(',');
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?select=' + cols + '&Status=eq.Active', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setUiTargets((Array.isArray(rows) ? rows : []).filter(function(v) { return v['Email'] && v['Email'].trim(); }));
+    }).catch(function() { setUiTargets([]); });
+  }
+
+  function uiFmtVal(v) { return (v != null && String(v).trim()) ? String(v).trim() : null; }
+  function uiFmtDate(dateStr) {
+    if (!dateStr) return null;
+    var d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+  function uiFmtMonthYear(dateStr) {
+    if (!dateStr) return null;
+    var d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+  function uiFmtPreferred(val) {
+    if (val === 'phone') return 'Phone';
+    if (val === 'email') return 'Email';
+    if (val === 'both') return 'Phone & Email';
+    return null;
+  }
+
+  function buildUpdateInfoEmail(v, tempPassword) {
+    function esc(s) { return String(s == null || s === '' ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    var firstName = (v['First Name'] || '').trim() || 'there';
+    var rows = [
+      ['Phone Number', uiFmtVal(v['Phone Number'])],
+      ['Email', uiFmtVal(v['Email'])],
+      ['Preferred Contact Method', uiFmtPreferred(v['Preferred Contact'])],
+      ['Mailing Address', uiFmtVal(v['Address'])],
+      ['Birthday', uiFmtDate(v['Birthday'])],
+      ['NSH Anniversary', uiFmtMonthYear(v['Volunteer Anniversary'])],
+      ['Emergency Contact', uiFmtVal(v['Emergency Contact'])],
+      ['Allergies', uiFmtVal(v['Allergies'])],
+      ['Favorite Quote', uiFmtVal(v['Favorite Quote'])],
+      ['Envisioned Future of NSH', uiFmtVal(v['NSH Future Vision'])],
+    ];
+    var rowsHtml = rows.map(function(r) {
+      var has = !!r[1];
+      return '<div style="display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid #efe9df">' +
+        '<span style="color:#888">' + esc(r[0]) + '</span>' +
+        '<span style="color:' + (has ? '#2a2420' : '#c0392b') + ';font-weight:' + (has ? 600 : 500) + ';text-align:right">' + (has ? esc(r[1]) : 'Not on file') + '</span>' +
+      '</div>';
+    }).join('');
+    var rowsText = rows.map(function(r) { return r[0] + ': ' + (r[1] || 'Not on file'); }).join('\n');
+
+    var credentialsHtml = '<div style="margin:18px 0;background:#faf5e8;border:1px solid #e8dab0;border-radius:8px;padding:14px 16px">' +
+        '<div style="font-weight:700;color:#2a2420;margin-bottom:6px">Your Volunteer Hub Login</div>' +
+        '<div>Email: <b>' + esc(v['Email']) + '</b></div>' +
+        '<div>Temporary Password: <b>' + esc(tempPassword) + '</b></div>' +
+        '<div style="margin-top:6px;color:#777;font-size:13px">You’ll be asked to create your own password the first time you log in.</div>' +
+      '</div>';
+    var bookmarkTip = '💡 Tip: Once you’re logged in, bookmark the page so it’s easy to find next time — click the ☆ icon in your browser’s address bar (→ ⭐) to save it.';
+
+    var subtext = '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#3a332a">' +
+        '<p>Hi ' + esc(firstName) + ',</p>' +
+        '<p>We want to make sure we have your most current information on file. Here’s what we currently have for you:</p>' +
+        '<div style="margin:16px 0">' + rowsHtml + '</div>' +
+        '<p>If anything above is missing or out of date, log in to your Volunteer Hub profile below to update it any time. Since this may be your first time (or first time in a while), here’s how to get in:</p>' +
+        credentialsHtml +
+        '<p style="font-size:13px;color:#666">' + bookmarkTip + '</p>' +
+      '</div>';
+
+    var html = buildBoardNotificationEmailHtml({
+      headline: 'Please Update Your Info',
+      subtext: subtext,
+      buttonText: 'Log In & Update My Info →',
+      buttonUrl: VOLUNTEER_HUB_URL + '#/profile',
+      footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
+    });
+
+    var text = 'Hi ' + firstName + ',\n\n' +
+      'We want to make sure we have your most current information on file. Here’s what we currently have for you:\n\n' +
+      rowsText +
+      '\n\nIf anything above is missing or out of date, log in to your Volunteer Hub profile to update it any time. Here’s how to get in:\n\n' +
+      'Email: ' + v['Email'] + '\n' +
+      'Temporary Password: ' + tempPassword + '\n' +
+      '(You’ll be asked to create your own password the first time you log in.)\n\n' +
+      bookmarkTip + '\n\n' +
+      VOLUNTEER_HUB_URL + '#/profile';
+
+    return { html: html, text: text, subject: 'Please Update Your Contact Info' };
+  }
+
+  function previewUpdateInfoEmail(v) {
+    // Preview never touches real auth -- a placeholder password is fine here,
+    // the real one is only generated at send time.
+    var email = buildUpdateInfoEmail(v, 'TempPass123');
+    var w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Email Preview — Please Update Your Info</title></head><body style="margin:0">' + email.html + '</body></html>');
+    w.document.close();
+  }
+
+  function sendUpdateInfoEmail(v) {
+    if (uiSendingId === v.id || uiSentIds[v.id]) return;
+    setUiSendingId(v.id);
+    fetch(SUPABASE_URL + '/functions/v1/volunteer-hub-account', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ volunteer_id: v.id, email: v['Email'] })
+    }).then(function(r) { return r.json(); }).then(function(cred) {
+      if (!cred || !cred.success) { setUiSendingId(null); alert('Failed to set up their Volunteer Hub login: ' + (cred && cred.error || 'unknown error')); return; }
+      var built = buildUpdateInfoEmail(v, cred.tempPassword);
+      return fetch(SUPABASE_URL + '/functions/v1/send-email', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: v['Email'], subject: built.subject, body: built.text, html: built.html })
+      }).then(function(res) {
+        setUiSendingId(null);
+        if (!res.ok) { alert('Failed to send.'); return; }
+        setUiSentIds(function(prev) { var n = Object.assign({}, prev); n[v.id] = true; return n; });
+        fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs', {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ sent_at: new Date().toISOString(), team_tag: 'Update Info Reminder', recipient_count: 1, recipients: [(v['First Name'] || '') + ' ' + (v['Last Name'] || '') + ' <' + v['Email'] + '>'], subject: built.subject })
+        }).then(function() {
+          return fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=10', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function(r) { return r.json(); }).then(function(data) { if (Array.isArray(data)) setLogs(data); });
+        }).catch(function() {});
+      });
+    }).catch(function() { setUiSendingId(null); alert('Failed to send — network error.'); });
+  }
+
   function handleLoadTemplate(id) {
     setTplLoadId(id);
     if (!id) return;
@@ -15518,6 +15665,9 @@ function VolEmailListsView({ navigate }) {
         </div>
         <button onClick={openTemplateModal} disabled={!volunteers} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 600, border: 'none', borderRadius: 8, background: gold, color: '#fff', cursor: volunteers ? 'pointer' : 'not-allowed', opacity: volunteers ? 1 : 0.5 }}>
           ✉ Template Email
+        </button>
+        <button onClick={openUpdateInfoModal} disabled={!volunteers} title="Personalized email to every active volunteer showing their info on file, with a link to update it" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 600, border: '1px solid ' + gold, borderRadius: 8, background: '#fff', color: gold, cursor: volunteers ? 'pointer' : 'not-allowed', opacity: volunteers ? 1 : 0.5 }}>
+          🔄 Update Info Reminder
         </button>
         <button onClick={function() { copyEmails((volunteers || []).filter(isActive), '__all_active__'); }} disabled={!volunteers} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 500, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#666', cursor: volunteers ? 'pointer' : 'not-allowed', opacity: volunteers ? 1 : 0.5 }}>
           {copied === '__all_active__' ? '✓ Copied' : '⧉ Copy All Active Volunteer Emails'}
@@ -15863,6 +16013,56 @@ function VolEmailListsView({ navigate }) {
                 </div>
                 <div style={{ fontSize: 10, color: '#ccc', textAlign: 'center' }}>Sends from info@northstarhouse.org</div>
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Update Info Reminder modal — browse volunteers, send one personalized email at a time by hand */}
+      {showUpdateInfoModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 460, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid #f0ece6', flexShrink: 0 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>Update Info Reminder</div>
+                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Pick who to send to — each email is personalized to that person and sent one at a time</div>
+              </div>
+              <button onClick={function() { setShowUpdateInfoModal(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: '#666', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+            </div>
+            {uiTargets === null ? (
+              <div style={{ textAlign: 'center', color: '#aaa', fontSize: 13, padding: '30px 0' }}>Loading volunteers…</div>
+            ) : (
+              <React.Fragment>
+                <div style={{ padding: '12px 20px 0', flexShrink: 0 }}>
+                  <input value={uiSearch} onChange={function(e) { setUiSearch(e.target.value); }} placeholder="Search by name or email…" style={inpSt} />
+                </div>
+                <div style={{ padding: '12px 20px 16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {uiTargets
+                    .filter(function(v) {
+                      if (!uiSearch.trim()) return true;
+                      var q = uiSearch.trim().toLowerCase();
+                      return ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).toLowerCase().indexOf(q) !== -1 || (v['Email'] || '').toLowerCase().indexOf(q) !== -1;
+                    })
+                    .sort(function(a, b) { return (a['Last Name'] || '').localeCompare(b['Last Name'] || ''); })
+                    .map(function(v) {
+                      var sent = !!uiSentIds[v.id];
+                      var sending = uiSendingId === v.id;
+                      return (
+                        <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#faf8f4', borderRadius: 8 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: '#2a2a2a' }}>{v['First Name']} {v['Last Name']}</div>
+                            <div style={{ fontSize: 11, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v['Email']}</div>
+                          </div>
+                          <button onClick={function() { previewUpdateInfoEmail(v); }} title="Preview this person's email" style={{ padding: '6px 10px', background: '#fff', border: '1px solid #e0d8cc', borderRadius: 7, fontSize: 11, color: '#666', cursor: 'pointer', flexShrink: 0 }}>Preview</button>
+                          <button onClick={function() { sendUpdateInfoEmail(v); }} disabled={sending || sent} style={{ padding: '6px 12px', background: sent ? '#eef7ee' : '#fff', color: sent ? '#2e7d32' : gold, border: '1px solid ' + (sent ? '#bfe0bf' : gold), borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: (sending || sent) ? 'default' : 'pointer', opacity: sending ? 0.6 : 1, flexShrink: 0 }}>
+                            {sent ? '✓ Sent' : sending ? 'Sending…' : 'Send'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  {uiTargets.length === 0 && <div style={{ textAlign: 'center', color: '#ccc', fontSize: 13, padding: '20px 0' }}>No active volunteers with an email on file.</div>}
+                </div>
+              </React.Fragment>
             )}
           </div>
         </div>
