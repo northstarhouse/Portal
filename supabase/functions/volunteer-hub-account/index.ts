@@ -30,13 +30,10 @@ const adminHeaders = {
   'Content-Type': 'application/json',
 };
 
-// Readable, unambiguous characters only -- this gets typed by hand off an email.
-function genTempPassword() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  let out = '';
-  for (let i = 0; i < 10; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
-}
+// Fixed by request rather than randomly generated -- every reset/creation
+// hands out this same temporary password. Fine since must_change_password
+// forces a real password to be set on first login regardless.
+const TEMP_PASSWORD = 'JuliaMorgan1905';
 
 async function setPassword(authUserId: string, tempPassword: string, email?: string) {
   const body: Record<string, unknown> = { password: tempPassword, user_metadata: { must_change_password: true } };
@@ -57,7 +54,7 @@ Deno.serve(async (req) => {
     const { volunteer_id, email } = await req.json();
     if (!volunteer_id || !email) return json({ success: false, error: 'volunteer_id and email are required' }, 400);
 
-    const tempPassword = genTempPassword();
+    const tempPassword = TEMP_PASSWORD;
 
     // Already linked to a known auth user for this volunteer?
     const linkRes = await fetch(

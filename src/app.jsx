@@ -15488,7 +15488,7 @@ function VolEmailListsView({ navigate }) {
         '<div>Temporary Password: <b>' + esc(tempPassword) + '</b></div>' +
         '<div style="margin-top:6px;color:#777;font-size:13px">You’ll be asked to create your own password the first time you log in.</div>' +
       '</div>';
-    var bookmarkTip = '💡 Tip: Once you’re logged in, bookmark the page so it’s easy to find next time — click the ☆ icon in your browser’s address bar (→ ⭐) to save it.';
+    var bookmarkTip = 'Tip: Once you’re logged in, bookmark the page so it’s easy to find next time — click the star icon in your browser’s address bar to save it.';
 
     var subtext = '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#3a332a">' +
         '<p>Hi ' + esc(firstName) + ',</p>' +
@@ -15523,7 +15523,7 @@ function VolEmailListsView({ navigate }) {
   function previewUpdateInfoEmail(v) {
     // Preview never touches real auth -- a placeholder password is fine here,
     // the real one is only generated at send time.
-    var email = buildUpdateInfoEmail(v, 'TempPass123');
+    var email = buildUpdateInfoEmail(v, 'JuliaMorgan1905');
     var w = window.open('', '_blank');
     if (!w) return;
     w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Email Preview — Please Update Your Info</title></head><body style="margin:0">' + email.html + '</body></html>');
@@ -15667,7 +15667,7 @@ function VolEmailListsView({ navigate }) {
           ✉ Template Email
         </button>
         <button onClick={openUpdateInfoModal} disabled={!volunteers} title="Personalized email to every active volunteer showing their info on file, with a link to update it" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 600, border: '1px solid ' + gold, borderRadius: 8, background: '#fff', color: gold, cursor: volunteers ? 'pointer' : 'not-allowed', opacity: volunteers ? 1 : 0.5 }}>
-          🔄 Update Info Reminder
+          Update Info Reminder
         </button>
         <button onClick={function() { copyEmails((volunteers || []).filter(isActive), '__all_active__'); }} disabled={!volunteers} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: 12, fontWeight: 500, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#666', cursor: volunteers ? 'pointer' : 'not-allowed', opacity: volunteers ? 1 : 0.5 }}>
           {copied === '__all_active__' ? '✓ Copied' : '⧉ Copy All Active Volunteer Emails'}
