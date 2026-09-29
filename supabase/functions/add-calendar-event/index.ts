@@ -27,7 +27,7 @@ const TIME_ZONE = "America/Los_Angeles";
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, prefer, x-app-token",
 };
 
 function json(body: unknown, status = 200) {
@@ -99,10 +99,14 @@ Deno.serve(async (req) => {
     const { summary, description, date, startTime, durationMin } = await req.json();
     if (!summary || !date || !startTime) return json({ error: "summary, date, and startTime are required" }, 400);
 
-    const duration = durationMin || 45;
-    const startDateTime = `${date}T${startTime}`;
-    const startMs = new Date(`${date}T${startTime}Z`).getTime(); // wall-clock arithmetic only; timeZone below governs the real offset
-    if (Number.isNaN(startMs)) return json({ error: "Invalid date/startTime" }, 400);
+    const duration = Number(durationMin ?? 45);
+    if (!Number.isFinite(duration) || duration <= 0) return json({ error: "durationMin must be a positive number" }, 400);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(startTime)) {
+      return json({ error: "Invalid date/startTime" }, 400);
+    }
+    const startDateTime = `${date}T${startTime.length === 5 ? startTime + ':00' : startTime}`;
+    const startMs = new Date(`${startDateTime}Z`).getTime(); // wall-clock arithmetic only; timeZone below governs the real offset
+    if (Number.isNaN(startMs) || new Date(startMs).toISOString().slice(0, 10) !== date) return json({ error: "Invalid date/startTime" }, 400);
     const endDateTime = new Date(startMs + duration * 60000).toISOString().slice(0, 19);
 
     const token = await getCalendarAccessToken();
