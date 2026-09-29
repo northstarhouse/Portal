@@ -15628,9 +15628,9 @@ function VolEmailListsView({ navigate }) {
     ];
     var rowsHtml = rows.map(function(r) {
       var has = !!r[1];
-      return '<div style="display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid #efe9df">' +
-        '<span style="color:#888">' + esc(r[0]) + '</span>' +
-        '<span style="color:' + (has ? '#2a2420' : '#c0392b') + ';font-weight:' + (has ? 600 : 500) + ';text-align:right">' + (has ? esc(r[1]) : 'Not on file') + '</span>' +
+      return '<div style="padding:7px 0;border-bottom:1px solid #efe9df">' +
+        '<span style="color:#888">' + esc(r[0]) + ':&nbsp;</span>' +
+        '<span style="color:' + (has ? '#2a2420' : '#c0392b') + ';font-weight:' + (has ? 600 : 500) + '">' + (has ? esc(r[1]) : 'Not on file') + '</span>' +
       '</div>';
     }).join('');
     var rowsText = rows.map(function(r) { return r[0] + ': ' + (r[1] || 'Not on file'); }).join('\n');
