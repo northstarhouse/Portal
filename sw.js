@@ -1,8 +1,16 @@
-var CACHE = 'nsh-v1791086346490';
+<<<<<<< HEAD
+var CACHE = 'nsh-v1791086852139';
 var STATIC = [
   '/Portal/',
   '/Portal/index.html',
-  '/Portal/assets/app.js?v=1791086346490',
+  '/Portal/assets/app.js?v=1791086852139',
+=======
+var CACHE = 'nsh-v1791084777048';
+var STATIC = [
+  '/Portal/',
+  '/Portal/index.html',
+  '/Portal/assets/app.js?v=1791084777048',
+>>>>>>> 1a4c20ae9f733ce408c9259a3727a5065e663333
   '/Portal/assets/logo.png',
   '/Portal/favicon.svg',
   'https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js',
