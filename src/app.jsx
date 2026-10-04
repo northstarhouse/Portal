@@ -7542,7 +7542,9 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
     setSaving(true);
     var nq = nextQ(quarter, year);
     var carried = currentGoals || {};
-    var nextFocus = carryGoalsForward ? (carried.primary_focus || '') : form.next_focus;
+    // The carried-forward Primary Focus isn't Q3's own focus repeated --
+    // Q4's real job is getting Q1 2027 goals sorted ahead of time.
+    var nextFocus = carryGoalsForward ? 'Sort out Q1 2027 goals' : form.next_focus;
     var nextGoal1 = carryGoalsForward ? (carried.goal_1 || '') : form.goal_1;
     var nextGoal2 = carryGoalsForward ? (carried.goal_2 || '') : form.goal_2;
     var nextGoal3 = carryGoalsForward ? (carried.goal_3 || '') : form.goal_3;
@@ -7795,10 +7797,10 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
           <span style={secStyle}>Next Quarter Goals</span>
           {carryGoalsForward ? (
             <React.Fragment>
-              <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Q4 goals are the same as Q3 -- carried over unchanged as {nqLabel} goals for {area || 'this area'}.</div>
+              <div style={{ fontSize: 12, color: '#777', lineHeight: 1.5, marginBottom: 14 }}>These goals are locked for Q4 — Q3 goals are carried over, giving all North Star House teams a chance to catch up on everything from throughout the year. The primary focus this quarter should be sorting out Q1 goals for 2027.</div>
               <div style={grp}>
                 <label style={lbl}>Primary Focus</label>
-                <div style={Object.assign({}, inpStyle, { background: '#faf8f4', color: '#666' })}>{(currentGoals && currentGoals.primary_focus) || '—'}</div>
+                <div style={{ padding: '10px 14px', borderRadius: 8, border: '1.5px solid ' + gold, background: '#fdf6e3', color: '#2a2a2a', fontWeight: 600, fontSize: 14 }}>Sort out Q1 2027 goals</div>
               </div>
               {['goal_1','goal_2','goal_3'].map(function(key, i) {
                 var text = currentGoals && currentGoals[key];
