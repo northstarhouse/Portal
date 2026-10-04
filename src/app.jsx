@@ -7543,8 +7543,8 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
     var nq = nextQ(quarter, year);
     var carried = currentGoals || {};
     // The carried-forward Primary Focus isn't Q3's own focus repeated --
-    // Q4's real job is getting Q1 2027 goals sorted ahead of time.
-    var nextFocus = carryGoalsForward ? 'Sort out Q1 2027 goals' : form.next_focus;
+    // Q4's real job is wrapping up the year and setting up Q1 2027.
+    var nextFocus = carryGoalsForward ? 'Finalize all 2026 quarterly goals, compile deliverables and develop Q1 2027 goals.' : form.next_focus;
     var nextGoal1 = carryGoalsForward ? (carried.goal_1 || '') : form.goal_1;
     var nextGoal2 = carryGoalsForward ? (carried.goal_2 || '') : form.goal_2;
     var nextGoal3 = carryGoalsForward ? (carried.goal_3 || '') : form.goal_3;
@@ -7800,7 +7800,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
               <div style={{ fontSize: 12, color: '#777', lineHeight: 1.5, marginBottom: 14 }}>These goals are locked for Q4 — Q3 goals are carried over, giving all North Star House teams a chance to catch up on everything from throughout the year. The primary focus this quarter should be sorting out Q1 goals for 2027.</div>
               <div style={grp}>
                 <label style={lbl}>Primary Focus</label>
-                <div style={{ padding: '10px 14px', borderRadius: 8, border: '1.5px solid ' + gold, background: '#fdf6e3', color: '#2a2a2a', fontWeight: 600, fontSize: 14 }}>Sort out Q1 2027 goals</div>
+                <div style={{ padding: '10px 14px', borderRadius: 8, border: '1.5px solid ' + gold, background: '#fdf6e3', color: '#2a2a2a', fontWeight: 600, fontSize: 14 }}>Finalize all 2026 quarterly goals, compile deliverables and develop Q1 2027 goals.</div>
               </div>
               {['goal_1','goal_2','goal_3'].map(function(key, i) {
                 var text = currentGoals && currentGoals[key];
@@ -13941,6 +13941,12 @@ function SuFormResponses({ form }) {
                     <span style={{ fontSize: 11, color: r.status === 'handled' ? '#2e7d32' : '#bbb', fontWeight: r.status === 'handled' ? 600 : 400 }}>{r.status === 'handled' ? 'Handled' : 'Mark handled'}</span>
                   </label>
                   <div style={{ fontSize: 11, color: '#bbb' }}>{new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+                  {form.id === DOCENT_TOUR_FORM_ID && r.tour_status && (function() {
+                    // Mirrors Volunteer Hub's TourRequestsCard STATUS_COLORS --
+                    // docents set this from their own dashboard, not here.
+                    var c = { 'Scheduled Tour': { bg: '#e8f5e9', color: '#2e7d32' }, 'Contact Made': { bg: '#fff8e1', color: '#8a6200' }, 'Dates Not Workable': { bg: '#ffebee', color: '#b71c1c' } }[r.tour_status] || { bg: '#f0ebe6', color: gold };
+                    return <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 12, background: c.bg, color: c.color }}>{r.tour_status}</span>;
+                  })()}
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
                   {form.id === DOCENT_TOUR_FORM_ID && (
