@@ -48,7 +48,7 @@ function buildBrandedEmailHtml(opts: { headline: string; subtext: string; note?:
     })
     .join('')
   return (
-    `<div style="background:#d9cdb8;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;">` +
+    `<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;">` +
     `<div style="max-width:560px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">` +
     `<div style="height:14px;background:${GOLD};"></div>` +
     `<div style="padding:48px 40px 32px;text-align:center;">` +
