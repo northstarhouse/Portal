@@ -1599,7 +1599,7 @@ function EventsView({ navigate }) {
     var byKey = {};
     function ensure(name) {
       var k = keyOfName(name);
-      if (!byKey[k]) byKey[k] = { name: name, date: null, earnings: 0, costs: 0, net: 0, earningsRows: [], expenseRows: [], image_url: null, checklist: [], ticketQty: 0, ticketRevenue: 0, ticketFees: 0, ticketNet: 0, rsvpQty: 0 };
+      if (!byKey[k]) byKey[k] = { name: name, date: null, earnings: 0, costs: 0, net: 0, earningsRows: [], expenseRows: [], image_url: null, checklist: [], ticketQty: 0, ticketRevenue: 0, ticketFees: 0, ticketNet: 0, rsvpQty: 0, ticketByDate: {} };
       return byKey[k];
     }
     groups.forEach(function(g) {
@@ -1612,13 +1612,20 @@ function EventsView({ navigate }) {
       if (!name) return;
       var b = ensure(name);
       b.date = b.date || o.event_date || null;
+      // Per-date split, for multi-night shows (e.g. Fri + Sat) that share a card.
+      var dk = o.event_date || '';
+      var d = b.ticketByDate[dk] || (b.ticketByDate[dk] = { date: dk, qty: 0, rsvps: 0, revenue: 0, net: 0 });
       if (o.kind === 'rsvp') {
         b.rsvpQty += Number(o.quantity || 0);
+        d.rsvps += Number(o.quantity || 0);
       } else {
         b.ticketQty += Number(o.quantity || 0);
         b.ticketRevenue += Number(o.amount || 0);
         b.ticketFees += Number(o.paypal_fee || 0);
         b.ticketNet += Number(o.net_amount != null ? o.net_amount : (o.amount || 0));
+        d.qty += Number(o.quantity || 0);
+        d.revenue += Number(o.amount || 0);
+        d.net += Number(o.net_amount != null ? o.net_amount : (o.amount || 0));
       }
     });
     (overviewCards || []).forEach(function(c) {
@@ -2324,6 +2331,24 @@ function EventsView({ navigate }) {
                     <span>Gross <b style={{ color: '#5a8a5a' }}>{fmt(c.ticketRevenue)}</b></span>
                     <span>Fees <b style={{ color: '#c07040' }}>{fmt(c.ticketFees)}</b></span>
                     <span>Net <b style={{ color: '#2a2a2a' }}>{fmt(c.ticketNet)}</b></span>
+                  </div>
+                )}
+                {Object.keys(c.ticketByDate || {}).length > 1 && (
+                  <div style={{ marginTop: 12, borderTop: '0.5px solid #f0ebe2', paddingTop: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>By date</div>
+                    {Object.keys(c.ticketByDate).map(function(k) { return c.ticketByDate[k]; })
+                      .sort(function(a, b) { return (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0); })
+                      .map(function(d) {
+                        return (
+                          <div key={d.date || 'none'} style={{ display: 'flex', flexWrap: 'wrap', gap: 18, fontSize: 12, color: '#555', padding: '5px 0', borderBottom: '0.5px solid #f5f1eb' }}>
+                            <span style={{ minWidth: 150, fontWeight: 600, color: '#2a2a2a' }}>{d.date || 'No date'}</span>
+                            <span><b style={{ color: '#2a2a2a' }}>{d.qty}</b> tickets</span>
+                            {d.rsvps > 0 && <span><b style={{ color: '#2a2a2a' }}>{d.rsvps}</b> RSVPs</span>}
+                            <span>Gross <b style={{ color: '#5a8a5a' }}>{fmt(d.revenue)}</b></span>
+                            <span>Net <b style={{ color: '#2a2a2a' }}>{fmt(d.net)}</b></span>
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
               </div>
@@ -18996,15 +19021,21 @@ function WebsitePaymentsView({ navigate }) {
   }
 
   var all = orders || [];
+  // One entry per show DATE, not per title -- a multi-night show (e.g. the
+  // Fall Magic Show, Fri + Sat) is two separate events with separate sales.
+  var evKey = function(o) {
+    var t = o.event_title || o.event_slug || '—';
+    return o.event_date ? t + ' · ' + o.event_date : t;
+  };
   var events = [];
   var seenEv = {};
   all.forEach(function(o) {
-    var k = o.event_title || o.event_slug;
+    var k = evKey(o);
     if (k && !seenEv[k]) { seenEv[k] = true; events.push(k); }
   });
 
   var filtered = all.filter(function(o) {
-    if (eventFilter !== 'all' && (o.event_title || o.event_slug) !== eventFilter) return false;
+    if (eventFilter !== 'all' && evKey(o) !== eventFilter) return false;
     if (kindFilter !== 'all' && o.kind !== kindFilter) return false;
     return true;
   });
@@ -19024,15 +19055,22 @@ function WebsitePaymentsView({ navigate }) {
 
   var byEvent = {};
   all.forEach(function(o) {
-    var k = o.event_title || o.event_slug || '—';
-    if (!byEvent[k]) byEvent[k] = { name: k, date: o.event_date || '', orders: 0, qty: 0, revenue: 0, fees: 0, net: 0, rsvps: 0 };
+    var k = evKey(o);
+    if (!byEvent[k]) byEvent[k] = { name: o.event_title || o.event_slug || '—', date: o.event_date || '', orders: 0, qty: 0, revenue: 0, fees: 0, net: 0, rsvps: 0 };
     var e = byEvent[k];
     e.orders += 1;
     if (o.kind === 'rsvp') { e.rsvps += Number(o.quantity || 0); }
     else { e.qty += Number(o.quantity || 0); e.revenue += Number(o.amount || 0); e.fees += Number(o.paypal_fee || 0); e.net += netOf(o); }
   });
+  // Highest-grossing show first, with every date of the same show kept
+  // together in date order (so Fri and Sat sit side by side).
+  var showTotal = {};
+  Object.keys(byEvent).forEach(function(k) { var e = byEvent[k]; showTotal[e.name] = (showTotal[e.name] || 0) + e.revenue; });
   var eventRows = Object.keys(byEvent).map(function(k) { return byEvent[k]; })
-    .sort(function(a, b) { return b.revenue - a.revenue; });
+    .sort(function(a, b) {
+      if (a.name !== b.name) return (showTotal[b.name] - showTotal[a.name]) || a.name.localeCompare(b.name);
+      return (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0);
+    });
 
   function exportCsv() {
     var head = ['Date', 'Kind', 'Name', 'Email', 'Phone', 'Event', 'Event Date', 'Tickets', 'Qty', 'Gross', 'PayPal Fee', 'Net', 'Currency', 'PayPal Order', 'PayPal Capture'];
