@@ -517,32 +517,28 @@ var ACTIVITY_TAG_COLORS = {
   'General - Voicemail': { bg: '#f0ece6', color: '#888' },
 };
 
-// Tracks, per browser, when this device last looked at a given form's
-// responses -- used to badge "unread" submissions since form_responses
-// itself has no per-admin read state (the Portal has one shared login,
-// not per-user accounts).
-var FORM_SEEN_KEY = 'nsh_form_resp_seen';
-function getFormSeenMap() {
-  try { return JSON.parse(localStorage.getItem(FORM_SEEN_KEY) || '{}'); } catch (e) { return {}; }
+// Tracks, shared across everyone using the Portal (via Supabase, not
+// per-browser localStorage), when a form's responses were last looked at --
+// used to badge "unread" submissions. Once any staff member opens a form's
+// responses, the badge clears for everyone, not just that one browser.
+function fetchFormSeenMap() {
+  return fetch(SUPABASE_URL + '/rest/v1/form_responses_seen?select=form_id,last_seen_at', {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+  }).then(function(r) { return r.json(); }).then(function(rows) {
+    var map = {};
+    (Array.isArray(rows) ? rows : []).forEach(function(r) { map[r.form_id] = r.last_seen_at; });
+    return map;
+  }).catch(function() { return {}; });
 }
 function markFormResponsesSeen(formId) {
-  var map = getFormSeenMap();
-  map[formId] = new Date().toISOString();
-  try { localStorage.setItem(FORM_SEEN_KEY, JSON.stringify(map)); } catch (e) {}
+  return fetch(SUPABASE_URL + '/rest/v1/form_responses_seen?on_conflict=form_id', {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+    body: JSON.stringify({ form_id: formId, last_seen_at: new Date().toISOString() })
+  }).catch(function() {});
 }
-// The very first time this device sees the seen-map (nothing recorded yet),
-// stamp every known form as "seen now" so existing/already-reviewed responses
-// don't all flood in as "unread" -- only submissions from here on count.
-function initFormSeenIfEmpty(formIds) {
-  var seen = getFormSeenMap();
-  if (Object.keys(seen).length > 0) return seen;
-  var now = new Date().toISOString();
-  formIds.forEach(function(id) { seen[id] = now; });
-  try { localStorage.setItem(FORM_SEEN_KEY, JSON.stringify(seen)); } catch (e) {}
-  return seen;
-}
-function countUnreadResponses(responses, formId) {
-  var seen = getFormSeenMap()[formId];
+function countUnreadResponses(responses, formId, seenMap) {
+  var seen = seenMap && seenMap[formId];
   if (!Array.isArray(responses)) return 0;
   if (!seen) return responses.length;
   return responses.filter(function(r) { return new Date(r.created_at) > new Date(seen); }).length;
@@ -14056,6 +14052,7 @@ function FormResponsesView({ navigate }) {
   var [events, setEvents] = useState([]);
   var [polls, setPolls] = useState([]);
   var [forms, setForms] = useState([]);
+  var [seenMap, setSeenMap] = useState({});
   var [loading, setLoading] = useState(true);
   var [selected, setSelected] = useState(null);
 
@@ -14066,12 +14063,12 @@ function FormResponsesView({ navigate }) {
       fetch(SUPABASE_URL + '/rest/v1/vol_events?select=*,vol_event_responses(count),vol_shift_slots(count)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
       fetch(SUPABASE_URL + '/rest/v1/vol_polls?select=*,vol_poll_votes(count)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
       fetch(SUPABASE_URL + '/rest/v1/nsh_forms?select=*,nsh_form_responses(created_at)&order=created_at.desc', { headers: h }).then(function(r) { return r.json(); }),
+      fetchFormSeenMap(),
     ]).then(function(res) {
       setEvents(Array.isArray(res[0]) ? res[0] : []);
       setPolls(Array.isArray(res[1]) ? res[1] : []);
-      var formsRes = Array.isArray(res[2]) ? res[2] : [];
-      initFormSeenIfEmpty(formsRes.map(function(fm) { return fm.id; }));
-      setForms(formsRes);
+      setForms(Array.isArray(res[2]) ? res[2] : []);
+      setSeenMap(res[3] || {});
       setLoading(false);
     }).catch(function() { setLoading(false); });
   }
@@ -14079,6 +14076,7 @@ function FormResponsesView({ navigate }) {
 
   function openForm(fm) {
     markFormResponsesSeen(fm.id);
+    setSeenMap(function(prev) { var n = Object.assign({}, prev); n[fm.id] = new Date().toISOString(); return n; });
     setSelected({ type: 'forms', id: fm.id });
   }
 
@@ -14128,7 +14126,7 @@ function FormResponsesView({ navigate }) {
               return visible.map(function(fm) {
                 var responses = fm.nsh_form_responses || [];
                 var meta = responses.length + ' responses';
-                var unread = countUnreadResponses(responses, fm.id);
+                var unread = countUnreadResponses(responses, fm.id, seenMap);
                 return <SuListRow key={fm.id} title={fm.title} meta={meta} unread={unread} onClick={function() { openForm(fm); }} />;
               });
             })()}
@@ -14518,11 +14516,14 @@ function AdminView({ navigate }) {
   var mailFileInputRef = React.useRef(null);
 
   useEffect(function() {
-    fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?select=form_id,created_at', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function(r) { return r.json(); }).then(function(rows) {
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?select=form_id,created_at', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function(r) { return r.json(); }),
+      fetchFormSeenMap(),
+    ]).then(function(res) {
+      var rows = res[0], seen = res[1];
       if (!Array.isArray(rows)) return;
-      var seen = initFormSeenIfEmpty(rows.map(function(r) { return r.form_id; }));
       var count = rows.filter(function(r) {
         var s = seen[r.form_id];
         return !s || new Date(r.created_at) > new Date(s);
@@ -18103,6 +18104,7 @@ function MeetingBoardReportsView({ navigate }) {
   var [voteItemsByMonth, setVoteItemsByMonth] = useState({}); // monthKey -> [{ item, tally }]
   var [openingPacket, setOpeningPacket] = useState(null); // monthKey while merging that month's packet
   var [packetModal, setPacketModal] = useState(null); // { monthKey, blobUrl } while the packet viewer is open
+  var [editingPastMonth, setEditingPastMonth] = useState(null); // monthKey whose normal upload cards are expanded inline
   var fileInputRef = React.useRef(null);
   var quickFileInputRef = React.useRef(null);
   var quickTargetRef = React.useRef(null); // { monthKey, category } for whichever quick-upload button was just clicked
@@ -18330,6 +18332,124 @@ function MeetingBoardReportsView({ navigate }) {
   function monthKeyOf(d) { return (d || '').slice(0, 7); } // 'YYYY-MM'
   function monthLabel(monthKey) { return new Date(monthKey + '-15T12:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); }
 
+  // The normal per-category upload grid for one month -- used for every
+  // active (upcoming) month, and reused inline for a past month when its
+  // Edit button is clicked, instead of being its own separate component.
+  function renderMonthCard(monthKey) {
+    var items = monthMap[monthKey];
+    var byCategory = {};
+    var uncategorized = [];
+    items.forEach(function(rep) {
+      if (rep.category && MEETING_REPORT_CATEGORIES.indexOf(rep.category) !== -1) {
+        if (!byCategory[rep.category]) byCategory[rep.category] = [];
+        byCategory[rep.category].push(rep);
+      } else {
+        uncategorized.push(rep);
+      }
+    });
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Board Agenda — {monthLabel(monthKey)}</div>
+          <button onClick={function() { handleOpenPacket(monthKey); }} disabled={openingPacket === monthKey} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: openingPacket === monthKey ? 'default' : 'pointer', opacity: openingPacket === monthKey ? 0.6 : 1, flexShrink: 0 }}>
+            {openingPacket === monthKey ? 'Opening…' : 'View / Download Full Packet'}
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+          {MEETING_REPORT_CATEGORIES.map(function(cat) {
+            var busy = quickUploading === (monthKey + ':' + cat);
+            var cc = MEETING_REPORT_CATEGORY_COLORS[cat];
+            var catItems = byCategory[cat] || [];
+            return (
+              <div key={cat} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 14px', background: cc.bg, borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: cc.color, fontFamily: "'Cardo', serif" }}>{cat}</div>
+                  <button onClick={function() { triggerQuickUpload(monthKey, cat); }} disabled={busy}
+                    style={{ background: '#fff', color: cc.color, border: '1px solid ' + cc.color, borderRadius: 20, padding: '4px 11px', fontSize: 11, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1, flexShrink: 0 }}>
+                    {busy ? 'Uploading…' : '+ Upload'}
+                  </button>
+                </div>
+                <div style={{ padding: catItems.length ? '10px 12px' : '16px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {catItems.length === 0 && <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>Nothing uploaded yet.</div>}
+                  {catItems.map(function(rep) {
+                    var busyReview = reviewingId === rep.id;
+                    return (
+                      <div key={rep.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#faf8f4', borderRadius: 8, padding: '7px 10px', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 100, fontSize: 12, color: '#2a2a2a' }}>
+                          {rep.title}
+                          {rep.review_status === 'Accepted' && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#2e7d32' }}>✓ Accepted</span>}
+                          {rep.review_status === 'Denied' && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#a04545' }}>✕ Denied</span>}
+                        </div>
+                        {rep.url && <a href={rep.url} target="_blank" rel="noopener noreferrer" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '4px 10px', fontSize: 11, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>Open</a>}
+                        {cat === 'Submitted for Review' && (
+                          <React.Fragment>
+                            <button onClick={function() { handleReviewAction(rep, 'accept'); }} disabled={busyReview} title="Accept" style={{ background: 'none', border: '1px solid #2e7d32', color: '#2e7d32', borderRadius: 7, padding: '4px 9px', fontSize: 11, fontWeight: 600, cursor: busyReview ? 'default' : 'pointer', opacity: busyReview ? 0.5 : 1, flexShrink: 0 }}>Accept</button>
+                            <button onClick={function() { handleReviewAction(rep, 'deny'); }} disabled={busyReview} title="Deny" style={{ background: 'none', border: '1px solid #a04545', color: '#a04545', borderRadius: 7, padding: '4px 9px', fontSize: 11, fontWeight: 600, cursor: busyReview ? 'default' : 'pointer', opacity: busyReview ? 0.5 : 1, flexShrink: 0 }}>Deny</button>
+                            <button onClick={function() { handleReviewAction(rep, 'next'); }} disabled={busyReview} title="Move to next meeting's Agenda" style={{ background: 'none', border: '1px solid ' + gold, color: gold, borderRadius: 7, padding: '4px 9px', fontSize: 11, fontWeight: 600, cursor: busyReview ? 'default' : 'pointer', opacity: busyReview ? 0.5 : 1, flexShrink: 0 }}>Next Meeting</button>
+                          </React.Fragment>
+                        )}
+                        <button onClick={function() { handleDelete(rep.id); }} disabled={deletingId === rep.id} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 11, flexShrink: 0 }}>
+                          {deletingId === rep.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          {(function() {
+            var votes = voteItemsByMonth[monthKey] || [];
+            return (
+              <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 14px', background: BOARD_VOTING_CARD_COLOR.bg, borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: BOARD_VOTING_CARD_COLOR.color, fontFamily: "'Cardo', serif" }}>Board Voting</div>
+                  <button onClick={function() { navigate('board'); }} style={{ background: '#fff', color: BOARD_VOTING_CARD_COLOR.color, border: '1px solid ' + BOARD_VOTING_CARD_COLOR.color, borderRadius: 20, padding: '4px 11px', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                    Open
+                  </button>
+                </div>
+                <div style={{ padding: votes.length ? '10px 12px' : '16px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {votes.length === 0 && <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>Nothing up for a vote this month.</div>}
+                  {votes.map(function(v) {
+                    return (
+                      <div key={v.item.row_id} style={{ background: '#faf8f4', borderRadius: 8, padding: '7px 10px' }}>
+                        <div style={{ fontSize: 12, color: '#2a2a2a', fontWeight: 600 }}>{v.item.title}</div>
+                        <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                          {v.item.status || 'Open'} &nbsp;·&nbsp; Yes {v.tally.yes} · No {v.tally.no} · Abstain {v.tally.abstain}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+        {uncategorized.length > 0 && (
+          <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', marginTop: 10 }}>
+            <div style={{ padding: '10px 14px', background: '#f0ece6', borderBottom: '0.5px solid #f0ece6', fontSize: 13, fontWeight: 700, color: '#666', fontFamily: "'Cardo', serif" }}>Other</div>
+            <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {uncategorized.map(function(rep) {
+                return (
+                  <div key={rep.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 160 }}>
+                      <div style={{ fontSize: 13, color: '#2a2a2a' }}>{rep.title}</div>
+                      {rep.notes && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{rep.notes}</div>}
+                    </div>
+                    {rep.url && <a href={rep.url} target="_blank" rel="noopener noreferrer" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>Open</a>}
+                    <button onClick={function() { handleDelete(rep.id); }} disabled={deletingId === rep.id} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 11, flexShrink: 0 }}>
+                      {deletingId === rep.id ? 'Deleting…' : 'Delete'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
   var lb = { fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 };
 
@@ -18380,9 +18500,19 @@ function MeetingBoardReportsView({ navigate }) {
       <input ref={quickFileInputRef} type="file" onChange={handleQuickFileChosen} style={{ display: 'none' }} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 13, color: '#999', marginTop: 2 }}>Click a category under a month to upload straight to it.</div>
-        <button onClick={function() { setShowAdd(function(v) { return !v; }); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-          {showAdd ? 'Cancel' : '+ Add Custom Report'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {pastMonthKeys.length > 0 && (
+            <button onClick={function() {
+              setForm(function(f) { return Object.assign({}, f, { meeting_date: pastMonthKeys[0] + '-15' }); });
+              setShowAdd(true);
+            }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+              Add to Past Board Packets
+            </button>
+          )}
+          <button onClick={function() { setShowAdd(function(v) { return !v; }); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+            {showAdd ? 'Cancel' : '+ Add Custom Report'}
+          </button>
+        </div>
       </div>
 
       {showAdd && (
@@ -18426,118 +18556,7 @@ function MeetingBoardReportsView({ navigate }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {activeMonthKeys.map(function(monthKey) {
-            var items = monthMap[monthKey];
-            var byCategory = {};
-            var uncategorized = [];
-            items.forEach(function(rep) {
-              if (rep.category && MEETING_REPORT_CATEGORIES.indexOf(rep.category) !== -1) {
-                if (!byCategory[rep.category]) byCategory[rep.category] = [];
-                byCategory[rep.category].push(rep);
-              } else {
-                uncategorized.push(rep);
-              }
-            });
-            return (
-              <div key={monthKey}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Board Agenda — {monthLabel(monthKey)}</div>
-                  <button onClick={function() { handleOpenPacket(monthKey); }} disabled={openingPacket === monthKey} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: openingPacket === monthKey ? 'default' : 'pointer', opacity: openingPacket === monthKey ? 0.6 : 1, flexShrink: 0 }}>
-                    {openingPacket === monthKey ? 'Opening…' : 'View / Download Full Packet'}
-                  </button>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-                  {MEETING_REPORT_CATEGORIES.map(function(cat) {
-                    var busy = quickUploading === (monthKey + ':' + cat);
-                    var cc = MEETING_REPORT_CATEGORY_COLORS[cat];
-                    var catItems = byCategory[cat] || [];
-                    return (
-                      <div key={cat} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
-                        <div style={{ padding: '10px 14px', background: cc.bg, borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: cc.color, fontFamily: "'Cardo', serif" }}>{cat}</div>
-                          <button onClick={function() { triggerQuickUpload(monthKey, cat); }} disabled={busy}
-                            style={{ background: '#fff', color: cc.color, border: '1px solid ' + cc.color, borderRadius: 20, padding: '4px 11px', fontSize: 11, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1, flexShrink: 0 }}>
-                            {busy ? 'Uploading…' : '+ Upload'}
-                          </button>
-                        </div>
-                        <div style={{ padding: catItems.length ? '10px 12px' : '16px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {catItems.length === 0 && <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>Nothing uploaded yet.</div>}
-                          {catItems.map(function(rep) {
-                            var busyReview = reviewingId === rep.id;
-                            return (
-                              <div key={rep.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#faf8f4', borderRadius: 8, padding: '7px 10px', flexWrap: 'wrap' }}>
-                                <div style={{ flex: 1, minWidth: 100, fontSize: 12, color: '#2a2a2a' }}>
-                                  {rep.title}
-                                  {rep.review_status === 'Accepted' && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#2e7d32' }}>✓ Accepted</span>}
-                                  {rep.review_status === 'Denied' && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#a04545' }}>✕ Denied</span>}
-                                </div>
-                                {rep.url && <a href={rep.url} target="_blank" rel="noopener noreferrer" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '4px 10px', fontSize: 11, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>Open</a>}
-                                {cat === 'Submitted for Review' && (
-                                  <React.Fragment>
-                                    <button onClick={function() { handleReviewAction(rep, 'accept'); }} disabled={busyReview} title="Accept" style={{ background: 'none', border: '1px solid #2e7d32', color: '#2e7d32', borderRadius: 7, padding: '4px 9px', fontSize: 11, fontWeight: 600, cursor: busyReview ? 'default' : 'pointer', opacity: busyReview ? 0.5 : 1, flexShrink: 0 }}>Accept</button>
-                                    <button onClick={function() { handleReviewAction(rep, 'deny'); }} disabled={busyReview} title="Deny" style={{ background: 'none', border: '1px solid #a04545', color: '#a04545', borderRadius: 7, padding: '4px 9px', fontSize: 11, fontWeight: 600, cursor: busyReview ? 'default' : 'pointer', opacity: busyReview ? 0.5 : 1, flexShrink: 0 }}>Deny</button>
-                                    <button onClick={function() { handleReviewAction(rep, 'next'); }} disabled={busyReview} title="Move to next meeting's Agenda" style={{ background: 'none', border: '1px solid ' + gold, color: gold, borderRadius: 7, padding: '4px 9px', fontSize: 11, fontWeight: 600, cursor: busyReview ? 'default' : 'pointer', opacity: busyReview ? 0.5 : 1, flexShrink: 0 }}>Next Meeting</button>
-                                  </React.Fragment>
-                                )}
-                                <button onClick={function() { handleDelete(rep.id); }} disabled={deletingId === rep.id} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 11, flexShrink: 0 }}>
-                                  {deletingId === rep.id ? 'Deleting…' : 'Delete'}
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {(function() {
-                    var votes = voteItemsByMonth[monthKey] || [];
-                    return (
-                      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
-                        <div style={{ padding: '10px 14px', background: BOARD_VOTING_CARD_COLOR.bg, borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: BOARD_VOTING_CARD_COLOR.color, fontFamily: "'Cardo', serif" }}>Board Voting</div>
-                          <button onClick={function() { navigate('board'); }} style={{ background: '#fff', color: BOARD_VOTING_CARD_COLOR.color, border: '1px solid ' + BOARD_VOTING_CARD_COLOR.color, borderRadius: 20, padding: '4px 11px', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-                            Open
-                          </button>
-                        </div>
-                        <div style={{ padding: votes.length ? '10px 12px' : '16px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {votes.length === 0 && <div style={{ fontSize: 12, color: '#bbb', fontStyle: 'italic' }}>Nothing up for a vote this month.</div>}
-                          {votes.map(function(v) {
-                            return (
-                              <div key={v.item.row_id} style={{ background: '#faf8f4', borderRadius: 8, padding: '7px 10px' }}>
-                                <div style={{ fontSize: 12, color: '#2a2a2a', fontWeight: 600 }}>{v.item.title}</div>
-                                <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
-                                  {v.item.status || 'Open'} &nbsp;·&nbsp; Yes {v.tally.yes} · No {v.tally.no} · Abstain {v.tally.abstain}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-                {uncategorized.length > 0 && (
-                  <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', marginTop: 10 }}>
-                    <div style={{ padding: '10px 14px', background: '#f0ece6', borderBottom: '0.5px solid #f0ece6', fontSize: 13, fontWeight: 700, color: '#666', fontFamily: "'Cardo', serif" }}>Other</div>
-                    <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {uncategorized.map(function(rep) {
-                        return (
-                          <div key={rep.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#faf8f4', borderRadius: 8, padding: '8px 12px', flexWrap: 'wrap' }}>
-                            <div style={{ flex: 1, minWidth: 160 }}>
-                              <div style={{ fontSize: 13, color: '#2a2a2a' }}>{rep.title}</div>
-                              {rep.notes && <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{rep.notes}</div>}
-                            </div>
-                            {rep.url && <a href={rep.url} target="_blank" rel="noopener noreferrer" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>Open</a>}
-                            <button onClick={function() { handleDelete(rep.id); }} disabled={deletingId === rep.id} style={{ background: 'none', border: 'none', color: '#a04545', cursor: 'pointer', fontSize: 11, flexShrink: 0 }}>
-                              {deletingId === rep.id ? 'Deleting…' : 'Delete'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
+            return <div key={monthKey}>{renderMonthCard(monthKey)}</div>;
           })}
         </div>
       )}
@@ -18547,12 +18566,21 @@ function MeetingBoardReportsView({ navigate }) {
           <div style={{ fontSize: 13, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Previous Meeting Packets</div>
           <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
             {pastMonthKeys.map(function(monthKey, i) {
+              var isEditing = editingPastMonth === monthKey;
               return (
-                <div key={monthKey} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', borderBottom: i < pastMonthKeys.length - 1 ? '0.5px solid #f0ece6' : 'none', flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{monthLabel(monthKey)} Board Packet</div>
-                  <button onClick={function() { handleOpenPacket(monthKey); }} disabled={openingPacket === monthKey} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: openingPacket === monthKey ? 'default' : 'pointer', opacity: openingPacket === monthKey ? 0.6 : 1, flexShrink: 0 }}>
-                    {openingPacket === monthKey ? 'Opening…' : 'View / Download Full Packet'}
-                  </button>
+                <div key={monthKey} style={{ borderBottom: i < pastMonthKeys.length - 1 ? '0.5px solid #f0ece6' : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{monthLabel(monthKey)} Board Packet</div>
+                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                      <button onClick={function() { setEditingPastMonth(isEditing ? null : monthKey); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                        {isEditing ? 'Done Editing' : 'Edit'}
+                      </button>
+                      <button onClick={function() { handleOpenPacket(monthKey); }} disabled={openingPacket === monthKey} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: openingPacket === monthKey ? 'default' : 'pointer', opacity: openingPacket === monthKey ? 0.6 : 1 }}>
+                        {openingPacket === monthKey ? 'Opening…' : 'View / Download Full Packet'}
+                      </button>
+                    </div>
+                  </div>
+                  {isEditing && <div style={{ padding: '0 16px 16px' }}>{renderMonthCard(monthKey)}</div>}
                 </div>
               );
             })}
