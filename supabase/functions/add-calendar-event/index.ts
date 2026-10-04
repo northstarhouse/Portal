@@ -21,6 +21,8 @@
 // Response: { ok: true, eventId, htmlLink } | { error }
 
 const GOOGLE_SERVICE_ACCOUNT_KEY = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const CALENDAR_ID = "thenorthstarhouse@gmail.com";
 const TIME_ZONE = "America/Los_Angeles";
 
@@ -129,6 +131,14 @@ Deno.serve(async (req) => {
       return json({ error: `Calendar insert failed: ${eventRes.status} ${errText}` }, 502);
     }
     const event = await eventRes.json();
+
+    // Refresh the cache immediately so this event shows up right away
+    // instead of waiting for the next scheduled poll -- fire-and-forget,
+    // a stale cache for a few hours isn't worth failing this request over.
+    fetch(`${SUPABASE_URL}/functions/v1/refresh-calendar-cache`, {
+      method: "POST",
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+    }).catch(() => {});
 
     return json({ ok: true, eventId: event.id, htmlLink: event.htmlLink });
   } catch (err) {

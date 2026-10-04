@@ -7442,7 +7442,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
   var [quarter, setQuarter] = useState(cq);
   var [year, setYear] = useState(cy);
   var [currentGoals, setCurrentGoals] = useState(null);
-  var emptyForm = { what_went_well: '', goal_1_status: 'On Track', goal_1_summary: '', goal_2_status: 'On Track', goal_2_summary: '', goal_3_status: 'On Track', goal_3_summary: '', challenges: [], challenges_details: '', support_needed: [], support_details: '', other_notes: '', next_focus: '', goal_1: '', goal_2: '', goal_3: '', extra_goals: [], extra_goals_status: [], extra_goals_summary: [] };
+  var emptyForm = { what_went_well: '', goal_1_status: 'On Track', goal_1_summary: '', goal_2_status: 'On Track', goal_2_summary: '', goal_3_status: 'On Track', goal_3_summary: '', challenges: [], challenges_details: '', support_needed: [], support_details: '', other_notes: '', extra_goals_status: [], extra_goals_summary: [] };
   var [form, setForm] = useState(emptyForm);
   var [saving, setSaving] = useState(false);
   var [saved, setSaved] = useState(false);
@@ -7471,11 +7471,6 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
             support_needed: r.support_needed || [],
             support_details: r.support_details || '',
             other_notes: r.other_notes || '',
-            next_focus: r.next_focus || '',
-            goal_1: r.goal_1 || '',
-            goal_2: r.goal_2 || '',
-            goal_3: r.goal_3 || '',
-            extra_goals: r.extra_goals || [],
             extra_goals_status: r.extra_goals_status || [],
             extra_goals_summary: r.extra_goals_summary || [],
           });
@@ -7524,19 +7519,16 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
     });
   }
 
-  function addExtraGoal() {
-    setForm(function(f) { return Object.assign({}, f, { extra_goals: f.extra_goals.concat(['']) }); });
-  }
-
-  function removeExtraGoal(i) {
-    setForm(function(f) { return Object.assign({}, f, { extra_goals: f.extra_goals.filter(function(_, idx) { return idx !== i; }) }); });
-  }
-
   function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
     var nq = nextQ(quarter, year);
-    var payload = { area: area, quarter: quarter, year: year, date_submitted: new Date().toISOString().slice(0,10), successes: form.what_went_well, goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary, extra_goals_status: form.extra_goals_status, extra_goals_summary: form.extra_goals_summary, challenges: form.challenges, challenges_details: form.challenges_details, support_needed: form.support_needed, support_details: form.support_details, other_notes: form.other_notes, next_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3, extra_goals: form.extra_goals };
+    // Next quarter's goals are no longer typed in on this form -- they're
+    // carried over unchanged from this quarter's own goals (currentGoals),
+    // since goals now persist across a quarter instead of being re-set
+    // every time. Also used below to seed the Op Quarter Goals row itself.
+    var carried = currentGoals || {};
+    var payload = { area: area, quarter: quarter, year: year, date_submitted: new Date().toISOString().slice(0,10), successes: form.what_went_well, goal_1_status: form.goal_1_status, goal_1_summary: form.goal_1_summary, goal_2_status: form.goal_2_status, goal_2_summary: form.goal_2_summary, goal_3_status: form.goal_3_status, goal_3_summary: form.goal_3_summary, extra_goals_status: form.extra_goals_status, extra_goals_summary: form.extra_goals_summary, challenges: form.challenges, challenges_details: form.challenges_details, support_needed: form.support_needed, support_details: form.support_details, other_notes: form.other_notes, next_focus: carried.primary_focus || '', goal_1: carried.goal_1 || '', goal_2: carried.goal_2 || '', goal_3: carried.goal_3 || '', extra_goals: carried.extra_goals || [] };
     var currentGoalsUpdate = currentGoals ? fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?id=eq.' + currentGoals.id, {
       method: 'PATCH',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
@@ -7554,7 +7546,7 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
           body: JSON.stringify(payload)
         });
     reflectionFetch.then(function(r) { return r.status === 204 ? null : r.json(); }).then(function() {
-      var goalsPayload = { area: area, quarter: nq.q, year: nq.yr, primary_focus: form.next_focus, goal_1: form.goal_1, goal_2: form.goal_2, goal_3: form.goal_3, extra_goals: form.extra_goals.filter(Boolean) };
+      var goalsPayload = { area: area, quarter: nq.q, year: nq.yr, primary_focus: carried.primary_focus || '', goal_1: carried.goal_1 || '', goal_2: carried.goal_2 || '', goal_3: carried.goal_3 || '', extra_goals: carried.extra_goals || [] };
       var headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
       var nextGoalsSave = fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(nq.q) + '&year=eq.' + nq.yr, { headers: headers })
         .then(function(r) { return r.json(); })
@@ -7781,32 +7773,30 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
         </div>
 
         <div style={cardLast}>
-          <span style={secStyle}>Next Quarter Focus & Goals</span>
-          <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>These will auto-populate as {nqLabel} goals for {area || 'this area'}.</div>
+          <span style={secStyle}>Next Quarter Goals</span>
+          <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Carried over unchanged as {nqLabel} goals for {area || 'this area'} -- goals are set once and no longer re-typed each quarter.</div>
           <div style={grp}>
-            <label style={lbl}>Primary Focus for Next Quarter</label>
-            <input value={form.next_focus} onChange={function(e) { setForm(function(f) { return Object.assign({}, f, { next_focus: e.target.value }); }); }} style={inpStyle} placeholder="Primary focus..." />
+            <label style={lbl}>Primary Focus</label>
+            <div style={Object.assign({}, inpStyle, { background: '#faf8f4', color: '#666' })}>{(currentGoals && currentGoals.primary_focus) || '—'}</div>
           </div>
           {['goal_1','goal_2','goal_3'].map(function(key, i) {
+            var text = currentGoals && currentGoals[key];
+            if (!text) return null;
             return (
               <div key={key} style={grp}>
                 <label style={lbl}>{i+1}.</label>
-                <input value={form[key]} onChange={function(e) { var v = e.target.value; setForm(function(f) { var p = {}; p[key] = v; return Object.assign({}, f, p); }); }} style={inpStyle} placeholder={'Goal ' + (i+1) + '...'} />
+                <div style={Object.assign({}, inpStyle, { background: '#faf8f4', color: '#666' })}>{text}</div>
               </div>
             );
           })}
-          {form.extra_goals.map(function(text, i) {
+          {(currentGoals && currentGoals.extra_goals || []).map(function(text, i) {
             return (
               <div key={'extra_' + i} style={grp}>
                 <label style={lbl}>{4 + i}.</label>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input value={text} onChange={function(e) { setArrayAt('extra_goals', i, e.target.value); }} style={inpStyle} placeholder={'Goal ' + (4 + i) + '...'} />
-                  <button type="button" onClick={function() { removeExtraGoal(i); }} style={{ background: 'none', border: '0.5px solid #ddd', color: '#aaa', borderRadius: 6, padding: '9px 12px', fontSize: 13, cursor: 'pointer', flexShrink: 0 }}>Remove</button>
-                </div>
+                <div style={Object.assign({}, inpStyle, { background: '#faf8f4', color: '#666' })}>{text}</div>
               </div>
             );
           })}
-          <button type="button" onClick={addExtraGoal} style={{ background: 'none', border: '1px dashed ' + gold, color: gold, borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>+ Add a goal</button>
         </div>
 
         <button type="submit" disabled={saving || !area} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '12px 32px', fontSize: 14, fontWeight: 600, cursor: saving || !area ? 'not-allowed' : 'pointer', opacity: (saving || !area) ? 0.6 : 1, width: '100%', marginBottom: 8 }}>

@@ -172,6 +172,11 @@ Deno.serve(async (req) => {
 
     await sbPatch(`estate_tours?id=eq.${encodeURIComponent(id)}`, { gcal_event_id: event.id });
 
+    // Refresh the cache immediately so this booking shows up right away
+    // instead of waiting for the next scheduled poll -- fire-and-forget,
+    // a stale cache for a few hours isn't worth failing this request over.
+    fetch(`${SUPABASE_URL}/functions/v1/refresh-calendar-cache`, { method: "POST", headers: sbHeaders() }).catch(() => {});
+
     return new Response(JSON.stringify({ ok: true, eventId: event.id, organizer: event.organizer, creator: event.creator }), { headers: { "Content-Type": "application/json" } });
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
