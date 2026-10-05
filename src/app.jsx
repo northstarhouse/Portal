@@ -668,7 +668,7 @@ const modules = [
   { id: "meeting-reports", label: "Meeting & Board Reports" },
   { id: "strategy", label: "Strategic Goal Progress", hidden: true },
   { id: "venue", label: "Venue Rentals", hidden: true },
-  { id: "estate-tours", label: "Estate Tours" },
+  { id: "estate-tours", label: "Estate Tours", hidden: true },
   { id: "ideas", label: "Ideas & Initiatives" },
   { id: "operational", label: "Operational Areas", hidden: true },
   { id: "financials", label: "Reimbursements", hidden: true },
@@ -3463,9 +3463,13 @@ function VolunteersView({ navigate }) {
     e.preventDefault();
     if (!selected) return;
     setSaving(true);
+    // Every field goes in the patch, even when cleared -- skipping empty
+    // strings used to mean clearing a field in the form (e.g. Birthday)
+    // never actually reached the database, since Supabase never saw it in
+    // the PATCH body at all and just kept whatever was already there.
     var row = {};
     Object.keys(form).forEach(function(k) {
-      if (form[k] !== '') row[k] = form[k] === true ? 'TRUE' : form[k] === false ? 'FALSE' : form[k];
+      row[k] = form[k] === true ? 'TRUE' : form[k] === false ? 'FALSE' : (form[k] === '' ? null : form[k]);
     });
     sbUpdate('2026 Volunteers', selected['First Name'], selected['Last Name'], row)
       .then(function(res) {
@@ -3483,26 +3487,24 @@ function VolunteersView({ navigate }) {
   }
 
   function InfoRow({ label, value, link, preferred }) {
-    if (!value) return null;
     return (
       <div style={{ display: 'flex', gap: 0, marginBottom: 10, alignItems: 'flex-start' }}>
         <div style={{ width: 110, fontSize: 12, color: '#777', flexShrink: 0, paddingTop: 1, display: 'flex', alignItems: 'center', gap: 5 }}>
           {label}
           {preferred && <span style={{ fontSize: 10, fontWeight: 600, color: gold, background: '#f0ebe2', padding: '1px 6px', borderRadius: 10 }}>preferred</span>}
         </div>
-        <div style={{ fontSize: 12, color: '#2a2a2a', flex: 1, lineHeight: 1.4 }}>
-          {link ? <a href={link} style={{ color: gold, textDecoration: 'none' }}>{value}</a> : value}
+        <div style={{ fontSize: 12, color: value ? '#2a2a2a' : '#bbb', fontStyle: value ? 'normal' : 'italic', flex: 1, lineHeight: 1.4 }}>
+          {value ? (link ? <a href={link} style={{ color: gold, textDecoration: 'none' }}>{value}</a> : value) : 'Not provided'}
         </div>
       </div>
     );
   }
 
   function NoteBlock({ label, value }) {
-    if (!value) return null;
     return (
       <div style={{ marginBottom: 10 }}>
         {label && <div style={{ fontSize: 12, color: '#888', fontWeight: 600, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 5 }}>{label}</div>}
-        <div style={{ fontSize: 12, color: '#444', lineHeight: 1.65, background: '#faf8f4', borderRadius: 8, padding: '10px 14px' }}>{value}</div>
+        <div style={{ fontSize: 12, color: value ? '#444' : '#bbb', fontStyle: value ? 'normal' : 'italic', lineHeight: 1.65, background: '#faf8f4', borderRadius: 8, padding: '10px 14px' }}>{value || 'Not provided'}</div>
       </div>
     );
   }
@@ -3686,22 +3688,18 @@ function VolunteersView({ navigate }) {
 
             {/* Body */}
             <div style={{ padding: '20px 28px 24px', overflowY: 'auto' }}>
-              {(selected['Email'] || selected['Phone Number'] || selected['Address'] || selected['Emergency Contact']) && (
-                <div style={{ marginBottom: 4 }}>
-                  <span style={volSecLabel}>Contact</span>
-                  <InfoRow label="Email" value={selected['Email']} link={'mailto:' + selected['Email']} preferred={selected['Preferred Contact'] === 'email' || selected['Preferred Contact'] === 'both'} />
-                  <InfoRow label="Phone" value={selected['Phone Number']} preferred={selected['Preferred Contact'] === 'phone' || selected['Preferred Contact'] === 'both'} />
-                  <InfoRow label="Address" value={selected['Address']} />
-                  <InfoRow label="Emergency" value={selected['Emergency Contact']} />
-                </div>
-              )}
-              {(selected['Volunteer Anniversary'] || selected['Birthday']) && (
-                <div style={{ marginBottom: 4 }}>
-                  <span style={volSecLabel}>Volunteer Info</span>
-                  <InfoRow label="Anniversary" value={fmtAnniversary(selected['Volunteer Anniversary'])} />
-                  <InfoRow label="Birthday" value={fmtBirthday(selected['Birthday']) + (zodiacFromIsoDate(selected['Birthday']) ? '  ·  ' + zodiacFromIsoDate(selected['Birthday']).name + ' ' + zodiacFromIsoDate(selected['Birthday']).symbol : '')} />
-                </div>
-              )}
+              <div style={{ marginBottom: 4 }}>
+                <span style={volSecLabel}>Contact</span>
+                <InfoRow label="Email" value={selected['Email']} link={selected['Email'] ? 'mailto:' + selected['Email'] : null} preferred={selected['Preferred Contact'] === 'email' || selected['Preferred Contact'] === 'both'} />
+                <InfoRow label="Phone" value={selected['Phone Number']} preferred={selected['Preferred Contact'] === 'phone' || selected['Preferred Contact'] === 'both'} />
+                <InfoRow label="Address" value={selected['Address']} />
+                <InfoRow label="Emergency" value={selected['Emergency Contact']} />
+              </div>
+              <div style={{ marginBottom: 4 }}>
+                <span style={volSecLabel}>Volunteer Info</span>
+                <InfoRow label="Anniversary" value={fmtAnniversary(selected['Volunteer Anniversary'])} />
+                <InfoRow label="Birthday" value={selected['Birthday'] ? (fmtBirthday(selected['Birthday']) + (zodiacFromIsoDate(selected['Birthday']) ? '  ·  ' + zodiacFromIsoDate(selected['Birthday']).name + ' ' + zodiacFromIsoDate(selected['Birthday']).symbol : '')) : ''} />
+              </div>
               <div style={{ marginBottom: 4 }}>
                 <span style={volSecLabel}>Donor Profile</span>
                 {selected.donor_id ? (
@@ -3748,16 +3746,14 @@ function VolunteersView({ navigate }) {
                   <NoteBlock label="2026 Mid-Year Notes from Lead" value={selected['Mid-Year Notes 2026']} />
                 </div>
               )}
-              {(selected['What they want to see at NSH'] || selected['Favorite Quote'] || selected['NSH Future Vision'] || selected['Allergies'] || selected['Special Considerations']) && (
-                <div style={{ marginBottom: 4 }}>
-                  <span style={volSecLabel}>Goals & About</span>
-                  {selected['What they want to see at NSH'] && <NoteBlock label="What they want to see at NSH" value={selected['What they want to see at NSH']} />}
-                  {selected['Favorite Quote'] && <NoteBlock label="Favorite Quote" value={selected['Favorite Quote']} />}
-                  {selected['NSH Future Vision'] && <NoteBlock label="NSH Future Vision" value={selected['NSH Future Vision']} />}
-                  {selected['Allergies'] && <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: '#c0392b', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>⚠ Allergies</div><div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{selected['Allergies']}</div></div>}
-                  {selected['Special Considerations'] && <div style={{ background: '#fafafa', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 12px' }}><div style={{ fontSize: 11, fontWeight: 600, color: '#666', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>🔒 Special Considerations</div><div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{selected['Special Considerations']}</div></div>}
-                </div>
-              )}
+              <div style={{ marginBottom: 4 }}>
+                <span style={volSecLabel}>Goals & About</span>
+                <NoteBlock label="What they want to see at NSH" value={selected['What they want to see at NSH']} />
+                <NoteBlock label="Favorite Quote" value={selected['Favorite Quote']} />
+                <NoteBlock label="NSH Future Vision" value={selected['NSH Future Vision']} />
+                <div style={{ marginBottom: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: '#c0392b', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>⚠ Allergies</div><div style={{ fontSize: 12, color: selected['Allergies'] ? '#555' : '#bbb', fontStyle: selected['Allergies'] ? 'normal' : 'italic', lineHeight: 1.5 }}>{selected['Allergies'] || 'Not provided'}</div></div>
+                <div style={{ background: '#fafafa', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 12px' }}><div style={{ fontSize: 11, fontWeight: 600, color: '#666', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>🔒 Special Considerations</div><div style={{ fontSize: 12, color: selected['Special Considerations'] ? '#555' : '#bbb', fontStyle: selected['Special Considerations'] ? 'normal' : 'italic', lineHeight: 1.5 }}>{selected['Special Considerations'] || 'Not provided'}</div></div>
+              </div>
               {(selected['Event Tags'] || '').split('|').map(function(t) { return t.trim(); }).filter(Boolean).length > 0 && (
                 <div style={{ marginBottom: 4 }}>
                   <span style={volSecLabel}>Custom Lists</span>
@@ -8094,7 +8090,22 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
   var [resourceTitle, setResourceTitle] = useState('');
   var [resourceUrl, setResourceUrl] = useState('');
   var [resourceSaving, setResourceSaving] = useState(false);
+  var [deletingResourceId, setDeletingResourceId] = useState(null);
   var resourceFileRef = React.useRef(null);
+
+  function deleteResource(r) {
+    if (deletingResourceId) return;
+    if (!window.confirm('Remove "' + r.title + '"?')) return;
+    setDeletingResourceId(r.id);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Resources') + '?id=eq.' + r.id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      clearCache('Op Resources');
+      setResources(function(prev) { return prev.filter(function(x) { return x.id !== r.id; }); });
+      setDeletingResourceId(null);
+    }).catch(function() { setDeletingResourceId(null); });
+  }
   var [showSponsorForm, setShowSponsorForm] = useState(false);
   var [showTodo, setShowTodo] = useState(false);
   var [todoItems, setTodoItems] = useState([]);
@@ -8741,6 +8752,10 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
                     <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     <span style={{ fontSize: 13, fontWeight: 500, color: gold, flex: 1 }}>{r.title}</span>
                     {r.description && <span style={{ fontSize: 11, color: '#aaa' }}>{r.description}</span>}
+                    <button type="button" title="Remove" onClick={function(e) { e.preventDefault(); e.stopPropagation(); deleteResource(r); }} disabled={deletingResourceId === r.id}
+                      style={{ background: 'none', border: 'none', color: '#bbb', cursor: deletingResourceId === r.id ? 'default' : 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>
+                      {deletingResourceId === r.id ? '…' : '×'}
+                    </button>
                   </a>
                 );
               })
@@ -15680,7 +15695,7 @@ function VolEmailListsView({ navigate }) {
     if (!dateStr) return null;
     var d = new Date(dateStr + 'T00:00:00');
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   }
   function uiFmtPreferred(val) {
     if (val === 'phone') return 'Phone';
