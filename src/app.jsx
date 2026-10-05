@@ -3146,7 +3146,7 @@ function VolunteersView({ navigate }) {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(function() {
-    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','Mid-Year Notes 2026','What they want to see at NSH','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day','donor_id','auth_user_id'])
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','Mid-Year Notes 2026','What they want to see at NSH','Favorite Quote','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day','donor_id','auth_user_id'])
       .then(function(data) {
         if (Array.isArray(data)) {
           setVolunteers(data);
