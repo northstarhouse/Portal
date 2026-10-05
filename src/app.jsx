@@ -14766,6 +14766,17 @@ function AdminView({ navigate }) {
           </span>
           Strategic Goal Progress
         </div>
+        <div
+          onClick={function() { navigate('brick-submission'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="9" height="6" rx="1"/><rect x="13" y="4" width="9" height="6" rx="1"/><rect x="7" y="14" width="9" height="6" rx="1"/><rect x="2" y="14" width="3" height="6" rx="1"/></svg>
+          </span>
+          Brick Submission
+        </div>
       </div>
       <input ref={mailFileInputRef} type="file" accept="image/*,.pdf" onChange={handleMailFileChosen} style={{ display: 'none' }} />
       {mailUploadResult && (
@@ -15196,6 +15207,17 @@ function VolEmailListsView({ navigate }) {
   var { useState: useS, useEffect: useE, useMemo } = React;
   var [volunteers, setVolunteers] = useS(null);
   var [logs, setLogs] = useS([]);
+  var [showAllLogs, setShowAllLogs] = useS(false);
+  var [allLogs, setAllLogs] = useS(null);
+
+  function openAllLogs() {
+    setShowAllLogs(true);
+    if (allLogs === null) {
+      fetch(SUPABASE_URL + '/rest/v1/volunteer_email_logs?select=*&order=sent_at.desc&limit=500', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function(r) { return r.json(); }).then(function(data) { setAllLogs(Array.isArray(data) ? data : []); }).catch(function() { setAllLogs([]); });
+    }
+  }
   var [activeOnly, setActiveOnly] = useS(true);
   var [expandedTeams, setExpandedTeams] = useS({});
   var [copied, setCopied] = useS(null);
@@ -15943,7 +15965,7 @@ function VolEmailListsView({ navigate }) {
               </div>
               {logs.map(function(log, i) {
                 return (
-                  <div key={i} style={{ padding: '10px 14px', borderBottom: i < logs.length - 1 ? '0.5px solid #f5f1eb' : 'none' }}>
+                  <div key={i} style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb' }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{log.team_tag}</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.subject}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
@@ -15953,6 +15975,9 @@ function VolEmailListsView({ navigate }) {
                   </div>
                 );
               })}
+              <button onClick={openAllLogs} style={{ display: 'block', width: '100%', padding: '9px 14px', background: 'none', border: 'none', borderTop: '0.5px solid #f0ece6', color: gold, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                View Full Recent Send List →
+              </button>
             </div>
           </div>
         )}
@@ -16018,6 +16043,36 @@ function VolEmailListsView({ navigate }) {
           </div>
         )}
       </div>
+
+      {/* Full recent send list modal */}
+      {showAllLogs && (
+        <div onClick={function() { setShowAllLogs(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 480, maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.18)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid #f0ece6' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>Full Recent Send List</div>
+              <button onClick={function() { setShowAllLogs(false); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: '#666', cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {allLogs === null ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
+              ) : allLogs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#ccc', fontSize: 13 }}>No sends yet.</div>
+              ) : allLogs.map(function(log, i) {
+                return (
+                  <div key={i} style={{ padding: '10px 20px', borderBottom: i < allLogs.length - 1 ? '0.5px solid #f5f1eb' : 'none' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{log.team_tag}</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{log.subject}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                      <span style={{ fontSize: 10, color: '#aaa' }}>{log.recipient_count} recipients</span>
+                      <span style={{ fontSize: 10, color: '#ccc' }}>{new Date(log.sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Email modal */}
       {modal && (
@@ -16526,6 +16581,187 @@ function WixFormsView({ navigate }) {
           </div>
         </React.Fragment>
       )}
+    </div>
+  );
+}
+
+var BRICK_STATUS_STYLE = {
+  pending:   { bg: '#fff8e6', color: '#a37c1a', label: 'Pending' },
+  submitted: { bg: '#e9f7ee', color: '#2e8a4f', label: 'Submitted' },
+  failed:    { bg: '#fdecec', color: '#c0392b', label: 'Failed' },
+};
+
+function BrickSubmissionView({ navigate }) {
+  var { useState: useS, useEffect: useE } = React;
+  var [orders, setOrders] = useS(null);
+  var [line1, setLine1] = useS('');
+  var [line2, setLine2] = useS('');
+  var [line3, setLine3] = useS('');
+  var [donorName, setDonorName] = useS('');
+  var [donorAddress, setDonorAddress] = useS('');
+  var [donorCity, setDonorCity] = useS('');
+  var [donorState, setDonorState] = useS('');
+  var [donorZip, setDonorZip] = useS('');
+  var [donorPhone, setDonorPhone] = useS('');
+  var [donorEmail, setDonorEmail] = useS('');
+  var [paymentType, setPaymentType] = useS('');
+  var [saving, setSaving] = useS(false);
+  var [saveError, setSaveError] = useS(null);
+
+  function loadOrders() {
+    fetch(SUPABASE_URL + '/rest/v1/brick_orders?select=*&order=created_at.desc&limit=50', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setOrders(rows);
+    }).catch(function() { setOrders([]); });
+  }
+
+  useE(function() { loadOrders(); }, []);
+
+  function resetForm() {
+    setLine1(''); setLine2(''); setLine3('');
+    setDonorName(''); setDonorAddress(''); setDonorCity(''); setDonorState(''); setDonorZip('');
+    setDonorPhone(''); setDonorEmail(''); setPaymentType('');
+  }
+
+  function submit(e) {
+    e.preventDefault();
+    if (!line1.trim()) { setSaveError('Line 1 is required.'); return; }
+    setSaving(true);
+    setSaveError(null);
+    sbInsert('brick_orders', {
+      line1: line1.trim(),
+      line2: line2.trim() || null,
+      line3: line3.trim() || null,
+      donor_name: donorName.trim() || null,
+      donor_address: donorAddress.trim() || null,
+      donor_city: donorCity.trim() || null,
+      donor_state: donorState.trim() || null,
+      donor_zip_code: donorZip.trim() || null,
+      donor_country: 'US',
+      donor_phone: donorPhone.trim() || null,
+      donor_email: donorEmail.trim() || null,
+      donor_payment_type: paymentType || null,
+    }).then(function() {
+      resetForm();
+      loadOrders();
+    }).catch(function() {
+      setSaveError('Failed to save — please try again.');
+    }).finally(function() { setSaving(false); });
+  }
+
+  var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif', outline: 'none', background: '#fff' };
+  var labelSt = { fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 4, display: 'block' };
+  var fieldWrap = { marginBottom: 12 };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0 }}>← Back</button>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Brick Submission</div>
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Queues a memorial brick order · a background job pushes it into Brick Markers</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <form onSubmit={submit} style={{ flex: '1 1 360px', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Engraved Text (BB4x8, max 20 chars/line)</div>
+          <div style={fieldWrap}>
+            <label style={labelSt}>Line 1 *</label>
+            <input style={inpSt} maxLength={20} value={line1} onChange={function(e) { setLine1(e.target.value); }} />
+          </div>
+          <div style={fieldWrap}>
+            <label style={labelSt}>Line 2</label>
+            <input style={inpSt} maxLength={20} value={line2} onChange={function(e) { setLine2(e.target.value); }} />
+          </div>
+          <div style={fieldWrap}>
+            <label style={labelSt}>Line 3</label>
+            <input style={inpSt} maxLength={20} value={line3} onChange={function(e) { setLine3(e.target.value); }} />
+          </div>
+
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, margin: '18px 0 12px' }}>Donor Information</div>
+          <div style={fieldWrap}>
+            <label style={labelSt}>Donor Name</label>
+            <input style={inpSt} value={donorName} onChange={function(e) { setDonorName(e.target.value); }} />
+          </div>
+          <div style={fieldWrap}>
+            <label style={labelSt}>Address</label>
+            <input style={inpSt} value={donorAddress} onChange={function(e) { setDonorAddress(e.target.value); }} />
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+            <div style={{ flex: 2 }}>
+              <label style={labelSt}>City</label>
+              <input style={inpSt} value={donorCity} onChange={function(e) { setDonorCity(e.target.value); }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelSt}>State</label>
+              <input style={inpSt} maxLength={2} placeholder="CA" value={donorState} onChange={function(e) { setDonorState(e.target.value.toUpperCase()); }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelSt}>ZIP</label>
+              <input style={inpSt} value={donorZip} onChange={function(e) { setDonorZip(e.target.value); }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelSt}>Phone</label>
+              <input style={inpSt} value={donorPhone} onChange={function(e) { setDonorPhone(e.target.value); }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelSt}>Email</label>
+              <input style={inpSt} type="email" value={donorEmail} onChange={function(e) { setDonorEmail(e.target.value); }} />
+            </div>
+          </div>
+          <div style={fieldWrap}>
+            <label style={labelSt}>Payment Type</label>
+            <select style={inpSt} value={paymentType} onChange={function(e) { setPaymentType(e.target.value); }}>
+              <option value="">—</option>
+              <option value="Unpaid">Unpaid</option>
+              <option value="PayPal/Credit Card">PayPal/Credit Card</option>
+              <option value="Check">Check</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          {saveError && <div style={{ fontSize: 12, color: '#c0392b', marginBottom: 10 }}>{saveError}</div>}
+          <button type="submit" disabled={saving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Saving…' : 'Add to Queue'}
+          </button>
+        </form>
+
+        <div style={{ flex: '1 1 320px' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>Recent Submissions</div>
+          {orders === null ? (
+            <div style={{ fontSize: 13, color: '#aaa' }}>Loading…</div>
+          ) : orders.length === 0 ? (
+            <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 24, textAlign: 'center', color: '#bbb', fontSize: 13 }}>No brick orders queued yet.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {orders.map(function(o) {
+                var st = BRICK_STATUS_STYLE[o.status] || BRICK_STATUS_STYLE.pending;
+                return (
+                  <div key={o.id} style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '10px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{o.line1}{o.line2 ? ' / ' + o.line2 : ''}{o.line3 ? ' / ' + o.line3 : ''}</div>
+                        <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{o.donor_name || 'No donor name'}</div>
+                      </div>
+                      <span style={{ background: st.bg, color: st.color, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, borderRadius: 6, padding: '3px 8px', flexShrink: 0 }}>{st.label}</span>
+                    </div>
+                    {o.status === 'submitted' && o.brickmarkers_item_id && (
+                      <div style={{ fontSize: 11, color: '#2e8a4f', marginTop: 6 }}>Brick Markers item #{o.brickmarkers_item_id}</div>
+                    )}
+                    {o.status === 'failed' && o.error && (
+                      <div style={{ fontSize: 11, color: '#c0392b', marginTop: 6 }}>{o.error}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -19309,6 +19545,7 @@ const views = {
   'event-plan': EventPlanLinkView,
   'vol-email-lists': VolEmailListsView,
   'wix-forms': WixFormsView,
+  'brick-submission': BrickSubmissionView,
   'form-builder': FormBuilderView,
   'form-responses': FormResponsesView,
   'dev-log': DevLogView,
