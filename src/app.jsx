@@ -280,6 +280,11 @@ function icalDateKey(val) {
 // (the sidebar entry is hidden too); flip to true to show it again.
 const SHOW_VENUE_RENTALS = false;
 
+// Form categories hidden from Form Responses (and its unread badge) for the
+// time being. The forms still exist and still collect responses; remove a
+// category from this list to show it again.
+var HIDDEN_RESPONSE_CATEGORIES = ['Wedding'];
+
 // Shared by the Venue Rentals dashboard and its Messages/Inquiries sub-pages
 // so every part of that feature agrees on which calendar entries count as
 // weddings/rentals.
@@ -14197,7 +14202,7 @@ function FormResponsesView({ navigate }) {
       <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden' }}>
         {tab === 'forms' && (
           <div style={{ display: 'flex', gap: 4, padding: '14px 16px 14px', borderBottom: '0.5px solid #f0ece6', flexWrap: 'wrap' }}>
-            {SU_FORM_CATEGORY_TABS.map(function(c) {
+            {SU_FORM_CATEGORY_TABS.filter(function(c) { return HIDDEN_RESPONSE_CATEGORIES.indexOf(c) === -1; }).map(function(c) {
               var active = formCategory === c;
               return <button key={c} onClick={function() { setFormCategory(c); }} style={{ padding: '4px 11px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: active ? '#f0ece6' : 'transparent', color: active ? '#2a2a2a' : '#999', border: 'none' }}>{c}</button>;
             })}
@@ -14214,7 +14219,8 @@ function FormResponsesView({ navigate }) {
               return <SuListRow key={pl.id} title={pl.question} meta={meta} onClick={function() { setSelected({ type: 'polls', id: pl.id }); }} />;
             }))}
             {tab === 'forms' && (function() {
-              var visible = formCategory === 'All' ? forms : forms.filter(function(fm) { return fm.category === formCategory; });
+              var shown = forms.filter(function(fm) { return HIDDEN_RESPONSE_CATEGORIES.indexOf(fm.category) === -1; });
+              var visible = formCategory === 'All' ? shown : shown.filter(function(fm) { return fm.category === formCategory; });
               if (visible.length === 0) return <SuEmpty text={formCategory === 'All' ? 'No forms yet.' : 'No ' + formCategory + ' forms yet.'} />;
               return visible.map(function(fm) {
                 var responses = fm.nsh_form_responses || [];
@@ -14614,10 +14620,17 @@ function AdminView({ navigate }) {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
       }).then(function(r) { return r.json(); }),
       fetchFormSeenMap(),
+      fetch(SUPABASE_URL + '/rest/v1/nsh_forms?select=id,category', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function(r) { return r.json(); }).catch(function() { return []; }),
     ]).then(function(res) {
       var rows = res[0], seen = res[1];
       if (!Array.isArray(rows)) return;
+      // Leave out forms in hidden categories -- their responses are not shown on Form Responses.
+      var hiddenIds = {};
+      (Array.isArray(res[2]) ? res[2] : []).forEach(function(f) { if (HIDDEN_RESPONSE_CATEGORIES.indexOf(f.category) !== -1) hiddenIds[f.id] = true; });
       var count = rows.filter(function(r) {
+        if (hiddenIds[r.form_id]) return false;
         var s = seen[r.form_id];
         return !s || new Date(r.created_at) > new Date(s);
       }).length;
