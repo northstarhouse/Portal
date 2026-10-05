@@ -100,22 +100,35 @@ async function sendMail(to: string, subject: string, text: string, html: string)
   return res.ok
 }
 
-type Tour = { id: string; visitor_name: string; visitor_email: string; date: string; start_time: string }
+type Tour = { id: string; visitor_name: string; visitor_email: string; date: string; start_time: string; guide_name?: string | null }
+
+// Who leads a tour: a guide assigned to that slot in the Portal wins;
+// otherwise Jen leads every Monday, Tuesday and Thursday tour. "" = no one to
+// name. Same rule as the booking confirmation in the website's worker.
+const DEFAULT_GUIDES_BY_WEEKDAY: Record<number, string> = { 1: 'Jen', 2: 'Jen', 4: 'Jen' } // 0 = Sunday
+function tourGuideFor(date: string, guideName?: string | null) {
+  const assigned = String(guideName || '').trim()
+  if (assigned && assigned.toLowerCase() !== 'default') return assigned
+  const d = new Date(`${date}T12:00:00`)
+  return Number.isNaN(d.getTime()) ? '' : DEFAULT_GUIDES_BY_WEEKDAY[d.getDay()] || ''
+}
 
 async function run24h(): Promise<number> {
   const rows: Tour[] = await sb('/rest/v1/rpc/tours_due_for_24h_reminder', { method: 'POST', body: '{}' }).then((r) => r.json())
   let sent = 0
   for (const t of rows || []) {
     const when = fmtWhen(t.date, t.start_time)
+    const guide = tourGuideFor(t.date, t.guide_name)
     const ok = await sendMail(
       t.visitor_email,
       `Reminder: your North Star House tour is tomorrow — ${when}`,
-      `Hi ${t.visitor_name},\n\nJust a reminder — your estate tour is tomorrow.\n\nTour Date & Time: ${when}\nAddress: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you then!\nNorth Star House`,
+      `Hi ${t.visitor_name},\n\nJust a reminder — your estate tour is tomorrow.\n\nTour Date & Time: ${when}\n${guide ? `Your tour guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you then!\nNorth Star House`,
       buildBrandedEmailHtml({
         headline: 'Your Tour is Tomorrow',
         subtext:
           `Hi ${esc(t.visitor_name)}, just a reminder — your estate tour is tomorrow:<br><br>` +
           `Tour Date &amp; Time: <strong>${esc(when)}</strong><br>` +
+          (guide ? `Your tour guide: <strong>${esc(guide)}</strong><br>` : '') +
           `Address: <strong>${esc(TOUR_ADDRESS)}</strong><br><br>` +
           TOUR_DIRECTIONS_HTML_INLINE,
       })
@@ -137,15 +150,17 @@ async function run1h(): Promise<number> {
   let sent = 0
   for (const t of rows || []) {
     const when = fmtWhen(t.date, t.start_time)
+    const guide = tourGuideFor(t.date, t.guide_name)
     const ok = await sendMail(
       t.visitor_email,
       `Your North Star House tour is in about an hour`,
-      `Hi ${t.visitor_name},\n\nYour estate tour is coming up shortly.\n\nTour Date & Time: ${when}\nAddress: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you soon!\nNorth Star House`,
+      `Hi ${t.visitor_name},\n\nYour estate tour is coming up shortly.\n\nTour Date & Time: ${when}\n${guide ? `Your tour guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you soon!\nNorth Star House`,
       buildBrandedEmailHtml({
         headline: 'See You Soon!',
         subtext:
           `Hi ${esc(t.visitor_name)}, your estate tour is coming up shortly:<br><br>` +
           `Tour Date &amp; Time: <strong>${esc(when)}</strong><br>` +
+          (guide ? `Your tour guide: <strong>${esc(guide)}</strong><br>` : '') +
           `Address: <strong>${esc(TOUR_ADDRESS)}</strong><br><br>` +
           TOUR_DIRECTIONS_HTML_INLINE,
       })
