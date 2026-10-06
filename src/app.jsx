@@ -6285,6 +6285,24 @@ function BoardView() {
     }).catch(function() { setClosingId(null); });
   }
 
+  function deleteVotingItem(item) {
+    if (!window.confirm('Delete "' + item.title + '"? This also removes any votes already cast on it. This cannot be undone.')) return;
+    setClosingId(item.row_id);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Board-Votes') + '?topicId=eq.' + encodeURIComponent(item.title), {
+      method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() {
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Board Voting Items') + '?row_id=eq.' + encodeURIComponent(item.row_id), {
+        method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      });
+    }).then(function() {
+      setItems(function(prev) { return prev.filter(function(i) { return i.row_id !== item.row_id; }); });
+      setVotes(function(prev) { return prev.filter(function(v) { return v.topicId !== item.title; }); });
+      clearCache('Board Voting Items');
+      clearCache('Board-Votes');
+      setClosingId(null);
+    }).catch(function() { setClosingId(null); alert('Failed to delete — please try again.'); });
+  }
+
   function isWon(item) {
     var t = tally(item);
     return t.yes > t.no && t.yes > 0;
@@ -6752,6 +6770,12 @@ function BoardView() {
                                     style={{ background: won ? '#2e7d32' : '#fff', color: won ? '#fff' : '#555', border: '0.5px solid ' + (won ? '#2e7d32' : '#e0d8cc'), borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: isClosing ? 0.6 : 1, whiteSpace: 'nowrap' }}>
                                     {isClosing ? 'Closing…' : 'Close Vote'}
                                   </button>
+                                  <button
+                                    onClick={function() { deleteVotingItem(item); }}
+                                    disabled={isClosing}
+                                    style={{ background: '#fff', color: '#c0392b', border: '0.5px solid #f0c9c2', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: isClosing ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                                    Delete
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -6793,6 +6817,12 @@ function BoardView() {
                                           <span style={{ color: '#888' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
                                         </div>
                                       </div>
+                                      <button
+                                        onClick={function(e) { e.stopPropagation(); deleteVotingItem(item); }}
+                                        title="Delete this voting item"
+                                        style={{ background: 'none', border: 'none', color: '#c0392b', fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '2px 6px', flexShrink: 0 }}>
+                                        Delete
+                                      </button>
                                       <span style={{ fontSize: 11, color: '#aaa', flexShrink: 0 }}>{expanded ? '▲' : '▼'}</span>
                                     </div>
                                     {expanded && (
@@ -17471,29 +17501,45 @@ function VenueInquiriesView({ navigate }) {
       fetchCalendarEvents().then(function(events) { setCalendarEvents(events); }).catch(function() { setCalendarEvents([]); });
     }
   }, [selected && selected.form_id]);
-
+  // Wedding Inquiry has a single "preferred date" field worth checking against
+  // the venue calendar; Event Inquiry and Pre Booking don't share that field
+  // id (each of the three forms has its own question set), so they fall back
+  // to a generic label/answer dump built from whatever that form actually asked.
   function buildInquiryFollowUpPrompt(r) {
     var a = r.answers || {};
-    var dateStr = a.w_date;
-    var availability = 'Not given';
-    if (dateStr) {
-      if (calendarEvents === null) {
-        availability = 'Unknown (venue calendar still loading)';
-      } else {
-        var conflicts = calendarEvents.filter(function(e) { return icalDateKey(e.DTSTART || e['DTSTART;VALUE=DATE']) === dateStr; });
-        availability = conflicts.length
-          ? 'Already booked -- conflicts with: ' + conflicts.map(function(c) { return c.SUMMARY || 'Untitled'; }).join(', ')
-          : 'Available';
+    var p = inquiryPreviewFields(r);
+    var isWedding = r.form_id === WEDDING_INQUIRY_FORM_ID;
+    var details, context;
+    if (isWedding) {
+      var dateStr = a.w_date;
+      var availability = 'Not given';
+      if (dateStr) {
+        if (calendarEvents === null) {
+          availability = 'Unknown (venue calendar still loading)';
+        } else {
+          var conflicts = calendarEvents.filter(function(e) { return icalDateKey(e.DTSTART || e['DTSTART;VALUE=DATE']) === dateStr; });
+          availability = conflicts.length
+            ? 'Already booked -- conflicts with: ' + conflicts.map(function(c) { return c.SUMMARY || 'Untitled'; }).join(', ')
+            : 'Available';
+        }
       }
+      details = 'Name: ' + (a.w_name || 'Unknown') + '\n' +
+        'Preferred date: ' + (a.w_date || 'Not given') + '\n' +
+        'Date availability: ' + availability + '\n' +
+        'Guest count: ' + (a.w_guests || 'Not given') + '\n' +
+        'Their message: "' + (a.w_message || '(no message left)') + '"';
+      context = 'Context: they found us through our website and, right there on the same page, had the option to book a property tour on the spot -- but they didn\'t complete that step, for whatever reason. We\'re following up warmly, referencing what they actually wrote in their message (not just a generic template), letting them know we\'d still love to have them, and gently inviting them to check our tour availability and schedule a visit whenever works for them. Keep it warm, personal, concise, and not pushy -- no hard sell. If their preferred date is already booked, do not imply it\'s open -- warmly note we\'ll help them find a date that works instead.';
+    } else {
+      details = (r.fields || []).map(function(f) {
+        var v = a[f.id];
+        if (v == null || v === '') return null;
+        return f.label + ': ' + (Array.isArray(v) ? v.join(', ') : v);
+      }).filter(Boolean).join('\n') || 'Name: ' + (p.name || 'Unknown');
+      context = 'Context: they found us through our website\'s ' + (r.form_name || 'inquiry') + ' form. We\'re following up warmly, referencing what they actually wrote (not just a generic template), letting them know we\'d love to have them, and inviting them to check our tour availability and schedule a visit whenever works for them. Keep it warm, personal, concise, and not pushy -- no hard sell.';
     }
-    return 'Write a warm, friendly follow-up email from North Star House (a historic house venue) to someone who submitted our website\'s wedding inquiry form.\n\n' +
-      'Their details:\n' +
-      'Name: ' + (a.w_name || 'Unknown') + '\n' +
-      'Preferred date: ' + (a.w_date || 'Not given') + '\n' +
-      'Date availability: ' + availability + '\n' +
-      'Guest count: ' + (a.w_guests || 'Not given') + '\n' +
-      'Their message: "' + (a.w_message || '(no message left)') + '"\n\n' +
-      'Context: they found us through our website and, right there on the same page, had the option to book a property tour on the spot -- but they didn\'t complete that step, for whatever reason. We\'re following up warmly, referencing what they actually wrote in their message (not just a generic template), letting them know we\'d still love to have them, and gently inviting them to check our tour availability and schedule a visit whenever works for them. Keep it warm, personal, concise, and not pushy -- no hard sell. If their preferred date is already booked, do not imply it\'s open -- warmly note we\'ll help them find a date that works instead.\n\n' +
+    return 'Write a warm, friendly follow-up email from North Star House (a historic house venue) to someone who submitted our website\'s ' + (r.form_name || 'inquiry') + ' form.\n\n' +
+      'Their details:\n' + details + '\n\n' +
+      context + '\n\n' +
       'Output format: first line "Subject: <subject line>", then a blank line, then just the email body (no greeting/sign-off needed -- those get added automatically). Plain text only, no markdown.';
   }
 
@@ -17512,8 +17558,8 @@ function VenueInquiriesView({ navigate }) {
     setComposingId(r.id);
     setComposeStep('paste');
     setComposePaste('');
-    var a = r.answers || {};
-    setComposeSubject('Following up, ' + (a.w_name || 'there') + '!');
+    var p = inquiryPreviewFields(r);
+    setComposeSubject('Following up, ' + (p.name || 'there') + '!');
     setComposeBody('');
   }
 
@@ -17532,8 +17578,8 @@ function VenueInquiriesView({ navigate }) {
 
   function buildFollowUpEmail(r) {
     function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-    var a = r.answers || {};
-    var firstName = (a.w_name || '').split(' ')[0] || 'there';
+    var a = r.answers || {}; var p = inquiryPreviewFields(r);
+    var firstName = ((p.name || '').split(' ')[0]) || 'there';
     var bodyHtml = esc(composeBody).replace(/\n/g, '<br>');
     var html = buildBoardNotificationEmailHtml({
       headline: 'Happy to Hear From You, ' + esc(firstName) + '!',
@@ -17545,7 +17591,7 @@ function VenueInquiriesView({ navigate }) {
       footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
     });
     var text = composeBody + '\n\nView our calendar availability: ' + CALENDAR_PUBLIC_URL + '\nSchedule a tour: ' + TOUR_BOOKING_URL;
-    return { html: html, text: text, subject: composeSubject, to: a.w_email };
+    return { html: html, text: text, subject: composeSubject, to: p.email };
   }
 
   function previewFollowUp(r) {
@@ -17702,7 +17748,7 @@ function VenueInquiriesView({ navigate }) {
                   </div>
                 );
               })()}
-              {selected.form_id === WEDDING_INQUIRY_FORM_ID && (
+              {RENTAL_INQUIRY_FORM_IDS.indexOf(selected.form_id) !== -1 && (
                 <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
                   <button onClick={function() { copyFollowUpPrompt(selected); }} title={copiedPromptId === selected.id ? 'Copied!' : "Copy an AI prompt for a follow-up email, pre-filled with this person's details"}
                     style={{ background: copiedPromptId === selected.id ? '#eef7ee' : '#fff', color: copiedPromptId === selected.id ? '#2e7d32' : '#888', border: '1px solid ' + (copiedPromptId === selected.id ? '#bfe0bf' : '#e0d8cc'), borderRadius: 7, padding: '6px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
@@ -17719,7 +17765,7 @@ function VenueInquiriesView({ navigate }) {
                   </button>
                 </div>
               )}
-              {selected.form_id === WEDDING_INQUIRY_FORM_ID && composingId === selected.id && (
+              {RENTAL_INQUIRY_FORM_IDS.indexOf(selected.form_id) !== -1 && composingId === selected.id && (
                 <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 14, marginBottom: 12 }}>
                   {composeStep === 'paste' ? (
                     <div>
