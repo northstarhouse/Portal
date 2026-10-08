@@ -2890,6 +2890,16 @@ function VolunteersView({ navigate }) {
   const [tab, setTab] = useState('active');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboarding, setOnboarding] = useState([]);
+
+  // "Start Onboarding" on a Form Responses row (see SuFormResponses) sets this
+  // flag and jumps here via the hash router before this component even
+  // mounts, so pick it up on first render rather than waiting on a fetch.
+  useEffect(function() {
+    if (window.__nshShowOnboarding) {
+      window.__nshShowOnboarding = false;
+      setShowOnboarding(true);
+    }
+  }, []);
   const [showImportNotes, setShowImportNotes] = useState(false);
   const [importNotesText, setImportNotesText] = useState('');
   const [importNotesRows, setImportNotesRows] = useState(null);
@@ -13569,6 +13579,8 @@ function SuFormResponses({ form }) {
   var [sentLead, setSentLead] = useState({});
   var [sendingVol, setSendingVol] = useState({});
   var [sentVol, setSentVol] = useState({});
+  var [startingOb, setStartingOb] = useState({});
+  var [startedOb, setStartedOb] = useState({});
   var [handlingId, setHandlingId] = useState(null);
   var [deletingId, setDeletingId] = useState(null);
   var [notesDraft, setNotesDraft] = useState({});
@@ -13766,6 +13778,41 @@ function SuFormResponses({ form }) {
       'Area(s) of Interest: ' + (areaNames || '—') +
       (about ? '\nAbout: ' + about : '');
     return { html: html, text: text, name: name, areaEntries: areaEntries };
+  }
+
+  // Creates a "Vol Onboarding" row from a volunteer inquiry (see
+  // VOLUNTEER_INTEREST_FORM_ID above) and jumps to the Volunteer Onboarding
+  // Pipeline so the new entry is right there, instead of a staffer retyping
+  // the person's info by hand into a separate "Add new" form.
+  function startOnboardingFromResponse(r) {
+    if (startingOb[r.id] || startedOb[r.id]) return;
+    var a = r.answers || {};
+    var areaNames = volunteerAreaEntries(r).map(function(e) { return e.formArea; }).join(', ');
+    setStartingOb(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Vol Onboarding'), {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({
+        first_name: a.v_first || 'Unknown',
+        last_name: a.v_last || null,
+        email: a.v_email || null,
+        phone: a.v_phone || null,
+        area_of_interest: areaNames || null,
+        notes: a.v_about ? ('From website volunteer inquiry: ' + a.v_about) : 'From website volunteer inquiry form',
+        pipeline_stage: 'New Inquiry',
+        status: 'In Progress'
+      })
+    }).then(function(res) { return res.json().then(function(rows) { return { ok: res.ok, rows: rows }; }); })
+      .then(function(result) {
+        setStartingOb(function(prev) { var n = Object.assign({}, prev); delete n[r.id]; return n; });
+        if (!result.ok) { alert('Failed to start onboarding: ' + (result.rows && result.rows.message || 'unknown error')); return; }
+        setStartedOb(function(prev) { var n = Object.assign({}, prev); n[r.id] = true; return n; });
+        window.__nshShowOnboarding = true;
+        window.location.hash = 'volunteers';
+      }).catch(function() {
+        setStartingOb(function(prev) { var n = Object.assign({}, prev); delete n[r.id]; return n; });
+        alert('Failed to start onboarding.');
+      });
   }
 
   function sendVolunteerAreaLeadEmail(r) {
@@ -14047,6 +14094,11 @@ function SuFormResponses({ form }) {
                         title="Thank the volunteer and let them know who will be reaching out"
                         style={{ background: sentVol[r.id] ? '#eef7ee' : '#fff', color: sentVol[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (sentVol[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: (sendingVol[r.id] || sentVol[r.id]) ? 'default' : 'pointer', opacity: sendingVol[r.id] ? 0.6 : 1 }}>
                         {sentVol[r.id] ? '✓ Volunteer emailed' : sendingVol[r.id] ? 'Sending…' : 'Email Volunteer'}
+                      </button>
+                      <button onClick={function() { startOnboardingFromResponse(r); }} disabled={startingOb[r.id] || startedOb[r.id]}
+                        title="Add this person to the Volunteer Onboarding Pipeline"
+                        style={{ background: startedOb[r.id] ? '#eef7ee' : '#fff', color: startedOb[r.id] ? '#2e7d32' : gold, border: '1px solid ' + (startedOb[r.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: (startingOb[r.id] || startedOb[r.id]) ? 'default' : 'pointer', opacity: startingOb[r.id] ? 0.6 : 1 }}>
+                        {startedOb[r.id] ? '✓ Added to Onboarding' : startingOb[r.id] ? 'Adding…' : 'Start Onboarding'}
                       </button>
                     </React.Fragment>
                   )}
