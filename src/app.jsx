@@ -13747,6 +13747,17 @@ function SuFormResponses({ form }) {
     });
   }
 
+  // "X" / "X & Y" / "X, Y & Z" -- natural-language list, no Oxford comma,
+  // used anywhere multiple volunteer areas of interest get read out in an
+  // email (both the area-lead notification and the volunteer thank-you).
+  function formatVolunteerAreaList(items) {
+    var arr = (items || []).filter(Boolean);
+    if (arr.length === 0) return '';
+    if (arr.length === 1) return arr[0];
+    if (arr.length === 2) return arr[0] + ' & ' + arr[1];
+    return arr.slice(0, -1).join(', ') + ' & ' + arr[arr.length - 1];
+  }
+
   function buildVolunteerAreaLeadEmail(r) {
     function esc(s) { return String(s == null || s === '' ? '—' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
     var a = r.answers || {};
@@ -13755,7 +13766,7 @@ function SuFormResponses({ form }) {
     var phone = a.v_phone || '';
     var about = a.v_about || '';
     var areaEntries = volunteerAreaEntries(r);
-    var areaNames = areaEntries.map(function(e) { return e.formArea; }).join(', ');
+    var areaNames = formatVolunteerAreaList(areaEntries.map(function(e) { return e.formArea; }));
 
     var subtext = '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif">' +
         '<div style="text-align:left;display:inline-block;font-size:14px;line-height:1.9;font-family:Helvetica,Arial,sans-serif">' +
@@ -13767,7 +13778,7 @@ function SuFormResponses({ form }) {
         (about ? '<div style="text-align:left;background:#f5f0e8;border-radius:8px;padding:14px 16px;margin-top:16px;font-size:14px;line-height:1.6;color:#3a332a;font-family:Helvetica,Arial,sans-serif"><b>About:</b><br/>' + esc(about) + '</div>' : '') +
       '</div>';
     var html = buildBoardNotificationEmailHtml({
-      headline: esc(name) + ' is interested in volunteering',
+      headline: esc(name) + ' is interested in ' + esc(areaNames || 'volunteering'),
       subtext: subtext,
       footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS
     });
@@ -13841,7 +13852,8 @@ function SuFormResponses({ form }) {
     var a = r.answers || {};
     var firstName = (a.v_first || '').trim() || 'there';
     var areaEntries = volunteerAreaEntries(r);
-    var areaList = areaEntries.map(function(e) { return e.formArea; }).join(', ') || 'volunteering with us';
+    var areaList = formatVolunteerAreaList(areaEntries.map(function(e) { return e.formArea; })) || 'volunteering with us';
+    var leadPhrase = areaEntries.length > 1 ? 'the leads for those areas' : 'the lead for that area';
 
     function leadLine(e) { return e.lead ? (e.lead + (e.leadEmail ? ' - ' + e.leadEmail : '')) : 'To be assigned'; }
     function scheduleLine(e) { return e.volunteerMessage || 'Contact the lead for current details'; }
@@ -13858,7 +13870,7 @@ function SuFormResponses({ form }) {
     var subtext = '<div style="text-align:left;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.7;color:#3a332a">' +
         '<p>Hi ' + esc(firstName) + ',</p>' +
         '<p>We’re excited to hear you’re interested in getting involved with ' + esc(areaList) + ' here at North Star House.</p>' +
-        '<p>Your information has been shared with the lead for that area who is going to follow up with you about current needs and next steps.</p>' +
+        '<p>Your information has been shared with ' + leadPhrase + ' who ' + (areaEntries.length > 1 ? 'are' : 'is') + ' going to follow up with you about current needs and next steps.</p>' +
         '<div style="border-top:1px solid #e5ddcf;margin:0 -40px 16px;"></div>' +
         areaBlocksHtml +
         '<div style="border-top:1px solid #e5ddcf;margin:0 -40px 16px;"></div>' +
@@ -13872,7 +13884,7 @@ function SuFormResponses({ form }) {
     });
     var text = 'Hi ' + firstName + ',\n\n' +
       'We’re excited to hear you’re interested in getting involved with ' + areaList + ' here at North Star House.\n\n' +
-      'Your information has been shared with the lead for that area who is going to follow up with you about current needs and next steps.\n\n' +
+      'Your information has been shared with ' + leadPhrase + ' who ' + (areaEntries.length > 1 ? 'are' : 'is') + ' going to follow up with you about current needs and next steps.\n\n' +
       areaBlocksText +
       '\n\nWe really appreciate that you want to support the house!\n\n\n-North Star House Team';
     return { html: html, text: text, subject: 'Volunteering at North Star House' };
