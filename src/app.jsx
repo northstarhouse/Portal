@@ -14815,6 +14815,17 @@ function AdminView({ navigate }) {
           Volunteer Email Lists
         </div>
         <div
+          onClick={function() { navigate('email-notices'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+          </span>
+          Email Notices
+        </div>
+        <div
           onClick={function() { navigate('announcements'); }}
           style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
           onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
@@ -15325,6 +15336,261 @@ function AcknowledgmentsQueueView({ navigate }) {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+// Public-facing counterpart to the Template Email tool in VolEmailListsView
+// below -- same branded-email mechanics (buildBoardNotificationEmailHtml,
+// same send-email function), but recipients come from ticket_orders grouped
+// by event instead of the volunteer roster, and the footer link row is
+// omitted (footerLinks: []) since Portal/Volunteer Hub/Website mean nothing
+// to a ticket buyer. Logs to email_notices_log, its own table, so these
+// public sends stay out of volunteer_email_logs.
+function EmailNoticesView({ navigate }) {
+  var { useState: useS, useEffect: useE, useMemo } = React;
+  var [events, setEvents] = useS(null);
+  var [selectedEvent, setSelectedEvent] = useS('');
+  var [buyers, setBuyers] = useS(null);
+  var [selected, setSelected] = useS({});
+  var [search, setSearch] = useS('');
+  var [subject, setSubject] = useS('');
+  var [headline, setHeadline] = useS('');
+  var [subtext, setSubtext] = useS('');
+  var [buttonText, setButtonText] = useS('');
+  var [buttonUrl, setButtonUrl] = useS('');
+  var [note, setNote] = useS('');
+  var [sending, setSending] = useS(false);
+  var [sent, setSent] = useS(false);
+  var [sendError, setSendError] = useS(null);
+  var [logs, setLogs] = useS([]);
+
+  var inpSt = { width: '100%', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, background: '#fff', boxSizing: 'border-box', fontFamily: 'system-ui, sans-serif' };
+
+  useE(function() {
+    fetch(SUPABASE_URL + '/rest/v1/ticket_orders?select=event_slug,event_title,event_date&order=event_date.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (!Array.isArray(rows)) { setEvents([]); return; }
+      var seen = {}; var list = [];
+      rows.forEach(function(r) {
+        if (!r.event_slug || seen[r.event_slug]) return;
+        seen[r.event_slug] = true;
+        list.push({ slug: r.event_slug, title: r.event_title || r.event_slug, date: r.event_date });
+      });
+      setEvents(list);
+    }).catch(function() { setEvents([]); });
+
+    fetch(SUPABASE_URL + '/rest/v1/email_notices_log?select=*&order=sent_at.desc&limit=10', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(data) { if (Array.isArray(data)) setLogs(data); }).catch(function() {});
+  }, []);
+
+  function loadBuyers(slug) {
+    setSelectedEvent(slug);
+    setBuyers(null);
+    setSelected({});
+    setSent(false);
+    setSendError(null);
+    if (!slug) return;
+    fetch(SUPABASE_URL + '/rest/v1/ticket_orders?event_slug=eq.' + encodeURIComponent(slug) + '&select=*&order=buyer_name.asc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      rows = Array.isArray(rows) ? rows : [];
+      // Dedupe by email -- the same buyer may have placed more than one
+      // order for the same event; only email them once, with their combined
+      // ticket count shown for context.
+      var byEmail = {};
+      rows.forEach(function(o) {
+        var email = (o.buyer_email || '').trim().toLowerCase();
+        if (!email) return;
+        if (!byEmail[email]) byEmail[email] = { buyer_name: o.buyer_name || email, buyer_email: email, totalQty: o.quantity || 0 };
+        else byEmail[email].totalQty += (o.quantity || 0);
+      });
+      var list = Object.keys(byEmail).map(function(e) { return byEmail[e]; });
+      setBuyers(list);
+      var sel = {};
+      list.forEach(function(b) { sel[b.buyer_email] = true; });
+      setSelected(sel);
+    }).catch(function() { setBuyers([]); });
+  }
+
+  function toggleSelected(email) {
+    setSelected(function(prev) { var n = Object.assign({}, prev); n[email] = !n[email]; return n; });
+  }
+
+  var selectedCount = Object.keys(selected).filter(function(e) { return selected[e]; }).length;
+
+  var filteredBuyers = useMemo(function() {
+    if (!buyers) return [];
+    if (!search.trim()) return buyers;
+    var q = search.trim().toLowerCase();
+    return buyers.filter(function(b) { return (b.buyer_name || '').toLowerCase().indexOf(q) !== -1 || b.buyer_email.indexOf(q) !== -1; });
+  }, [buyers, search]);
+
+  function handleSend() {
+    var recipients = (buyers || []).filter(function(b) { return selected[b.buyer_email]; });
+    if (!recipients.length || !subject.trim() || !headline.trim()) return;
+    setSending(true);
+    setSendError(null);
+    var html = buildBoardNotificationEmailHtml({ headline: headline, subtext: subtext, buttonText: buttonText, buttonUrl: buttonUrl, note: note, footerLinks: [] });
+    var text = headline + '\n\n' + subtext + (buttonText.trim() && buttonUrl.trim() ? '\n\n' + buttonText + ': ' + buttonUrl : '') + (note ? '\n\n' + note : '');
+    var eventMeta = (events || []).find(function(e) { return e.slug === selectedEvent; });
+    fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: recipients.map(function(b) { return b.buyer_email; }), subject: subject, body: text, html: html })
+    }).then(function(r) { return r.json().then(function(j) { return { ok: r.ok, json: j }; }); }).then(function(res) {
+      if (!res.ok) throw new Error(res.json.error || 'Send failed');
+      setSent(true);
+      return fetch(SUPABASE_URL + '/rest/v1/email_notices_log', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          sent_at: new Date().toISOString(),
+          event_slug: selectedEvent,
+          event_title: eventMeta ? eventMeta.title : selectedEvent,
+          recipient_count: recipients.length,
+          recipients: recipients.map(function(b) { return b.buyer_name + ' <' + b.buyer_email + '>'; }),
+          subject: subject,
+          sender: 'info@northstarhouse.org'
+        })
+      });
+    }).then(function() {
+      return fetch(SUPABASE_URL + '/rest/v1/email_notices_log?select=*&order=sent_at.desc&limit=10', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function(r) { return r.json(); }).then(function(data) { if (Array.isArray(data)) setLogs(data); });
+    }).catch(function(err) {
+      setSendError(err.message || 'Unknown error');
+    }).finally(function() { setSending(false); });
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap', rowGap: 10 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Email Notices</div>
+          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Branded announcements to ticket buyers of a specific event — cancellations, updates, offers</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 320, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Event</label>
+            <select value={selectedEvent} onChange={function(e) { loadBuyers(e.target.value); }} style={inpSt}>
+              <option value="">{events === null ? 'Loading events…' : 'Choose an event…'}</option>
+              {(events || []).map(function(e) {
+                var d = e.date ? new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                return <option key={e.slug} value={e.slug}>{e.title}{d ? ' — ' + d : ''}</option>;
+              })}
+            </select>
+          </div>
+
+          {selectedEvent && (
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>
+                Recipients ({selectedCount} of {(buyers || []).length} selected)
+              </label>
+              <input value={search} onChange={function(e) { setSearch(e.target.value); }} placeholder="Search buyers by name or email…" style={Object.assign({}, inpSt, { marginBottom: 8 })} />
+              <div style={{ background: '#faf8f4', borderRadius: 8, padding: '6px 10px', maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                {buyers === null ? (
+                  <div style={{ fontSize: 12, color: '#aaa', padding: '10px 4px' }}>Loading buyers…</div>
+                ) : filteredBuyers.length === 0 ? (
+                  <div style={{ fontSize: 12, color: '#aaa', padding: '10px 4px' }}>No buyers found for this event.</div>
+                ) : filteredBuyers.map(function(b) {
+                  var checked = !!selected[b.buyer_email];
+                  return (
+                    <label key={b.buyer_email} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 4px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={checked} onChange={function() { toggleSelected(b.buyer_email); }} style={{ accentColor: gold, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a', flexShrink: 0 }}>{b.buyer_name}</span>
+                      <span style={{ fontSize: 11, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.buyer_email}</span>
+                      <span style={{ fontSize: 11, color: '#bbb', marginLeft: 'auto', flexShrink: 0 }}>{b.totalQty} ticket{b.totalQty === 1 ? '' : 's'}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Subject line</label>
+            <input value={subject} onChange={function(e) { setSubject(e.target.value); }} placeholder="Email subject…" style={inpSt} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Headline</label>
+            <input value={headline} onChange={function(e) { setHeadline(e.target.value); }} placeholder="Big text at the top of the email…" style={inpSt} />
+          </div>
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Body text</label>
+            <textarea value={subtext} onChange={function(e) { setSubtext(e.target.value); }} placeholder="Smaller paragraph below the headline…" rows={5} style={Object.assign({}, inpSt, { resize: 'vertical' })} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Button text (optional)</label>
+              <input value={buttonText} onChange={function(e) { setButtonText(e.target.value); }} placeholder="e.g. View Details" style={inpSt} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Button link</label>
+              <input value={buttonUrl} onChange={function(e) { setButtonUrl(e.target.value); }} placeholder="https://…" style={inpSt} />
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Note (optional, small italic text)</label>
+            <input value={note} onChange={function(e) { setNote(e.target.value); }} placeholder="e.g. Use promo code FALLMAGIC at checkout" style={inpSt} />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Preview — exactly what recipients will see</label>
+            <div style={{ border: '0.5px solid #e0d8cc', borderRadius: 8, overflow: 'hidden' }}
+              dangerouslySetInnerHTML={{ __html: buildBoardNotificationEmailHtml({
+                headline: headline || 'Headline',
+                subtext: subtext || 'Body text will appear here…',
+                buttonText: buttonText,
+                buttonUrl: buttonUrl,
+                note: note,
+                footerLinks: []
+              }) }}
+            />
+          </div>
+
+          {sent && <div style={{ fontSize: 12, color: '#2e7d32', background: '#eef7ee', borderRadius: 8, padding: '10px 12px' }}>✓ Sent to {selectedCount} recipient(s).</div>}
+          {sendError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{sendError}</div>}
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleSend}
+              disabled={sending || !selectedCount || !subject.trim() || !headline.trim()}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (sending || !selectedCount || !subject.trim() || !headline.trim()) ? 0.5 : 1 }}
+            >
+              {sending ? 'Sending…' : '✉ Send Notice'}
+            </button>
+          </div>
+          <div style={{ fontSize: 10, color: '#ccc', textAlign: 'center' }}>Sends from info@northstarhouse.org · no internal links included</div>
+        </div>
+
+        {logs.length > 0 && (
+          <div style={{ width: 220, flexShrink: 0 }}>
+            <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden', position: 'sticky', top: 16 }}>
+              <div style={{ padding: '10px 14px', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Recent Notices</div>
+              </div>
+              {logs.map(function(log, i) {
+                return (
+                  <div key={i} style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{log.event_title || log.event_slug}</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.subject}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                      <span style={{ fontSize: 10, color: '#aaa' }}>{log.recipient_count} recipients</span>
+                      <span style={{ fontSize: 10, color: '#ccc' }}>{new Date(log.sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -19687,6 +19953,7 @@ const views = {
   'event-overviews': EventsView, // alias -- EventsView always opens on its card-based "Events" tab
   'event-plan': EventPlanLinkView,
   'vol-email-lists': VolEmailListsView,
+  'email-notices': EmailNoticesView,
   'wix-forms': WixFormsView,
   'brick-submission': BrickSubmissionView,
   'form-builder': FormBuilderView,
@@ -19812,9 +20079,11 @@ function buildBoardNotificationEmailHtml(opts) {
           buttons.map(function(b) { return '<a href="' + b.url + '" style="display:inline-block;background:' + gold + ';color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:15px;padding:14px 26px;border-radius:6px;margin:0 6px 8px;">' + b.text + '</a>'; }).join('') +
           (note ? '<p style="margin:20px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>' + note + '</i></p>' : '') +
         '</div>' +
-        '<table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #e5ddcf;">' +
-          '<tr>' + footerCells + '</tr>' +
-        '</table>' +
+        (footerLinks.length > 0
+          ? '<table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #e5ddcf;">' +
+              '<tr>' + footerCells + '</tr>' +
+            '</table>'
+          : '') +
       '</div>' +
     '</div>'
   );
