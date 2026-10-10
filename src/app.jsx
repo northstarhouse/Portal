@@ -15362,6 +15362,7 @@ function EmailNoticesView({ navigate }) {
   var [note, setNote] = useS('');
   var [sending, setSending] = useS(false);
   var [sent, setSent] = useS(false);
+  var [sentCount, setSentCount] = useS(0);
   var [sendError, setSendError] = useS(null);
   var [logs, setLogs] = useS([]);
 
@@ -15436,13 +15437,22 @@ function EmailNoticesView({ navigate }) {
     var html = buildBoardNotificationEmailHtml({ headline: headline, subtext: subtext, buttonText: buttonText, buttonUrl: buttonUrl, note: note, footerLinks: [] });
     var text = headline + '\n\n' + subtext + (buttonText.trim() && buttonUrl.trim() ? '\n\n' + buttonText + ': ' + buttonUrl : '') + (note ? '\n\n' + note : '');
     var eventMeta = (events || []).find(function(e) { return e.slug === selectedEvent; });
-    fetch(SUPABASE_URL + '/functions/v1/send-email', {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: recipients.map(function(b) { return b.buyer_email; }), subject: subject, body: text, html: html })
-    }).then(function(r) { return r.json().then(function(j) { return { ok: r.ok, json: j }; }); }).then(function(res) {
-      if (!res.ok) throw new Error(res.json.error || 'Send failed');
+    // One send-email call per recipient -- a single call with an array `to`
+    // puts everyone in the same To: header (a group email, everyone sees
+    // every other address), which is wrong for an external announcement.
+    Promise.all(recipients.map(function(b) {
+      return fetch(SUPABASE_URL + '/functions/v1/send-email', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: [b.buyer_email], subject: subject, body: text, html: html })
+      }).then(function(r) { return r.json().then(function(j) { return { ok: r.ok, json: j, email: b.buyer_email }; }); });
+    })).then(function(results) {
+      var failed = results.filter(function(r) { return !r.ok; });
+      if (failed.length === results.length) throw new Error(results[0].json.error || 'Send failed');
+      var succeeded = recipients.filter(function(b) { return results.some(function(r) { return r.ok && r.email === b.buyer_email; }); });
       setSent(true);
+      setSentCount(succeeded.length);
+      if (failed.length) setSendError(failed.length + ' of ' + results.length + ' failed: ' + failed.map(function(f) { return f.email; }).join(', '));
       return fetch(SUPABASE_URL + '/rest/v1/email_notices_log', {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
@@ -15450,8 +15460,8 @@ function EmailNoticesView({ navigate }) {
           sent_at: new Date().toISOString(),
           event_slug: selectedEvent,
           event_title: eventMeta ? eventMeta.title : selectedEvent,
-          recipient_count: recipients.length,
-          recipients: recipients.map(function(b) { return b.buyer_name + ' <' + b.buyer_email + '>'; }),
+          recipient_count: succeeded.length,
+          recipients: succeeded.map(function(b) { return b.buyer_name + ' <' + b.buyer_email + '>'; }),
           subject: subject,
           sender: 'info@northstarhouse.org'
         })
@@ -15554,7 +15564,7 @@ function EmailNoticesView({ navigate }) {
             />
           </div>
 
-          {sent && <div style={{ fontSize: 12, color: '#2e7d32', background: '#eef7ee', borderRadius: 8, padding: '10px 12px' }}>✓ Sent to {selectedCount} recipient(s).</div>}
+          {sent && <div style={{ fontSize: 12, color: '#2e7d32', background: '#eef7ee', borderRadius: 8, padding: '10px 12px' }}>✓ Sent individually to {sentCount} recipient(s).</div>}
           {sendError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{sendError}</div>}
 
           <div style={{ display: 'flex', gap: 8 }}>
