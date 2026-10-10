@@ -15539,8 +15539,8 @@ function EmailNoticesView({ navigate }) {
             <input value={headline} onChange={function(e) { setHeadline(e.target.value); }} placeholder="Big text at the top of the email…" style={inpSt} />
           </div>
           <div>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Body text</label>
-            <textarea value={subtext} onChange={function(e) { setSubtext(e.target.value); }} placeholder="Smaller paragraph below the headline… each line becomes its own paragraph" rows={5} style={Object.assign({}, inpSt, { resize: 'vertical' })} />
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Body text — each line is its own paragraph, **word** for bold</label>
+            <textarea value={subtext} onChange={function(e) { setSubtext(e.target.value); }} placeholder="Smaller paragraph below the headline…" rows={5} style={Object.assign({}, inpSt, { resize: 'vertical' })} />
           </div>
           <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Highlight box (optional)</label>
@@ -15548,7 +15548,7 @@ function EmailNoticesView({ navigate }) {
             <input value={boxCode} onChange={function(e) { setBoxCode(e.target.value); }} placeholder="Code shown large in the box, e.g. FALLMAGIC" style={inpSt} />
           </div>
           <div>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Closing text (optional, shown after the box)</label>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Closing text (optional, shown after the box) — **word** for bold</label>
             <textarea value={closing} onChange={function(e) { setClosing(e.target.value); }} placeholder="Any paragraphs that come after the highlight box…" rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -20103,6 +20103,9 @@ function buildBoardNotificationEmailHtml(opts) {
     var border = i < footerLinks.length - 1 ? 'border-right:1px solid #e5ddcf;' : '';
     return '<td style="width:' + (100 / footerLinks.length).toFixed(2) + '%;text-align:center;padding:14px 8px;' + border + '"><a href="' + l.url + '" style="color:' + gold + ';text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:13px;">' + l.label + '</a></td>';
   }).join('');
+  // Plain-text fields support **bold** the way the person typed it, rather
+  // than needing a rich-text editor -- turns into <strong>, nothing else.
+  function mdBold(s) { return String(s || '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'); }
   // A textarea's line breaks are just \n characters, which HTML collapses --
   // without this, a multi-paragraph body (like a cancellation notice) renders
   // as one run-on paragraph. Each non-blank line becomes its own <p>, the way
@@ -20113,7 +20116,7 @@ function buildBoardNotificationEmailHtml(opts) {
       .split(/\n+/)
       .map(function(s) { return s.trim(); })
       .filter(Boolean)
-      .map(function(p) { return '<p style="margin:0 0 16px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;text-align:left;' + (extraStyle || '') + '">' + p + '</p>'; })
+      .map(function(p) { return '<p style="margin:0 0 16px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;text-align:left;' + (extraStyle || '') + '">' + mdBold(p) + '</p>'; })
       .join('');
   }
   var subtextHtml = linesToParagraphs(subtext);
@@ -20135,7 +20138,10 @@ function buildBoardNotificationEmailHtml(opts) {
           boxHtml +
           (closingHtml ? '<div style="margin:0 0 16px;">' + closingHtml + '</div>' : '') +
           buttons.map(function(b) { return '<a href="' + b.url + '" style="display:inline-block;background:' + gold + ';color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:15px;padding:14px 26px;border-radius:6px;margin:0 6px 8px;">' + b.text + '</a>'; }).join('') +
-          (note ? '<p style="margin:20px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>' + note + '</i></p>' : '') +
+          (note
+            ? '<div style="border-top:1px solid #e5ddcf;width:60%;margin:20px auto 16px;"></div>' +
+              '<p style="margin:0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>' + mdBold(note) + '</i></p>'
+            : '') +
         '</div>' +
         (footerLinks.length > 0
           ? '<table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #e5ddcf;">' +
