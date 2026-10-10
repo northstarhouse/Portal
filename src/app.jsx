@@ -13554,12 +13554,14 @@ function SuPollResponses({ poll }) {
   );
 }
 
-function suAnswerEntries(field, answer) {
+function suAnswerEntries(field, answer, note) {
   if (field.type === 'group') {
     return (field.parts || []).map(function(part) { return { label: part.label, value: answer && answer[part.id] }; })
       .filter(function(e) { return e.value !== undefined && e.value !== '' && e.value !== null && !(Array.isArray(e.value) && e.value.length === 0); });
   }
-  return (answer === undefined || answer === '' || answer === null || (Array.isArray(answer) && answer.length === 0)) ? [] : [{ label: field.label, value: answer }];
+  var empty = answer === undefined || answer === '' || answer === null || (Array.isArray(answer) && answer.length === 0);
+  if (empty && !note) return [];
+  return [{ label: field.label, value: empty ? '' : answer, note: note || null }];
 }
 
 var DOCENT_TOUR_FORM_ID = '0635cd26-b0c7-4076-b9b1-bd25d1949467';
@@ -14190,24 +14192,34 @@ function SuFormResponses({ form }) {
               {groups.map(function(g, gi) {
                 if (!g.section) {
                   var q = g.fields[0];
-                  var entries = suAnswerEntries(q, r.answers ? r.answers[q.id] : undefined);
+                  var entries = suAnswerEntries(q, r.answers ? r.answers[q.id] : undefined, r.answers ? r.answers[q.id + '__note'] : undefined);
                   if (!entries.length) return null;
                   return (
                     <div key={q.id} style={{ marginBottom: 8 }}>
                       {entries.map(function(en, ei) {
-                        return <div key={ei} style={{ fontSize: 13, marginBottom: 3 }}><span style={{ color: '#999' }}>{en.label}: </span><span style={{ color: '#2a2a2a', fontWeight: 500 }}>{Array.isArray(en.value) ? en.value.join(', ') : String(en.value)}</span></div>;
+                        return (
+                          <div key={ei} style={{ fontSize: 13, marginBottom: 3 }}>
+                            <span style={{ color: '#999' }}>{en.label}: </span><span style={{ color: '#2a2a2a', fontWeight: 500 }}>{Array.isArray(en.value) ? en.value.join(', ') : String(en.value)}</span>
+                            {en.note && <div style={{ color: '#999', fontStyle: 'italic', marginTop: 2 }}>Note: {en.note}</div>}
+                          </div>
+                        );
                       })}
                     </div>
                   );
                 }
-                var blocks = g.fields.map(function(q2) { return { q: q2, entries: suAnswerEntries(q2, r.answers ? r.answers[q2.id] : undefined) }; }).filter(function(b) { return b.entries.length; });
+                var blocks = g.fields.map(function(q2) { return { q: q2, entries: suAnswerEntries(q2, r.answers ? r.answers[q2.id] : undefined, r.answers ? r.answers[q2.id + '__note'] : undefined) }; }).filter(function(b) { return b.entries.length; });
                 if (!blocks.length) return null;
                 return (
                   <div key={gi} style={{ marginBottom: 10, background: '#faf8f4', borderRadius: 8, padding: 10 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: gold, marginBottom: 6 }}>{g.section}</div>
                     {blocks.map(function(b) {
                       return b.entries.map(function(en, ei) {
-                        return <div key={b.q.id + ei} style={{ fontSize: 13, marginBottom: 3 }}><span style={{ color: '#999' }}>{en.label}: </span><span style={{ color: '#2a2a2a', fontWeight: 500 }}>{Array.isArray(en.value) ? en.value.join(', ') : String(en.value)}</span></div>;
+                        return (
+                          <div key={b.q.id + ei} style={{ fontSize: 13, marginBottom: 3 }}>
+                            <span style={{ color: '#999' }}>{en.label}: </span><span style={{ color: '#2a2a2a', fontWeight: 500 }}>{Array.isArray(en.value) ? en.value.join(', ') : String(en.value)}</span>
+                            {en.note && <div style={{ color: '#999', fontStyle: 'italic', marginTop: 2 }}>Note: {en.note}</div>}
+                          </div>
+                        );
                       });
                     })}
                   </div>
@@ -17892,11 +17904,12 @@ function VenueInquiriesView({ navigate }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {suGroupFieldsBySection(selected.fields).map(function(g, gi) {
                     return g.fields.map(function(q) {
-                      return suAnswerEntries(q, selected.answers ? selected.answers[q.id] : undefined).map(function(en, ei) {
+                      return suAnswerEntries(q, selected.answers ? selected.answers[q.id] : undefined, selected.answers ? selected.answers[q.id + '__note'] : undefined).map(function(en, ei) {
                         return (
                           <div key={q.id + '_' + ei}>
                             <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>{en.label}</div>
                             <div style={{ fontSize: 13, color: '#2a2a2a', whiteSpace: 'pre-wrap' }}>{Array.isArray(en.value) ? en.value.join(', ') : String(en.value)}</div>
+                            {en.note && <div style={{ fontSize: 12, color: '#999', fontStyle: 'italic', marginTop: 2 }}>Note: {en.note}</div>}
                           </div>
                         );
                       });
