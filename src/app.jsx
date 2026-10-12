@@ -17346,11 +17346,14 @@ function VenueRentalsView({ navigate }) {
   const [rescheduleDate, setRescheduleDate] = useS('');
   const [rescheduleTime, setRescheduleTime] = useS('');
   const [detailSaving, setDetailSaving] = useS(false);
+  const [noteDraft, setNoteDraft] = useS(''); // staff_notes editor for the open tour popup
+  const [noteSaving, setNoteSaving] = useS(false);
 
   function openDetail(entry) {
     setDetailEntry(entry);
     setRescheduling(false);
     setDetailFormFields(null);
+    setNoteDraft((entry.raw && entry.raw.staff_notes) || '');
     if (entry.kind === 'Tour' && entry.raw && entry.raw.inquiry_form_id) {
       fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=eq.' + encodeURIComponent(entry.raw.inquiry_form_id) + '&select=fields', {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -17385,6 +17388,27 @@ function VenueRentalsView({ navigate }) {
       .then(function() {
         loadTours();
         setDetailEntry(null);
+      }).finally(function() { setDetailSaving(false); });
+  }
+
+  function saveNote() {
+    if (noteSaving || !detailEntry || !detailEntry.raw) return;
+    setNoteSaving(true);
+    sbPatchById('estate_tours', detailEntry.raw.id, { staff_notes: noteDraft })
+      .then(function() {
+        setDetailEntry(function(prev) { return prev ? Object.assign({}, prev, { raw: Object.assign({}, prev.raw, { staff_notes: noteDraft }) }) : prev; });
+        loadTours();
+      }).finally(function() { setNoteSaving(false); });
+  }
+
+  function togglePrebookingSent() {
+    if (detailSaving || !detailEntry || !detailEntry.raw) return;
+    var next = detailEntry.raw.prebooking_form_sent_at ? null : new Date().toISOString();
+    setDetailSaving(true);
+    sbPatchById('estate_tours', detailEntry.raw.id, { prebooking_form_sent_at: next })
+      .then(function() {
+        setDetailEntry(function(prev) { return prev ? Object.assign({}, prev, { raw: Object.assign({}, prev.raw, { prebooking_form_sent_at: next }) }) : prev; });
+        loadTours();
       }).finally(function() { setDetailSaving(false); });
   }
 
@@ -17663,8 +17687,6 @@ function VenueRentalsView({ navigate }) {
 
   return (
     <div>
-      <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
-
       {!SHOW_LEGACY_VENUE_DASHBOARD && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
           <VenueOverviewCard
@@ -17681,7 +17703,7 @@ function VenueRentalsView({ navigate }) {
                 {upcomingCombined.slice(0, 6).map(function(e) {
                   var month = e.date.toLocaleDateString('en-US', { month: 'short', timeZone: 'America/Los_Angeles' }).toUpperCase();
                   var day = e.date.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'America/Los_Angeles' });
-                  var when = e.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) + ' • ' + e.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
+                  var when = e.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) + ' • ' + e.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) + (e.kind === 'Tour' && e.raw.guide_name ? ' • ' + e.raw.guide_name : '');
                   return (
                     <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}
                       onClick={function() { openDetail(e); }}>
@@ -17887,6 +17909,35 @@ function VenueRentalsView({ navigate }) {
                       </div>
                     </div>
                   )}
+
+                  <div style={{ background: detailEntry.raw.prebooking_form_sent_at ? '#eef7ee' : '#fff8ec', border: '1px solid ' + (detailEntry.raw.prebooking_form_sent_at ? '#cfe8cf' : '#f0dba6'), borderRadius: 8, padding: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ fontSize: 12, color: detailEntry.raw.prebooking_form_sent_at ? '#2d6a2d' : '#8a6d1d' }}>
+                      {detailEntry.raw.prebooking_form_sent_at
+                        ? 'Venue Pre-Booking Form sent ' + new Date(detailEntry.raw.prebooking_form_sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : 'Venue Pre-Booking Form has not been sent yet'}
+                    </div>
+                    <button onClick={togglePrebookingSent} disabled={detailSaving} style={{ flexShrink: 0, padding: '6px 10px', background: '#fff', border: '1px solid ' + (detailEntry.raw.prebooking_form_sent_at ? '#cfe8cf' : '#f0dba6'), borderRadius: 6, fontSize: 11, fontWeight: 600, color: detailEntry.raw.prebooking_form_sent_at ? '#2d6a2d' : '#8a6d1d', cursor: 'pointer' }}>
+                      {detailEntry.raw.prebooking_form_sent_at ? 'Mark unsent' : 'Mark as sent'}
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Notes</div>
+                    <textarea
+                      value={noteDraft}
+                      onChange={function(e) { setNoteDraft(e.target.value); }}
+                      rows={3}
+                      placeholder="Add a note about this tour…"
+                      style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }}
+                    />
+                    <button
+                      onClick={saveNote}
+                      disabled={noteSaving || noteDraft === (detailEntry.raw.staff_notes || '')}
+                      style={{ alignSelf: 'flex-start', padding: '7px 14px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (noteSaving || noteDraft === (detailEntry.raw.staff_notes || '')) ? 0.6 : 1 }}
+                    >
+                      {noteSaving ? 'Saving…' : 'Save note'}
+                    </button>
+                  </div>
 
                   {rescheduling ? (
                     <div style={{ background: '#faf8f4', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
