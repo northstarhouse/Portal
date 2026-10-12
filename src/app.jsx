@@ -17732,12 +17732,12 @@ function VenueRentalsView({ navigate }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 26, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Venue Rentals Dashboard</div>
           <div style={{ fontSize: 13, color: '#999', marginTop: 4 }}>Manage inquiries, tours, and bookings for North Star House.</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginLeft: 'auto' }}>
           {nextUpcoming && (
             <div
               onClick={function() { openDetail({ kind: 'Wedding', title: nextUpcoming.title, date: nextUpcoming.date, raw: nextUpcoming }); }}
