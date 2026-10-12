@@ -17337,6 +17337,57 @@ function VenueRentalsView({ navigate }) {
   const [scheduleOpen, setScheduleOpen] = useS(false);
   const debounceTimers = useR({});
 
+  // Detail popup for a row in the new Upcoming Tours card -- shows the
+  // submitted tour-request info, and lets staff reschedule or mark a no-show
+  // without leaving the overview page.
+  const [detailEntry, setDetailEntry] = useS(null); // the combined {kind, title, date, raw} row
+  const [detailFormFields, setDetailFormFields] = useS(null); // nsh_forms.fields for raw.inquiry_form_id, for labeling raw.inquiry_answers
+  const [rescheduling, setRescheduling] = useS(false);
+  const [rescheduleDate, setRescheduleDate] = useS('');
+  const [rescheduleTime, setRescheduleTime] = useS('');
+  const [detailSaving, setDetailSaving] = useS(false);
+
+  function openDetail(entry) {
+    setDetailEntry(entry);
+    setRescheduling(false);
+    setDetailFormFields(null);
+    if (entry.kind === 'Tour' && entry.raw && entry.raw.inquiry_form_id) {
+      fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=eq.' + encodeURIComponent(entry.raw.inquiry_form_id) + '&select=fields', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      }).then(function(r) { return r.json(); }).then(function(rows) {
+        setDetailFormFields((Array.isArray(rows) && rows[0] && rows[0].fields) || []);
+      }).catch(function() { setDetailFormFields([]); });
+    }
+  }
+
+  function startReschedule() {
+    var t = detailEntry.raw;
+    setRescheduleDate(t.date || '');
+    setRescheduleTime(t.start_time || '');
+    setRescheduling(true);
+  }
+
+  function saveReschedule() {
+    if (!rescheduleDate || !rescheduleTime || detailSaving) return;
+    setDetailSaving(true);
+    sbPatchById('estate_tours', detailEntry.raw.id, { date: rescheduleDate, start_time: rescheduleTime, reminder_24h_sent_at: null, reminder_1h_sent_at: null })
+      .then(function() {
+        loadTours();
+        setDetailEntry(null);
+      }).finally(function() { setDetailSaving(false); });
+  }
+
+  function markNoShow() {
+    if (detailSaving) return;
+    if (!window.confirm('Mark ' + (detailEntry.raw.visitor_name || 'this visitor') + ' as a no-show? This removes them from the upcoming list.')) return;
+    setDetailSaving(true);
+    sbPatchById('estate_tours', detailEntry.raw.id, { status: 'no_show' })
+      .then(function() {
+        loadTours();
+        setDetailEntry(null);
+      }).finally(function() { setDetailSaving(false); });
+  }
+
   function loadTours() {
     fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&status=in.(booked,requested)&order=date.asc.nullslast&limit=100', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -17602,10 +17653,10 @@ function VenueRentalsView({ navigate }) {
   // card below. Reuses the same `weddings`/`tours` state the legacy view
   // already fetches -- no new data-fetching added.
   var upcomingCombined = [].concat(
-    (weddings || []).map(function(w) { return { key: 'w-' + w.uid, kind: 'Wedding', title: w.title, date: w.date }; }),
+    (weddings || []).map(function(w) { return { key: 'w-' + w.uid, kind: 'Wedding', title: w.title, date: w.date, raw: w }; }),
     (tours || []).filter(function(t) { return t.status === 'booked' && t.date; }).map(function(t) {
       var d = new Date(t.date + 'T' + (t.start_time || '00:00:00'));
-      return { key: 't-' + t.id, kind: 'Tour', title: (t.visitor_name || 'Visitor') + ' Tour', date: d };
+      return { key: 't-' + t.id, kind: 'Tour', title: (t.visitor_name || 'Visitor') + ' Tour', date: d, raw: t };
     })
   ).filter(function(e) { return e.date && e.date.getTime() >= Date.now() - 24 * 60 * 60 * 1000; })
     .sort(function(a, b) { return a.date - b.date; });
@@ -17633,7 +17684,7 @@ function VenueRentalsView({ navigate }) {
                   var when = e.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) + ' • ' + e.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
                   return (
                     <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}
-                      onClick={function() { navigate(e.kind === 'Tour' ? 'estate-tours' : 'venue'); }}>
+                      onClick={function() { openDetail(e); }}>
                       <div style={{ flexShrink: 0, width: 42, textAlign: 'center', background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: '4px 0' }}>
                         <div style={{ fontSize: 9, fontWeight: 700, color: gold, letterSpacing: 0.5 }}>{month}</div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{day}</div>
@@ -17781,6 +17832,84 @@ function VenueRentalsView({ navigate }) {
 
       {scheduleOpen && (
         <ScheduleTourModal onClose={function() { setScheduleOpen(false); }} onScheduled={function() { loadTours(); }} />
+      )}
+
+      {detailEntry && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }} onClick={function() { setDetailEntry(null); }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 480, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 12px 48px rgba(0,0,0,0.18)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid #f0ece6' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{detailEntry.title}</div>
+                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{detailEntry.kind}{detailEntry.raw && detailEntry.raw.status ? ' · ' + detailEntry.raw.status : ''}</div>
+              </div>
+              <button onClick={function() { setDetailEntry(null); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: '#666', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+            </div>
+
+            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {detailEntry.kind === 'Wedding' ? (
+                <div style={{ fontSize: 12, color: '#999' }}>
+                  This is a calendar event, not a form submission — there's no inquiry data to show. Date: {detailEntry.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.
+                </div>
+              ) : (
+                <React.Fragment>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {[
+                      ['Visitor', detailEntry.raw.visitor_name],
+                      ['Email', detailEntry.raw.visitor_email],
+                      ['Phone', detailEntry.raw.visitor_phone],
+                      ['Date & time', detailEntry.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) + ' at ' + detailEntry.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })],
+                      ['Guide', detailEntry.raw.guide_name],
+                    ].filter(function(pair) { return pair[1]; }).map(function(pair) {
+                      return (
+                        <div key={pair[0]} style={{ display: 'flex', gap: 8, fontSize: 13 }}>
+                          <span style={{ color: '#999', width: 90, flexShrink: 0 }}>{pair[0]}</span>
+                          <span style={{ color: '#2a2a2a', fontWeight: 500 }}>{pair[1]}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {detailEntry.raw.inquiry_answers && Object.keys(detailEntry.raw.inquiry_answers).length > 0 && (
+                    <div style={{ background: '#faf8f4', borderRadius: 8, padding: 12 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Submitted with their request</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {Object.keys(detailEntry.raw.inquiry_answers).map(function(k) {
+                          var field = (detailFormFields || []).find(function(f) { return f.id === k; });
+                          var val = detailEntry.raw.inquiry_answers[k];
+                          if (val === undefined || val === null || val === '') return null;
+                          return (
+                            <div key={k}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: 0.5 }}>{field ? field.label : k}</div>
+                              <div style={{ fontSize: 13, color: '#2a2a2a' }}>{Array.isArray(val) ? val.join(', ') : String(val)}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {rescheduling ? (
+                    <div style={{ background: '#faf8f4', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <input type="date" value={rescheduleDate} onChange={function(e) { setRescheduleDate(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
+                        <input type="time" value={rescheduleTime} onChange={function(e) { setRescheduleTime(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={saveReschedule} disabled={detailSaving || !rescheduleDate || !rescheduleTime} style={{ flex: 1, padding: '8px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (detailSaving || !rescheduleDate || !rescheduleTime) ? 0.6 : 1 }}>{detailSaving ? 'Saving…' : 'Save new date'}</button>
+                        <button onClick={function() { setRescheduling(false); }} disabled={detailSaving} style={{ padding: '8px 14px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+                      <button onClick={startReschedule} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Reschedule</button>
+                      <button onClick={markNoShow} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: '#fff', color: '#c0392b', border: '1px solid #e4b8b0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Didn't Show Up</button>
+                    </div>
+                  )}
+                </React.Fragment>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
