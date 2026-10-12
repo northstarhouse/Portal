@@ -280,6 +280,12 @@ function icalDateKey(val) {
 // (the sidebar entry is hidden too); flip to true to show it again.
 const SHOW_VENUE_RENTALS = true;
 
+// The old Venue Rentals dashboard (calendar sync, wedding checklist tracking,
+// inquiries, cost totals) is being replaced with a simpler overview. Nothing
+// below is deleted -- all its data-fetching and handlers are untouched --
+// this just swaps which JSX renders. Flip to true to bring the old view back.
+const SHOW_LEGACY_VENUE_DASHBOARD = false;
+
 // Form categories hidden from Form Responses (and its unread badge) for the
 // time being. The forms still exist and still collect responses; remove a
 // category from this list to show it again.
@@ -17591,9 +17597,97 @@ function VenueRentalsView({ navigate }) {
 
   var nextUpcoming = upcoming.length ? upcoming[0] : null;
 
+  // New minimal overview: merges weddings (calendar) + tours (estate_tours)
+  // into one dated list, newest-first-sorted by date, for the Upcoming Tours
+  // card below. Reuses the same `weddings`/`tours` state the legacy view
+  // already fetches -- no new data-fetching added.
+  var upcomingCombined = [].concat(
+    (weddings || []).map(function(w) { return { key: 'w-' + w.uid, kind: 'Wedding', title: w.title, date: w.date }; }),
+    (tours || []).filter(function(t) { return t.status === 'booked' && t.date; }).map(function(t) {
+      var d = new Date(t.date + 'T' + (t.start_time || '00:00:00'));
+      return { key: 't-' + t.id, kind: 'Tour', title: (t.visitor_name || 'Visitor') + ' Tour', date: d };
+    })
+  ).filter(function(e) { return e.date && e.date.getTime() >= Date.now() - 24 * 60 * 60 * 1000; })
+    .sort(function(a, b) { return a.date - b.date; });
+
   return (
     <div>
       <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
+
+      {!SHOW_LEGACY_VENUE_DASHBOARD && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+          <VenueOverviewCard
+            icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}
+            title="Upcoming Tours"
+            onViewAll={function() { navigate('estate-tours'); }}
+          >
+            {(weddings === null && tours === null) ? (
+              <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
+            ) : upcomingCombined.length === 0 ? (
+              <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Nothing scheduled yet.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {upcomingCombined.slice(0, 6).map(function(e) {
+                  var month = e.date.toLocaleDateString('en-US', { month: 'short', timeZone: 'America/Los_Angeles' }).toUpperCase();
+                  var day = e.date.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'America/Los_Angeles' });
+                  var when = e.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) + ' • ' + e.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
+                  return (
+                    <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}
+                      onClick={function() { navigate(e.kind === 'Tour' ? 'estate-tours' : 'venue'); }}>
+                      <div style={{ flexShrink: 0, width: 42, textAlign: 'center', background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: '4px 0' }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: gold, letterSpacing: 0.5 }}>{month}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{day}</div>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
+                        <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{when}</div>
+                      </div>
+                      <div style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: e.kind === 'Tour' ? '#e6eef7' : '#f5ecd9', color: e.kind === 'Tour' ? '#3a6ea8' : '#8a6d2f' }}>{e.kind}</div>
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </VenueOverviewCard>
+
+          <VenueOverviewCard
+            icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>}
+            title="New Messages"
+            onViewAll={function() { navigate('venue-messages'); }}
+          >
+            {messages === null ? (
+              <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
+            ) : messages.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px 10px' }}>
+                <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#c4b595" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>No messages yet</div>
+                <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.5, maxWidth: 220, margin: '0 auto' }}>Messages from the venue rental inquiry form will appear here.</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {messages.slice(0, 6).map(function(m) {
+                  return (
+                    <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}
+                      onClick={function() { navigate('venue-messages'); }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.from_name || m.from_email || 'Unknown'}</div>
+                        <div style={{ fontSize: 11, color: '#999', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.subject || m.body}</div>
+                      </div>
+                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </VenueOverviewCard>
+        </div>
+      )}
+
+      {SHOW_LEGACY_VENUE_DASHBOARD && (
+      <>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 13, color: '#aaa' }}>
           {nextUpcoming ? ('Next up: ' + nextUpcoming.title + ' — ' + nextUpcoming.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) : 'Wedding & rental tracking'}
@@ -17682,10 +17776,29 @@ function VenueRentalsView({ navigate }) {
           </div>
         </div>
       )}
+      </>
+      )}
 
       {scheduleOpen && (
         <ScheduleTourModal onClose={function() { setScheduleOpen(false); }} onScheduled={function() { loadTours(); }} />
       )}
+    </div>
+  );
+}
+
+// Overview card shell for the new (non-legacy) Venue Rentals landing page --
+// icon + title + "View all" header, arbitrary content below.
+function VenueOverviewCard({ icon, title, onViewAll, children }) {
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {icon}
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{title}</div>
+        </div>
+        <div onClick={onViewAll} style={{ fontSize: 12, color: gold, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>View all →</div>
+      </div>
+      {children}
     </div>
   );
 }
