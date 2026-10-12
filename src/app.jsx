@@ -17732,6 +17732,33 @@ function VenueRentalsView({ navigate }) {
 
   return (
     <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 26, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Venue Rentals Dashboard</div>
+          <div style={{ fontSize: 13, color: '#999', marginTop: 4 }}>Manage inquiries, tours, and bookings for North Star House.</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          {nextUpcoming && (
+            <div
+              onClick={function() { openDetail({ kind: 'Wedding', title: nextUpcoming.title, date: nextUpcoming.date, raw: nextUpcoming }); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+            >
+              <div style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, background: '#faf4e8', border: '0.5px solid #e8dcc0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>Next up: {nextUpcoming.title}</div>
+                <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{nextUpcoming.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+              </div>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          )}
+          <button onClick={function() { setScheduleOpen(true); }} style={{ flexShrink: 0, padding: '10px 18px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            + Schedule a Tour
+          </button>
+        </div>
+      </div>
+
       {!SHOW_LEGACY_VENUE_DASHBOARD && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
           <VenueOverviewCard
