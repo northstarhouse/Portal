@@ -17760,7 +17760,7 @@ function VenueRentalsView({ navigate }) {
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
                         <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{when}</div>
                       </div>
-                      <div style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: tourCategoryColor(tourCategoryLabel(e)).bg, color: tourCategoryColor(tourCategoryLabel(e)).color }}>{tourCategoryLabel(e)}</div>
+                      <div style={{ flexShrink: 0, width: 78, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 10, fontWeight: 700, padding: '3px 0', borderRadius: 20, background: tourCategoryColor(tourCategoryLabel(e)).bg, color: tourCategoryColor(tourCategoryLabel(e)).color }}>{tourCategoryLabel(e)}</div>
                       <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                   );
