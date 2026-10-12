@@ -17331,6 +17331,16 @@ function BirthdaysView({ navigate }) {
 var TOUR_WEDDING_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
 var TOUR_EVENT_TYPE_FIELD_ID = '0uj9rtfk';
 var TOUR_CATEGORY_OPTIONS = ['Wedding', 'Event', 'Non-Profit', 'Memorials'];
+var TOUR_CATEGORY_COLORS = {
+  Wedding: { bg: '#f5ecd9', color: '#8a6d2f' },
+  Event: { bg: '#e6eef7', color: '#3a6ea8' },
+  'Non-Profit': { bg: '#e8f5e9', color: '#2e7d32' },
+  Memorials: { bg: '#eef0f5', color: '#52607a' },
+  Tour: { bg: '#f0ece6', color: '#888' },
+};
+function tourCategoryColor(label) {
+  return TOUR_CATEGORY_COLORS[label] || TOUR_CATEGORY_COLORS.Tour;
+}
 function tourCategoryLabel(e) {
   var raw = e.raw || {};
   // A manual override (set by staff, e.g. for tours booked directly through
@@ -17750,7 +17760,7 @@ function VenueRentalsView({ navigate }) {
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
                         <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{when}</div>
                       </div>
-                      <div style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: e.kind === 'Tour' ? '#e6eef7' : '#f5ecd9', color: e.kind === 'Tour' ? '#3a6ea8' : '#8a6d2f' }}>{tourCategoryLabel(e)}</div>
+                      <div style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: tourCategoryColor(tourCategoryLabel(e)).bg, color: tourCategoryColor(tourCategoryLabel(e)).color }}>{tourCategoryLabel(e)}</div>
                       <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                   );
