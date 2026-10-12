@@ -17323,6 +17323,24 @@ function BirthdaysView({ navigate }) {
   );
 }
 
+// Tour requests all come through the same estate_tours table, but the visitor
+// filled out one of several different inquiry forms on the public site --
+// Weddings has its own form id, while Private/Public Events, Non-Profit, and
+// Memorials all share one form id and are told apart by a preset "event type"
+// answer. This maps a tour/wedding row to that human label for display.
+var TOUR_WEDDING_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
+var TOUR_EVENT_TYPE_FIELD_ID = '0uj9rtfk';
+function tourCategoryLabel(e) {
+  if (e.kind === 'Wedding') return 'Wedding';
+  var raw = e.raw || {};
+  if (raw.inquiry_form_id === TOUR_WEDDING_FORM_ID) return 'Wedding';
+  var eventType = raw.inquiry_answers && raw.inquiry_answers[TOUR_EVENT_TYPE_FIELD_ID];
+  if (eventType === 'Non-Profit Event') return 'Non-Profit';
+  if (eventType === 'Memorial') return 'Memorials';
+  if (eventType === 'Private Event' || eventType === 'Public Event') return 'Event';
+  return 'Tour';
+}
+
 function VenueRentalsView({ navigate }) {
   const { useState: useS, useEffect: useE, useRef: useR } = React;
   const [weddings, setWeddings] = useS([]);
@@ -17348,12 +17366,14 @@ function VenueRentalsView({ navigate }) {
   const [detailSaving, setDetailSaving] = useS(false);
   const [noteDraft, setNoteDraft] = useS(''); // staff_notes editor for the open tour popup
   const [noteSaving, setNoteSaving] = useS(false);
+  const [editingNote, setEditingNote] = useS(false); // false = showing the saved note read-only
 
   function openDetail(entry) {
     setDetailEntry(entry);
     setRescheduling(false);
     setDetailFormFields(null);
     setNoteDraft((entry.raw && entry.raw.staff_notes) || '');
+    setEditingNote(!(entry.raw && entry.raw.staff_notes));
     if (entry.kind === 'Tour' && entry.raw && entry.raw.inquiry_form_id) {
       fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=eq.' + encodeURIComponent(entry.raw.inquiry_form_id) + '&select=fields', {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -17397,6 +17417,7 @@ function VenueRentalsView({ navigate }) {
     sbPatchById('estate_tours', detailEntry.raw.id, { staff_notes: noteDraft })
       .then(function() {
         setDetailEntry(function(prev) { return prev ? Object.assign({}, prev, { raw: Object.assign({}, prev.raw, { staff_notes: noteDraft }) }) : prev; });
+        setEditingNote(false);
         loadTours();
       }).finally(function() { setNoteSaving(false); });
   }
@@ -17715,7 +17736,7 @@ function VenueRentalsView({ navigate }) {
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
                         <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{when}</div>
                       </div>
-                      <div style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: e.kind === 'Tour' ? '#e6eef7' : '#f5ecd9', color: e.kind === 'Tour' ? '#3a6ea8' : '#8a6d2f' }}>{e.kind}</div>
+                      <div style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: e.kind === 'Tour' ? '#e6eef7' : '#f5ecd9', color: e.kind === 'Tour' ? '#3a6ea8' : '#8a6d2f' }}>{tourCategoryLabel(e)}</div>
                       <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                   );
@@ -17862,7 +17883,7 @@ function VenueRentalsView({ navigate }) {
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid #f0ece6' }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{detailEntry.title}</div>
-                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{detailEntry.kind}{detailEntry.raw && detailEntry.raw.status ? ' · ' + detailEntry.raw.status : ''}</div>
+                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{tourCategoryLabel(detailEntry)}{detailEntry.raw && detailEntry.raw.status ? ' · ' + detailEntry.raw.status : ''}</div>
               </div>
               <button onClick={function() { setDetailEntry(null); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: '#666', cursor: 'pointer', flexShrink: 0 }}>✕</button>
             </div>
@@ -17923,20 +17944,48 @@ function VenueRentalsView({ navigate }) {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Notes</div>
-                    <textarea
-                      value={noteDraft}
-                      onChange={function(e) { setNoteDraft(e.target.value); }}
-                      rows={3}
-                      placeholder="Add a note about this tour…"
-                      style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }}
-                    />
-                    <button
-                      onClick={saveNote}
-                      disabled={noteSaving || noteDraft === (detailEntry.raw.staff_notes || '')}
-                      style={{ alignSelf: 'flex-start', padding: '7px 14px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (noteSaving || noteDraft === (detailEntry.raw.staff_notes || '')) ? 0.6 : 1 }}
-                    >
-                      {noteSaving ? 'Saving…' : 'Save note'}
-                    </button>
+                    {editingNote ? (
+                      <React.Fragment>
+                        <textarea
+                          value={noteDraft}
+                          onChange={function(e) { setNoteDraft(e.target.value); }}
+                          rows={3}
+                          placeholder="Add a note about this tour…"
+                          autoFocus
+                          style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }}
+                        />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={saveNote}
+                            disabled={noteSaving || noteDraft === (detailEntry.raw.staff_notes || '')}
+                            style={{ padding: '7px 14px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (noteSaving || noteDraft === (detailEntry.raw.staff_notes || '')) ? 0.6 : 1 }}
+                          >
+                            {noteSaving ? 'Saving…' : 'Save note'}
+                          </button>
+                          {detailEntry.raw.staff_notes && (
+                            <button
+                              onClick={function() { setNoteDraft(detailEntry.raw.staff_notes || ''); setEditingNote(false); }}
+                              disabled={noteSaving}
+                              style={{ padding: '7px 14px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
+                      </React.Fragment>
+                    ) : (
+                      <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: 10, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                        <div style={{ fontSize: 13, color: detailEntry.raw.staff_notes ? '#2a2a2a' : '#bbb', whiteSpace: 'pre-wrap' }}>
+                          {detailEntry.raw.staff_notes || 'No notes yet.'}
+                        </div>
+                        <button
+                          onClick={function() { setEditingNote(true); }}
+                          style={{ flexShrink: 0, padding: '5px 10px', background: '#fff', border: '1px solid #e0d8cc', borderRadius: 6, fontSize: 11, fontWeight: 600, color: gold, cursor: 'pointer' }}
+                        >
+                          {detailEntry.raw.staff_notes ? 'Edit' : 'Add note'}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {rescheduling ? (

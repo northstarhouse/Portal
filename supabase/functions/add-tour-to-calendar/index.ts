@@ -118,7 +118,26 @@ type Tour = {
   visitor_phone: string | null;
   status: string;
   gcal_event_id: string | null;
+  inquiry_form_id: string | null;
+  inquiry_answers: Record<string, unknown> | null;
 };
+
+// Tour requests all come through estate_tours, but the visitor filled out one
+// of several different inquiry forms on the public site -- Weddings has its
+// own form id, while Private/Public Events, Non-Profit, and Memorials all
+// share one form id and are told apart by a preset "event type" answer.
+// Mirrors tourCategoryLabel() in the Portal app (src/app.jsx).
+const WEDDING_FORM_ID = "1eea2137-f94d-414b-a977-4ed622214580";
+const EVENT_TYPE_FIELD_ID = "0uj9rtfk";
+
+function tourCategoryLabel(tour: Tour): string {
+  if (tour.inquiry_form_id === WEDDING_FORM_ID) return "Wedding";
+  const eventType = tour.inquiry_answers?.[EVENT_TYPE_FIELD_ID];
+  if (eventType === "Non-Profit Event") return "Non-Profit";
+  if (eventType === "Memorial") return "Memorials";
+  if (eventType === "Private Event" || eventType === "Public Event") return "Event";
+  return "Tour";
+}
 
 Deno.serve(async (req) => {
   try {
@@ -139,6 +158,7 @@ Deno.serve(async (req) => {
     const endDateTime = new Date(startMs + duration * 60000).toISOString().slice(0, 19);
 
     const contactLines = [
+      `Type: ${tourCategoryLabel(tour)}`,
       tour.visitor_email ? `Email: ${tour.visitor_email}` : null,
       tour.visitor_phone ? `Phone: ${tour.visitor_phone}` : null,
       tour.guide_name ? `Guide: ${tour.guide_name}` : null,
