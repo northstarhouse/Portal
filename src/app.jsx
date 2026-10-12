@@ -278,7 +278,7 @@ function icalDateKey(val) {
 
 // Home-page "Venue Rentals" shortcut button. Off for the time being
 // (the sidebar entry is hidden too); flip to true to show it again.
-const SHOW_VENUE_RENTALS = false;
+const SHOW_VENUE_RENTALS = true;
 
 // Form categories hidden from Form Responses (and its unread badge) for the
 // time being. The forms still exist and still collect responses; remove a
@@ -676,7 +676,7 @@ const modules = [
   { id: "board", label: "Board Voting" },
   { id: "meeting-reports", label: "Meeting & Board Reports" },
   { id: "strategy", label: "Strategic Goal Progress", hidden: true },
-  { id: "venue", label: "Venue Rentals", hidden: true },
+  { id: "venue", label: "Venue Rentals" },
   { id: "estate-tours", label: "Estate Tours", hidden: true },
   { id: "ideas", label: "Ideas & Initiatives" },
   { id: "operational", label: "Operational Areas", hidden: true },
