@@ -17332,7 +17332,7 @@ var TOUR_WEDDING_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
 var TOUR_EVENT_TYPE_FIELD_ID = '0uj9rtfk';
 var TOUR_CATEGORY_OPTIONS = ['Wedding', 'Event', 'Non-Profit', 'Memorials'];
 var TOUR_CATEGORY_COLORS = {
-  Wedding: { bg: '#f5ecd9', color: '#8a6d2f' },
+  Wedding: { bg: '#fbe4ec', color: '#b3487a' },
   Event: { bg: '#e6eef7', color: '#3a6ea8' },
   'Non-Profit': { bg: '#e8f5e9', color: '#2e7d32' },
   Memorials: { bg: '#eef0f5', color: '#52607a' },
