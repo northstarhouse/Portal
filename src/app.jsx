@@ -17796,38 +17796,65 @@ function VenueRentalsView({ navigate }) {
             )}
           </VenueOverviewCard>
 
-          <VenueOverviewCard
-            icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>}
-            title="New Messages"
-            onViewAll={function() { navigate('venue-messages'); }}
-          >
-            {messages === null ? (
-              <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
-            ) : messages.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '30px 10px' }}>
-                <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
-                  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#c4b595" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <VenueOverviewCard
+              icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>}
+              title="New Messages"
+              onViewAll={function() { navigate('venue-messages'); }}
+            >
+              {messages === null ? (
+                <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
+              ) : messages.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '30px 10px' }}>
+                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#c4b595" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>No messages yet</div>
+                  <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.5, maxWidth: 220, margin: '0 auto' }}>Messages from the venue rental inquiry form will appear here.</div>
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>No messages yet</div>
-                <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.5, maxWidth: 220, margin: '0 auto' }}>Messages from the venue rental inquiry form will appear here.</div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {messages.slice(0, 6).map(function(m) {
-                  return (
-                    <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}
-                      onClick={function() { navigate('venue-messages'); }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.from_name || m.from_email || 'Unknown'}</div>
-                        <div style={{ fontSize: 11, color: '#999', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.subject || m.body}</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {messages.slice(0, 6).map(function(m) {
+                    return (
+                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}
+                        onClick={function() { navigate('venue-messages'); }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.from_name || m.from_email || 'Unknown'}</div>
+                          <div style={{ fontSize: 11, color: '#999', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.subject || m.body}</div>
+                        </div>
+                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
                       </div>
-                      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+              )}
+            </VenueOverviewCard>
+
+            {/* Inquiries counter: rental inquiry-form submissions still waiting
+                on a reply (not checked off as handled). Click to see them all. */}
+            <div onClick={function() { navigate('venue-inquiries'); }} role="button" tabIndex={0}
+              onKeyDown={function(ev) { if (ev.key === 'Enter') navigate('venue-inquiries'); }}
+              style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
               </div>
-            )}
-          </VenueOverviewCard>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Inquiries</div>
+                <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
+                  {inquiries === null ? 'Loading…' : (inquiries.length + ' total' + (inquiries.length ? ' • ' + inquiries.filter(function(q) { return q.status === 'handled'; }).length + ' handled' : ''))}
+                </div>
+              </div>
+              {inquiries !== null && (
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1, color: inquiries.some(function(q) { return q.status !== 'handled'; }) ? gold : '#bbb' }}>
+                    {inquiries.filter(function(q) { return q.status !== 'handled'; }).length}
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: '#999', marginTop: 3 }}>New</div>
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: gold, fontWeight: 600, flexShrink: 0 }}>View all →</div>
+            </div>
+          </div>
         </div>
       )}
 
