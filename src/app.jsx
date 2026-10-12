@@ -17330,9 +17330,13 @@ function BirthdaysView({ navigate }) {
 // answer. This maps a tour/wedding row to that human label for display.
 var TOUR_WEDDING_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
 var TOUR_EVENT_TYPE_FIELD_ID = '0uj9rtfk';
+var TOUR_CATEGORY_OPTIONS = ['Wedding', 'Event', 'Non-Profit', 'Memorials'];
 function tourCategoryLabel(e) {
-  if (e.kind === 'Wedding') return 'Wedding';
   var raw = e.raw || {};
+  // A manual override (set by staff, e.g. for tours booked directly through
+  // the Portal with no public inquiry form behind them) always wins.
+  if (raw.category) return raw.category;
+  if (e.kind === 'Wedding') return 'Wedding';
   if (raw.inquiry_form_id === TOUR_WEDDING_FORM_ID) return 'Wedding';
   var eventType = raw.inquiry_answers && raw.inquiry_answers[TOUR_EVENT_TYPE_FIELD_ID];
   if (eventType === 'Non-Profit Event') return 'Non-Profit';
@@ -17420,6 +17424,16 @@ function VenueRentalsView({ navigate }) {
         setEditingNote(false);
         loadTours();
       }).finally(function() { setNoteSaving(false); });
+  }
+
+  function setTourCategory(value) {
+    if (detailSaving || !detailEntry || !detailEntry.raw) return;
+    setDetailSaving(true);
+    sbPatchById('estate_tours', detailEntry.raw.id, { category: value || null })
+      .then(function() {
+        setDetailEntry(function(prev) { return prev ? Object.assign({}, prev, { raw: Object.assign({}, prev.raw, { category: value || null }) }) : prev; });
+        loadTours();
+      }).finally(function() { setDetailSaving(false); });
   }
 
   function togglePrebookingSent() {
@@ -17910,6 +17924,21 @@ function VenueRentalsView({ navigate }) {
                         </div>
                       );
                     })}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                    <span style={{ color: '#999', width: 90, flexShrink: 0 }}>Type</span>
+                    <select
+                      value={detailEntry.raw.category || ''}
+                      onChange={function(e) { setTourCategory(e.target.value); }}
+                      disabled={detailSaving}
+                      style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, color: '#2a2a2a', background: '#fff' }}
+                    >
+                      <option value="">{tourCategoryLabel(detailEntry) === 'Tour' ? 'Unknown — set manually' : tourCategoryLabel(detailEntry) + ' (from inquiry form)'}</option>
+                      {TOUR_CATEGORY_OPTIONS.map(function(opt) {
+                        return <option key={opt} value={opt}>{opt}</option>;
+                      })}
+                    </select>
                   </div>
 
                   {detailEntry.raw.inquiry_answers && Object.keys(detailEntry.raw.inquiry_answers).length > 0 && (
@@ -18585,6 +18614,7 @@ function ScheduleTourModal({ onClose, onScheduled, prefill }) {
   var [name, setName] = useState((prefill && prefill.visitor_name) || '');
   var [email, setEmail] = useState((prefill && prefill.visitor_email) || '');
   var [phone, setPhone] = useState((prefill && prefill.visitor_phone) || '');
+  var [category, setCategory] = useState((prefill && prefill.category) || '');
   var [saving, setSaving] = useState(false);
   var [error, setError] = useState('');
 
@@ -18603,7 +18633,7 @@ function ScheduleTourModal({ onClose, onScheduled, prefill }) {
     if (!name.trim() || !email.trim()) { setError('Name and email are required.'); return; }
     setSaving(true);
     setError('');
-    var patch = { status: 'booked', visitor_name: name.trim(), visitor_email: email.trim(), visitor_phone: phone.trim() || null };
+    var patch = { status: 'booked', visitor_name: name.trim(), visitor_email: email.trim(), visitor_phone: phone.trim() || null, category: category || null };
     if (prefill && prefill.inquiry_form_id) patch.inquiry_form_id = prefill.inquiry_form_id;
     if (prefill && prefill.inquiry_answers) patch.inquiry_answers = prefill.inquiry_answers;
     sbPatchById('estate_tours', slotId, patch).then(function(r) {
@@ -18649,7 +18679,15 @@ function ScheduleTourModal({ onClose, onScheduled, prefill }) {
         <input type="email" value={email} onChange={function(e) { setEmail(e.target.value); }} placeholder="visitor@example.com" style={Object.assign({}, inputStyle, { marginBottom: 12 })} />
 
         <label style={labelStyle}>Phone (optional)</label>
-        <input value={phone} onChange={function(e) { setPhone(e.target.value); }} placeholder="(555) 555-5555" style={Object.assign({}, inputStyle, { marginBottom: 16 })} />
+        <input value={phone} onChange={function(e) { setPhone(e.target.value); }} placeholder="(555) 555-5555" style={Object.assign({}, inputStyle, { marginBottom: 12 })} />
+
+        <label style={labelStyle}>Tour Type (optional)</label>
+        <select value={category} onChange={function(e) { setCategory(e.target.value); }} style={Object.assign({}, inputStyle, { marginBottom: 16 })}>
+          <option value="">— Not set —</option>
+          {TOUR_CATEGORY_OPTIONS.map(function(opt) {
+            return <option key={opt} value={opt}>{opt}</option>;
+          })}
+        </select>
 
         {error && <div style={{ fontSize: 12, color: '#c0392b', marginBottom: 12 }}>{error}</div>}
 
