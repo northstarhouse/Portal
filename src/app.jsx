@@ -332,8 +332,9 @@ var WEDDING_INQUIRY_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
 // Information Form (filled out once a date's been discussed with the
 // venue coordinator) cover the venue's actual inquiry funnel.
 var EVENT_INQUIRY_FORM_ID = 'a87b86b0-94cd-4d28-b57e-00b79b5f1fee';
-var PRE_BOOKING_FORM_ID = 'a3a383f7-e1db-4344-9dec-ea879ad3406d';
-var RENTAL_INQUIRY_FORM_IDS = [WEDDING_INQUIRY_FORM_ID, EVENT_INQUIRY_FORM_ID, PRE_BOOKING_FORM_ID];
+var PRE_BOOKING_FORM_ID = 'a3a383f7-e1db-4344-9dec-ea879ad3406d'; // Wedding
+var PRE_BOOKING_FORM_ID_EVENT = '668f27d4-7e2d-4ce6-ba0c-bac5ddf9d8f8'; // Private/Public Events, Non-Profit, Memorials
+var RENTAL_INQUIRY_FORM_IDS = [WEDDING_INQUIRY_FORM_ID, EVENT_INQUIRY_FORM_ID, PRE_BOOKING_FORM_ID, PRE_BOOKING_FORM_ID_EVENT];
 
 // Best guess at a response's headline name/email, since each of the three
 // forms uses its own field ids -- matches on the field *label* instead
