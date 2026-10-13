@@ -20547,6 +20547,26 @@ function WebsitePaymentsView({ navigate }) {
     return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  // "paid" is only one of several kinds that actually involve money --
+  // donations, memberships, and brick orders are real PayPal captures too
+  // (with amount/paypal_fee/net_amount populated the same way), while only
+  // rsvp/comp are genuinely free. Previously only "paid" showed its price,
+  // so donations/memberships/bricks all looked like free RSVPs here.
+  var ORDER_KIND_BADGES = {
+    paid: { label: 'PAID', bg: '#eafaf0', color: '#2e7d32' },
+    donation: { label: 'DONATION', bg: '#eafaf0', color: '#2e7d32' },
+    membership: { label: 'MEMBERSHIP', bg: '#eafaf0', color: '#2e7d32' },
+    brick: { label: 'BRICK', bg: '#eafaf0', color: '#2e7d32' },
+    comp: { label: 'COMP', bg: '#eaf1fb', color: '#3a6ea5' },
+    rsvp: { label: 'RSVP', bg: '#eaf1fb', color: '#3a6ea5' },
+  };
+  function orderKindBadge(o) {
+    return ORDER_KIND_BADGES[o.kind] || ORDER_KIND_BADGES.rsvp;
+  }
+  function orderIsPaid(o) {
+    return o.kind === 'paid' || o.kind === 'donation' || o.kind === 'membership' || o.kind === 'brick';
+  }
+
   var all = orders || [];
   // One entry per show DATE, not per title -- a multi-night show (e.g. the
   // Fall Magic Show, Fri + Sat) is two separate events with separate sales.
@@ -20570,7 +20590,7 @@ function WebsitePaymentsView({ navigate }) {
   var now = new Date();
   var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   var netOf = function(o) { return Number(o.net_amount != null ? o.net_amount : (o.amount || 0)); };
-  var paid = all.filter(function(o) { return o.kind === 'paid'; });
+  var paid = all.filter(orderIsPaid);
   var totalRevenue = paid.reduce(function(s, o) { return s + Number(o.amount || 0); }, 0);
   var totalFees = paid.reduce(function(s, o) { return s + Number(o.paypal_fee || 0); }, 0);
   var totalNet = paid.reduce(function(s, o) { return s + netOf(o); }, 0);
@@ -20610,8 +20630,8 @@ function WebsitePaymentsView({ navigate }) {
         o.event_title || o.event_slug, o.event_date || '',
         tix, o.quantity,
         o.amount,
-        o.kind === 'paid' && o.paypal_fee != null ? o.paypal_fee : '',
-        o.kind === 'paid' ? netOf(o) : '',
+        orderIsPaid(o) && o.paypal_fee != null ? o.paypal_fee : '',
+        orderIsPaid(o) ? netOf(o) : '',
         o.currency,
         o.paypal_order_id || '', o.paypal_capture_id || ''
       ].map(function(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; });
@@ -20691,15 +20711,15 @@ function WebsitePaymentsView({ navigate }) {
             return [
               <td key="w" style={{ padding: '8px 10px', color: '#777', whiteSpace: 'nowrap' }}>{new Date(o.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>,
               <td key="k" style={{ padding: '8px 10px' }}>
-                <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '2px 8px', background: o.kind === 'paid' ? '#eafaf0' : '#eaf1fb', color: o.kind === 'paid' ? '#2e7d32' : '#3a6ea5' }}>{o.kind === 'paid' ? 'PAID' : 'RSVP'}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '2px 8px', background: orderKindBadge(o).bg, color: orderKindBadge(o).color }}>{orderKindBadge(o).label}</span>
               </td>,
               <td key="n" style={{ padding: '8px 10px', fontWeight: 500 }}>{o.buyer_name}</td>,
               <td key="e" style={{ padding: '8px 10px', color: '#555' }}>{o.buyer_email}</td>,
               <td key="ev" style={{ padding: '8px 10px', color: '#555' }}>{(o.event_title || o.event_slug)}{o.event_date ? ' · ' + o.event_date : ''}</td>,
               <td key="t" style={{ padding: '8px 10px', color: '#555' }}>{(o.tickets || []).map(function(t) { return t.qty + 'x ' + t.tier; }).join(', ')}</td>,
-              <td key="a" style={{ padding: '8px 10px', fontWeight: 500, whiteSpace: 'nowrap' }}>{o.kind === 'paid' ? money(o.amount) : '—'}</td>,
-              <td key="f" style={{ padding: '8px 10px', color: '#a05a1a', whiteSpace: 'nowrap' }}>{o.kind === 'paid' && o.paypal_fee != null ? '−' + money(o.paypal_fee) : '—'}</td>,
-              <td key="nt" style={{ padding: '8px 10px', fontWeight: 500, whiteSpace: 'nowrap' }}>{o.kind === 'paid' ? money(netOf(o)) : '—'}</td>
+              <td key="a" style={{ padding: '8px 10px', fontWeight: 500, whiteSpace: 'nowrap' }}>{orderIsPaid(o) ? money(o.amount) : '—'}</td>,
+              <td key="f" style={{ padding: '8px 10px', color: '#a05a1a', whiteSpace: 'nowrap' }}>{orderIsPaid(o) && o.paypal_fee != null ? '−' + money(o.paypal_fee) : '—'}</td>,
+              <td key="nt" style={{ padding: '8px 10px', fontWeight: 500, whiteSpace: 'nowrap' }}>{orderIsPaid(o) ? money(netOf(o)) : '—'}</td>
             ];
           }}
         />
