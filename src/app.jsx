@@ -17732,12 +17732,12 @@ function VenueRentalsView({ navigate }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: 26, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Venue Rentals Dashboard</div>
-          <div style={{ fontSize: 13, color: '#999', marginTop: 4 }}>Manage inquiries, tours, and bookings for North Star House.</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 16, marginBottom: 20, flexWrap: 'nowrap', overflowX: 'auto' }}>
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ fontSize: 26, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", whiteSpace: 'nowrap' }}>Venue Rentals Dashboard</div>
+          <div style={{ fontSize: 13, color: '#999', marginTop: 4, whiteSpace: 'nowrap' }}>Manage inquiries, tours, and bookings for North Star House.</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginLeft: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'nowrap', marginLeft: 'auto', flexShrink: 0 }}>
           {nextUpcoming && (
             <div
               onClick={function() { openDetail({ kind: 'Wedding', title: nextUpcoming.title, date: nextUpcoming.date, raw: nextUpcoming }); }}
@@ -17746,9 +17746,9 @@ function VenueRentalsView({ navigate }) {
               <div style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, background: '#faf4e8', border: '0.5px solid #e8dcc0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>Next up: {nextUpcoming.title}</div>
-                <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{nextUpcoming.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+              <div style={{ maxWidth: 260 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Next up: {nextUpcoming.title}</div>
+                <div style={{ fontSize: 11, color: '#999', marginTop: 1, whiteSpace: 'nowrap' }}>{nextUpcoming.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
               </div>
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
             </div>
