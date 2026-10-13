@@ -17830,8 +17830,10 @@ function VenueRentalsView({ navigate }) {
               )}
             </VenueOverviewCard>
 
-            {/* Inquiries counter: rental inquiry-form submissions still waiting
-                on a reply (not checked off as handled). Click to see them all. */}
+            {/* Inquiries counter: rental inquiry-form submissions. Most are
+                answered by automation, so this is a plain count (total, plus
+                how many came in this month) rather than a "needs reply" tally.
+                Click to see them all. */}
             <div onClick={function() { navigate('venue-inquiries'); }} role="button" tabIndex={0}
               onKeyDown={function(ev) { if (ev.key === 'Enter') navigate('venue-inquiries'); }}
               style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -17841,15 +17843,17 @@ function VenueRentalsView({ navigate }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Inquiries</div>
                 <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
-                  {inquiries === null ? 'Loading…' : (inquiries.length + ' total' + (inquiries.length ? ' • ' + inquiries.filter(function(q) { return q.status === 'handled'; }).length + ' handled' : ''))}
+                  {inquiries === null ? 'Loading…' : (function() {
+                    var now = new Date();
+                    var thisMonth = inquiries.filter(function(q) { var d = new Date(q.created_at); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); }).length;
+                    return thisMonth + ' this month';
+                  })()}
                 </div>
               </div>
               {inquiries !== null && (
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1, color: inquiries.some(function(q) { return q.status !== 'handled'; }) ? gold : '#bbb' }}>
-                    {inquiries.filter(function(q) { return q.status !== 'handled'; }).length}
-                  </div>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: '#999', marginTop: 3 }}>New</div>
+                  <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1, color: gold }}>{inquiries.length}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: '#999', marginTop: 3 }}>Total</div>
                 </div>
               )}
               <div style={{ fontSize: 12, color: gold, fontWeight: 600, flexShrink: 0 }}>View all →</div>
