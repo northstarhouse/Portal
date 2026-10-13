@@ -18796,7 +18796,8 @@ function EstateToursView() {
   const [calWeekStart, setCalWeekStart] = useState(function() {
     var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - d.getDay()); return d;
   });
-  const [calView, setCalView] = useState('week'); // Month/Day tabs are visual only for now
+  const [calView, setCalView] = useState('week');
+  const [calMonthDate, setCalMonthDate] = useState(function() { var d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [selectedId, setSelectedId] = useState(null);
   const [showAllList, setShowAllList] = useState(false);
   const [panelReschedule, setPanelReschedule] = useState(false);
@@ -18841,7 +18842,21 @@ function EstateToursView() {
       (calToursByDate[t.date] = calToursByDate[t.date] || []).push(t);
     }
   });
+  calToursByDate = Object.keys(calToursByDate).reduce(function(acc, k) {
+    acc[k] = calToursByDate[k].slice().sort(function(a, b) { return (a.start_time || '') < (b.start_time || '') ? -1 : 1; });
+    return acc;
+  }, {});
   var selectedTour = selectedId ? all.find(function(t) { return t.id === selectedId; }) : null;
+
+  // Month grid: a fixed 6-week (42-day) block starting on the Sunday on/before
+  // the 1st, so the layout never jumps row count month to month.
+  var calMonthDays = (function() {
+    var first = new Date(calMonthDate.getFullYear(), calMonthDate.getMonth(), 1);
+    var start = new Date(first); start.setDate(start.getDate() - start.getDay());
+    var out = [];
+    for (var i = 0; i < 42; i++) { var d = new Date(start); d.setDate(d.getDate() + i); out.push(d); }
+    return out;
+  })();
 
   function toggleBlock(slot) {
     if (busyId) return;
@@ -18900,8 +18915,12 @@ function EstateToursView() {
   function shiftWeek(delta) {
     setCalWeekStart(function(prev) { var d = new Date(prev); d.setDate(d.getDate() + delta * 7); return d; });
   }
+  function shiftMonth(delta) {
+    setCalMonthDate(function(prev) { return new Date(prev.getFullYear(), prev.getMonth() + delta, 1); });
+  }
   function goToday() {
     var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - d.getDay()); setCalWeekStart(d);
+    var m = new Date(); setCalMonthDate(new Date(m.getFullYear(), m.getMonth(), 1));
   }
 
   function selectTour(t) {
@@ -18968,6 +18987,86 @@ function EstateToursView() {
 
   if (rows === null) return <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>;
 
+  // Shared between Month and Week views -- whichever block was clicked.
+  var sidePanel = (
+    <div style={{ width: 280, flexShrink: 0 }}>
+      {!selectedTour ? (
+        <div style={{ ...cardStyle, padding: 20, textAlign: 'center', color: '#bbb', fontSize: 12 }}>Select a tour on the calendar to see its details.</div>
+      ) : (
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '0.5px solid #f0ece6' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{(selectedTour.visitor_name || 'Visitor') + ' Tour'}</div>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <button onClick={function() { startPanelReschedule(selectedTour); }} title="Reschedule" style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0e8', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+              </button>
+              <button onClick={function() { setSelectedId(null); }} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0e8', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#888', fontSize: 12 }}>✕</button>
+            </div>
+          </div>
+
+          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+            {[
+              [<svg key="c" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, selectedTour.date ? new Date(selectedTour.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : ''],
+              [<svg key="t" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, selectedTour.start_time ? (fmtTime(selectedTour.start_time) + ' – ' + fmtTime(addMinutesToTime(selectedTour.start_time, selectedTour.duration_min || 45)) + ' (' + durationLabel(selectedTour.duration_min) + ')') : ''],
+              [<svg key="p" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>, selectedTour.visitor_name],
+              [<svg key="m" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>, selectedTour.visitor_email],
+              [<svg key="ph" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>, selectedTour.visitor_phone],
+              [<svg key="g" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, 'Interested in: ' + tourCategoryLabel({ kind: 'Tour', raw: selectedTour })],
+            ].filter(function(pair) { return pair[1]; }).map(function(pair, i) {
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <span style={{ flexShrink: 0, marginTop: 2 }}>{pair[0]}</span>
+                  <span style={{ color: '#2a2a2a' }}>{pair[1]}</span>
+                </div>
+              );
+            })}
+
+            <div style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Notes</div>
+              {panelNoteEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <textarea value={panelNoteDraft} onChange={function(e) { setPanelNoteDraft(e.target.value); }} rows={3} placeholder="Add a note…" style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={function() { savePanelNote(selectedTour); }} disabled={panelBusy} style={{ padding: '6px 12px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{panelBusy ? 'Saving…' : 'Save'}</button>
+                    <button onClick={function() { setPanelNoteEditing(false); setPanelNoteDraft(selectedTour.staff_notes || ''); }} disabled={panelBusy} style={{ padding: '6px 12px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: 10 }}>
+                  <div style={{ fontSize: 12, color: selectedTour.staff_notes ? '#2a2a2a' : '#bbb', whiteSpace: 'pre-wrap' }}>{selectedTour.staff_notes || 'No notes yet.'}</div>
+                  <button onClick={function() { setPanelNoteEditing(true); }} style={{ flexShrink: 0, padding: '4px 8px', background: '#fff', border: '1px solid #e0d8cc', borderRadius: 6, fontSize: 10, fontWeight: 600, color: gold, cursor: 'pointer' }}>{selectedTour.staff_notes ? 'Edit' : 'Add'}</button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ padding: '0 16px 16px' }}>
+            {panelReschedule ? (
+              <div style={{ background: '#faf8f4', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <input type="date" value={panelRescheduleDate} onChange={function(e) { setPanelRescheduleDate(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
+                  <input type="time" value={panelRescheduleTime} onChange={function(e) { setPanelRescheduleTime(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={function() { savePanelReschedule(selectedTour); }} disabled={panelBusy || !panelRescheduleDate || !panelRescheduleTime} style={{ flex: 1, padding: '8px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: panelBusy ? 0.6 : 1 }}>{panelBusy ? 'Saving…' : 'Save new date'}</button>
+                  <button onClick={function() { setPanelReschedule(false); }} disabled={panelBusy} style={{ padding: '8px 14px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button onClick={function() { markPanelCompleted(selectedTour); }} disabled={panelBusy} style={{ padding: '10px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>✓ Mark as Completed</button>
+                <button onClick={function() { startPanelReschedule(selectedTour); }} disabled={panelBusy} style={{ padding: '10px', background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  Reschedule
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div>
       {/* --- Week calendar --- */}
@@ -18975,15 +19074,15 @@ function EstateToursView() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button onClick={goToday} style={{ padding: '7px 14px', background: '#f5f0e8', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#666', cursor: 'pointer' }}>Today</button>
-            <button onClick={function() { shiftWeek(-1); }} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', color: '#888' }}>‹</button>
-            <button onClick={function() { shiftWeek(1); }} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', color: '#888' }}>›</button>
+            <button onClick={function() { calView === 'month' ? shiftMonth(-1) : shiftWeek(-1); }} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', color: '#888' }}>‹</button>
+            <button onClick={function() { calView === 'month' ? shiftMonth(1) : shiftWeek(1); }} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', color: '#888' }}>›</button>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginLeft: 4 }}>
-              {calDays[0].toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              {(calView === 'month' ? calMonthDate : calDays[0]).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ display: 'flex', background: '#f5f0e8', borderRadius: 8, padding: 3 }}>
-              {['Month', 'Week', 'Day'].map(function(v) {
+              {['Month', 'Week'].map(function(v) {
                 var active = v.toLowerCase() === calView;
                 return (
                   <button key={v} onClick={function() { setCalView(v.toLowerCase()); }} style={{ padding: '6px 14px', background: active ? gold : 'transparent', color: active ? '#fff' : '#888', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{v}</button>
@@ -18997,8 +19096,43 @@ function EstateToursView() {
           </div>
         </div>
 
-        {calView !== 'week' ? (
-          <div style={{ padding: '50px 0', textAlign: 'center', color: '#bbb', fontSize: 13 }}>{calView === 'month' ? 'Month' : 'Day'} view coming soon — switch back to Week.</div>
+        {calView === 'month' ? (
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, minWidth: 0, overflowX: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', minWidth: 560, borderTop: '1px solid #f2ece0', borderLeft: '1px solid #f2ece0' }}>
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(function(w) {
+                  return <div key={w} style={{ textAlign: 'center', padding: '6px 0', fontSize: 10, fontWeight: 700, color: '#aaa', textTransform: 'uppercase', borderRight: '1px solid #f2ece0', borderBottom: '1px solid #f2ece0', background: '#faf8f4' }}>{w}</div>;
+                })}
+                {calMonthDays.map(function(d, i) {
+                  var dk = dateKeyOf(d);
+                  var inMonth = d.getMonth() === calMonthDate.getMonth();
+                  var isToday = dk === todayKey;
+                  var dayTours = calToursByDate[dk] || [];
+                  var shown = dayTours.slice(0, 3);
+                  var extra = dayTours.length - shown.length;
+                  return (
+                    <div key={i} style={{ minHeight: 92, padding: 6, borderRight: '1px solid #f2ece0', borderBottom: '1px solid #f2ece0', background: inMonth ? '#fff' : '#faf8f4' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: isToday ? '#fff' : (inMonth ? '#888' : '#ccc'), background: isToday ? gold : 'transparent', width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>{d.getDate()}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {shown.map(function(t) {
+                          var colors = tourCategoryColor(tourCategoryLabel({ kind: 'Tour', raw: t }));
+                          var isSelected = t.id === selectedId;
+                          return (
+                            <div key={t.id} onClick={function() { selectTour(t); }}
+                              style={{ fontSize: 10, fontWeight: 600, padding: '2px 4px', borderRadius: 4, background: colors.bg, color: colors.color, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', boxShadow: isSelected ? '0 0 0 1.5px ' + colors.color : 'none' }}>
+                              {fmtTime(t.start_time)} {t.visitor_name || 'Visitor'}
+                            </div>
+                          );
+                        })}
+                        {extra > 0 && <div style={{ fontSize: 10, color: '#aaa', paddingLeft: 4 }}>+{extra} more</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {sidePanel}
+          </div>
         ) : (
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
             <div style={{ flex: 1, minWidth: 0, overflowX: 'auto' }}>
@@ -19047,83 +19181,7 @@ function EstateToursView() {
                 })}
               </div>
             </div>
-
-            <div style={{ width: 280, flexShrink: 0 }}>
-              {!selectedTour ? (
-                <div style={{ ...cardStyle, padding: 20, textAlign: 'center', color: '#bbb', fontSize: 12 }}>Select a tour on the calendar to see its details.</div>
-              ) : (
-                <div style={cardStyle}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '0.5px solid #f0ece6' }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{(selectedTour.visitor_name || 'Visitor') + ' Tour'}</div>
-                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                      <button onClick={function() { startPanelReschedule(selectedTour); }} title="Reschedule" style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0e8', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-                      </button>
-                      <button onClick={function() { setSelectedId(null); }} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0e8', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#888', fontSize: 12 }}>✕</button>
-                    </div>
-                  </div>
-
-                  <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
-                    {[
-                      [<svg key="c" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, selectedTour.date ? new Date(selectedTour.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : ''],
-                      [<svg key="t" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, selectedTour.start_time ? (fmtTime(selectedTour.start_time) + ' – ' + fmtTime(addMinutesToTime(selectedTour.start_time, selectedTour.duration_min || 45)) + ' (' + durationLabel(selectedTour.duration_min) + ')') : ''],
-                      [<svg key="p" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>, selectedTour.visitor_name],
-                      [<svg key="m" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>, selectedTour.visitor_email],
-                      [<svg key="ph" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>, selectedTour.visitor_phone],
-                      [<svg key="g" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, 'Interested in: ' + tourCategoryLabel({ kind: 'Tour', raw: selectedTour })],
-                    ].filter(function(pair) { return pair[1]; }).map(function(pair, i) {
-                      return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                          <span style={{ flexShrink: 0, marginTop: 2 }}>{pair[0]}</span>
-                          <span style={{ color: '#2a2a2a' }}>{pair[1]}</span>
-                        </div>
-                      );
-                    })}
-
-                    <div style={{ marginTop: 4 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Notes</div>
-                      {panelNoteEditing ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          <textarea value={panelNoteDraft} onChange={function(e) { setPanelNoteDraft(e.target.value); }} rows={3} placeholder="Add a note…" style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }} />
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button onClick={function() { savePanelNote(selectedTour); }} disabled={panelBusy} style={{ padding: '6px 12px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{panelBusy ? 'Saving…' : 'Save'}</button>
-                            <button onClick={function() { setPanelNoteEditing(false); setPanelNoteDraft(selectedTour.staff_notes || ''); }} disabled={panelBusy} style={{ padding: '6px 12px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: 10 }}>
-                          <div style={{ fontSize: 12, color: selectedTour.staff_notes ? '#2a2a2a' : '#bbb', whiteSpace: 'pre-wrap' }}>{selectedTour.staff_notes || 'No notes yet.'}</div>
-                          <button onClick={function() { setPanelNoteEditing(true); }} style={{ flexShrink: 0, padding: '4px 8px', background: '#fff', border: '1px solid #e0d8cc', borderRadius: 6, fontSize: 10, fontWeight: 600, color: gold, cursor: 'pointer' }}>{selectedTour.staff_notes ? 'Edit' : 'Add'}</button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ padding: '0 16px 16px' }}>
-                    {panelReschedule ? (
-                      <div style={{ background: '#faf8f4', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          <input type="date" value={panelRescheduleDate} onChange={function(e) { setPanelRescheduleDate(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
-                          <input type="time" value={panelRescheduleTime} onChange={function(e) { setPanelRescheduleTime(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
-                        </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button onClick={function() { savePanelReschedule(selectedTour); }} disabled={panelBusy || !panelRescheduleDate || !panelRescheduleTime} style={{ flex: 1, padding: '8px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: panelBusy ? 0.6 : 1 }}>{panelBusy ? 'Saving…' : 'Save new date'}</button>
-                          <button onClick={function() { setPanelReschedule(false); }} disabled={panelBusy} style={{ padding: '8px 14px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <button onClick={function() { markPanelCompleted(selectedTour); }} disabled={panelBusy} style={{ padding: '10px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>✓ Mark as Completed</button>
-                        <button onClick={function() { startPanelReschedule(selectedTour); }} disabled={panelBusy} style={{ padding: '10px', background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                          Reschedule
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            {sidePanel}
           </div>
         )}
 
