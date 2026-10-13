@@ -286,6 +286,13 @@ const SHOW_VENUE_RENTALS = true;
 // this just swaps which JSX renders. Flip to true to bring the old view back.
 const SHOW_LEGACY_VENUE_DASHBOARD = false;
 
+// The "Upcoming Estate Tours" list (with its Email Guide / Delete actions)
+// at the top of the Estate Tours page is redundant now that the Venue
+// Rentals dashboard has its own Upcoming Tours card -- this page is meant
+// to just be for editing the schedule (slots/guides/special hours) now.
+// Nothing is deleted; flip to true to bring the list back.
+const SHOW_ESTATE_TOURS_UPCOMING_LIST = false;
+
 // Form categories hidden from Form Responses (and its unread badge) for the
 // time being. The forms still exist and still collect responses; remove a
 // category from this list to show it again.
@@ -18784,6 +18791,21 @@ function EstateToursView() {
   const [sendError, setSendError] = useState(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
 
+  // Week-calendar view (visual, approximate block placement -- not a true
+  // precision time-axis renderer) + its detail side panel.
+  const [calWeekStart, setCalWeekStart] = useState(function() {
+    var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - d.getDay()); return d;
+  });
+  const [calView, setCalView] = useState('week'); // Month/Day tabs are visual only for now
+  const [selectedId, setSelectedId] = useState(null);
+  const [showAllList, setShowAllList] = useState(false);
+  const [panelReschedule, setPanelReschedule] = useState(false);
+  const [panelRescheduleDate, setPanelRescheduleDate] = useState('');
+  const [panelRescheduleTime, setPanelRescheduleTime] = useState('');
+  const [panelBusy, setPanelBusy] = useState(false);
+  const [panelNoteEditing, setPanelNoteEditing] = useState(false);
+  const [panelNoteDraft, setPanelNoteDraft] = useState('');
+
   function load() {
     fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&order=created_at.desc&limit=500', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -18809,6 +18831,17 @@ function EstateToursView() {
   const byDate = {};
   slots.forEach(function(s) { (byDate[s.date] = byDate[s.date] || []).push(s); });
   const slotDates = Object.keys(byDate).sort();
+
+  var CAL_START_HOUR = 9, CAL_END_HOUR = 17, CAL_ROW_H = 48;
+  var calDays = [0, 1, 2, 3, 4, 5, 6].map(function(i) { var d = new Date(calWeekStart); d.setDate(d.getDate() + i); return d; });
+  var calHours = []; for (var ch = CAL_START_HOUR; ch <= CAL_END_HOUR; ch++) calHours.push(ch);
+  var calToursByDate = {};
+  all.forEach(function(t) {
+    if ((t.status === 'booked' || t.status === 'requested') && t.date && t.start_time) {
+      (calToursByDate[t.date] = calToursByDate[t.date] || []).push(t);
+    }
+  });
+  var selectedTour = selectedId ? all.find(function(t) { return t.id === selectedId; }) : null;
 
   function toggleBlock(slot) {
     if (busyId) return;
@@ -18850,6 +18883,58 @@ function EstateToursView() {
     }).catch(function() { alert('Could not delete — network error.'); }).finally(function() { setBusyId(null); });
   }
 
+  function dateKeyOf(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function timeToDecimal(t) { if (!t) return null; var p = t.split(':'); return parseInt(p[0], 10) + parseInt(p[1], 10) / 60; }
+  function addMinutesToTime(timeStr, mins) {
+    var p = timeStr.split(':');
+    var total = (((parseInt(p[0], 10) * 60 + parseInt(p[1], 10) + mins) % 1440) + 1440) % 1440;
+    return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0') + ':00';
+  }
+  function durationLabel(mins) {
+    var m = mins || 45;
+    if (m % 60 === 0) return (m / 60) + ' hour' + (m / 60 === 1 ? '' : 's');
+    if (m < 60) return m + ' min';
+    return (m / 60).toFixed(1) + ' hours';
+  }
+
+  function shiftWeek(delta) {
+    setCalWeekStart(function(prev) { var d = new Date(prev); d.setDate(d.getDate() + delta * 7); return d; });
+  }
+  function goToday() {
+    var d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - d.getDay()); setCalWeekStart(d);
+  }
+
+  function selectTour(t) {
+    setSelectedId(t.id);
+    setPanelReschedule(false);
+    setPanelNoteEditing(false);
+    setPanelNoteDraft(t.staff_notes || '');
+  }
+
+  function startPanelReschedule(t) {
+    setPanelRescheduleDate(t.date || '');
+    setPanelRescheduleTime(t.start_time || '');
+    setPanelReschedule(true);
+  }
+  function savePanelReschedule(t) {
+    if (!panelRescheduleDate || !panelRescheduleTime || panelBusy) return;
+    setPanelBusy(true);
+    sbPatchById('estate_tours', t.id, { date: panelRescheduleDate, start_time: panelRescheduleTime, reminder_24h_sent_at: null, reminder_1h_sent_at: null })
+      .then(function() { setPanelReschedule(false); load(); }).finally(function() { setPanelBusy(false); });
+  }
+  function markPanelCompleted(t) {
+    if (panelBusy) return;
+    setPanelBusy(true);
+    sbPatchById('estate_tours', t.id, { status: 'completed' })
+      .then(function() { setSelectedId(null); load(); }).finally(function() { setPanelBusy(false); });
+  }
+  function savePanelNote(t) {
+    if (panelBusy) return;
+    setPanelBusy(true);
+    sbPatchById('estate_tours', t.id, { staff_notes: panelNoteDraft })
+      .then(function() { setPanelNoteEditing(false); load(); }).finally(function() { setPanelBusy(false); });
+  }
+
   function openEmailModal(tour) {
     const when = tour.date ? (fmtDate(tour.date) + ' at ' + fmtTime(tour.start_time)) : 'a date to be confirmed';
     const subject = 'Estate tour — ' + (tour.visitor_name || 'a visitor') + (tour.date ? ' — ' + when : '');
@@ -18885,6 +18970,173 @@ function EstateToursView() {
 
   return (
     <div>
+      {/* --- Week calendar --- */}
+      <div style={{ ...cardStyle, padding: 14, marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={goToday} style={{ padding: '7px 14px', background: '#f5f0e8', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#666', cursor: 'pointer' }}>Today</button>
+            <button onClick={function() { shiftWeek(-1); }} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', color: '#888' }}>‹</button>
+            <button onClick={function() { shiftWeek(1); }} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, cursor: 'pointer', color: '#888' }}>›</button>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginLeft: 4 }}>
+              {calDays[0].toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', background: '#f5f0e8', borderRadius: 8, padding: 3 }}>
+              {['Month', 'Week', 'Day'].map(function(v) {
+                var active = v.toLowerCase() === calView;
+                return (
+                  <button key={v} onClick={function() { setCalView(v.toLowerCase()); }} style={{ padding: '6px 14px', background: active ? gold : 'transparent', color: active ? '#fff' : '#888', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{v}</button>
+                );
+              })}
+            </div>
+            <button style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#666', cursor: 'pointer' }}>
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              Filters
+            </button>
+          </div>
+        </div>
+
+        {calView !== 'week' ? (
+          <div style={{ padding: '50px 0', textAlign: 'center', color: '#bbb', fontSize: 13 }}>{calView === 'month' ? 'Month' : 'Day'} view coming soon — switch back to Week.</div>
+        ) : (
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, minWidth: 0, overflowX: 'auto' }}>
+              <div style={{ display: 'flex', minWidth: 650 }}>
+                <div style={{ width: 46, flexShrink: 0 }}>
+                  <div style={{ height: 40 }} />
+                  {calHours.map(function(h) {
+                    return (
+                      <div key={h} style={{ height: CAL_ROW_H, fontSize: 10, color: '#bbb', textAlign: 'right', paddingRight: 6, position: 'relative', top: -6 }}>
+                        {(h % 12 === 0 ? 12 : h % 12) + (h < 12 ? 'AM' : 'PM')}
+                      </div>
+                    );
+                  })}
+                </div>
+                {calDays.map(function(d, di) {
+                  var dk = dateKeyOf(d);
+                  var isToday = dk === todayKey;
+                  return (
+                    <div key={di} style={{ flex: 1, minWidth: 80, borderLeft: '1px solid #f2ece0' }}>
+                      <div style={{ height: 40, textAlign: 'center', borderBottom: '1px solid #ece6da' }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#aaa', textTransform: 'uppercase' }}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: isToday ? gold : '#2a2a2a', marginTop: 1 }}>{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                      </div>
+                      <div style={{ position: 'relative', height: calHours.length * CAL_ROW_H }}>
+                        {calHours.map(function(h, hi) {
+                          return <div key={h} style={{ position: 'absolute', top: hi * CAL_ROW_H, left: 0, right: 0, height: CAL_ROW_H, borderTop: '1px solid #f2ece0' }} />;
+                        })}
+                        {(calToursByDate[dk] || []).map(function(t) {
+                          var startDec = timeToDecimal(t.start_time);
+                          if (startDec === null || startDec < CAL_START_HOUR || startDec >= CAL_END_HOUR + 1) return null;
+                          var top = (startDec - CAL_START_HOUR) * CAL_ROW_H;
+                          var heightPx = Math.max(((t.duration_min || 45) / 60) * CAL_ROW_H, 26);
+                          var colors = tourCategoryColor(tourCategoryLabel({ kind: 'Tour', raw: t }));
+                          var isSelected = t.id === selectedId;
+                          return (
+                            <div key={t.id} onClick={function() { selectTour(t); }}
+                              style={{ position: 'absolute', top: top, left: 2, right: 2, height: heightPx, background: colors.bg, borderLeft: '3px solid ' + colors.color, borderRadius: 5, padding: '3px 6px', fontSize: 10, color: colors.color, cursor: 'pointer', overflow: 'hidden', boxShadow: isSelected ? '0 0 0 2px ' + colors.color : 'none' }}>
+                              <div style={{ fontWeight: 700 }}>{fmtTime(t.start_time)}</div>
+                              <div style={{ fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{(t.visitor_name || 'Visitor') + ' Tour'}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ width: 280, flexShrink: 0 }}>
+              {!selectedTour ? (
+                <div style={{ ...cardStyle, padding: 20, textAlign: 'center', color: '#bbb', fontSize: 12 }}>Select a tour on the calendar to see its details.</div>
+              ) : (
+                <div style={cardStyle}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '0.5px solid #f0ece6' }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{(selectedTour.visitor_name || 'Visitor') + ' Tour'}</div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button onClick={function() { startPanelReschedule(selectedTour); }} title="Reschedule" style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0e8', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                      </button>
+                      <button onClick={function() { setSelectedId(null); }} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0e8', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#888', fontSize: 12 }}>✕</button>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+                    {[
+                      [<svg key="c" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, selectedTour.date ? new Date(selectedTour.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : ''],
+                      [<svg key="t" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>, selectedTour.start_time ? (fmtTime(selectedTour.start_time) + ' – ' + fmtTime(addMinutesToTime(selectedTour.start_time, selectedTour.duration_min || 45)) + ' (' + durationLabel(selectedTour.duration_min) + ')') : ''],
+                      [<svg key="p" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>, selectedTour.visitor_name],
+                      [<svg key="m" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>, selectedTour.visitor_email],
+                      [<svg key="ph" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>, selectedTour.visitor_phone],
+                      [<svg key="g" width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, 'Interested in: ' + tourCategoryLabel({ kind: 'Tour', raw: selectedTour })],
+                    ].filter(function(pair) { return pair[1]; }).map(function(pair, i) {
+                      return (
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                          <span style={{ flexShrink: 0, marginTop: 2 }}>{pair[0]}</span>
+                          <span style={{ color: '#2a2a2a' }}>{pair[1]}</span>
+                        </div>
+                      );
+                    })}
+
+                    <div style={{ marginTop: 4 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Notes</div>
+                      {panelNoteEditing ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <textarea value={panelNoteDraft} onChange={function(e) { setPanelNoteDraft(e.target.value); }} rows={3} placeholder="Add a note…" style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }} />
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={function() { savePanelNote(selectedTour); }} disabled={panelBusy} style={{ padding: '6px 12px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{panelBusy ? 'Saving…' : 'Save'}</button>
+                            <button onClick={function() { setPanelNoteEditing(false); setPanelNoteDraft(selectedTour.staff_notes || ''); }} disabled={panelBusy} style={{ padding: '6px 12px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: 10 }}>
+                          <div style={{ fontSize: 12, color: selectedTour.staff_notes ? '#2a2a2a' : '#bbb', whiteSpace: 'pre-wrap' }}>{selectedTour.staff_notes || 'No notes yet.'}</div>
+                          <button onClick={function() { setPanelNoteEditing(true); }} style={{ flexShrink: 0, padding: '4px 8px', background: '#fff', border: '1px solid #e0d8cc', borderRadius: 6, fontSize: 10, fontWeight: 600, color: gold, cursor: 'pointer' }}>{selectedTour.staff_notes ? 'Edit' : 'Add'}</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '0 16px 16px' }}>
+                    {panelReschedule ? (
+                      <div style={{ background: '#faf8f4', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          <input type="date" value={panelRescheduleDate} onChange={function(e) { setPanelRescheduleDate(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
+                          <input type="time" value={panelRescheduleTime} onChange={function(e) { setPanelRescheduleTime(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={function() { savePanelReschedule(selectedTour); }} disabled={panelBusy || !panelRescheduleDate || !panelRescheduleTime} style={{ flex: 1, padding: '8px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: panelBusy ? 0.6 : 1 }}>{panelBusy ? 'Saving…' : 'Save new date'}</button>
+                          <button onClick={function() { setPanelReschedule(false); }} disabled={panelBusy} style={{ padding: '8px 14px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <button onClick={function() { markPanelCompleted(selectedTour); }} disabled={panelBusy} style={{ padding: '10px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>✓ Mark as Completed</button>
+                        <button onClick={function() { startPanelReschedule(selectedTour); }} disabled={panelBusy} style={{ padding: '10px', background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                          Reschedule
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, paddingTop: 14, borderTop: '0.5px solid #f0ece6' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Upcoming Tours</div>
+          <button onClick={function() { setShowAllList(function(v) { return !v; }); }} style={{ padding: '7px 14px', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#666', cursor: 'pointer' }}>
+            {showAllList ? 'Hide All Tours' : 'View All Tours →'}
+          </button>
+        </div>
+      </div>
+
+      {(SHOW_ESTATE_TOURS_UPCOMING_LIST || showAllList) && (
+      <>
       {/* --- Upcoming tours (booked + requested) --- */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Upcoming Estate Tours</div>
@@ -18929,6 +19181,8 @@ function EstateToursView() {
             );
           })}
         </div>
+      )}
+      </>
       )}
 
       {/* --- Availability calendar --- */}
