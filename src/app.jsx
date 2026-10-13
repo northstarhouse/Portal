@@ -17753,8 +17753,8 @@ function VenueRentalsView({ navigate }) {
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
             </div>
           )}
-          <button onClick={function() { setScheduleOpen(true); }} style={{ flexShrink: 0, padding: '10px 18px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            + Schedule a Tour
+          <button onClick={function() { navigate('estate-tours'); }} style={{ flexShrink: 0, padding: '10px 18px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            Edit Tour Schedule
           </button>
         </div>
       </div>
