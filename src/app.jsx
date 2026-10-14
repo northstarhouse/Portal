@@ -9474,7 +9474,7 @@ function SponsorsView() {
   var [editing, setEditing] = useState(false);
   var [editSponsorForm, setEditSponsorForm] = useState({});
   var [editSponsorSaving, setEditSponsorSaving] = useState(false);
-  var emptyAddForm = { 'Business Name': '', 'Main Contact': '', 'Area Supported': '', 'NSH Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Date Recieved': '', 'Notes': '' };
+  var emptyAddForm = { 'Business Name': '', 'Main Contact': '', 'NSH Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Notes': '' };
   var [showAdd, setShowAdd] = useState(false);
   var [addForm, setAddForm] = useState(emptyAddForm);
   var [addSaving, setAddSaving] = useState(false);
@@ -9658,6 +9658,41 @@ function SponsorsView() {
     }).catch(function() { setInkindSavingId(null); });
   }
 
+  function slugifySponsorName(s) {
+    return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  // Pushes just the logo + name onto the public site's Sponsors page
+  // (site_content, page_key "sponsors") whenever a logo is uploaded here --
+  // matched by name so an existing sponsor's hand-written description/
+  // website link/tier are left untouched; only its logo (and name, in case
+  // of a typo fix) gets overwritten. A sponsor with no matching entry yet
+  // gets added bare (name + logo, no description) -- whoever manages site
+  // content can write their story in later.
+  function syncSponsorLogoToWebsite(name, logoUrl) {
+    if (!name) return;
+    fetch(SUPABASE_URL + '/rest/v1/site_content?page_key=eq.sponsors&select=content', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      var row = Array.isArray(rows) && rows[0] ? rows[0] : null;
+      if (!row) return;
+      var content = row.content || {};
+      var list = Array.isArray(content.sponsors) ? content.sponsors.slice() : [];
+      var key = name.trim().toLowerCase();
+      var idx = list.findIndex(function(s) { return (s.name || '').trim().toLowerCase() === key; });
+      if (idx >= 0) {
+        list[idx] = Object.assign({}, list[idx], { logo: logoUrl, name: name });
+      } else {
+        list.push({ name: name, slug: slugifySponsorName(name), logo: logoUrl });
+      }
+      return fetch(SUPABASE_URL + '/rest/v1/site_content?page_key=eq.sponsors', {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: Object.assign({}, content, { sponsors: list }) })
+      });
+    }).catch(function() {});
+  }
+
   function handleLogoUpload(e) {
     var file = e.target.files[0];
     if (!file || !selected) return;
@@ -9691,6 +9726,7 @@ function SponsorsView() {
         setSelected(updated);
         clearCache('Sponsors');
         setSponsors(function(prev) { return prev.map(function(s) { return s.id === selected.id ? updated : s; }); });
+        syncSponsorLogoToWebsite(updated['Business Name'], url);
         setLogoUploading(false);
         e.target.value = '';
       });
@@ -9820,39 +9856,37 @@ function SponsorsView() {
         <button onClick={function() { setAddForm(Object.assign({}, emptyAddForm, { sponsor_status: tab === 'current' ? null : tab })); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add New Sponsor</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: (selected && !isMobile) ? '240px 1fr' : '1fr', gap: 16 }}>
-        <div>
+      <div style={{ display: 'grid', gridTemplateColumns: (selected && !isMobile) ? 'minmax(260px, 320px) 1fr' : '1fr', gap: 16 }}>
+        <div style={{ minWidth: 0 }}>
           {sponsors === null && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>Loading…</div>}
           {sponsors !== null && visibleSponsors.length === 0 && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>No {tab} sponsors yet.</div>}
           {sponsors !== null && visibleSponsors.map(function(s) {
             var isSelected = selected && selected.id === s.id;
             return (
               <div key={s.id} onClick={function() { selectSponsor(isSelected ? null : s); }}
-                style={{ background: isSelected ? '#faf5ee' : '#fff', border: '0.5px solid ' + (isSelected ? gold : '#e8e0d5'), borderRadius: 10, padding: '14px 18px', marginBottom: 10, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 14 }}
+                style={{ background: isSelected ? '#faf5ee' : '#fff', border: '0.5px solid ' + (isSelected ? gold : '#e8e0d5'), borderRadius: 10, padding: '14px 18px', marginBottom: 10, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'flex-start', gap: 12 }}
                 onMouseEnter={function(e) { if (!isSelected) e.currentTarget.style.background = '#fdfaf6'; }}
                 onMouseLeave={function(e) { if (!isSelected) e.currentTarget.style.background = isSelected ? '#faf5ee' : '#fff'; }}>
                 {s.logo_url
-                  ? <img src={s.logo_url} alt={s['Business Name']} onError={function(e) { e.currentTarget.style.display='none'; e.currentTarget.nextSibling.style.display='flex'; }} style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 6, flexShrink: 0, border: '0.5px solid #e8e0d5' }} />
+                  ? <img src={s.logo_url} alt={s['Business Name']} onError={function(e) { e.currentTarget.style.display='none'; e.currentTarget.nextSibling.style.display='flex'; }} style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 6, flexShrink: 0, border: '0.5px solid #e8e0d5' }} />
                   : null}
-                <div style={{ width: 44, height: 44, borderRadius: 6, background: '#f0ece6', display: s.logo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: gold, flexShrink: 0 }}>{(s['Business Name'] || '?')[0]}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 3 }}>{s['Business Name']}</div>
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ width: 40, height: 40, borderRadius: 6, background: '#f0ece6', display: s.logo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, color: gold, flexShrink: 0 }}>{(s['Business Name'] || '?')[0]}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s['Business Name']}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                     {s['Main Contact'] && <span style={{ fontSize: 12, color: '#666' }}>{s['Main Contact']}</span>}
                     {s['Area Supported'] && <span style={{ fontSize: 12, color: '#aaa' }}>{s['Area Supported']}</span>}
+                    {(function() {
+                      var total = sponsorInKindTotal(s.id);
+                      var tier = getTier(total);
+                      return (
+                        <>
+                          {total > 0 && <span style={{ fontSize: 12, fontWeight: 600, color: gold }}>${total.toLocaleString()}</span>}
+                          {tier && <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '1px 8px', whiteSpace: 'nowrap' }}>{tier.name}</span>}
+                        </>
+                      );
+                    })()}
                   </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                  {(function() {
-                    var total = sponsorInKindTotal(s.id);
-                    var tier = getTier(total);
-                    return (
-                      <>
-                        {total > 0 && <div style={{ fontSize: 13, fontWeight: 600, color: gold }}>${total.toLocaleString()}</div>}
-                        {tier && <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '1px 8px' }}>{tier.name}</span>}
-                      </>
-                    );
-                  })()}
                 </div>
               </div>
             );
@@ -9860,7 +9894,7 @@ function SponsorsView() {
         </div>
 
         {selected && (
-          <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '20px 22px', alignSelf: 'start', position: 'sticky', top: 20 }}>
+          <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '20px 22px', alignSelf: 'start', position: 'sticky', top: 20, minWidth: 0 }}>
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div style={{ flex: 1, paddingRight: 8 }}>
@@ -10102,7 +10136,7 @@ function SponsorsView() {
             </div>
             <form onSubmit={submitAddSponsor}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                {[['Business Name','Business Name *',true],['Main Contact','Main Contact',false],['Area Supported','Area Supported',false],['NSH Contact','NSH Contact',false],['Phone Number','Phone',false],['Email Address','Email',false],['Mailing Address','Address',false],['Date Recieved','Date Received',false]].map(function(pair) {
+                {[['Business Name','Business Name *',true],['Main Contact','Main Contact',false],['NSH Contact','NSH Contact',false],['Phone Number','Phone',false],['Email Address','Email',false],['Mailing Address','Address',false]].map(function(pair) {
                   return (
                     <div key={pair[0]}>
                       <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>{pair[1]}</label>
