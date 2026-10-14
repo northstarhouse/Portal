@@ -9580,6 +9580,44 @@ function SponsorsView() {
     }).catch(function(err) { alert('Error saving in-kind: ' + err.message); setInkindSaving(false); });
   }
 
+  // Builds a print-ready thank-you letter for one logged in-kind entry,
+  // matching the Conservancy's standard template (board letterhead layout,
+  // same merge fields: DonorName/Address/Name/Description/Estimated Value/
+  // Date, same closing and tax-deductibility footer). Opens its own window
+  // so the browser's print dialog only ever touches this one letter, not
+  // the whole Portal page.
+  function printThankYouNote(sponsor, entry) {
+    var donorName = sponsor['Business Name'] || '';
+    var salutationName = sponsor['Main Contact'] || sponsor['Business Name'] || 'Friend';
+    var address = sponsor['Mailing Address'] || '';
+    var valueStr = '$' + (parseFloat(entry.value) || 0).toLocaleString();
+    var dateStr = entry.date ? new Date(entry.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+    function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    var html = '<!doctype html><html><head><meta charset="utf-8"><title>Thank You — ' + esc(donorName) + '</title>' +
+      '<style>' +
+      'body{font-family:Georgia,\'Times New Roman\',serif;font-size:14px;line-height:1.7;color:#1e1e1e;max-width:6.5in;margin:0.75in auto;}' +
+      'p{margin:0 0 14px;}' +
+      '.addr{margin-bottom:20px;}' +
+      '.footer{margin-top:40px;padding-top:14px;border-top:1px solid #ccc;font-size:11px;color:#555;}' +
+      '@media print{body{margin:0.6in auto;}}' +
+      '</style></head><body>' +
+      '<div class="addr">' + esc(donorName) + (address ? '<br>' + esc(address).replace(/\n/g, '<br>') : '') + '</div>' +
+      '<p>Dear ' + esc(salutationName) + ',</p>' +
+      '<p>On behalf of the Board of Directors of the North Star Historic Conservancy, thank you for your generous in-kind contribution of ' + esc(entry.description) + ', with an estimated value of ' + esc(valueStr) + ', received on ' + esc(dateStr) + '.</p>' +
+      '<p>Your support makes a meaningful difference in our ability to care for and activate the North Star House as a vibrant community gathering space. Contributions like yours help offset operational costs, allowing us to direct more resources toward restoration, programming, and public engagement.</p>' +
+      '<p>We are deeply grateful for your willingness to support this work in such a practical and impactful way. Your contribution directly strengthens our ability to move projects forward and serve the community more effectively.</p>' +
+      '<p>With sincere appreciation,</p>' +
+      '<p>Ken Underwood<br>President</p>' +
+      '<div class="footer">The North Star Historic Conservancy is a 501(c)3 organization, EIN 38-3734947.<br>No goods or services were provided in exchange for this gift.<br>Donations of money or securities are tax deductible to the extent allowed by law.</div>' +
+      '</body></html>';
+    var w = window.open('', '_blank', 'width=800,height=900');
+    if (!w) { alert('Please allow pop-ups to print the thank-you note.'); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(function() { w.print(); }, 300);
+  }
+
   function deleteInKind(id) {
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?id=eq.' + id, {
       method: 'DELETE',
@@ -9990,6 +10028,8 @@ function SponsorsView() {
                           </div>
                           <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{e.description}</div>
                         </div>
+                        <button onClick={function() { printThankYouNote(selected, e); }} title="Print a thank-you letter for this contribution"
+                          style={{ background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: gold, cursor: 'pointer', flexShrink: 0 }}>Thank-You Note</button>
                         <button onClick={function() { setEditingInKindId(e.id); setEditInKindForm({ description: e.description || '', date: e.date || '', value: e.value != null ? String(e.value) : '', contribution_type: e.contribution_type || '' }); }}
                           style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer', flexShrink: 0 }}>Edit</button>
                         <button onClick={function() { deleteInKind(e.id); }} style={{ background: 'none', border: 'none', color: '#ddd', fontSize: 14, cursor: 'pointer', flexShrink: 0, padding: '2px 4px' }}>×</button>
