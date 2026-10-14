@@ -1918,8 +1918,12 @@ function EventsView({ navigate }) {
         )}
         {tab === 'feedback' && (
           <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={function() { setShowBulkFeedback(function(s) { return !s; }); setShowAddFeedback(false); }} style={{ fontSize: 12, background: showBulkFeedback ? '#f5f0ea' : '#fff', color: showBulkFeedback ? '#666' : gold, border: '1px solid ' + (showBulkFeedback ? '#e0d8cc' : gold), borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showBulkFeedback ? 'Cancel' : '📋 Paste Multiple'}</button>
-            <button onClick={function() { setShowAddFeedback(function(s) { return !s; }); setShowBulkFeedback(false); }} style={{ fontSize: 12, background: showAddFeedback ? '#f5f0ea' : gold, color: showAddFeedback ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>{showAddFeedback ? 'Cancel' : '+ Add Feedback'}</button>
+            <button onClick={function() { setShowBulkFeedback(function(s) { return !s; }); setShowAddFeedback(false); }} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, background: showBulkFeedback ? '#f5f0ea' : '#fff', color: showBulkFeedback ? '#666' : gold, border: '1px solid ' + (showBulkFeedback ? '#e0d8cc' : gold), borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>
+              {showBulkFeedback ? 'Cancel' : (<><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>Paste Multiple</>)}
+            </button>
+            <button onClick={function() { setShowAddFeedback(function(s) { return !s; }); setShowBulkFeedback(false); }} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, background: showAddFeedback ? '#f5f0ea' : gold, color: showAddFeedback ? '#666' : '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 500 }}>
+              {showAddFeedback ? 'Cancel' : (<><svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Feedback</>)}
+            </button>
           </div>
         )}
       </div>
@@ -9507,16 +9511,30 @@ function SponsorsView() {
     setInkindForm({ description: '', date: new Date().toISOString().slice(0,10), value: '' });
   }
 
+  // Each tier's `ownBenefits` are just what that tier adds on top of the one
+  // below it -- "All Heritage Partner benefits" etc. isn't stored as a
+  // literal line (useless as a checklist item), it's built below into the
+  // full cumulative `benefits` list every tier actually gets, so the
+  // existing tier.benefits.map(...) renders/checks off the real concrete
+  // items regardless of which tier a sponsor is in.
   var TIERS = [
-    { name: 'Innovator', min: 5000, color: '#7c3aed', bg: '#f3f0ff', border: '#c4b5fd', range: '$5,000–$9,999',
-      benefits: ['Builder benefits, plus:', 'One "Sponsor Highlight" article in one of our quarterly newsletters', 'An 8"×8" commemorative brick placed as part of the brick terrace capital project', 'Picnic lunch or reception for you and ten guests in the North Star House'] },
-    { name: 'Builder', min: 2500, color: '#1565c0', bg: '#e3f2fd', border: '#90caf9', range: '$2,500–$4,999',
-      benefits: ['Believer benefits, plus:', 'Named Solo Sponsor of one NSHC event (name/logo in materials, event signage, recognized from stage)', 'A 4"×8" commemorative brick placed as part of the brick terrace capital project', 'Personal VIP tour of the upstairs construction project!'] },
-    { name: 'Believer', min: 1000, color: '#2e7d32', bg: '#e8f5e9', border: '#a5d6a7', range: '$1,000–$2,499',
-      benefits: ['Company name/logo listed as a Sponsor in event programs, newsletters, website and yearly Sponsorship Banner', 'Invitation to State of the Star membership celebration', 'Two complimentary tickets to a NSHC event', 'Custom made plaque with yearly stars', 'Sponsor Spotlight on our social media platforms'] },
-    { name: 'Friend of NSH', min: 250, color: '#b45309', bg: '#fffbeb', border: '#fcd34d', range: '$250–$999',
-      benefits: ['Business name listed as a Friend in event programs, newsletters, and website', 'Invitation to State of the Star membership celebration'] },
+    { name: 'Presenting Sponsor', min: 10000, color: '#7c3aed', bg: '#f3f0ff', border: '#c4b5fd', range: '$10,000+',
+      ownBenefits: ['"Presented by" naming & press release inclusion', 'Welcome remarks & materials table at event', '"2027 Presenting Sponsor" personalized brick placed on grounds'] },
+    { name: 'Keystone Sponsor', min: 5000, color: '#1565c0', bg: '#e3f2fd', border: '#90caf9', range: '$5,000–$9,999',
+      ownBenefits: ['6 complimentary North Star House event tickets', '"2027 Keystone Sponsor" personalized brick placed on grounds'] },
+    { name: 'Preservation Leader', min: 2500, color: '#2e7d32', bg: '#e8f5e9', border: '#a5d6a7', range: '$2,500–$4,999',
+      ownBenefits: ['Large logo placement on banner', '"2027 Preservation Leader" personalized brick placed on grounds'] },
+    { name: 'Heritage Partner', min: 1000, color: '#b45309', bg: '#fffbeb', border: '#fcd34d', range: '$1,000–$2,499',
+      ownBenefits: ['Website & newsletter feature', '"2027 Heritage Partner" personalized brick placed on grounds'] },
+    { name: 'Friend of the North Star House', min: 300, color: '#0f766e', bg: '#f0fdfa', border: '#5eead4', range: '$300–$999',
+      ownBenefits: ['Sponsorship recognition & logo on website', 'Logo placement on banner', '2 complimentary North Star House event tickets'] },
+    { name: 'Community Supporter', min: 0, color: '#6b7280', bg: '#f3f4f6', border: '#d1d5db', range: 'Under $300',
+      ownBenefits: ['Public thank-you on website'] },
   ];
+  for (var tierIdx = TIERS.length - 1; tierIdx >= 0; tierIdx--) {
+    var below = tierIdx < TIERS.length - 1 ? TIERS[tierIdx + 1].benefits : [];
+    TIERS[tierIdx].benefits = below.concat(TIERS[tierIdx].ownBenefits);
+  }
 
   function getTier(total) {
     return TIERS.find(function(t) { return total >= t.min; }) || null;
@@ -9525,6 +9543,24 @@ function SponsorsView() {
   function sponsorInKindTotal(sponsorId) {
     return allInKind.filter(function(e) { return e.sponsor_id === sponsorId; })
       .reduce(function(sum, e) { return sum + (parseFloat(e.value) || 0); }, 0);
+  }
+
+  // Tracks which of the sponsor's tier benefits have actually been fulfilled
+  // (logo placed, brick ordered, tickets sent, etc.) -- keyed by the benefit's
+  // own text rather than tier+index, so a checked-off item stays checked if
+  // the sponsor's tier changes later (most tiers share benefits with the one
+  // below them).
+  function toggleBenefit(benefitText) {
+    if (!selected) return;
+    var current = selected.benefits_checklist || {};
+    var next = Object.assign({}, current, { [benefitText]: !current[benefitText] });
+    setSponsors(function(prev) { return prev.map(function(s) { return s.id === selected.id ? Object.assign({}, s, { benefits_checklist: next }) : s; }); });
+    setSelected(function(prev) { return prev && prev.id === selected.id ? Object.assign({}, prev, { benefits_checklist: next }) : prev; });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?id=eq.' + selected.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ benefits_checklist: next })
+    }).then(function() { clearCache('Sponsors'); });
   }
 
   function submitInKind(e) {
@@ -9866,14 +9902,28 @@ function SponsorsView() {
                       <span style={{ fontSize: 12, color: '#aaa' }}>total in-kind value</span>
                       {tier && <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '2px 10px' }}>{tier.name}</span>}
                     </div>
-                    {tier && (
-                      <div style={{ background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 8, padding: '10px 14px' }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: tier.color, marginBottom: 6 }}>{tier.name} Benefits · {tier.range}</div>
-                        {tier.benefits.map(function(b, i) {
-                          return <div key={i} style={{ fontSize: 11, color: tier.color, opacity: 0.85, marginBottom: 3, paddingLeft: b.endsWith(':') ? 0 : 8 }}>{b.endsWith(':') ? b : '• ' + b}</div>;
-                        })}
-                      </div>
-                    )}
+                    {tier && (function() {
+                      var checklist = selected.benefits_checklist || {};
+                      var doneCount = tier.benefits.filter(function(b) { return checklist[b]; }).length;
+                      return (
+                        <div style={{ background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 8, padding: '10px 14px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: tier.color }}>{tier.name} Benefits · {tier.range}</div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: tier.color, opacity: 0.75 }}>{doneCount}/{tier.benefits.length} done</div>
+                          </div>
+                          {tier.benefits.map(function(b, i) {
+                            var checked = !!checklist[b];
+                            return (
+                              <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginBottom: 5, cursor: 'pointer' }}>
+                                <input type="checkbox" checked={checked} onChange={function() { toggleBenefit(b); }}
+                                  style={{ marginTop: 2, accentColor: tier.color, flexShrink: 0, cursor: 'pointer' }} />
+                                <span style={{ fontSize: 11, color: tier.color, opacity: checked ? 0.55 : 0.9, textDecoration: checked ? 'line-through' : 'none' }}>{b}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })()}
@@ -20620,7 +20670,7 @@ function WebsitePaymentsView({ navigate }) {
     });
 
   function exportCsv() {
-    var head = ['Date', 'Kind', 'Name', 'Email', 'Phone', 'Event', 'Event Date', 'Tickets', 'Qty', 'Gross', 'PayPal Fee', 'Net', 'Currency', 'PayPal Order', 'PayPal Capture'];
+    var head = ['Date', 'Kind', 'Name', 'Email', 'Phone', 'Event', 'Event Date', 'Tickets', 'Qty', 'Gross', 'PayPal Fee', 'Net', 'Currency', 'PayPal Order', 'PayPal Capture', 'Note'];
     var lines = [head.join(',')];
     filtered.forEach(function(o) {
       var tix = (o.tickets || []).map(function(t) { return t.qty + 'x ' + t.tier + ' @' + t.price; }).join(' | ');
@@ -20633,7 +20683,8 @@ function WebsitePaymentsView({ navigate }) {
         orderIsPaid(o) && o.paypal_fee != null ? o.paypal_fee : '',
         orderIsPaid(o) ? netOf(o) : '',
         o.currency,
-        o.paypal_order_id || '', o.paypal_capture_id || ''
+        o.paypal_order_id || '', o.paypal_capture_id || '',
+        o.note || ''
       ].map(function(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; });
       lines.push(row.join(','));
     });
@@ -20705,7 +20756,7 @@ function WebsitePaymentsView({ navigate }) {
         <div style={{ fontSize: 12, color: '#aaa' }}>No orders yet.</div>
       ) : (
         <Table
-          cols={['When', 'Type', 'Name', 'Email', 'Event', 'Tickets', 'Gross', 'Fee', 'Net']}
+          cols={['When', 'Type', 'Name', 'Email', 'Event', 'Tickets', 'Gross', 'Fee', 'Net', 'Note']}
           rows={filtered}
           renderRow={function(o) {
             return [
@@ -20719,7 +20770,8 @@ function WebsitePaymentsView({ navigate }) {
               <td key="t" style={{ padding: '8px 10px', color: '#555' }}>{(o.tickets || []).map(function(t) { return t.qty + 'x ' + t.tier; }).join(', ')}</td>,
               <td key="a" style={{ padding: '8px 10px', fontWeight: 500, whiteSpace: 'nowrap' }}>{orderIsPaid(o) ? money(o.amount) : '—'}</td>,
               <td key="f" style={{ padding: '8px 10px', color: '#a05a1a', whiteSpace: 'nowrap' }}>{orderIsPaid(o) && o.paypal_fee != null ? '−' + money(o.paypal_fee) : '—'}</td>,
-              <td key="nt" style={{ padding: '8px 10px', fontWeight: 500, whiteSpace: 'nowrap' }}>{orderIsPaid(o) ? money(netOf(o)) : '—'}</td>
+              <td key="nt" style={{ padding: '8px 10px', fontWeight: 500, whiteSpace: 'nowrap' }}>{orderIsPaid(o) ? money(netOf(o)) : '—'}</td>,
+              <td key="note" title={o.note || ''} style={{ padding: '8px 10px', color: '#777', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.note || ''}</td>
             ];
           }}
         />
