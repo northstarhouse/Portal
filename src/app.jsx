@@ -9581,11 +9581,12 @@ function SponsorsView() {
   }
 
   // Builds a print-ready thank-you letter for one logged in-kind entry,
-  // matching the Conservancy's standard template (board letterhead layout,
-  // same merge fields: DonorName/Address/Name/Description/Estimated Value/
-  // Date, same closing and tax-deductibility footer). Opens its own window
-  // so the browser's print dialog only ever touches this one letter, not
-  // the whole Portal page.
+  // matching the Conservancy's two standard templates (same board
+  // letterhead layout, closing, and tax-deductibility footer in both) --
+  // the "Monetary Value" template for cash sponsorships, the general one
+  // for actual in-kind goods/services/discounts. Opens its own window so
+  // the browser's print dialog only ever touches this one letter, not the
+  // whole Portal page.
   function printThankYouNote(sponsor, entry) {
     var donorName = sponsor['Business Name'] || '';
     var salutationName = sponsor['Main Contact'] || sponsor['Business Name'] || 'Friend';
@@ -9593,6 +9594,18 @@ function SponsorsView() {
     var valueStr = '$' + (parseFloat(entry.value) || 0).toLocaleString();
     var dateStr = entry.date ? new Date(entry.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
     function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    var isMonetary = entry.contribution_type === 'Monetary Value';
+    var openingPara = isMonetary
+      ? ('On behalf of the Board of Directors of the North Star Historic Conservancy, thank you for your generous monetary sponsorship of ' + esc(valueStr) + ', received on ' + esc(dateStr) + '.')
+      : ('On behalf of the Board of Directors of the North Star Historic Conservancy, thank you for your generous in-kind contribution of ' + esc(entry.description) + ', with an estimated value of ' + esc(valueStr) + ', received on ' + esc(dateStr) + '.');
+    var bodyParas = isMonetary ? [
+      'Your sponsorship plays an important role in preserving and maintaining the historic North Star House while supporting its continued use as a vibrant community gathering space. Contributions like yours help offset operational expenses, advance ongoing restoration efforts, and make community events, educational programming, and public engagement possible.',
+      'As a nonprofit organization dedicated to the preservation of this nationally significant historic landmark, we rely on the generosity of local businesses and community partners who recognize the importance of protecting North Star House for future generations.',
+      'We are grateful for your investment in our mission and your commitment to supporting local history, preservation, and community connection. Your partnership makes a meaningful difference in our ability to continue this work.',
+    ] : [
+      'Your support makes a meaningful difference in our ability to care for and activate the North Star House as a vibrant community gathering space. Contributions like yours help offset operational costs, allowing us to direct more resources toward restoration, programming, and public engagement.',
+      'We are deeply grateful for your willingness to support this work in such a practical and impactful way. Your contribution directly strengthens our ability to move projects forward and serve the community more effectively.',
+    ];
     var html = '<!doctype html><html><head><meta charset="utf-8"><title>Thank You — ' + esc(donorName) + '</title>' +
       '<style>' +
       'body{font-family:Georgia,\'Times New Roman\',serif;font-size:14px;line-height:1.7;color:#1e1e1e;max-width:6.5in;margin:0.75in auto;}' +
@@ -9603,9 +9616,8 @@ function SponsorsView() {
       '</style></head><body>' +
       '<div class="addr">' + esc(donorName) + (address ? '<br>' + esc(address).replace(/\n/g, '<br>') : '') + '</div>' +
       '<p>Dear ' + esc(salutationName) + ',</p>' +
-      '<p>On behalf of the Board of Directors of the North Star Historic Conservancy, thank you for your generous in-kind contribution of ' + esc(entry.description) + ', with an estimated value of ' + esc(valueStr) + ', received on ' + esc(dateStr) + '.</p>' +
-      '<p>Your support makes a meaningful difference in our ability to care for and activate the North Star House as a vibrant community gathering space. Contributions like yours help offset operational costs, allowing us to direct more resources toward restoration, programming, and public engagement.</p>' +
-      '<p>We are deeply grateful for your willingness to support this work in such a practical and impactful way. Your contribution directly strengthens our ability to move projects forward and serve the community more effectively.</p>' +
+      '<p>' + openingPara + '</p>' +
+      bodyParas.map(function(t) { return '<p>' + t + '</p>'; }).join('') +
       '<p>With sincere appreciation,</p>' +
       '<p>Ken Underwood<br>President</p>' +
       '<div class="footer">The North Star Historic Conservancy is a 501(c)3 organization, EIN 38-3734947.<br>No goods or services were provided in exchange for this gift.<br>Donations of money or securities are tax deductible to the extent allowed by law.</div>' +
