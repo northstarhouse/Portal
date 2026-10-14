@@ -9516,17 +9516,17 @@ function SponsorsView() {
   // existing tier.benefits.map(...) renders/checks off the real concrete
   // items regardless of which tier a sponsor is in.
   var TIERS = [
-    { name: 'Presenting Sponsor', min: 10000, color: '#7c3aed', bg: '#f3f0ff', border: '#c4b5fd', range: '$10,000+',
+    { name: 'Presenting Sponsor', min: 10000, color: '#7c3aed', bg: '#f3f0ff', border: '#c4b5fd', range: '$10,000+', tickets: 6,
       ownBenefits: ['"Presented by" naming & press release inclusion', 'Welcome remarks & materials table at event', '"2027 Presenting Sponsor" personalized brick placed on grounds'] },
-    { name: 'Keystone Sponsor', min: 5000, color: '#1565c0', bg: '#e3f2fd', border: '#90caf9', range: '$5,000–$9,999',
+    { name: 'Keystone Sponsor', min: 5000, color: '#1565c0', bg: '#e3f2fd', border: '#90caf9', range: '$5,000–$9,999', tickets: 6,
       ownBenefits: ['6 complimentary North Star House event tickets', '"2027 Keystone Sponsor" personalized brick placed on grounds'] },
-    { name: 'Preservation Leader', min: 2500, color: '#2e7d32', bg: '#e8f5e9', border: '#a5d6a7', range: '$2,500–$4,999',
+    { name: 'Preservation Leader', min: 2500, color: '#2e7d32', bg: '#e8f5e9', border: '#a5d6a7', range: '$2,500–$4,999', tickets: 2,
       ownBenefits: ['Large logo placement on banner', '"2027 Preservation Leader" personalized brick placed on grounds'] },
-    { name: 'Heritage Partner', min: 1000, color: '#b45309', bg: '#fffbeb', border: '#fcd34d', range: '$1,000–$2,499',
+    { name: 'Heritage Partner', min: 1000, color: '#b45309', bg: '#fffbeb', border: '#fcd34d', range: '$1,000–$2,499', tickets: 2,
       ownBenefits: ['Website & newsletter feature', '"2027 Heritage Partner" personalized brick placed on grounds'] },
-    { name: 'Friend of the North Star House', min: 300, color: '#0f766e', bg: '#f0fdfa', border: '#5eead4', range: '$300–$999',
+    { name: 'Friend of the North Star House', min: 300, color: '#0f766e', bg: '#f0fdfa', border: '#5eead4', range: '$300–$999', tickets: 2,
       ownBenefits: ['Sponsorship recognition & logo on website', 'Logo placement on banner', '2 complimentary North Star House event tickets'] },
-    { name: 'Community Supporter', min: 0, color: '#6b7280', bg: '#f3f4f6', border: '#d1d5db', range: 'Under $300',
+    { name: 'Community Supporter', min: 0, color: '#6b7280', bg: '#f3f4f6', border: '#d1d5db', range: 'Under $300', tickets: 0,
       ownBenefits: ['Public thank-you on website'] },
   ];
   for (var tierIdx = TIERS.length - 1; tierIdx >= 0; tierIdx--) {
@@ -9595,17 +9595,24 @@ function SponsorsView() {
     var dateStr = entry.date ? new Date(entry.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
     function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
     var isMonetary = entry.contribution_type === 'Monetary Value';
+    var tier = getTier(sponsorInKindTotal(sponsor.id));
+    var ticketCount = tier ? tier.tickets : 0;
+    var ticketPara = ticketCount > 0
+      ? ('As a token of our appreciation, your sponsorship includes ' + ticketCount + ' complimentary event tickets, which can be redeemed for an upcoming North Star House event using the promotional code 2026SPONSOR when registering online.')
+      : null;
     var openingPara = isMonetary
       ? ('On behalf of the Board of Directors of the North Star Historic Conservancy, thank you for your generous monetary sponsorship of ' + esc(valueStr) + ', received on ' + esc(dateStr) + '.')
       : ('On behalf of the Board of Directors of the North Star Historic Conservancy, thank you for your generous in-kind contribution of ' + esc(entry.description) + ', with an estimated value of ' + esc(valueStr) + ', received on ' + esc(dateStr) + '.');
     var bodyParas = isMonetary ? [
       'Your sponsorship plays an important role in preserving and maintaining the historic North Star House while supporting its continued use as a vibrant community gathering space. Contributions like yours help offset operational expenses, advance ongoing restoration efforts, and make community events, educational programming, and public engagement possible.',
-      'As a nonprofit organization dedicated to the preservation of this nationally significant historic landmark, we rely on the generosity of local businesses and community partners who recognize the importance of protecting North Star House for future generations.',
+      ticketPara,
       'We are grateful for your investment in our mission and your commitment to supporting local history, preservation, and community connection. Your partnership makes a meaningful difference in our ability to continue this work.',
     ] : [
       'Your support makes a meaningful difference in our ability to care for and activate the North Star House as a vibrant community gathering space. Contributions like yours help offset operational costs, allowing us to direct more resources toward restoration, programming, and public engagement.',
+      ticketPara,
       'We are deeply grateful for your willingness to support this work in such a practical and impactful way. Your contribution directly strengthens our ability to move projects forward and serve the community more effectively.',
     ];
+    bodyParas = bodyParas.filter(Boolean);
     var html = '<!doctype html><html><head><meta charset="utf-8"><title>Thank You — ' + esc(donorName) + '</title>' +
       '<style>' +
       'body{font-family:Georgia,\'Times New Roman\',serif;font-size:14px;line-height:1.7;color:#1e1e1e;max-width:6.5in;margin:0.75in auto;}' +
