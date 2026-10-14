@@ -8187,7 +8187,7 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
   var [todoEditTimeVal, setTodoEditTimeVal] = useState('');
   var [todoEditingHoursId, setTodoEditingHoursId] = useState(null);
   var [todoEditHoursVal, setTodoEditHoursVal] = useState('');
-  var emptySponsorForm = { 'Business Name': '', 'Main Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Donation': '', 'Fair Market Value': '', 'Area Supported': area, 'Date Recieved': '', 'NSH Contact': '' };
+  var emptySponsorForm = { 'Business Name': '', 'Main Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Area Supported': area, 'Date Recieved': '', 'NSH Contact': '' };
   var [sponsorForm, setSponsorForm] = useState(emptySponsorForm);
   var [sponsorSaving, setSponsorSaving] = useState(false);
   var [sponsorSaved, setSponsorSaved] = useState(false);
@@ -8939,8 +8939,6 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
                 <div style={grp}><label style={lb}>Email Address</label><input name="Email Address" type="email" value={sponsorForm['Email Address']} onChange={fc} style={fi} /></div>
                 <div style={grp}><label style={lb}>Mailing Address</label><input name="Mailing Address" value={sponsorForm['Mailing Address']} onChange={fc} style={fi} /></div>
                 <div style={{ borderTop: '0.5px solid #f0ece6', margin: '16px 0' }} />
-                <div style={grp}><label style={lb}>In-Kind Donation Description</label><textarea name="Donation" value={sponsorForm['Donation']} onChange={fc} rows={3} style={Object.assign({}, fi, { resize: 'vertical' })} /></div>
-                <div style={grp}><label style={lb}>Estimated Fair Market Value</label><input name="Fair Market Value" value={sponsorForm['Fair Market Value']} onChange={fc} style={fi} placeholder="e.g. $500" /></div>
                 <div style={grp}>
                   <label style={lb}>Area Supported</label>
                   <select name="Area Supported" value={sponsorForm['Area Supported']} onChange={fc} style={fi}>
@@ -9476,7 +9474,7 @@ function SponsorsView() {
   var [editing, setEditing] = useState(false);
   var [editSponsorForm, setEditSponsorForm] = useState({});
   var [editSponsorSaving, setEditSponsorSaving] = useState(false);
-  var emptyAddForm = { 'Business Name': '', 'Main Contact': '', 'Donation': '', 'Fair Market Value': '', 'Area Supported': '', 'NSH Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Date Recieved': '', 'Notes': '' };
+  var emptyAddForm = { 'Business Name': '', 'Main Contact': '', 'Area Supported': '', 'NSH Contact': '', 'Phone Number': '', 'Email Address': '', 'Mailing Address': '', 'Date Recieved': '', 'Notes': '' };
   var [showAdd, setShowAdd] = useState(false);
   var [addForm, setAddForm] = useState(emptyAddForm);
   var [addSaving, setAddSaving] = useState(false);
@@ -9831,7 +9829,7 @@ function SponsorsView() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <button onClick={function() { setEditSponsorForm({ 'Business Name': selected['Business Name'] || '', 'Main Contact': selected['Main Contact'] || '', 'Donation': selected['Donation'] || '', 'Fair Market Value': selected['Fair Market Value'] || '', 'Area Supported': selected['Area Supported'] || '', 'NSH Contact': selected['NSH Contact'] || '', 'Phone Number': selected['Phone Number'] || '', 'Email Address': selected['Email Address'] || '', 'Mailing Address': selected['Mailing Address'] || '', 'Date Recieved': selected['Date Recieved'] || '', 'Notes': selected['Notes'] || '' }); setEditing(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#888', cursor: 'pointer' }}>Edit</button>
+                <button onClick={function() { setEditSponsorForm({ 'Business Name': selected['Business Name'] || '', 'Main Contact': selected['Main Contact'] || '', 'Area Supported': selected['Area Supported'] || '', 'NSH Contact': selected['NSH Contact'] || '', 'Phone Number': selected['Phone Number'] || '', 'Email Address': selected['Email Address'] || '', 'Mailing Address': selected['Mailing Address'] || '', 'Date Recieved': selected['Date Recieved'] || '', 'Notes': selected['Notes'] || '' }); setEditing(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#888', cursor: 'pointer' }}>Edit</button>
                 <button onClick={function() { setSelected(null); setEditing(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
               </div>
             </div>
@@ -9839,7 +9837,7 @@ function SponsorsView() {
               <div style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 16, border: '0.5px solid #e8e0d5' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 12 }}>Edit Sponsor</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                  {[['Business Name','Business Name'],['Main Contact','Main Contact'],['Donation','Donation'],['Fair Market Value','Fair Market Value'],['Area Supported','Area Supported'],['NSH Contact','NSH Contact'],['Phone Number','Phone'],['Email Address','Email'],['Mailing Address','Address'],['Date Recieved','Date Received']].map(function(pair) {
+                  {[['Business Name','Business Name'],['Main Contact','Main Contact'],['Area Supported','Area Supported'],['NSH Contact','NSH Contact'],['Phone Number','Phone'],['Email Address','Email'],['Mailing Address','Address'],['Date Recieved','Date Received']].map(function(pair) {
                     return (
                       <div key={pair[0]}>
                         <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>{pair[1]}</div>
@@ -9929,8 +9927,8 @@ function SponsorsView() {
               })()}
               <form onSubmit={submitInKind} style={{ background: '#faf8f5', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
                 <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Scope of Work *</div>
-                  <textarea value={inkindForm.description} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{description:e.target.value});});}} rows={2} style={Object.assign({}, inpStyle, { resize: 'vertical' })} placeholder="Describe the in-kind work or service…" required />
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Type of Donation or In-Kind Work *</div>
+                  <textarea value={inkindForm.description} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{description:e.target.value});});}} rows={2} style={Object.assign({}, inpStyle, { resize: 'vertical' })} placeholder="e.g. Monetary donation, catering, printing services…" required />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
                   <div>
@@ -10052,7 +10050,7 @@ function SponsorsView() {
             </div>
             <form onSubmit={submitAddSponsor}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                {[['Business Name','Business Name *',true],['Main Contact','Main Contact',false],['Donation','Donation',false],['Fair Market Value','Fair Market Value',false],['Area Supported','Area Supported',false],['NSH Contact','NSH Contact',false],['Phone Number','Phone',false],['Email Address','Email',false],['Mailing Address','Address',false],['Date Recieved','Date Received',false]].map(function(pair) {
+                {[['Business Name','Business Name *',true],['Main Contact','Main Contact',false],['Area Supported','Area Supported',false],['NSH Contact','NSH Contact',false],['Phone Number','Phone',false],['Email Address','Email',false],['Mailing Address','Address',false],['Date Recieved','Date Received',false]].map(function(pair) {
                   return (
                     <div key={pair[0]}>
                       <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>{pair[1]}</label>
