@@ -9669,15 +9669,24 @@ function SponsorsView() {
     return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   }
 
-  // Pushes just the logo + name onto the public site's Sponsors page
-  // (site_content, page_key "sponsors") whenever a logo is uploaded here --
-  // matched by name so an existing sponsor's hand-written description/
-  // website link/tier are left untouched; only its logo (and name, in case
-  // of a typo fix) gets overwritten. A sponsor with no matching entry yet
-  // gets added bare (name + logo, no description) -- whoever manages site
-  // content can write their story in later.
-  function syncSponsorLogoToWebsite(name, logoUrl) {
+  function websiteLabelFor(url) {
+    try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return url; }
+  }
+
+  // Pushes name + logo + (when set) website link and overview onto the
+  // public site's Sponsors page (site_content, page_key "sponsors"),
+  // matched by name. Only overwrites a field the Portal actually has a
+  // value for -- a sponsor whose rich description/website were hand-
+  // written directly on the site keeps them untouched if the Portal's
+  // Website/Overview fields are still blank. A sponsor with no matching
+  // entry yet gets added bare (name + logo, nothing else) if that's all
+  // that's set.
+  function syncSponsorToWebsite(sponsor, logoUrlOverride) {
+    var name = sponsor['Business Name'];
     if (!name) return;
+    var logoUrl = logoUrlOverride || sponsor.logo_url;
+    var website = sponsor.website;
+    var overview = sponsor.overview;
     fetch(SUPABASE_URL + '/rest/v1/site_content?page_key=eq.sponsors&select=content', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
@@ -9687,10 +9696,14 @@ function SponsorsView() {
       var list = Array.isArray(content.sponsors) ? content.sponsors.slice() : [];
       var key = name.trim().toLowerCase();
       var idx = list.findIndex(function(s) { return (s.name || '').trim().toLowerCase() === key; });
+      var patch = { name: name };
+      if (logoUrl) patch.logo = logoUrl;
+      if (website) { patch.website = website; patch.websiteLabel = websiteLabelFor(website); }
+      if (overview) patch.description = overview;
       if (idx >= 0) {
-        list[idx] = Object.assign({}, list[idx], { logo: logoUrl, name: name });
+        list[idx] = Object.assign({}, list[idx], patch);
       } else {
-        list.push({ name: name, slug: slugifySponsorName(name), logo: logoUrl });
+        list.push(Object.assign({ slug: slugifySponsorName(name) }, patch));
       }
       return fetch(SUPABASE_URL + '/rest/v1/site_content?page_key=eq.sponsors', {
         method: 'PATCH',
@@ -9733,7 +9746,7 @@ function SponsorsView() {
         setSelected(updated);
         clearCache('Sponsors');
         setSponsors(function(prev) { return prev.map(function(s) { return s.id === selected.id ? updated : s; }); });
-        syncSponsorLogoToWebsite(updated['Business Name'], url);
+        syncSponsorToWebsite(updated, url);
         setLogoUploading(false);
         e.target.value = '';
       });
@@ -9774,6 +9787,7 @@ function SponsorsView() {
       setSelected(updated);
       setSponsors(function(prev) { return prev.map(function(s) { return s.id === selected.id ? updated : s; }); });
       clearCache('Sponsors');
+      syncSponsorToWebsite(updated);
       setEditing(false);
       setEditSponsorSaving(false);
     }).catch(function() { setEditSponsorSaving(false); });
@@ -9920,7 +9934,7 @@ function SponsorsView() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <button onClick={function() { setEditSponsorForm({ 'Business Name': selected['Business Name'] || '', 'Main Contact': selected['Main Contact'] || '', 'Area Supported': selected['Area Supported'] || '', 'NSH Contact': selected['NSH Contact'] || '', 'Phone Number': selected['Phone Number'] || '', 'Email Address': selected['Email Address'] || '', 'Mailing Address': selected['Mailing Address'] || '', 'Date Recieved': selected['Date Recieved'] || '', 'Notes': selected['Notes'] || '' }); setEditing(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#888', cursor: 'pointer' }}>Edit</button>
+                <button onClick={function() { setEditSponsorForm({ 'Business Name': selected['Business Name'] || '', 'Main Contact': selected['Main Contact'] || '', 'Area Supported': selected['Area Supported'] || '', 'NSH Contact': selected['NSH Contact'] || '', 'Phone Number': selected['Phone Number'] || '', 'Email Address': selected['Email Address'] || '', 'Mailing Address': selected['Mailing Address'] || '', 'Date Recieved': selected['Date Recieved'] || '', 'website': selected['website'] || '', 'overview': selected['overview'] || '', 'Notes': selected['Notes'] || '' }); setEditing(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#888', cursor: 'pointer' }}>Edit</button>
                 <button onClick={function() { setSelected(null); setEditing(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
               </div>
             </div>
@@ -9928,14 +9942,18 @@ function SponsorsView() {
               <div style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 16, border: '0.5px solid #e8e0d5' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 12 }}>Edit Sponsor</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                  {[['Business Name','Business Name'],['Main Contact','Main Contact'],['Area Supported','Area Supported'],['NSH Contact','NSH Contact'],['Phone Number','Phone'],['Email Address','Email'],['Mailing Address','Address'],['Date Recieved','Date Received']].map(function(pair) {
+                  {[['Business Name','Business Name'],['Main Contact','Main Contact'],['Area Supported','Area Supported'],['NSH Contact','NSH Contact'],['Phone Number','Phone'],['Email Address','Email'],['Mailing Address','Address'],['Date Recieved','Date Received'],['website','Website']].map(function(pair) {
                     return (
                       <div key={pair[0]}>
                         <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>{pair[1]}</div>
-                        <input value={editSponsorForm[pair[0]] || ''} onChange={function(e) { var k = pair[0]; var v = e.target.value; setEditSponsorForm(function(f) { return Object.assign({}, f, { [k]: v }); }); }} style={inpStyle} />
+                        <input value={editSponsorForm[pair[0]] || ''} onChange={function(e) { var k = pair[0]; var v = e.target.value; setEditSponsorForm(function(f) { return Object.assign({}, f, { [k]: v }); }); }} style={inpStyle} placeholder={pair[0] === 'website' ? 'https://…' : undefined} />
                       </div>
                     );
                   })}
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Overview <span style={{ color: '#aaa' }}>(public sponsor page — leave blank to keep whatever's there now)</span></div>
+                  <textarea value={editSponsorForm['overview'] || ''} onChange={function(e) { var v = e.target.value; setEditSponsorForm(function(f) { return Object.assign({}, f, { overview: v }); }); }} rows={4} style={Object.assign({}, inpStyle, { resize: 'vertical' })} placeholder="What should visitors read about this sponsor?" />
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Notes</div>
@@ -9971,6 +9989,13 @@ function SponsorsView() {
             <InfoRow label="Email" value={selected['Email Address']} link={'mailto:' + selected['Email Address']} />
             <InfoRow label="Mailing Address" value={selected['Mailing Address']} />
             <InfoRow label="Date Received" value={selected['Date Recieved']} />
+            <InfoRow label="Website" value={selected['website']} link={selected['website']} />
+            {selected['overview'] && (
+              <div style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', marginBottom: 18 }}>
+                <div style={{ fontSize: 11, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 }}>Overview (public sponsor page)</div>
+                <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>{selected['overview']}</div>
+              </div>
+            )}
             {selected['Notes'] && (
               <div style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', marginBottom: 18 }}>
                 <div style={{ fontSize: 11, color: '#aaa', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 }}>Notes</div>
