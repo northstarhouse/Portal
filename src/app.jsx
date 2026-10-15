@@ -856,6 +856,8 @@ const typeColors = {
   const [iheSaving, setIheSaving] = useState(false);
   const [activity, setActivity] = useState(null);
   const [editingTagId, setEditingTagId] = useState(null);
+  const [volHoursMonth, setVolHoursMonth] = useState(null);
+  const [volHoursYear, setVolHoursYear] = useState(null);
 
   function updateActivityTag(id, newTag) {
     setActivity(function(prev) { return prev.map(function(a) { return a.id === id ? Object.assign({}, a, { tag: newTag }) : a; }); });
@@ -931,6 +933,48 @@ const typeColors = {
     }).then(function(r) { return r.json(); }).then(function(rows) {
       setActivity(Array.isArray(rows) ? rows : []);
     }).catch(function() { setActivity([]); });
+    (function loadVolunteerHours() {
+      var year = new Date().getFullYear();
+      var pageSize = 1000;
+      function fetchPage(offset, acc) {
+        return fetch(SUPABASE_URL + '/rest/v1/kiosk_logs?type=eq.volunteer&timestamp=gte.' + year + '-01-01T00:00:00.000Z&timestamp=lt.' + (year + 1) + '-01-01T00:00:00.000Z&order=name.asc,timestamp.asc&select=timestamp,name,action&limit=' + pageSize + '&offset=' + offset, {
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+        }).then(function(r) { return r.json(); }).then(function(page) {
+          if (!Array.isArray(page)) return acc;
+          var all = acc.concat(page);
+          return page.length < pageSize ? all : fetchPage(offset + pageSize, all);
+        });
+      }
+      fetchPage(0, []).then(function(logs) {
+        // Pair each check-in with the next check-out for the same volunteer
+        // (logs are ordered name,timestamp asc so this walks in order).
+        var byName = {};
+        logs.forEach(function(log) {
+          var name = (log.name || '').trim();
+          if (!name) return;
+          if (!byName[name]) byName[name] = [];
+          byName[name].push(log);
+        });
+        var now = new Date();
+        var curMonth = now.getMonth();
+        var monthTotal = 0, yearTotal = 0;
+        Object.keys(byName).forEach(function(name) {
+          var nameLogs = byName[name];
+          for (var i = 0; i < nameLogs.length; i++) {
+            if (nameLogs[i].action !== 'check-in') continue;
+            var checkOut = null;
+            for (var j = i + 1; j < nameLogs.length; j++) { if (nameLogs[j].action === 'check-out') { checkOut = nameLogs[j]; break; } }
+            if (!checkOut) continue;
+            var hrs = (new Date(checkOut.timestamp) - new Date(nameLogs[i].timestamp)) / 3600000;
+            if (hrs <= 0 || hrs > 24) continue;
+            yearTotal += hrs;
+            if (new Date(nameLogs[i].timestamp).getMonth() === curMonth) monthTotal += hrs;
+          }
+        });
+        setVolHoursMonth(monthTotal);
+        setVolHoursYear(yearTotal);
+      }).catch(function() { setVolHoursMonth(0); setVolHoursYear(0); });
+    })();
     function loadVaRsvps() {
       fetch(SUPABASE_URL + '/rest/v1/vol_events?title=ilike.*Appreciation*&select=id,title,date,time,plan_id&order=date.desc&limit=1', {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -1070,6 +1114,8 @@ const typeColors = {
         <div onClick={function() { navigate('donors'); }} style={{ cursor: 'pointer' }}><StatCard label="Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /></div>
         <div onClick={function() { navigate('volunteers'); }} style={{ cursor: 'pointer' }}><StatCard label="Active Volunteers" value={activeVols === null ? '...' : activeVols} /></div>
 <div onClick={function() { navigate('sponsors'); }} style={{ cursor: 'pointer' }}><StatCard label="Sponsors" value={sponsors === null ? '...' : sponsors.length} /></div>
+        <StatCard label="Vol. Hours This Month" value={volHoursMonth === null ? '...' : volHoursMonth.toLocaleString('en-US', { maximumFractionDigits: 1 })} />
+        <StatCard label="Vol. Hours This Year" value={volHoursYear === null ? '...' : volHoursYear.toLocaleString('en-US', { maximumFractionDigits: 1 })} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 16, marginBottom: 16 }}>
