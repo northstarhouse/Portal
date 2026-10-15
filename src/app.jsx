@@ -9471,6 +9471,7 @@ function SponsorsView() {
   var [editingInKindId, setEditingInKindId] = useState(null);
   var [editInKindForm, setEditInKindForm] = useState({});
   var [inkindSavingId, setInkindSavingId] = useState(null);
+  var [pdfGeneratingId, setPdfGeneratingId] = useState(null);
   var [editing, setEditing] = useState(false);
   var [editSponsorForm, setEditSponsorForm] = useState({});
   var [editSponsorSaving, setEditSponsorSaving] = useState(false);
@@ -9587,7 +9588,8 @@ function SponsorsView() {
   // for actual in-kind goods/services/discounts. Opens its own window so
   // the browser's print dialog only ever touches this one letter, not the
   // whole Portal page.
-  function printThankYouNote(sponsor, entry) {
+  // Builds the thank-you letter's HTML -- shared by the print and PDF-download paths.
+  function buildThankYouHtml(sponsor, entry) {
     var donorName = sponsor['Business Name'] || '';
     var salutationName = sponsor['Main Contact'] || sponsor['Business Name'] || 'Friend';
     var address = sponsor['Mailing Address'] || '';
@@ -9595,24 +9597,16 @@ function SponsorsView() {
     var dateStr = entry.date ? new Date(entry.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
     function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
     var isMonetary = entry.contribution_type === 'Monetary Value';
-    var tier = getTier(sponsorInKindTotal(sponsor.id));
-    var ticketCount = tier ? tier.tickets : 0;
-    var ticketPara = ticketCount > 0
-      ? ('As a token of our appreciation, your sponsorship includes ' + ticketCount + ' complimentary event tickets, which can be redeemed for an upcoming North Star House event using the promotional code 2026SPONSOR when registering online.')
-      : null;
     var openingPara = isMonetary
       ? ('On behalf of the Board of Directors of the North Star Historic Conservancy, thank you for your generous monetary sponsorship of ' + esc(valueStr) + ', received on ' + esc(dateStr) + '.')
       : ('On behalf of the Board of Directors of the North Star Historic Conservancy, thank you for your generous in-kind contribution of ' + esc(entry.description) + ', with an estimated value of ' + esc(valueStr) + ', received on ' + esc(dateStr) + '.');
     var bodyParas = isMonetary ? [
       'Your sponsorship plays an important role in preserving and maintaining the historic North Star House while supporting its continued use as a vibrant community gathering space. Contributions like yours help offset operational expenses, advance ongoing restoration efforts, and make community events, educational programming, and public engagement possible.',
-      ticketPara,
       'We are grateful for your investment in our mission and your commitment to supporting local history, preservation, and community connection. Your partnership makes a meaningful difference in our ability to continue this work.',
     ] : [
       'Your support makes a meaningful difference in our ability to care for and activate the North Star House as a vibrant community gathering space. Contributions like yours help offset operational costs, allowing us to direct more resources toward restoration, programming, and public engagement.',
-      ticketPara,
       'We are deeply grateful for your willingness to support this work in such a practical and impactful way. Your contribution directly strengthens our ability to move projects forward and serve the community more effectively.',
     ];
-    bodyParas = bodyParas.filter(Boolean);
     var letterheadUrl = SUPABASE_URL + '/storage/v1/object/public/site-images/thank-you-letterhead.jpg';
     // Mirrors the "Board Members" sidebar in the real Drive templates.
     var BOARD_MEMBERS = [
@@ -9635,7 +9629,7 @@ function SponsorsView() {
       '@page{size:letter portrait;margin:0.45in;}' +
       '*{box-sizing:border-box;}' +
       'html,body{width:7.6in;}' +
-      'body{font-family:\'EB Garamond\',Georgia,\'Times New Roman\',serif;font-size:17px;line-height:1.52;color:#1e1e1e;margin:0 auto;padding:0;}' +
+      'body{font-family:\'EB Garamond\',Georgia,\'Times New Roman\',serif;font-size:17px;line-height:1.52;color:#1e1e1e;margin:0 auto;padding:0;letter-spacing:0.01px;}' +
       '.letterhead{display:block;width:100%;height:auto;margin:0 auto 16px;}' +
       '.layout{width:100%;border-collapse:collapse;}' +
       '.sidebar{width:160px;vertical-align:top;padding-right:20px;border-right:1px solid #ccc;}' +
@@ -9646,13 +9640,14 @@ function SponsorsView() {
       '.bm-role{font-size:13px;font-style:italic;color:#777;}' +
       'p{margin:0 0 12px;}' +
       '.addr{margin-bottom:14px;}' +
+      '.donor-name{color:' + gold + ';font-weight:600;font-size:18px;}' +
       '.footer{margin-top:16px;padding-top:8px;border-top:1px solid #ccc;font-size:11px;color:#555;line-height:1.4;}' +
       '</style></head><body>' +
       '<img class="letterhead" src="' + letterheadUrl + '" alt="North Star Historical Conservancy">' +
       '<table class="layout"><tr>' +
       '<td class="sidebar">' + boardHtml + '</td>' +
       '<td class="main">' +
-      '<div class="addr">' + esc(donorName) + (address ? '<br>' + esc(address).replace(/\n/g, '<br>') : '') + '</div>' +
+      '<div class="addr"><span class="donor-name">' + esc(donorName) + '</span>' + (address ? '<br>' + esc(address).replace(/\n/g, '<br>') : '') + '</div>' +
       '<p>Dear ' + esc(salutationName) + ',</p>' +
       '<p>' + openingPara + '</p>' +
       bodyParas.map(function(t) { return '<p>' + t + '</p>'; }).join('') +
@@ -9661,6 +9656,11 @@ function SponsorsView() {
       '<div class="footer">The North Star Historic Conservancy is a 501(c)3 organization, EIN 38-3734947.<br>No goods or services were provided in exchange for this gift.<br>Donations of money or securities are tax deductible to the extent allowed by law.</div>' +
       '</td></tr></table>' +
       '</body></html>';
+    return html;
+  }
+
+  function printThankYouNote(sponsor, entry) {
+    var html = buildThankYouHtml(sponsor, entry);
     var w = window.open('', '_blank', 'width=800,height=900');
     if (!w) { alert('Please allow pop-ups to print the thank-you note.'); return; }
     w.document.write(html);
@@ -9678,6 +9678,53 @@ function SponsorsView() {
       setTimeout(doPrint, 3000);
     } else {
       setTimeout(doPrint, 300);
+    }
+  }
+
+  // Renders the same letter into a PDF file and downloads it, so it can be
+  // attached to an email manually (rather than printed to paper).
+  function downloadThankYouPdf(sponsor, entry, onDone) {
+    var html = buildThankYouHtml(sponsor, entry);
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:820px;height:1200px;border:0;';
+    document.body.appendChild(iframe);
+    var doc = iframe.contentDocument;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    function cleanup() { document.body.removeChild(iframe); if (onDone) onDone(); }
+
+    function renderPdf() {
+      var target = doc.body;
+      window.html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }).then(function(canvas) {
+        var imgData = canvas.toDataURL('image/jpeg', 0.95);
+        var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+        var pdf = new jsPDFCtor({ unit: 'in', format: 'letter', orientation: 'portrait' });
+        var pageW = 8.5;
+        pdf.addImage(imgData, 'JPEG', 0, 0, pageW, (pageW * canvas.height) / canvas.width);
+        var donorName = sponsor['Business Name'] || 'Sponsor';
+        var filename = 'Thank-You - ' + donorName.replace(/[^a-z0-9]+/gi, ' ').trim() + '.pdf';
+        pdf.save(filename);
+        cleanup();
+      }).catch(function(err) {
+        alert('Could not generate PDF: ' + err.message);
+        cleanup();
+      });
+    }
+
+    // html2canvas needs the webfont fully swapped in before it measures text --
+    // otherwise it silently collapses the spaces between words.
+    function afterFonts() {
+      if (doc.fonts && doc.fonts.ready) { doc.fonts.ready.then(renderPdf); } else { renderPdf(); }
+    }
+    var img = doc.querySelector('.letterhead');
+    if (img && !img.complete) {
+      img.addEventListener('load', afterFonts);
+      img.addEventListener('error', afterFonts);
+      setTimeout(afterFonts, 3000);
+    } else {
+      setTimeout(afterFonts, 300);
     }
   }
 
@@ -10152,6 +10199,9 @@ function SponsorsView() {
                         </div>
                         <button onClick={function() { printThankYouNote(selected, e); }} title="Print a thank-you letter for this contribution"
                           style={{ background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: gold, cursor: 'pointer', flexShrink: 0 }}>Thank-You Note</button>
+                        <button onClick={function() { setPdfGeneratingId(e.id); downloadThankYouPdf(selected, e, function() { setPdfGeneratingId(null); }); }}
+                          disabled={pdfGeneratingId === e.id} title="Download a PDF of the thank-you letter to attach to an email"
+                          style={{ background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: gold, cursor: 'pointer', flexShrink: 0, opacity: pdfGeneratingId === e.id ? 0.6 : 1 }}>{pdfGeneratingId === e.id ? 'Preparing…' : 'Download PDF'}</button>
                         <button onClick={function() { setEditingInKindId(e.id); setEditInKindForm({ description: e.description || '', date: e.date || '', value: e.value != null ? String(e.value) : '', contribution_type: e.contribution_type || '' }); }}
                           style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer', flexShrink: 0 }}>Edit</button>
                         <button onClick={function() { deleteInKind(e.id); }} style={{ background: 'none', border: 'none', color: '#ddd', fontSize: 14, cursor: 'pointer', flexShrink: 0, padding: '2px 4px' }}>×</button>
