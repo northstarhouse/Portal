@@ -9613,14 +9613,19 @@ function SponsorsView() {
       'We are deeply grateful for your willingness to support this work in such a practical and impactful way. Your contribution directly strengthens our ability to move projects forward and serve the community more effectively.',
     ];
     bodyParas = bodyParas.filter(Boolean);
+    var letterheadUrl = SUPABASE_URL + '/storage/v1/object/public/site-images/thank-you-letterhead.jpg';
     var html = '<!doctype html><html><head><meta charset="utf-8"><title>Thank You — ' + esc(donorName) + '</title>' +
+      '<link rel="preconnect" href="https://fonts.googleapis.com">' +
+      '<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">' +
       '<style>' +
-      'body{font-family:Georgia,\'Times New Roman\',serif;font-size:14px;line-height:1.7;color:#1e1e1e;max-width:6.5in;margin:0.75in auto;}' +
+      'body{font-family:\'EB Garamond\',Georgia,\'Times New Roman\',serif;font-size:15px;line-height:1.7;color:#1e1e1e;max-width:6.5in;margin:0.5in auto 0.75in;}' +
+      '.letterhead{width:100%;display:block;margin-bottom:28px;}' +
       'p{margin:0 0 14px;}' +
       '.addr{margin-bottom:20px;}' +
       '.footer{margin-top:40px;padding-top:14px;border-top:1px solid #ccc;font-size:11px;color:#555;}' +
-      '@media print{body{margin:0.6in auto;}}' +
+      '@media print{body{margin:0.3in auto 0.6in;}}' +
       '</style></head><body>' +
+      '<img class="letterhead" src="' + letterheadUrl + '" alt="North Star Historical Conservancy">' +
       '<div class="addr">' + esc(donorName) + (address ? '<br>' + esc(address).replace(/\n/g, '<br>') : '') + '</div>' +
       '<p>Dear ' + esc(salutationName) + ',</p>' +
       '<p>' + openingPara + '</p>' +
