@@ -9636,7 +9636,7 @@ function SponsorsView() {
       '*{box-sizing:border-box;}' +
       'html,body{width:7.6in;}' +
       'body{font-family:\'EB Garamond\',Georgia,\'Times New Roman\',serif;font-size:12px;line-height:1.4;color:#1e1e1e;margin:0 auto;padding:0;}' +
-      '.letterhead{display:block;max-height:0.85in;width:auto;margin:0 auto 12px;}' +
+      '.letterhead{display:block;width:100%;height:auto;margin:0 auto 16px;}' +
       '.layout{width:100%;border-collapse:collapse;}' +
       '.sidebar{width:130px;vertical-align:top;padding-right:16px;border-right:1px solid #ccc;}' +
       '.main{vertical-align:top;padding-left:20px;}' +
