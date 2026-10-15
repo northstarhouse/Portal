@@ -9635,18 +9635,18 @@ function SponsorsView() {
       '@page{size:letter portrait;margin:0.45in;}' +
       '*{box-sizing:border-box;}' +
       'html,body{width:7.6in;}' +
-      'body{font-family:\'EB Garamond\',Georgia,\'Times New Roman\',serif;font-size:12px;line-height:1.4;color:#1e1e1e;margin:0 auto;padding:0;}' +
+      'body{font-family:\'EB Garamond\',Georgia,\'Times New Roman\',serif;font-size:17px;line-height:1.52;color:#1e1e1e;margin:0 auto;padding:0;}' +
       '.letterhead{display:block;width:100%;height:auto;margin:0 auto 16px;}' +
       '.layout{width:100%;border-collapse:collapse;}' +
-      '.sidebar{width:130px;vertical-align:top;padding-right:16px;border-right:1px solid #ccc;}' +
-      '.main{vertical-align:top;padding-left:20px;}' +
-      '.board-title{font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#555;margin-bottom:10px;}' +
-      '.board-member{margin-bottom:7px;}' +
-      '.bm-name{font-size:11px;color:#1e1e1e;}' +
-      '.bm-role{font-size:9.5px;font-style:italic;color:#777;}' +
-      'p{margin:0 0 8px;}' +
-      '.addr{margin-bottom:12px;}' +
-      '.footer{margin-top:18px;padding-top:8px;border-top:1px solid #ccc;font-size:9px;color:#555;}' +
+      '.sidebar{width:160px;vertical-align:top;padding-right:20px;border-right:1px solid #ccc;}' +
+      '.main{vertical-align:top;padding-left:28px;}' +
+      '.board-title{font-size:13px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#555;margin-bottom:16px;}' +
+      '.board-member{margin-bottom:13px;}' +
+      '.bm-name{font-size:15px;color:#1e1e1e;}' +
+      '.bm-role{font-size:13px;font-style:italic;color:#777;}' +
+      'p{margin:0 0 12px;}' +
+      '.addr{margin-bottom:14px;}' +
+      '.footer{margin-top:16px;padding-top:8px;border-top:1px solid #ccc;font-size:11px;color:#555;line-height:1.4;}' +
       '</style></head><body>' +
       '<img class="letterhead" src="' + letterheadUrl + '" alt="North Star Historical Conservancy">' +
       '<table class="layout"><tr>' +
