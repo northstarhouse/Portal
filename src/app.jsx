@@ -9632,7 +9632,10 @@ function SponsorsView() {
       '<link rel="preconnect" href="https://fonts.googleapis.com">' +
       '<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">' +
       '<style>' +
-      'body{font-family:\'EB Garamond\',Georgia,\'Times New Roman\',serif;font-size:12px;line-height:1.4;color:#1e1e1e;max-width:7.5in;margin:0.35in auto;}' +
+      '@page{size:letter portrait;margin:0.45in;}' +
+      '*{box-sizing:border-box;}' +
+      'html,body{width:7.6in;}' +
+      'body{font-family:\'EB Garamond\',Georgia,\'Times New Roman\',serif;font-size:12px;line-height:1.4;color:#1e1e1e;margin:0 auto;padding:0;}' +
       '.letterhead{display:block;max-height:0.85in;width:auto;margin:0 auto 12px;}' +
       '.layout{width:100%;border-collapse:collapse;}' +
       '.sidebar{width:130px;vertical-align:top;padding-right:16px;border-right:1px solid #ccc;}' +
@@ -9644,7 +9647,6 @@ function SponsorsView() {
       'p{margin:0 0 8px;}' +
       '.addr{margin-bottom:12px;}' +
       '.footer{margin-top:18px;padding-top:8px;border-top:1px solid #ccc;font-size:9px;color:#555;}' +
-      '@media print{body{margin:0.3in auto;}}' +
       '</style></head><body>' +
       '<img class="letterhead" src="' + letterheadUrl + '" alt="North Star Historical Conservancy">' +
       '<table class="layout"><tr>' +
