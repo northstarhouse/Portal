@@ -9666,7 +9666,19 @@ function SponsorsView() {
     w.document.write(html);
     w.document.close();
     w.focus();
-    setTimeout(function() { w.print(); }, 300);
+    // The letterhead is an external image -- printing on a fixed timeout can
+    // fire before it's actually loaded, leaving it blank on the printed page.
+    // Wait for it (with a timeout fallback in case it fails to load at all).
+    var fired = false;
+    function doPrint() { if (fired) return; fired = true; w.print(); }
+    var img = w.document.querySelector('.letterhead');
+    if (img && !img.complete) {
+      img.addEventListener('load', doPrint);
+      img.addEventListener('error', doPrint);
+      setTimeout(doPrint, 3000);
+    } else {
+      setTimeout(doPrint, 300);
+    }
   }
 
   function deleteInKind(id) {
