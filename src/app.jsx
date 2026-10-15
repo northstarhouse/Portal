@@ -9480,6 +9480,7 @@ function SponsorsView() {
   var [addForm, setAddForm] = useState(emptyAddForm);
   var [addSaving, setAddSaving] = useState(false);
   var [tab, setTab] = useState('current');
+  var [orgSettings, setOrgSettings] = useState(null);
 
   useEffect(function() {
     cachedFetchAll('Sponsors').then(function(rows) {
@@ -9488,6 +9489,13 @@ function SponsorsView() {
     cachedFetchAll('Sponsor In-Kind').then(function(rows) {
       if (Array.isArray(rows)) setAllInKind(rows);
     });
+    // Reuses the same return-address settings the donation acknowledgment
+    // letters/envelopes are built from, so sponsor envelopes match.
+    fetch(SUPABASE_URL + '/rest/v1/acknowledgment_settings?select=*&limit=1', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setOrgSettings((Array.isArray(rows) && rows[0]) || {});
+    }).catch(function() { setOrgSettings({}); });
   }, []);
 
   useEffect(function() {
@@ -9726,6 +9734,41 @@ function SponsorsView() {
     } else {
       setTimeout(afterFonts, 300);
     }
+  }
+
+  // Matches the return-address block used for donation acknowledgment
+  // envelopes -- standard #10 envelope (9.5in x 4.125in), return address
+  // top-left, recipient address lower-right.
+  function printEnvelope(sponsor) {
+    var address = sponsor['Mailing Address'] || '';
+    if (!address.trim()) { alert("No mailing address on file for this sponsor -- add one before printing an envelope."); return; }
+    function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    var s = orgSettings || {};
+    var returnLines = [
+      s.org_legal_name,
+      s.return_address_line1,
+      s.return_address_line2,
+      [s.return_address_city, s.return_address_state, s.return_address_zip].filter(Boolean).join(', ')
+    ].filter(Boolean);
+    var recipientName = sponsor['Business Name'] || '';
+    var html = '<!doctype html><html><head><meta charset="utf-8"><title>Envelope — ' + esc(recipientName) + '</title>' +
+      '<style>' +
+      '@page{size:9.5in 4.125in;margin:0;}' +
+      '*{box-sizing:border-box;}' +
+      'html,body{width:9.5in;height:4.125in;margin:0;padding:0;}' +
+      'body{font-family:Georgia,\'Times New Roman\',serif;color:#1e1e1e;position:relative;}' +
+      '.return{position:absolute;top:0.35in;left:0.4in;font-size:10px;line-height:1.45;}' +
+      '.recipient{position:absolute;top:2in;left:4.4in;font-size:13px;line-height:1.55;max-width:4.6in;}' +
+      '</style></head><body>' +
+      (returnLines.length ? '<div class="return">' + returnLines.map(esc).join('<br>') + '</div>' : '') +
+      '<div class="recipient">' + esc(recipientName) + (address ? '<br>' + esc(address).replace(/\n/g, '<br>') : '') + '</div>' +
+      '</body></html>';
+    var w = window.open('', '_blank', 'width=760,height=340');
+    if (!w) { alert('Please allow pop-ups to print the envelope.'); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(function() { w.print(); }, 300);
   }
 
   function deleteInKind(id) {
@@ -10202,6 +10245,8 @@ function SponsorsView() {
                         <button onClick={function() { setPdfGeneratingId(e.id); downloadThankYouPdf(selected, e, function() { setPdfGeneratingId(null); }); }}
                           disabled={pdfGeneratingId === e.id} title="Download a PDF of the thank-you letter to attach to an email"
                           style={{ background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: gold, cursor: 'pointer', flexShrink: 0, opacity: pdfGeneratingId === e.id ? 0.6 : 1 }}>{pdfGeneratingId === e.id ? 'Preparing…' : 'Download PDF'}</button>
+                        <button onClick={function() { printEnvelope(selected); }} title="Print a #10 envelope addressed to this sponsor"
+                          style={{ background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: gold, cursor: 'pointer', flexShrink: 0 }}>Envelope</button>
                         <button onClick={function() { setEditingInKindId(e.id); setEditInKindForm({ description: e.description || '', date: e.date || '', value: e.value != null ? String(e.value) : '', contribution_type: e.contribution_type || '' }); }}
                           style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer', flexShrink: 0 }}>Edit</button>
                         <button onClick={function() { deleteInKind(e.id); }} style={{ background: 'none', border: 'none', color: '#ddd', fontSize: 14, cursor: 'pointer', flexShrink: 0, padding: '2px 4px' }}>×</button>
