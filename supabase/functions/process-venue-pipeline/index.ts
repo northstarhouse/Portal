@@ -7,7 +7,14 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const SCHEDULING_BASE_URL = 'https://northstarhouse.github.io/venue/';
 const LOGO_URL = 'https://northstarhouse.github.io/venue/assets/logo.png';
-const PREBOOKING_FORM_URL = 'https://northstarhouse.github.io/NSH-forms/?view=form&id=a3a383f7-e1db-4344-9dec-ea879ad3406d';
+// Weddings and everything else (Private/Public Events, Non-Profit, Memorials)
+// have separate pre-booking forms -- weddings' asks for a partner's name,
+// the others don't. event_type is null for inquiries from before this split.
+const PREBOOKING_FORM_URL_WEDDING = 'https://northstarhouse.github.io/NSH-forms/?view=form&id=a3a383f7-e1db-4344-9dec-ea879ad3406d';
+const PREBOOKING_FORM_URL_EVENT = 'https://northstarhouse.github.io/NSH-forms/?view=form&id=668f27d4-7e2d-4ce6-ba0c-bac5ddf9d8f8';
+function prebookingFormUrlFor(eventType?: string | null) {
+  return eventType && eventType !== 'Wedding' ? PREBOOKING_FORM_URL_EVENT : PREBOOKING_FORM_URL_WEDDING;
+}
 // TODO: replace with the real hosted Client Guidebook URL once provided.
 const GUIDEBOOK_URL = 'https://northstarhouse.github.io/venue/';
 const AVAILABILITY_CALENDAR_URL = 'https://northstarhouse.github.io/venue/?availability=1';
@@ -285,15 +292,16 @@ Deno.serve(async (req) => {
   // ── Step 8: 1h after tour start -> docs + pre-booking form, mark completed ──
   try {
     const oneHourAgoStart = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-    const rows = await rest(`venue_tours?select=*,venue_inquiries(id,name,email),venue_tour_hosts(name)&status=eq.Scheduled&docs_sent_at=is.null&slot_start=lte.${encodeURIComponent(oneHourAgoStart)}`);
+    const rows = await rest(`venue_tours?select=*,venue_inquiries(id,name,email,event_type),venue_tour_hosts(name)&status=eq.Scheduled&docs_sent_at=is.null&slot_start=lte.${encodeURIComponent(oneHourAgoStart)}`);
     for (const tour of rows) {
       const inq = tour.venue_inquiries;
       try {
         if (inq?.email) {
           const hostName = tour.venue_tour_hosts?.name || '';
+          const prebookingLink = prebookingFormUrlFor(inq.event_type);
           await sendTemplated(templates.toured_docs, inq.email,
-            { name: inq.name, host_name: hostName, guidebook_link: GUIDEBOOK_URL, prebooking_link: PREBOOKING_FORM_URL, availability_calendar_link: AVAILABILITY_CALENDAR_URL },
-            { name: escapeHtml(inq.name), host_name: escapeHtml(hostName), guidebook_link: GUIDEBOOK_URL, prebooking_link: PREBOOKING_FORM_URL, availability_calendar_link: AVAILABILITY_CALENDAR_URL });
+            { name: inq.name, host_name: hostName, guidebook_link: GUIDEBOOK_URL, prebooking_link: prebookingLink, availability_calendar_link: AVAILABILITY_CALENDAR_URL },
+            { name: escapeHtml(inq.name), host_name: escapeHtml(hostName), guidebook_link: GUIDEBOOK_URL, prebooking_link: prebookingLink, availability_calendar_link: AVAILABILITY_CALENDAR_URL });
         }
         await rest(`venue_tours?id=eq.${tour.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ docs_sent_at: nowIso, status: 'Completed' }) });
         if (inq?.id) await rest(`venue_inquiries?id=eq.${inq.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'Toured - Docs Sent' }) });
