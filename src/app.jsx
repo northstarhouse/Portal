@@ -9741,6 +9741,17 @@ function SponsorsView() {
     var address = sponsor['Mailing Address'] || '';
     if (!address.trim()) { alert("No mailing address on file for this sponsor -- add one before printing an envelope."); return; }
     function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    // "Mailing Address" is a single free-text field (e.g. "123 Main St,
+    // Grass Valley, CA 95945") -- break it into proper envelope lines
+    // instead of printing it as one run-on line. Real newlines (if ever
+    // entered) win; otherwise split on commas, keeping "City, State ZIP"
+    // together as the last line.
+    function addressLines(addr) {
+      if (addr.indexOf('\n') !== -1) return addr.split('\n').map(function(s) { return s.trim(); }).filter(Boolean);
+      var parts = addr.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+      if (parts.length <= 2) return parts;
+      return parts.slice(0, -2).concat([parts.slice(-2).join(', ')]);
+    }
     var s = orgSettings || {};
     var returnLines = [
       s.org_legal_name,
@@ -9749,6 +9760,7 @@ function SponsorsView() {
       [s.return_address_city, s.return_address_state, s.return_address_zip].filter(Boolean).join(', ')
     ].filter(Boolean);
     var recipientName = sponsor['Business Name'] || '';
+    var recipientLines = [recipientName].concat(addressLines(address)).filter(Boolean);
     var html = '<!doctype html><html><head><meta charset="utf-8"><title>Envelope — ' + esc(recipientName) + '</title>' +
       '<style>' +
       '@page{size:9.5in 4.125in;margin:0;}' +
@@ -9759,7 +9771,7 @@ function SponsorsView() {
       '.recipient{position:absolute;top:2in;left:4.4in;font-size:13px;line-height:1.55;max-width:4.6in;}' +
       '</style></head><body>' +
       (returnLines.length ? '<div class="return">' + returnLines.map(esc).join('<br>') + '</div>' : '') +
-      '<div class="recipient">' + esc(recipientName) + (address ? '<br>' + esc(address).replace(/\n/g, '<br>') : '') + '</div>' +
+      '<div class="recipient">' + recipientLines.map(esc).join('<br>') + '</div>' +
       '</body></html>';
     var w = window.open('', '_blank', 'width=760,height=340');
     if (!w) { alert('Please allow pop-ups to print the envelope.'); return; }
