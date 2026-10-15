@@ -9614,18 +9614,42 @@ function SponsorsView() {
     ];
     bodyParas = bodyParas.filter(Boolean);
     var letterheadUrl = SUPABASE_URL + '/storage/v1/object/public/site-images/thank-you-letterhead.jpg';
+    // Mirrors the "Board Members" sidebar in the real Drive templates.
+    var BOARD_MEMBERS = [
+      { name: 'Kenneth Underwood', role: 'President' },
+      { name: 'Wyn Spiller', role: 'Treasurer' },
+      { name: 'Paula Campbell', role: 'Secretary' },
+      { name: 'Rick Panos', role: '' },
+      { name: 'Jeff Cereghino', role: '' },
+      { name: 'Rich Hill', role: '' },
+    ];
+    var boardHtml = '<div class="board-title">Board Members</div>' +
+      BOARD_MEMBERS.map(function(m) {
+        return '<div class="board-member"><div class="bm-name">' + esc(m.name) + '</div>' +
+          (m.role ? '<div class="bm-role">' + esc(m.role) + '</div>' : '') + '</div>';
+      }).join('');
     var html = '<!doctype html><html><head><meta charset="utf-8"><title>Thank You — ' + esc(donorName) + '</title>' +
       '<link rel="preconnect" href="https://fonts.googleapis.com">' +
       '<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">' +
       '<style>' +
-      'body{font-family:\'EB Garamond\',Georgia,\'Times New Roman\',serif;font-size:15px;line-height:1.7;color:#1e1e1e;max-width:6.5in;margin:0.5in auto 0.75in;}' +
+      'body{font-family:\'EB Garamond\',Georgia,\'Times New Roman\',serif;font-size:15px;line-height:1.7;color:#1e1e1e;max-width:7.5in;margin:0.5in auto 0.75in;}' +
       '.letterhead{width:100%;display:block;margin-bottom:28px;}' +
+      '.layout{width:100%;border-collapse:collapse;}' +
+      '.sidebar{width:150px;vertical-align:top;padding-right:20px;border-right:1px solid #ccc;}' +
+      '.main{vertical-align:top;padding-left:24px;}' +
+      '.board-title{font-size:12px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:#555;margin-bottom:14px;}' +
+      '.board-member{margin-bottom:12px;}' +
+      '.bm-name{font-size:13px;color:#1e1e1e;}' +
+      '.bm-role{font-size:11px;font-style:italic;color:#777;}' +
       'p{margin:0 0 14px;}' +
       '.addr{margin-bottom:20px;}' +
       '.footer{margin-top:40px;padding-top:14px;border-top:1px solid #ccc;font-size:11px;color:#555;}' +
       '@media print{body{margin:0.3in auto 0.6in;}}' +
       '</style></head><body>' +
       '<img class="letterhead" src="' + letterheadUrl + '" alt="North Star Historical Conservancy">' +
+      '<table class="layout"><tr>' +
+      '<td class="sidebar">' + boardHtml + '</td>' +
+      '<td class="main">' +
       '<div class="addr">' + esc(donorName) + (address ? '<br>' + esc(address).replace(/\n/g, '<br>') : '') + '</div>' +
       '<p>Dear ' + esc(salutationName) + ',</p>' +
       '<p>' + openingPara + '</p>' +
@@ -9633,6 +9657,7 @@ function SponsorsView() {
       '<p>With sincere appreciation,</p>' +
       '<p>Ken Underwood<br>President</p>' +
       '<div class="footer">The North Star Historic Conservancy is a 501(c)3 organization, EIN 38-3734947.<br>No goods or services were provided in exchange for this gift.<br>Donations of money or securities are tax deductible to the extent allowed by law.</div>' +
+      '</td></tr></table>' +
       '</body></html>';
     var w = window.open('', '_blank', 'width=800,height=900');
     if (!w) { alert('Please allow pop-ups to print the thank-you note.'); return; }
