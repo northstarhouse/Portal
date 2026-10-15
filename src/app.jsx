@@ -9599,7 +9599,6 @@ function SponsorsView() {
   // Builds the thank-you letter's HTML -- shared by the print and PDF-download paths.
   function buildThankYouHtml(sponsor, entry) {
     var donorName = sponsor['Business Name'] || '';
-    var salutationName = sponsor['Main Contact'] || sponsor['Business Name'] || 'Friend';
     var address = sponsor['Mailing Address'] || '';
     var valueStr = '$' + (parseFloat(entry.value) || 0).toLocaleString();
     var dateStr = entry.date ? new Date(entry.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
@@ -9656,7 +9655,6 @@ function SponsorsView() {
       '<td class="sidebar">' + boardHtml + '</td>' +
       '<td class="main">' +
       '<div class="addr"><span class="donor-name">' + esc(donorName) + '</span>' + (address ? '<br>' + esc(address).replace(/\n/g, '<br>') : '') + '</div>' +
-      '<p>Dear ' + esc(salutationName) + ',</p>' +
       '<p>' + openingPara + '</p>' +
       bodyParas.map(function(t) { return '<p>' + t + '</p>'; }).join('') +
       '<p>With sincere appreciation,</p>' +
