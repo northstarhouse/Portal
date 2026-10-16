@@ -695,6 +695,7 @@ const modules = [
   { id: "ideas", label: "Ideas & Initiatives" },
   { id: "operational", label: "Operational Areas", hidden: true },
   { id: "financials", label: "Reimbursements", hidden: true },
+  { id: "walk-in-guests", label: "Walk-In Guest List", hidden: true },
   { id: "reviews", label: "Reviews", hidden: true },
   { id: "admin", label: "Admin", hidden: true },
 ];
@@ -10388,6 +10389,175 @@ function SponsorsView() {
   );
 }
 
+// Colors for known Eras -- anything typed in later that isn't one of these
+// just falls back to a neutral gray tag instead of breaking.
+var WALKIN_ERA_COLORS = {
+  'Founder': { fg: '#7c3aed', bg: '#f3f0ff', border: '#c4b5fd' },
+  'Destruction': { fg: '#c0392b', bg: '#fdecea', border: '#f3b7af' },
+  'School': { fg: '#1565c0', bg: '#e3f2fd', border: '#90caf9' },
+};
+function walkinEraStyle(era) {
+  return WALKIN_ERA_COLORS[era] || { fg: '#777', bg: '#f0ece6', border: '#e0d8cc' };
+}
+
+function WalkInGuestsView() {
+  var { useState, useEffect } = React;
+  var emptyForm = { name: '', visit_date: '', email: '', phone: '', notes: '', era: '' };
+  var [guests, setGuests] = useState(null);
+  var [search, setSearch] = useState('');
+  var [formOpen, setFormOpen] = useState(null); // null | 'new' | the guest row being edited
+  var [form, setForm] = useState(emptyForm);
+  var [saving, setSaving] = useState(false);
+  var [deletingId, setDeletingId] = useState(null);
+
+  function load() {
+    clearCache('Walk-In Guests');
+    cachedFetchAll('Walk-In Guests').then(function(rows) {
+      if (!Array.isArray(rows)) return;
+      setGuests(rows.slice().sort(function(a, b) {
+        if (!a.visit_date && !b.visit_date) return 0;
+        if (!a.visit_date) return 1;
+        if (!b.visit_date) return -1;
+        return b.visit_date.localeCompare(a.visit_date);
+      }));
+    });
+  }
+  useEffect(function() { load(); }, []);
+
+  function openAdd() { setForm(emptyForm); setFormOpen('new'); }
+  function openEdit(g) {
+    setForm({ name: g.name || '', visit_date: g.visit_date || '', email: g.email || '', phone: g.phone || '', notes: g.notes || '', era: g.era || '' });
+    setFormOpen(g);
+  }
+
+  function submitForm(e) {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    setSaving(true);
+    var payload = {
+      name: form.name.trim(),
+      visit_date: form.visit_date || null,
+      email: form.email.trim() || null,
+      phone: form.phone.trim() || null,
+      notes: form.notes.trim() || null,
+      era: form.era.trim() || null,
+    };
+    var isEdit = formOpen && formOpen !== 'new';
+    var url = SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Walk-In Guests') + (isEdit ? '?id=eq.' + formOpen.id : '');
+    fetch(url, {
+      method: isEdit ? 'PATCH' : 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.ok ? r.json() : r.json().then(function(err) { throw new Error(err.message || r.status); }); })
+      .then(function() {
+        setSaving(false);
+        setFormOpen(null);
+        load();
+      }).catch(function(err) { alert('Save failed: ' + err.message); setSaving(false); });
+  }
+
+  function deleteGuest(id) {
+    if (!window.confirm('Delete this guest entry? This cannot be undone.')) return;
+    setDeletingId(id);
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Walk-In Guests') + '?id=eq.' + id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() { setDeletingId(null); load(); }).catch(function() { setDeletingId(null); });
+  }
+
+  var fmtVisitDate = function(iso) { return iso ? new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null; };
+  var q = search.trim().toLowerCase();
+  var visible = guests === null ? [] : guests.filter(function(g) {
+    if (!q) return true;
+    return [g.name, g.era, g.notes, g.email].some(function(v) { return (v || '').toLowerCase().indexOf(q) !== -1; });
+  });
+  var inpStyle = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, background: '#fff', boxSizing: 'border-box' };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: '#aaa' }}>{guests === null ? 'Loading…' : guests.length + ' guest' + (guests.length !== 1 ? 's' : '')}</div>
+        <button onClick={openAdd} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add Guest</button>
+      </div>
+
+      <input value={search} onChange={function(e) { setSearch(e.target.value); }} placeholder="Search by name, era, or notes…" style={Object.assign({}, inpStyle, { marginBottom: 16 })} />
+
+      {guests === null && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>Loading…</div>}
+      {guests !== null && visible.length === 0 && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>{guests.length === 0 ? 'No walk-in guests logged yet.' : 'No guests match that search.'}</div>}
+
+      {visible.map(function(g) {
+        var eraStyle = walkinEraStyle(g.era);
+        var dateStr = fmtVisitDate(g.visit_date);
+        return (
+          <div key={g.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 18px', marginBottom: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a' }}>{g.name}</span>
+                  {g.era && <span style={{ fontSize: 11, fontWeight: 600, color: eraStyle.fg, background: eraStyle.bg, border: '1px solid ' + eraStyle.border, borderRadius: 20, padding: '1px 9px' }}>{g.era}</span>}
+                </div>
+                <div style={{ fontSize: 12, color: '#888' }}>
+                  {dateStr || 'No date on file'}
+                  {g.email && <span> · <a href={'mailto:' + g.email} style={{ color: gold, textDecoration: 'none' }}>{g.email}</a></span>}
+                  {g.phone && <span> · {g.phone}</span>}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button onClick={function() { openEdit(g); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>Edit</button>
+                <button onClick={function() { deleteGuest(g.id); }} disabled={deletingId === g.id} style={{ background: 'none', border: 'none', color: '#ddd', fontSize: 14, cursor: 'pointer', padding: '2px 4px' }}>×</button>
+              </div>
+            </div>
+            {g.notes && <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{g.notes}</div>}
+          </div>
+        );
+      })}
+
+      {formOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 520, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>{formOpen === 'new' ? 'New Walk-In Guest' : 'Edit Guest'}</div>
+              <button onClick={function() { setFormOpen(null); }} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#bbb' }}>×</button>
+            </div>
+            <form onSubmit={submitForm}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Name *</label>
+                  <input required value={form.name} onChange={function(e) { var v = e.target.value; setForm(function(f) { return Object.assign({}, f, { name: v }); }); }} style={inpStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Date</label>
+                  <input type="date" value={form.visit_date} onChange={function(e) { var v = e.target.value; setForm(function(f) { return Object.assign({}, f, { visit_date: v }); }); }} style={inpStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Email</label>
+                  <input type="email" value={form.email} onChange={function(e) { var v = e.target.value; setForm(function(f) { return Object.assign({}, f, { email: v }); }); }} style={inpStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Phone</label>
+                  <input value={form.phone} onChange={function(e) { var v = e.target.value; setForm(function(f) { return Object.assign({}, f, { phone: v }); }); }} style={inpStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Era</label>
+                  <input value={form.era} onChange={function(e) { var v = e.target.value; setForm(function(f) { return Object.assign({}, f, { era: v }); }); }} style={inpStyle} placeholder="Founder, School, Destruction…" />
+                </div>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>Notes</label>
+                <textarea value={form.notes} onChange={function(e) { var v = e.target.value; setForm(function(f) { return Object.assign({}, f, { notes: v }); }); }} rows={5} style={Object.assign({}, inpStyle, { resize: 'vertical' })} />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" disabled={saving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Saving…' : (formOpen === 'new' ? 'Add Guest' : 'Save Changes')}</button>
+                <button type="button" onClick={function() { setFormOpen(null); }} style={{ padding: '9px 18px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QuarterWorkspaceView({ navigate }) {
   var { useState: useS, useEffect: useE, useRef } = React;
   var year = new Date().getFullYear();
@@ -15252,6 +15422,17 @@ function AdminView({ navigate }) {
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
           </span>
           Planning
+        </div>
+        <div
+          onClick={function() { navigate('walk-in-guests'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          Walk-In Guest List
         </div>
         {/* Hidden for the time being -- set SHOW_VENUE_RENTALS to true to bring it back. */}
         {SHOW_VENUE_RENTALS && (
@@ -21117,6 +21298,7 @@ const views = {
   ideas: IdeasView,
   operational: OperationalView,
   financials: FinancialsView,
+  'walk-in-guests': WalkInGuestsView,
   'office-cash-flow': OfficeCashFlowView,
   'financial-overview': FinancialOverviewView,
   reviews: ReviewsView,
