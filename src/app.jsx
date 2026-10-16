@@ -18297,7 +18297,7 @@ function VenueRentalsView({ navigate }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 16, marginBottom: 20, flexWrap: 'nowrap', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ flexShrink: 0 }}>
           <div style={{ fontSize: 26, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", whiteSpace: 'nowrap' }}>Venue Rentals Dashboard</div>
           <div style={{ fontSize: 13, color: '#999', marginTop: 4, whiteSpace: 'nowrap' }}>Manage inquiries, tours, and bookings for North Star House.</div>
@@ -18365,6 +18365,18 @@ function VenueRentalsView({ navigate }) {
             {/* Tour Requests -- first in this column, above New Messages. */}
             {(function() {
         var fmtReqDate = function(d) { try { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); } catch (e) { return d; } };
+        var fmtInquiryDate = function(iso) { try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return ''; } };
+        // Normalizes whatever the visitor typed (raw digits, dashes, a
+        // leading country code, already-formatted...) into (xxx) xxx-xxxx.
+        // Anything that isn't a plain 10/11-digit US number is left as-is
+        // rather than mangled.
+        var fmtPhone = function(raw) {
+          if (!raw) return '';
+          var digits = String(raw).replace(/\D/g, '');
+          if (digits.length === 11 && digits[0] === '1') digits = digits.slice(1);
+          if (digits.length !== 10) return raw;
+          return '(' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6);
+        };
         var requests = (tours || []).filter(function(t) { return t.status === 'requested'; })
           .sort(function(a, b) {
             if (!!a.request_handled !== !!b.request_handled) return a.request_handled ? 1 : -1;
@@ -18394,15 +18406,23 @@ function VenueRentalsView({ navigate }) {
                   return (
                     <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderBottom: '0.5px solid #f0ece2', opacity: t.request_handled ? 0.6 : 1 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{t.visitor_name || 'Unknown'}</div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{(t.visitor_name || 'Unknown') + ' - ' + tourCategoryLabel({ kind: 'Tour', raw: t })}</div>
+                          {t.created_at && <div style={{ fontSize: 11, color: '#bbb' }}>Inquired {fmtInquiryDate(t.created_at)}</div>}
+                        </div>
                         <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
                           {t.visitor_email && <a href={'mailto:' + t.visitor_email} style={{ color: gold, textDecoration: 'none' }}>{t.visitor_email}</a>}
                           {t.visitor_email && t.visitor_phone && ' · '}
-                          {t.visitor_phone}
+                          {fmtPhone(t.visitor_phone)}
                         </div>
                         <div style={{ fontSize: 12, color: '#555', marginTop: 6, lineHeight: 1.6 }}>
                           {slots.length === 0 ? 'No preferred dates on file' : slots.map(function(s, i) {
-                            return <div key={i}>{fmtReqDate(s.date)}{s.time_label ? ' (' + s.time_label + ')' : ''}</div>;
+                            return (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 0', borderTop: i > 0 ? '0.5px solid #f0ece2' : 'none' }}>
+                                <span style={{ color: '#ccc' }}>•</span>
+                                <span>{fmtReqDate(s.date)}{s.time_label ? ' (' + s.time_label + ')' : ''}</span>
+                              </div>
+                            );
                           })}
                         </div>
                         <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} />
