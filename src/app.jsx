@@ -19320,31 +19320,31 @@ function VenueInquiriesView({ navigate }) {
 // (open -> booked) the public site's own booking widget uses, so a
 // staff-scheduled tour is indistinguishable from one a visitor booked
 // themselves (same reminder emails, same calendar).
-// Tour times are quarter hours only (:00/:15/:30/:45): one compact dropdown,
-// 7:00 AM-9:00 PM. Native <input type="time"> can't reliably restrict the
-// minutes. Value is "HH:MM" (24h); an existing off-grid time stays listed.
-var QUARTER_HOURS = (function() {
-  var out = [];
-  for (var h = 7; h <= 21; h++) {
-    for (var m = 0; m < 60; m += 15) {
-      if (h === 21 && m > 0) break;
-      out.push((h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m);
-    }
-  }
-  return out;
-})();
-function quarterHourLabel(hhmm) {
-  var p = hhmm.split(':'), h = parseInt(p[0], 10);
-  return ((h % 12) || 12) + ':' + p[1] + ' ' + (h >= 12 ? 'PM' : 'AM');
-}
+// Tour times as two fields: hour (with AM/PM, 7 AM-9 PM) and minutes limited
+// to 00 / 15 / 30 / 45. Native <input type="time"> can't reliably restrict the
+// minutes. Value is "HH:MM" (24h); an existing off-grid value stays listed.
+var TOUR_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+var TOUR_MINUTES = ['00', '15', '30', '45'];
+function tourHourLabel(h) { return ((h % 12) || 12) + ' ' + (h >= 12 ? 'PM' : 'AM'); }
 function QuarterHourSelect({ value, onChange, disabled, style, ariaLabel }) {
-  var v = (value || '').slice(0, 5);
-  var options = v && QUARTER_HOURS.indexOf(v) < 0 ? [v].concat(QUARTER_HOURS) : QUARTER_HOURS;
+  var parts = (value || '').slice(0, 5).split(':');
+  var hour = parts[0] ? parseInt(parts[0], 10) : '';
+  var minute = parts[1] || '00';
+  var hours = hour !== '' && TOUR_HOURS.indexOf(hour) < 0 ? [hour].concat(TOUR_HOURS) : TOUR_HOURS;
+  var minutes = TOUR_MINUTES.indexOf(minute) < 0 ? [minute].concat(TOUR_MINUTES) : TOUR_MINUTES;
+  function set(h, m) { onChange(h === '' ? '' : (h < 10 ? '0' : '') + h + ':' + m); }
+  var label = ariaLabel || 'Time';
   return (
-    <select aria-label={ariaLabel || 'Time'} disabled={disabled} value={v} onChange={function(e) { onChange(e.target.value); }} style={style}>
-      <option value="">Time…</option>
-      {options.map(function(o) { return <option key={o} value={o}>{quarterHourLabel(o)}</option>; })}
-    </select>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <select aria-label={label + ' hour'} disabled={disabled} value={hour} onChange={function(e) { set(e.target.value === '' ? '' : parseInt(e.target.value, 10), minute); }} style={style}>
+        <option value="">Hour</option>
+        {hours.map(function(h) { return <option key={h} value={h}>{tourHourLabel(h)}</option>; })}
+      </select>
+      <span aria-hidden="true" style={{ color: '#999' }}>:</span>
+      <select aria-label={label + ' minutes'} disabled={disabled} value={minute} onChange={function(e) { set(hour === '' ? 12 : hour, e.target.value); }} style={style}>
+        {minutes.map(function(m) { return <option key={m} value={m}>{m}</option>; })}
+      </select>
+    </span>
   );
 }
 
