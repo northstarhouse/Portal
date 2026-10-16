@@ -5186,10 +5186,12 @@ function DonorsView({ navigate }) {
         </select>
         <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto'}}>
           <span style={{fontSize:11,color:'#aaa'}}>{filteredDonors.length} donor{filteredDonors.length!==1?'s':''}</span>
-          {navigate && <button onClick={function(){navigate('acknowledgments-queue');}} style={{padding:'5px 10px',background:'none',border:'0.5px solid #e0d8cc',color:'#888',borderRadius:6,fontSize:11,fontWeight:500,cursor:'pointer'}}>Acknowledgments to Process</button>}
-          <button onClick={bulkFillAddresses} disabled={bulkFilling} title="Fill blank structured mailing address fields from each donor's existing Address field" style={{padding:'5px 10px',background:'none',border:'0.5px solid #e0d8cc',color:'#888',borderRadius:6,fontSize:11,fontWeight:500,cursor:'pointer',opacity:bulkFilling?0.7:1}}>{bulkFilling?'Filling…':'Bulk-Fill Addresses'}</button>
-          <button onClick={exportCSV} style={{padding:'5px 10px',background:'none',border:'0.5px solid #e0d8cc',color:'#888',borderRadius:6,fontSize:11,fontWeight:500,cursor:'pointer'}}>↓ CSV</button>
-          <button onClick={function(){setImportText('');setImportRows(null);setImportStatus('');setShowImport(true);}} style={{padding:'5px 10px',background:'none',border:'0.5px solid #e0d8cc',color:'#888',borderRadius:6,fontSize:11,fontWeight:500,cursor:'pointer'}}>Import Donations</button>
+          {/* Donor tools in one menu (Acknowledgments are handled outside the Portal). */}
+          <PortalToolsMenu items={[
+            { label: bulkFilling ? 'Filling addresses…' : 'Bulk-Fill Addresses', onClick: bulkFillAddresses, disabled: bulkFilling, title: "Fill blank structured mailing address fields from each donor's existing Address field" },
+            { label: 'Download CSV', onClick: exportCSV },
+            { label: 'Import Donations', onClick: function() { setImportText(''); setImportRows(null); setImportStatus(''); setShowImport(true); } },
+          ]} />
           <button onClick={function(){setAddForm(emptyAddForm);setAddGiftForm(emptyGiftForm);setAddExistingDonor(null);setAddSearchQuery('');setAddMode('search');setShowAdd(true);}} style={{padding:'6px 12px',background:gold,color:'#fff',border:'none',borderRadius:6,fontSize:11,fontWeight:600,cursor:'pointer'}}>+ Add Donation</button>
         </div>
         <input ref={checkFileInputRef} type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleCheckFileChosen} />
@@ -19316,6 +19318,44 @@ function VenueInquiriesView({ navigate }) {
 // (open -> booked) the public site's own booking widget uses, so a
 // staff-scheduled tour is indistinguishable from one a visitor booked
 // themselves (same reminder emails, same calendar).
+// A small "Tools ▾" button that opens a menu of actions. items: [{ label,
+// onClick, disabled?, title? }]. Closes on pick, outside click or Escape.
+function PortalToolsMenu({ items, label }) {
+  var [open, setOpen] = useState(false);
+  var ref = React.useRef(null);
+  React.useEffect(function() {
+    if (!open) return;
+    function onDown(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    function onKey(e) { if (e.key === 'Escape') setOpen(false); }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return function() { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button type="button" onClick={function() { setOpen(!open); }} aria-haspopup="menu" aria-expanded={open}
+        style={{ padding: '5px 10px', background: open ? '#faf8f4' : 'none', border: '0.5px solid #e0d8cc', color: '#666', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+        {label || 'Tools'} <span style={{ fontSize: 9, opacity: 0.7 }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 50, minWidth: 190, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', padding: 4 }}>
+          {items.map(function(it) {
+            return (
+              <button key={it.label} type="button" role="menuitem" disabled={it.disabled} title={it.title}
+                onClick={function() { setOpen(false); it.onClick(); }}
+                onMouseEnter={function(e) { e.currentTarget.style.background = '#faf8f4'; }}
+                onMouseLeave={function(e) { e.currentTarget.style.background = 'none'; }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', background: 'none', border: 'none', borderRadius: 6, fontSize: 12, color: it.disabled ? '#bbb' : '#2a2a2a', cursor: it.disabled ? 'default' : 'pointer' }}>
+                {it.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Tour times as two fields: hour (with AM/PM, 7 AM-9 PM) and minutes limited
 // to 00 / 15 / 30 / 45. Native <input type="time"> can't reliably restrict the
 // minutes. Value is "HH:MM" (24h); an existing off-grid value stays listed.
