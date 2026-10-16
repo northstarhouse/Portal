@@ -18361,6 +18361,58 @@ function VenueRentalsView({ navigate }) {
           </VenueOverviewCard>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Tour Requests -- first in this column, above New Messages. */}
+            {(function() {
+        var fmtReqDate = function(d) { try { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); } catch (e) { return d; } };
+        var requests = (tours || []).filter(function(t) { return t.status === 'requested'; })
+          .sort(function(a, b) {
+            if (!!a.request_handled !== !!b.request_handled) return a.request_handled ? 1 : -1;
+            return (b.created_at || '').localeCompare(a.created_at || '');
+          });
+        var unhandledCount = requests.filter(function(t) { return !t.request_handled; }).length;
+        return (
+          <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Tour Requests</div>
+              {tours !== null && <div style={{ fontSize: 12, color: unhandledCount > 0 ? gold : '#999', fontWeight: unhandledCount > 0 ? 700 : 400 }}>{unhandledCount} unhandled</div>}
+            </div>
+            {tours === null ? (
+              <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
+            ) : requests.length === 0 ? (
+              <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>No tour date requests with alternate dates yet.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {requests.map(function(t) {
+                  var slots = t.requested_slots || [];
+                  return (
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderBottom: '0.5px solid #f0ece2', opacity: t.request_handled ? 0.6 : 1 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{t.visitor_name || 'Unknown'}</div>
+                        <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
+                          {t.visitor_email && <a href={'mailto:' + t.visitor_email} style={{ color: gold, textDecoration: 'none' }}>{t.visitor_email}</a>}
+                          {t.visitor_email && t.visitor_phone && ' · '}
+                          {t.visitor_phone}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#555', marginTop: 6, lineHeight: 1.6 }}>
+                          {slots.length === 0 ? 'No preferred dates on file' : slots.map(function(s, i) {
+                            return <div key={i}>{fmtReqDate(s.date)}{s.time_label ? ' (' + s.time_label + ')' : ''}</div>;
+                          })}
+                        </div>
+                      </div>
+                      <select value={t.request_handled ? 'handled' : 'not_handled'} disabled={reqSavingId === t.id}
+                        onChange={function(e) { setRequestHandled(t.id, e.target.value === 'handled'); }}
+                        style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: t.request_handled ? '#f0f7f2' : '#fff8e8', color: t.request_handled ? '#2e6b4f' : '#b45309', fontWeight: 600 }}>
+                        <option value="not_handled">Not Handled</option>
+                        <option value="handled">Handled</option>
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
             <VenueOverviewCard
               icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>}
               title="New Messages"
@@ -18425,58 +18477,6 @@ function VenueRentalsView({ navigate }) {
           </div>
         </div>
       )}
-
-      {!SHOW_LEGACY_VENUE_DASHBOARD && (function() {
-        var fmtReqDate = function(d) { try { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); } catch (e) { return d; } };
-        var requests = (tours || []).filter(function(t) { return t.status === 'requested'; })
-          .sort(function(a, b) {
-            if (!!a.request_handled !== !!b.request_handled) return a.request_handled ? 1 : -1;
-            return (b.created_at || '').localeCompare(a.created_at || '');
-          });
-        var unhandledCount = requests.filter(function(t) { return !t.request_handled; }).length;
-        return (
-          <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18, marginTop: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Tour Requests</div>
-              {tours !== null && <div style={{ fontSize: 12, color: unhandledCount > 0 ? gold : '#999', fontWeight: unhandledCount > 0 ? 700 : 400 }}>{unhandledCount} unhandled</div>}
-            </div>
-            {tours === null ? (
-              <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
-            ) : requests.length === 0 ? (
-              <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>No tour date requests with alternate dates yet.</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {requests.map(function(t) {
-                  var slots = t.requested_slots || [];
-                  return (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderBottom: '0.5px solid #f0ece2', opacity: t.request_handled ? 0.6 : 1 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{t.visitor_name || 'Unknown'}</div>
-                        <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
-                          {t.visitor_email && <a href={'mailto:' + t.visitor_email} style={{ color: gold, textDecoration: 'none' }}>{t.visitor_email}</a>}
-                          {t.visitor_email && t.visitor_phone && ' · '}
-                          {t.visitor_phone}
-                        </div>
-                        <div style={{ fontSize: 12, color: '#555', marginTop: 6, lineHeight: 1.6 }}>
-                          {slots.length === 0 ? 'No preferred dates on file' : slots.map(function(s, i) {
-                            return <div key={i}>{fmtReqDate(s.date)}{s.time_label ? ' (' + s.time_label + ')' : ''}</div>;
-                          })}
-                        </div>
-                      </div>
-                      <select value={t.request_handled ? 'handled' : 'not_handled'} disabled={reqSavingId === t.id}
-                        onChange={function(e) { setRequestHandled(t.id, e.target.value === 'handled'); }}
-                        style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: t.request_handled ? '#f0f7f2' : '#fff8e8', color: t.request_handled ? '#2e6b4f' : '#b45309', fontWeight: 600 }}>
-                        <option value="not_handled">Not Handled</option>
-                        <option value="handled">Handled</option>
-                      </select>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })()}
 
       {SHOW_LEGACY_VENUE_DASHBOARD && (
       <>
