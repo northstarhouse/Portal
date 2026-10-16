@@ -17920,6 +17920,9 @@ function VenueRentalsView({ navigate }) {
   const [reqSavingId, setReqSavingId] = useS(null); // request_handled toggle in-flight for this tour id
   const [justBooked, setJustBooked] = useS(null); // tour request booked via "Add to Calendar" (for the confirmation line)
   const [scheduleOpen, setScheduleOpen] = useS(false);
+  // Inquiries = messages/requests still at the pre-booking stage; Clients =
+  // confirmed/booked tours and weddings (pre-booking form filled out).
+  const [venueTab, setVenueTab] = useS('inquiries');
   const debounceTimers = useR({});
 
   // Detail popup for a row in the new Upcoming Tours card -- shows the
@@ -18303,19 +18306,17 @@ function VenueRentalsView({ navigate }) {
           <div style={{ fontSize: 13, color: '#999', marginTop: 4, whiteSpace: 'nowrap' }}>Manage inquiries, tours, and bookings for North Star House.</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'nowrap', marginLeft: 'auto', flexShrink: 0 }}>
-          {nextUpcoming && (
-            <div
-              onClick={function() { openDetail({ kind: 'Wedding', title: nextUpcoming.title, date: nextUpcoming.date, raw: nextUpcoming }); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
-            >
-              <div style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, background: '#faf4e8', border: '0.5px solid #e8dcc0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              </div>
-              <div style={{ maxWidth: 260 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Next up: {nextUpcoming.title}</div>
-                <div style={{ fontSize: 11, color: '#999', marginTop: 1, whiteSpace: 'nowrap' }}>{nextUpcoming.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
-              </div>
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
+          {!SHOW_LEGACY_VENUE_DASHBOARD && (
+            <div style={{ display: 'flex', gap: 2, background: '#f5f0ea', borderRadius: 10, padding: 4 }}>
+              {[['inquiries', 'Inquiries'], ['clients', 'Clients']].map(function(pair) {
+                var isActive = venueTab === pair[0];
+                return (
+                  <button key={pair[0]} onClick={function() { setVenueTab(pair[0]); }}
+                    style={{ padding: '7px 16px', borderRadius: 7, border: 'none', fontSize: 13, fontWeight: isActive ? 600 : 400, background: isActive ? '#fff' : 'transparent', color: isActive ? '#2a2a2a' : '#888', cursor: 'pointer', boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s', whiteSpace: 'nowrap' }}>
+                    {pair[1]}
+                  </button>
+                );
+              })}
             </div>
           )}
           <button onClick={function() { navigate('estate-tours'); }} style={{ flexShrink: 0, padding: '10px 18px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
@@ -18326,6 +18327,7 @@ function VenueRentalsView({ navigate }) {
 
       {!SHOW_LEGACY_VENUE_DASHBOARD && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+          {venueTab === 'clients' && (
           <VenueOverviewCard
             icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}
             title="Upcoming Tours"
@@ -18360,7 +18362,9 @@ function VenueRentalsView({ navigate }) {
               </div>
             )}
           </VenueOverviewCard>
+          )}
 
+          {venueTab === 'inquiries' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Tour Requests -- first in this column, above New Messages. */}
             {(function() {
@@ -18503,6 +18507,7 @@ function VenueRentalsView({ navigate }) {
               <div style={{ fontSize: 12, color: gold, fontWeight: 600, flexShrink: 0 }}>View all →</div>
             </div>
           </div>
+          )}
         </div>
       )}
 
@@ -19571,7 +19576,7 @@ function EstateToursView() {
     .filter(function(t) { return t.status === 'booked' || t.status === 'requested'; })
     .sort(function(a, b) { return (a.date || '9999-99-99') < (b.date || '9999-99-99') ? -1 : 1; });
   const slots = all
-    .filter(function(t) { return (t.status === 'open' || t.status === 'blocked') && t.date >= todayKey; })
+    .filter(function(t) { return (t.status === 'open' || t.status === 'blocked' || t.status === 'booked') && t.date >= todayKey; })
     .sort(function(a, b) { return (a.date + a.start_time) < (b.date + b.start_time) ? -1 : 1; });
   const byDate = {};
   slots.forEach(function(s) { (byDate[s.date] = byDate[s.date] || []).push(s); });
@@ -19607,6 +19612,17 @@ function EstateToursView() {
     setBusyId(slot.id);
     const next = slot.status === 'open' ? 'blocked' : 'open';
     sbPatchById('estate_tours', slot.id, { status: next }).then(function() { load(); }).finally(function() { setBusyId(null); });
+  }
+
+  function deleteSlot(slot, e) {
+    e.stopPropagation();
+    if (busyId) return;
+    if (!window.confirm('Remove this ' + fmtTime(slot.start_time) + ' slot on ' + fmtDate(slot.date) + '?')) return;
+    setBusyId(slot.id);
+    fetch(SUPABASE_URL + '/rest/v1/estate_tours?id=eq.' + slot.id, {
+      method: 'DELETE',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function() { load(); }).finally(function() { setBusyId(null); });
   }
 
   function addSlot(e) {
@@ -19995,7 +20011,7 @@ function EstateToursView() {
         </button>
       </div>
       <div style={{ fontSize: 12, color: '#aaa', marginBottom: 16 }}>
-        The default Mon/Tue/Thu 9–12 schedule refills automatically. Click a time below to block or reopen it. Use "Add a Slot" for Sierra's random Fri/Sat/Sun tours.
+        Tour slots auto-book up to 8 weeks out.
       </div>
 
       {addOpen && (
@@ -20030,19 +20046,46 @@ function EstateToursView() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {byDate[d].map(function(s) {
                     const blocked = s.status === 'blocked';
+                    const booked = s.status === 'booked';
+                    if (booked) {
+                      // A confirmed tour -- shown here for schedule context, but
+                      // managed (reschedule/no-show) from Upcoming Tours, not
+                      // block/delete here.
+                      return (
+                        <span key={s.id} title={'Booked: ' + (s.visitor_name || 'Visitor')}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', borderRadius: 20, padding: '6px 12px', fontSize: 12, fontWeight: 600,
+                            border: '1px solid #c8e6d0', background: '#eaf7ee', color: '#2e7d32',
+                          }}>
+                          {fmtTime(s.start_time)} · {s.visitor_name || 'Booked'}
+                        </span>
+                      );
+                    }
                     return (
-                      <button key={s.id} onClick={function() { toggleBlock(s); }} disabled={busyId === s.id}
-                        title={blocked ? 'Blocked — click to reopen' : 'Open — click to block'}
-                        style={{
-                          padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: busyId === s.id ? 'not-allowed' : 'pointer',
-                          border: blocked ? '1px solid #f3d9d9' : '1px solid #d8ead9',
-                          background: blocked ? '#fdf2f2' : '#f2f9f3',
-                          color: blocked ? '#c0392b' : '#2e7d32',
-                          textDecoration: blocked ? 'line-through' : 'none',
-                          opacity: busyId === s.id ? 0.5 : 1,
-                        }}>
-                        {fmtTime(s.start_time)}{s.guide_name !== 'default' ? ' · ' + s.guide_name : ''}
-                      </button>
+                      <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center', borderRadius: 20, overflow: 'hidden', opacity: busyId === s.id ? 0.5 : 1 }}>
+                        <button onClick={function() { toggleBlock(s); }} disabled={busyId === s.id}
+                          title={blocked ? 'Blocked — click to reopen' : 'Open — click to block'}
+                          style={{
+                            padding: '6px 6px 6px 12px', fontSize: 12, fontWeight: 500, cursor: busyId === s.id ? 'not-allowed' : 'pointer',
+                            border: blocked ? '1px solid #f3d9d9' : '1px solid #e0d8cc',
+                            borderRight: 'none',
+                            background: blocked ? '#fdf2f2' : '#fff',
+                            color: blocked ? '#c0392b' : '#555',
+                          }}>
+                          {blocked ? '✕ ' : ''}{fmtTime(s.start_time)}{s.guide_name !== 'default' ? ' · ' + s.guide_name : ''}
+                        </button>
+                        <button onClick={function(e) { deleteSlot(s, e); }} disabled={busyId === s.id}
+                          title="Remove this slot"
+                          style={{
+                            padding: '6px 10px 6px 4px', fontSize: 12, fontWeight: 700, cursor: busyId === s.id ? 'not-allowed' : 'pointer',
+                            border: blocked ? '1px solid #f3d9d9' : '1px solid #e0d8cc',
+                            borderLeft: 'none',
+                            background: blocked ? '#fdf2f2' : '#fff',
+                            color: blocked ? '#c0392b' : '#999',
+                          }}>
+                          ×
+                        </button>
+                      </span>
                     );
                   })}
                 </div>
