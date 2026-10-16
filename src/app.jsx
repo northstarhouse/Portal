@@ -5187,8 +5187,9 @@ function DonorsView({ navigate }) {
         </select>
         <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto'}}>
           <span style={{fontSize:11,color:'#aaa'}}>{filteredDonors.length} donor{filteredDonors.length!==1?'s':''}</span>
-          {/* Donor tools in one menu (Acknowledgments are handled outside the Portal). */}
+          {/* Donor tools in one menu. */}
           <PortalToolsMenu items={[
+            navigate && { label: 'Acknowledgments to Process', onClick: function() { navigate('acknowledgments-queue'); } },
             { label: bulkFilling ? 'Filling addresses…' : 'Bulk-Fill Addresses', onClick: bulkFillAddresses, disabled: bulkFilling, title: "Fill blank structured mailing address fields from each donor's existing Address field" },
             { label: 'Download CSV', onClick: exportCSV },
             { label: 'Import Donations', onClick: function() { setImportText(''); setImportRows(null); setImportStatus(''); setShowImport(true); } },
@@ -19339,7 +19340,7 @@ function PortalToolsMenu({ items, label }) {
       </button>
       {open && (
         <div role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 50, minWidth: 190, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', padding: 4 }}>
-          {items.map(function(it) {
+          {items.filter(Boolean).map(function(it) {
             return (
               <button key={it.label} type="button" role="menuitem" disabled={it.disabled} title={it.title}
                 onClick={function() { setOpen(false); it.onClick(); }}
