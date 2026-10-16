@@ -18733,7 +18733,7 @@ function VenueRentalsView({ navigate }) {
                     <div style={{ background: '#faf8f4', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                         <input type="date" value={rescheduleDate} onChange={function(e) { setRescheduleDate(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
-                        <input type="time" value={rescheduleTime} onChange={function(e) { setRescheduleTime(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
+                        <QuarterHourSelect ariaLabel="New tour time" value={rescheduleTime} onChange={setRescheduleTime} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={saveReschedule} disabled={detailSaving || !rescheduleDate || !rescheduleTime} style={{ flex: 1, padding: '8px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (detailSaving || !rescheduleDate || !rescheduleTime) ? 0.6 : 1 }}>{detailSaving ? 'Saving…' : 'Save new date'}</button>
@@ -19320,6 +19320,34 @@ function VenueInquiriesView({ navigate }) {
 // (open -> booked) the public site's own booking widget uses, so a
 // staff-scheduled tour is indistinguishable from one a visitor booked
 // themselves (same reminder emails, same calendar).
+// Tour times are quarter hours only (:00/:15/:30/:45): one compact dropdown,
+// 7:00 AM-9:00 PM. Native <input type="time"> can't reliably restrict the
+// minutes. Value is "HH:MM" (24h); an existing off-grid time stays listed.
+var QUARTER_HOURS = (function() {
+  var out = [];
+  for (var h = 7; h <= 21; h++) {
+    for (var m = 0; m < 60; m += 15) {
+      if (h === 21 && m > 0) break;
+      out.push((h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m);
+    }
+  }
+  return out;
+})();
+function quarterHourLabel(hhmm) {
+  var p = hhmm.split(':'), h = parseInt(p[0], 10);
+  return ((h % 12) || 12) + ':' + p[1] + ' ' + (h >= 12 ? 'PM' : 'AM');
+}
+function QuarterHourSelect({ value, onChange, disabled, style, ariaLabel }) {
+  var v = (value || '').slice(0, 5);
+  var options = v && QUARTER_HOURS.indexOf(v) < 0 ? [v].concat(QUARTER_HOURS) : QUARTER_HOURS;
+  return (
+    <select aria-label={ariaLabel || 'Time'} disabled={disabled} value={v} onChange={function(e) { onChange(e.target.value); }} style={style}>
+      <option value="">Time…</option>
+      {options.map(function(o) { return <option key={o} value={o}>{quarterHourLabel(o)}</option>; })}
+    </select>
+  );
+}
+
 // "+ Add to Calendar" on a venue Tour Request: staff pick the actual date and
 // time (quick-pick buttons for the dates the visitor asked for, or any date),
 // and the request becomes a booked tour. Marking an estate_tours row booked
@@ -19384,7 +19412,7 @@ function TourRequestCalendarRow({ tour, onBooked }) {
       )}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
         <input type="date" aria-label="Tour date" disabled={saving} value={date} onChange={function(e) { setDate(e.target.value); }} style={inputStyle} />
-        <input type="time" aria-label="Tour time" disabled={saving} value={time} onChange={function(e) { setTime(e.target.value); }} style={inputStyle} />
+        <QuarterHourSelect ariaLabel="Tour time" disabled={saving} value={time} onChange={setTime} style={inputStyle} />
         <button type="button" onClick={confirm} disabled={saving || !date || !time}
           style={{ fontSize: 11, fontWeight: 600, padding: '6px 12px', borderRadius: 6, border: 'none', background: gold, color: '#fff', cursor: 'pointer', opacity: (saving || !date || !time) ? 0.6 : 1 }}>
           {saving ? 'Booking…' : 'Confirm'}
@@ -19761,7 +19789,7 @@ function EstateToursView() {
               <div style={{ background: '#faf8f4', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <input type="date" value={panelRescheduleDate} onChange={function(e) { setPanelRescheduleDate(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
-                  <input type="time" value={panelRescheduleTime} onChange={function(e) { setPanelRescheduleTime(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
+                  <QuarterHourSelect ariaLabel="New tour time" value={panelRescheduleTime} onChange={setPanelRescheduleTime} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={function() { savePanelReschedule(selectedTour); }} disabled={panelBusy || !panelRescheduleDate || !panelRescheduleTime} style={{ flex: 1, padding: '8px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: panelBusy ? 0.6 : 1 }}>{panelBusy ? 'Saving…' : 'Save new date'}</button>
@@ -19978,7 +20006,7 @@ function EstateToursView() {
           </div>
           <div>
             <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>Time</label>
-            <input type="time" value={addTime} onChange={function(e) { setAddTime(e.target.value); }} style={inputStyle} />
+            <QuarterHourSelect ariaLabel="Slot time" value={addTime} onChange={setAddTime} style={inputStyle} />
           </div>
           <div>
             <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>Guide</label>
