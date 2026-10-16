@@ -335,6 +335,9 @@ var EVENT_INQUIRY_FORM_ID = 'a87b86b0-94cd-4d28-b57e-00b79b5f1fee';
 var PRE_BOOKING_FORM_ID = 'a3a383f7-e1db-4344-9dec-ea879ad3406d'; // Wedding
 var PRE_BOOKING_FORM_ID_EVENT = '668f27d4-7e2d-4ce6-ba0c-bac5ddf9d8f8'; // Private/Public Events, Non-Profit, Memorials
 var RENTAL_INQUIRY_FORM_IDS = [WEDDING_INQUIRY_FORM_ID, EVENT_INQUIRY_FORM_ID, PRE_BOOKING_FORM_ID, PRE_BOOKING_FORM_ID_EVENT];
+function isVenueClientSubmission(submission) {
+  return submission.form_id === PRE_BOOKING_FORM_ID || submission.form_id === PRE_BOOKING_FORM_ID_EVENT;
+}
 
 // Alternate tour dates await staff coordination, so suppress generic outreach.
 function fetchPendingTourRequestEmails() {
@@ -17951,8 +17954,7 @@ function VenueRentalsView({ navigate }) {
   const [reqSavingId, setReqSavingId] = useS(null); // request_handled toggle in-flight for this tour id
   const [justBooked, setJustBooked] = useS(null); // tour request booked via "Add to Calendar" (for the confirmation line)
   const [scheduleOpen, setScheduleOpen] = useS(false);
-  // Inquiries = messages/requests still at the pre-booking stage; Clients =
-  // confirmed/booked tours and weddings (pre-booking form filled out).
+  // Tours stay in Inquiries. Clients begin with an official pre-booking submission.
   const [venueTab, setVenueTab] = useS('inquiries');
   const debounceTimers = useR({});
 
@@ -18316,17 +18318,13 @@ function VenueRentalsView({ navigate }) {
 
   var nextUpcoming = upcoming.length ? upcoming[0] : null;
 
-  // New minimal overview: merges weddings (calendar) + tours (estate_tours)
-  // into one dated list, newest-first-sorted by date, for the Upcoming Tours
-  // card below. Reuses the same `weddings`/`tours` state the legacy view
-  // already fetches -- no new data-fetching added.
-  var upcomingCombined = [].concat(
-    (weddings || []).map(function(w) { return { key: 'w-' + w.uid, kind: 'Wedding', title: w.title, date: w.date, raw: w }; }),
-    (tours || []).filter(function(t) { return t.status === 'booked' && t.date; }).map(function(t) {
-      var d = new Date(t.date + 'T' + (t.start_time || '00:00:00'));
-      return { key: 't-' + t.id, kind: 'Tour', title: (t.visitor_name || 'Visitor') + ' Tour', date: d, raw: t };
-    })
-  ).filter(function(e) { return e.date && e.date.getTime() >= Date.now() - 24 * 60 * 60 * 1000; })
+  // A booked tour is still an inquiry; only pre-booking submissions are clients.
+  var inquirySubmissions = inquiries === null ? null : inquiries.filter(function(q) { return !isVenueClientSubmission(q); });
+  var clientSubmissions = inquiries === null ? null : inquiries.filter(isVenueClientSubmission);
+  var upcomingCombined = (tours || []).filter(function(t) { return t.status === 'booked' && t.date; }).map(function(t) {
+    var d = new Date(t.date + 'T' + (t.start_time || '00:00:00'));
+    return { key: 't-' + t.id, kind: 'Tour', title: (t.visitor_name || 'Visitor') + ' Tour', date: d, raw: t };
+  }).filter(function(e) { return e.date && e.date.getTime() >= Date.now() - 24 * 60 * 60 * 1000; })
     .sort(function(a, b) { return a.date - b.date; });
 
   return (
@@ -18358,13 +18356,13 @@ function VenueRentalsView({ navigate }) {
 
       {!SHOW_LEGACY_VENUE_DASHBOARD && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-          {venueTab === 'clients' && (
+          {venueTab === 'inquiries' && (
           <VenueOverviewCard
             icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}
             title="Upcoming Tours"
             onViewAll={function() { navigate('estate-tours'); }}
           >
-            {(weddings === null && tours === null) ? (
+            {tours === null ? (
               <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
             ) : upcomingCombined.length === 0 ? (
               <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Nothing scheduled yet.</div>
@@ -18393,6 +18391,25 @@ function VenueRentalsView({ navigate }) {
               </div>
             )}
           </VenueOverviewCard>
+          )}
+
+          {venueTab === 'clients' && (
+            <VenueOverviewCard title="Clients" onViewAll={function() { navigate('venue-clients'); }}>
+              <div style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>Official pre-booking forms submitted after the tour.</div>
+              {clientSubmissions === null ? (
+                <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
+              ) : clientSubmissions.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>No pre-booking forms submitted yet.</div>
+              ) : clientSubmissions.slice(0, 6).map(function(sub) {
+                var contact = inquiryPreviewFields(sub);
+                return (
+                  <button key={sub.id} onClick={function() { navigate('venue-clients'); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 0', background: 'none', border: 'none', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{contact.name || contact.email || 'Unknown'}</div>
+                    <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{sub.form_name} · {new Date(sub.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                  </button>
+                );
+              })}
+            </VenueOverviewCard>
           )}
 
           {venueTab === 'inquiries' && (
@@ -18522,16 +18539,16 @@ function VenueRentalsView({ navigate }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Inquiries</div>
                 <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
-                  {inquiries === null ? 'Loading…' : (function() {
+                  {inquirySubmissions === null ? 'Loading…' : (function() {
                     var now = new Date();
-                    var thisMonth = inquiries.filter(function(q) { var d = new Date(q.created_at); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); }).length;
+                    var thisMonth = inquirySubmissions.filter(function(q) { var d = new Date(q.created_at); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); }).length;
                     return thisMonth + ' this month';
                   })()}
                 </div>
               </div>
-              {inquiries !== null && (
+              {inquirySubmissions !== null && (
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1, color: gold }}>{inquiries.length}</div>
+                  <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1, color: gold }}>{inquirySubmissions.length}</div>
                   <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: '#999', marginTop: 3 }}>Total</div>
                 </div>
               )}
@@ -18931,7 +18948,11 @@ function VenueMessagesView({ navigate }) {
 // dropdown), and Pre Booking Information Form (see RENTAL_INQUIRY_FORM_IDS
 // / fetchVenueInquiries). Handled/notes live directly on nsh_form_responses,
 // same as SuFormResponses -- no separate override table needed here.
-function VenueInquiriesView({ navigate }) {
+function VenueClientsView({ navigate }) {
+  return <VenueInquiriesView navigate={navigate} clientsOnly={true} />;
+}
+
+function VenueInquiriesView({ navigate, clientsOnly }) {
   const [rows, setRows] = useState(null);
   const [selected, setSelected] = useState(null);
   const [notesDraft, setNotesDraft] = useState('');
@@ -18957,7 +18978,7 @@ function VenueInquiriesView({ navigate }) {
   // has already booked (or requested) a property tour.
   const [tours, setTours] = useState(null);
 
-  function load() { fetchVenueInquiries().then(function(r) { setRows(r); }); }
+  function load() { fetchVenueInquiries().then(function(r) { setRows(r.filter(function(sub) { return isVenueClientSubmission(sub) === !!clientsOnly; })); }); }
   useEffect(function() { load(); }, []);
   useEffect(function() {
     fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&status=in.(booked,requested)&order=date.asc.nullslast&limit=200', {
@@ -19182,8 +19203,8 @@ function VenueInquiriesView({ navigate }) {
   return (
     <div>
       <button onClick={function() { navigate('venue'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Venue Rentals</button>
-      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>Inquiries</div>
-      <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>Wedding Inquiry, Event Inquiry, and Pre Booking form submissions — check off once handled.</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>{clientsOnly ? 'Clients' : 'Inquiries'}</div>
+      <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>{clientsOnly ? 'Official pre-booking form submissions — check off once handled.' : 'Wedding and Event Inquiry submissions — tours remain inquiries until an official pre-booking form is submitted.'}</div>
 
       {rows === null ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
@@ -19254,7 +19275,7 @@ function VenueInquiriesView({ navigate }) {
               {pendingTourEmails && !inquiryFollowUpAllowed(selected, pendingTourEmails) && (
                 <div style={{ fontSize: 12, color: '#a15c00', marginBottom: 12 }}>Follow-up paused while different tour times await coordination.</div>
               )}
-              {RENTAL_INQUIRY_FORM_IDS.indexOf(selected.form_id) !== -1 && inquiryFollowUpAllowed(selected, pendingTourEmails) && (
+              {!clientsOnly && RENTAL_INQUIRY_FORM_IDS.indexOf(selected.form_id) !== -1 && inquiryFollowUpAllowed(selected, pendingTourEmails) && (
                 <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
                   <button onClick={function() { copyFollowUpPrompt(selected); }} title={copiedPromptId === selected.id ? 'Copied!' : "Copy an AI prompt for a follow-up email, pre-filled with this person's details"}
                     style={{ background: copiedPromptId === selected.id ? '#eef7ee' : '#fff', color: copiedPromptId === selected.id ? '#2e7d32' : '#888', border: '1px solid ' + (copiedPromptId === selected.id ? '#bfe0bf' : '#e0d8cc'), borderRadius: 7, padding: '6px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
@@ -19271,7 +19292,7 @@ function VenueInquiriesView({ navigate }) {
                   </button>
                 </div>
               )}
-              {RENTAL_INQUIRY_FORM_IDS.indexOf(selected.form_id) !== -1 && inquiryFollowUpAllowed(selected, pendingTourEmails) && composingId === selected.id && (
+              {!clientsOnly && RENTAL_INQUIRY_FORM_IDS.indexOf(selected.form_id) !== -1 && inquiryFollowUpAllowed(selected, pendingTourEmails) && composingId === selected.id && (
                 <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 14, marginBottom: 12 }}>
                   {composeStep === 'paste' ? (
                     <div>
@@ -21623,6 +21644,7 @@ const views = {
   venue: VenueRentalsView,
   'venue-messages': VenueMessagesView,
   'venue-inquiries': VenueInquiriesView,
+  'venue-clients': VenueClientsView,
   'estate-tours': EstateToursView,
   ideas: IdeasView,
   operational: OperationalView,
