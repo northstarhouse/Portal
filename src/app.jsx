@@ -336,6 +336,30 @@ var PRE_BOOKING_FORM_ID = 'a3a383f7-e1db-4344-9dec-ea879ad3406d'; // Wedding
 var PRE_BOOKING_FORM_ID_EVENT = '668f27d4-7e2d-4ce6-ba0c-bac5ddf9d8f8'; // Private/Public Events, Non-Profit, Memorials
 var RENTAL_INQUIRY_FORM_IDS = [WEDDING_INQUIRY_FORM_ID, EVENT_INQUIRY_FORM_ID, PRE_BOOKING_FORM_ID, PRE_BOOKING_FORM_ID_EVENT];
 
+// Alternate tour dates await staff coordination, so suppress generic outreach.
+function fetchPendingTourRequestEmails() {
+  return fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=visitor_email&status=eq.requested', {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+  }).then(function(r) {
+    if (!r.ok) throw new Error('Could not check tour requests');
+    return r.json();
+  }).then(function(rows) {
+    if (!Array.isArray(rows)) throw new Error('Could not check tour requests');
+    return rows.map(function(t) { return (t.visitor_email || '').trim().toLowerCase(); }).filter(Boolean);
+  });
+}
+function usePendingTourRequestEmails() {
+  var [emails, setEmails] = useState(null);
+  useEffect(function() {
+    fetchPendingTourRequestEmails().then(setEmails).catch(function() { /* Keep follow-up unavailable until verified. */ });
+  }, []);
+  return [emails, setEmails];
+}
+function inquiryFollowUpAllowed(r, pendingEmails) {
+  var email = (inquiryPreviewFields(r).email || (r.answers || {}).w_email || '').trim().toLowerCase();
+  return pendingEmails !== null && !!email && pendingEmails.indexOf(email) === -1;
+}
+
 // Best guess at a response's headline name/email, since each of the three
 // forms uses its own field ids -- matches on the field *label* instead
 // (every one of them has some "...Name..."/"...Email..." field).
@@ -14145,6 +14169,7 @@ function SuFormResponses({ form }) {
   var [composeBody, setComposeBody] = useState('');
   var [sendingFollowUpId, setSendingFollowUpId] = useState(null);
   var [sentFollowUp, setSentFollowUp] = useState({});
+  var [pendingTourEmails, setPendingTourEmails] = usePendingTourRequestEmails();
   var [calendarEvents, setCalendarEvents] = useState(null); // null = not loaded yet; only fetched for the Wedding Inquiry form
   useEffect(function() {
     if (!form) { setLoading(false); return; }
@@ -14505,6 +14530,7 @@ function SuFormResponses({ form }) {
   }
 
   function copyFollowUpPrompt(r) {
+    if (!inquiryFollowUpAllowed(r, pendingTourEmails)) return;
     var text = buildInquiryFollowUpPrompt(r);
     function done() { setCopiedPromptId(r.id); setTimeout(function() { setCopiedPromptId(null); }, 2000); }
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -14515,6 +14541,7 @@ function SuFormResponses({ form }) {
   }
 
   function startCompose(r) {
+    if (!inquiryFollowUpAllowed(r, pendingTourEmails)) return;
     if (composingId === r.id) { setComposingId(null); return; }
     setComposingId(r.id);
     setComposeStep('paste');
@@ -14563,7 +14590,17 @@ function SuFormResponses({ form }) {
     w.document.close();
   }
 
-  function sendFollowUp(r) {
+  async function sendFollowUp(r) {
+    // Recheck in case a request arrived while the composer was open.
+    try {
+      var pending = await fetchPendingTourRequestEmails();
+      setPendingTourEmails(pending);
+      if (!inquiryFollowUpAllowed(r, pending)) {
+        setComposingId(null);
+        alert('Follow-up blocked: this client has requested different tour times.');
+        return;
+      }
+    } catch (e) { alert('Could not verify tour requests. Follow-up was not sent.'); return; }
     var email = buildFollowUpEmail(r);
     if (!email.to) { alert('No email address on file for this inquiry.'); return; }
     if (sendingFollowUpId) return;
@@ -14626,7 +14663,7 @@ function SuFormResponses({ form }) {
                       </button>
                     </React.Fragment>
                   )}
-                  {form.id === WEDDING_INQUIRY_FORM_ID && (
+                  {form.id === WEDDING_INQUIRY_FORM_ID && inquiryFollowUpAllowed(r, pendingTourEmails) && (
                     <React.Fragment>
                       <button onClick={function() { copyFollowUpPrompt(r); }} title={copiedPromptId === r.id ? 'Copied!' : "Copy an AI prompt for a follow-up email, pre-filled with this person's details"}
                         style={{ background: copiedPromptId === r.id ? '#eef7ee' : '#fff', color: copiedPromptId === r.id ? '#2e7d32' : '#888', border: '1px solid ' + (copiedPromptId === r.id ? '#bfe0bf' : '#e0d8cc'), borderRadius: 7, padding: '6px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
@@ -14673,7 +14710,7 @@ function SuFormResponses({ form }) {
                 </div>
               </div>
 
-              {form.id === WEDDING_INQUIRY_FORM_ID && composingId === r.id && (
+              {form.id === WEDDING_INQUIRY_FORM_ID && inquiryFollowUpAllowed(r, pendingTourEmails) && composingId === r.id && (
                 <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 14, marginBottom: 10 }}>
                   {composeStep === 'paste' ? (
                     <div>
@@ -18912,6 +18949,7 @@ function VenueInquiriesView({ navigate }) {
   const [composeBody, setComposeBody] = useState('');
   const [copiedPromptId, setCopiedPromptId] = useState(null);
   const [sentFollowUp, setSentFollowUp] = useState({});
+  var [pendingTourEmails, setPendingTourEmails] = usePendingTourRequestEmails();
   const [sendingFollowUpId, setSendingFollowUpId] = useState(null);
   const [calendarEvents, setCalendarEvents] = useState(null);
   // booked/requested estate_tours rows, matched to inquiries by email so
@@ -18997,6 +19035,7 @@ function VenueInquiriesView({ navigate }) {
   }
 
   function copyFollowUpPrompt(r) {
+    if (!inquiryFollowUpAllowed(r, pendingTourEmails)) return;
     var text = buildInquiryFollowUpPrompt(r);
     function done() { setCopiedPromptId(r.id); setTimeout(function() { setCopiedPromptId(null); }, 2000); }
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -19007,6 +19046,7 @@ function VenueInquiriesView({ navigate }) {
   }
 
   function startCompose(r) {
+    if (!inquiryFollowUpAllowed(r, pendingTourEmails)) return;
     if (composingId === r.id) { setComposingId(null); return; }
     setComposingId(r.id);
     setComposeStep('paste');
@@ -19055,7 +19095,17 @@ function VenueInquiriesView({ navigate }) {
     w.document.close();
   }
 
-  function sendFollowUp(r) {
+  async function sendFollowUp(r) {
+    // Recheck in case a request arrived while the composer was open.
+    try {
+      var pending = await fetchPendingTourRequestEmails();
+      setPendingTourEmails(pending);
+      if (!inquiryFollowUpAllowed(r, pending)) {
+        setComposingId(null);
+        alert('Follow-up blocked: this client has requested different tour times.');
+        return;
+      }
+    } catch (e) { alert('Could not verify tour requests. Follow-up was not sent.'); return; }
     var email = buildFollowUpEmail(r);
     if (!email.to) { alert('No email address on file for this inquiry.'); return; }
     if (sendingFollowUpId) return;
@@ -19201,7 +19251,10 @@ function VenueInquiriesView({ navigate }) {
                   </div>
                 );
               })()}
-              {RENTAL_INQUIRY_FORM_IDS.indexOf(selected.form_id) !== -1 && (
+              {pendingTourEmails && !inquiryFollowUpAllowed(selected, pendingTourEmails) && (
+                <div style={{ fontSize: 12, color: '#a15c00', marginBottom: 12 }}>Follow-up paused while different tour times await coordination.</div>
+              )}
+              {RENTAL_INQUIRY_FORM_IDS.indexOf(selected.form_id) !== -1 && inquiryFollowUpAllowed(selected, pendingTourEmails) && (
                 <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
                   <button onClick={function() { copyFollowUpPrompt(selected); }} title={copiedPromptId === selected.id ? 'Copied!' : "Copy an AI prompt for a follow-up email, pre-filled with this person's details"}
                     style={{ background: copiedPromptId === selected.id ? '#eef7ee' : '#fff', color: copiedPromptId === selected.id ? '#2e7d32' : '#888', border: '1px solid ' + (copiedPromptId === selected.id ? '#bfe0bf' : '#e0d8cc'), borderRadius: 7, padding: '6px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
@@ -19218,7 +19271,7 @@ function VenueInquiriesView({ navigate }) {
                   </button>
                 </div>
               )}
-              {RENTAL_INQUIRY_FORM_IDS.indexOf(selected.form_id) !== -1 && composingId === selected.id && (
+              {RENTAL_INQUIRY_FORM_IDS.indexOf(selected.form_id) !== -1 && inquiryFollowUpAllowed(selected, pendingTourEmails) && composingId === selected.id && (
                 <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 14, marginBottom: 12 }}>
                   {composeStep === 'paste' ? (
                     <div>

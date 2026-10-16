@@ -36,6 +36,16 @@ async function rest(path: string, init: RequestInit = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+// Alternate-time requests await staff coordination. Do not chase them with
+// generic scheduling emails or archive them for not choosing an open slot.
+async function hasPendingTourRequest(email: string) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized) return false;
+  const literal = normalized.replace(/[\\%_*]/g, '\\$&');
+  const rows = await rest(`estate_tours?select=id&status=eq.requested&visitor_email=ilike.${encodeURIComponent(literal)}&limit=1`);
+  return rows.length > 0;
+}
+
 let templateCache: Record<string, { subject: string; body: string; html_body: string }> | null = null;
 async function getTemplates() {
   if (templateCache) return templateCache;
@@ -174,6 +184,7 @@ Deno.serve(async (req) => {
     const rows = await rest(`venue_inquiries?select=*&status=eq.New&email=not.is.null`);
     for (const inq of rows) {
       try {
+        if (await hasPendingTourRequest(inq.email)) continue;
         const link = `${SCHEDULING_BASE_URL}?schedule=${inq.id}`;
         const slots = await fetchOpenSlots();
         const widget = renderSlotsWidget(inq.id, slots);
@@ -192,6 +203,7 @@ Deno.serve(async (req) => {
     const rows = await rest(`venue_inquiries?select=*&status=eq.${encodeURIComponent('Initial Inquiry Sent')}&initial_sent_at=lte.${encodeURIComponent(cutoff)}&email=not.is.null`);
     for (const inq of rows) {
       try {
+        if (await hasPendingTourRequest(inq.email)) continue;
         const link = `${SCHEDULING_BASE_URL}?schedule=${inq.id}`;
         const slots = await fetchOpenSlots();
         const widget = renderSlotsWidget(inq.id, slots);
@@ -211,6 +223,7 @@ Deno.serve(async (req) => {
     const rows = await rest(`venue_inquiries?select=*&status=in.(${inList})&created_at=lte.${encodeURIComponent(cutoff)}&email=not.is.null`);
     for (const inq of rows) {
       try {
+        if (await hasPendingTourRequest(inq.email)) continue;
         const link = `${SCHEDULING_BASE_URL}?schedule=${inq.id}`;
         const slots = await fetchOpenSlots();
         const widget = renderSlotsWidget(inq.id, slots);
@@ -226,9 +239,10 @@ Deno.serve(async (req) => {
   // ── Step 4: Archive 5 days after final follow-up if still no tour ──
   try {
     const cutoff = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString();
-    const rows = await rest(`venue_inquiries?select=id&status=eq.${encodeURIComponent('Final Follow Up Sent')}&final_follow_up_sent_at=lte.${encodeURIComponent(cutoff)}`);
+    const rows = await rest(`venue_inquiries?select=id,email&status=eq.${encodeURIComponent('Final Follow Up Sent')}&final_follow_up_sent_at=lte.${encodeURIComponent(cutoff)}`);
     for (const inq of rows) {
       try {
+        if (await hasPendingTourRequest(inq.email)) continue;
         await rest(`venue_inquiries?id=eq.${inq.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'Archive' }) });
         result.archived++;
       } catch (e) { console.error('archive failed for', inq.id, e); result.errors++; }
