@@ -17952,6 +17952,7 @@ function VenueRentalsView({ navigate }) {
   const [inquiries, setInquiries] = useS(null);
   const [tours, setTours] = useS(null); // booked/requested estate_tours rows
   const [reqSavingId, setReqSavingId] = useS(null); // request_handled toggle in-flight for this tour id
+  const [reqDeletingId, setReqDeletingId] = useS(null);
   const [justBooked, setJustBooked] = useS(null); // tour request booked via "Add to Calendar" (for the confirmation line)
   const [scheduleOpen, setScheduleOpen] = useS(false);
   // Tours stay in Inquiries. Clients begin with an official pre-booking submission.
@@ -18062,6 +18063,24 @@ function VenueRentalsView({ navigate }) {
     fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&status=in.(booked,requested)&order=date.asc.nullslast&limit=100', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) { setTours(Array.isArray(rows) ? rows : []); }).catch(function() { setTours([]); });
+  }
+
+  async function deleteTourRequest(tour) {
+    if (reqDeletingId || reqSavingId) return;
+    if (!window.confirm('Delete this tour request for ' + (tour.visitor_name || 'this visitor') + '? This cannot be undone.')) return;
+    setReqDeletingId(tour.id);
+    try {
+      const response = await fetch(SUPABASE_URL + '/functions/v1/delete-estate-tour', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: tour.id, requestedOnly: true })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ? JSON.stringify(result.error) : 'Could not delete request');
+      setTours(function(prev) { return (prev || []).filter(function(t) { return t.id !== tour.id; }); });
+    } catch (err) {
+      alert('Could not delete tour request: ' + err.message);
+    } finally { setReqDeletingId(null); }
   }
 
   useE(function() {
@@ -18482,12 +18501,18 @@ function VenueRentalsView({ navigate }) {
                         </div>
                         <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} />
                       </div>
-                      <select value={t.request_handled ? 'handled' : 'not_handled'} disabled={reqSavingId === t.id}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', flexShrink: 0 }}>
+                      <select value={t.request_handled ? 'handled' : 'not_handled'} disabled={reqSavingId === t.id || reqDeletingId === t.id}
                         onChange={function(e) { setRequestHandled(t.id, e.target.value === 'handled'); }}
                         style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: t.request_handled ? '#f0f7f2' : '#fff8e8', color: t.request_handled ? '#2e6b4f' : '#b45309', fontWeight: 600 }}>
                         <option value="not_handled">Not Handled</option>
                         <option value="handled">Handled</option>
                       </select>
+                      <button type="button" onClick={function() { deleteTourRequest(t); }} disabled={!!reqDeletingId || !!reqSavingId}
+                        style={{ padding: '5px 10px', border: '0.5px solid #e5c4bf', borderRadius: 6, background: 'none', color: '#b54535', fontSize: 11, cursor: reqDeletingId || reqSavingId ? 'default' : 'pointer' }}>
+                        {reqDeletingId === t.id ? 'Deleting…' : 'Delete'}
+                      </button>
+                      </div>
                     </div>
                   );
                 })}

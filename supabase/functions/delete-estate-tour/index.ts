@@ -15,6 +15,14 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const GOOGLE_SERVICE_ACCOUNT_KEY = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY')
 const CALENDAR_ID = 'thenorthstarhouse@gmail.com'
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
+}
 
 function base64url(bytes: ArrayBuffer | Uint8Array) {
   const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
@@ -71,12 +79,13 @@ async function deleteCalendarEvent(eventId: string) {
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   try {
-    if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'POST only' }), { status: 405 })
-    const { id } = await req.json()
-    if (!id || typeof id !== 'string') return new Response(JSON.stringify({ error: 'id required' }), { status: 400 })
+    if (req.method !== 'POST') return jsonResponse({ error: 'POST only' }, 405)
+    const { id, requestedOnly } = await req.json()
+    if (!id || typeof id !== 'string') return jsonResponse({ error: 'id required' }, 400)
 
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/estate_tours?id=eq.${encodeURIComponent(id)}`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/estate_tours?id=eq.${encodeURIComponent(id)}${requestedOnly === true ? '&status=eq.requested' : ''}`, {
       method: 'DELETE',
       headers: {
         apikey: SERVICE_KEY,
@@ -85,17 +94,17 @@ Deno.serve(async (req) => {
       },
     })
     const deleted = await res.json()
-    if (!res.ok) return new Response(JSON.stringify({ error: deleted }), { status: 500 })
+    if (!res.ok) return jsonResponse({ error: deleted }, 500)
     if (!Array.isArray(deleted) || deleted.length === 0) {
-      return new Response(JSON.stringify({ error: 'No row with that id' }), { status: 404 })
+      return jsonResponse({ error: requestedOnly ? 'Request no longer exists or has already been booked. Refresh the list.' : 'No row with that id' }, 404)
     }
 
     if (deleted[0].gcal_event_id && GOOGLE_SERVICE_ACCOUNT_KEY) {
       await deleteCalendarEvent(deleted[0].gcal_event_id)
     }
 
-    return new Response(JSON.stringify({ ok: true, deleted: deleted[0] }), { headers: { 'Content-Type': 'application/json' } })
+    return jsonResponse({ ok: true, deleted: deleted[0] })
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500 })
+    return jsonResponse({ error: String(err) }, 500)
   }
 })

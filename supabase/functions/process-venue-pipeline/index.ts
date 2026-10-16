@@ -46,6 +46,16 @@ async function hasPendingTourRequest(email: string) {
   return rows.length > 0;
 }
 
+function tourRequestHasExpired(tour: { requested_slots?: { date?: string }[] }, today: string) {
+  const slots = tour.requested_slots;
+  // Missing or malformed dates require staff review, never automatic deletion.
+  return Array.isArray(slots) && slots.length > 0 && slots.every((slot) => {
+    const date = slot?.date;
+    return typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      && !Number.isNaN(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date && date < today;
+  });
+}
+
 let templateCache: Record<string, { subject: string; body: string; html_body: string }> | null = null;
 async function getTemplates() {
   if (templateCache) return templateCache;
@@ -177,7 +187,32 @@ Deno.serve(async (req) => {
   const now = new Date();
   const nowIso = now.toISOString();
   const templates = await getTemplates();
-  const result: Record<string, number> = { initial: 0, followUp48h: 0, finalFollowUp30d: 0, archived: 0, tourConfirmation: 0, reminder24h: 0, reminder1h: 0, touredDocs: 0, questionnaireReminder: 0, completed: 0, feedbackRequested: 0, feedbackArchived: 0, errors: 0 };
+  const result: Record<string, number> = { expiredRequests: 0, initial: 0, followUp48h: 0, finalFollowUp30d: 0, archived: 0, tourConfirmation: 0, reminder24h: 0, reminder1h: 0, touredDocs: 0, questionnaireReminder: 0, completed: 0, feedbackRequested: 0, feedbackArchived: 0, errors: 0 };
+
+  // The existing 15-minute schedule also clears unbooked requests once ALL
+  // preferred dates are past in Grass Valley. Today's dates remain available.
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+    const part = (type: string) => parts.find((p) => p.type === type)!.value;
+    const today = `${part('year')}-${part('month')}-${part('day')}`;
+    const rows = await rest('estate_tours?select=id,visitor_email,requested_slots&status=eq.requested');
+    for (const tour of rows) {
+      if (!tourRequestHasExpired(tour, today)) continue;
+      try {
+        // Do not restart old scheduling outreach when its suppression row is removed.
+        const email = String(tour.visitor_email || '').trim().replace(/[\\%_*]/g, '\\$&');
+        if (email) await rest(`venue_inquiries?email=ilike.${encodeURIComponent(email)}&status=in.(${encodeURIComponent('"New","Initial Inquiry Sent","Follow Up Sent","Final Follow Up Sent"')})`, {
+          method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'Archive' }),
+        });
+        // Recheck status and dates atomically so a newly booked or edited
+        // request cannot be removed from a stale snapshot.
+        const deleted = await rest(`estate_tours?id=eq.${encodeURIComponent(tour.id)}&status=eq.requested&requested_slots=eq.${encodeURIComponent(JSON.stringify(tour.requested_slots))}`, {
+          method: 'DELETE', headers: { Prefer: 'return=representation' },
+        });
+        result.expiredRequests += (deleted || []).length;
+      } catch (e) { console.error('expired request cleanup failed for', tour.id, e); result.errors++; }
+    }
+  } catch (e) { console.error('expired request query failed', e); result.errors++; }
 
   // ── Step 1: New wedding inquiries -> send initial guide + scheduling widget ──
   try {

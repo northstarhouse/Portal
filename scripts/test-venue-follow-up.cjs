@@ -7,7 +7,7 @@ const esbuild = require('esbuild');
 const source = fs.readFileSync('supabase/functions/process-venue-pipeline/index.ts', 'utf8');
 const code = esbuild.transformSync(source, { loader: 'ts', format: 'cjs' }).code;
 
-async function runPipeline(pending, checkFails = false) {
+async function runPipeline(pending, checkFails = false, expired = []) {
   let handler;
   const sent = [], patched = [];
   const context = {
@@ -20,6 +20,12 @@ async function runPipeline(pending, checkFails = false) {
       }
       const query = new URL(url).searchParams;
       const table = new URL(url).pathname.split('/').pop();
+      if (options.method === 'DELETE') {
+        assert.equal(table, 'estate_tours');
+        assert.equal(query.get('status'), 'eq.requested');
+        assert.ok(query.get('requested_slots').startsWith('eq.['));
+        return Response.json([{ id: query.get('id') }]);
+      }
       if (options.method === 'PATCH') {
         patched.push(JSON.parse(options.body));
         return new Response(null, { status: 204 });
@@ -28,6 +34,7 @@ async function runPipeline(pending, checkFails = false) {
         ['initial_inquiry', 'follow_up_48h', 'final_follow_up_30d'].map(key => ({ key, subject: key, body: 'Hello {{name}}' }))
       );
       if (table === 'estate_tours') {
+        if (query.get('select') === 'id,visitor_email,requested_slots') return Response.json(expired);
         assert.equal(query.get('status'), 'eq.requested');
         assert.equal(query.get('visitor_email'), 'ilike.client@example.com');
         return checkFails ? new Response('unavailable', { status: 503 }) : Response.json(pending ? [{ id: 'request' }] : []);
@@ -48,6 +55,49 @@ test('pending alternate times block initial, 48h, 30d outreach and auto-archive'
   assert.equal(sent.length, 0);
   assert.equal(patched.length, 0);
   assert.equal(result.errors, 0);
+});
+
+test('expiry keeps today, future alternatives, empty and invalid dates', () => {
+  const context = { Deno: { env: { get() {} }, serve() {} } };
+  vm.runInNewContext(code, context);
+  const expired = dates => context.tourRequestHasExpired({ requested_slots: dates.map(date => ({ date })) }, '2026-10-16');
+  assert.equal(expired(['2026-10-14', '2026-10-15']), true);
+  for (const dates of [[], ['2026-10-16'], ['2026-10-14', '2026-10-17'], ['invalid'], ['2026-02-30'], ['']]) {
+    assert.equal(expired(dates), false, JSON.stringify(dates));
+  }
+});
+
+test('scheduled cleanup deletes expired requests without sending follow-ups', async () => {
+  const { sent, patched, result } = await runPipeline(true, false, [{
+    id: 'expired-request', visitor_email: 'client@example.com', requested_slots: [{ date: '2020-01-01' }],
+  }]);
+  assert.equal(result.expiredRequests, 1);
+  assert.equal(sent.length, 0);
+  assert.equal(patched.length, 1);
+  assert.equal(patched[0].status, 'Archive');
+});
+
+test('request deletion supports browser preflight and cannot delete a newly booked tour', async () => {
+  const deleteCode = esbuild.transformSync(fs.readFileSync('supabase/functions/delete-estate-tour/index.ts', 'utf8'), { loader: 'ts', format: 'cjs' }).code;
+  let handler, calls = 0;
+  vm.runInNewContext(deleteCode, {
+    Response, Deno: { env: { get: () => 'https://database.example' }, serve: fn => { handler = fn; } },
+    fetch: async (url, options) => {
+      calls++;
+      assert.equal(options.method, 'DELETE');
+      assert.equal(new URL(url).searchParams.get('status'), 'eq.requested');
+      return Response.json([]);
+    },
+  });
+  const preflight = await handler(new Request('https://example.com', { method: 'OPTIONS' }));
+  assert.equal(preflight.headers.get('access-control-allow-origin'), '*');
+  assert.equal(calls, 0);
+  const response = await handler(new Request('https://example.com', {
+    method: 'POST', body: JSON.stringify({ id: 'request', requestedOnly: true }),
+  }));
+  assert.equal(response.status, 404);
+  assert.equal(calls, 1);
+  assert.equal(response.headers.get('access-control-allow-origin'), '*');
 });
 
 test('unrelated clients retain the existing outreach and archival flow', async () => {
