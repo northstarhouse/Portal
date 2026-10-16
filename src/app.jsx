@@ -17918,6 +17918,7 @@ function VenueRentalsView({ navigate }) {
   const [inquiries, setInquiries] = useS(null);
   const [tours, setTours] = useS(null); // booked/requested estate_tours rows
   const [reqSavingId, setReqSavingId] = useS(null); // request_handled toggle in-flight for this tour id
+  const [justBooked, setJustBooked] = useS(null); // tour request booked via "Add to Calendar" (for the confirmation line)
   const [scheduleOpen, setScheduleOpen] = useS(false);
   const debounceTimers = useR({});
 
@@ -18376,6 +18377,12 @@ function VenueRentalsView({ navigate }) {
               <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Tour Requests</div>
               {tours !== null && <div style={{ fontSize: 12, color: unhandledCount > 0 ? gold : '#999', fontWeight: unhandledCount > 0 ? 700 : 400 }}>{unhandledCount} unhandled</div>}
             </div>
+            {justBooked && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: '#2e6b4f', background: '#f0f7f2', border: '0.5px solid #cfe6d8', borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>
+                <span>✓ Booked {justBooked.visitor_name || 'the visitor'} for {fmtReqDate(justBooked.date)} at {new Date('2000-01-01T' + justBooked.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} and added it to the calendar. It's now under Upcoming Tours.</span>
+                <button onClick={function() { setJustBooked(null); }} style={{ background: 'none', border: 'none', color: '#2e6b4f', cursor: 'pointer', fontSize: 14, lineHeight: 1 }} aria-label="Dismiss">×</button>
+              </div>
+            )}
             {tours === null ? (
               <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
             ) : requests.length === 0 ? (
@@ -18398,6 +18405,7 @@ function VenueRentalsView({ navigate }) {
                             return <div key={i}>{fmtReqDate(s.date)}{s.time_label ? ' (' + s.time_label + ')' : ''}</div>;
                           })}
                         </div>
+                        <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} />
                       </div>
                       <select value={t.request_handled ? 'handled' : 'not_handled'} disabled={reqSavingId === t.id}
                         onChange={function(e) { setRequestHandled(t.id, e.target.value === 'handled'); }}
@@ -19292,6 +19300,85 @@ function VenueInquiriesView({ navigate }) {
 // (open -> booked) the public site's own booking widget uses, so a
 // staff-scheduled tour is indistinguishable from one a visitor booked
 // themselves (same reminder emails, same calendar).
+// "+ Add to Calendar" on a venue Tour Request: staff pick the actual date and
+// time (quick-pick buttons for the dates the visitor asked for, or any date),
+// and the request becomes a booked tour. Marking an estate_tours row booked
+// is what puts it on the Google Calendar (estate_tour_booked_sync_calendar
+// trigger -> add-tour-to-calendar, idempotent via gcal_event_id); it also
+// moves it into Upcoming Tours and onto the automatic reminder emails.
+function TourRequestCalendarRow({ tour, onBooked }) {
+  var slots = tour.requested_slots || [];
+  var [open, setOpen] = useState(false);
+  var [date, setDate] = useState('');
+  var [time, setTime] = useState('');
+  var [saving, setSaving] = useState(false);
+  var [error, setError] = useState('');
+
+  function chipLabel(d) {
+    try { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); } catch (e) { return d; }
+  }
+
+  function confirm() {
+    if (saving || !date || !time) return;
+    setSaving(true);
+    setError('');
+    sbPatchById('estate_tours', tour.id, { date: date, start_time: time, status: 'booked', request_handled: true, reminder_24h_sent_at: null, reminder_1h_sent_at: null })
+      .then(function(r) {
+        setSaving(false);
+        if (Array.isArray(r) && r.length) {
+          logActivity('Booked a venue tour for ' + (tour.visitor_name || 'a visitor') + ' and added it to the calendar', 'tour_booked');
+          setOpen(false);
+          if (onBooked) onBooked(r[0]);
+        } else {
+          setError((r && (r.message || r.error || r.hint)) || 'Could not book this tour. Please try again.');
+        }
+      })
+      .catch(function() { setSaving(false); setError('Network error. Check the calendar before trying again.'); });
+  }
+
+  var inputStyle = { fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid #e0d8cc', background: '#fff', color: '#2a2a2a' };
+
+  if (!open) {
+    return (
+      <button type="button" onClick={function() { setOpen(true); if (!date && slots[0] && slots[0].date) setDate(slots[0].date); }}
+        style={{ marginTop: 8, fontSize: 11, fontWeight: 600, padding: '5px 10px', borderRadius: 6, border: '0.5px solid ' + gold, background: '#fff', color: gold, cursor: 'pointer' }}>
+        + Add to Calendar
+      </button>
+    );
+  }
+  return (
+    <div style={{ marginTop: 8, padding: 10, borderRadius: 8, background: '#faf8f4', border: '0.5px solid #e8e0d5' }}>
+      {slots.some(function(sl) { return sl.date; }) && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+          <span style={{ fontSize: 11, color: '#999', alignSelf: 'center' }}>Requested:</span>
+          {slots.filter(function(sl) { return sl.date; }).map(function(sl, i) {
+            var on = sl.date === date;
+            return (
+              <button key={i} type="button" disabled={saving} onClick={function() { setDate(sl.date); }}
+                style={{ fontSize: 11, padding: '3px 9px', borderRadius: 20, cursor: 'pointer', border: '0.5px solid ' + (on ? gold : '#e0d8cc'), background: on ? gold : '#fff', color: on ? '#fff' : '#555', fontWeight: on ? 600 : 400 }}>
+                {chipLabel(sl.date)}{sl.time_label ? ' · ' + sl.time_label : ''}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+        <input type="date" aria-label="Tour date" disabled={saving} value={date} onChange={function(e) { setDate(e.target.value); }} style={inputStyle} />
+        <input type="time" aria-label="Tour time" disabled={saving} value={time} onChange={function(e) { setTime(e.target.value); }} style={inputStyle} />
+        <button type="button" onClick={confirm} disabled={saving || !date || !time}
+          style={{ fontSize: 11, fontWeight: 600, padding: '6px 12px', borderRadius: 6, border: 'none', background: gold, color: '#fff', cursor: 'pointer', opacity: (saving || !date || !time) ? 0.6 : 1 }}>
+          {saving ? 'Booking…' : 'Confirm'}
+        </button>
+        <button type="button" disabled={saving} onClick={function() { setOpen(false); setError(''); }}
+          style={{ fontSize: 11, padding: '6px 10px', borderRadius: 6, border: '0.5px solid #e0d8cc', background: '#fff', color: '#888', cursor: 'pointer' }}>
+          Cancel
+        </button>
+      </div>
+      {error && <div style={{ fontSize: 11, color: '#c0392b', marginTop: 6 }}>{error}</div>}
+    </div>
+  );
+}
+
 function ScheduleTourModal({ onClose, onScheduled, prefill }) {
   var [slots, setSlots] = useState(null);
   var [slotId, setSlotId] = useState('');
