@@ -699,6 +699,7 @@ var NAV_ICONS = {
   'event-overviews': '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
   'walk-in-guests': '<path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/>',
   'form-responses': '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+  announcements: '<path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
 };
 
 function NavIcon({ id, active }) {
@@ -17952,7 +17953,6 @@ function VenueRentalsView({ navigate }) {
   const [inquiries, setInquiries] = useS(null);
   const [tours, setTours] = useS(null); // booked/requested estate_tours rows
   const [reqSavingId, setReqSavingId] = useS(null); // request_handled toggle in-flight for this tour id
-  const [reqDeletingId, setReqDeletingId] = useS(null);
   const [justBooked, setJustBooked] = useS(null); // tour request booked via "Add to Calendar" (for the confirmation line)
   const [scheduleOpen, setScheduleOpen] = useS(false);
   // Tours stay in Inquiries. Clients begin with an official pre-booking submission.
@@ -18065,23 +18065,6 @@ function VenueRentalsView({ navigate }) {
     }).then(function(r) { return r.json(); }).then(function(rows) { setTours(Array.isArray(rows) ? rows : []); }).catch(function() { setTours([]); });
   }
 
-  async function deleteTourRequest(tour) {
-    if (reqDeletingId || reqSavingId) return;
-    if (!window.confirm('Delete this tour request for ' + (tour.visitor_name || 'this visitor') + '? This cannot be undone.')) return;
-    setReqDeletingId(tour.id);
-    try {
-      const response = await fetch(SUPABASE_URL + '/functions/v1/delete-estate-tour', {
-        method: 'POST',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: tour.id, requestedOnly: true })
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ? JSON.stringify(result.error) : 'Could not delete request');
-      setTours(function(prev) { return (prev || []).filter(function(t) { return t.id !== tour.id; }); });
-    } catch (err) {
-      alert('Could not delete tour request: ' + err.message);
-    } finally { setReqDeletingId(null); }
-  }
 
   useE(function() {
     var trackPromise = fetch(SUPABASE_URL + '/rest/v1/venue_wedding_tracking?select=*&order=event_date.asc', {
@@ -18502,16 +18485,12 @@ function VenueRentalsView({ navigate }) {
                         <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', flexShrink: 0 }}>
-                      <select value={t.request_handled ? 'handled' : 'not_handled'} disabled={reqSavingId === t.id || reqDeletingId === t.id}
+                      <select value={t.request_handled ? 'handled' : 'not_handled'} disabled={reqSavingId === t.id}
                         onChange={function(e) { setRequestHandled(t.id, e.target.value === 'handled'); }}
                         style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: t.request_handled ? '#f0f7f2' : '#fff8e8', color: t.request_handled ? '#2e6b4f' : '#b45309', fontWeight: 600 }}>
                         <option value="not_handled">Not Handled</option>
                         <option value="handled">Handled</option>
                       </select>
-                      <button type="button" onClick={function() { deleteTourRequest(t); }} disabled={!!reqDeletingId || !!reqSavingId}
-                        style={{ padding: '5px 10px', border: '0.5px solid #e5c4bf', borderRadius: 6, background: 'none', color: '#b54535', fontSize: 11, cursor: reqDeletingId || reqSavingId ? 'default' : 'pointer' }}>
-                        {reqDeletingId === t.id ? 'Deleting…' : 'Delete'}
-                      </button>
                       </div>
                     </div>
                   );
@@ -20446,7 +20425,6 @@ function AnnouncementsView({ navigate }) {
 
   return (
     <div style={{ maxWidth: 640 }}>
-      <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a' }}>Announcements</div>
         <button onClick={function() { setForm(emptyForm); setShowAdd(!showAdd); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{showAdd ? 'Cancel' : '+ New Announcement'}</button>
