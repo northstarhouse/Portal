@@ -2600,6 +2600,30 @@ function sbPatchById(table, id, row) {
   }).then(r => r.json());
 }
 
+// Reschedules a booked estate tour through the reschedule-estate-tour edge
+// function, which also moves its Google Calendar event and (when notify)
+// emails the visitor the new time. Resolves { ok, calendar, emailed } or
+// rejects with a message.
+function rescheduleEstateTour(id, date, startTime, notify) {
+  return fetch(SUPABASE_URL + '/functions/v1/reschedule-estate-tour', {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: id, date: date, start_time: startTime, notify: notify })
+  }).then(function(r) {
+    return r.json().catch(function() { return {}; }).then(function(j) {
+      if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      return j;
+    });
+  });
+}
+function rescheduleProblems(res, notify) {
+  var issues = [];
+  if (res.unchanged) return issues;
+  if (res.calendar && res.calendar !== 'moved' && res.calendar !== 'created' && res.calendar !== 'skipped') issues.push('Google Calendar was not updated (' + res.calendar + ').');
+  if (notify && !res.emailed) issues.push('The email to the visitor did not send.');
+  return issues;
+}
+
 var DEFAULT_LIST_COLOR = '#0d6eab';
 var TEAM_COLORS = {
   'Grounds':      { bg: '#e8f5e9', color: '#2e7d32' },
@@ -17967,6 +17991,7 @@ function VenueRentalsView({ navigate }) {
   const [rescheduling, setRescheduling] = useS(false);
   const [rescheduleDate, setRescheduleDate] = useS('');
   const [rescheduleTime, setRescheduleTime] = useS('');
+  const [rescheduleNotify, setRescheduleNotify] = useS(true);
   const [detailSaving, setDetailSaving] = useS(false);
   const [noteDraft, setNoteDraft] = useS(''); // staff_notes editor for the open tour popup
   const [noteSaving, setNoteSaving] = useS(false);
@@ -17991,17 +18016,21 @@ function VenueRentalsView({ navigate }) {
     var t = detailEntry.raw;
     setRescheduleDate(t.date || '');
     setRescheduleTime(t.start_time || '');
+    setRescheduleNotify(true);
     setRescheduling(true);
   }
 
   function saveReschedule() {
     if (!rescheduleDate || !rescheduleTime || detailSaving) return;
     setDetailSaving(true);
-    sbPatchById('estate_tours', detailEntry.raw.id, { date: rescheduleDate, start_time: rescheduleTime, reminder_24h_sent_at: null, reminder_1h_sent_at: null })
-      .then(function() {
+    rescheduleEstateTour(detailEntry.raw.id, rescheduleDate, rescheduleTime, rescheduleNotify)
+      .then(function(res) {
+        var issues = rescheduleProblems(res, rescheduleNotify);
+        if (issues.length) alert('Rescheduled, but:\n' + issues.join('\n'));
         loadTours();
         setDetailEntry(null);
-      }).finally(function() { setDetailSaving(false); });
+      }).catch(function(e) { alert('Could not reschedule: ' + e.message); })
+      .finally(function() { setDetailSaving(false); });
   }
 
   function markNoShow() {
@@ -18795,6 +18824,10 @@ function VenueRentalsView({ navigate }) {
                         <input type="date" value={rescheduleDate} onChange={function(e) { setRescheduleDate(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
                         <QuarterHourSelect ariaLabel="New tour time" value={rescheduleTime} onChange={setRescheduleTime} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
                       </div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#555', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={rescheduleNotify} onChange={function(e) { setRescheduleNotify(e.target.checked); }} />
+                        Email the visitor their new time
+                      </label>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={saveReschedule} disabled={detailSaving || !rescheduleDate || !rescheduleTime} style={{ flex: 1, padding: '8px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: (detailSaving || !rescheduleDate || !rescheduleTime) ? 0.6 : 1 }}>{detailSaving ? 'Saving…' : 'Save new date'}</button>
                         <button onClick={function() { setRescheduling(false); }} disabled={detailSaving} style={{ padding: '8px 14px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
@@ -19665,6 +19698,7 @@ function EstateToursView() {
   const [panelReschedule, setPanelReschedule] = useState(false);
   const [panelRescheduleDate, setPanelRescheduleDate] = useState('');
   const [panelRescheduleTime, setPanelRescheduleTime] = useState('');
+  const [panelRescheduleNotify, setPanelRescheduleNotify] = useState(true);
   const [panelBusy, setPanelBusy] = useState(false);
   const [panelNoteEditing, setPanelNoteEditing] = useState(false);
   const [panelNoteDraft, setPanelNoteDraft] = useState('');
@@ -19806,13 +19840,19 @@ function EstateToursView() {
   function startPanelReschedule(t) {
     setPanelRescheduleDate(t.date || '');
     setPanelRescheduleTime(t.start_time || '');
+    setPanelRescheduleNotify(true);
     setPanelReschedule(true);
   }
   function savePanelReschedule(t) {
     if (!panelRescheduleDate || !panelRescheduleTime || panelBusy) return;
     setPanelBusy(true);
-    sbPatchById('estate_tours', t.id, { date: panelRescheduleDate, start_time: panelRescheduleTime, reminder_24h_sent_at: null, reminder_1h_sent_at: null })
-      .then(function() { setPanelReschedule(false); load(); }).finally(function() { setPanelBusy(false); });
+    rescheduleEstateTour(t.id, panelRescheduleDate, panelRescheduleTime, panelRescheduleNotify)
+      .then(function(res) {
+        var issues = rescheduleProblems(res, panelRescheduleNotify);
+        if (issues.length) alert('Rescheduled, but:\n' + issues.join('\n'));
+        setPanelReschedule(false); load();
+      }).catch(function(e) { alert('Could not reschedule: ' + e.message); })
+      .finally(function() { setPanelBusy(false); });
   }
   function markPanelCompleted(t) {
     if (panelBusy) return;
@@ -19920,6 +19960,10 @@ function EstateToursView() {
                   <input type="date" value={panelRescheduleDate} onChange={function(e) { setPanelRescheduleDate(e.target.value); }} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
                   <QuarterHourSelect ariaLabel="New tour time" value={panelRescheduleTime} onChange={setPanelRescheduleTime} style={{ padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13 }} />
                 </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#555', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={panelRescheduleNotify} onChange={function(e) { setPanelRescheduleNotify(e.target.checked); }} />
+                  Email the visitor their new time
+                </label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={function() { savePanelReschedule(selectedTour); }} disabled={panelBusy || !panelRescheduleDate || !panelRescheduleTime} style={{ flex: 1, padding: '8px', background: gold, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: panelBusy ? 0.6 : 1 }}>{panelBusy ? 'Saving…' : 'Save new date'}</button>
                   <button onClick={function() { setPanelReschedule(false); }} disabled={panelBusy} style={{ padding: '8px 14px', background: '#f0ece6', border: 'none', borderRadius: 7, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
