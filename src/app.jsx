@@ -700,6 +700,7 @@ var NAV_ICONS = {
   'walk-in-guests': '<path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/>',
   'form-responses': '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
   announcements: '<path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
+  'maintenance-request': '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
 };
 
 function NavIcon({ id, active }) {
@@ -15121,7 +15122,6 @@ function MaintenanceRequestView({ navigate }) {
   var [submitted, setSubmitted] = useState(false);
   var [log, setLog] = useState(null);
   var [resolvingId, setResolvingId] = useState(null);
-  var [showResolved, setShowResolved] = useState(false);
 
   function fetchLog() {
     fetch(SUPABASE_URL + '/rest/v1/activity_log?action=eq.maintenance_request&select=*&order=created_at.desc&limit=200', {
@@ -15171,7 +15171,6 @@ function MaintenanceRequestView({ navigate }) {
 
   return (
     <div style={{ maxWidth: 900 }}>
-      <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
       <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Logs straight to the Activity Log, tagged Maintenance.</div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
@@ -15212,43 +15211,55 @@ function MaintenanceRequestView({ navigate }) {
         </div>
 
         <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '0.5px solid #f0ece6' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '0.5px solid #f0ece6' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Open Requests {log !== null && '(' + open.length + ')'}</div>
-            {resolved.length > 0 && (
-              <button onClick={function() { setShowResolved(function(v) { return !v; }); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: '#888', cursor: 'pointer' }}>
-                {showResolved ? 'Hide' : 'Show'} Resolved ({resolved.length})
-              </button>
-            )}
           </div>
           <div style={{ maxHeight: 520, overflowY: 'auto' }}>
             {log === null && <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div>}
-            {log !== null && open.length === 0 && !showResolved && <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No open requests.</div>}
-            {(showResolved ? open.concat(resolved) : open).map(function(item, i, arr) {
+            {log !== null && open.length === 0 && <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>No open requests.</div>}
+            {open.map(function(item, i, arr) {
               var ts = item.created_at ? new Date(item.created_at) : null;
               var when = ts ? ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
               return (
-                <div key={item.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '12px 18px', borderBottom: i < arr.length - 1 ? '0.5px solid #f5f0e8' : 'none', opacity: item.resolved ? 0.55 : 1 }}>
-                  {item.resolved ? (
-                    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 3, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>
-                  ) : (
-                    <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: '#c46a1a', marginTop: 5, flexShrink: 0 }} />
-                  )}
+                <div key={item.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '12px 18px', borderBottom: i < arr.length - 1 ? '0.5px solid #f5f0e8' : 'none' }}>
+                  <div style={{ minWidth: 6, height: 6, borderRadius: '50%', background: '#c46a1a', marginTop: 5, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5, textDecoration: item.resolved ? 'line-through' : 'none' }}>{item.description}</div>
+                    <div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5 }}>{item.description}</div>
                     <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{when}</div>
                   </div>
-                  {!item.resolved && (
-                    <button onClick={function() { markResolved(item); }} disabled={resolvingId === item.id}
-                      style={{ fontSize: 11, fontWeight: 600, color: '#2e7d32', background: '#eafaf0', border: '0.5px solid #cdebd8', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', flexShrink: 0, opacity: resolvingId === item.id ? 0.6 : 1 }}>
-                      {resolvingId === item.id ? '…' : 'Mark Resolved'}
-                    </button>
-                  )}
+                  <button onClick={function() { markResolved(item); }} disabled={resolvingId === item.id}
+                    style={{ fontSize: 11, fontWeight: 600, color: '#2e7d32', background: '#eafaf0', border: '0.5px solid #cdebd8', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', flexShrink: 0, opacity: resolvingId === item.id ? 0.6 : 1 }}>
+                    {resolvingId === item.id ? '…' : 'Mark Resolved'}
+                  </button>
                 </div>
               );
             })}
           </div>
         </div>
       </div>
+
+      {resolved.length > 0 && (
+        <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden', marginTop: 20 }}>
+          <div style={{ padding: '14px 18px', borderBottom: '0.5px solid #f0ece6' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Resolved Requests ({resolved.length})</div>
+          </div>
+          <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+            {resolved.map(function(item, i, arr) {
+              var rts = item.resolved_at ? new Date(item.resolved_at) : null;
+              var resolvedWhen = rts ? rts.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown date';
+              return (
+                <div key={item.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '12px 18px', borderBottom: i < arr.length - 1 ? '0.5px solid #f5f0e8' : 'none', opacity: 0.7 }}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#2e7d32" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 3, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, color: '#2a2a2a', lineHeight: 1.5, textDecoration: 'line-through' }}>{item.description}</div>
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Resolved {resolvedWhen}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -18469,11 +18480,60 @@ function VenueRentalsView({ navigate }) {
             return (b.created_at || '').localeCompare(a.created_at || '');
           });
         var unhandledCount = requests.filter(function(t) { return !t.request_handled; }).length;
+        function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+        function exportRequestsPdf() {
+          var rowsHtml = requests.map(function(t) {
+            var slots = t.requested_slots || [];
+            var datesStr = slots.length === 0 ? 'None on file' : slots.map(function(s) { return fmtReqDate(s.date) + (s.time_label ? ' (' + s.time_label + ')' : ''); }).join('; ');
+            return '<tr>' +
+              '<td>' + esc(t.visitor_name || 'Unknown') + '</td>' +
+              '<td>' + esc(tourCategoryLabel({ kind: 'Tour', raw: t })) + '</td>' +
+              '<td>' + esc(t.visitor_email) + '</td>' +
+              '<td>' + esc(fmtPhone(t.visitor_phone)) + '</td>' +
+              '<td>' + esc(t.created_at ? fmtInquiryDate(t.created_at) : '') + '</td>' +
+              '<td>' + esc(datesStr) + '</td>' +
+              '<td>' + (t.request_handled ? 'Handled' : 'Not Handled') + '</td>' +
+              '</tr>';
+          }).join('');
+          var html = '<!doctype html><html><head><meta charset="utf-8"><title>Tour Requests</title>' +
+            '<style>' +
+            '@page{size:letter landscape;margin:0.4in;}' +
+            '*{box-sizing:border-box;}' +
+            'body{font-family:Georgia,\'Times New Roman\',serif;font-size:11px;color:#1e1e1e;margin:0;}' +
+            'h1{font-size:18px;margin:0 0 4px;}' +
+            '.sub{font-size:11px;color:#777;margin-bottom:14px;}' +
+            'table{width:100%;border-collapse:collapse;}' +
+            'th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;color:#886c44;border-bottom:1px solid #ccc;padding:6px 8px;}' +
+            'td{padding:6px 8px;border-bottom:0.5px solid #eee;vertical-align:top;}' +
+            'tr:nth-child(even){background:#faf8f5;}' +
+            '</style></head><body>' +
+            '<h1>Venue Tour Requests</h1>' +
+            '<div class="sub">Exported ' + esc(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) + ' · ' + requests.length + ' request' + (requests.length !== 1 ? 's' : '') + '</div>' +
+            '<table><thead><tr><th>Name</th><th>Tour Type</th><th>Email</th><th>Phone</th><th>Inquired</th><th>Preferred Dates</th><th>Status</th></tr></thead><tbody>' +
+            rowsHtml +
+            '</tbody></table>' +
+            '</body></html>';
+          var w = window.open('', '_blank', 'width=1000,height=700');
+          if (!w) { alert('Please allow pop-ups to export the PDF.'); return; }
+          w.document.write(html);
+          w.document.close();
+          w.focus();
+          setTimeout(function() { w.print(); }, 300);
+        }
         return (
           <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Tour Requests</div>
-              {tours !== null && <div style={{ fontSize: 12, color: unhandledCount > 0 ? gold : '#999', fontWeight: unhandledCount > 0 ? 700 : 400 }}>{unhandledCount} unhandled</div>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {tours !== null && <div style={{ fontSize: 12, color: unhandledCount > 0 ? gold : '#999', fontWeight: unhandledCount > 0 ? 700 : 400 }}>{unhandledCount} unhandled</div>}
+                {requests.length > 0 && (
+                  <button onClick={exportRequestsPdf} title="Export this list as a PDF"
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>
+                    <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Export PDF
+                  </button>
+                )}
+              </div>
             </div>
             {justBooked && (
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: '#2e6b4f', background: '#f0f7f2', border: '0.5px solid #cfe6d8', borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>
