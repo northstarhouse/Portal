@@ -18490,30 +18490,29 @@ function VenueRentalsView({ navigate }) {
               '<td>' + esc(tourCategoryLabel({ kind: 'Tour', raw: t })) + '</td>' +
               '<td>' + esc(t.visitor_email) + '</td>' +
               '<td>' + esc(fmtPhone(t.visitor_phone)) + '</td>' +
-              '<td>' + esc(t.created_at ? fmtInquiryDate(t.created_at) : '') + '</td>' +
               '<td>' + esc(datesStr) + '</td>' +
               '<td>' + (t.request_handled ? 'Handled' : 'Not Handled') + '</td>' +
               '</tr>';
           }).join('');
           var html = '<!doctype html><html><head><meta charset="utf-8"><title>Tour Requests</title>' +
             '<style>' +
-            '@page{size:letter landscape;margin:0.4in;}' +
+            '@page{size:letter portrait;margin:0.4in;}' +
             '*{box-sizing:border-box;}' +
             'body{font-family:Georgia,\'Times New Roman\',serif;font-size:11px;color:#1e1e1e;margin:0;}' +
             'h1{font-size:18px;margin:0 0 4px;}' +
             '.sub{font-size:11px;color:#777;margin-bottom:14px;}' +
             'table{width:100%;border-collapse:collapse;}' +
             'th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;color:#886c44;border-bottom:1px solid #ccc;padding:6px 8px;}' +
-            'td{padding:6px 8px;border-bottom:0.5px solid #eee;vertical-align:top;}' +
+            'td{padding:6px 8px;border-bottom:0.5px solid #eee;vertical-align:top;overflow-wrap:anywhere;}' +
             'tr:nth-child(even){background:#faf8f5;}' +
             '</style></head><body>' +
             '<h1>Venue Tour Requests</h1>' +
             '<div class="sub">Exported ' + esc(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) + ' · ' + requests.length + ' request' + (requests.length !== 1 ? 's' : '') + '</div>' +
-            '<table><thead><tr><th>Name</th><th>Tour Type</th><th>Email</th><th>Phone</th><th>Inquired</th><th>Preferred Dates</th><th>Status</th></tr></thead><tbody>' +
+            '<table><thead><tr><th>Name</th><th>Tour Type</th><th>Email</th><th>Phone</th><th>Preferred Dates</th><th>Status</th></tr></thead><tbody>' +
             rowsHtml +
             '</tbody></table>' +
             '</body></html>';
-          var w = window.open('', '_blank', 'width=1000,height=700');
+          var w = window.open('', '_blank', 'width=820,height=1000');
           if (!w) { alert('Please allow pop-ups to export the PDF.'); return; }
           w.document.write(html);
           w.document.close();
