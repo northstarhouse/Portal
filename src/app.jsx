@@ -18030,6 +18030,14 @@ function VenueRentalsView({ navigate, initialTab }) {
     });
   }
   const debounceTimers = useR({});
+  const [colorCoding, setColorCoding] = useS(function() {
+    try { return localStorage.getItem('nsh-venue-color-coding') === 'on'; } catch (e) { return false; }
+  });
+  function toggleColorCoding() {
+    var next = !colorCoding;
+    setColorCoding(next);
+    try { localStorage.setItem('nsh-venue-color-coding', next ? 'on' : 'off'); } catch (e) {}
+  }
 
   // Detail popup for a row in the new Upcoming Tours card -- shows the
   // submitted tour-request info, and lets staff reschedule or mark a no-show
@@ -18407,7 +18415,23 @@ function VenueRentalsView({ navigate, initialTab }) {
     .sort(function(a, b) { return a.date - b.date; });
 
   return (
-    <div>
+    <div className={colorCoding ? 'venue-color-coding' : 'venue-neutral'}>
+      <style>{`
+        .venue-color-coding [data-venue-tone] {
+          background: var(--venue-paper) !important;
+          border-color: var(--venue-edge) !important;
+          box-shadow: inset 0 4px 0 var(--venue-accent), 0 3px 10px rgba(42,36,32,.04);
+        }
+        [data-venue-tone="tours"] { --venue-paper:#f0f6ff; --venue-edge:#c7daf0; --venue-accent:#598bc1; }
+        [data-venue-tone="requests"] { --venue-paper:#fff5e5; --venue-edge:#ecd3a5; --venue-accent:#c68d33; }
+        [data-venue-tone="messages"] { --venue-paper:#f5f0ff; --venue-edge:#dcd0ef; --venue-accent:#9875bb; }
+        [data-venue-tone="inquiries"] { --venue-paper:#fffbe5; --venue-edge:#e7dca5; --venue-accent:#b5a047; }
+        .venue-color-coding .vc-card[data-venue-state="ready"] { background:#f1f8f0; border-color:#c6dfc2; box-shadow:inset 4px 0 0 #65965a; }
+        .venue-color-coding .vc-card[data-venue-state="attention"] { background:#fff8e8; border-color:#ecd7a5; box-shadow:inset 4px 0 0 #c79535; }
+        .venue-color-coding .vc-card[data-venue-state="overdue"] { background:#fff1f1; border-color:#edcaca; box-shadow:inset 4px 0 0 #bf6c6c; }
+        .venue-color-coding .vc-side-card.priority { background:#fff3e9; border-color:#ecd1b9; }
+        .venue-color-coding .vc-side-card:not(.priority) { background:#f0f6ff; border-color:#c7daf0; }
+      `}</style>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 280px', minWidth: 0 }}>
           <div style={{ fontSize: 26, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Venue Rentals Dashboard</div>
@@ -18433,9 +18457,23 @@ function VenueRentalsView({ navigate, initialTab }) {
           <button onClick={function() { navigate('estate-tours'); }} style={{ flexShrink: 0, padding: '10px 18px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             Edit Tour Schedule
           </button>
+          <button type="button" aria-pressed={colorCoding} onClick={toggleColorCoding}
+            title="Color-code this dashboard. Saved only in this browser."
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0, padding: '9px 12px', background: colorCoding ? '#f5f0ff' : 'none', border: '1px solid ' + (colorCoding ? '#c8b5de' : '#e0d8cc'), borderRadius: 8, color: colorCoding ? '#745295' : '#777', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3 1.5 1.5 0 0 1 1.1-2.5H18a3 3 0 0 0 3-3A9 9 0 0 0 12 3Z"/><circle cx="7.5" cy="11" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="7.5" r="1" fill="currentColor" stroke="none"/></svg>
+            Color coding <span style={{ fontSize: 10, fontWeight: 500 }}>{colorCoding ? 'On' : 'Off'}</span>
+          </button>
         </div>
       </div>
 
+      {colorCoding && (
+        <div aria-label="Color key" style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 11, color: '#777', marginBottom: 16 }}>
+          {(venueTab === 'clients'
+            ? [['#65965a', 'On track'], ['#c79535', 'Needs attention'], ['#bf6c6c', 'Past due']]
+            : [['#598bc1', 'Upcoming tours'], ['#c68d33', 'Tour requests'], ['#9875bb', 'Messages'], ['#b5a047', 'Inquiries']]
+          ).map(function(item) { return <span key={item[1]} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 2, background: item[0] }} />{item[1]}</span>; })}
+        </div>
+      )}
       {inquiriesError && <div role="alert" style={{ padding: 16, border: '1px solid #e7c9be', borderRadius: 10, background: '#fff5ef', marginBottom: 16, color: '#8c4c35', fontSize: 13 }}>{inquiriesError}. <button type="button" onClick={loadInquiries} style={{background:'none',border:0,textDecoration:'underline',color:'inherit',cursor:'pointer'}}>Try again</button></div>}
       {!SHOW_LEGACY_VENUE_DASHBOARD && (
         <div style={{ display: 'grid', gridTemplateColumns: venueTab === 'clients' ? 'minmax(0, 1fr)' : 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 16 }}>
@@ -18443,6 +18481,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           <VenueOverviewCard
             icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}
             title="Upcoming Tours"
+            tone="tours"
             onViewAll={function() { navigate('estate-tours'); }}
           >
             {tours === null ? (
@@ -18466,7 +18505,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
                         <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{when}</div>
                       </div>
-                      <div style={{ flexShrink: 0, width: 78, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 10, fontWeight: 700, padding: '3px 0', borderRadius: 20, background: tourCategoryColor(tourCategoryLabel(e)).bg, color: tourCategoryColor(tourCategoryLabel(e)).color }}>{tourCategoryLabel(e)}</div>
+                      <div style={{ flexShrink: 0, width: 78, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 10, fontWeight: 700, padding: '3px 0', borderRadius: 20, background: colorCoding ? tourCategoryColor(tourCategoryLabel(e)).bg : '#f0ece6', color: colorCoding ? tourCategoryColor(tourCategoryLabel(e)).color : '#777' }}>{tourCategoryLabel(e)}</div>
                       <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                   );
@@ -18543,7 +18582,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           setTimeout(function() { w.print(); }, 300);
         }
         return (
-          <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18 }}>
+          <div data-venue-tone="requests" style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Tour Requests</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -18614,6 +18653,7 @@ function VenueRentalsView({ navigate, initialTab }) {
             <VenueOverviewCard
               icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>}
               title="New Messages"
+              tone="messages"
               onViewAll={function() { navigate('venue-messages'); }}
             >
               {messages === null ? (
@@ -18648,7 +18688,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                 answered by automation, so this is a plain count (total, plus
                 how many came in this month) rather than a "needs reply" tally.
                 Click to see them all. */}
-            <div onClick={function() { navigate('venue-inquiries'); }} role="button" tabIndex={0}
+            <div data-venue-tone="inquiries" onClick={function() { navigate('venue-inquiries'); }} role="button" tabIndex={0}
               onKeyDown={function(ev) { if (ev.key === 'Enter') navigate('venue-inquiries'); }}
               style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -18933,9 +18973,9 @@ function VenueRentalsView({ navigate, initialTab }) {
 
 // Overview card shell for the new (non-legacy) Venue Rentals landing page --
 // icon + title + "View all" header, arbitrary content below.
-function VenueOverviewCard({ icon, title, onViewAll, children }) {
+function VenueOverviewCard({ icon, title, onViewAll, children, tone }) {
   return (
-    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18 }}>
+    <div data-venue-tone={tone} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {icon}
