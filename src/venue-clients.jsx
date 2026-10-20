@@ -9,8 +9,32 @@ function dateLabel(date) { return date ? new Date(date.includes('T') ? date : da
 function text(html) { return String(html || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(); }
 function amount(cents, currency = 'USD') { return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format((cents || 0) / 100); }
 
+// Store staff verification beside the form response, separately from the
+// immutable HoneyBook snapshot and the actual certificate-upload timestamp.
+export async function saveVenueInsuranceVerification({ baseUrl, apiKey, request = fetch }, responseId, verified, note = '') {
+  if (!responseId || typeof verified !== 'boolean') throw new Error('Choose a client and verification status.');
+  const headers = { apikey:apiKey, Authorization:'Bearer '+apiKey, 'Content-Type':'application/json' };
+  const resource = baseUrl + '/rest/v1/nsh_form_responses?id=eq.' + encodeURIComponent(responseId);
+  async function readResponse(res) {
+    if (!res.ok) throw new Error('Insurance verification could not be saved. Please try again.');
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('Client record is unavailable or you do not have permission to update it.');
+    return rows[0];
+  }
+  const current = await readResponse(await request(resource+'&select=id,form_id,answers', {headers}));
+  if (!['a3a383f7-e1db-4344-9dec-ea879ad3406d','668f27d4-7e2d-4ce6-ba0c-bac5ddf9d8f8'].includes(current.form_id)) throw new Error('This record is not a venue client.');
+  const now = new Date().toISOString();
+  const insurance = { verified, verified_at:verified ? now : null, updated_at:now, note:String(note).trim().slice(0,2000) };
+  const answers = { ...current.answers, __venue_checklist:{ ...current.answers?.__venue_checklist, insurance } };
+  const saved = await readResponse(await request(resource+'&form_id=eq.'+encodeURIComponent(current.form_id), {method:'PATCH',headers:{...headers,Prefer:'return=representation'},body:JSON.stringify({answers})}));
+  if (saved.answers?.__venue_checklist?.insurance?.verified !== verified) throw new Error('Verification was not saved. Please try again.');
+  return saved;
+}
+
 export function buildVenueClient(sub, live = null, today = venueDateKey()) {
   const a = sub.answers || {}, hb = a.__honeybook, p = hb?.project || {};
+  const insuranceCheck = a.__venue_checklist?.insurance;
+  const insuranceVerified = typeof insuranceCheck?.verified === 'boolean' ? insuranceCheck.verified : !!live?.insurance_uploaded_at;
   const eventDate = live?.event_date || p.project_date || a.sn9urgfr || a.evp_date || null;
   const eventEnd = p.project_end_date || eventDate;
   const responses = hb?.file_responses || [];
@@ -42,10 +66,10 @@ export function buildVenueClient(sub, live = null, today = venueDateKey()) {
   for (const [index, s] of unsigned.entries()) task('signature-' + index, s.signee_type === 'vendor' ? 'Venue countersignature' : 'Client signature', null, s.signee_name || 'Required signer', 'signature');
   if (!hb) task('booking', 'Review pre-booking details', null, 'Prepare the agreement and payment schedule', 'booking');
   if (!surveyComplete) task('survey', surveySent ? 'Complete event questionnaire' : 'Event questionnaire', requirementsDue, surveySent ? 'Sent; awaiting required answers' : 'Not yet on file', 'survey');
-  if (!live?.insurance_uploaded_at) task('insurance', 'Confirm insurance on file', requirementsDue, 'Coverage not verified in the portal', 'insurance');
+  if (!insuranceVerified) task('insurance', 'Confirm insurance on file', requirementsDue, 'Coverage not verified in the portal', 'insurance');
   if (!eventDate) task('date', 'Confirm event date', null, 'No date recorded', 'booking');
   tasks.sort((x, y) => x.rank - y.rank || (x.due || eventDate || '9999').localeCompare(y.due || eventDate || '9999'));
-  return { id:sub.id, sub, name, email, contacts, hb, eventDate, eventEnd, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified:!!live?.insurance_uploaded_at, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments?.amount_paid?.amount ?? null, balance:payments?.balance_due?.amount ?? null, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
+  return { id:sub.id, sub, name, email, contacts, hb, eventDate, eventEnd, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments?.amount_paid?.amount ?? null, balance:payments?.balance_due?.amount ?? null, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
 }
 
 const css = `
@@ -53,13 +77,34 @@ const css = `
 @media(min-width:1101px){.vc-sidebar{position:sticky;top:110px}}@media(max-width:1100px){.vc-layout{grid-template-columns:minmax(0,1fr)}.vc-sidebar{display:grid;grid-template-columns:1fr 1fr}}@media(max-width:650px){.vc-stats{grid-template-columns:1fr 1fr;gap:8px}.vc-stat{padding:13px}.vc-stat strong{font-size:25px}.vc-card-head{padding:15px 13px;gap:10px;flex-wrap:wrap}.vc-card-body{grid-template-columns:1fr 1fr;gap:18px;padding:16px 13px}.vc-card-body>div:last-child{grid-column:1/-1}.vc-card-foot{padding:10px 13px;flex-wrap:wrap}.vc-sidebar{grid-template-columns:1fr}.vc-name{font-size:17px}.vc-contact-grid{grid-template-columns:1fr}.vc-modal-head,.vc-modal-body{padding:18px}.vc-toolbar input{max-width:none;width:100%;flex-basis:100%}}
 `;
 
-function ClientDetail({ client, onClose }) {
+function InsuranceVerification({ client, onVerify }) {
+  const [note,setNote] = React.useState(client.insuranceCheck?.note || '');
+  const [saving,setSaving] = React.useState(false), [error,setError] = React.useState(''), [saved,setSaved] = React.useState(false);
+  async function save(verified) {
+    if (saving) return;
+    setSaving(true);setError('');setSaved(false);
+    try { await onVerify(client.id,verified,note);setSaved(true); }
+    catch(e) { setError(e.message || 'Could not save insurance verification.'); }
+    finally { setSaving(false); }
+  }
+  return <section aria-labelledby="vc-insurance-title" style={{border:'1px solid #e6dfd3',borderRadius:10,padding:16,marginTop:24}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><h3 id="vc-insurance-title" style={{margin:0}}>Insurance</h3><span className={'vc-pill '+(client.insuranceVerified?'good':'alert')}>{client.insuranceVerified?'Verified on file':'Needs verification'}</span></div>
+    <p className="vc-muted">{client.insuranceVerified ? (client.insuranceCheck?.verified_at ? 'Verified '+dateLabel(client.insuranceCheck.verified_at)+'.' : 'Certificate received '+dateLabel(client.insuranceUploadedAt)+'.') : 'After reviewing the certificate, mark it verified here—even if it was received by email or in HoneyBook.'}</p>
+    {client.sourceUrl && <p><a href={client.sourceUrl} target="_blank" rel="noopener noreferrer">Review documents in HoneyBook ↗</a></p>}
+    <label style={{display:'block',fontSize:12,color:'#6f685c'}}>Verification note <span className="vc-muted">(optional)</span><textarea aria-label="Insurance verification note" value={note} onChange={e=>{setNote(e.target.value);setSaved(false);}} disabled={saving || client.insuranceVerified} maxLength={2000} rows={2} placeholder="For example: certificate received by email; reviewed coverage and event date." style={{display:'block',width:'100%',marginTop:7,border:'1px solid #ded7cb',borderRadius:7,padding:10,font:'inherit',resize:'vertical',background:client.insuranceVerified?'#faf8f3':'white'}}/></label>
+    <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',marginTop:12}}><button type="button" disabled={saving || !onVerify} onClick={()=>save(!client.insuranceVerified)} style={{border:client.insuranceVerified?'1px solid #ded7cb':'1px solid #886c44',borderRadius:7,padding:'9px 13px',background:client.insuranceVerified?'white':'#886c44',color:client.insuranceVerified?'#6f685c':'white',opacity:saving?.6:1}}>{saving?'Saving…':client.insuranceVerified?'Undo verification':'Mark insurance verified'}</button>{saved&&<span role="status" className="vc-muted">{client.insuranceVerified?'Verification saved.':'Verification removed.'}</span>}</div>
+    {error&&<p role="alert" style={{fontSize:12,color:'#a64f3c',marginBottom:0}}>{error}</p>}
+  </section>;
+}
+
+function ClientDetail({ client, onClose, onVerify }) {
   const ref = React.useRef(null);
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
   return <dialog ref={ref} className="vc-dialog" aria-labelledby="vc-client-title" onCancel={onClose} onClick={e => { if(e.target === ref.current) onClose(); }}>
     <div className="vc-modal-head"><div style={{flex:1}}><div className="vc-label">{client.type} · {dateLabel(client.eventDate)}</div><h2 id="vc-client-title" className="vc-name" style={{fontSize:25}}>{client.name}</h2><div className="vc-muted">Client details</div></div><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button></div>
     <div className="vc-modal-body">
       <h3>Contacts</h3><div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div></div>)}</div>
+      <InsuranceVerification client={client} onVerify={onVerify}/>
       <h3>Payment schedule</h3>{client.payments ? <><p className="vc-muted">{amount(client.paid,client.currency)} paid · {amount(client.balance,client.currency)} remaining · {amount(client.total,client.currency)} invoice total</p><div style={{overflowX:'auto'}}><table className="vc-table"><thead><tr><th>Payment</th><th>Due</th><th>Amount</th><th>Status</th></tr></thead><tbody>{client.schedule.map((s,i) => <tr key={i}><td>{s.label}</td><td>{dateLabel(s.due)}</td><td>{amount(s.cents,s.currency)}</td><td><span className={'vc-pill '+(s.paid?'good':s.due && s.due < venueDateKey()?'danger':'')}>{s.paid?'Paid':s.due && s.due < venueDateKey()?'Past due':'Scheduled'}</span></td></tr>)}</tbody></table></div><p className="vc-muted">Original invoice schedule, including any security deposit. Payment names follow the source schedule order.</p></> : <p className="vc-muted">A payment schedule has not been recorded.</p>}
       <h3>Still to do</h3>{client.tasks.length ? client.tasks.map(task => <div key={task.key} className="vc-task"><div className="vc-task-head">{task.title}</div><div className="vc-task-name">{task.detail}</div><div className={'vc-task-date '+(task.overdue?'late':'')}>{task.due ? (task.overdue?'Past due · ':'Due ') + dateLabel(task.due) : 'Awaiting completion'}</div></div>) : <p className="vc-muted">No outstanding items recorded.</p>}
       {client.signatures && <><h3>Contract signatures</h3>{client.signatures.signatures.map((s,i) => <div className="vc-line" key={i}><span className={'vc-dot '+(s.signed?'good':'')}/><span>{s.signee_name} · {s.signed?'Signed '+dateLabel(s.signed_at):'Awaiting signature'}</span></div>)}</>}
@@ -69,18 +114,25 @@ function ClientDetail({ client, onClose }) {
   </dialog>;
 }
 
-export function VenueClientDashboard({ submissions, loadEvents }) {
+export function VenueClientDashboard({ submissions, loadEvents, saveInsurance }) {
   const [events,setEvents] = React.useState([]), [error,setError] = React.useState('');
+  const [savedResponses,setSavedResponses] = React.useState({});
   const [query,setQuery] = React.useState(''), [filter,setFilter] = React.useState('all'), [all,setAll] = React.useState(false), [allTasks,setAllTasks] = React.useState(false), [selected,setSelected] = React.useState(null);
   React.useEffect(() => { let cancelled=false; loadEvents().then(rows => {if(!cancelled)setEvents(rows);}).catch(() => {if(!cancelled)setError('Live requirement updates are unavailable. Showing the saved client records.');}); return()=>{cancelled=true;}; }, [loadEvents]);
   const today = venueDateKey();
-  const clients = (submissions || []).map(sub => buildVenueClient(sub,events.find(e=>e.prebooking_form_response_id===sub.id),today)).filter(c => !c.eventEnd || c.eventEnd >= today).sort((a,b)=>(a.eventDate || '9999').localeCompare(b.eventDate || '9999'));
+  const clients = (submissions || []).map(sub => buildVenueClient(savedResponses[sub.id] ? {...sub,...savedResponses[sub.id]} : sub,events.find(e=>e.prebooking_form_response_id===sub.id),today)).filter(c => !c.eventEnd || c.eventEnd >= today).sort((a,b)=>(a.eventDate || '9999').localeCompare(b.eventDate || '9999'));
   const urgent = clients.flatMap(client=>client.urgent.map(task=>({...task,client}))).sort((a,b)=>a.rank-b.rank || (a.due || a.client.eventDate || '9999').localeCompare(b.due || b.client.eventDate || '9999'));
   const upcoming = clients.flatMap(client=>client.tasks.filter(t=>t.due && t.due>=today).map(task=>({...task,client}))).sort((a,b)=>a.due.localeCompare(b.due));
   const dueSoon = clients.flatMap(c=>c.duePayments).filter(p=>p.due && p.due<=shiftDate(today,30));
   const matches = clients.filter(c=>(filter!=='attention'||c.urgent.length>0)&&(filter!=='soon'||(c.days!==null && c.days<=60))&&(!query || (c.name+' '+c.email+' '+c.eventDate).toLowerCase().includes(query.toLowerCase())));
   const shown = all ? matches : matches.slice(0,4);
-  const open = c => setSelected(c);
+  const open = c => setSelected(c.id);
+  const selectedClient = clients.find(c=>c.id===selected);
+  async function verifyInsurance(id,verified,note) {
+    if (!saveInsurance) throw new Error('Insurance verification is unavailable. Please reload and try again.');
+    const record = await saveInsurance(id,verified,note);
+    setSavedResponses(prev=>({...prev,[id]:record}));
+  }
   const setScope = scope => {setFilter(scope);setAll(false);};
   return <div className="vc-dashboard" style={{gridColumn:'1 / -1'}}>
     <style>{css}</style>
@@ -110,6 +162,6 @@ export function VenueClientDashboard({ submissions, loadEvents }) {
       <section className="vc-side-card"><h2 className="vc-side-title">Coming up next</h2><div className="vc-muted">Your next collection and planning deadlines.</div>{upcoming.slice(0,4).map(t=><button className="vc-task" key={t.key} onClick={()=>open(t.client)}><div className="vc-task-date">{dateLabel(t.due)}</div><div className="vc-task-head" style={{marginTop:4}}>{t.title}</div><div className="vc-task-name">{t.client.name}</div></button>)}{!upcoming.length&&<p className="vc-muted">No upcoming deadlines recorded.</p>}</section>
     </aside></div>
     {clients.some(c=>c.hb)&&<p className="vc-footer-note">HoneyBook payments and signatures reflect the saved import, not a live sync. Insurance marked “to verify” may already have been supplied outside this portal. Final-detail reminders are shown against the 30-day planning deadline.</p>}
-    {selected&&<ClientDetail client={selected} onClose={()=>setSelected(null)}/>}
+    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} onClose={()=>setSelected(null)} onVerify={verifyInsurance}/>}
   </div>;
 }

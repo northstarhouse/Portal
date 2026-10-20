@@ -1,6 +1,6 @@
 ﻿const { useState, useEffect } = React;
 
-import { VenueClientDashboard } from './venue-clients.jsx';
+import { VenueClientDashboard, saveVenueInsuranceVerification } from './venue-clients.jsx';
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
@@ -412,6 +412,10 @@ function loadVenueClientEvents() {
   return fetch(SUPABASE_URL + '/rest/v1/venue_inquiries?select=id,name,event_type,event_date,prebooking_form_response_id,insurance_uploaded_at,questionnaire_form_response_id,questionnaire_sent_at&prebooking_form_response_id=not.is.null', {
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
   }).then(function(r) { if (!r.ok) throw new Error('Could not load live event requirements'); return r.json(); }).then(function(rows) { if (!Array.isArray(rows)) throw new Error('Invalid event requirements'); return rows; });
+}
+
+function saveClientInsurance(responseId, verified, note) {
+  return saveVenueInsuranceVerification({ baseUrl:SUPABASE_URL, apiKey:SUPABASE_KEY }, responseId, verified, note);
 }
 
 // ─── ICS recurrence (RRULE) expansion ──────────────────────────────────────
@@ -18017,6 +18021,12 @@ function VenueRentalsView({ navigate, initialTab }) {
     setInquiriesError('');
     fetchVenueInquiries({ strict: true }).then(setInquiries).catch(function(error) { setInquiriesError(error.message); });
   }
+  function saveInsurance(responseId, verified, note) {
+    return saveClientInsurance(responseId, verified, note).then(function(saved) {
+      setInquiries(function(rows) { return rows && rows.map(function(row) { return row.id === saved.id ? Object.assign({}, row, saved) : row; }); });
+      return saved;
+    });
+  }
   const debounceTimers = useR({});
 
   // Detail popup for a row in the new Upcoming Tours card -- shows the
@@ -18465,7 +18475,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
 
           {venueTab === 'clients' && (
-            !inquiriesError && <VenueClientDashboard submissions={clientSubmissions} loadEvents={loadVenueClientEvents} />
+            !inquiriesError && <VenueClientDashboard submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} />
           )}
 
           {venueTab === 'inquiries' && (

@@ -7,6 +7,7 @@ const code = esbuild.transformSync(fs.readFileSync('src/venue-clients.jsx', 'utf
 const mod={exports:{}};
 vm.runInNewContext(code,{module:mod,exports:mod.exports,Intl,Date});
 const {buildVenueClient,venueDateKey}=mod.exports;
+const {saveVenueInsuranceVerification}=mod.exports;
 test('deployed browser artifact contains the dashboard without an unresolved module import',()=>{
   const artifact=fs.readFileSync('assets/app.js','utf8');
   assert.match(artifact,/vc-dashboard/);
@@ -28,6 +29,35 @@ test('never calls unverified insurance supplied or missing',()=>{
   assert.equal(c.insuranceVerified,false);assert.equal(c.tasks.find(t=>t.kind==='insurance').title,'Confirm insurance on file');
   const verified=buildVenueClient(submission(),{insurance_uploaded_at:'2026-10-01'},today);
   assert.equal(verified.tasks.some(t=>t.kind==='insurance'),false);
+});
+test('insurance verification saves separately, survives reload, and can be undone',async()=>{
+  let record=submission();record.answers.other_field='Preserve this';record.answers.__venue_checklist={another_check:{done:true}};
+  const original=JSON.stringify(record.answers.__honeybook);const writes=[];
+  const request=async(url,options)=>{
+    assert.match(url,/nsh_form_responses\?id=eq.one/);
+    if(options.method==='PATCH'){const payload=JSON.parse(options.body);writes.push(payload);record={...record,...payload};}
+    return Response.json([record]);
+  };
+  const config={baseUrl:'https://example.test',apiKey:'test',request};
+  const saved=await saveVenueInsuranceVerification(config,'one',true,'Received by email; certificate reviewed.');
+  assert.equal(saved.answers.other_field,'Preserve this');
+  assert.equal(JSON.stringify(saved.answers.__honeybook),original);
+  assert.equal(saved.answers.__venue_checklist.another_check.done,true);
+  assert.ok(saved.answers.__venue_checklist.insurance.verified_at);
+  const reloaded=buildVenueClient(JSON.parse(JSON.stringify(saved)),null,today);
+  assert.equal(reloaded.insuranceVerified,true);assert.equal(reloaded.tasks.some(t=>t.kind==='insurance'),false);
+  const undone=await saveVenueInsuranceVerification(config,'one',false,'Received by email; certificate reviewed.');
+  assert.equal(undone.answers.__venue_checklist.insurance.verified_at,null);
+  assert.equal(buildVenueClient(undone,null,today).tasks.some(t=>t.kind==='insurance'),true);
+  assert.equal(writes.length,2);assert.deepEqual(Object.keys(writes[0]),['answers']);
+});
+test('insurance save rejects failed or empty writes instead of showing a false success',async()=>{
+  const run=async response=>{
+    const request=async(url,options)=>options.method==='PATCH'?response:Response.json([submission()]);
+    return saveVenueInsuranceVerification({baseUrl:'https://example.test',apiKey:'test',request},'one',true);
+  };
+  await assert.rejects(run(new Response('denied',{status:403})),/could not be saved/);
+  await assert.rejects(run(Response.json([])),/unavailable or you do not have permission/);
 });
 test('uses a 30-calendar-day final-detail deadline across DST',()=>{
   const c=buildVenueClient(submission({project:{name:'Wedding',project_date:'2026-11-07'}}),null,today);
