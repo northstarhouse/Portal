@@ -25,6 +25,7 @@ Deno.serve(async req=>{
    const th=await tokenHash(raw);const resolved=await rpc('resolve',{token_hash:th});const signer=resolved.signer;
    if(action==='view'){const result=await rpc('view',{token_hash:th});return json({...result,signer:{id:result.signer.id,name:result.signer.name,email:mask(result.signer.email),role:result.signer.role,status:result.signer.status},version:publicRecord(result.version)});}
    if(action==='client_pdf')return new Response(await agreementPdf(resolved.version),{headers:{...CORS,'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="North-Star-House-agreement-v'+resolved.version.version+'.pdf"'}});
+   if(signer.status!=='pending')return json({error:'This signature response is already recorded and locked. You can view or download the agreement; changes require a new version.'},409);
    if(action==='request_code'){
     const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,'0');
     await rpc('code',{token_hash:th,code_hash:await codeHash(signer.id,code)});
