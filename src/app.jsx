@@ -1,12 +1,14 @@
 ﻿const { useState, useEffect } = React;
 
 import { VenueClientDashboard, saveVenueInsuranceVerification } from './venue-clients.jsx';
+import { createAgreementApi, AgreementSigningPage } from './venue-contracts.jsx';
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
 const WIX_FORMS_URL = "https://script.google.com/macros/s/AKfycbzY3c6_xF2ucrZrQnZLa1bcU2TIcFadBH9UEeIbJYMKumvxygql8ulN-67q1Vu_WM4h/exec";
 
 const APP_TOKEN_KEY = 'nsh-app-token';
+const venueAgreementApi = createAgreementApi({baseUrl:SUPABASE_URL,apiKey:SUPABASE_KEY,staffToken:function(){try{return localStorage.getItem(APP_TOKEN_KEY);}catch(e){return null;}}});
 
 (function installFetchGate() {
   if (window.__nshFetchGated) return;
@@ -18475,7 +18477,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
 
           {venueTab === 'clients' && (
-            !inquiriesError && <VenueClientDashboard submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} />
+            !inquiriesError && <VenueClientDashboard submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} agreementApi={venueAgreementApi} />
           )}
 
           {venueTab === 'inquiries' && (
@@ -22530,4 +22532,5 @@ function Dashboard() {
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(React.createElement(AppGate, null, React.createElement(Dashboard)));
+const agreementToken = new URLSearchParams(window.location.hash.slice(1)).get('agreement');
+root.render(agreementToken ? React.createElement(AgreementSigningPage, {api:venueAgreementApi,token:agreementToken}) : React.createElement(AppGate, null, React.createElement(Dashboard)));

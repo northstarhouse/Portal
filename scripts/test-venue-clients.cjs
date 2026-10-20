@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const esbuild = require('esbuild');
-const code = esbuild.transformSync(fs.readFileSync('src/venue-clients.jsx', 'utf8'), {loader:'jsx',format:'cjs'}).code;
+const code = esbuild.buildSync({entryPoints:['src/venue-clients.jsx'],bundle:true,write:false,format:'cjs'}).outputFiles[0].text;
 const mod={exports:{}};
 vm.runInNewContext(code,{module:mod,exports:mod.exports,Intl,Date});
 const {buildVenueClient,venueDateKey}=mod.exports;
@@ -83,6 +83,14 @@ test('native pre-booking retains unknown finances and the correct event type',()
 test('preserves a multi-day event end rather than hiding an ongoing event',()=>{
   const c=buildVenueClient(submission({project:{name:'Rehearsal & Wedding',project_date:'2026-10-18',project_end_date:'2026-10-20'}}),null,today);
   assert.equal(c.eventEnd,'2026-10-20');assert.equal(c.days,-1);
+});
+test('new portal agreements replace imported signature status without changing imported money',()=>{
+ const native=[{id:'native',response_id:'one',version:2,status:'completed',recipients:[{name:'Client',role:'client',status:'signed'},{name:'Venue',role:'venue',status:'signed'}]}];
+ const c=buildVenueClient(submission(),null,today,native);
+ assert.equal(c.unsigned.length,0);assert.equal(c.signatures.all_required_signed,true);assert.equal(c.balance,80000);
+ native[0].status='expired';native[0].recipients[0].status='pending';
+ const expired=buildVenueClient(submission(),null,today,native);
+ assert.ok(expired.tasks.some(t=>t.title==='Prepare revised agreement'));assert.equal(expired.tasks.some(t=>t.kind==='signature'),false);
 });
 const source=fs.readFileSync('src/app.jsx','utf8');
 const loader=source.slice(source.indexOf('function fetchVenueInquiries('),source.indexOf('function loadVenueClientEvents('));

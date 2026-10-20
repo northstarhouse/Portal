@@ -1,3 +1,4 @@
+import { ContractManager } from './venue-contracts.jsx';
 // Client dashboard: reads the imported source snapshot without changing signed
 // agreements, invoice schedules, or sending any client communications.
 export function venueDateKey(date = new Date()) {
@@ -31,7 +32,7 @@ export async function saveVenueInsuranceVerification({ baseUrl, apiKey, request 
   return saved;
 }
 
-export function buildVenueClient(sub, live = null, today = venueDateKey()) {
+export function buildVenueClient(sub, live = null, today = venueDateKey(), nativeVersions = []) {
   const a = sub.answers || {}, hb = a.__honeybook, p = hb?.project || {};
   const insuranceCheck = a.__venue_checklist?.insurance;
   const insuranceVerified = typeof insuranceCheck?.verified === 'boolean' ? insuranceCheck.verified : !!live?.insurance_uploaded_at;
@@ -44,7 +45,8 @@ export function buildVenueClient(sub, live = null, today = venueDateKey()) {
   // Prefer signatures on the selected invoice, rather than an older signed file.
   const contract = invoice?.responses?.signatures ? invoice : latest(r => r.responses?.signatures);
   const payments = invoice?.responses?.payments || null;
-  const signatures = contract?.responses?.signatures || null;
+  const nativeAgreement = nativeVersions.filter(v=>v.response_id===sub.id&&!['draft','void'].includes(v.status)).sort((a,b)=>b.version-a.version)[0] || null;
+  const signatures = nativeAgreement ? {all_required_signed:nativeAgreement.status==='completed',signatures:(nativeAgreement.recipients||[]).map(s=>({signee_name:s.name,signee_type:s.role==='venue'?'vendor':'client',required:true,signed:s.status==='signed',signed_at:s.signed_at}))} : contract?.responses?.signatures || null;
   const currency = payments?.total?.currency || 'USD';
   const schedule = (payments?.schedule || []).map((payment, index) => ({ ...payment, cents: payment.amount?.amount || 0, currency: payment.amount?.currency || currency, label: index === 0 ? 'Booking payment' : 'Scheduled payment ' + (index + 1), due: payment.due_date?.slice(0, 10) || null })).sort((x, y) => (x.due || '9999').localeCompare(y.due || '9999'));
   const duePayments = schedule.filter(s => !s.paid);
@@ -63,13 +65,14 @@ export function buildVenueClient(sub, live = null, today = venueDateKey()) {
     tasks.push({ key: sub.id + '-' + key, title, due, detail, kind, overdue, urgent: overdue || soon || kind === 'signature' || kind === 'booking', rank: overdue ? 0 : kind === 'signature' || kind === 'booking' ? 1 : soon ? 2 : 3 });
   }
   for (const payment of duePayments) task('payment-' + schedule.indexOf(payment), 'Collect ' + amount(payment.cents, payment.currency), payment.due, payment.label, 'payment');
-  for (const [index, s] of unsigned.entries()) task('signature-' + index, s.signee_type === 'vendor' ? 'Venue countersignature' : 'Client signature', null, s.signee_name || 'Required signer', 'signature');
+  if (nativeAgreement && ['declined','expired'].includes(nativeAgreement.status)) task('contract-revision','Prepare revised agreement',null,'Previous request '+nativeAgreement.status,'booking');
+  else for (const [index, s] of unsigned.entries()) task('signature-' + index, s.signee_type === 'vendor' ? 'Venue countersignature' : 'Client signature', null, s.signee_name || 'Required signer', 'signature');
   if (!hb) task('booking', 'Review pre-booking details', null, 'Prepare the agreement and payment schedule', 'booking');
   if (!surveyComplete) task('survey', surveySent ? 'Complete event questionnaire' : 'Event questionnaire', requirementsDue, surveySent ? 'Sent; awaiting required answers' : 'Not yet on file', 'survey');
   if (!insuranceVerified) task('insurance', 'Confirm insurance on file', requirementsDue, 'Coverage not verified in the portal', 'insurance');
   if (!eventDate) task('date', 'Confirm event date', null, 'No date recorded', 'booking');
   tasks.sort((x, y) => x.rank - y.rank || (x.due || eventDate || '9999').localeCompare(y.due || eventDate || '9999'));
-  return { id:sub.id, sub, name, email, contacts, hb, eventDate, eventEnd, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments?.amount_paid?.amount ?? null, balance:payments?.balance_due?.amount ?? null, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
+  return { id:sub.id, sub, name, email, contacts, hb, eventDate, eventEnd, nativeAgreement, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments?.amount_paid?.amount ?? null, balance:payments?.balance_due?.amount ?? null, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
 }
 
 const css = `
@@ -97,7 +100,7 @@ function InsuranceVerification({ client, onVerify }) {
   </section>;
 }
 
-function ClientDetail({ client, onClose, onVerify }) {
+function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChange }) {
   const ref = React.useRef(null);
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
   return <dialog ref={ref} className="vc-dialog" aria-labelledby="vc-client-title" onCancel={onClose} onClick={e => { if(e.target === ref.current) onClose(); }}>
@@ -105,6 +108,7 @@ function ClientDetail({ client, onClose, onVerify }) {
     <div className="vc-modal-body">
       <h3>Contacts</h3><div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div></div>)}</div>
       <InsuranceVerification client={client} onVerify={onVerify}/>
+      {agreementApi&&<ContractManager client={client} api={agreementApi} onChange={onContractsChange}/>}
       <h3>Payment schedule</h3>{client.payments ? <><p className="vc-muted">{amount(client.paid,client.currency)} paid · {amount(client.balance,client.currency)} remaining · {amount(client.total,client.currency)} invoice total</p><div style={{overflowX:'auto'}}><table className="vc-table"><thead><tr><th>Payment</th><th>Due</th><th>Amount</th><th>Status</th></tr></thead><tbody>{client.schedule.map((s,i) => <tr key={i}><td>{s.label}</td><td>{dateLabel(s.due)}</td><td>{amount(s.cents,s.currency)}</td><td><span className={'vc-pill '+(s.paid?'good':s.due && s.due < venueDateKey()?'danger':'')}>{s.paid?'Paid':s.due && s.due < venueDateKey()?'Past due':'Scheduled'}</span></td></tr>)}</tbody></table></div><p className="vc-muted">Original invoice schedule, including any security deposit. Payment names follow the source schedule order.</p></> : <p className="vc-muted">A payment schedule has not been recorded.</p>}
       <h3>Still to do</h3>{client.tasks.length ? client.tasks.map(task => <div key={task.key} className="vc-task"><div className="vc-task-head">{task.title}</div><div className="vc-task-name">{task.detail}</div><div className={'vc-task-date '+(task.overdue?'late':'')}>{task.due ? (task.overdue?'Past due · ':'Due ') + dateLabel(task.due) : 'Awaiting completion'}</div></div>) : <p className="vc-muted">No outstanding items recorded.</p>}
       {client.signatures && <><h3>Contract signatures</h3>{client.signatures.signatures.map((s,i) => <div className="vc-line" key={i}><span className={'vc-dot '+(s.signed?'good':'')}/><span>{s.signee_name} · {s.signed?'Signed '+dateLabel(s.signed_at):'Awaiting signature'}</span></div>)}</>}
@@ -114,13 +118,15 @@ function ClientDetail({ client, onClose, onVerify }) {
   </dialog>;
 }
 
-export function VenueClientDashboard({ submissions, loadEvents, saveInsurance }) {
+export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, agreementApi }) {
   const [events,setEvents] = React.useState([]), [error,setError] = React.useState('');
   const [savedResponses,setSavedResponses] = React.useState({});
+  const [nativeVersions,setNativeVersions] = React.useState([]);
+  React.useEffect(()=>{let cancelled=false;function refresh(){if(agreementApi)agreementApi('summary').then(rows=>{if(!cancelled)setNativeVersions(rows);}).catch(()=>{if(!cancelled)setError('Live agreement status is unavailable. Showing the saved client records.');});}refresh();const timer=setInterval(refresh,60000);window.addEventListener('focus',refresh);return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',refresh);};},[agreementApi]);
   const [query,setQuery] = React.useState(''), [filter,setFilter] = React.useState('all'), [all,setAll] = React.useState(false), [allTasks,setAllTasks] = React.useState(false), [selected,setSelected] = React.useState(null);
   React.useEffect(() => { let cancelled=false; loadEvents().then(rows => {if(!cancelled)setEvents(rows);}).catch(() => {if(!cancelled)setError('Live requirement updates are unavailable. Showing the saved client records.');}); return()=>{cancelled=true;}; }, [loadEvents]);
   const today = venueDateKey();
-  const clients = (submissions || []).map(sub => buildVenueClient(savedResponses[sub.id] ? {...sub,...savedResponses[sub.id]} : sub,events.find(e=>e.prebooking_form_response_id===sub.id),today)).filter(c => !c.eventEnd || c.eventEnd >= today).sort((a,b)=>(a.eventDate || '9999').localeCompare(b.eventDate || '9999'));
+  const clients = (submissions || []).map(sub => buildVenueClient(savedResponses[sub.id] ? {...sub,...savedResponses[sub.id]} : sub,events.find(e=>e.prebooking_form_response_id===sub.id),today,nativeVersions)).filter(c => !c.eventEnd || c.eventEnd >= today).sort((a,b)=>(a.eventDate || '9999').localeCompare(b.eventDate || '9999'));
   const urgent = clients.flatMap(client=>client.urgent.map(task=>({...task,client}))).sort((a,b)=>a.rank-b.rank || (a.due || a.client.eventDate || '9999').localeCompare(b.due || b.client.eventDate || '9999'));
   const upcoming = clients.flatMap(client=>client.tasks.filter(t=>t.due && t.due>=today).map(task=>({...task,client}))).sort((a,b)=>a.due.localeCompare(b.due));
   const dueSoon = clients.flatMap(c=>c.duePayments).filter(p=>p.due && p.due<=shiftDate(today,30));
@@ -150,7 +156,7 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance })
       {submissions===null ? <div role="status" className="vc-empty">Loading client events…</div> : shown.length===0 ? <div className="vc-empty">{clients.length?'No events match this view.':'No upcoming client events yet.'}{clients.length>0&&<div><button className="vc-text-button" onClick={()=>{setQuery('');setScope('all');}}>Show all upcoming events</button></div>}</div> : shown.map(c=>{
         const pastDue=c.duePayments.find(p=>p.due && p.due<today), next=c.duePayments[0];
         return <article key={c.id} className="vc-card"><div className="vc-card-head"><div className="vc-date"><small>{c.eventDate ? new Date(c.eventDate+'T12:00:00').toLocaleDateString('en-US',{month:'short'}) : 'Date'}</small><strong>{c.eventDate?Number(c.eventDate.slice(8,10)):'?'}</strong></div><div className="vc-head-main"><h3 className="vc-name">{c.name}</h3><div className="vc-muted">{dateLabel(c.eventDate)}{c.eventEnd && c.eventEnd!==c.eventDate?' – '+dateLabel(c.eventEnd):''} · {c.type}{c.days!==null?' · '+(c.days>0?c.days+' days away':c.days===0?'Today':'In progress'):''}</div></div><button className="vc-open" onClick={()=>open(c)} aria-label={'View details for '+c.name}>View details</button></div>
-          <div className="vc-card-body"><div><div className="vc-label">Agreement</div><span className={'vc-pill '+(c.signatures ? c.unsigned.length?'alert':'good':'')}>{c.signatures ? c.unsigned.length?'Signature pending':'Fully signed':'Not on file'}</span>{c.unsigned.map((s,i)=><div key={i} className="vc-muted" style={{marginTop:5}}>{s.signee_type==='vendor'?'Venue':'Client'} · {s.signee_name}</div>)}</div>
+          <div className="vc-card-body"><div><div className="vc-label">Agreement</div><span className={'vc-pill '+(c.signatures ? c.unsigned.length?'alert':'good':'')}>{c.nativeAgreement && ['declined','expired'].includes(c.nativeAgreement.status) ? (c.nativeAgreement.status==='declined'?'Revision declined':'Signing request expired') : c.signatures ? c.unsigned.length?'Signature pending':'Fully signed':'Not on file'}</span>{c.unsigned.map((s,i)=><div key={i} className="vc-muted" style={{marginTop:5}}>{s.signee_type==='vendor'?'Venue':'Client'} · {s.signee_name}</div>)}</div>
           <div><div className="vc-label">Payments</div>{c.payments ? <><div className="vc-payment-amount">{amount(c.paid,c.currency)} <span className="vc-muted">of {amount(c.total,c.currency)}</span></div><div className="vc-progress" role="progressbar" aria-label="Invoice paid" aria-valuemin={0} aria-valuemax={100} aria-valuenow={c.total ? Math.round(c.paid/c.total*100):0}><span style={{width:Math.max(0,Math.min(100,c.total?c.paid/c.total*100:0))+'%'}}/></div><div className="vc-muted">{c.balance===0?'Paid in full':amount(c.balance,c.currency)+' remaining'}</div>{pastDue&&<span className="vc-pill danger" style={{marginTop:7}}>Payment past due</span>}</> : <div className="vc-muted">Schedule not yet recorded</div>}</div>
           <div><div className="vc-label">Final details</div><div className="vc-line"><span className={'vc-dot '+(c.surveyComplete?'good':'')}/>{c.surveyComplete?'Questionnaire complete':c.surveySent?'Questionnaire in progress':'Questionnaire to collect'}</div><div className="vc-line"><span className={'vc-dot '+(c.insuranceVerified?'good':'')}/>{c.insuranceVerified?'Insurance on file':'Insurance to verify'}</div></div></div>
           <div className="vc-card-foot"><span>{next ? (pastDue?'Past due: ':'Next payment: ')+amount(next.cents,next.currency)+(next.due?' · '+dateLabel(next.due):'') : c.payments?'No remaining scheduled payments':'Review booking paperwork'}</span><span>{c.requirementsDue?'Final details due '+dateLabel(c.requirementsDue):'Event date to confirm'}</span></div>
@@ -161,7 +167,7 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance })
       <section className="vc-side-card priority"><h2 className="vc-side-title">Needs your attention <span className="vc-counter">{submissions===null?'—':urgent.length}</span></h2><div className="vc-muted">Past due first, then signatures and approaching deadlines.</div>{submissions===null?<p className="vc-muted">Loading priorities…</p>:urgent.length===0?<p className="vc-muted">No urgent items recorded.</p>:(allTasks?urgent:urgent.slice(0,6)).map(t=><button className="vc-task" key={t.key} onClick={()=>open(t.client)}><div className="vc-task-head">{t.title}</div><div className="vc-task-name">{t.client.name}</div><div className={'vc-task-date '+(t.overdue?'late':'')}>{t.due?(t.overdue?'Past due · ':'Due ')+dateLabel(t.due):t.detail}</div></button>)}{urgent.length>6&&<button className="vc-text-button" onClick={()=>setAllTasks(!allTasks)}>{allTasks?'Show fewer priorities':'See all '+urgent.length+' priorities ↓'}</button>}</section>
       <section className="vc-side-card"><h2 className="vc-side-title">Coming up next</h2><div className="vc-muted">Your next collection and planning deadlines.</div>{upcoming.slice(0,4).map(t=><button className="vc-task" key={t.key} onClick={()=>open(t.client)}><div className="vc-task-date">{dateLabel(t.due)}</div><div className="vc-task-head" style={{marginTop:4}}>{t.title}</div><div className="vc-task-name">{t.client.name}</div></button>)}{!upcoming.length&&<p className="vc-muted">No upcoming deadlines recorded.</p>}</section>
     </aside></div>
-    {clients.some(c=>c.hb)&&<p className="vc-footer-note">HoneyBook payments and signatures reflect the saved import, not a live sync. Insurance marked “to verify” may already have been supplied outside this portal. Final-detail reminders are shown against the 30-day planning deadline.</p>}
-    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} onClose={()=>setSelected(null)} onVerify={verifyInsurance}/>}
+    {clients.some(c=>c.hb)&&<p className="vc-footer-note">Imported HoneyBook payments and signatures are snapshots. New portal agreements refresh automatically. Insurance marked “to verify” may already have been supplied outside this portal. Final-detail reminders are shown against the 30-day planning deadline.</p>}
+    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} onClose={()=>setSelected(null)} onVerify={verifyInsurance} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }

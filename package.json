@@ -16,7 +16,9 @@
   "author": "North Star House",
   "license": "ISC",
   "devDependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "esbuild": "^0.27.2",
-    "jimp": "^1.6.0"
+    "jimp": "^1.6.0",
+    "pdf-lib": "^1.17.1"
   }
 }
