@@ -1,5 +1,7 @@
 ﻿const { useState, useEffect } = React;
 
+import { VenueClientDashboard } from './venue-clients.jsx';
+
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
 const WIX_FORMS_URL = "https://script.google.com/macros/s/AKfycbzY3c6_xF2ucrZrQnZLa1bcU2TIcFadBH9UEeIbJYMKumvxygql8ulN-67q1Vu_WM4h/exec";
@@ -377,12 +379,20 @@ function inquiryPreviewFields(inq) {
   };
 }
 
-function fetchVenueInquiries() {
+function fetchVenueInquiries(options) {
   var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
   var idFilter = 'in.(' + RENTAL_INQUIRY_FORM_IDS.join(',') + ')';
+  function readJson(r) { if (!r.ok) throw new Error('Could not load venue client records'); return r.json(); }
+  function responses(offset, accumulated) {
+    return fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?form_id=' + idFilter + '&select=*&order=created_at.desc,id.desc&limit=200&offset=' + offset, { headers: hdrs }).then(readJson).then(function(rows) {
+      if (!Array.isArray(rows)) throw new Error('Invalid venue client response');
+      var all = accumulated.concat(rows);
+      return rows.length === 200 ? responses(offset + 200, all) : all;
+    });
+  }
   return Promise.all([
-    fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=' + idFilter + '&select=id,title,fields', { headers: hdrs }).then(function(r) { return r.json(); }),
-    fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?form_id=' + idFilter + '&select=*&order=created_at.desc&limit=200', { headers: hdrs }).then(function(r) { return r.json(); }),
+    fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=' + idFilter + '&select=id,title,fields', { headers: hdrs }).then(readJson),
+    responses(0, []),
   ]).then(function(res) {
     var forms = Array.isArray(res[0]) ? res[0] : [];
     var formById = {};
@@ -395,7 +405,13 @@ function fetchVenueInquiries() {
         created_at: r.created_at, status: r.status, internal_notes: r.internal_notes, answers: r.answers || {},
       };
     });
-  }).catch(function() { return []; });
+  }).catch(function(error) { if (options && options.strict) throw error; return []; });
+}
+
+function loadVenueClientEvents() {
+  return fetch(SUPABASE_URL + '/rest/v1/venue_inquiries?select=id,name,event_type,event_date,prebooking_form_response_id,insurance_uploaded_at,questionnaire_form_response_id,questionnaire_sent_at&prebooking_form_response_id=not.is.null', {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+  }).then(function(r) { if (!r.ok) throw new Error('Could not load live event requirements'); return r.json(); }).then(function(rows) { if (!Array.isArray(rows)) throw new Error('Invalid event requirements'); return rows; });
 }
 
 // ─── ICS recurrence (RRULE) expansion ──────────────────────────────────────
@@ -17976,7 +17992,7 @@ function tourCategoryLabel(e) {
   return 'Tour';
 }
 
-function VenueRentalsView({ navigate }) {
+function VenueRentalsView({ navigate, initialTab }) {
   const { useState: useS, useEffect: useE, useRef: useR } = React;
   const [weddings, setWeddings] = useS([]);
   const [tracking, setTracking] = useS({});
@@ -17986,12 +18002,21 @@ function VenueRentalsView({ navigate }) {
   const [editingField, setEditingField] = useS(null); // { uid, field: 'ig'|'album', val }
   const [messages, setMessages] = useS(null); // null while loading, [] once loaded
   const [inquiries, setInquiries] = useS(null);
+  const [inquiriesError, setInquiriesError] = useS('');
   const [tours, setTours] = useS(null); // booked/requested estate_tours rows
   const [reqSavingId, setReqSavingId] = useS(null); // request_handled toggle in-flight for this tour id
   const [justBooked, setJustBooked] = useS(null); // tour request booked via "Add to Calendar" (for the confirmation line)
   const [scheduleOpen, setScheduleOpen] = useS(false);
   // Tours stay in Inquiries. Clients begin with an official pre-booking submission.
-  const [venueTab, setVenueTab] = useS('inquiries');
+  const [venueTab, setVenueTab] = useS(function() {
+    if (initialTab) return initialTab;
+    try { return sessionStorage.getItem('nsh-venue-tab') === 'clients' ? 'clients' : 'inquiries'; } catch (e) { return 'inquiries'; }
+  });
+  useE(function() { try { sessionStorage.setItem('nsh-venue-tab', venueTab); } catch (e) {} }, [venueTab]);
+  function loadInquiries() {
+    setInquiriesError('');
+    fetchVenueInquiries({ strict: true }).then(setInquiries).catch(function(error) { setInquiriesError(error.message); });
+  }
   const debounceTimers = useR({});
 
   // Detail popup for a row in the new Upcoming Tours card -- shows the
@@ -18125,7 +18150,7 @@ function VenueRentalsView({ navigate }) {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) { setMessages(Array.isArray(rows) ? rows : []); }).catch(function() { setMessages([]); });
 
-    fetchVenueInquiries().then(function(rows) { setInquiries(rows); });
+    loadInquiries();
 
     loadTours();
   }, []);
@@ -18372,11 +18397,11 @@ function VenueRentalsView({ navigate }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div style={{ flexShrink: 0 }}>
-          <div style={{ fontSize: 26, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", whiteSpace: 'nowrap' }}>Venue Rentals Dashboard</div>
-          <div style={{ fontSize: 13, color: '#999', marginTop: 4, whiteSpace: 'nowrap' }}>Manage inquiries, tours, and bookings for North Star House.</div>
+        <div style={{ flex: '1 1 280px', minWidth: 0 }}>
+          <div style={{ fontSize: 26, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Venue Rentals Dashboard</div>
+          <div style={{ fontSize: 13, color: '#999', marginTop: 4 }}>Manage inquiries, tours, and bookings for North Star House.</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'nowrap', marginLeft: 'auto', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginLeft: 'auto' }}>
           {!SHOW_LEGACY_VENUE_DASHBOARD && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
               {[['inquiries', 'Inquiries'], ['clients', 'Clients']].map(function(pair, index) {
@@ -18399,8 +18424,9 @@ function VenueRentalsView({ navigate }) {
         </div>
       </div>
 
+      {inquiriesError && <div role="alert" style={{ padding: 16, border: '1px solid #e7c9be', borderRadius: 10, background: '#fff5ef', marginBottom: 16, color: '#8c4c35', fontSize: 13 }}>{inquiriesError}. <button type="button" onClick={loadInquiries} style={{background:'none',border:0,textDecoration:'underline',color:'inherit',cursor:'pointer'}}>Try again</button></div>}
       {!SHOW_LEGACY_VENUE_DASHBOARD && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: venueTab === 'clients' ? 'minmax(0, 1fr)' : 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 16 }}>
           {venueTab === 'inquiries' && (
           <VenueOverviewCard
             icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}
@@ -18439,22 +18465,7 @@ function VenueRentalsView({ navigate }) {
           )}
 
           {venueTab === 'clients' && (
-            <VenueOverviewCard title="Clients" onViewAll={function() { navigate('venue-clients'); }}>
-              <div style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>Official pre-booking forms submitted after the tour.</div>
-              {clientSubmissions === null ? (
-                <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
-              ) : clientSubmissions.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>No pre-booking forms submitted yet.</div>
-              ) : clientSubmissions.slice(0, 6).map(function(sub) {
-                var contact = inquiryPreviewFields(sub);
-                return (
-                  <button key={sub.id} onClick={function() { navigate('venue-clients'); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 0', background: 'none', border: 'none', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{contact.name || contact.email || 'Unknown'}</div>
-                    <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{sub.form_name} · {new Date(sub.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                  </button>
-                );
-              })}
-            </VenueOverviewCard>
+            !inquiriesError && <VenueClientDashboard submissions={clientSubmissions} loadEvents={loadVenueClientEvents} />
           )}
 
           {venueTab === 'inquiries' && (
@@ -19048,7 +19059,7 @@ function VenueMessagesView({ navigate }) {
 // / fetchVenueInquiries). Handled/notes live directly on nsh_form_responses,
 // same as SuFormResponses -- no separate override table needed here.
 function VenueClientsView({ navigate }) {
-  return <VenueInquiriesView navigate={navigate} clientsOnly={true} />;
+  return <VenueRentalsView navigate={navigate} initialTab="clients" />;
 }
 
 function VenueInquiriesView({ navigate, clientsOnly }) {
