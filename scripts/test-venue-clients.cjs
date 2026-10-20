@@ -7,6 +7,12 @@ const code = esbuild.transformSync(fs.readFileSync('src/venue-clients.jsx', 'utf
 const mod={exports:{}};
 vm.runInNewContext(code,{module:mod,exports:mod.exports,Intl,Date});
 const {buildVenueClient,venueDateKey}=mod.exports;
+test('deployed browser artifact contains the dashboard without an unresolved module import',()=>{
+  const artifact=fs.readFileSync('assets/app.js','utf8');
+  assert.match(artifact,/vc-dashboard/);
+  assert.match(artifact,/Needs your attention/);
+  assert.doesNotMatch(artifact,/\brequire\(["']\.\/venue-clients/);
+});
 const today='2026-10-19';
 function submission(overrides={}){
   return {id:'one',form_id:'a3a383f7-e1db-4344-9dec-ea879ad3406d',answers:{__honeybook:{project:{id:'project',name:'Casey & Morgan Wedding',project_date:'2026-11-07'},workspace:{id:'workspace'},files:[{id:'new',updated_at:'2026-10-18'},{id:'old',updated_at:'2026-09-01'}],file_responses:[{id:'new',responses:{payments:{total:{amount:650000,currency:'usd'},amount_paid:{amount:570000,currency:'usd'},balance_due:{amount:80000,currency:'usd'},schedule:[{amount:{amount:570000,currency:'usd'},due_date:'2026-09-01',paid:true},{amount:{amount:80000,currency:'usd'},due_date:'2026-10-07',paid:false}]},signatures:{all_required_signed:false,signatures:[{signee_name:'Casey',signee_type:'client',required:true,signed:true},{signee_name:'Venue',signee_type:'vendor',required:true,signed:false}]}}},{id:'old',responses:{signatures:{all_required_signed:true,signatures:[{signee_name:'Casey',required:true,signed:true}]}}}],...overrides}}};
