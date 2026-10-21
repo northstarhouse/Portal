@@ -18438,7 +18438,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           border-color: var(--venue-edge) !important;
           box-shadow: inset 0 4px 0 var(--venue-accent), 0 3px 10px rgba(42,36,32,.04);
         }
-        [data-venue-tone="tours"] { --venue-paper:#f0f6ff; --venue-edge:#c7daf0; --venue-accent:#598bc1; }
+        [data-venue-tone="tours"] { --venue-paper:#fafcfe; --venue-edge:#c7daf0; --venue-accent:#598bc1; }
         [data-venue-tone="requests"] { --venue-paper:#fff5e5; --venue-edge:#ecd3a5; --venue-accent:#c68d33; }
         [data-venue-tone="messages"] { --venue-paper:#f5f0ff; --venue-edge:#dcd0ef; --venue-accent:#9875bb; }
         [data-venue-tone="inquiries"] { --venue-paper:#fffbe5; --venue-edge:#e7dca5; --venue-accent:#b5a047; }
@@ -18520,13 +18520,13 @@ function VenueRentalsView({ navigate, initialTab }) {
                   var month = e.date.toLocaleDateString('en-US', { month: 'short', timeZone: 'America/Los_Angeles' }).toUpperCase();
                   var day = e.date.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'America/Los_Angeles' });
                   var when = e.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) + ' • ' + e.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) + (e.kind === 'Tour' && e.raw.guide_name ? ' • ' + e.raw.guide_name : '');
-                  var dateDark = colorCoding ? tourCategoryColor(tourCategoryLabel(e)).dark : null;
+                  var dateColors = colorCoding ? tourCategoryColor(tourCategoryLabel(e)) : null;
                   return (
                     <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}
                       onClick={function() { openDetail(e); }}>
-                      <div style={{ flexShrink: 0, width: 42, textAlign: 'center', background: dateDark || '#faf8f4', border: '0.5px solid ' + (dateDark || '#e8e0d5'), borderRadius: 8, padding: '4px 0' }}>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: dateDark ? '#fff' : gold, letterSpacing: 0.5 }}>{month}</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: dateDark ? '#fff' : '#2a2a2a' }}>{day}</div>
+                      <div style={{ flexShrink: 0, width: 42, textAlign: 'center', background: dateColors ? dateColors.bg : '#faf8f4', border: '0.5px solid ' + (dateColors ? dateColors.color : '#e8e0d5'), borderRadius: 8, padding: '4px 0' }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: dateColors ? dateColors.color : gold, letterSpacing: 0.5 }}>{month}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: dateColors ? dateColors.color : '#2a2a2a' }}>{day}</div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
