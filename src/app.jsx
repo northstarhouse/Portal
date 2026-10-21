@@ -18633,7 +18633,7 @@ function VenueRentalsView({ navigate, initialTab }) {
         }
         return (
           <div data-venue-tone="requests" style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', boxShadow: colorCoding ? 'none' : undefined }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: colorCoding ? '14px 18px' : '18px 18px 10px', background: colorCoding ? '#c6690f' : 'transparent' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: colorCoding ? '14px 18px' : '18px 18px 10px', background: colorCoding ? gold : 'transparent' }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: colorCoding ? '#fff' : '#2a2a2a', fontFamily: "'Cardo', serif" }}>Tour Requests</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {tours !== null && <div style={{ fontSize: 12, color: colorCoding ? 'rgba(255,255,255,0.9)' : (unhandledCount > 0 ? gold : '#999'), fontWeight: unhandledCount > 0 ? 700 : 400 }}>{unhandledCount} unhandled</div>}
@@ -18664,7 +18664,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                         <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
                           {t.visitor_email && <a href={'mailto:' + t.visitor_email} style={{ color: gold, textDecoration: 'none' }}>{t.visitor_email}</a>}
                           {t.visitor_email && t.visitor_phone && ' · '}
-                          <span style={{ color: colorCoding ? '#c6690f' : 'inherit', fontWeight: colorCoding ? 600 : 400 }}>{fmtPhone(t.visitor_phone)}</span>
+                          <span style={{ color: colorCoding ? gold : 'inherit', fontWeight: colorCoding ? 600 : 400 }}>{fmtPhone(t.visitor_phone)}</span>
                         </div>
                         <div style={{ fontSize: 12, color: '#555', marginTop: 6, lineHeight: 1.6 }}>
                           {slots.length === 0 ? 'No preferred dates on file' : slots.map(function(s, i) {
@@ -18685,7 +18685,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                         <option value="made_contact">Made Contact</option>
                       </select>
                       {t.request_status === 'made_contact' && <div style={{ fontSize: 10, color: '#888' }}>Archives {fmtMadeContactDate(new Date(new Date(t.made_contact_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString())}</div>}
-                      <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} accentDark={colorCoding ? '#c6690f' : null} />
+                      <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} accentDark={colorCoding ? gold : null} />
                       </div>
                     </div>
                   );
@@ -19088,7 +19088,7 @@ function VenueRentalsView({ navigate, initialTab }) {
 
 // Overview card shell for the new (non-legacy) Venue Rentals landing page --
 // icon + title + "View all" header, arbitrary content below.
-var VENUE_TONE_DARK = { tours: '#2d5a8a', requests: '#c6690f', inquiries: '#8a7020' };
+var VENUE_TONE_DARK = { tours: gold, requests: gold, inquiries: gold };
 function VenueOverviewCard({ icon, title, onViewAll, children, tone, colorCoding }) {
   var dark = colorCoding && VENUE_TONE_DARK[tone];
   return (
