@@ -18856,6 +18856,9 @@ function VenueRentalsView({ navigate, initialTab }) {
                   )}
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: dColor.bg, color: dColor.color }}>{dCat}</span>
                 </div>
+                {detailEntry.raw && detailEntry.raw.guide_name && (
+                  <div style={{ fontSize: 13, color: '#777', marginTop: 8 }}>Booked Tour with <strong style={{ color: '#2a2a2a' }}>{detailEntry.raw.guide_name}</strong></div>
+                )}
               </div>
               <button onClick={function() { setDetailEntry(null); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: '#666', cursor: 'pointer', flexShrink: 0 }}>✕</button>
             </div>
@@ -18907,22 +18910,6 @@ function VenueRentalsView({ navigate, initialTab }) {
                           </div>
                         );
                       })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 8 }}>Event Details</div>
-                    <div style={{ ...infoCard, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-                      {detailEntry.raw.guide_name && (
-                        <div style={{ flex: '1 1 120px' }}>
-                          <div style={infoLabel}>Guide</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{detailEntry.raw.guide_name}</div>
-                        </div>
-                      )}
-                      <div style={{ flex: '1 1 140px' }}>
-                        <div style={infoLabel}>Inquiry/Event Kind</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{dCat === 'Memorials' ? 'Memorial' : dCat}</div>
-                      </div>
                     </div>
                   </div>
 
