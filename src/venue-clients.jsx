@@ -126,7 +126,7 @@ function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChan
   const ref = React.useRef(null);
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
   return <dialog ref={ref} className="vc-dialog" aria-labelledby="vc-client-title" onCancel={onClose} onClick={e => { if(e.target === ref.current) onClose(); }}>
-    <div className="vc-modal-head"><div style={{flex:1}}><div className="vc-label">{client.type} · {dateLabel(client.eventDate)}</div><h2 id="vc-client-title" className="vc-name" style={{fontSize:25}}>{client.name}</h2><div className="vc-muted">Client details</div></div><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button></div>
+    <div className="vc-modal-head"><div style={{flex:1}}><div className="vc-label" style={{color:'#886c44',display:'inline-block',borderBottom:'2px solid #886c44',paddingBottom:4}}>{client.type} · {dateLabel(client.eventDate)}</div><h2 id="vc-client-title" className="vc-name" style={{fontSize:25}}>{client.name}</h2><div className="vc-muted">Client details</div></div><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button></div>
     {client.payments && <div className="vc-hstepper" aria-label="Payment timeline">
       {client.schedule.map((s,i) => {
         const pastDue = s.due && s.due < venueDateKey() && !s.paid;
