@@ -17976,8 +17976,8 @@ var TOUR_WEDDING_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
 var TOUR_EVENT_TYPE_FIELD_ID = '0uj9rtfk';
 var TOUR_CATEGORY_OPTIONS = ['Wedding', 'Event', 'Non-Profit', 'Memorials'];
 var TOUR_CATEGORY_COLORS = {
-  Wedding: { bg: '#fbe4ec', color: '#b3487a', dark: '#a3123a' },
-  Event: { bg: '#e6eef7', color: '#3a6ea8', dark: '#1a4fa0' },
+  Wedding: { bg: '#fbe4ec', color: '#b3487a', dark: '#1a4fa0' },
+  Event: { bg: '#e6eef7', color: '#3a6ea8', dark: '#a3123a' },
   'Non-Profit': { bg: '#e8f5e9', color: '#2e7d32', dark: '#1b7a3d' },
   Memorials: { bg: '#eef0f5', color: '#52607a', dark: '#6a3fa0' },
   Tour: { bg: '#f0ece6', color: '#888', dark: '#d35400' },
