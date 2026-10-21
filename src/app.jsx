@@ -18438,7 +18438,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           border-color: var(--venue-edge) !important;
           box-shadow: inset 0 4px 0 var(--venue-accent), 0 3px 10px rgba(42,36,32,.04);
         }
-        [data-venue-tone="tours"] { --venue-paper:#fafcfe; --venue-edge:#c7daf0; --venue-accent:#598bc1; }
+        [data-venue-tone="tours"] { --venue-paper:#fff; --venue-edge:#c7daf0; --venue-accent:#598bc1; }
         [data-venue-tone="requests"] { --venue-paper:#fff5e5; --venue-edge:#ecd3a5; --venue-accent:#c68d33; }
         [data-venue-tone="messages"] { --venue-paper:#f5f0ff; --venue-edge:#dcd0ef; --venue-accent:#9875bb; }
         [data-venue-tone="inquiries"] { --venue-paper:#fffbe5; --venue-edge:#e7dca5; --venue-accent:#b5a047; }
