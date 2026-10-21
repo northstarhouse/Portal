@@ -18857,7 +18857,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: dColor.bg, color: dColor.color }}>{dCat}</span>
                 </div>
                 {detailEntry.raw && detailEntry.raw.guide_name && (
-                  <div style={{ fontSize: 13, color: '#777', marginTop: 8 }}>Booked Tour with <strong style={{ color: '#2a2a2a' }}>{detailEntry.raw.guide_name}</strong></div>
+                  <div style={{ fontSize: 13, color: '#2e7d4f', marginTop: 8 }}>Booked Tour with <strong>{detailEntry.raw.guide_name}</strong></div>
                 )}
               </div>
               <button onClick={function() { setDetailEntry(null); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: '#666', cursor: 'pointer', flexShrink: 0 }}>✕</button>
