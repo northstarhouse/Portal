@@ -18826,7 +18826,7 @@ function VenueRentalsView({ navigate, initialTab }) {
         function fieldByLabel(re) { return fields.find(function(f) { return re.test(f.label || ''); }); }
         function answerFor(field) { return field ? answers[field.id] : undefined; }
         var guestCountField = fieldByLabel(/guest count/i);
-        var desiredDateField = fieldByLabel(/event date/i);
+        var desiredDateField = fieldByLabel(/event date|wedding date|preferred.*date|desired.*date/i);
         var notesField = fields.find(function(f) { return f.type === 'long_text'; }) || fieldByLabel(/details|share/i);
         var nameField = fieldByLabel(/name/i), emailField = fieldByLabel(/email/i), phoneField = fieldByLabel(/phone/i), kindField = fieldByLabel(/kind of event/i);
         var shownFieldIds = [guestCountField, desiredDateField, notesField, nameField, emailField, phoneField, kindField].filter(Boolean).map(function(f) { return f.id; });
