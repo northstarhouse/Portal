@@ -18472,14 +18472,6 @@ function VenueRentalsView({ navigate, initialTab }) {
         </div>
       </div>
 
-      {colorCoding && (
-        <div aria-label="Color key" style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 11, color: '#777', marginBottom: 16 }}>
-          {(venueTab === 'clients'
-            ? [['#65965a', 'On track'], ['#c79535', 'Needs attention'], ['#bf6c6c', 'Past due']]
-            : [['#598bc1', 'Upcoming tours'], ['#c68d33', 'Tour requests'], ['#b5a047', 'Inquiries']]
-          ).map(function(item) { return <span key={item[1]} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 2, background: item[0] }} />{item[1]}</span>; })}
-        </div>
-      )}
       {inquiriesError && <div role="alert" style={{ padding: 16, border: '1px solid #e7c9be', borderRadius: 10, background: '#fff5ef', marginBottom: 16, color: '#8c4c35', fontSize: 13 }}>{inquiriesError}. <button type="button" onClick={loadInquiries} style={{background:'none',border:0,textDecoration:'underline',color:'inherit',cursor:'pointer'}}>Try again</button></div>}
       {!SHOW_LEGACY_VENUE_DASHBOARD && (
         <div style={{ display: 'grid', gridTemplateColumns: venueTab === 'clients' ? 'minmax(0, 1fr)' : 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 16 }}>
