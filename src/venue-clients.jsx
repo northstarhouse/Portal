@@ -150,14 +150,7 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, a
   const setScope = scope => {setFilter(scope);setAll(false);};
   return <div className="vc-dashboard" style={{gridColumn:'1 / -1'}}>
     <style>{css}</style>
-    <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'baseline',flexWrap:'wrap'}}><p className="vc-muted" style={{margin:0}}>Upcoming celebrations, payment progress, and what still needs attention.</p><span className="vc-muted">{new Date(today+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</span></div>
     {error && <p role="status" className="vc-pill alert">{error}</p>}
-    <div className="vc-stats">{[
-      ['Upcoming events',clients.length,'Weddings & private events'],
-      ['In the next 60 days',clients.filter(c=>c.days!==null&&c.days<=60).length,'Getting ready to celebrate'],
-      ['Payments to follow up',dueSoon.length,'Past due or due in 30 days'],
-      ['Clients needing attention',clients.filter(c=>c.urgent.length).length,'Signatures, payments & final details'],
-    ].map(([label,value,note])=><div key={label} className="vc-stat"><small>{label}</small><strong>{submissions===null?'—':value}</strong><small>{note}</small></div>)}</div>
     <div className="vc-layout"><section aria-label="Upcoming client events">
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}><h2 className="vc-section-title">Upcoming weddings &amp; events</h2><span className="vc-muted">{submissions===null?'Loading…':clients.length+' events'}</span></div>
       <div className="vc-toolbar"><button className="vc-filter" aria-pressed={filter==='all'} onClick={()=>setScope('all')}>All upcoming</button><button className="vc-filter" aria-pressed={filter==='attention'} onClick={()=>setScope('attention')}>Needs attention</button><button className="vc-filter" aria-pressed={filter==='soon'} onClick={()=>setScope('soon')}>Next 60 days</button><input aria-label="Search clients" placeholder="Search names or dates…" value={query} onChange={e=>{setQuery(e.target.value);setAll(false);}}/></div>
