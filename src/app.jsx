@@ -18633,7 +18633,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                         <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
                           {t.visitor_email && <a href={'mailto:' + t.visitor_email} style={{ color: gold, textDecoration: 'none' }}>{t.visitor_email}</a>}
                           {t.visitor_email && t.visitor_phone && ' · '}
-                          {fmtPhone(t.visitor_phone)}
+                          <span style={{ color: colorCoding ? '#c6690f' : 'inherit', fontWeight: colorCoding ? 600 : 400 }}>{fmtPhone(t.visitor_phone)}</span>
                         </div>
                         <div style={{ fontSize: 12, color: '#555', marginTop: 6, lineHeight: 1.6 }}>
                           {slots.length === 0 ? 'No preferred dates on file' : slots.map(function(s, i) {
