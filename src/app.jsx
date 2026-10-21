@@ -18913,20 +18913,6 @@ function VenueRentalsView({ navigate, initialTab }) {
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 8 }}>Event Details</div>
                     <div style={{ ...infoCard, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-                      <div style={{ flex: '1 1 160px' }}>
-                        <div style={infoLabel}>Type</div>
-                        <select
-                          value={detailEntry.raw.category || ''}
-                          onChange={function(e) { setTourCategory(e.target.value); }}
-                          disabled={detailSaving}
-                          style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#2a2a2a', background: '#fff' }}
-                        >
-                          <option value="">{dCat === 'Tour' ? 'Unknown — set manually' : dCat + ' (from inquiry form)'}</option>
-                          {TOUR_CATEGORY_OPTIONS.map(function(opt) {
-                            return <option key={opt} value={opt}>{opt}</option>;
-                          })}
-                        </select>
-                      </div>
                       {detailEntry.raw.guide_name && (
                         <div style={{ flex: '1 1 120px' }}>
                           <div style={infoLabel}>Guide</div>
