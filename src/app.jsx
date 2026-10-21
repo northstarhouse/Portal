@@ -18631,15 +18631,16 @@ function VenueRentalsView({ navigate, initialTab }) {
           w.focus();
           setTimeout(function() { w.print(); }, 300);
         }
+        var reqHeaderColor = colorCoding ? '#c6690f' : gold;
         return (
-          <div data-venue-tone="requests" style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', boxShadow: !colorCoding ? 'none' : undefined }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: !colorCoding ? '14px 18px' : '18px 18px 10px', background: !colorCoding ? gold : 'transparent' }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: !colorCoding ? '#fff' : '#2a2a2a', fontFamily: "'Cardo', serif" }}>Tour Requests</div>
+          <div data-venue-tone="requests" style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', boxShadow: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: reqHeaderColor }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', fontFamily: "'Cardo', serif" }}>Tour Requests</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {tours !== null && <div style={{ fontSize: 12, color: !colorCoding ? 'rgba(255,255,255,0.9)' : (unhandledCount > 0 ? gold : '#999'), fontWeight: unhandledCount > 0 ? 700 : 400 }}>{unhandledCount} unhandled</div>}
+                {tours !== null && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)', fontWeight: unhandledCount > 0 ? 700 : 400 }}>{unhandledCount} unhandled</div>}
               </div>
             </div>
-            <div style={{ padding: !colorCoding ? '14px 18px 18px' : '0 18px 18px' }}>
+            <div style={{ padding: '14px 18px 18px' }}>
             {justBooked && (
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: '#2e6b4f', background: '#f0f7f2', border: '0.5px solid #cfe6d8', borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>
                 <span>✓ Booked {justBooked.visitor_name || 'the visitor'} for {fmtReqDate(justBooked.date)} at {new Date('2000-01-01T' + justBooked.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} and added it to the calendar. It's now under Upcoming Tours.</span>
@@ -18731,8 +18732,8 @@ function VenueRentalsView({ navigate, initialTab }) {
             <div data-venue-tone="inquiries" onClick={function() { navigate('venue-inquiries'); }} role="button" tabIndex={0}
               onKeyDown={function(ev) { if (ev.key === 'Enter') navigate('venue-inquiries'); }}
               style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', background: !colorCoding ? VENUE_TONE_DARK.inquiries : '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={!colorCoding ? '#fff' : gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: colorCoding ? VENUE_TONE_DARK.inquiries : gold, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Inquiries</div>
@@ -19088,9 +19089,9 @@ function VenueRentalsView({ navigate, initialTab }) {
 
 // Overview card shell for the new (non-legacy) Venue Rentals landing page --
 // icon + title + "View all" header, arbitrary content below.
-var VENUE_TONE_DARK = { tours: gold, requests: gold, inquiries: gold };
+var VENUE_TONE_DARK = { tours: '#2d5a8a', requests: '#c6690f', inquiries: '#8a7020' };
 function VenueOverviewCard({ icon, title, onViewAll, children, tone, colorCoding }) {
-  var dark = !colorCoding && VENUE_TONE_DARK[tone];
+  var dark = colorCoding ? VENUE_TONE_DARK[tone] : gold;
   return (
     <div data-venue-tone={tone} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', boxShadow: dark ? 'none' : undefined }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: dark ? '14px 18px' : '18px 18px 10px', background: dark || 'transparent' }}>
