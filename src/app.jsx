@@ -18843,6 +18843,12 @@ function VenueRentalsView({ navigate, initialTab }) {
           try { return new Date(String(v).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); }
           catch (e) { return String(v); }
         }
+        // Checked against the actual rental calendar (venue_wedding_tracking /
+        // Google Calendar weddings feed), not just tour bookings -- a morning
+        // docent tour doesn't block a full-day wedding, but another wedding does.
+        var desiredDateValue = desiredDateField && answerFor(desiredDateField);
+        var desiredDateKey = desiredDateValue ? String(desiredDateValue).slice(0, 10) : null;
+        var desiredDateTaken = desiredDateKey && (weddings || []).some(function(w) { return w.date && w.date.toISOString().slice(0, 10) === desiredDateKey; });
         var infoCard = { background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 12 };
         var infoLabel = { fontSize: 10, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 };
         var infoValue = { fontSize: 14, fontWeight: 700, color: '#2a2a2a' };
@@ -18890,7 +18896,12 @@ function VenueRentalsView({ navigate, initialTab }) {
                     )}
                     {desiredDateField && answerFor(desiredDateField) && (
                       <div style={{ flex: '1 1 200px', ...infoCard }}>
-                        <div style={infoLabel}>Desired Event Date</div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={infoLabel}>Desired Event Date</div>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: desiredDateTaken ? '#f9eae7' : '#e8f5e9', color: desiredDateTaken ? '#a64f3c' : '#2e7d32', whiteSpace: 'nowrap' }}>
+                            {desiredDateTaken ? 'Not Available' : 'Available'}
+                          </span>
+                        </div>
                         <div style={infoValue}>{fmtLongDate(answerFor(desiredDateField))}</div>
                       </div>
                     )}
