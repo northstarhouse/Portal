@@ -728,6 +728,8 @@ var NAV_ICONS = {
   announcements: '<path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
   'maintenance-request': '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
   'website-payments': '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/>',
+  'venue-inquiries': '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  'venue-messages': '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
 };
 
 function NavIcon({ id, active }) {
@@ -19481,25 +19483,25 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
               var isHandled = sub.status === 'handled';
               var tour = matchedTour(sub);
               return (
-                <div key={sub.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: i < rows.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
+                <div key={sub.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 18px', borderBottom: i < rows.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
                   <input type="checkbox" title="Mark as handled" checked={isHandled} disabled={handlingId === sub.id}
                     onChange={function() { toggleHandled(sub); }}
-                    style={{ marginTop: 3, width: 15, height: 15, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0, opacity: handlingId === sub.id ? 0.5 : 1 }} />
+                    style={{ marginTop: 4, width: 16, height: 16, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0, opacity: handlingId === sub.id ? 0.5 : 1 }} />
                   <button onClick={function() { setSelected(function(prev) { return prev && prev.id === sub.id ? null : sub; }); }}
                     style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                          <div style={{ fontSize: 10, color: gold, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{sub.form_name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 10, color: '#8a6d1d', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, background: '#fdf3e3', padding: '2px 8px', borderRadius: 20 }}>{sub.form_name}</span>
                           {tour && (
-                            <div title={(tour.status === 'booked' ? 'Tour booked: ' : 'Tour requested: ') + fmtTourWhen(tour)}
-                              style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '1px 6px', borderRadius: 5, color: tour.status === 'booked' ? '#2e7d32' : '#a15c00', background: tour.status === 'booked' ? '#eafaf0' : '#fdf3e3' }}>
+                            <span title={(tour.status === 'booked' ? 'Tour booked: ' : 'Tour requested: ') + fmtTourWhen(tour)}
+                              style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: tour.status === 'booked' ? '#2e7d32' : '#a15c00', background: tour.status === 'booked' ? '#eafaf0' : '#fdf3e3' }}>
                               {tour.status === 'booked' ? 'Tour booked' : 'Tour requested'}
-                            </div>
+                            </span>
                           )}
                         </div>
-                        {preview && <div style={{ fontSize: 13, color: isHandled ? '#aaa' : '#2a2a2a' }}>{preview}</div>}
-                        {p.email && p.email !== preview && <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{p.email}</div>}
+                        {preview && <div style={{ fontSize: 14, fontWeight: 600, color: isHandled ? '#aaa' : '#2a2a2a' }}>{preview}</div>}
+                        {p.email && p.email !== preview && <div style={{ fontSize: 12, color: '#999', marginTop: 1 }}>{p.email}</div>}
                       </div>
                       <div style={{ fontSize: 11, color: '#bbb', flexShrink: 0, whiteSpace: 'nowrap' }}>{fmtTs(sub.created_at)}</div>
                     </div>
@@ -22685,7 +22687,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
