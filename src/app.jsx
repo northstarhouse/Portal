@@ -18631,7 +18631,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           w.focus();
           setTimeout(function() { w.print(); }, 300);
         }
-        var reqHeaderColor = colorCoding ? '#c6690f' : gold;
+        var reqHeaderColor = colorCoding ? '#c6690f' : '#8a1f1f';
         return (
           <div data-venue-tone="requests" style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', boxShadow: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: reqHeaderColor }}>
