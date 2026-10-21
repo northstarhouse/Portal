@@ -18508,7 +18508,6 @@ function VenueRentalsView({ navigate, initialTab }) {
             title="Upcoming Tours"
             tone="tours"
             colorCoding={colorCoding}
-            onViewAll={function() { navigate('estate-tours'); }}
           >
             {tours === null ? (
               <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
@@ -18516,7 +18515,7 @@ function VenueRentalsView({ navigate, initialTab }) {
               <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Nothing scheduled yet.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {upcomingCombined.slice(0, 6).map(function(e) {
+                {upcomingCombined.map(function(e) {
                   var month = e.date.toLocaleDateString('en-US', { month: 'short', timeZone: 'America/Los_Angeles' }).toUpperCase();
                   var day = e.date.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'America/Los_Angeles' });
                   var when = e.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) + ' • ' + e.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) + (e.kind === 'Tour' && e.raw.guide_name ? ' • ' + e.raw.guide_name : '');
@@ -19088,7 +19087,7 @@ function VenueOverviewCard({ icon, title, onViewAll, children, tone, colorCoding
           {dark ? React.cloneElement(icon, { stroke: '#fff' }) : icon}
           <div style={{ fontSize: 15, fontWeight: 700, color: dark ? '#fff' : '#2a2a2a', fontFamily: "'Cardo', serif" }}>{title}</div>
         </div>
-        <div onClick={onViewAll} style={{ fontSize: 12, color: dark ? '#fff' : gold, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>View all →</div>
+        {onViewAll && <div onClick={onViewAll} style={{ fontSize: 12, color: dark ? '#fff' : gold, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>View all →</div>}
       </div>
       <div style={{ padding: dark ? '14px 18px 18px' : '0 18px 18px' }}>{children}</div>
     </div>
