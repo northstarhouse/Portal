@@ -18619,13 +18619,6 @@ function VenueRentalsView({ navigate, initialTab }) {
               <div style={{ fontSize: 15, fontWeight: 700, color: colorCoding ? '#fff' : '#2a2a2a', fontFamily: "'Cardo', serif" }}>Tour Requests</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {tours !== null && <div style={{ fontSize: 12, color: colorCoding ? 'rgba(255,255,255,0.9)' : (unhandledCount > 0 ? gold : '#999'), fontWeight: unhandledCount > 0 ? 700 : 400 }}>{unhandledCount} unhandled</div>}
-                {requests.length > 0 && (
-                  <button onClick={exportRequestsPdf} title="Export this list as a PDF"
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, background: colorCoding ? 'rgba(255,255,255,0.15)' : 'none', border: colorCoding ? '0.5px solid rgba(255,255,255,0.5)' : '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 600, color: colorCoding ? '#fff' : '#886c44', cursor: 'pointer' }}>
-                    <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Export PDF
-                  </button>
-                )}
               </div>
             </div>
             <div style={{ padding: colorCoding ? '14px 18px 18px' : '0 18px 18px' }}>
