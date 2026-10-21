@@ -18713,8 +18713,8 @@ function VenueRentalsView({ navigate, initialTab }) {
             <div data-venue-tone="inquiries" onClick={function() { navigate('venue-inquiries'); }} role="button" tabIndex={0}
               onKeyDown={function(ev) { if (ev.key === 'Enter') navigate('venue-inquiries'); }}
               style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: colorCoding ? VENUE_TONE_DARK.inquiries : '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colorCoding ? '#fff' : gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Inquiries</div>
@@ -19070,7 +19070,7 @@ function VenueRentalsView({ navigate, initialTab }) {
 
 // Overview card shell for the new (non-legacy) Venue Rentals landing page --
 // icon + title + "View all" header, arbitrary content below.
-var VENUE_TONE_DARK = { tours: '#2d5a8a', requests: '#c6690f' };
+var VENUE_TONE_DARK = { tours: '#2d5a8a', requests: '#c6690f', inquiries: '#8a7020' };
 function VenueOverviewCard({ icon, title, onViewAll, children, tone, colorCoding }) {
   var dark = colorCoding && VENUE_TONE_DARK[tone];
   return (
