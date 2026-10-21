@@ -18645,7 +18645,6 @@ function VenueRentalsView({ navigate, initialTab }) {
                             );
                           })}
                         </div>
-                        <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} accentDark={colorCoding ? '#c6690f' : null} />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', flexShrink: 0 }}>
                       <select value={t.request_status || 'not_handled'} disabled={reqSavingId === t.id}
@@ -18655,6 +18654,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                         <option value="made_contact">Made Contact</option>
                       </select>
                       {t.request_status === 'made_contact' && <div style={{ fontSize: 10, color: '#bbb' }}>Archives {fmtMadeContactDate(new Date(new Date(t.made_contact_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString())}</div>}
+                      <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} accentDark={colorCoding ? '#c6690f' : null} />
                       </div>
                     </div>
                   );
