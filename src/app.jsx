@@ -18068,7 +18068,7 @@ function VenueRentalsView({ navigate, initialTab }) {
     setRescheduling(false);
     setDetailFormFields(null);
     setNoteDraft((entry.raw && entry.raw.staff_notes) || '');
-    setEditingNote(!(entry.raw && entry.raw.staff_notes));
+    setEditingNote(false);
     if (entry.kind === 'Tour' && entry.raw && entry.raw.inquiry_form_id) {
       fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=eq.' + encodeURIComponent(entry.raw.inquiry_form_id) + '&select=fields', {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -19038,7 +19038,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                           onClick={function() { setEditingNote(true); }}
                           style={{ flexShrink: 0, padding: '5px 10px', background: '#fff', border: '1px solid #e0d8cc', borderRadius: 6, fontSize: 11, fontWeight: 600, color: gold, cursor: 'pointer' }}
                         >
-                          {detailEntry.raw.staff_notes ? 'Edit' : 'Add note'}
+                          {detailEntry.raw.staff_notes ? 'Edit' : '+ Add Notes'}
                         </button>
                       </div>
                     )}
