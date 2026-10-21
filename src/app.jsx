@@ -18462,14 +18462,17 @@ function VenueRentalsView({ navigate, initialTab }) {
       `}</style>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
         {!SHOW_LEGACY_VENUE_DASHBOARD && (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#f0ece2', borderRadius: 10, padding: 4, flexShrink: 0 }}>
-            {[['inquiries', 'Inquiries'], ['clients', 'Clients']].map(function(pair) {
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexShrink: 0 }}>
+            {[['inquiries', 'Inquiries'], ['clients', 'Clients']].map(function(pair, index) {
               var isActive = venueTab === pair[0];
               return (
-                <button key={pair[0]} type="button" aria-pressed={isActive} onClick={function() { setVenueTab(pair[0]); }}
-                  style={{ padding: '10px 22px', border: 'none', borderRadius: 8, fontSize: 17, fontFamily: "'Cardo', serif", fontWeight: 700, background: isActive ? gold : 'transparent', color: isActive ? '#fff' : '#777', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  {pair[1]}
-                </button>
+                <React.Fragment key={pair[0]}>
+                  {index > 0 && <span aria-hidden="true" style={{ width: 2, height: 26, background: gold, flexShrink: 0 }} />}
+                  <button type="button" aria-pressed={isActive} onClick={function() { setVenueTab(pair[0]); }}
+                    style={{ padding: '7px 0', border: 'none', fontSize: 20, fontFamily: "'Cardo', serif", fontWeight: isActive ? 700 : 500, background: 'none', color: isActive ? '#2a2a2a' : '#888', cursor: 'pointer', textDecoration: isActive ? 'underline' : 'none', textDecorationColor: gold, textDecorationThickness: 2, textUnderlineOffset: 8, whiteSpace: 'nowrap' }}>
+                    {pair[1]}
+                  </button>
+                </React.Fragment>
               );
             })}
           </div>
