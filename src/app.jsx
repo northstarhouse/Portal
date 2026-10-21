@@ -18480,9 +18480,11 @@ function VenueRentalsView({ navigate, initialTab }) {
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginLeft: 'auto' }}>
-          <button onClick={function() { navigate('estate-tours'); }} style={{ flexShrink: 0, padding: '10px 18px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            Edit Tour Schedule
-          </button>
+          {venueTab !== 'clients' && (
+            <button onClick={function() { navigate('estate-tours'); }} style={{ flexShrink: 0, padding: '10px 18px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              Edit Tour Schedule
+            </button>
+          )}
           <button type="button" aria-pressed={colorCoding} onClick={toggleColorCoding}
             title="Color-code this dashboard. Saved only in this browser."
             style={{ display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0, padding: '9px 12px', background: colorCoding ? '#f5f0ff' : 'none', border: '1px solid ' + (colorCoding ? '#c8b5de' : '#e0d8cc'), borderRadius: 8, color: colorCoding ? '#745295' : '#777', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
