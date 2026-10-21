@@ -18656,7 +18656,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                 {requests.map(function(t) {
                   var slots = t.requested_slots || [];
                   return (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderBottom: colorCoding ? '1.5px solid #dba75b' : '0.5px solid #f0ece2', opacity: t.request_status === 'made_contact' ? 0.6 : 1 }}>
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderBottom: '1.5px solid ' + reqHeaderColor + '60', opacity: t.request_status === 'made_contact' ? 0.6 : 1 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{(t.visitor_name || 'Unknown') + ' - ' + tourCategoryLabel({ kind: 'Tour', raw: t })}</div>
