@@ -152,7 +152,7 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, a
     <style>{css}</style>
     {error && <p role="status" className="vc-pill alert">{error}</p>}
     <div className="vc-layout"><section aria-label="Upcoming client events">
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}><h2 className="vc-section-title">Upcoming weddings &amp; events</h2><span className="vc-muted">{submissions===null?'Loading…':clients.length+' events'}</span></div>
+      <div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:10}}><span className="vc-muted">{submissions===null?'Loading…':clients.length+' events'}</span></div>
       <div className="vc-toolbar"><select aria-label="Filter clients" className="vc-filter-select" value={filter} onChange={e=>setScope(e.target.value)}><option value="all">All upcoming</option><option value="attention">Needs attention</option><option value="soon">Next 60 days</option></select><input aria-label="Search clients" placeholder="Search names or dates…" value={query} onChange={e=>{setQuery(e.target.value);setAll(false);}}/></div>
       {submissions===null ? <div role="status" className="vc-empty">Loading client events…</div> : shown.length===0 ? <div className="vc-empty">{clients.length?'No events match this view.':'No upcoming client events yet.'}{clients.length>0&&<div><button className="vc-text-button" onClick={()=>{setQuery('');setScope('all');}}>Show all upcoming events</button></div>}</div> : shown.map(c=>{
         const pastDue=c.duePayments.find(p=>p.due && p.due<today), next=c.duePayments[0];
