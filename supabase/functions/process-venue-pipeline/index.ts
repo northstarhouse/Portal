@@ -15,6 +15,21 @@ const PREBOOKING_FORM_URL_EVENT = 'https://northstarhouse.github.io/NSH-forms/?v
 function prebookingFormUrlFor(eventType?: string | null) {
   return eventType && eventType !== 'Wedding' ? PREBOOKING_FORM_URL_EVENT : PREBOOKING_FORM_URL_WEDDING;
 }
+// Mirrors tourCategoryLabel() in the Portal's src/app.jsx -- keep in sync if
+// that logic ever changes (manual category override, then the wedding
+// inquiry form id, then the "what kind of event" answer on the shared
+// inquiry forms).
+const TOUR_EVENT_TYPE_FIELD_ID = '0uj9rtfk';
+const TOUR_WEDDING_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
+function estateTourCategory(tour: { category?: string | null; inquiry_form_id?: string | null; inquiry_answers?: Record<string, unknown> | null }) {
+  if (tour.category) return tour.category;
+  if (tour.inquiry_form_id === TOUR_WEDDING_FORM_ID) return 'Wedding';
+  const eventType = tour.inquiry_answers?.[TOUR_EVENT_TYPE_FIELD_ID];
+  if (eventType === 'Non-Profit Event') return 'Non-Profit';
+  if (eventType === 'Memorial') return 'Memorials';
+  if (eventType === 'Private Event' || eventType === 'Public Event') return 'Event';
+  return 'Tour';
+}
 // TODO: replace with the real hosted Client Guidebook URL once provided.
 const GUIDEBOOK_URL = 'https://northstarhouse.github.io/venue/';
 const AVAILABILITY_CALENDAR_URL = 'https://northstarhouse.github.io/venue/?availability=1';
@@ -187,7 +202,7 @@ Deno.serve(async (req) => {
   const now = new Date();
   const nowIso = now.toISOString();
   const templates = await getTemplates();
-  const result: Record<string, number> = { expiredRequests: 0, initial: 0, followUp48h: 0, finalFollowUp30d: 0, archived: 0, tourConfirmation: 0, reminder24h: 0, reminder1h: 0, touredDocs: 0, questionnaireReminder: 0, completed: 0, feedbackRequested: 0, feedbackArchived: 0, errors: 0 };
+  const result: Record<string, number> = { expiredRequests: 0, initial: 0, followUp48h: 0, finalFollowUp30d: 0, archived: 0, tourConfirmation: 0, reminder24h: 0, reminder1h: 0, touredDocs: 0, estateTourPrebooking: 0, questionnaireReminder: 0, completed: 0, feedbackRequested: 0, feedbackArchived: 0, errors: 0 };
 
   // The existing 15-minute schedule also clears unbooked requests once ALL
   // preferred dates are past in Grass Valley. Today's dates remain available.
@@ -358,6 +373,28 @@ Deno.serve(async (req) => {
       } catch (e) { console.error('toured_docs failed for', tour.id, e); result.errors++; }
     }
   } catch (e) { console.error('step8 query failed', e); }
+
+  // ── Step 8b: 1h after an estate_tours tour -> pre-booking form email ──
+  // Same intent as step 8, but for the real, currently-active tour-booking
+  // system (estate_tours/TourBooker), which step 8's venue_tours/
+  // venue_tour_hosts pair has been disconnected from since this pipeline's
+  // earlier design (that pair saw its last tour back in August).
+  try {
+    const rows = await rest('rpc/tours_due_for_prebooking_email', { method: 'POST', body: '{}' });
+    for (const tour of rows) {
+      try {
+        if (tour.visitor_email) {
+          const category = estateTourCategory(tour);
+          const prebookingLink = prebookingFormUrlFor(category);
+          await sendTemplated(templates.toured_docs, tour.visitor_email,
+            { name: tour.visitor_name || 'there', host_name: tour.guide_name || '', guidebook_link: GUIDEBOOK_URL, prebooking_link: prebookingLink, availability_calendar_link: AVAILABILITY_CALENDAR_URL },
+            { name: escapeHtml(tour.visitor_name || 'there'), host_name: escapeHtml(tour.guide_name || ''), guidebook_link: GUIDEBOOK_URL, prebooking_link: prebookingLink, availability_calendar_link: AVAILABILITY_CALENDAR_URL });
+        }
+        await rest(`estate_tours?id=eq.${tour.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ prebooking_form_sent_at: nowIso }) });
+        result.estateTourPrebooking++;
+      } catch (e) { console.error('estate tour prebooking email failed for', tour.id, e); result.errors++; }
+    }
+  } catch (e) { console.error('step8b query failed', e); }
 
   // ── Step 9: 30 days before event_date -> questionnaire + insurance reminder ──
   try {
