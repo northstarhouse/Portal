@@ -131,7 +131,7 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, a
   const [savedResponses,setSavedResponses] = React.useState({});
   const [nativeVersions,setNativeVersions] = React.useState([]);
   React.useEffect(()=>{let cancelled=false;function refresh(){if(agreementApi)agreementApi('summary').then(rows=>{if(!cancelled)setNativeVersions(rows);}).catch(()=>{if(!cancelled)setError('Live agreement status is unavailable. Showing the saved client records.');});}refresh();const timer=setInterval(refresh,60000);window.addEventListener('focus',refresh);return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',refresh);};},[agreementApi]);
-  const [query,setQuery] = React.useState(''), [filter,setFilter] = React.useState('all'), [all,setAll] = React.useState(false), [allTasks,setAllTasks] = React.useState(false), [selected,setSelected] = React.useState(null);
+  const [query,setQuery] = React.useState(''), [filter,setFilter] = React.useState('all'), [allTasks,setAllTasks] = React.useState(false), [selected,setSelected] = React.useState(null);
   React.useEffect(() => { let cancelled=false; loadEvents().then(rows => {if(!cancelled)setEvents(rows);}).catch(() => {if(!cancelled)setError('Live requirement updates are unavailable. Showing the saved client records.');}); return()=>{cancelled=true;}; }, [loadEvents]);
   const today = venueDateKey();
   const clients = (submissions || []).map(sub => buildVenueClient(savedResponses[sub.id] ? {...sub,...savedResponses[sub.id]} : sub,events.find(e=>e.prebooking_form_response_id===sub.id),today,nativeVersions)).filter(c => !c.eventEnd || c.eventEnd >= today).sort((a,b)=>(a.eventDate || '9999').localeCompare(b.eventDate || '9999'));
@@ -139,7 +139,7 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, a
   const upcoming = clients.flatMap(client=>client.tasks.filter(t=>t.due && t.due>=today).map(task=>({...task,client}))).sort((a,b)=>a.due.localeCompare(b.due));
   const dueSoon = clients.flatMap(c=>c.duePayments).filter(p=>p.due && p.due<=shiftDate(today,30));
   const matches = clients.filter(c=>(filter!=='attention'||c.urgent.length>0)&&(!query || (c.name+' '+c.email+' '+c.eventDate).toLowerCase().includes(query.toLowerCase())));
-  const shown = all ? matches : matches.slice(0,4);
+  const shown = filter==='viewall' ? matches : matches.slice(0,4);
   const open = c => setSelected(c.id);
   const selectedClient = clients.find(c=>c.id===selected);
   async function verifyInsurance(id,verified,note) {
@@ -147,13 +147,13 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, a
     const record = await saveInsurance(id,verified,note);
     setSavedResponses(prev=>({...prev,[id]:record}));
   }
-  const setScope = scope => {setFilter(scope);setAll(false);};
+  const setScope = scope => setFilter(scope);
   return <div className="vc-dashboard" style={{gridColumn:'1 / -1'}}>
     <style>{css}</style>
     {error && <p role="status" className="vc-pill alert">{error}</p>}
     <div className="vc-layout"><section aria-label="Upcoming client events">
       <div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:10}}><span className="vc-muted">{submissions===null?'Loading…':clients.length+' events'}</span></div>
-      <div className="vc-toolbar"><select aria-label="Filter clients" className="vc-filter-select" value={filter} onChange={e=>setScope(e.target.value)}><option value="all">All upcoming</option><option value="attention">Needs attention</option></select><input aria-label="Search clients" placeholder="Search names or dates…" value={query} onChange={e=>{setQuery(e.target.value);setAll(false);}}/></div>
+      <div className="vc-toolbar"><select aria-label="Filter clients" className="vc-filter-select" value={filter} onChange={e=>setScope(e.target.value)}><option value="all">All upcoming</option><option value="attention">Needs attention</option><option value="viewall">View all events</option></select><input aria-label="Search clients" placeholder="Search names or dates…" value={query} onChange={e=>setQuery(e.target.value)}/></div>
       {submissions===null ? <div role="status" className="vc-empty">Loading client events…</div> : shown.length===0 ? <div className="vc-empty">{clients.length?'No events match this view.':'No upcoming client events yet.'}{clients.length>0&&<div><button className="vc-text-button" onClick={()=>{setQuery('');setScope('all');}}>Show all upcoming events</button></div>}</div> : shown.map(c=>{
         const pastDue=c.duePayments.find(p=>p.due && p.due<today), next=c.duePayments[0];
         return <article key={c.id} className="vc-card" data-venue-state={c.tasks.some(t=>t.overdue) ? "overdue" : c.tasks.some(t=>t.urgent) ? "attention" : "ready"}><div className="vc-card-head"><div className="vc-date"><small>{c.eventDate ? new Date(c.eventDate+'T12:00:00').toLocaleDateString('en-US',{month:'short'}) : 'Date'}</small><strong>{c.eventDate?Number(c.eventDate.slice(8,10)):'?'}</strong></div><div className="vc-head-main"><h3 className="vc-name">{c.name}</h3><div className="vc-muted">{dateLabel(c.eventDate)}{c.eventEnd && c.eventEnd!==c.eventDate?' – '+dateLabel(c.eventEnd):''} · {c.type}{c.days!==null?' · '+(c.days>0?c.days+' days away':c.days===0?'Today':'In progress'):''}</div></div><button className="vc-open" onClick={()=>open(c)} aria-label={'View details for '+c.name}>View details</button></div>
@@ -163,10 +163,8 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, a
           <div className="vc-card-foot"><span>{next ? (pastDue?'Past due: ':'Next payment: ')+amount(next.cents,next.currency)+(next.due?' · '+dateLabel(next.due):'') : c.payments?'✓ All Payments Collected':'Review booking paperwork'}</span><span>{c.surveyComplete && c.insuranceVerified ? '✓ All Details Collected' : c.requirementsDue?'Final details due '+dateLabel(c.requirementsDue):'Event date to confirm'}</span></div>
         </article>;
       })}
-      {matches.length>4&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><span className="vc-muted">Showing {shown.length} of {matches.length}</span><button className="vc-text-button" onClick={()=>setAll(!all)}>{all?'Show fewer events':'View all '+matches.length+' events ↓'}</button></div>}
-    </section><aside className="vc-sidebar" aria-label="Client priorities and upcoming deadlines">
+    </section><aside className="vc-sidebar" aria-label="Client priorities">
       <section className="vc-side-card priority"><h2 className="vc-side-title">Needs your attention <span className="vc-counter">{submissions===null?'—':urgent.length}</span></h2>{submissions===null?<p className="vc-muted">Loading priorities…</p>:urgent.length===0?<p className="vc-muted">No urgent items recorded.</p>:(allTasks?urgent:urgent.slice(0,6)).map(t=><button className="vc-task" key={t.key} onClick={()=>open(t.client)}><div className="vc-task-head">{t.title}</div><div className="vc-task-name">{t.client.name}</div><div className={'vc-task-date '+(t.overdue?'late':'')}>{t.due?(t.overdue?'Past due · ':'Due ')+dateLabel(t.due):t.detail}</div></button>)}{urgent.length>6&&<button className="vc-text-button" onClick={()=>setAllTasks(!allTasks)}>{allTasks?'Show fewer priorities':'See all '+urgent.length+' priorities ↓'}</button>}</section>
-      <section className="vc-side-card"><h2 className="vc-side-title">Coming up next</h2>{upcoming.slice(0,4).map(t=><button className="vc-task" key={t.key} onClick={()=>open(t.client)}><div className="vc-task-date">{dateLabel(t.due)}</div><div className="vc-task-head" style={{marginTop:4}}>{t.title}</div><div className="vc-task-name">{t.client.name}</div></button>)}{!upcoming.length&&<p className="vc-muted">No upcoming deadlines recorded.</p>}</section>
     </aside></div>
     {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} onClose={()=>setSelected(null)} onVerify={verifyInsurance} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
