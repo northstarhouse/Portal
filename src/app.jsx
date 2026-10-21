@@ -17983,7 +17983,7 @@ var TOUR_CATEGORY_COLORS = {
   Wedding: { bg: '#fbe4ec', color: '#b3487a', dark: '#1a4fa0' },
   Event: { bg: '#e6eef7', color: '#3a6ea8', dark: '#a3123a' },
   'Non-Profit': { bg: '#e8f5e9', color: '#2e7d32', dark: '#1b7a3d' },
-  Memorials: { bg: '#eef0f5', color: '#52607a', dark: '#6a3fa0' },
+  Memorials: { bg: '#e8f5e9', color: '#2e7d32', dark: '#6a3fa0' },
   Tour: { bg: '#f0ece6', color: '#888', dark: '#d35400' },
 };
 function tourCategoryColor(label) {
