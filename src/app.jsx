@@ -18818,64 +18818,144 @@ function VenueRentalsView({ navigate, initialTab }) {
         <ScheduleTourModal onClose={function() { setScheduleOpen(false); }} onScheduled={function() { loadTours(); }} />
       )}
 
-      {detailEntry && (
+      {detailEntry && (function() {
+        var dCat = tourCategoryLabel(detailEntry);
+        var dColor = tourCategoryColor(dCat);
+        var fields = detailFormFields || [];
+        var answers = (detailEntry.raw && detailEntry.raw.inquiry_answers) || {};
+        function fieldByLabel(re) { return fields.find(function(f) { return re.test(f.label || ''); }); }
+        function answerFor(field) { return field ? answers[field.id] : undefined; }
+        var guestCountField = fieldByLabel(/guest count/i);
+        var desiredDateField = fieldByLabel(/event date/i);
+        var notesField = fields.find(function(f) { return f.type === 'long_text'; }) || fieldByLabel(/details|share/i);
+        var nameField = fieldByLabel(/name/i), emailField = fieldByLabel(/email/i), phoneField = fieldByLabel(/phone/i), kindField = fieldByLabel(/kind of event/i);
+        var shownFieldIds = [guestCountField, desiredDateField, notesField, nameField, emailField, phoneField, kindField].filter(Boolean).map(function(f) { return f.id; });
+        var otherAnswers = Object.keys(answers).filter(function(k) {
+          var v = answers[k];
+          return v !== undefined && v !== null && v !== '' && shownFieldIds.indexOf(k) === -1;
+        });
+        function fmtLongDate(v) {
+          if (!v) return '';
+          try { return new Date(String(v).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); }
+          catch (e) { return String(v); }
+        }
+        var infoCard = { background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 12 };
+        var infoLabel = { fontSize: 10, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 };
+        var infoValue = { fontSize: 14, fontWeight: 700, color: '#2a2a2a' };
+        return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }} onClick={function() { setDetailEntry(null); }}>
-          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 480, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 12px 48px rgba(0,0,0,0.18)' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid #f0ece6' }}>
+          <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 12px 48px rgba(0,0,0,0.18)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '20px 24px 16px', borderBottom: '0.5px solid #f0ece6' }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{detailEntry.title}</div>
-                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{tourCategoryLabel(detailEntry)}{detailEntry.raw && detailEntry.raw.status ? ' · ' + detailEntry.raw.status : ''}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{detailEntry.title}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                  {detailEntry.raw && detailEntry.raw.status && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: detailEntry.raw.status === 'booked' ? '#e3f3e9' : '#f0ece6', color: detailEntry.raw.status === 'booked' ? '#2e7d4f' : '#777' }}>
+                      {detailEntry.raw.status === 'booked' ? '✓ Booked' : detailEntry.raw.status}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: dColor.bg, color: dColor.color }}>{dCat}</span>
+                </div>
               </div>
               <button onClick={function() { setDetailEntry(null); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: '#666', cursor: 'pointer', flexShrink: 0 }}>✕</button>
             </div>
 
-            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
               {detailEntry.kind === 'Wedding' ? (
                 <div style={{ fontSize: 12, color: '#999' }}>
                   This is a calendar event, not a form submission — there's no inquiry data to show. Date: {detailEntry.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.
                 </div>
               ) : (
                 <React.Fragment>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {[
-                      ['Visitor', detailEntry.raw.visitor_name],
-                      ['Email', detailEntry.raw.visitor_email],
-                      ['Phone', detailEntry.raw.visitor_phone],
-                      ['Date & time', detailEntry.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) + ' at ' + detailEntry.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })],
-                      ['Guide', detailEntry.raw.guide_name],
-                    ].filter(function(pair) { return pair[1]; }).map(function(pair) {
-                      return (
-                        <div key={pair[0]} style={{ display: 'flex', gap: 8, fontSize: 13 }}>
-                          <span style={{ color: '#999', width: 90, flexShrink: 0 }}>{pair[0]}</span>
-                          <span style={{ color: '#2a2a2a', fontWeight: 500 }}>{pair[1]}</span>
-                        </div>
-                      );
-                    })}
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 220px', background: '#eef4fc', border: '0.5px solid #d6e4f5', borderRadius: 10, padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#dbe8fa', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#3a6ea8" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
+                      </div>
+                      <div>
+                        <div style={infoLabel}>Date &amp; Time</div>
+                        <div style={infoValue}>{detailEntry.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' })}</div>
+                        <div style={{ fontSize: 13, color: '#555', marginTop: 1 }}>{detailEntry.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })}</div>
+                      </div>
+                    </div>
+                    {guestCountField && answerFor(guestCountField) != null && answerFor(guestCountField) !== '' && (
+                      <div style={{ flex: '1 1 160px', ...infoCard }}>
+                        <div style={infoLabel}>Estimated Guest Count</div>
+                        <div style={infoValue}>{answerFor(guestCountField)}</div>
+                      </div>
+                    )}
+                    {desiredDateField && answerFor(desiredDateField) && (
+                      <div style={{ flex: '1 1 200px', ...infoCard }}>
+                        <div style={infoLabel}>Desired Event Date</div>
+                        <div style={infoValue}>{fmtLongDate(answerFor(desiredDateField))}</div>
+                      </div>
+                    )}
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                    <span style={{ color: '#999', width: 90, flexShrink: 0 }}>Type</span>
-                    <select
-                      value={detailEntry.raw.category || ''}
-                      onChange={function(e) { setTourCategory(e.target.value); }}
-                      disabled={detailSaving}
-                      style={{ padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, color: '#2a2a2a', background: '#fff' }}
-                    >
-                      <option value="">{tourCategoryLabel(detailEntry) === 'Tour' ? 'Unknown — set manually' : tourCategoryLabel(detailEntry) + ' (from inquiry form)'}</option>
-                      {TOUR_CATEGORY_OPTIONS.map(function(opt) {
-                        return <option key={opt} value={opt}>{opt}</option>;
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 8 }}>Visitor &amp; Contact Information</div>
+                    <div style={{ ...infoCard, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+                      {[
+                        ['Visitor', detailEntry.raw.visitor_name],
+                        ['Email', detailEntry.raw.visitor_email],
+                        ['Phone', detailEntry.raw.visitor_phone],
+                      ].filter(function(p) { return p[1]; }).map(function(p) {
+                        return (
+                          <div key={p[0]} style={{ flex: '1 1 140px' }}>
+                            <div style={infoLabel}>{p[0]}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{p[1]}</div>
+                          </div>
+                        );
                       })}
-                    </select>
+                    </div>
                   </div>
 
-                  {detailEntry.raw.inquiry_answers && Object.keys(detailEntry.raw.inquiry_answers).length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 8 }}>Event Details</div>
+                    <div style={{ ...infoCard, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+                      <div style={{ flex: '1 1 160px' }}>
+                        <div style={infoLabel}>Type</div>
+                        <select
+                          value={detailEntry.raw.category || ''}
+                          onChange={function(e) { setTourCategory(e.target.value); }}
+                          disabled={detailSaving}
+                          style={{ padding: '5px 7px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 13, fontWeight: 600, color: '#2a2a2a', background: '#fff' }}
+                        >
+                          <option value="">{dCat === 'Tour' ? 'Unknown — set manually' : dCat + ' (from inquiry form)'}</option>
+                          {TOUR_CATEGORY_OPTIONS.map(function(opt) {
+                            return <option key={opt} value={opt}>{opt}</option>;
+                          })}
+                        </select>
+                      </div>
+                      {detailEntry.raw.guide_name && (
+                        <div style={{ flex: '1 1 120px' }}>
+                          <div style={infoLabel}>Guide</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{detailEntry.raw.guide_name}</div>
+                        </div>
+                      )}
+                      <div style={{ flex: '1 1 140px' }}>
+                        <div style={infoLabel}>Inquiry/Event Kind</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{dCat === 'Memorials' ? 'Memorial' : dCat}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {notesField && answerFor(notesField) && (
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 8 }}>Inquiry Notes</div>
+                      <div style={{ background: '#fdf3e4', border: '0.5px solid #f0dba6', borderRadius: 10, padding: 12, fontSize: 13, color: '#2a2a2a', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                        {answerFor(notesField)}
+                      </div>
+                    </div>
+                  )}
+
+                  {otherAnswers.length > 0 && (
                     <div style={{ background: '#faf8f4', borderRadius: 8, padding: 12 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Submitted with their request</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Other submitted answers</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {Object.keys(detailEntry.raw.inquiry_answers).map(function(k) {
-                          var field = (detailFormFields || []).find(function(f) { return f.id === k; });
-                          var val = detailEntry.raw.inquiry_answers[k];
-                          if (val === undefined || val === null || val === '') return null;
+                        {otherAnswers.map(function(k) {
+                          var field = fields.find(function(f) { return f.id === k; });
+                          var val = answers[k];
                           return (
                             <div key={k}>
                               <div style={{ fontSize: 10, fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: 0.5 }}>{field ? field.label : k}</div>
@@ -18884,6 +18964,13 @@ function VenueRentalsView({ navigate, initialTab }) {
                           );
                         })}
                       </div>
+                    </div>
+                  )}
+
+                  {detailEntry.raw.created_at && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#aaa' }}>
+                      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      Submitted with their request · {new Date(detailEntry.raw.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                     </div>
                   )}
 
@@ -18970,7 +19057,8 @@ function VenueRentalsView({ navigate, initialTab }) {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
