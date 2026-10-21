@@ -18002,6 +18002,13 @@ function tourCategoryLabel(e) {
   if (eventType === 'Private Event' || eventType === 'Public Event') return 'Event';
   return 'Tour';
 }
+// "Jennifer Oceguera Tour" -> "Jennifer Oceguera Wedding Tour", "Danielle
+// Simpson Memorial Tour", etc. Generic (uncategorized) tours keep just "Tour".
+function tourTitleFor(raw) {
+  var cat = tourCategoryLabel({ kind: 'Tour', raw: raw || {} });
+  var catSingular = cat === 'Memorials' ? 'Memorial' : cat;
+  return ((raw && raw.visitor_name) || 'Visitor') + ' ' + (cat && cat !== 'Tour' ? catSingular + ' ' : '') + 'Tour';
+}
 
 function VenueRentalsView({ navigate, initialTab }) {
   const { useState: useS, useEffect: useE, useRef: useR } = React;
@@ -18417,10 +18424,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   var clientSubmissions = inquiries === null ? null : inquiries.filter(isVenueClientSubmission);
   var upcomingCombined = (tours || []).filter(function(t) { return t.status === 'booked' && t.date; }).map(function(t) {
     var d = new Date(t.date + 'T' + (t.start_time || '00:00:00'));
-    var cat = tourCategoryLabel({ kind: 'Tour', raw: t });
-    var catSingular = cat === 'Memorials' ? 'Memorial' : cat;
-    var title = (t.visitor_name || 'Visitor') + ' ' + (cat && cat !== 'Tour' ? catSingular + ' ' : '') + 'Tour';
-    return { key: 't-' + t.id, kind: 'Tour', title: title, date: d, raw: t };
+    return { key: 't-' + t.id, kind: 'Tour', title: tourTitleFor(t), date: d, raw: t };
   }).filter(function(e) { return e.date && e.date.getTime() >= Date.now() - 24 * 60 * 60 * 1000; })
     .sort(function(a, b) { return a.date - b.date; });
 
@@ -20098,7 +20102,7 @@ function EstateToursView() {
       ) : (
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '0.5px solid #f0ece6' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{(selectedTour.visitor_name || 'Visitor') + ' Tour'}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{tourTitleFor(selectedTour)}</div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               <button onClick={function() { startPanelReschedule(selectedTour); }} title="Reschedule" style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0e8', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
                 <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
@@ -20278,7 +20282,7 @@ function EstateToursView() {
                             <div key={t.id} onClick={function() { selectTour(t); }}
                               style={{ position: 'absolute', top: top, left: 2, right: 2, height: heightPx, background: colors.bg, borderLeft: '3px solid ' + colors.color, borderRadius: 5, padding: '3px 6px', fontSize: 10, color: colors.color, cursor: 'pointer', overflow: 'hidden', boxShadow: isSelected ? '0 0 0 2px ' + colors.color : 'none' }}>
                               <div style={{ fontWeight: 700 }}>{fmtTime(t.start_time)}</div>
-                              <div style={{ fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{(t.visitor_name || 'Visitor') + ' Tour'}</div>
+                              <div style={{ fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{tourTitleFor(t)}</div>
                             </div>
                           );
                         })}
