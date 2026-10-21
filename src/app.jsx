@@ -18633,7 +18633,7 @@ function VenueRentalsView({ navigate, initialTab }) {
         }
         var reqHeaderColor = colorCoding ? '#c6690f' : '#5c1414';
         return (
-          <div data-venue-tone="requests" style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', boxShadow: 'none' }}>
+          <div data-venue-tone="requests" style={{ background: '#fff', border: '1px solid ' + reqHeaderColor + '40', borderRadius: 12, overflow: 'hidden', boxShadow: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: reqHeaderColor }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', fontFamily: "'Cardo', serif" }}>Tour Requests</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
