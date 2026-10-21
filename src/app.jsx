@@ -18855,14 +18855,11 @@ function VenueRentalsView({ navigate, initialTab }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                   {detailEntry.raw && detailEntry.raw.status && (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: detailEntry.raw.status === 'booked' ? '#e3f3e9' : '#f0ece6', color: detailEntry.raw.status === 'booked' ? '#2e7d4f' : '#777' }}>
-                      {detailEntry.raw.status === 'booked' ? '✓ Booked' : detailEntry.raw.status}
+                      {detailEntry.raw.status === 'booked' ? ('✓ Booked' + (detailEntry.raw.guide_name ? ' Tour with ' + detailEntry.raw.guide_name : '')) : detailEntry.raw.status}
                     </span>
                   )}
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: dColor.bg, color: dColor.color }}>{dCat}</span>
                 </div>
-                {detailEntry.raw && detailEntry.raw.guide_name && (
-                  <div style={{ fontSize: 13, color: '#2e7d4f', marginTop: 8 }}>Booked Tour with <strong>{detailEntry.raw.guide_name}</strong></div>
-                )}
               </div>
               <button onClick={function() { setDetailEntry(null); }} style={{ background: '#f0ece6', border: 'none', borderRadius: 8, padding: '5px 10px', fontSize: 12, color: '#666', cursor: 'pointer', flexShrink: 0 }}>✕</button>
             </div>
