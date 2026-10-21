@@ -329,16 +329,20 @@ function fetchWeddings() {
 // Inquiries query.
 var WEDDING_INQUIRY_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
 // The real rental/event-booking lead forms (nsh_forms), replacing the old
-// best-effort Wix-form-name keyword guess. Event Inquiry Form covers
-// weddings, private events, memorials, non-profit events, and public
-// events all through one "what kind of event" dropdown, so it alone plus
-// the dedicated Wedding Inquiry form and the further-along Pre Booking
-// Information Form (filled out once a date's been discussed with the
-// venue coordinator) cover the venue's actual inquiry funnel.
+// best-effort Wix-form-name keyword guess. Event Inquiry Form used to cover
+// weddings, private events, memorials, non-profit events, and public events
+// all through one shared form with a "what kind of event" dropdown; it's now
+// split into one dedicated form per event type (same fields, clear titles)
+// so staff can tell at a glance which page an inquiry came from. That form
+// id is kept around for the generic Events page, which still uses it.
 var EVENT_INQUIRY_FORM_ID = 'a87b86b0-94cd-4d28-b57e-00b79b5f1fee';
+var PRIVATE_EVENT_INQUIRY_FORM_ID = '5b886667-5230-4866-9874-7bc0dcdb3320';
+var PUBLIC_EVENT_INQUIRY_FORM_ID = 'cd8f1e9f-06c5-4369-8b66-3498aff31465';
+var MEMORIAL_INQUIRY_FORM_ID = '952bc156-e89d-4790-814d-d2c2e9738a8b';
+var NONPROFIT_EVENT_INQUIRY_FORM_ID = 'e8cc69a1-1693-4fb4-8518-b8bb486dd055';
 var PRE_BOOKING_FORM_ID = 'a3a383f7-e1db-4344-9dec-ea879ad3406d'; // Wedding
 var PRE_BOOKING_FORM_ID_EVENT = '668f27d4-7e2d-4ce6-ba0c-bac5ddf9d8f8'; // Private/Public Events, Non-Profit, Memorials
-var RENTAL_INQUIRY_FORM_IDS = [WEDDING_INQUIRY_FORM_ID, EVENT_INQUIRY_FORM_ID, PRE_BOOKING_FORM_ID, PRE_BOOKING_FORM_ID_EVENT];
+var RENTAL_INQUIRY_FORM_IDS = [WEDDING_INQUIRY_FORM_ID, EVENT_INQUIRY_FORM_ID, PRIVATE_EVENT_INQUIRY_FORM_ID, PUBLIC_EVENT_INQUIRY_FORM_ID, MEMORIAL_INQUIRY_FORM_ID, NONPROFIT_EVENT_INQUIRY_FORM_ID, PRE_BOOKING_FORM_ID, PRE_BOOKING_FORM_ID_EVENT];
 function isVenueClientSubmission(submission) {
   return submission.form_id === PRE_BOOKING_FORM_ID || submission.form_id === PRE_BOOKING_FORM_ID_EVENT;
 }
