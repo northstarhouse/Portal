@@ -18460,28 +18460,21 @@ function VenueRentalsView({ navigate, initialTab }) {
         .venue-color-coding .vc-side-card.priority { background:#fff3e9; border-color:#ecd1b9; }
         .venue-color-coding .vc-side-card:not(.priority) { background:#f0f6ff; border-color:#c7daf0; }
       `}</style>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 280px', minWidth: 0 }}>
-          <div style={{ fontSize: 26, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Venue Rentals Dashboard</div>
-          <div style={{ fontSize: 13, color: '#999', marginTop: 4 }}>Manage inquiries, tours, and bookings for North Star House.</div>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+        {!SHOW_LEGACY_VENUE_DASHBOARD && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#f0ece2', borderRadius: 10, padding: 4, flexShrink: 0 }}>
+            {[['inquiries', 'Inquiries'], ['clients', 'Clients']].map(function(pair) {
+              var isActive = venueTab === pair[0];
+              return (
+                <button key={pair[0]} type="button" aria-pressed={isActive} onClick={function() { setVenueTab(pair[0]); }}
+                  style={{ padding: '10px 22px', border: 'none', borderRadius: 8, fontSize: 17, fontFamily: "'Cardo', serif", fontWeight: 700, background: isActive ? gold : 'transparent', color: isActive ? '#fff' : '#777', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  {pair[1]}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginLeft: 'auto' }}>
-          {!SHOW_LEGACY_VENUE_DASHBOARD && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-              {[['inquiries', 'Inquiries'], ['clients', 'Clients']].map(function(pair, index) {
-                var isActive = venueTab === pair[0];
-                return (
-                  <React.Fragment key={pair[0]}>
-                    {index > 0 && <span aria-hidden="true" style={{ width: 2, height: 20, background: gold, flexShrink: 0 }} />}
-                    <button type="button" aria-pressed={isActive} onClick={function() { setVenueTab(pair[0]); }}
-                      style={{ padding: '7px 0', border: 'none', fontSize: 13, fontWeight: isActive ? 600 : 400, background: 'none', color: isActive ? '#2a2a2a' : '#888', cursor: 'pointer', textDecoration: isActive ? 'underline' : 'none', textDecorationColor: gold, textDecorationThickness: 2, textUnderlineOffset: 7, whiteSpace: 'nowrap' }}>
-                      {pair[1]}
-                    </button>
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          )}
           <button onClick={function() { navigate('estate-tours'); }} style={{ flexShrink: 0, padding: '10px 18px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             Edit Tour Schedule
           </button>
@@ -18502,6 +18495,7 @@ function VenueRentalsView({ navigate, initialTab }) {
             icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}
             title="Upcoming Tours"
             tone="tours"
+            colorCoding={colorCoding}
             onViewAll={function() { navigate('estate-tours'); }}
           >
             {tours === null ? (
@@ -18609,20 +18603,21 @@ function VenueRentalsView({ navigate, initialTab }) {
           setTimeout(function() { w.print(); }, 300);
         }
         return (
-          <div data-venue-tone="requests" style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Tour Requests</div>
+          <div data-venue-tone="requests" style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', boxShadow: colorCoding ? 'none' : undefined }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: colorCoding ? '14px 18px' : '18px 18px 10px', background: colorCoding ? '#c6690f' : 'transparent' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: colorCoding ? '#fff' : '#2a2a2a', fontFamily: "'Cardo', serif" }}>Tour Requests</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {tours !== null && <div style={{ fontSize: 12, color: unhandledCount > 0 ? gold : '#999', fontWeight: unhandledCount > 0 ? 700 : 400 }}>{unhandledCount} unhandled</div>}
+                {tours !== null && <div style={{ fontSize: 12, color: colorCoding ? 'rgba(255,255,255,0.9)' : (unhandledCount > 0 ? gold : '#999'), fontWeight: unhandledCount > 0 ? 700 : 400 }}>{unhandledCount} unhandled</div>}
                 {requests.length > 0 && (
                   <button onClick={exportRequestsPdf} title="Export this list as a PDF"
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 600, color: '#886c44', cursor: 'pointer' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, background: colorCoding ? 'rgba(255,255,255,0.15)' : 'none', border: colorCoding ? '0.5px solid rgba(255,255,255,0.5)' : '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 600, color: colorCoding ? '#fff' : '#886c44', cursor: 'pointer' }}>
                     <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Export PDF
                   </button>
                 )}
               </div>
             </div>
+            <div style={{ padding: colorCoding ? '14px 18px 18px' : '0 18px 18px' }}>
             {justBooked && (
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: '#2e6b4f', background: '#f0f7f2', border: '0.5px solid #cfe6d8', borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>
                 <span>✓ Booked {justBooked.visitor_name || 'the visitor'} for {fmtReqDate(justBooked.date)} at {new Date('2000-01-01T' + justBooked.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} and added it to the calendar. It's now under Upcoming Tours.</span>
@@ -18703,6 +18698,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                 </div>
               </details>
             )}
+            </div>
           </div>
         );
       })()}
@@ -19070,17 +19066,19 @@ function VenueRentalsView({ navigate, initialTab }) {
 
 // Overview card shell for the new (non-legacy) Venue Rentals landing page --
 // icon + title + "View all" header, arbitrary content below.
-function VenueOverviewCard({ icon, title, onViewAll, children, tone }) {
+var VENUE_TONE_DARK = { tours: '#2d5a8a', requests: '#c6690f' };
+function VenueOverviewCard({ icon, title, onViewAll, children, tone, colorCoding }) {
+  var dark = colorCoding && VENUE_TONE_DARK[tone];
   return (
-    <div data-venue-tone={tone} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+    <div data-venue-tone={tone} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', boxShadow: dark ? 'none' : undefined }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: dark ? '14px 18px' : '18px 18px 10px', background: dark || 'transparent' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {icon}
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{title}</div>
+          {dark ? React.cloneElement(icon, { stroke: '#fff' }) : icon}
+          <div style={{ fontSize: 15, fontWeight: 700, color: dark ? '#fff' : '#2a2a2a', fontFamily: "'Cardo', serif" }}>{title}</div>
         </div>
-        <div onClick={onViewAll} style={{ fontSize: 12, color: gold, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>View all →</div>
+        <div onClick={onViewAll} style={{ fontSize: 12, color: dark ? '#fff' : gold, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>View all →</div>
       </div>
-      {children}
+      <div style={{ padding: dark ? '14px 18px 18px' : '0 18px 18px' }}>{children}</div>
     </div>
   );
 }
