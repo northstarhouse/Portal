@@ -18459,7 +18459,7 @@ function VenueRentalsView({ navigate, initialTab }) {
         .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-date { background:#8a3d3d; border-color:#8a3d3d; }
         .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-date small, .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-date strong { color:#fff; }
         .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-card-foot { background:#8a3d3d; border-top-color:#8a3d3d; color:#fff; font-weight:700; }
-        .venue-color-coding .vc-side-card.priority { background:#fff3e9; border-color:#ecd1b9; }
+        .venue-color-coding .vc-side-card.priority { background:#fff3e9; }
         .venue-color-coding .vc-side-card:not(.priority) { background:#f0f6ff; border-color:#c7daf0; }
       `}</style>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
