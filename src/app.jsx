@@ -18476,7 +18476,7 @@ function VenueRentalsView({ navigate, initialTab }) {
         <div aria-label="Color key" style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 11, color: '#777', marginBottom: 16 }}>
           {(venueTab === 'clients'
             ? [['#65965a', 'On track'], ['#c79535', 'Needs attention'], ['#bf6c6c', 'Past due']]
-            : [['#598bc1', 'Upcoming tours'], ['#c68d33', 'Tour requests'], ['#9875bb', 'Messages'], ['#b5a047', 'Inquiries']]
+            : [['#598bc1', 'Upcoming tours'], ['#c68d33', 'Tour requests'], ['#b5a047', 'Inquiries']]
           ).map(function(item) { return <span key={item[1]} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 2, background: item[0] }} />{item[1]}</span>; })}
         </div>
       )}
@@ -18692,40 +18692,6 @@ function VenueRentalsView({ navigate, initialTab }) {
           </div>
         );
       })()}
-            <VenueOverviewCard
-              icon={<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>}
-              title="New Messages"
-              tone="messages"
-              onViewAll={function() { navigate('venue-messages'); }}
-            >
-              {messages === null ? (
-                <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
-              ) : messages.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '30px 10px' }}>
-                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
-                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#c4b595" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>No messages yet</div>
-                  <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.5, maxWidth: 220, margin: '0 auto' }}>Messages from the venue rental inquiry form will appear here.</div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {messages.slice(0, 6).map(function(m) {
-                    return (
-                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}
-                        onClick={function() { navigate('venue-messages'); }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.from_name || m.from_email || 'Unknown'}</div>
-                          <div style={{ fontSize: 11, color: '#999', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.subject || m.body}</div>
-                        </div>
-                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </VenueOverviewCard>
-
             {/* Inquiries counter: rental inquiry-form submissions. Most are
                 answered by automation, so this is a plain count (total, plus
                 how many came in this month) rather than a "needs reply" tally.
