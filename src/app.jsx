@@ -18645,7 +18645,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                             );
                           })}
                         </div>
-                        <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} accentDark={colorCoding ? tourCategoryColor(tourCategoryLabel({ kind: 'Tour', raw: t })).dark : null} />
+                        <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} accentDark={colorCoding ? '#c6690f' : null} />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', flexShrink: 0 }}>
                       <select value={t.request_status || 'not_handled'} disabled={reqSavingId === t.id}
