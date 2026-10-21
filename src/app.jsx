@@ -411,7 +411,7 @@ function fetchVenueInquiries(options) {
 }
 
 function loadVenueClientEvents() {
-  return fetch(SUPABASE_URL + '/rest/v1/venue_inquiries?select=id,name,event_type,event_date,prebooking_form_response_id,insurance_uploaded_at,questionnaire_form_response_id,questionnaire_sent_at&prebooking_form_response_id=not.is.null', {
+  return fetch(SUPABASE_URL + '/rest/v1/venue_inquiries?select=id,name,event_type,event_date,prebooking_form_response_id,insurance_uploaded_at,questionnaire_form_response_id,questionnaire_sent_at,venue_payment_schedule(sequence,kind,label,amount_cents,amount_paid_cents,due_date,status)&prebooking_form_response_id=not.is.null', {
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
   }).then(function(r) { if (!r.ok) throw new Error('Could not load live event requirements'); return r.json(); }).then(function(rows) { if (!Array.isArray(rows)) throw new Error('Invalid event requirements'); return rows; });
 }

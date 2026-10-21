@@ -44,11 +44,19 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   const invoice = latest(r => r.responses?.payments);
   // Prefer signatures on the selected invoice, rather than an older signed file.
   const contract = invoice?.responses?.signatures ? invoice : latest(r => r.responses?.signatures);
-  const payments = invoice?.responses?.payments || null;
+  // Weddings booked natively (no HoneyBook import) get their schedule from
+  // venue_payment_schedule instead, generated automatically at booking time.
+  const nativeScheduleRows = (live?.venue_payment_schedule || []).slice().sort((x, y) => x.sequence - y.sequence);
+  const payments = invoice?.responses?.payments || (nativeScheduleRows.length ? {
+    total: { amount: nativeScheduleRows.reduce((s, r) => s + (r.amount_cents || 0), 0), currency: 'USD' },
+    amount_paid: { amount: nativeScheduleRows.reduce((s, r) => s + (r.amount_paid_cents || 0), 0) },
+    balance_due: { amount: nativeScheduleRows.reduce((s, r) => s + ((r.amount_cents || 0) - (r.amount_paid_cents || 0)), 0) },
+    schedule: nativeScheduleRows.map(r => ({ amount: { amount: r.amount_cents, currency: 'USD' }, due_date: r.due_date, paid: r.status === 'paid', __nativeLabel: r.label })),
+  } : null);
   const nativeAgreement = nativeVersions.filter(v=>v.response_id===sub.id&&!['draft','void'].includes(v.status)).sort((a,b)=>b.version-a.version)[0] || null;
   const signatures = nativeAgreement ? {all_required_signed:nativeAgreement.status==='completed',signatures:(nativeAgreement.recipients||[]).map(s=>({signee_name:s.name,signee_type:s.role==='venue'?'vendor':'client',required:true,signed:s.status==='signed',signed_at:s.signed_at}))} : contract?.responses?.signatures || null;
   const currency = payments?.total?.currency || 'USD';
-  const schedule = (payments?.schedule || []).map((payment, index) => ({ ...payment, cents: payment.amount?.amount || 0, currency: payment.amount?.currency || currency, label: index === 0 ? 'Booking payment' : 'Scheduled payment ' + (index + 1), due: payment.due_date?.slice(0, 10) || null })).sort((x, y) => (x.due || '9999').localeCompare(y.due || '9999'));
+  const schedule = (payments?.schedule || []).map((payment, index) => ({ ...payment, cents: payment.amount?.amount || 0, currency: payment.amount?.currency || currency, label: payment.__nativeLabel || (index === 0 ? 'Booking payment' : 'Scheduled payment ' + (index + 1)), due: payment.due_date?.slice(0, 10) || null })).sort((x, y) => (x.due || '9999').localeCompare(y.due || '9999'));
   const duePayments = schedule.filter(s => !s.paid);
   const unsigned = signatures?.signatures?.filter(s => s.required && !s.signed) || [];
   const surveys = responses.filter(r => r.responses?.questionnaire && /(?:wedding|event) info questionnaire/i.test(r.title || ''));
