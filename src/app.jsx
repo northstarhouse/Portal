@@ -18133,15 +18133,17 @@ function VenueRentalsView({ navigate, initialTab }) {
       }).finally(function() { setDetailSaving(false); });
   }
 
-  // "Handled"/"Not Handled" on a tour-date request (status 'requested') is
-  // tracked separately from status itself -- staff mark these as handled once
-  // they've followed up, independent of whether the visitor ever actually
-  // gets booked into a confirmed slot.
-  function setRequestHandled(id, handled) {
+  // Status on a tour-date request (status 'requested') is tracked separately
+  // from status itself -- staff mark these as they follow up, independent of
+  // whether the visitor ever actually gets booked into a confirmed slot.
+  // "Made Contact" starts a 30-day clock after which the request fades into
+  // the Archived section below (a UI-only fade -- status stays 'requested').
+  function setRequestStatus(id, status) {
     setReqSavingId(id);
-    sbPatchById('estate_tours', id, { request_handled: handled })
+    var madeContactAt = status === 'made_contact' ? new Date().toISOString() : null;
+    sbPatchById('estate_tours', id, { request_status: status, made_contact_at: madeContactAt, request_handled: status !== 'not_handled' })
       .then(function() {
-        setTours(function(prev) { return (prev || []).map(function(t) { return t.id === id ? Object.assign({}, t, { request_handled: handled }) : t; }); });
+        setTours(function(prev) { return (prev || []).map(function(t) { return t.id === id ? Object.assign({}, t, { request_status: status, made_contact_at: madeContactAt, request_handled: status !== 'not_handled' }) : t; }); });
       }).finally(function() { setReqSavingId(null); });
   }
 
@@ -18537,15 +18539,22 @@ function VenueRentalsView({ navigate, initialTab }) {
           if (digits.length !== 10) return raw;
           return '(' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6);
         };
-        var requests = (tours || []).filter(function(t) { return t.status === 'requested'; })
+        var THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+        var isArchived = function(t) { return t.request_status === 'made_contact' && t.made_contact_at && (Date.now() - new Date(t.made_contact_at).getTime()) > THIRTY_DAYS_MS; };
+        var allRequests = (tours || []).filter(function(t) { return t.status === 'requested'; });
+        var requests = allRequests.filter(function(t) { return !isArchived(t); })
           .sort(function(a, b) {
-            if (!!a.request_handled !== !!b.request_handled) return a.request_handled ? 1 : -1;
+            var av = a.request_status === 'made_contact' ? 1 : 0, bv = b.request_status === 'made_contact' ? 1 : 0;
+            if (av !== bv) return av - bv;
             return (b.created_at || '').localeCompare(a.created_at || '');
           });
-        var unhandledCount = requests.filter(function(t) { return !t.request_handled; }).length;
+        var archivedRequests = allRequests.filter(isArchived)
+          .sort(function(a, b) { return (b.made_contact_at || '').localeCompare(a.made_contact_at || ''); });
+        var unhandledCount = requests.filter(function(t) { return (t.request_status || 'not_handled') === 'not_handled'; }).length;
+        function fmtMadeContactDate(iso) { try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return ''; } }
         function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
         function exportRequestsPdf() {
-          var rowsHtml = requests.map(function(t) {
+          var rowsHtml = allRequests.map(function(t) {
             var slots = t.requested_slots || [];
             var datesStr = slots.length === 0 ? 'None on file' : slots.map(function(s) { return fmtReqDate(s.date) + (s.time_label ? ' (' + s.time_label + ')' : ''); }).join('; ');
             return '<tr>' +
@@ -18554,7 +18563,7 @@ function VenueRentalsView({ navigate, initialTab }) {
               '<td>' + esc(t.visitor_email) + '</td>' +
               '<td>' + esc(fmtPhone(t.visitor_phone)) + '</td>' +
               '<td>' + esc(datesStr) + '</td>' +
-              '<td>' + (t.request_handled ? 'Handled' : 'Not Handled') + '</td>' +
+              '<td>' + (isArchived(t) ? 'Made Contact (Archived)' : t.request_status === 'made_contact' ? 'Made Contact' : 'Not Handled') + '</td>' +
               '</tr>';
           }).join('');
           var html = '<!doctype html><html><head><meta charset="utf-8"><title>Tour Requests</title>' +
@@ -18570,7 +18579,7 @@ function VenueRentalsView({ navigate, initialTab }) {
             'tr:nth-child(even){background:#faf8f5;}' +
             '</style></head><body>' +
             '<h1>Venue Tour Requests</h1>' +
-            '<div class="sub">Exported ' + esc(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) + ' · ' + requests.length + ' request' + (requests.length !== 1 ? 's' : '') + '</div>' +
+            '<div class="sub">Exported ' + esc(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })) + ' · ' + allRequests.length + ' request' + (allRequests.length !== 1 ? 's' : '') + '</div>' +
             '<table><thead><tr><th>Name</th><th>Tour Type</th><th>Email</th><th>Phone</th><th>Preferred Dates</th><th>Status</th></tr></thead><tbody>' +
             rowsHtml +
             '</tbody></table>' +
@@ -18612,7 +18621,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                 {requests.map(function(t) {
                   var slots = t.requested_slots || [];
                   return (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderBottom: '0.5px solid #f0ece2', opacity: t.request_handled ? 0.6 : 1 }}>
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderBottom: '0.5px solid #f0ece2', opacity: t.request_status === 'made_contact' ? 0.6 : 1 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{(t.visitor_name || 'Unknown') + ' - ' + tourCategoryLabel({ kind: 'Tour', raw: t })}</div>
@@ -18636,17 +18645,46 @@ function VenueRentalsView({ navigate, initialTab }) {
                         <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', flexShrink: 0 }}>
-                      <select value={t.request_handled ? 'handled' : 'not_handled'} disabled={reqSavingId === t.id}
-                        onChange={function(e) { setRequestHandled(t.id, e.target.value === 'handled'); }}
-                        style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: t.request_handled ? '#f0f7f2' : '#fff8e8', color: t.request_handled ? '#2e6b4f' : '#b45309', fontWeight: 600 }}>
+                      <select value={t.request_status || 'not_handled'} disabled={reqSavingId === t.id}
+                        onChange={function(e) { setRequestStatus(t.id, e.target.value); }}
+                        style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: t.request_status === 'made_contact' ? '#f0f7f2' : '#fff8e8', color: t.request_status === 'made_contact' ? '#2e6b4f' : '#b45309', fontWeight: 600 }}>
                         <option value="not_handled">Not Handled</option>
-                        <option value="handled">Handled</option>
+                        <option value="made_contact">Made Contact</option>
                       </select>
+                      {t.request_status === 'made_contact' && <div style={{ fontSize: 10, color: '#bbb' }}>Archives {fmtMadeContactDate(new Date(new Date(t.made_contact_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString())}</div>}
                       </div>
                     </div>
                   );
                 })}
               </div>
+            )}
+            {archivedRequests.length > 0 && (
+              <details style={{ marginTop: 14, borderTop: '0.5px solid #f0ece2', paddingTop: 10 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#999' }}>Archived &mdash; made contact 30+ days ago ({archivedRequests.length})</summary>
+                <div style={{ display: 'flex', flexDirection: 'column', marginTop: 6 }}>
+                  {archivedRequests.map(function(t) {
+                    return (
+                      <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0', borderBottom: '0.5px solid #f6f3ec' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>{(t.visitor_name || 'Unknown') + ' - ' + tourCategoryLabel({ kind: 'Tour', raw: t })}</div>
+                          <div style={{ fontSize: 11, color: '#bbb', marginTop: 2 }}>
+                            {t.visitor_email && <a href={'mailto:' + t.visitor_email} style={{ color: gold, textDecoration: 'none' }}>{t.visitor_email}</a>}
+                            {t.visitor_email && t.visitor_phone && ' · '}
+                            {fmtPhone(t.visitor_phone)}
+                            {t.made_contact_at && ' · Made contact ' + fmtMadeContactDate(t.made_contact_at)}
+                          </div>
+                        </div>
+                        <select value={t.request_status || 'not_handled'} disabled={reqSavingId === t.id}
+                          onChange={function(e) { setRequestStatus(t.id, e.target.value); }}
+                          style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: '#fff', color: '#777', fontWeight: 600 }}>
+                          <option value="not_handled">Not Handled</option>
+                          <option value="made_contact">Made Contact</option>
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
             )}
           </div>
         );
