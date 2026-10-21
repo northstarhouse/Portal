@@ -18923,16 +18923,17 @@ function VenueRentalsView({ navigate, initialTab }) {
                   )}
 
                   {otherAnswers.length > 0 && (
-                    <div style={{ background: '#faf8f4', borderRadius: 8, padding: 12 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Other submitted answers</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 8 }}>Other Submitted Answers</div>
+                      <div style={{ ...infoCard, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
                         {otherAnswers.map(function(k) {
                           var field = fields.find(function(f) { return f.id === k; });
                           var val = answers[k];
+                          var display = Array.isArray(val) ? val.join(', ') : (field && field.type === 'date' ? fmtLongDate(val) : String(val));
                           return (
-                            <div key={k}>
-                              <div style={{ fontSize: 10, fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: 0.5 }}>{field ? field.label : k}</div>
-                              <div style={{ fontSize: 13, color: '#2a2a2a' }}>{Array.isArray(val) ? val.join(', ') : String(val)}</div>
+                            <div key={k} style={{ flex: '1 1 160px' }}>
+                              <div style={infoLabel}>{field ? field.label : k}</div>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{display}</div>
                             </div>
                           );
                         })}
