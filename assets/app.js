@@ -320,14 +320,14 @@ Temporary Password: `+$+`
         .venue-color-coding .vc-card[data-venue-state="ready"] { background:#f1f8f0; border-color:#c6dfc2; box-shadow:inset 4px 0 0 #65965a; }
         .venue-color-coding .vc-card[data-venue-state="attention"] { background:#fff8e8; border-color:#ecd7a5; box-shadow:inset 4px 0 0 #c79535; }
         .venue-color-coding .vc-card[data-venue-state="overdue"] { background:#fff1f1; border-color:#edcaca; box-shadow:inset 4px 0 0 #bf6c6c; }
-        .venue-color-coding .vc-card[data-venue-state="ready"] .vc-date { background:#eaf3e8; border-color:#c6dfc2; }
-        .venue-color-coding .vc-card[data-venue-state="ready"] .vc-date small, .venue-color-coding .vc-card[data-venue-state="ready"] .vc-date strong { color:#3d6b38; }
+        .venue-color-coding .vc-card[data-venue-state="ready"] .vc-date { background:#3d6b38; border-color:#3d6b38; }
+        .venue-color-coding .vc-card[data-venue-state="ready"] .vc-date small, .venue-color-coding .vc-card[data-venue-state="ready"] .vc-date strong { color:#fff; }
         .venue-color-coding .vc-card[data-venue-state="ready"] .vc-card-foot { background:#3d6b38; border-top-color:#3d6b38; color:#fff; font-weight:700; }
-        .venue-color-coding .vc-card[data-venue-state="attention"] .vc-date { background:#fff3d9; border-color:#ecd7a5; }
-        .venue-color-coding .vc-card[data-venue-state="attention"] .vc-date small, .venue-color-coding .vc-card[data-venue-state="attention"] .vc-date strong { color:#8a641e; }
+        .venue-color-coding .vc-card[data-venue-state="attention"] .vc-date { background:#8a641e; border-color:#8a641e; }
+        .venue-color-coding .vc-card[data-venue-state="attention"] .vc-date small, .venue-color-coding .vc-card[data-venue-state="attention"] .vc-date strong { color:#fff; }
         .venue-color-coding .vc-card[data-venue-state="attention"] .vc-card-foot { background:#8a641e; border-top-color:#8a641e; color:#fff; font-weight:700; }
-        .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-date { background:#ffe3e3; border-color:#edcaca; }
-        .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-date small, .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-date strong { color:#8a3d3d; }
+        .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-date { background:#8a3d3d; border-color:#8a3d3d; }
+        .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-date small, .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-date strong { color:#fff; }
         .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-card-foot { background:#8a3d3d; border-top-color:#8a3d3d; color:#fff; font-weight:700; }
         .venue-color-coding .vc-side-card.priority { background:#fff3e9; border-color:#ecd1b9; }
         .venue-color-coding .vc-side-card:not(.priority) { background:#f0f6ff; border-color:#c7daf0; }
