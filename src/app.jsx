@@ -18413,7 +18413,10 @@ function VenueRentalsView({ navigate, initialTab }) {
   var clientSubmissions = inquiries === null ? null : inquiries.filter(isVenueClientSubmission);
   var upcomingCombined = (tours || []).filter(function(t) { return t.status === 'booked' && t.date; }).map(function(t) {
     var d = new Date(t.date + 'T' + (t.start_time || '00:00:00'));
-    return { key: 't-' + t.id, kind: 'Tour', title: (t.visitor_name || 'Visitor') + ' Tour', date: d, raw: t };
+    var cat = tourCategoryLabel({ kind: 'Tour', raw: t });
+    var catSingular = cat === 'Memorials' ? 'Memorial' : cat;
+    var title = (t.visitor_name || 'Visitor') + ' ' + (cat && cat !== 'Tour' ? catSingular + ' ' : '') + 'Tour';
+    return { key: 't-' + t.id, kind: 'Tour', title: title, date: d, raw: t };
   }).filter(function(e) { return e.date && e.date.getTime() >= Date.now() - 24 * 60 * 60 * 1000; })
     .sort(function(a, b) { return a.date - b.date; });
 
@@ -18509,7 +18512,6 @@ function VenueRentalsView({ navigate, initialTab }) {
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
                         <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{when}</div>
                       </div>
-                      <div style={{ flexShrink: 0, width: 78, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 10, fontWeight: 700, padding: '3px 0', borderRadius: 20, background: colorCoding ? tourCategoryColor(tourCategoryLabel(e)).bg : '#f0ece6', color: colorCoding ? tourCategoryColor(tourCategoryLabel(e)).color : '#777' }}>{tourCategoryLabel(e)}</div>
                       <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                   );
