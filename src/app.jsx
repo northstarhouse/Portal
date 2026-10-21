@@ -18020,6 +18020,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   const [editingField, setEditingField] = useS(null); // { uid, field: 'ig'|'album', val }
   const [messages, setMessages] = useS(null); // null while loading, [] once loaded
   const [inquiries, setInquiries] = useS(null);
+  const [bookedEventDates, setBookedEventDates] = useS([]); // [{event_date, status}] across every venue_inquiries category, not just weddings
   const [inquiriesError, setInquiriesError] = useS('');
   const [tours, setTours] = useS(null); // booked/requested estate_tours rows
   const [reqSavingId, setReqSavingId] = useS(null); // request_handled toggle in-flight for this tour id
@@ -18187,6 +18188,10 @@ function VenueRentalsView({ navigate, initialTab }) {
     loadInquiries();
 
     loadTours();
+
+    fetch(SUPABASE_URL + '/rest/v1/venue_inquiries?select=event_date,status&event_date=not.is.null&status=neq.Archive', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setBookedEventDates(Array.isArray(rows) ? rows : []); }).catch(function() { setBookedEventDates([]); });
   }, []);
 
   function getTrack(uid) {
@@ -18843,12 +18848,17 @@ function VenueRentalsView({ navigate, initialTab }) {
           try { return new Date(String(v).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); }
           catch (e) { return String(v); }
         }
-        // Checked against the actual rental calendar (venue_wedding_tracking /
-        // Google Calendar weddings feed), not just tour bookings -- a morning
-        // docent tour doesn't block a full-day wedding, but another wedding does.
+        // Checked against venue_inquiries (every booked event type going
+        // forward, not just weddings) plus the Google Calendar weddings feed
+        // (for older/HoneyBook-imported dates not yet in venue_inquiries) --
+        // a morning docent tour doesn't block a full-day rental, but another
+        // confirmed event on the same date does.
         var desiredDateValue = desiredDateField && answerFor(desiredDateField);
         var desiredDateKey = desiredDateValue ? String(desiredDateValue).slice(0, 10) : null;
-        var desiredDateTaken = desiredDateKey && (weddings || []).some(function(w) { return w.date && w.date.toISOString().slice(0, 10) === desiredDateKey; });
+        var desiredDateTaken = !!desiredDateKey && (
+          (bookedEventDates || []).some(function(b) { return b.event_date === desiredDateKey; }) ||
+          (weddings || []).some(function(w) { return w.date && w.date.toISOString().slice(0, 10) === desiredDateKey; })
+        );
         var infoCard = { background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 12 };
         var infoLabel = { fontSize: 10, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 };
         var infoValue = { fontSize: 14, fontWeight: 700, color: '#2a2a2a' };
