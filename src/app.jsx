@@ -18452,6 +18452,9 @@ function VenueRentalsView({ navigate, initialTab }) {
         .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-date { background:#8a3d3d; border-color:#8a3d3d; }
         .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-date small, .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-date strong { color:#fff; }
         .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-card-foot { background:#8a3d3d; border-top-color:#8a3d3d; color:#fff; font-weight:700; }
+        .venue-color-coding .vc-card[data-venue-state="ready"] .vc-open { color:#3d6b38; }
+        .venue-color-coding .vc-card[data-venue-state="attention"] .vc-open { color:#8a641e; }
+        .venue-color-coding .vc-card[data-venue-state="overdue"] .vc-open { color:#8a3d3d; }
         .venue-color-coding .vc-side-card.priority { background:#fff3e9; }
         .venue-color-coding .vc-side-card:not(.priority) { background:#f0f6ff; border-color:#c7daf0; }
       `}</style>
