@@ -18474,7 +18474,7 @@ function VenueRentalsView({ navigate, initialTab }) {
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginLeft: 'auto' }}>
           {venueTab !== 'clients' && (
-            <button onClick={function() { navigate('estate-tours'); }} style={{ flexShrink: 0, padding: '10px 18px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button onClick={function() { navigate('estate-tours'); }} style={{ flexShrink: 0, padding: '10px 18px', background: 'transparent', color: gold, border: '1.5px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               Edit Tour Schedule
             </button>
           )}
