@@ -723,6 +723,7 @@ var NAV_ICONS = {
   'form-responses': '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
   announcements: '<path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
   'maintenance-request': '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  'website-payments': '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/>',
 };
 
 function NavIcon({ id, active }) {
@@ -21709,8 +21710,32 @@ function WebsitePaymentsView({ navigate }) {
     a.click();
   }
 
+  var STAT_ICONS = {
+    gross: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+    fee: '<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>',
+    net: '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
+    month: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    ticket: '<path d="M2 9a3 3 0 1 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 1 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/>',
+    rsvp: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
+  };
+  function statIcon(name) {
+    return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: STAT_ICONS[name] }} />;
+  }
+  function ModernStat({ icon, label, value, sub }) {
+    return (
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d4', borderRadius: 12, padding: '14px 16px', flex: 1, minWidth: 128 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(136,108,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{statIcon(icon)}</div>
+          <div style={{ fontSize: 11, color: '#999', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</div>
+        </div>
+        <div style={{ fontSize: 21, fontWeight: 600, color: '#2a2a2a', lineHeight: 1.2 }}>{value}</div>
+        <div style={{ fontSize: 11, color: '#999', marginTop: 2, minHeight: 14 }}>{sub || ''}</div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ maxWidth: 980 }}>
+    <div>
       <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>&larr; Admin</button>
 
       {err && (
@@ -21719,13 +21744,13 @@ function WebsitePaymentsView({ navigate }) {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
-        <StatCard label="Gross revenue" value={orders === null ? '…' : money(totalRevenue)} sub={paid.length + ' paid orders'} />
-        <StatCard label="PayPal fees" value={orders === null ? '…' : '−' + money(totalFees)} sub="paid by North Star" />
-        <StatCard label="Net revenue" value={orders === null ? '…' : money(totalNet)} sub="after fees" />
-        <StatCard label="This month" value={orders === null ? '…' : money(monthRevenue)} sub="gross" />
-        <StatCard label="Tickets sold" value={orders === null ? '…' : ticketCount} />
-        <StatCard label="RSVPs" value={orders === null ? '…' : rsvpCount} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 22 }}>
+        <ModernStat icon="gross" label="Gross revenue" value={orders === null ? '…' : money(totalRevenue)} sub={paid.length + ' paid orders'} />
+        <ModernStat icon="fee" label="PayPal fees" value={orders === null ? '…' : '−' + money(totalFees)} sub="paid by North Star" />
+        <ModernStat icon="net" label="Net revenue" value={orders === null ? '…' : money(totalNet)} sub="after fees" />
+        <ModernStat icon="month" label="This month" value={orders === null ? '…' : money(monthRevenue)} sub="gross" />
+        <ModernStat icon="ticket" label="Tickets sold" value={orders === null ? '…' : ticketCount} />
+        <ModernStat icon="rsvp" label="RSVPs" value={orders === null ? '…' : rsvpCount} />
       </div>
 
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, margin: '4px 0 10px' }}>By event</div>
@@ -21750,17 +21775,20 @@ function WebsitePaymentsView({ navigate }) {
 
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2 }}>Orders &amp; attendees</div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <select value={eventFilter} onChange={function(e) { setEventFilter(e.target.value); }} style={{ fontSize: 12, border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 8px' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <select value={eventFilter} onChange={function(e) { setEventFilter(e.target.value); }} style={{ fontSize: 12, border: '0.5px solid #e0d8cc', borderRadius: 7, padding: '6px 9px', background: '#fff' }}>
             <option value="all">All events</option>
             {events.map(function(ev) { return <option key={ev} value={ev}>{ev}</option>; })}
           </select>
-          <select value={kindFilter} onChange={function(e) { setKindFilter(e.target.value); }} style={{ fontSize: 12, border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 8px' }}>
-            <option value="all">Paid + RSVP</option>
-            <option value="paid">Paid</option>
-            <option value="rsvp">RSVP</option>
-          </select>
-          <button onClick={exportCsv} disabled={!filtered.length} style={{ fontSize: 12, fontWeight: 600, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', cursor: filtered.length ? 'pointer' : 'default', opacity: filtered.length ? 1 : 0.5 }}>Export CSV</button>
+          <div style={{ display: 'inline-flex', border: '0.5px solid #e0d8cc', borderRadius: 7, overflow: 'hidden' }}>
+            {[['all', 'Paid + RSVP'], ['paid', 'Paid'], ['rsvp', 'RSVP']].map(function(k, i) {
+              return <button key={k[0]} onClick={function() { setKindFilter(k[0]); }} style={{ fontSize: 12, fontWeight: 600, border: 'none', borderLeft: i ? '0.5px solid #e0d8cc' : 'none', padding: '6px 10px', cursor: 'pointer', background: kindFilter === k[0] ? gold : '#fff', color: kindFilter === k[0] ? '#fff' : '#777' }}>{k[1]}</button>;
+            })}
+          </div>
+          <button onClick={exportCsv} disabled={!filtered.length} style={{ fontSize: 12, fontWeight: 600, background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '6px 13px', cursor: filtered.length ? 'pointer' : 'default', opacity: filtered.length ? 1 : 0.5, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
         </div>
       </div>
 
@@ -21770,22 +21798,28 @@ function WebsitePaymentsView({ navigate }) {
         <div style={{ fontSize: 12, color: '#aaa' }}>No orders yet.</div>
       ) : (
         <Table
-          cols={['When', 'Type', 'Name', 'Email', 'Event', 'Tickets', 'Gross', 'Fee', 'Net', 'Note']}
+          cols={['Order', 'Buyer', 'Event', 'Amount']}
           rows={filtered}
           renderRow={function(o) {
+            var tix = (o.tickets || []).map(function(t) { return t.qty + 'x ' + t.tier; }).join(', ');
             return [
-              <td key="w" style={{ padding: '8px 10px', color: '#777', whiteSpace: 'nowrap' }}>{new Date(o.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>,
-              <td key="k" style={{ padding: '8px 10px' }}>
-                <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '2px 8px', background: orderKindBadge(o).bg, color: orderKindBadge(o).color }}>{orderKindBadge(o).label}</span>
+              <td key="w" style={{ padding: '10px 10px', whiteSpace: 'nowrap' }}>
+                <div style={{ marginBottom: 4 }}><span style={{ fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '2px 8px', background: orderKindBadge(o).bg, color: orderKindBadge(o).color }}>{orderKindBadge(o).label}</span></div>
+                <div style={{ color: '#999', fontSize: 11 }}>{new Date(o.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
               </td>,
-              <td key="n" style={{ padding: '8px 10px', fontWeight: 500 }}>{o.buyer_name}</td>,
-              <td key="e" style={{ padding: '8px 10px', color: '#555' }}>{o.buyer_email}</td>,
-              <td key="ev" style={{ padding: '8px 10px', color: '#555' }}>{(o.event_title || o.event_slug)}{o.event_date ? ' · ' + o.event_date : ''}</td>,
-              <td key="t" style={{ padding: '8px 10px', color: '#555' }}>{(o.tickets || []).map(function(t) { return t.qty + 'x ' + t.tier; }).join(', ')}</td>,
-              <td key="a" style={{ padding: '8px 10px', fontWeight: 500, whiteSpace: 'nowrap' }}>{orderIsPaid(o) ? money(o.amount) : '—'}</td>,
-              <td key="f" style={{ padding: '8px 10px', color: '#a05a1a', whiteSpace: 'nowrap' }}>{orderIsPaid(o) && o.paypal_fee != null ? '−' + money(o.paypal_fee) : '—'}</td>,
-              <td key="nt" style={{ padding: '8px 10px', fontWeight: 500, whiteSpace: 'nowrap' }}>{orderIsPaid(o) ? money(netOf(o)) : '—'}</td>,
-              <td key="note" title={o.note || ''} style={{ padding: '8px 10px', color: '#777', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.note || ''}</td>
+              <td key="b" style={{ padding: '10px 10px', maxWidth: 190 }}>
+                <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.buyer_name}</div>
+                <div style={{ color: '#999', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.buyer_email}</div>
+              </td>,
+              <td key="ev" style={{ padding: '10px 10px', maxWidth: 220 }}>
+                <div style={{ color: '#444' }}>{(o.event_title || o.event_slug)}{o.event_date ? ' · ' + o.event_date : ''}</div>
+                {tix && <div style={{ color: '#999', fontSize: 11, marginTop: 2 }}>{tix}</div>}
+                {o.note && <div title={o.note} style={{ color: '#aaa', fontSize: 11, marginTop: 2, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.note}</div>}
+              </td>,
+              <td key="a" style={{ padding: '10px 10px', whiteSpace: 'nowrap' }}>
+                <div style={{ fontWeight: 600 }}>{orderIsPaid(o) ? money(o.amount) : '—'}</div>
+                {orderIsPaid(o) && o.paypal_fee != null && <div style={{ color: '#a05a1a', fontSize: 11, marginTop: 2 }}>−{money(o.paypal_fee)} fee → {money(netOf(o))} net</div>}
+              </td>
             ];
           }}
         />
