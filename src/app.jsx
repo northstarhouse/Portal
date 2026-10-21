@@ -18619,9 +18619,9 @@ function VenueRentalsView({ navigate, initialTab }) {
               </div>
             )}
             {tours === null ? (
-              <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
+              <div style={{ fontSize: 13, color: '#777', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
             ) : requests.length === 0 ? (
-              <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>No tour date requests with alternate dates yet.</div>
+              <div style={{ fontSize: 13, color: '#777', padding: '20px 0', textAlign: 'center' }}>No tour date requests with alternate dates yet.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {requests.map(function(t) {
@@ -18631,9 +18631,9 @@ function VenueRentalsView({ navigate, initialTab }) {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{(t.visitor_name || 'Unknown') + ' - ' + tourCategoryLabel({ kind: 'Tour', raw: t })}</div>
-                          {t.created_at && <div style={{ fontSize: 11, color: '#bbb' }}>Inquired {fmtInquiryDate(t.created_at)}</div>}
+                          {t.created_at && <div style={{ fontSize: 11, color: '#888' }}>Inquired {fmtInquiryDate(t.created_at)}</div>}
                         </div>
-                        <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
                           {t.visitor_email && <a href={'mailto:' + t.visitor_email} style={{ color: gold, textDecoration: 'none' }}>{t.visitor_email}</a>}
                           {t.visitor_email && t.visitor_phone && ' · '}
                           <span style={{ color: colorCoding ? '#c6690f' : 'inherit', fontWeight: colorCoding ? 600 : 400 }}>{fmtPhone(t.visitor_phone)}</span>
@@ -18642,7 +18642,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                           {slots.length === 0 ? 'No preferred dates on file' : slots.map(function(s, i) {
                             return (
                               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 0', borderTop: i > 0 ? '0.5px solid #f0ece2' : 'none' }}>
-                                <span style={{ color: '#ccc' }}>•</span>
+                                <span style={{ color: '#999' }}>•</span>
                                 <span>{fmtReqDate(s.date)}{s.time_label ? ' (' + s.time_label + ')' : ''}</span>
                               </div>
                             );
@@ -18656,7 +18656,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                         <option value="not_handled">Not Handled</option>
                         <option value="made_contact">Made Contact</option>
                       </select>
-                      {t.request_status === 'made_contact' && <div style={{ fontSize: 10, color: '#bbb' }}>Archives {fmtMadeContactDate(new Date(new Date(t.made_contact_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString())}</div>}
+                      {t.request_status === 'made_contact' && <div style={{ fontSize: 10, color: '#888' }}>Archives {fmtMadeContactDate(new Date(new Date(t.made_contact_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString())}</div>}
                       <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} accentDark={colorCoding ? '#c6690f' : null} />
                       </div>
                     </div>
@@ -18673,7 +18673,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                       <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0', borderBottom: '0.5px solid #f6f3ec' }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>{(t.visitor_name || 'Unknown') + ' - ' + tourCategoryLabel({ kind: 'Tour', raw: t })}</div>
-                          <div style={{ fontSize: 11, color: '#bbb', marginTop: 2 }}>
+                          <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
                             {t.visitor_email && <a href={'mailto:' + t.visitor_email} style={{ color: gold, textDecoration: 'none' }}>{t.visitor_email}</a>}
                             {t.visitor_email && t.visitor_phone && ' · '}
                             {fmtPhone(t.visitor_phone)}
