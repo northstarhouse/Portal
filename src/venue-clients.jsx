@@ -126,12 +126,12 @@ function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChan
   </dialog>;
 }
 
-export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, agreementApi }) {
+export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, agreementApi, filter, setFilter, query, setQuery }) {
   const [events,setEvents] = React.useState([]), [error,setError] = React.useState('');
   const [savedResponses,setSavedResponses] = React.useState({});
   const [nativeVersions,setNativeVersions] = React.useState([]);
   React.useEffect(()=>{let cancelled=false;function refresh(){if(agreementApi)agreementApi('summary').then(rows=>{if(!cancelled)setNativeVersions(rows);}).catch(()=>{if(!cancelled)setError('Live agreement status is unavailable. Showing the saved client records.');});}refresh();const timer=setInterval(refresh,60000);window.addEventListener('focus',refresh);return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',refresh);};},[agreementApi]);
-  const [query,setQuery] = React.useState(''), [filter,setFilter] = React.useState('all'), [allTasks,setAllTasks] = React.useState(false), [selected,setSelected] = React.useState(null);
+  const [allTasks,setAllTasks] = React.useState(false), [selected,setSelected] = React.useState(null);
   React.useEffect(() => { let cancelled=false; loadEvents().then(rows => {if(!cancelled)setEvents(rows);}).catch(() => {if(!cancelled)setError('Live requirement updates are unavailable. Showing the saved client records.');}); return()=>{cancelled=true;}; }, [loadEvents]);
   const today = venueDateKey();
   const clients = (submissions || []).map(sub => buildVenueClient(savedResponses[sub.id] ? {...sub,...savedResponses[sub.id]} : sub,events.find(e=>e.prebooking_form_response_id===sub.id),today,nativeVersions)).filter(c => !c.eventEnd || c.eventEnd >= today).sort((a,b)=>(a.eventDate || '9999').localeCompare(b.eventDate || '9999'));
@@ -147,13 +147,12 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, a
     const record = await saveInsurance(id,verified,note);
     setSavedResponses(prev=>({...prev,[id]:record}));
   }
-  const setScope = scope => setFilter(scope);
   return <div className="vc-dashboard" style={{gridColumn:'1 / -1'}}>
     <style>{css}</style>
     {error && <p role="status" className="vc-pill alert">{error}</p>}
     <div className="vc-layout"><section aria-label="Upcoming client events">
-      <div className="vc-toolbar" style={{justifyContent:'flex-end'}}><span className="vc-muted" style={{marginRight:'auto'}}>{submissions===null?'Loading…':clients.length+' events'}</span><select aria-label="Filter clients" className="vc-filter-select" value={filter} onChange={e=>setScope(e.target.value)}><option value="all">All upcoming</option><option value="attention">Needs attention</option><option value="viewall">View all events</option></select><input aria-label="Search clients" placeholder="Search names or dates…" value={query} onChange={e=>setQuery(e.target.value)}/></div>
-      {submissions===null ? <div role="status" className="vc-empty">Loading client events…</div> : shown.length===0 ? <div className="vc-empty">{clients.length?'No events match this view.':'No upcoming client events yet.'}{clients.length>0&&<div><button className="vc-text-button" onClick={()=>{setQuery('');setScope('all');}}>Show all upcoming events</button></div>}</div> : shown.map(c=>{
+      <div style={{marginBottom:16}}><span className="vc-muted">{submissions===null?'Loading…':clients.length+' events'}</span></div>
+      {submissions===null ? <div role="status" className="vc-empty">Loading client events…</div> : shown.length===0 ? <div className="vc-empty">{clients.length?'No events match this view.':'No upcoming client events yet.'}{clients.length>0&&<div><button className="vc-text-button" onClick={()=>{setQuery('');setFilter('all');}}>Show all upcoming events</button></div>}</div> : shown.map(c=>{
         const pastDue=c.duePayments.find(p=>p.due && p.due<today), next=c.duePayments[0];
         return <article key={c.id} className="vc-card" data-venue-state={c.tasks.some(t=>t.overdue) ? "overdue" : c.tasks.some(t=>t.urgent) ? "attention" : "ready"}><div className="vc-card-head"><div className="vc-date"><small>{c.eventDate ? new Date(c.eventDate+'T12:00:00').toLocaleDateString('en-US',{month:'short'}) : 'Date'}</small><strong>{c.eventDate?Number(c.eventDate.slice(8,10)):'?'}</strong></div><div className="vc-head-main"><h3 className="vc-name">{c.name}</h3><div className="vc-muted">{dateLabel(c.eventDate)}{c.eventEnd && c.eventEnd!==c.eventDate?' – '+dateLabel(c.eventEnd):''} · {c.type}{c.days!==null?' · '+(c.days>0?c.days+' days away':c.days===0?'Today':'In progress'):''}</div></div><button className="vc-open" onClick={()=>open(c)} aria-label={'View details for '+c.name}>View details</button></div>
           <div className="vc-card-body"><div><div className="vc-label">Agreement</div><span className={'vc-pill '+(c.signatures ? c.unsigned.length?(c.unsigned.some(s=>s.signee_type==='vendor')?'danger':'alert'):'good':'')}>{c.nativeAgreement && ['declined','expired'].includes(c.nativeAgreement.status) ? (c.nativeAgreement.status==='declined'?'Revision declined':'Signing request expired') : c.signatures ? c.unsigned.length?'Signature pending':'Fully signed':'Not on file'}</span>{c.unsigned.map((s,i)=><div key={i} className="vc-muted" style={{marginTop:5}}>{s.signee_type==='vendor'?'Venue':'Client'} · {s.signee_name}</div>)}</div>

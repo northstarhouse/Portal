@@ -18046,6 +18046,8 @@ function VenueRentalsView({ navigate, initialTab }) {
   }
   const debounceTimers = useR({});
   var colorCoding = true; // kept on permanently now -- toggle removed per feedback
+  const [clientFilter, setClientFilter] = useS('all');
+  const [clientQuery, setClientQuery] = useS('');
 
   // Detail popup for a row in the new Upcoming Tours card -- shows the
   // submitted tour-request info, and lets staff reschedule or mark a no-show
@@ -18476,6 +18478,18 @@ function VenueRentalsView({ navigate, initialTab }) {
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginLeft: 'auto' }}>
+          {venueTab === 'clients' && (
+            <React.Fragment>
+              <select aria-label="Filter clients" value={clientFilter} onChange={function(e) { setClientFilter(e.target.value); }}
+                style={{ border: '1px solid #ded7cb', background: '#fff', borderRadius: 7, padding: '9px 11px', fontSize: 12, color: '#333', cursor: 'pointer' }}>
+                <option value="all">All upcoming</option>
+                <option value="attention">Needs attention</option>
+                <option value="viewall">View all events</option>
+              </select>
+              <input aria-label="Search clients" placeholder="Search names or dates…" value={clientQuery} onChange={function(e) { setClientQuery(e.target.value); }}
+                style={{ border: '1px solid #ded7cb', background: '#fff', borderRadius: 7, padding: '9px 11px', fontSize: 12, minWidth: 180 }} />
+            </React.Fragment>
+          )}
           {venueTab !== 'clients' && (
             <button onClick={function() { navigate('estate-tours'); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0, padding: '10px 18px', background: 'transparent', color: gold, border: '1.5px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -18528,7 +18542,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
 
           {venueTab === 'clients' && (
-            !inquiriesError && <VenueClientDashboard submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} agreementApi={venueAgreementApi} />
+            !inquiriesError && <VenueClientDashboard submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
           )}
 
           {venueTab === 'inquiries' && (
