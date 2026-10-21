@@ -17976,11 +17976,11 @@ var TOUR_WEDDING_FORM_ID = '1eea2137-f94d-414b-a977-4ed622214580';
 var TOUR_EVENT_TYPE_FIELD_ID = '0uj9rtfk';
 var TOUR_CATEGORY_OPTIONS = ['Wedding', 'Event', 'Non-Profit', 'Memorials'];
 var TOUR_CATEGORY_COLORS = {
-  Wedding: { bg: '#fbe4ec', color: '#b3487a', dark: '#7a2f55' },
-  Event: { bg: '#e6eef7', color: '#3a6ea8', dark: '#244a70' },
-  'Non-Profit': { bg: '#e8f5e9', color: '#2e7d32', dark: '#1b4d1e' },
-  Memorials: { bg: '#eef0f5', color: '#52607a', dark: '#313b4d' },
-  Tour: { bg: '#f0ece6', color: '#888', dark: '#555' },
+  Wedding: { bg: '#fbe4ec', color: '#b3487a', dark: '#ff1f7a' },
+  Event: { bg: '#e6eef7', color: '#3a6ea8', dark: '#0062ff' },
+  'Non-Profit': { bg: '#e8f5e9', color: '#2e7d32', dark: '#00c853' },
+  Memorials: { bg: '#eef0f5', color: '#52607a', dark: '#7c4dff' },
+  Tour: { bg: '#f0ece6', color: '#888', dark: '#ff6d00' },
 };
 function tourCategoryColor(label) {
   return TOUR_CATEGORY_COLORS[label] || TOUR_CATEGORY_COLORS.Tour;
@@ -18501,9 +18501,9 @@ function VenueRentalsView({ navigate, initialTab }) {
                   return (
                     <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}
                       onClick={function() { openDetail(e); }}>
-                      <div style={{ flexShrink: 0, width: 42, textAlign: 'center', background: dateDark ? dateDark + '14' : '#faf8f4', border: '0.5px solid ' + (dateDark || '#e8e0d5'), borderRadius: 8, padding: '4px 0' }}>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: dateDark || gold, letterSpacing: 0.5 }}>{month}</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: dateDark || '#2a2a2a' }}>{day}</div>
+                      <div style={{ flexShrink: 0, width: 42, textAlign: 'center', background: dateDark || '#faf8f4', border: '0.5px solid ' + (dateDark || '#e8e0d5'), borderRadius: 8, padding: '4px 0' }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: dateDark ? '#fff' : gold, letterSpacing: 0.5 }}>{month}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: dateDark ? '#fff' : '#2a2a2a' }}>{day}</div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
@@ -19669,6 +19669,7 @@ function QuarterHourSelect({ value, onChange, disabled, style, ariaLabel }) {
 // moves it into Upcoming Tours and onto the automatic reminder emails.
 function TourRequestCalendarRow({ tour, onBooked, accentDark }) {
   var accent = accentDark || gold;
+  var loud = !!accentDark;
   var slots = tour.requested_slots || [];
   var [open, setOpen] = useState(false);
   var [date, setDate] = useState('');
@@ -19703,7 +19704,7 @@ function TourRequestCalendarRow({ tour, onBooked, accentDark }) {
   if (!open) {
     return (
       <button type="button" onClick={function() { setOpen(true); if (!date && slots[0] && slots[0].date) setDate(slots[0].date); }}
-        style={{ marginTop: 8, fontSize: 11, fontWeight: 600, padding: '5px 10px', borderRadius: 6, border: '0.5px solid ' + accent, background: '#fff', color: accent, cursor: 'pointer' }}>
+        style={{ marginTop: 8, fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 6, border: '0.5px solid ' + accent, background: loud ? accent : '#fff', color: loud ? '#fff' : accent, cursor: 'pointer' }}>
         + Add to Calendar
       </button>
     );
