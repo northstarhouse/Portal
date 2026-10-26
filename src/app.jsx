@@ -19920,7 +19920,8 @@ function EstateToursView() {
   const [addOpen, setAddOpen] = useState(false);
   const [addDate, setAddDate] = useState('');
   const [addTime, setAddTime] = useState('');
-  const [addGuide, setAddGuide] = useState('Sierra');
+  const [addGuide, setAddGuide] = useState('Jen');
+  const [addRecurring, setAddRecurring] = useState(false);
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState('');
   const [busyId, setBusyId] = useState(null);
@@ -20018,16 +20019,40 @@ function EstateToursView() {
   function addSlot(e) {
     e.preventDefault();
     if (!addDate || !addTime) { setAddError('Date and time are required.'); return; }
+    if (addSaving) return;
     setAddSaving(true);
     setAddError('');
-    sbInsert('estate_tours', { date: addDate, start_time: addTime, guide_name: addGuide.trim() || 'Sierra', status: 'open' }).then(function(r) {
-      if (Array.isArray(r) && r.length) {
-        setAddDate(''); setAddTime(''); setAddOpen(false);
-        load();
-      } else {
-        setAddError((r && (r.message || r.error || (r.hint))) || 'Could not add that slot — it may already exist.');
+    // "Repeat weekly" = this date plus the same weekday and time for the next 8 weeks (the booking horizon).
+    var dates = [addDate];
+    if (addRecurring) {
+      for (var k = 1; k <= 8; k++) {
+        var d = new Date(addDate + 'T12:00:00');
+        d.setDate(d.getDate() + 7 * k);
+        dates.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
       }
-    }).finally(function() { setAddSaving(false); });
+    }
+    // Skip dates that already have a slot for this guide at this time (Jen's slots are unique per date + time).
+    fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=date&guide_name=eq.' + encodeURIComponent(addGuide) + '&start_time=eq.' + encodeURIComponent(addTime) + '&date=in.(' + dates.join(',') + ')', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(existing) {
+      var have = {};
+      (Array.isArray(existing) ? existing : []).forEach(function(x) { have[x.date] = true; });
+      var fresh = dates.filter(function(dt) { return !have[dt]; });
+      if (!fresh.length) {
+        setAddError(dates.length > 1 ? addGuide + ' already has a slot at that time on all of those dates.' : 'That slot already exists.');
+        return;
+      }
+      return sbInsert('estate_tours', fresh.map(function(dt) { return { date: dt, start_time: addTime, guide_name: addGuide, status: 'open' }; })).then(function(r) {
+        if (Array.isArray(r) && r.length) {
+          setAddDate(''); setAddTime(''); setAddOpen(false); setAddRecurring(false);
+          if (r.length < dates.length) alert('Added ' + r.length + ' slot' + (r.length === 1 ? '' : 's') + '. ' + (dates.length - r.length) + ' already existed and were skipped.');
+          load();
+        } else {
+          setAddError((r && (r.message || r.error || (r.hint))) || 'Could not add that slot — it may already exist.');
+        }
+      });
+    }).catch(function() { setAddError('Could not add the slot. Please try again.'); })
+      .finally(function() { setAddSaving(false); });
   }
 
   function deleteTour(t) {
@@ -20426,8 +20451,15 @@ function EstateToursView() {
           </div>
           <div>
             <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>Guide</label>
-            <input type="text" value={addGuide} onChange={function(e) { setAddGuide(e.target.value); }} placeholder="Sierra" style={inputStyle} />
+            <select value={addGuide} onChange={function(e) { setAddGuide(e.target.value); }} aria-label="Tour guide" style={inputStyle}>
+              <option value="Jen">Jen</option>
+              <option value="Derek">Derek</option>
+            </select>
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#555', padding: '0 4px 10px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={addRecurring} onChange={function(e) { setAddRecurring(e.target.checked); }} />
+            Repeat weekly (next 8 weeks)
+          </label>
           <button type="submit" disabled={addSaving} style={{ padding: '9px 16px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', opacity: addSaving ? 0.6 : 1 }}>
             {addSaving ? 'Adding…' : 'Add'}
           </button>
