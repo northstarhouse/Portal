@@ -402,11 +402,11 @@ Deno.serve(async (req) => {
     }
   } catch (e) { console.error('step8b query failed', e); }
 
-  // ── Step 9: 30 days before event_date -> questionnaire + insurance reminder ──
+  // ── Step 9: 60 days before event_date -> questionnaire + insurance + brick reminder ──
   try {
-    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const in60Days = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const todayStr = now.toISOString().slice(0, 10);
-    const rows = await rest(`venue_inquiries?select=*&status=eq.Booked&questionnaire_sent_at=is.null&event_date=lte.${in30Days}&event_date=gte.${todayStr}&email=not.is.null`);
+    const rows = await rest(`venue_inquiries?select=*&status=eq.Booked&questionnaire_sent_at=is.null&event_date=lte.${in60Days}&event_date=gte.${todayStr}&email=not.is.null`);
     for (const inq of rows) {
       try {
         // One page for everything now; both legacy variables point at it so older template copies still work.
@@ -419,6 +419,25 @@ Deno.serve(async (req) => {
       } catch (e) { console.error('questionnaire_insurance_reminder failed for', inq.id, e); result.errors++; }
     }
   } catch (e) { console.error('step9 query failed', e); }
+
+  // ── Step 9b: 30 days before event_date, questionnaire still not submitted -> second reminder ──
+  // Needs the first reminder to be at least a week old so a late booking doesn't get both at once.
+  try {
+    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const todayStr = now.toISOString().slice(0, 10);
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const rows = await rest(`venue_inquiries?select=*&status=eq.${encodeURIComponent('Questionnaire Sent')}&questionnaire_form_response_id=is.null&questionnaire_reminder_2_sent_at=is.null&questionnaire_sent_at=lte.${encodeURIComponent(weekAgo)}&event_date=lte.${in30Days}&event_date=gte.${todayStr}&email=not.is.null`);
+    for (const inq of rows) {
+      try {
+        const code = venueCode(inq.event_date);
+        await sendTemplated(templates.questionnaire_reminder_30d, inq.email,
+          { name: inq.name, venue_code: code, event_page_link: CLIENT_PAGE_URL },
+          { name: escapeHtml(inq.name), venue_code: escapeHtml(code), event_page_link: CLIENT_PAGE_URL });
+        await rest(`venue_inquiries?id=eq.${inq.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ questionnaire_reminder_2_sent_at: nowIso }) });
+        result.questionnaireReminder2 = (result.questionnaireReminder2 || 0) + 1;
+      } catch (e) { console.error('questionnaire_reminder_30d failed for', inq.id, e); result.errors++; }
+    }
+  } catch (e) { console.error('step9b query failed', e); }
 
   // ── Step 10: project ends (day after event_date) -> Completed ──
   try {
