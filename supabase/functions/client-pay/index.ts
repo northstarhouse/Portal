@@ -254,7 +254,7 @@ Deno.serve(async req => {
     if (action === 'questionnaire_get') {
       const form = (await rest(`nsh_forms?select=fields&id=eq.${QUESTIONNAIRE_FORM_ID}`))[0];
       if (!form) throw new Fail('The questionnaire is unavailable right now.', 503);
-      const fields = (form.fields || []).filter((f: any) => f.id !== EMAIL_FIELD).map((f: any) => ({ id: f.id, type: f.type, label: f.label, required: !!f.required, options: f.options || [], section: f.section || '', placeholder: f.placeholder || '', note: f.note || '', image: f.image || '', imageAlt: f.imageAlt || '' }));
+      const fields = (form.fields || []).filter((f: any) => f.id !== EMAIL_FIELD).map((f: any) => ({ id: f.id, type: f.type, label: f.label, required: !!f.required, options: f.options || [], section: f.section || '', display: f.display || '', placeholder: f.placeholder || '', note: f.note || '', image: f.image || '', imageAlt: f.imageAlt || '' }));
       const prev = inq.questionnaire_form_response_id ? (await rest(`nsh_form_responses?select=answers&id=eq.${inq.questionnaire_form_response_id}`))[0] : null;
       return json({ fields, answers: prev?.answers || {}, submitted: !!prev });
     }

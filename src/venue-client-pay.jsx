@@ -90,6 +90,7 @@ function Questionnaire({ api, code, name, onSaved }) {
       {f.note && <span className="cp-note">{f.note}</span>}
       {f.type === 'long_text' ? <textarea rows={3} placeholder={f.placeholder || ''} value={answers[f.id] || ''} onChange={e => set(f.id, e.target.value)} />
         : f.type === 'yes_no' ? <select value={answers[f.id] || ''} onChange={e => set(f.id, e.target.value)}><option value="">—</option><option>Yes</option><option>No</option></select>
+        : f.type === 'multiple_choice' && f.display === 'dropdown' ? <select value={answers[f.id] || ''} onChange={e => set(f.id, e.target.value)}><option value="">—</option>{f.options.map(o => <option key={o} value={o}>{o}</option>)}</select>
         : f.type === 'multiple_choice' ? f.options.map(o => <label className="cp-check" key={o}><input type="radio" name={f.id} checked={answers[f.id] === o} onChange={() => set(f.id, o)} />{o}</label>)
         : f.type === 'checkboxes' ? f.options.map(o => <label className="cp-check" key={o}><input type="checkbox" checked={(answers[f.id] || []).includes(o)} onChange={e => set(f.id, e.target.checked ? [...(answers[f.id] || []), o] : (answers[f.id] || []).filter(x => x !== o))} />{o}</label>)
         : <input placeholder={f.placeholder || ''} value={answers[f.id] || ''} onChange={e => set(f.id, e.target.value)} />}
