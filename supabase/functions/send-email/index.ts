@@ -15,6 +15,8 @@ const ADMIN_BCC = 'media@thenorthstarhouse.org'
 const DEFAULT_FROM = 'info@northstarhouse.org'
 const ALLOWED_FROM = new Set(['venue@northstarhouse.org'])
 const VENUE_REPLY_TO = 'venue@thenorthstarhouse.org'
+// Wedding/private-event emails are also copied (bcc) to the venue inbox.
+const VENUE_BCC = 'venue@thenorthstarhouse.org'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -40,7 +42,7 @@ Deno.serve(async (req) => {
     const callerBcc: string[] = bcc
       ? (Array.isArray(bcc) ? bcc : String(bcc).split(',').map((e: string) => e.trim()).filter(Boolean))
       : []
-    const bccList: string[] = Array.from(new Set([ADMIN_BCC, ...callerBcc]))
+    const bccList: string[] = Array.from(new Set([ADMIN_BCC, ...callerBcc, ...(wantedFrom ? [VENUE_BCC] : [])]))
 
     const fromName = sender ? `${sender} · North Star House` : 'North Star House'
 
