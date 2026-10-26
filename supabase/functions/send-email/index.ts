@@ -8,12 +8,13 @@ const CORS = {
 // without every call site having to remember to add it.
 const ADMIN_BCC = 'media@thenorthstarhouse.org'
 
-// Default sending address (domain verified with Resend). Callers may ask for one of the
-// ALLOWED_FROM addresses via `fromEmail`; if Resend refuses it (e.g. its domain isn't
-// verified yet) we resend from the default with the requested address as Reply-To,
-// so an email is never lost over the sender address.
+// Default sending address (northstarhouse.org is the domain verified with Resend). Callers may
+// ask for one of the ALLOWED_FROM addresses via `fromEmail`; those are sent with Reply-To set to
+// VENUE_REPLY_TO. If Resend refuses the requested sender we resend from the default, so an
+// email is never lost over the sender address.
 const DEFAULT_FROM = 'info@northstarhouse.org'
-const ALLOWED_FROM = new Set(['venue@thenorthstarhouse.org'])
+const ALLOWED_FROM = new Set(['venue@northstarhouse.org'])
+const VENUE_REPLY_TO = 'venue@thenorthstarhouse.org'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -61,10 +62,11 @@ Deno.serve(async (req) => {
       }),
     })
 
-    let res = await send(wantedFrom || DEFAULT_FROM, wantedFrom)
+    const replyTo = wantedFrom ? VENUE_REPLY_TO : null
+    let res = await send(wantedFrom || DEFAULT_FROM, replyTo)
     if (!res.ok && wantedFrom) {
       console.error('send-email: sender rejected, falling back to default', wantedFrom, res.status)
-      res = await send(DEFAULT_FROM, wantedFrom)
+      res = await send(DEFAULT_FROM, replyTo)
     }
 
     const data = await res.json()

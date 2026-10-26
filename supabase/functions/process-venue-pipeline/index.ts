@@ -154,7 +154,7 @@ async function sendEmail(to: string, subject: string, body: string, html?: strin
   const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
-    body: JSON.stringify({ to, subject, body, ...(html ? { html } : {}), sender: 'Venue Team', fromEmail: 'venue@thenorthstarhouse.org' }),
+    body: JSON.stringify({ to, subject, body, ...(html ? { html } : {}), sender: 'Venue Team', fromEmail: 'venue@northstarhouse.org' }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `send-email HTTP ${res.status}`);
