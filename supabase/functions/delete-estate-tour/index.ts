@@ -17,7 +17,7 @@ const GOOGLE_SERVICE_ACCOUNT_KEY = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY')
 const CALENDAR_ID = 'thenorthstarhouse@gmail.com'
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-app-token',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 function jsonResponse(body: unknown, status = 200) {

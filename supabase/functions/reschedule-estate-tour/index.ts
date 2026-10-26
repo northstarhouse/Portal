@@ -27,7 +27,7 @@ const GOLD = '#886c44'
 const TOUR_ADDRESS = '12075 Auburn Rd. Grass Valley, CA 95949'
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-app-token',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 function jsonResponse(body: unknown, status = 200) {
