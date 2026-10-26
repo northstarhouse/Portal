@@ -33,7 +33,13 @@ function estateTourCategory(tour: { category?: string | null; inquiry_form_id?: 
 // Public, no-login scrollable page (guidebook/index.html in this repo's GitHub Pages site).
 const GUIDEBOOK_URL = 'https://northstarhouse.github.io/Portal/guidebook/';
 const AVAILABILITY_CALENDAR_URL = 'https://northstarhouse.github.io/venue/?availability=1';
-const QUESTIONNAIRE_FORM_URL = 'https://northstarhouse.github.io/NSH-forms/?view=form&id=e9be06b9-6788-41bc-a78a-28e02b8b749a';
+// Clients' event page (payments, insurance, questionnaire, brick wording), unlocked by their venue code.
+const CLIENT_PAGE_URL = 'https://northstarhouse.github.io/Portal/#pay';
+// Venue code = wedding date written like DEC-28-2026.
+const venueCode = (d: unknown) => {
+  const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][+m[2] - 1]}-${m[3]}-${m[1]}` : '';
+};
 const FEEDBACK_FORM_URL = 'https://northstarhouse.github.io/NSH-forms/?view=form&id=5ebe4961-d50e-47f1-9071-e81c2ada6233';
 const TZ = 'America/Los_Angeles';
 
@@ -403,11 +409,11 @@ Deno.serve(async (req) => {
     const rows = await rest(`venue_inquiries?select=*&status=eq.Booked&questionnaire_sent_at=is.null&event_date=lte.${in30Days}&event_date=gte.${todayStr}&email=not.is.null`);
     for (const inq of rows) {
       try {
-        const questionnaireLink = QUESTIONNAIRE_FORM_URL;
-        const insuranceLink = `${SCHEDULING_BASE_URL}?insurance=${inq.id}`;
+        // One page for everything now; both legacy variables point at it so older template copies still work.
+        const code = venueCode(inq.event_date);
         await sendTemplated(templates.questionnaire_insurance_reminder, inq.email,
-          { name: inq.name, questionnaire_link: questionnaireLink, insurance_link: insuranceLink },
-          { name: escapeHtml(inq.name), questionnaire_link: questionnaireLink, insurance_link: insuranceLink });
+          { name: inq.name, venue_code: code, event_page_link: CLIENT_PAGE_URL, questionnaire_link: CLIENT_PAGE_URL, insurance_link: CLIENT_PAGE_URL },
+          { name: escapeHtml(inq.name), venue_code: escapeHtml(code), event_page_link: CLIENT_PAGE_URL, questionnaire_link: CLIENT_PAGE_URL, insurance_link: CLIENT_PAGE_URL });
         await rest(`venue_inquiries?id=eq.${inq.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'Questionnaire Sent', questionnaire_sent_at: nowIso }) });
         result.questionnaireReminder++;
       } catch (e) { console.error('questionnaire_insurance_reminder failed for', inq.id, e); result.errors++; }
