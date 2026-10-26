@@ -30,8 +30,8 @@ function estateTourCategory(tour: { category?: string | null; inquiry_form_id?: 
   if (eventType === 'Private Event' || eventType === 'Public Event') return 'Event';
   return 'Tour';
 }
-// TODO: replace with the real hosted Client Guidebook URL once provided.
-const GUIDEBOOK_URL = 'https://northstarhouse.github.io/venue/';
+// Public, no-login scrollable page (guidebook/index.html in this repo's GitHub Pages site).
+const GUIDEBOOK_URL = 'https://northstarhouse.github.io/Portal/guidebook/';
 const AVAILABILITY_CALENDAR_URL = 'https://northstarhouse.github.io/venue/?availability=1';
 const QUESTIONNAIRE_FORM_URL = 'https://northstarhouse.github.io/NSH-forms/?view=form&id=e9be06b9-6788-41bc-a78a-28e02b8b749a';
 const FEEDBACK_FORM_URL = 'https://northstarhouse.github.io/NSH-forms/?view=form&id=5ebe4961-d50e-47f1-9071-e81c2ada6233';
