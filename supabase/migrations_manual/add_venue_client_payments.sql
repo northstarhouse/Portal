@@ -27,3 +27,17 @@ alter table public.venue_inquiries add column if not exists insurance_drive_url 
 -- Wedding brick engraving chosen on the client page (3 lines, 20 characters max each).
 alter table public.venue_inquiries add column if not exists brick_lines jsonb;
 alter table public.venue_inquiries add column if not exists brick_submitted_at timestamptz;
+
+-- Messages clients send from the event page ("Message our team"). Server-only: RLS on, no public policies.
+create table if not exists public.venue_client_messages (
+  id bigint generated always as identity primary key,
+  inquiry_id bigint not null references public.venue_inquiries(id),
+  event_title text,
+  from_name text not null,
+  from_email text,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists venue_client_messages_inquiry_idx on public.venue_client_messages(inquiry_id, created_at desc);
+alter table public.venue_client_messages enable row level security;
+revoke all on public.venue_client_messages from anon, authenticated;

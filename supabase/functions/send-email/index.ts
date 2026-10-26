@@ -22,7 +22,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   try {
-    const { to, cc, bcc, subject, body, html, sender, fromEmail } = await req.json()
+    const { to, cc, bcc, subject, body, html, sender, fromEmail, replyTo: replyToRaw } = await req.json()
+    // Optional Reply-To (e.g. a client's address when their message is forwarded to the team).
+    const callerReplyTo = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(String(replyToRaw || '')) ? String(replyToRaw).trim() : null
     const wantedFrom = ALLOWED_FROM.has(String(fromEmail || '').toLowerCase()) ? String(fromEmail).toLowerCase() : null
 
     const recipients: string[] = Array.isArray(to)
@@ -64,7 +66,7 @@ Deno.serve(async (req) => {
       }),
     })
 
-    const replyTo = wantedFrom ? VENUE_REPLY_TO : null
+    const replyTo = callerReplyTo || (wantedFrom ? VENUE_REPLY_TO : null)
     let res = await send(wantedFrom || DEFAULT_FROM, replyTo)
     if (!res.ok && wantedFrom) {
       console.error('send-email: sender rejected, falling back to default', wantedFrom, res.status)

@@ -34,6 +34,14 @@ function brakeMiss(ip: string) {
   misses.set(ip, { n: cur.n + 1, t: cur.t });
 }
 
+// At most 5 messages per 15 minutes from one address.
+const sent = new Map<string, number[]>();
+function messageBrake(ip: string) {
+  const now = Date.now(), recent = (sent.get(ip) || []).filter(t => now - t < 15 * 60_000);
+  if (recent.length >= 5) throw new Fail('You have sent several messages recently. Please try again in a little while, or call us.', 429);
+  recent.push(now); sent.set(ip, recent);
+}
+
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 // Venue code = wedding date, written like DEC-28-2026. Also accepts "DEC 28 2026",
 // "December 28, 2026", "12/28/2026" and "2026-12-28" -> "2026-12-28".
@@ -198,6 +206,38 @@ Deno.serve(async req => {
       catch (e) { console.error('client-pay drive', e instanceof Error ? e.message : e); throw new Fail('The upload failed. Please try again.', 502); }
       await rest(`venue_inquiries?id=eq.${inq.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ insurance_uploaded_at: new Date().toISOString(), insurance_drive_url: url }) });
       return json({ uploaded: true });
+    }
+
+    // "Message our team": saved (server-only table) and emailed to the venue team.
+    if (action === 'send_message') {
+      const text = String(body.message || '').trim();
+      const fromName = String(body.contact_name || '').trim().slice(0, 100);
+      const fromEmail = String(body.contact_email || '').trim().slice(0, 200);
+      if (!fromName) throw new Fail('Please enter your name.');
+      if (!text) throw new Fail('Please type a message.');
+      if (text.length > 2000) throw new Fail('Please keep your message under 2,000 characters.');
+      if (fromEmail && !/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(fromEmail)) throw new Fail('That email address does not look right.');
+      messageBrake(ip);
+      const since = encodeURIComponent(new Date(Date.now() - 3600_000).toISOString());
+      const recent = await rest(`venue_client_messages?select=id&inquiry_id=eq.${inq.id}&created_at=gte.${since}`);
+      if (recent.length >= 10) throw new Fail('You have sent several messages recently. Please call or email us directly.', 429);
+      await rest('venue_client_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ inquiry_id: inq.id, event_title: inq.name, from_name: fromName, from_email: fromEmail || null, body: text }) });
+      // The saved message is the record, so an email hiccup doesn't lose it.
+      try {
+        const mail = await fetch(`${URL_}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY },
+          body: JSON.stringify({
+            to: 'venue@thenorthstarhouse.org',
+            subject: `Message from ${inq.name} (${code})`,
+            body: `${fromName} sent a message from the client event page.\n\nBooking: ${inq.name}\nEvent date: ${date}\nBooking email on file: ${inq.email || 'none'}\nReply goes to: ${fromEmail || inq.email || 'none on file'}\n\n${text}\n\nReply to this email to answer them. A copy is saved with the booking.`,
+            sender: 'Event Page',
+            replyTo: fromEmail || inq.email || undefined,
+          }),
+        });
+        if (!mail.ok) console.error('client-pay message email failed', mail.status);
+      } catch (e) { console.error('client-pay message email', e instanceof Error ? e.message : e); }
+      return json({ sent: true });
     }
 
     // Wedding brick engraving: 3 lines, 20 characters max each (counting spaces and punctuation).
