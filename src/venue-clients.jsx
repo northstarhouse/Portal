@@ -63,7 +63,8 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   const surveyComplete = !!live?.questionnaire_form_response_id || surveys.some(r => { const qs = r.responses.questionnaire.questions || []; return qs.some(q => q.answered) && qs.filter(q => q.required).every(q => q.answered); });
   const surveySent = !!live?.questionnaire_sent_at || surveys.length > 0;
   const requirementsDue = eventDate ? shiftDate(eventDate, -30) : null;
-  const contacts = (hb?.contacts || []).filter(c => c.kind === 'client');
+  const formContacts = [['7fnabd0i','c9u1sxb4','163otrai','ps4addr1'], ['7leui2ic','pt4mail1','pt4phon1','pt4addr1']].filter(k => a[k[0]]).map((k, i) => ({ id:'form-' + i, full_name:a[k[0]], email:a[k[1]] || '', phone_number:a[k[2]] || '', address:a[k[3]] || '', kind:'client' }));
+  const contacts = (hb?.contacts || []).filter(c => c.kind === 'client').concat(hb?.contacts?.some(c => c.kind === 'client') ? [] : formContacts);
   const name = (p.name || live?.name || a['7fnabd0i'] || a.evp_name || 'Client').replace(/\s*\([SJ]\)\s*$/i, '').replace(/\s+Wedding\s*$/i, '').trim();
   const email = a.c9u1sxb4 || a.evp_email || contacts[0]?.email;
   const tasks = [];
@@ -80,7 +81,7 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   if (!insuranceVerified) task('insurance', 'Confirm insurance on file', requirementsDue, 'Coverage not verified in the portal', 'insurance');
   if (!eventDate) task('date', 'Confirm event date', null, 'No date recorded', 'booking');
   tasks.sort((x, y) => x.rank - y.rank || (x.due || eventDate || '9999').localeCompare(y.due || eventDate || '9999'));
-  return { id:sub.id, sub, name, email, contacts, hb, eventDate, eventEnd, nativeAgreement, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments?.amount_paid?.amount ?? null, balance:payments?.balance_due?.amount ?? null, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
+  return { id:sub.id, sub, name, email, contacts, hb, eventDate, eventEnd, nativeAgreement, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments?.amount_paid?.amount ?? null, balance:payments?.balance_due?.amount ?? null, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
 }
 
 const css = `
@@ -148,9 +149,13 @@ function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChan
     <div className="vc-modal-body">
       <div className="vc-modal-section">
         <div className="vc-modal-section-title">Contacts</div>
-        <div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div></div>)}</div>
+        <div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div>{c.address && <div className="vc-muted">{c.address}</div>}</div>)}</div>
       </div>
       <InsuranceVerification client={client} onVerify={onVerify}/>
+      <div className="vc-modal-section" aria-labelledby="vc-brick-title">
+        <div className="vc-modal-section-title"><span id="vc-brick-title">Wedding brick</span><span className={'vc-pill '+(client.brickLines?.some(l => String(l).trim())?'good':'alert')}>{client.brickLines?.some(l => String(l).trim())?'Wording submitted':'Not submitted yet'}</span></div>
+        {client.brickLines?.some(l => String(l).trim()) ? <><div style={{fontFamily:'Cardo,Georgia,serif',letterSpacing:2,lineHeight:1.9,background:'#faf8f3',border:'1px solid #eee7dd',borderRadius:7,padding:'10px 14px'}}>{client.brickLines.map((l,i) => <div key={i}>{l || ' '}</div>)}</div>{client.brickSubmittedAt && <p className="vc-muted" style={{marginBottom:0}}>Submitted {dateLabel(client.brickSubmittedAt.slice(0,10))}</p>}</> : <p className="vc-muted" style={{margin:0}}>The client chooses 3 lines of up to 20 characters on their event page.</p>}
+      </div>
       {agreementApi&&<ContractManager client={client} api={agreementApi} onChange={onContractsChange}/>}
       <div className="vc-modal-section">
         <div className="vc-modal-section-title">Payment timeline</div>

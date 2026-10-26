@@ -8,6 +8,8 @@
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const ADMIN_EMAIL = 'media@thenorthstarhouse.org'
+// Optional extra recipients, restricted to this list: this endpoint is callable with the public key and the list contains guest names.
+const ALLOWED_RECIPIENTS = new Set([ADMIN_EMAIL, 'development@thenorthstarhouse.org', 'gkopec333@gmail.com', 'sanders_pennvalley@comcast.net'])
 
 function splitName(name: string) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
@@ -22,8 +24,10 @@ function escapeHtml(s: unknown) {
 
 Deno.serve(async (req) => {
   try {
-    const { eventSlug } = await req.json().catch(() => ({}))
+    const { eventSlug, to } = await req.json().catch(() => ({}))
     if (!eventSlug) return new Response(JSON.stringify({ error: 'eventSlug required' }), { status: 400 })
+    const recipients: string[] = Array.isArray(to) && to.length ? to.map((e: unknown) => String(e).trim().toLowerCase()) : [ADMIN_EMAIL]
+    if (recipients.some((e) => !ALLOWED_RECIPIENTS.has(e))) return new Response(JSON.stringify({ error: 'recipient not allowed' }), { status: 400 })
 
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/ticket_orders?select=buyer_name,buyer_email,paypal_payer_name,quantity,event_title,event_date&event_slug=eq.${encodeURIComponent(eventSlug)}&status=eq.completed`,
@@ -66,7 +70,7 @@ Deno.serve(async (req) => {
     const sendRes = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
-      body: JSON.stringify({ to: ADMIN_EMAIL, subject, body, html, sender: 'Box Office' }),
+      body: JSON.stringify({ to: recipients, subject, body, html, sender: 'Box Office' }),
     })
     const sendData = await sendRes.json().catch(() => ({}))
     if (!sendRes.ok) throw new Error(sendData.error || `send-email HTTP ${sendRes.status}`)

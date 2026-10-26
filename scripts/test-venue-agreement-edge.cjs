@@ -56,3 +56,19 @@ test('agreement PDF supports Unicode, page breaks and a signature audit appendix
  const version={id:'test-document',title:'Test agreement — café',version:1,status:'completed',document_hash:'a'.repeat(64),body:Array.from({length:90},(_,i)=>`Section ${i+1}. Test event rental terms, privacy, setup and departure. Café, résumé, Кириллица. Each line must remain readable.`).join('\n'),recipients:[{name:'Test Client',email:'client@example.invalid',role:'client',status:'signed',signed_name:'Test Client',signed_at:'2026-10-19T20:00:00Z',consent:'I have read this agreement and agree to sign electronically.',evidence:{document_hash:'a'.repeat(64),email_verified_at:'2026-10-19T20:00:00Z'}}],events:[{created_at:'2026-10-19T20:00:00Z',action:'signed',actor:'Test Client',detail:{}}]};
  const bytes=await mod.exports.agreementPdf(version);const {PDFDocument}=require('pdf-lib');const reopened=await PDFDocument.load(bytes);assert.ok(reopened.getPageCount()>=3);assert.equal(reopened.getTitle(),version.title);fs.mkdirSync('tmp/pdfs',{recursive:true});fs.writeFileSync('tmp/pdfs/agreement-test.pdf',bytes);
 });
+test('client signing requires the venue code (wedding date, like DEC-28-2026); the venue countersigner is exempt',async()=>{
+ const run=async(role,venueCode)=>{
+  const rpcCalls=[];
+  const api=handler(async(url,options)=>{
+   if(url.includes('venue_inquiries'))return Response.json([{event_date:'2026-12-28'}]);
+   const data=JSON.parse(options.body);rpcCalls.push(data.p_action);
+   if(data.p_action==='resolve')return Response.json({signer:{id:'s',email:'client@example.invalid',role,status:'pending'},version:{response_id:'r1',signers:[],recipients:[],events:[]}});
+   return Response.json({signers:[],recipients:[],events:[]});
+  });
+  const response=await api(req({action:'sign',token:'a'.repeat(64),code:'123456',venue_code:venueCode,signed_name:'A Client',consent:true,document_hash:'h'}));
+  return {status:response.status,rpcCalls};
+ };
+ for(const wrong of [undefined,'','JAN-01-2027','not a date']){const r=await run('client',wrong);assert.equal(r.status,400);assert.ok(!r.rpcCalls.includes('sign'));}
+ for(const right of ['DEC-28-2026','dec 28 2026','December 28, 2026','12/28/2026','2026-12-28']){const r=await run('client',right);assert.equal(r.status,200,right);assert.ok(r.rpcCalls.includes('sign'));}
+ const venue=await run('venue',undefined);assert.equal(venue.status,200);assert.ok(venue.rpcCalls.includes('sign'));
+});

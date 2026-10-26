@@ -2,6 +2,7 @@
 
 import { VenueClientDashboard, saveVenueInsuranceVerification } from './venue-clients.jsx';
 import { createAgreementApi, AgreementSigningPage } from './venue-contracts.jsx';
+import { ClientPayPage, createClientPayApi } from './venue-client-pay.jsx';
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
@@ -415,7 +416,7 @@ function fetchVenueInquiries(options) {
 }
 
 function loadVenueClientEvents() {
-  return fetch(SUPABASE_URL + '/rest/v1/venue_inquiries?select=id,name,event_type,event_date,prebooking_form_response_id,insurance_uploaded_at,questionnaire_form_response_id,questionnaire_sent_at,venue_payment_schedule(sequence,kind,label,amount_cents,amount_paid_cents,due_date,status)&prebooking_form_response_id=not.is.null', {
+  return fetch(SUPABASE_URL + '/rest/v1/venue_inquiries?select=id,name,event_type,event_date,prebooking_form_response_id,insurance_uploaded_at,brick_lines,brick_submitted_at,questionnaire_form_response_id,questionnaire_sent_at,venue_payment_schedule(sequence,kind,label,amount_cents,amount_paid_cents,due_date,status)&prebooking_form_response_id=not.is.null', {
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
   }).then(function(r) { if (!r.ok) throw new Error('Could not load live event requirements'); return r.json(); }).then(function(rows) { if (!Array.isArray(rows)) throw new Error('Invalid event requirements'); return rows; });
 }
@@ -22726,4 +22727,5 @@ function Dashboard() {
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 const agreementToken = new URLSearchParams(window.location.hash.slice(1)).get('agreement');
-root.render(agreementToken ? React.createElement(AgreementSigningPage, {api:venueAgreementApi,token:agreementToken}) : React.createElement(AppGate, null, React.createElement(Dashboard)));
+const isClientPayPage = /^#pay(\/|$)/.test(window.location.hash);
+root.render(agreementToken ? React.createElement(AgreementSigningPage, {api:venueAgreementApi,token:agreementToken}) : isClientPayPage ? React.createElement(ClientPayPage, {api:createClientPayApi({baseUrl:SUPABASE_URL,apiKey:SUPABASE_KEY})}) : React.createElement(AppGate, null, React.createElement(Dashboard)));
