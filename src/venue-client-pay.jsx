@@ -24,6 +24,8 @@ const style = `.cp-page{--gold:#886c44;--ink:#2c2418;--muted:#6f685c;--line:#e8e
 .cp-big{font-family:Cardo,Georgia,serif;font-size:30px;font-weight:700;line-height:1.1}.cp-bar{height:8px;background:#f1e9dc;overflow:hidden;margin:14px 0}.cp-bar span{display:block;height:100%;background:#6b8c6c}
 .cp-next{display:flex;gap:10px;align-items:center;background:#f4eee3;padding:12px 14px;font-size:14px;margin-bottom:14px}.cp-next svg{flex:none;color:var(--gold)}
 .cp-check{display:flex;gap:8px;align-items:center;font-weight:400;margin:4px 0}.cp-check input{width:auto;margin:0}
+.cp-qcols{column-count:2;column-gap:44px;margin-bottom:22px}.cp-qsec-wrap{break-inside:avoid-column}.cp-qsec-wrap .cp-sec:first-child{margin-top:8px}@media(max-width:820px){.cp-qcols{column-count:1}}
+.cp-sec{font-family:Cardo,Georgia,serif;font-weight:400;font-size:19px;color:var(--gold);text-align:center;margin:30px 0 18px;padding:12px 8px;border-top:1px solid var(--gold);border-bottom:1px solid var(--gold)}.cp-lab{display:block;font-weight:400;font-size:15px;line-height:1.45}.cp-note{display:block;font-style:italic;font-weight:400;color:var(--muted);font-size:13px;margin-top:2px}.cp-fieldimg{display:block;width:100%;height:auto;margin:0 0 16px;border:1px solid var(--line)}.cp-field input::placeholder,.cp-field textarea::placeholder{color:#9a9488;font-size:15px;font-weight:400}
 @media(max-width:820px){.cp-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.cp-tile{gap:10px;padding:12px}.cp-ico{width:38px;height:38px}.cp-chev{display:none}.cp-cols{grid-template-columns:1fr}.cp-head{flex-direction:column;min-height:0;padding-top:96px}.cp-head-img{top:-28px;left:-16px;right:-16px;bottom:auto;height:150px;width:auto;opacity:.6;-webkit-mask-image:linear-gradient(to bottom,#000 40%,transparent 100%);mask-image:linear-gradient(to bottom,#000 40%,transparent 100%)}.cp-head-main{max-width:100%}.cp-head-side{width:100%;flex-direction:row;align-items:center;justify-content:space-between}.cp-linkbtn{margin:0}}`;
 const money = c => (c / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
@@ -71,17 +73,29 @@ function Questionnaire({ api, code, name, onSaved }) {
     try { await api('questionnaire_save', { code, name, answers }); setDone(true); onSaved(); } catch (x) { setErr(x.message); } finally { setBusy(false); }
   }
   if (!form) return err ? <div className="cp-error" role="alert">{err}</div> : <p className="cp-muted">Loading…</p>;
+  // Consecutive fields with the same section share one titled block (same layout as the HoneyBook questionnaire).
+  const groups = [];
+  form.fields.forEach(f => { const last = groups[groups.length - 1]; if (last && last.section === f.section) last.fields.push(f); else groups.push({ section: f.section, fields: [f] }); });
   return <form onSubmit={save}>
-    <p className="cp-muted">{form.submitted ? 'Your answers are saved. You can change them any time before your event.' : 'Tell us about your day so we can prepare.'}</p>
+    <p className="cp-muted">We're so excited to host your wedding at the North Star House! To help us prepare, we're collecting important event details. Our team will review everything and connect with you if we need to coordinate on any specific details.</p>
+    {form.submitted && <p className="cp-muted"><em>Your answers are saved. You can change them any time before your event.</em></p>}
     {err && <div className="cp-error" role="alert">{err}</div>}
     {done && <div className="cp-ok" role="status">Saved. Thank you!</div>}
-    {form.fields.map(f => <div className="cp-field" key={f.id}>{f.label}{f.required && <span className="cp-req"> *</span>}
-      {f.type === 'long_text' ? <textarea rows={3} value={answers[f.id] || ''} onChange={e => set(f.id, e.target.value)} />
+    <div className="cp-qcols">
+    {groups.map((g, gi) => <div className="cp-qsec-wrap" key={gi}>
+    {g.section && <h3 className="cp-sec">{g.section}</h3>}
+    {g.fields.map(f => <div className="cp-field" key={f.id}>
+      {f.image && <img className="cp-fieldimg" src={f.image} alt={f.imageAlt || ''} loading="lazy" />}
+      <span className="cp-lab">{f.label}{f.required && <span className="cp-req"> *</span>}</span>
+      {f.note && <span className="cp-note">{f.note}</span>}
+      {f.type === 'long_text' ? <textarea rows={3} placeholder={f.placeholder || ''} value={answers[f.id] || ''} onChange={e => set(f.id, e.target.value)} />
         : f.type === 'yes_no' ? <select value={answers[f.id] || ''} onChange={e => set(f.id, e.target.value)}><option value="">—</option><option>Yes</option><option>No</option></select>
         : f.type === 'multiple_choice' ? f.options.map(o => <label className="cp-check" key={o}><input type="radio" name={f.id} checked={answers[f.id] === o} onChange={() => set(f.id, o)} />{o}</label>)
         : f.type === 'checkboxes' ? f.options.map(o => <label className="cp-check" key={o}><input type="checkbox" checked={(answers[f.id] || []).includes(o)} onChange={e => set(f.id, e.target.checked ? [...(answers[f.id] || []), o] : (answers[f.id] || []).filter(x => x !== o))} />{o}</label>)
-        : <input value={answers[f.id] || ''} onChange={e => set(f.id, e.target.value)} />}
+        : <input placeholder={f.placeholder || ''} value={answers[f.id] || ''} onChange={e => set(f.id, e.target.value)} />}
     </div>)}
+    </div>)}
+    </div>
     <button className="cp-btn" disabled={busy}>{busy ? 'Saving…' : form.submitted ? 'Update my answers' : 'Save & continue'}</button>
   </form>;
 }
@@ -237,19 +251,19 @@ export function ClientPayPage({ api }) {
             {data.insurance_uploaded && <div className="cp-ok" role="status">{insNote || 'We have your insurance on file. You can upload a replacement below.'}</div>}
             <label className="cp-field">Upload a PDF, JPG or PNG (up to 8 MB)<input type="file" accept="application/pdf,image/jpeg,image/png" disabled={busy} onChange={e => { uploadInsurance(e.target.files[0]); e.target.value = ''; }} /></label>
           </Acc>
-          <Acc id="cp-brick" title="Your legacy brick" pill={<Pill ok={data.brick_done} yes="Submitted" no="Needed" />} defaultOpen={!data.brick_done}>
-            <Brick api={api} code={code} name={name} initial={data.brick_lines} done={data.brick_done} onSaved={lines => setData(d => ({ ...d, brick_lines: lines, brick_done: true }))} />
-          </Acc>
           <Acc id="cp-message" title="Message our team">
             <MessageTeam api={api} code={code} name={name} />
           </Acc>
         </div>
         <div className="cp-col">
-          <Acc id="cp-questionnaire" title="Event questionnaire" pill={<Pill ok={data.questionnaire_done} yes="Completed" no="To do" />} defaultOpen={!data.questionnaire_done}>
-            <Questionnaire api={api} code={code} name={name} onSaved={() => setData(d => ({ ...d, questionnaire_done: true }))} />
+          <Acc id="cp-brick" title="Your legacy brick" pill={<Pill ok={data.brick_done} yes="Submitted" no="Needed" />} defaultOpen={!data.brick_done}>
+            <Brick api={api} code={code} name={name} initial={data.brick_lines} done={data.brick_done} onSaved={lines => setData(d => ({ ...d, brick_lines: lines, brick_done: true }))} />
           </Acc>
         </div>
       </div>
+      <Acc id="cp-questionnaire" title="Event questionnaire" pill={<Pill ok={data.questionnaire_done} yes="Completed" no="To do" />} defaultOpen={!data.questionnaire_done}>
+        <Questionnaire api={api} code={code} name={name} onSaved={() => setData(d => ({ ...d, questionnaire_done: true }))} />
+      </Acc>
     </>}
   </div></main>;
 }
