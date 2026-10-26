@@ -189,16 +189,16 @@ export function ClientPayPage({ api }) {
             <p className="cp-muted">Every wedding includes an engraved brick on the grounds. Choose your wording below: 3 lines, up to 20 characters each, including spaces and punctuation.</p>
             <Brick api={api} code={code} name={name} initial={data.brick_lines} done={data.brick_done} onSaved={lines => setData(d => ({ ...d, brick_lines: lines, brick_done: true }))} />
           </div>
+          <div className="cp-card" id="cp-message">
+            <h2>Message our team</h2>
+            <MessageTeam api={api} code={code} name={name} />
+          </div>
         </div>
         <div className="cp-col">
           <div className="cp-card" id="cp-questionnaire">
             <h2>Event questionnaire{tag(data.questionnaire_done, 'Completed', 'To do')}</h2>
             <details open={!data.questionnaire_done}><summary className="cp-muted" style={{ cursor: 'pointer', marginBottom: 10 }}>{data.questionnaire_done ? 'View or update my answers' : 'Fill out now'}</summary>
               <Questionnaire api={api} code={code} name={name} onSaved={() => setData(d => ({ ...d, questionnaire_done: true }))} /></details>
-          </div>
-          <div className="cp-card" id="cp-message">
-            <h2>Message our team</h2>
-            <MessageTeam api={api} code={code} name={name} />
           </div>
         </div>
       </div>
