@@ -18,7 +18,7 @@ const style = `.cp-page{overflow-x:hidden;--gold:#886c44;--ink:#2c2418;--muted:#
 .cp-acc-head{width:100%;display:flex;align-items:center;gap:12px;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}.cp-acc-head .cp-grow{flex:1}.cp-acc-chev{transition:transform .15s;color:#7b7366}.cp-acc-head[aria-expanded=true] .cp-acc-chev{transform:rotate(90deg)}.cp-acc-body{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}.cp-acc-body[hidden]{display:none}
 .cp-pill{white-space:nowrap;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;background:#faf0e6;color:#9a5d22}.cp-pill.ok{background:#e4eee4;color:#3f6b47}
 .cp-field{display:block;font-size:13px;font-weight:600;margin-bottom:14px}.cp-field input,.cp-field textarea,.cp-field select{display:block;width:100%;box-sizing:border-box;margin-top:6px;border:1px solid #dcd3c4;background:#fff;border-radius:0;padding:12px;font:inherit;font-size:16px;font-weight:400}.cp-req{color:#b23b2e}
-.cp-btn{background:var(--gold);color:#fff;border:0;border-radius:0;padding:13px 22px;font:inherit;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;cursor:pointer}.cp-btn:after{content:" \\2192"}.cp-btn:disabled{opacity:.55;cursor:default}
+.cp-btn{background:var(--gold);color:#fff;border:0;border-radius:0;padding:13px 22px;font:inherit;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;cursor:pointer}.cp-btn:after{content:" \\2192"}.cp-btn:disabled{opacity:.55;cursor:default}a.cp-btn{display:inline-block;text-decoration:none}
 .cp-muted{color:var(--muted);font-size:13px;line-height:1.55}.cp-error{background:#f9eae7;color:#a64f3c;border:1px solid #a64f3c;padding:10px 12px;font-size:13px;margin-bottom:14px}.cp-ok{background:#edf4ed;color:#426b4a;border:1px solid #426b4a;padding:10px 12px;font-size:13px;margin-bottom:14px}
 .cp-big{font-family:Cardo,Georgia,serif;font-size:30px;font-weight:700;line-height:1.1}.cp-bar{height:8px;background:#f1e9dc;overflow:hidden;margin:14px 0}.cp-bar span{display:block;height:100%;background:#6b8c6c}
 .cp-next{display:flex;gap:10px;align-items:center;background:#f4eee3;padding:12px 14px;font-size:14px;margin-bottom:14px}.cp-next svg{flex:none;color:var(--gold)}
@@ -253,6 +253,11 @@ export function ClientPayPage({ api }) {
           <Acc id="cp-message" title="Message our team">
             <MessageTeam api={api} code={code} name={name} />
           </Acc>
+          <div className="cp-card" id="cp-walkthrough">
+            <h2>Second walk-through</h2>
+            <p className="cp-muted" style={{ marginTop: 0 }}>Want to see the estate again before your day? This opens our website's tour schedule. Tap "View tour availability" there to pick a time.</p>
+            <a className="cp-btn" href="https://www.northstarhouse.org/weddings#inquiry" target="_blank" rel="noopener noreferrer">Schedule second walk-through</a>
+          </div>
         </div>
         <div className="cp-col">
           <Acc id="cp-brick" title="Your legacy brick" pill={<Pill ok={data.brick_done} yes="Submitted" no="Needed" />} defaultOpen={!data.brick_done}>

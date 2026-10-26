@@ -18672,7 +18672,8 @@ function VenueRentalsView({ navigate, initialTab }) {
                 {requests.map(function(t) {
                   var slots = t.requested_slots || [];
                   return (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderBottom: '1.5px solid ' + reqHeaderColor + '60', opacity: t.request_status === 'made_contact' ? 0.6 : 1 }}>
+                    <div key={t.id} style={{ padding: '12px 0', borderBottom: '1.5px solid ' + reqHeaderColor + '60', opacity: t.request_status === 'made_contact' ? 0.6 : 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{(t.visitor_name || 'Unknown') + ' - ' + tourCategoryLabel({ kind: 'Tour', raw: t })}</div>
@@ -18702,8 +18703,9 @@ function VenueRentalsView({ navigate, initialTab }) {
                         <option value="made_contact">Made Contact</option>
                       </select>
                       {t.request_status === 'made_contact' && <div style={{ fontSize: 10, color: '#888' }}>Archives {fmtMadeContactDate(new Date(new Date(t.made_contact_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString())}</div>}
-                      <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} accentDark={colorCoding ? gold : null} />
                       </div>
+                      </div>
+                      <TourRequestCalendarRow tour={t} onBooked={function(row) { setJustBooked(row); loadTours(); }} accentDark={colorCoding ? gold : null} />
                     </div>
                   );
                 })}
@@ -19778,6 +19780,7 @@ function TourRequestCalendarRow({ tour, onBooked, accentDark }) {
   var [open, setOpen] = useState(false);
   var [date, setDate] = useState('');
   var [time, setTime] = useState('');
+  var [guide, setGuide] = useState('Jen');
   var [saving, setSaving] = useState(false);
   var [error, setError] = useState('');
 
@@ -19789,15 +19792,19 @@ function TourRequestCalendarRow({ tour, onBooked, accentDark }) {
     if (saving || !date || !time) return;
     setSaving(true);
     setError('');
-    sbPatchById('estate_tours', tour.id, { date: date, start_time: time, status: 'booked', request_handled: true, reminder_24h_sent_at: null, reminder_1h_sent_at: null })
-      .then(function(r) {
+    fetch(SUPABASE_URL + '/functions/v1/book-tour-request', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: tour.id, date: date, start_time: time, guide_name: guide })
+    }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok && j.ok === true, body: j }; }); })
+      .then(function(res) {
         setSaving(false);
-        if (Array.isArray(r) && r.length) {
-          logActivity('Booked a venue tour for ' + (tour.visitor_name || 'a visitor') + ' and added it to the calendar', 'tour_booked');
+        if (res.ok && res.body.row) {
+          logActivity('Booked a venue tour for ' + (tour.visitor_name || 'a visitor') + ' with ' + guide + ' and added it to the calendar', 'tour_booked');
           setOpen(false);
-          if (onBooked) onBooked(r[0]);
+          if (onBooked) onBooked(res.body.row);
         } else {
-          setError((r && (r.message || r.error || r.hint)) || 'Could not book this tour. Please try again.');
+          setError(res.body.error || 'Could not book this tour. Please try again.');
         }
       })
       .catch(function() { setSaving(false); setError('Network error. Check the calendar before trying again.'); });
@@ -19814,7 +19821,7 @@ function TourRequestCalendarRow({ tour, onBooked, accentDark }) {
     );
   }
   return (
-    <div style={{ marginTop: 8, padding: 10, borderRadius: 8, background: '#faf8f4', border: '0.5px solid #e8e0d5' }}>
+    <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#faf8f4', border: '0.5px solid #e8e0d5', width: '100%', boxSizing: 'border-box' }}>
       {slots.some(function(sl) { return sl.date; }) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
           <span style={{ fontSize: 11, color: '#999', alignSelf: 'center' }}>Requested:</span>
@@ -19832,6 +19839,10 @@ function TourRequestCalendarRow({ tour, onBooked, accentDark }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
         <input type="date" aria-label="Tour date" disabled={saving} value={date} onChange={function(e) { setDate(e.target.value); }} style={inputStyle} />
         <QuarterHourSelect ariaLabel="Tour time" disabled={saving} value={time} onChange={setTime} style={inputStyle} />
+        <select aria-label="Tour guide" disabled={saving} value={guide} onChange={function(e) { setGuide(e.target.value); }} style={inputStyle}>
+          <option value="Jen">Guide: Jen</option>
+          <option value="Derek">Guide: Derek</option>
+        </select>
         <button type="button" onClick={confirm} disabled={saving || !date || !time}
           style={{ fontSize: 11, fontWeight: 600, padding: '6px 12px', borderRadius: 6, border: 'none', background: gold, color: '#fff', cursor: 'pointer', opacity: (saving || !date || !time) ? 0.6 : 1 }}>
           {saving ? 'Booking…' : 'Confirm'}
