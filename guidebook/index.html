@@ -66,18 +66,21 @@ footer a{color:#fff}
 .gallery img{width:100%;height:240px;object-fit:cover;border-radius:6px}
 @media(max-width:780px){body{font-size:18px}section{padding:44px 0}.welcome,.space{grid-template-columns:1fr;gap:22px}.space.flip .space-img{order:0}.gallery{grid-template-columns:1fr}.gallery img{height:200px}}
 @media print{nav{display:none}.hero{min-height:auto;color:#000;background:none}.hero:before{display:none}}
+nav a[aria-current=page]{color:var(--gold);border-bottom:2px solid var(--gold);padding-bottom:2px}
+.pager{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:8px 0 56px}
+.pager a{display:inline-block;text-decoration:none;border:1px solid var(--gold);color:var(--gold);padding:11px 22px;border-radius:6px;font-size:17px}
+.pager a.next{background:var(--gold);color:#fff;margin-left:auto}
 </style>
 </head>
 <body>
 <nav><div class="wrap"><b>NORTH STAR HOUSE</b>
-<a href="#welcome">Welcome</a><a href="#spaces">The Spaces</a><a href="#details">Rental Details</a><a href="#payments">Payments</a><a href="#questionnaire">Questionnaire</a><a href="#vendors">Trusted Vendors</a><a href="#brick">Your Brick</a><a href="#contacts">Contacts</a></div></nav>
+<a href="./" aria-current="page">Welcome</a><a href="spaces.html">The Spaces</a><a href="details.html">Rental Details</a><a href="payments.html">Payments &amp; Questionnaire</a><a href="vendors.html">Trusted Vendors</a><a href="brick.html">Your Brick</a><a href="contacts.html">Contacts</a></div></nav>
 
 <header class="hero"><div>
   <small>OUR WEDDING TOUR</small>
   <h1>Client Guidebook</h1>
   <p>12075 Auburn Rd. Grass Valley, CA 95949</p>
 </div></header>
-
 <section id="welcome"><div class="wrap welcome">
   <div>
     <span class="eyebrow">Welcome to North Star House</span>
@@ -100,191 +103,7 @@ footer a{color:#fff}
   <p>One of the things couples love most about North Star House is the flexibility. We allow you to bring in your own vendors from catering and rentals to music and florals so you can truly customize your day to match your style, budget, and vision.</p>
 </div></section></div>
 
-<section id="spaces"><div class="wrap">
-  <span class="eyebrow">Personalize Your Wedding</span><h2 style="margin-bottom:0">The Spaces</h2>
-  <img src="img/aerial.jpg" alt="Aerial view of a wedding reception on the East Lawn beside the Courtyard" loading="lazy" style="border-radius:6px;margin-top:24px;max-height:560px;width:100%;object-fit:cover">
-
-  <section class="space" id="west-lawn">
-    <div class="space-text"><span class="eyebrow">About</span><h2>The West Lawn</h2><p>Our most popular ceremony location, the West Lawn offers a stunning natural setting framed by mature trees and the timeless architecture of the historic North Star House. This expansive lawn provides ample space and flexibility for a variety of ceremony layouts, whether you’re planning an intimate gathering or a larger celebration. The surrounding landscape creates a serene and picturesque backdrop, perfect for wedding portraits and candid moments alike.</p></div>
-    <div class="space-img"><img src="img/westlawn.jpg" alt="A wedding ceremony under tall trees on the West Lawn" loading="lazy"></div>
-  </section>
-
-  <section class="space flip" id="east-lawn">
-    <div class="space-text"><span class="eyebrow">About</span><h2>The East Lawn</h2><p>The East Lawn is one of the largest and most versatile outdoor spaces at the North Star House, often used for receptions, dinners, and community events. Located just outside the catering kitchen, it allows for easy vendor access and smooth food service.</p><p>The flat, open layout is ideal for accommodating tables, tents, and decor, all framed by mature trees and the historic stone facade of the house. The nearby Courtyard is typically used for dancing, creating a natural flow between dinner and entertainment. With power access and convenient entry points, the East Lawn is a practical yet picturesque choice for outdoor gatherings.</p></div>
-    <div class="space-img"><img src="img/eastlawn.jpg" alt="Guests gathered on the East Lawn in front of the house" loading="lazy"></div>
-  </section>
-
-  <section class="space solo" id="heritage-garden">
-    <div class="space-text"><span class="eyebrow">About</span><h2>Heritage Garden</h2><p>Tucked behind the House, the Heritage Garden is a peaceful space filled with native plants, historic charm, and natural beauty. Couples often choose it for portraits or first-look photos, taking advantage of the garden’s rich textures and seasonal blooms. Whether it’s a quiet moment alone, a scenic backdrop, or simply a beautiful place for your guests to explore, the Heritage Garden adds a timeless touch to your wedding day story.</p></div>
-    
-  </section>
-
-  <section class="space flip" id="catering-kitchen">
-    <div class="space-text"><span class="eyebrow">About</span><h2>Catering Kitchen</h2><p>Our catering kitchen is located near the Courtyard, just off the East Lawn – perfectly positioned for receptions and events in that area. The space includes ample prep counters, refrigeration, sinks, and easy access for loading and unloading. While not a full commercial kitchen, it is designed to support staging, plating, and service for your event. We recommend coordinating directly with your caterer to ensure the space meets their needs.</p></div>
-    <div class="space-img"><img src="img/kitchen.jpg" alt="The catering kitchen with stainless steel prep tables and shelving" loading="lazy"></div>
-  </section>
-
-  <section class="space" id="courtyard">
-    <div class="space-text"><span class="eyebrow">About</span><h2>The Courtyard</h2><p>The Courtyard is a favorite outdoor space located just off the East Lawn and next to the catering kitchen. Framed by historic stone walls and the architectural character of the House, it’s commonly used for first dances, DJ or band setups, cocktail hour, and evening receptions. The area includes power access and accommodates lighting and sound equipment. Its intimate layout and open-air atmosphere make it an ideal setting for celebration.</p></div>
-    <div class="space-img two"><img src="img/courtyard.jpg" alt="The Courtyard glowing with string lights at night" loading="lazy"><img src="img/courtyard2.jpg" alt="A couple toasting beneath the stone arches" loading="lazy"></div>
-  </section>
-
-  <section class="space flip" id="terrace">
-    <div class="space-text"><span class="eyebrow">About</span><h2>The Terrace</h2><p>The Terrace, located along the south side of the House, is a scenic space often used for cocktail hours, guest mingling, and sunset views. With its historic stonework and natural slope overlooking the grounds, it offers a relaxed yet elegant atmosphere. The area is ideal for setting up lounge furniture or high-top tables and serves as a seamless transition space between indoor and outdoor festivities.</p></div>
-    <div class="space-img"><img src="img/terrace.jpg" alt="Tables set on the stone Terrace overlooking the lawn" loading="lazy"></div>
-  </section>
-
-  <section class="space" id="reception-hall">
-    <div class="space-text"><span class="eyebrow">About</span><h2>Reception Hall &amp; Dining Room</h2><p>The Reception Hall and Dining Room provide an elegant indoor option for events at the North Star House. These connected spaces feature original woodwork, large windows, and historic details that create a warm, welcoming atmosphere. Commonly used for indoor receptions, dinners, or smaller gatherings, the combined area can comfortably accommodate up to 76 guests. This is a great option for events during colder months or for clients looking for an intimate setting within the historic home itself.</p><p>The layout allows for flexibility in table arrangements, and guests can easily transition between the indoor spaces and the nearby terrace and courtyard.</p></div>
-    <div class="space-img two"><img src="img/hall.jpg" alt="The Reception Hall with original wood beams and French doors" loading="lazy"><img src="img/dining.jpg" alt="A window nook in the Dining Room" loading="lazy"></div>
-  </section>
-  <div class="gallery"><img src="img/cake.jpg" alt="A two-tier wedding cake with white flowers" loading="lazy"><img src="img/guests.jpg" alt="Wedding guests seated for a lawn ceremony" loading="lazy"><img src="img/facade.jpg" alt="The stone and shingle facade strung with lights" loading="lazy"></div>
-</div></section>
-
-<div class="band" id="details"><section><div class="wrap">
-  <span class="eyebrow">Venue &amp; Rental Agreement Details</span><h2>Setup, Rentals &amp; Planning</h2>
-  <div class="grid3">
-    <div class="card"><h3>Event Timing</h3><p>Your rental period is 10 hours, beginning when we open the indoor venue for you. You may choose your preferred start time, with the latest possible end time being 11 PM. Should you require additional time, extra hours are available for $150 per hour.</p></div>
-    <div class="card"><h3>Setup &amp; Breakdown</h3><p>All setup and breakdown must occur within your contracted rental time. Outdoor setup is permitted before your rental period begins, but please note that other routine activities (e.g., tours, grounds maintenance) may still take place. If you plan to arrive early for outdoor setup, please let us know in advance so we can coordinate accordingly.</p></div>
-    <div class="card"><h3>Catering</h3><p>We require professional caterers for weddings to handle food service, rental breakdown, and trash cleanup to ensure a smooth experience and protect your security deposit. If your chosen caterer has not worked with us before, we’ll coordinate with them to familiarize them with our facilities. For inspiration, you can explore our recommended vendor list below.</p></div>
-    <div class="card"><h3>Available Rentals</h3><p>We’re pleased to provide the following rentals for your event: 25 round 60” tables, 200 white folding chairs, 3 rectangular 8’ tables, 2 rectangular 6’ tables, and patio tables, chairs, and umbrellas. Feel free to use any or all of these, or bring in additional rentals. We kindly ask that all furniture, including ours, is returned to its original location before your departure.</p></div>
-    <div class="card"><h3>Rental Company</h3><p>If you’re using a rental company, please coordinate delivery for the day of your event and pickup by 10 AM the following morning. We cannot accommodate deliveries the day before if there is another event scheduled. If you encounter any scheduling challenges, please have your rental provider contact us directly to ensure a smooth process.</p></div>
-    <div class="card"><h3>Weather &amp; Tenting</h3><p>To prepare for any weather conditions, we recommend having a backup plan that includes tenting options. Tents can be set up in the courtyard or other areas of the property, and we require the use of weighted anchors or sandbags rather than stakes. We will work directly with your tent supplier to ensure everything is properly coordinated.</p></div>
-    <div class="card"><h3>Event Insurance</h3><p>Event insurance is required and due one month before your wedding. You are welcome to use any provider of your choice. For ease, EventHelper offers pre-filled coverage requirements. Simply enter your event details to get started.</p></div>
-    <div class="card"><h3>Planning Support</h3><p>We are here to assist you every step of the way! We offer up to two onsite planning meetings to review your event details, answer questions, and provide expert feedback. Approximately 60 days before your wedding, we will send you a questionnaire to gather the final details for our Site Manager. Returning this promptly allows us to finalize logistics and ensures a smooth planning process, which we will discuss in a meeting or call.</p></div>
-    <div class="card"><h3>Lighting</h3><p>The estate is beautifully illuminated with string lights in the courtyard and over the East Lawn, twinkle pillar lights, and trim lighting on the House, all designed to create a magical atmosphere for your event.</p></div>
-  </div>
-</div></section></div>
-
-<section id="payments"><div class="wrap lead">
-  <span class="eyebrow">Payment Schedule Overview</span><h2>Your Payment Plan</h2>
-  <p>To help make the planning process smooth and manageable, we’ve broken your payment plan into clear, timed installments:</p>
-  <ul class="steps" style="text-align:left">
-    <li><b>Retainer</b><span>Due upon booking to reserve your date</span></li>
-    <li><b>First Installment</b><span>Due 5 months before your event</span></li>
-    <li><b>Second Installment</b><span>Due 3 months before your event</span></li>
-    <li><b>Security Deposit</b><span>Due 1 month before your event</span></li>
-  </ul>
-  <p style="margin-top:22px">All payment dates and amounts are listed in your invoice. We’ll email you a secure payment link for each payment, along with reminders to keep you on track.</p>
-</div></section>
-
-<div class="band" id="questionnaire"><section><div class="wrap lead">
-  <span class="eyebrow">Wedding Details Questionnaire</span><h2>Your Final Details</h2>
-  <p>About 60 days before your event, we will send you a detailed questionnaire to help us gather the final logistics and ensure everything is coordinated for your special day. This questionnaire will cover essential event details, including timelines, vendor information, and any special requests you may have. Completing and returning the questionnaire promptly will allow us to finalize everything and ensure a seamless event experience.</p>
-</div></section></div>
-
-<section id="vendors"><div class="wrap">
-  <span class="eyebrow">Trusted Vendor List</span><h2 style="margin-bottom:0">Our Recommended Vendors</h2>
-  <p class="note">You’re welcome to bring in the vendors of your choice. These are professionals who know North Star House well.</p>
-  <div class="vendors">
-      <div class="vcard"><h3>Caterers</h3><ul>
-        <li><strong><a href="https://antoniocatering.net" target="_blank" rel="noopener">Antonio Ayestaran Custom Catering</a></strong><span><a href="tel:5304018462">530-401-8462</a></span></li>
-        <li><strong><a href="https://farm2tablecatering.com" target="_blank" rel="noopener">Farm to Table Catering</a></strong><span><a href="tel:5306157707">530-615-7707</a></span></li>
-        <li><strong><a href="https://thehamstand.com" target="_blank" rel="noopener">The Ham Stand</a></strong><span><a href="tel:5302647685">530-264-7685</a></span></li>
-        <li><strong><a href="https://gourmetgarageloomis.com" target="_blank" rel="noopener">Bella Familia Pizza / Gourmet Garage</a></strong><span><a href="tel:5304486358">530-448-6358</a></span></li>
-        <li><strong><a href="https://savortheflavorbbq.com" target="_blank" rel="noopener">Savor the Flavor BBQ</a></strong><span><a href="tel:5307489285">530-748-9285</a></span></li>
-      </ul></div>
-      <div class="vcard"><h3>DJ Services</h3><ul>
-        <li><strong><a href="https://avlentertainment.com" target="_blank" rel="noopener">AVL Entertainment</a></strong><span>@avlentertainment</span></li>
-        <li><strong><a href="https://someonesaidyes.com" target="_blank" rel="noopener">Someone Said Yes</a></strong><span>@someonesaidyes</span></li>
-        <li><strong><a href="https://aseriousproduction.com" target="_blank" rel="noopener">A Serious Production</a></strong><span>@aseriousproduction</span></li>
-        <li><strong><a href="https://allstardjgroup.com" target="_blank" rel="noopener">All Star DJ</a></strong><span>@allstardjgroup</span></li>
-        <li><strong><a href="https://themusicxpressdj.com" target="_blank" rel="noopener">The Music Xpress</a></strong><span>@themusicxpress</span></li>
-      </ul></div>
-      <div class="vcard"><h3>Photographers</h3><ul>
-        <li><strong><a href="https://bryangallagherphoto.com" target="_blank" rel="noopener">Bryan Gallagher Photo</a></strong><span>@bryangallagherphoto</span></li>
-        <li><strong><a href="https://andrewandmelanie.com" target="_blank" rel="noopener">Andrew &amp; Melanie Photography</a></strong><span>@andrewmelaniephoto</span></li>
-        <li><strong><a href="https://kathrynwhitephotography.com" target="_blank" rel="noopener">Kathryn White Photography</a></strong><span>@kathrynwhitephoto</span></li>
-        <li><strong><a href="https://arichristine.biz" target="_blank" rel="noopener">Ari Christine Photography</a></strong><span>@arichristinephoto</span></li>
-        <li><strong><a href="https://savvproductions.com" target="_blank" rel="noopener">Savv Productions</a></strong><span>@savvproductions</span></li>
-      </ul></div>
-      <div class="vcard"><h3>Party Rental Services</h3><ul>
-        <li><strong><a href="https://srcparty.com" target="_blank" rel="noopener">SRC Rentals</a></strong><span><a href="tel:5302722266">530-272-2266</a></span></li>
-        <li><strong><a href="https://timelessarches.com" target="_blank" rel="noopener">Timeless Arches</a></strong><span><a href="tel:7758006190">775-800-6190</a></span></li>
-        <li><strong><a href="https://suttertents.com" target="_blank" rel="noopener">Sutter Tents</a></strong><span><a href="tel:5306452002">530-645-2002</a></span></li>
-      </ul></div>
-      <div class="vcard"><h3>Florists</h3><ul>
-        <li><strong><a href="https://goldenflorals.com" target="_blank" rel="noopener">Golden Flowers</a></strong><span><a href="tel:5305577689">530-557-7689</a></span></li>
-        <li><strong><a href="https://flowers-studio-lafleur.com" target="_blank" rel="noopener">LaFleur Flower Studio</a></strong><span><a href="tel:9165003859">916-500-3859</a></span></li>
-        <li><strong><a href="https://sweetrootsfarm.com" target="_blank" rel="noopener">Sweet Roots Floral</a></strong><span><a href="tel:5302770338">530-277-0338</a></span></li>
-        <li><strong><a href="https://grassvalleyflorist.com" target="_blank" rel="noopener">Grass Valley Florist</a></strong><span><a href="tel:5302732223">530-273-2223</a></span></li>
-        <li><strong><a href="https://prettyinpetalsnc.com" target="_blank" rel="noopener">Pretty in Petals</a></strong><span><a href="tel:2096610251">209-661-0251</a></span></li>
-      </ul></div>
-      <div class="vcard"><h3>Cakes &amp; Desserts</h3><ul>
-        <li><strong><a href="https://idosbydeb.com" target="_blank" rel="noopener">I Do’s by Deb</a></strong><span><a href="tel:5304093716">530-409-3716</a></span></li>
-        <li><strong><a href="https://grassvalleybakery.com" target="_blank" rel="noopener">Cake Bakery &amp; Cafe</a></strong><span><a href="tel:5306154126">530-615-4126</a></span></li>
-        <li><strong><a href="https://thesweetspotgv.com" target="_blank" rel="noopener">The Sweet Spot</a></strong><span><a href="tel:5309200462">530-920-0462</a></span></li>
-        <li><strong><a href="https://corvusbakery.com" target="_blank" rel="noopener">Corvus Bakery</a></strong><span><a href="tel:5308025102">530-802-5102</a></span></li>
-        <li><strong><a href="https://sweettoothbakingco.com" target="_blank" rel="noopener">Sweet Tooth Baking Company</a></strong></li>
-      </ul></div>
-      <div class="vcard"><h3>Event Planners</h3><ul>
-        <li><strong><a href="https://wildandlovelyevents.com" target="_blank" rel="noopener">Wild &amp; Lovely Events</a></strong><span><a href="tel:5309133735">530-913-3735</a></span></li>
-        <li><strong><a href="https://acuratedstory.com" target="_blank" rel="noopener">A Curated Story</a></strong><span><a href="tel:5309138527">530-913-8527</a></span></li>
-        <li><strong><a href="https://fairygodcoordinator.com" target="_blank" rel="noopener">The Fairy God Coordinator</a></strong><span><a href="tel:9165619525">916-561-9525</a></span></li>
-        <li><strong><a href="https://tohaveandtoholdweddings.com" target="_blank" rel="noopener">To Have &amp; To Hold Wedding Planning</a></strong><span><a href="tel:9254087888">925-408-7888</a></span></li>
-        <li><strong><a href="https://yourdaywithcayliej.biz" target="_blank" rel="noopener">Your Day with Caylie J</a></strong><span><a href="tel:5303048008">530-304-8008</a></span></li>
-        <li><strong><a href="https://storybookweddings.biz" target="_blank" rel="noopener">Storybook Weddings</a></strong><span><a href="tel:5303208882">530-320-8882</a></span></li>
-        <li><strong><a href="https://honeysuckletraditions.com" target="_blank" rel="noopener">Honeysuckle Traditions</a></strong><span><a href="tel:5406716551">540-671-6551</a></span></li>
-      </ul></div>
-      <div class="vcard"><h3>Beverage Services</h3><ul>
-        <li><strong><a href="https://taptrucksierrafoothills.com" target="_blank" rel="noopener">Tap Truck Sierra Foothills</a></strong><span><a href="tel:5309060030">530-906-0030</a></span></li>
-        <li><strong><a href="https://tumbleweedtaverngv.com" target="_blank" rel="noopener">Tumbleweed Tavern</a></strong><span><a href="tel:5303620932">530-362-0932</a></span></li>
-      </ul></div>
-      <div class="vcard"><h3>Beauty</h3><ul>
-        <li><strong><a href="https://carrielesperance.com" target="_blank" rel="noopener">Carrie L’esperance</a></strong><span><a href="tel:5306159736">530-615-9736</a></span></li>
-        <li><strong><a href="https://wanderlustbeautynorcal.com" target="_blank" rel="noopener">Wanderlust Beauty Collective</a></strong></li>
-        <li><strong><a href="https://courtneysagemakeup.com" target="_blank" rel="noopener">Courtney Sage</a></strong></li>
-        <li><strong><a href="https://luxeestheticsbymaddie.com" target="_blank" rel="noopener">Luxe Esthetics by Maddie</a></strong><span><a href="tel:5309132905">530-913-2905</a></span></li>
-      </ul></div>
-      <div class="vcard"><h3>Officiants</h3><ul>
-        <li><strong><a href="https://legaciesmadeoflove.com" target="_blank" rel="noopener">Legacies of Love</a></strong><span><a href="tel:5305459405">530-545-9405</a></span></li>
-        <li><strong><a href="https://weddingpastorcalifornia.com" target="_blank" rel="noopener">Pastor Mark</a></strong><span><a href="tel:5302070880">530-207-0880</a></span></li>
-      </ul></div>
-      <div class="vcard"><h3>Accommodations</h3><ul>
-        <li><strong><a href="https://goldminersinn.com" target="_blank" rel="noopener">Gold Miners Inn</a></strong><span><a href="tel:5304771700">530-477-1700</a></span></li>
-        <li><strong><a href="https://creektowncottages.com" target="_blank" rel="noopener">Creektown Cottages</a></strong><span><a href="tel:5303082370">530-308-2370</a></span></li>
-        <li><strong><a href="https://inntowncampground.com" target="_blank" rel="noopener">Inn Town Campground</a></strong><span><a href="tel:5302659900">530-265-9900</a></span></li>
-        <li><strong><a href="https://holbrooke.com" target="_blank" rel="noopener">Holbrooke Hotel</a></strong><span><a href="tel:5302731353">530-273-1353</a></span></li>
-        <li><strong><a href="https://theparsonage1865.com" target="_blank" rel="noopener">The Parsonage 1865</a></strong><span><a href="tel:5307986061">530-798-6061</a></span></li>
-        <li><strong><a href="https://gvcourtyardsuites.com" target="_blank" rel="noopener">Courtyard Suites</a></strong></li>
-      </ul></div>
-      <div class="vcard"><h3>Shuttle Services</h3><ul>
-        <li><strong><a href="https://regalcarriagesacramento.com" target="_blank" rel="noopener">Regal Carriage and Limo</a></strong><span><a href="tel:9169568507">916-956-8507</a></span></li>
-        <li><strong><a href="https://frettys.com" target="_blank" rel="noopener">Fretty’s</a></strong><span><a href="tel:5302732296">530-273-2296</a></span></li>
-      </ul></div>
-      <div class="vcard"><h3>Portable Restrooms</h3><ul>
-        <li><strong><a href="https://executive-washrooms.com" target="_blank" rel="noopener">Executive Washrooms</a></strong><span><a href="tel:5309338503">530-933-8503</a></span></li>
-        <li><strong><a href="https://moonlightloo.com" target="_blank" rel="noopener">Moonlight LOO</a></strong><span><a href="tel:5302652253">530-265-2253</a></span></li>
-      </ul></div>
-      <div class="vcard"><h3>Novelties</h3><ul>
-        <li><strong><a href="https://stickwithmeillustrations.com" target="_blank" rel="noopener">Stick With Me – Custom Illustrations &amp; Design</a></strong></li>
-        <li><strong>Queen of Hearts Mobile Tattoo</strong><span><a href="tel:5309233846">530-923-3846</a></span></li>
-        <li><strong><a href="https://linked-gems.square.site" target="_blank" rel="noopener">Linked Gems</a></strong></li>
-      </ul></div>
-  </div>
-</div></section>
-
-<div class="band" id="brick"><section><div class="wrap lead">
-  <span class="eyebrow">Personalized Wedding Brick</span><h2>Your Legacy Brick</h2>
-  <p>Every wedding at North Star House includes a custom-engraved legacy brick. This brick becomes a permanent part of the grounds, honoring your day while helping preserve the house for future generations.</p>
-  <p>You will choose your personalized wording through the link below. Once installed, your brick remains as a lasting reminder of your celebration and your connection to North Star House.</p>
-  <p class="note">Max 20 characters per line, including spaces &amp; punctuation.</p>
-  <a class="brick" href="https://www.northstarhouse.org/engraving" target="_blank" rel="noopener">Choose Your Engraved Message</a>
-</div></section></div>
-
-<section id="contacts"><div class="wrap">
-  <span class="eyebrow">North Star House Contacts</span><h2>Who to Call</h2>
-  <div class="contacts">
-    <div class="card"><h3>Venue Coordinators</h3><p>The North Star House Venue Coordinators are your go-to contacts throughout the planning process. They will answer your questions, prepare your contracts, tour the estate with you, and ensure every detail is in place for a seamless experience.</p>
-      <p><strong>Jen McGuire</strong><br><a href="tel:5305752451">530-575-2451</a><br><a href="mailto:Jen@thenorthstarhouse.org">Jen@thenorthstarhouse.org</a></p></div>
-    <div class="card"><h3>Site Managers</h3><p>A Site Manager will be assigned to your wedding day by your venue coordinators and will be on-site to ensure the venue is clean, prepared, and functioning as expected. They are there to support you and your team with anything related to the venue itself, including restroom supplies, lighting access, and any last-minute property questions.</p>
-      <p>They will also help ensure your caterer and coordinator are aware of venue expectations by providing them with a copy of the Client Rental Responsibilities Checklist on the day of your event. This helps confirm that key venue guidelines, cleanup expectations, and property-use requirements have been clearly communicated to the professionals supporting your event.</p>
-      <p>While your Site Manager is there to assist with venue operations and property-related needs, they do not take the place of a wedding coordinator or planner. Their role is specifically to represent the venue, support venue functionality, and help ensure that all venue-related standards and agreements are upheld throughout your wedding day.</p>
-      <p><strong>Sierra Gianonni</strong><br><a href="tel:5302106364">530-210-6364</a><br><a href="mailto:Sierra@thenorthstarhouse.org">Sierra@thenorthstarhouse.org</a></p></div>
-  </div>
-</div></section>
-
-<div class="banner"><img src="img/closing.jpg" alt="A couple walking across the lawn in front of North Star House at sunset" loading="lazy"></div>
+<div class="wrap pager"><a class="next" href="spaces.html">The Spaces &rarr;</a></div>
 <footer><p>North Star House &middot; 12075 Auburn Rd. Grass Valley, CA 95949<br><a href="https://www.northstarhouse.org">www.northstarhouse.org</a> &middot; <a href="mailto:venue@northstarhouse.org">venue@northstarhouse.org</a></p></footer>
 </body>
 </html>

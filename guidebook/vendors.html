@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Trusted Vendors | North Star House</title>
+<meta name="description" content="Your guide to planning a wedding at North Star House: the spaces, rental details, payment schedule, trusted vendors and contacts.">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cardo:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--gold:#886c44;--ink:#2c2418;--muted:#6b6254;--cream:#f8f4ed;--line:#e6dfd3;--card:#fff}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:64px}
+body{margin:0;background:var(--cream);color:var(--ink);font-family:Cardo,Georgia,serif;font-size:19px;line-height:1.7;-webkit-text-size-adjust:100%}
+img{display:block;max-width:100%;height:auto}
+a{color:var(--gold)}
+h1,h2,h3{font-weight:400;line-height:1.2;margin:0}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+nav{position:sticky;top:0;z-index:10;background:rgba(248,244,237,.96);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;gap:22px;align-items:center;overflow-x:auto;white-space:nowrap;scrollbar-width:none;height:52px}
+nav .wrap::-webkit-scrollbar{display:none}
+nav b{letter-spacing:2px;font-size:12px;color:var(--gold);flex-shrink:0}
+nav a{font-size:15px;text-decoration:none;color:var(--ink);flex-shrink:0}
+nav a:hover{color:var(--gold)}
+.hero{position:relative;color:#fff;text-align:center;min-height:min(78vh,620px);display:flex;align-items:center;justify-content:center;background:#3a2f22 url(img/hero.jpg) center/cover}
+.hero:before{content:"";position:absolute;inset:0;background:linear-gradient(rgba(30,22,12,.35),rgba(30,22,12,.55))}
+.hero div{position:relative;padding:40px 20px}
+.hero small{display:block;letter-spacing:4px;font-size:13px;margin-bottom:14px}
+.hero h1{font-size:clamp(38px,7vw,72px)}
+.hero p{margin:14px 0 0;font-style:italic;font-size:20px}
+.eyebrow{display:block;letter-spacing:3px;font-size:12px;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+section{padding:64px 0}
+.welcome{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+.welcome img,.space-img img,.banner img{border-radius:6px;width:100%}
+h2{font-size:clamp(28px,4vw,40px);margin-bottom:16px}
+h3{font-size:24px;margin-bottom:8px}
+.sig{font-style:italic;color:var(--muted)}
+.lead{max-width:760px;margin:0 auto;text-align:center}
+.divider{border:0;border-top:1px solid var(--line);margin:0}
+.band{background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.space{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;padding:44px 0}
+.space.flip .space-img{order:-1}.space.solo{grid-template-columns:1fr;max-width:760px}
+.space-img.two{display:grid;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-top:28px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:22px 24px}
+.card p{margin:6px 0 0;font-size:17px}
+.steps{list-style:none;padding:0;margin:24px 0 0;display:grid;gap:12px}
+.steps li{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 20px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.steps b{font-weight:700}.steps span{color:var(--muted)}
+.vendors{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;margin-top:28px}
+.vcard{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px 22px}
+.vcard h3{font-size:21px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:10px}
+.vcard ul{list-style:none;margin:0;padding:0}
+.vcard li{padding:7px 0;font-size:16px;line-height:1.45}
+.vcard li span{display:block;color:var(--muted);font-size:15px}
+.vcard li a{text-decoration:none}.vcard li strong a{border-bottom:1px solid var(--line)}
+.contacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-top:24px}
+.banner{padding:0}.banner img{border-radius:0;max-height:520px;object-fit:cover}
+.note{font-size:16px;color:var(--muted)}
+footer{background:#2c2418;color:#d9cdb8;text-align:center;padding:44px 20px;font-size:16px}
+footer a{color:#fff}
+.brick{display:inline-block;margin-top:10px;background:var(--gold);color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:17px}
+.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+.gallery img{width:100%;height:240px;object-fit:cover;border-radius:6px}
+@media(max-width:780px){body{font-size:18px}section{padding:44px 0}.welcome,.space{grid-template-columns:1fr;gap:22px}.space.flip .space-img{order:0}.gallery{grid-template-columns:1fr}.gallery img{height:200px}}
+@media print{nav{display:none}.hero{min-height:auto;color:#000;background:none}.hero:before{display:none}}
+nav a[aria-current=page]{color:var(--gold);border-bottom:2px solid var(--gold);padding-bottom:2px}
+.pager{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:8px 0 56px}
+.pager a{display:inline-block;text-decoration:none;border:1px solid var(--gold);color:var(--gold);padding:11px 22px;border-radius:6px;font-size:17px}
+.pager a.next{background:var(--gold);color:#fff;margin-left:auto}
+</style>
+</head>
+<body>
+<nav><div class="wrap"><b>NORTH STAR HOUSE</b>
+<a href="./">Welcome</a><a href="spaces.html">The Spaces</a><a href="details.html">Rental Details</a><a href="payments.html">Payments &amp; Questionnaire</a><a href="vendors.html" aria-current="page">Trusted Vendors</a><a href="brick.html">Your Brick</a><a href="contacts.html">Contacts</a></div></nav>
+
+<section id="vendors"><div class="wrap">
+  <span class="eyebrow">Trusted Vendor List</span><h2 style="margin-bottom:0">Our Recommended Vendors</h2>
+  <p class="note">You’re welcome to bring in the vendors of your choice. These are professionals who know North Star House well.</p>
+  <div class="vendors">
+      <div class="vcard"><h3>Caterers</h3><ul>
+        <li><strong><a href="https://antoniocatering.net" target="_blank" rel="noopener">Antonio Ayestaran Custom Catering</a></strong><span><a href="tel:5304018462">530-401-8462</a></span></li>
+        <li><strong><a href="https://farm2tablecatering.com" target="_blank" rel="noopener">Farm to Table Catering</a></strong><span><a href="tel:5306157707">530-615-7707</a></span></li>
+        <li><strong><a href="https://thehamstand.com" target="_blank" rel="noopener">The Ham Stand</a></strong><span><a href="tel:5302647685">530-264-7685</a></span></li>
+        <li><strong><a href="https://gourmetgarageloomis.com" target="_blank" rel="noopener">Bella Familia Pizza / Gourmet Garage</a></strong><span><a href="tel:5304486358">530-448-6358</a></span></li>
+        <li><strong><a href="https://savortheflavorbbq.com" target="_blank" rel="noopener">Savor the Flavor BBQ</a></strong><span><a href="tel:5307489285">530-748-9285</a></span></li>
+      </ul></div>
+      <div class="vcard"><h3>DJ Services</h3><ul>
+        <li><strong><a href="https://avlentertainment.com" target="_blank" rel="noopener">AVL Entertainment</a></strong><span>@avlentertainment</span></li>
+        <li><strong><a href="https://someonesaidyes.com" target="_blank" rel="noopener">Someone Said Yes</a></strong><span>@someonesaidyes</span></li>
+        <li><strong><a href="https://aseriousproduction.com" target="_blank" rel="noopener">A Serious Production</a></strong><span>@aseriousproduction</span></li>
+        <li><strong><a href="https://allstardjgroup.com" target="_blank" rel="noopener">All Star DJ</a></strong><span>@allstardjgroup</span></li>
+        <li><strong><a href="https://themusicxpressdj.com" target="_blank" rel="noopener">The Music Xpress</a></strong><span>@themusicxpress</span></li>
+      </ul></div>
+      <div class="vcard"><h3>Photographers</h3><ul>
+        <li><strong><a href="https://bryangallagherphoto.com" target="_blank" rel="noopener">Bryan Gallagher Photo</a></strong><span>@bryangallagherphoto</span></li>
+        <li><strong><a href="https://andrewandmelanie.com" target="_blank" rel="noopener">Andrew &amp; Melanie Photography</a></strong><span>@andrewmelaniephoto</span></li>
+        <li><strong><a href="https://kathrynwhitephotography.com" target="_blank" rel="noopener">Kathryn White Photography</a></strong><span>@kathrynwhitephoto</span></li>
+        <li><strong><a href="https://arichristine.biz" target="_blank" rel="noopener">Ari Christine Photography</a></strong><span>@arichristinephoto</span></li>
+        <li><strong><a href="https://savvproductions.com" target="_blank" rel="noopener">Savv Productions</a></strong><span>@savvproductions</span></li>
+      </ul></div>
+      <div class="vcard"><h3>Party Rental Services</h3><ul>
+        <li><strong><a href="https://srcparty.com" target="_blank" rel="noopener">SRC Rentals</a></strong><span><a href="tel:5302722266">530-272-2266</a></span></li>
+        <li><strong><a href="https://timelessarches.com" target="_blank" rel="noopener">Timeless Arches</a></strong><span><a href="tel:7758006190">775-800-6190</a></span></li>
+        <li><strong><a href="https://suttertents.com" target="_blank" rel="noopener">Sutter Tents</a></strong><span><a href="tel:5306452002">530-645-2002</a></span></li>
+      </ul></div>
+      <div class="vcard"><h3>Florists</h3><ul>
+        <li><strong><a href="https://goldenflorals.com" target="_blank" rel="noopener">Golden Flowers</a></strong><span><a href="tel:5305577689">530-557-7689</a></span></li>
+        <li><strong><a href="https://flowers-studio-lafleur.com" target="_blank" rel="noopener">LaFleur Flower Studio</a></strong><span><a href="tel:9165003859">916-500-3859</a></span></li>
+        <li><strong><a href="https://sweetrootsfarm.com" target="_blank" rel="noopener">Sweet Roots Floral</a></strong><span><a href="tel:5302770338">530-277-0338</a></span></li>
+        <li><strong><a href="https://grassvalleyflorist.com" target="_blank" rel="noopener">Grass Valley Florist</a></strong><span><a href="tel:5302732223">530-273-2223</a></span></li>
+        <li><strong><a href="https://prettyinpetalsnc.com" target="_blank" rel="noopener">Pretty in Petals</a></strong><span><a href="tel:2096610251">209-661-0251</a></span></li>
+      </ul></div>
+      <div class="vcard"><h3>Cakes &amp; Desserts</h3><ul>
+        <li><strong><a href="https://idosbydeb.com" target="_blank" rel="noopener">I Do’s by Deb</a></strong><span><a href="tel:5304093716">530-409-3716</a></span></li>
+        <li><strong><a href="https://grassvalleybakery.com" target="_blank" rel="noopener">Cake Bakery &amp; Cafe</a></strong><span><a href="tel:5306154126">530-615-4126</a></span></li>
+        <li><strong><a href="https://thesweetspotgv.com" target="_blank" rel="noopener">The Sweet Spot</a></strong><span><a href="tel:5309200462">530-920-0462</a></span></li>
+        <li><strong><a href="https://corvusbakery.com" target="_blank" rel="noopener">Corvus Bakery</a></strong><span><a href="tel:5308025102">530-802-5102</a></span></li>
+        <li><strong><a href="https://sweettoothbakingco.com" target="_blank" rel="noopener">Sweet Tooth Baking Company</a></strong></li>
+      </ul></div>
+      <div class="vcard"><h3>Event Planners</h3><ul>
+        <li><strong><a href="https://wildandlovelyevents.com" target="_blank" rel="noopener">Wild &amp; Lovely Events</a></strong><span><a href="tel:5309133735">530-913-3735</a></span></li>
+        <li><strong><a href="https://acuratedstory.com" target="_blank" rel="noopener">A Curated Story</a></strong><span><a href="tel:5309138527">530-913-8527</a></span></li>
+        <li><strong><a href="https://fairygodcoordinator.com" target="_blank" rel="noopener">The Fairy God Coordinator</a></strong><span><a href="tel:9165619525">916-561-9525</a></span></li>
+        <li><strong><a href="https://tohaveandtoholdweddings.com" target="_blank" rel="noopener">To Have &amp; To Hold Wedding Planning</a></strong><span><a href="tel:9254087888">925-408-7888</a></span></li>
+        <li><strong><a href="https://yourdaywithcayliej.biz" target="_blank" rel="noopener">Your Day with Caylie J</a></strong><span><a href="tel:5303048008">530-304-8008</a></span></li>
+        <li><strong><a href="https://storybookweddings.biz" target="_blank" rel="noopener">Storybook Weddings</a></strong><span><a href="tel:5303208882">530-320-8882</a></span></li>
+        <li><strong><a href="https://honeysuckletraditions.com" target="_blank" rel="noopener">Honeysuckle Traditions</a></strong><span><a href="tel:5406716551">540-671-6551</a></span></li>
+      </ul></div>
+      <div class="vcard"><h3>Beverage Services</h3><ul>
+        <li><strong><a href="https://taptrucksierrafoothills.com" target="_blank" rel="noopener">Tap Truck Sierra Foothills</a></strong><span><a href="tel:5309060030">530-906-0030</a></span></li>
+        <li><strong><a href="https://tumbleweedtaverngv.com" target="_blank" rel="noopener">Tumbleweed Tavern</a></strong><span><a href="tel:5303620932">530-362-0932</a></span></li>
+      </ul></div>
+      <div class="vcard"><h3>Beauty</h3><ul>
+        <li><strong><a href="https://carrielesperance.com" target="_blank" rel="noopener">Carrie L’esperance</a></strong><span><a href="tel:5306159736">530-615-9736</a></span></li>
+        <li><strong><a href="https://wanderlustbeautynorcal.com" target="_blank" rel="noopener">Wanderlust Beauty Collective</a></strong></li>
+        <li><strong><a href="https://courtneysagemakeup.com" target="_blank" rel="noopener">Courtney Sage</a></strong></li>
+        <li><strong><a href="https://luxeestheticsbymaddie.com" target="_blank" rel="noopener">Luxe Esthetics by Maddie</a></strong><span><a href="tel:5309132905">530-913-2905</a></span></li>
+      </ul></div>
+      <div class="vcard"><h3>Officiants</h3><ul>
+        <li><strong><a href="https://legaciesmadeoflove.com" target="_blank" rel="noopener">Legacies of Love</a></strong><span><a href="tel:5305459405">530-545-9405</a></span></li>
+        <li><strong><a href="https://weddingpastorcalifornia.com" target="_blank" rel="noopener">Pastor Mark</a></strong><span><a href="tel:5302070880">530-207-0880</a></span></li>
+      </ul></div>
+      <div class="vcard"><h3>Accommodations</h3><ul>
+        <li><strong><a href="https://goldminersinn.com" target="_blank" rel="noopener">Gold Miners Inn</a></strong><span><a href="tel:5304771700">530-477-1700</a></span></li>
+        <li><strong><a href="https://creektowncottages.com" target="_blank" rel="noopener">Creektown Cottages</a></strong><span><a href="tel:5303082370">530-308-2370</a></span></li>
+        <li><strong><a href="https://inntowncampground.com" target="_blank" rel="noopener">Inn Town Campground</a></strong><span><a href="tel:5302659900">530-265-9900</a></span></li>
+        <li><strong><a href="https://holbrooke.com" target="_blank" rel="noopener">Holbrooke Hotel</a></strong><span><a href="tel:5302731353">530-273-1353</a></span></li>
+        <li><strong><a href="https://theparsonage1865.com" target="_blank" rel="noopener">The Parsonage 1865</a></strong><span><a href="tel:5307986061">530-798-6061</a></span></li>
+        <li><strong><a href="https://gvcourtyardsuites.com" target="_blank" rel="noopener">Courtyard Suites</a></strong></li>
+      </ul></div>
+      <div class="vcard"><h3>Shuttle Services</h3><ul>
+        <li><strong><a href="https://regalcarriagesacramento.com" target="_blank" rel="noopener">Regal Carriage and Limo</a></strong><span><a href="tel:9169568507">916-956-8507</a></span></li>
+        <li><strong><a href="https://frettys.com" target="_blank" rel="noopener">Fretty’s</a></strong><span><a href="tel:5302732296">530-273-2296</a></span></li>
+      </ul></div>
+      <div class="vcard"><h3>Portable Restrooms</h3><ul>
+        <li><strong><a href="https://executive-washrooms.com" target="_blank" rel="noopener">Executive Washrooms</a></strong><span><a href="tel:5309338503">530-933-8503</a></span></li>
+        <li><strong><a href="https://moonlightloo.com" target="_blank" rel="noopener">Moonlight LOO</a></strong><span><a href="tel:5302652253">530-265-2253</a></span></li>
+      </ul></div>
+      <div class="vcard"><h3>Novelties</h3><ul>
+        <li><strong><a href="https://stickwithmeillustrations.com" target="_blank" rel="noopener">Stick With Me – Custom Illustrations &amp; Design</a></strong></li>
+        <li><strong>Queen of Hearts Mobile Tattoo</strong><span><a href="tel:5309233846">530-923-3846</a></span></li>
+        <li><strong><a href="https://linked-gems.square.site" target="_blank" rel="noopener">Linked Gems</a></strong></li>
+      </ul></div>
+  </div>
+</div></section>
+
+<div class="wrap pager"><a class="prev" href="payments.html">&larr; Payments &amp; Questionnaire</a><a class="next" href="brick.html">Your Brick &rarr;</a></div>
+<footer><p>North Star House &middot; 12075 Auburn Rd. Grass Valley, CA 95949<br><a href="https://www.northstarhouse.org">www.northstarhouse.org</a> &middot; <a href="mailto:venue@northstarhouse.org">venue@northstarhouse.org</a></p></footer>
+</body>
+</html>

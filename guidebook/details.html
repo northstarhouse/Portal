@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Rental Details | North Star House</title>
+<meta name="description" content="Your guide to planning a wedding at North Star House: the spaces, rental details, payment schedule, trusted vendors and contacts.">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cardo:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{--gold:#886c44;--ink:#2c2418;--muted:#6b6254;--cream:#f8f4ed;--line:#e6dfd3;--card:#fff}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:64px}
+body{margin:0;background:var(--cream);color:var(--ink);font-family:Cardo,Georgia,serif;font-size:19px;line-height:1.7;-webkit-text-size-adjust:100%}
+img{display:block;max-width:100%;height:auto}
+a{color:var(--gold)}
+h1,h2,h3{font-weight:400;line-height:1.2;margin:0}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+nav{position:sticky;top:0;z-index:10;background:rgba(248,244,237,.96);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;gap:22px;align-items:center;overflow-x:auto;white-space:nowrap;scrollbar-width:none;height:52px}
+nav .wrap::-webkit-scrollbar{display:none}
+nav b{letter-spacing:2px;font-size:12px;color:var(--gold);flex-shrink:0}
+nav a{font-size:15px;text-decoration:none;color:var(--ink);flex-shrink:0}
+nav a:hover{color:var(--gold)}
+.hero{position:relative;color:#fff;text-align:center;min-height:min(78vh,620px);display:flex;align-items:center;justify-content:center;background:#3a2f22 url(img/hero.jpg) center/cover}
+.hero:before{content:"";position:absolute;inset:0;background:linear-gradient(rgba(30,22,12,.35),rgba(30,22,12,.55))}
+.hero div{position:relative;padding:40px 20px}
+.hero small{display:block;letter-spacing:4px;font-size:13px;margin-bottom:14px}
+.hero h1{font-size:clamp(38px,7vw,72px)}
+.hero p{margin:14px 0 0;font-style:italic;font-size:20px}
+.eyebrow{display:block;letter-spacing:3px;font-size:12px;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+section{padding:64px 0}
+.welcome{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+.welcome img,.space-img img,.banner img{border-radius:6px;width:100%}
+h2{font-size:clamp(28px,4vw,40px);margin-bottom:16px}
+h3{font-size:24px;margin-bottom:8px}
+.sig{font-style:italic;color:var(--muted)}
+.lead{max-width:760px;margin:0 auto;text-align:center}
+.divider{border:0;border-top:1px solid var(--line);margin:0}
+.band{background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.space{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;padding:44px 0}
+.space.flip .space-img{order:-1}.space.solo{grid-template-columns:1fr;max-width:760px}
+.space-img.two{display:grid;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-top:28px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:22px 24px}
+.card p{margin:6px 0 0;font-size:17px}
+.steps{list-style:none;padding:0;margin:24px 0 0;display:grid;gap:12px}
+.steps li{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 20px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.steps b{font-weight:700}.steps span{color:var(--muted)}
+.vendors{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;margin-top:28px}
+.vcard{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px 22px}
+.vcard h3{font-size:21px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:10px}
+.vcard ul{list-style:none;margin:0;padding:0}
+.vcard li{padding:7px 0;font-size:16px;line-height:1.45}
+.vcard li span{display:block;color:var(--muted);font-size:15px}
+.vcard li a{text-decoration:none}.vcard li strong a{border-bottom:1px solid var(--line)}
+.contacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-top:24px}
+.banner{padding:0}.banner img{border-radius:0;max-height:520px;object-fit:cover}
+.note{font-size:16px;color:var(--muted)}
+footer{background:#2c2418;color:#d9cdb8;text-align:center;padding:44px 20px;font-size:16px}
+footer a{color:#fff}
+.brick{display:inline-block;margin-top:10px;background:var(--gold);color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:17px}
+.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+.gallery img{width:100%;height:240px;object-fit:cover;border-radius:6px}
+@media(max-width:780px){body{font-size:18px}section{padding:44px 0}.welcome,.space{grid-template-columns:1fr;gap:22px}.space.flip .space-img{order:0}.gallery{grid-template-columns:1fr}.gallery img{height:200px}}
+@media print{nav{display:none}.hero{min-height:auto;color:#000;background:none}.hero:before{display:none}}
+nav a[aria-current=page]{color:var(--gold);border-bottom:2px solid var(--gold);padding-bottom:2px}
+.pager{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:8px 0 56px}
+.pager a{display:inline-block;text-decoration:none;border:1px solid var(--gold);color:var(--gold);padding:11px 22px;border-radius:6px;font-size:17px}
+.pager a.next{background:var(--gold);color:#fff;margin-left:auto}
+</style>
+</head>
+<body>
+<nav><div class="wrap"><b>NORTH STAR HOUSE</b>
+<a href="./">Welcome</a><a href="spaces.html">The Spaces</a><a href="details.html" aria-current="page">Rental Details</a><a href="payments.html">Payments &amp; Questionnaire</a><a href="vendors.html">Trusted Vendors</a><a href="brick.html">Your Brick</a><a href="contacts.html">Contacts</a></div></nav>
+
+<div class="band" id="details"><section><div class="wrap">
+  <span class="eyebrow">Venue &amp; Rental Agreement Details</span><h2>Setup, Rentals &amp; Planning</h2>
+  <div class="grid3">
+    <div class="card"><h3>Event Timing</h3><p>Your rental period is 10 hours, beginning when we open the indoor venue for you. You may choose your preferred start time, with the latest possible end time being 11 PM. Should you require additional time, extra hours are available for $150 per hour.</p></div>
+    <div class="card"><h3>Setup &amp; Breakdown</h3><p>All setup and breakdown must occur within your contracted rental time. Outdoor setup is permitted before your rental period begins, but please note that other routine activities (e.g., tours, grounds maintenance) may still take place. If you plan to arrive early for outdoor setup, please let us know in advance so we can coordinate accordingly.</p></div>
+    <div class="card"><h3>Catering</h3><p>We require professional caterers for weddings to handle food service, rental breakdown, and trash cleanup to ensure a smooth experience and protect your security deposit. If your chosen caterer has not worked with us before, we’ll coordinate with them to familiarize them with our facilities. For inspiration, you can explore our recommended vendor list below.</p></div>
+    <div class="card"><h3>Available Rentals</h3><p>We’re pleased to provide the following rentals for your event: 25 round 60” tables, 200 white folding chairs, 3 rectangular 8’ tables, 2 rectangular 6’ tables, and patio tables, chairs, and umbrellas. Feel free to use any or all of these, or bring in additional rentals. We kindly ask that all furniture, including ours, is returned to its original location before your departure.</p></div>
+    <div class="card"><h3>Rental Company</h3><p>If you’re using a rental company, please coordinate delivery for the day of your event and pickup by 10 AM the following morning. We cannot accommodate deliveries the day before if there is another event scheduled. If you encounter any scheduling challenges, please have your rental provider contact us directly to ensure a smooth process.</p></div>
+    <div class="card"><h3>Weather &amp; Tenting</h3><p>To prepare for any weather conditions, we recommend having a backup plan that includes tenting options. Tents can be set up in the courtyard or other areas of the property, and we require the use of weighted anchors or sandbags rather than stakes. We will work directly with your tent supplier to ensure everything is properly coordinated.</p></div>
+    <div class="card"><h3>Event Insurance</h3><p>Event insurance is required and due one month before your wedding. You are welcome to use any provider of your choice. For ease, EventHelper offers pre-filled coverage requirements. Simply enter your event details to get started.</p></div>
+    <div class="card"><h3>Planning Support</h3><p>We are here to assist you every step of the way! We offer up to two onsite planning meetings to review your event details, answer questions, and provide expert feedback. Approximately 60 days before your wedding, we will send you a questionnaire to gather the final details for our Site Manager. Returning this promptly allows us to finalize logistics and ensures a smooth planning process, which we will discuss in a meeting or call.</p></div>
+    <div class="card"><h3>Lighting</h3><p>The estate is beautifully illuminated with string lights in the courtyard and over the East Lawn, twinkle pillar lights, and trim lighting on the House, all designed to create a magical atmosphere for your event.</p></div>
+  </div>
+</div></section></div>
+
+<div class="wrap pager"><a class="prev" href="spaces.html">&larr; The Spaces</a><a class="next" href="payments.html">Payments &amp; Questionnaire &rarr;</a></div>
+<footer><p>North Star House &middot; 12075 Auburn Rd. Grass Valley, CA 95949<br><a href="https://www.northstarhouse.org">www.northstarhouse.org</a> &middot; <a href="mailto:venue@northstarhouse.org">venue@northstarhouse.org</a></p></footer>
+</body>
+</html>
