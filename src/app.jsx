@@ -415,6 +415,19 @@ function fetchVenueInquiries(options) {
   }).catch(function(error) { if (options && options.strict) throw error; return []; });
 }
 
+// Booked estate tours whose date falls in the current calendar month (days already past included).
+// Resolves a number, or null if the lookup failed.
+function fetchToursThisMonth() {
+  var now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  var pad = function(n) { return String(n).padStart(2, '0'); };
+  var first = y + '-' + pad(m + 1) + '-01';
+  var next = new Date(y, m + 1, 1);
+  var nextKey = next.getFullYear() + '-' + pad(next.getMonth() + 1) + '-01';
+  return fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=id&status=eq.booked&date=gte.' + first + '&date=lt.' + nextKey + '&limit=1000', {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+  }).then(function(r) { return r.json(); }).then(function(rows) { return Array.isArray(rows) ? rows.length : null; }).catch(function() { return null; });
+}
+
 function loadVenueClientEvents() {
   return fetch(SUPABASE_URL + '/rest/v1/venue_inquiries?select=id,name,event_type,event_date,prebooking_form_response_id,insurance_uploaded_at,brick_lines,brick_submitted_at,questionnaire_form_response_id,questionnaire_sent_at,venue_payment_schedule(sequence,kind,label,amount_cents,amount_paid_cents,due_date,status)&prebooking_form_response_id=not.is.null', {
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -18026,6 +18039,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   const [bookedEventDates, setBookedEventDates] = useS([]); // [{event_date, status}] across every venue_inquiries category, not just weddings
   const [inquiriesError, setInquiriesError] = useS('');
   const [tours, setTours] = useS(null); // booked/requested estate_tours rows
+  const [toursMonth, setToursMonth] = useS(null); // booked tours dated in the current month
   const [reqSavingId, setReqSavingId] = useS(null); // request_handled toggle in-flight for this tour id
   const [justBooked, setJustBooked] = useS(null); // tour request booked via "Add to Calendar" (for the confirmation line)
   const [scheduleOpen, setScheduleOpen] = useS(false);
@@ -18168,6 +18182,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   }
 
   function loadTours() {
+    fetchToursThisMonth().then(setToursMonth);
     fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&status=in.(booked,requested)&order=date.asc.nullslast&limit=100', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) { setTours(Array.isArray(rows) ? rows : []); }).catch(function() { setTours([]); });
@@ -18745,6 +18760,9 @@ function VenueRentalsView({ navigate, initialTab }) {
                     return thisMonth + ' this month';
                   })()}
                 </div>
+                <div style={{ fontSize: 12, color: '#999', marginTop: 1 }}>
+                  {toursMonth === null ? '' : toursMonth + (toursMonth === 1 ? ' tour' : ' tours') + ' this month'}
+                </div>
               </div>
               {inquirySubmissions !== null && (
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -19258,9 +19276,11 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
   // staff can see at a glance whether someone who submitted an inquiry form
   // has already booked (or requested) a property tour.
   const [tours, setTours] = useState(null);
+  const [toursMonth, setToursMonth] = useState(null);
 
   function load() { fetchVenueInquiries().then(function(r) { setRows(r.filter(function(sub) { return isVenueClientSubmission(sub) === !!clientsOnly; })); }); }
   useEffect(function() { load(); }, []);
+  useEffect(function() { fetchToursThisMonth().then(setToursMonth); }, []);
   useEffect(function() {
     fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&status=in.(booked,requested)&order=date.asc.nullslast&limit=200', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -19485,7 +19505,12 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
     <div>
       <button onClick={function() { navigate('venue'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Venue Rentals</button>
       <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>{clientsOnly ? 'Clients' : 'Inquiries'}</div>
-      <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>{clientsOnly ? 'Official pre-booking form submissions — check off once handled.' : 'Wedding and Event Inquiry submissions — tours remain inquiries until an official pre-booking form is submitted.'}</div>
+      <div style={{ fontSize: 12, color: '#aaa', marginBottom: clientsOnly ? 20 : 6 }}>{clientsOnly ? 'Official pre-booking form submissions — check off once handled.' : 'Wedding and Event Inquiry submissions — tours remain inquiries until an official pre-booking form is submitted.'}</div>
+      {!clientsOnly && toursMonth !== null && (
+        <div style={{ fontSize: 12, color: '#666', marginBottom: 20 }}>
+          <strong style={{ color: '#2a2a2a' }}>{toursMonth}</strong> {toursMonth === 1 ? 'tour' : 'tours'} booked in {new Date().toLocaleDateString('en-US', { month: 'long' })}
+        </div>
+      )}
 
       {rows === null ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
