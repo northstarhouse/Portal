@@ -8,11 +8,19 @@ const CORS = {
 // without every call site having to remember to add it.
 const ADMIN_BCC = 'media@thenorthstarhouse.org'
 
+// Default sending address (domain verified with Resend). Callers may ask for one of the
+// ALLOWED_FROM addresses via `fromEmail`; if Resend refuses it (e.g. its domain isn't
+// verified yet) we resend from the default with the requested address as Reply-To,
+// so an email is never lost over the sender address.
+const DEFAULT_FROM = 'info@northstarhouse.org'
+const ALLOWED_FROM = new Set(['venue@thenorthstarhouse.org'])
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   try {
-    const { to, cc, bcc, subject, body, html, sender } = await req.json()
+    const { to, cc, bcc, subject, body, html, sender, fromEmail } = await req.json()
+    const wantedFrom = ALLOWED_FROM.has(String(fromEmail || '').toLowerCase()) ? String(fromEmail).toLowerCase() : null
 
     const recipients: string[] = Array.isArray(to)
       ? to
@@ -35,22 +43,29 @@ Deno.serve(async (req) => {
 
     const fromName = sender ? `${sender} · North Star House` : 'North Star House'
 
-    const res = await fetch('https://api.resend.com/emails', {
+    const send = (fromAddr: string, replyTo: string | null) => fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `${fromName} <info@northstarhouse.org>`,
+        from: `${fromName} <${fromAddr}>`,
         to: recipients,
         subject,
         text: body || '',
         ...(html ? { html } : {}),
+        ...(replyTo ? { reply_to: replyTo } : {}),
         ...(ccList.length ? { cc: ccList } : {}),
         ...(bccList.length ? { bcc: bccList } : {}),
       }),
     })
+
+    let res = await send(wantedFrom || DEFAULT_FROM, wantedFrom)
+    if (!res.ok && wantedFrom) {
+      console.error('send-email: sender rejected, falling back to default', wantedFrom, res.status)
+      res = await send(DEFAULT_FROM, wantedFrom)
+    }
 
     const data = await res.json()
     if (!res.ok) throw new Error(JSON.stringify(data))
