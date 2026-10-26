@@ -217,7 +217,7 @@ export function ClientPayPage({ api }) {
         <div className="cp-head-main">
           <div className="cp-brandrow">NORTH STAR HOUSE</div>
           <h1>{data.name}</h1>
-          <div className="cp-sub"><Icon name="calendar" size={16} /><span>{fmt(data.event_date, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span><i /><span>{data.event_type || 'Event'}</span></div>
+          <div className="cp-sub"><Icon name="calendar" size={16} /><span>{fmt(data.event_date, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span></div>
         </div>
         <div className="cp-head-side">
           <div className="cp-countdown">{daysTo > 0 ? <><strong>{daysTo}</strong><hr /><span>{daysTo === 1 ? 'day to go' : 'days to go'}</span></> : daysTo === 0 ? <strong style={{ fontSize: 24 }}>Today!</strong> : <strong style={{ fontSize: 20 }}>Congratulations</strong>}</div>
