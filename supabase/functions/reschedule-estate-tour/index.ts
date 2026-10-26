@@ -214,13 +214,43 @@ Deno.serve(async (req) => {
     if (!tour) return jsonResponse({ error: 'No tour with that id' }, 404)
 
     const changed = tour.date !== date || String(tour.start_time || '').slice(0, 8) !== time
+
+    // A guide has one row per time slot (unique on date + start_time). If the target time is an
+    // empty "open" slot, this tour takes it over; anything else at that time is a real conflict.
+    let takenOverSlot: any = null
+    if (changed && tour.guide_name) {
+      const clashRes = await sb(
+        `/rest/v1/estate_tours?date=eq.${date}&start_time=eq.${time}&guide_name=eq.${encodeURIComponent(tour.guide_name)}&id=neq.${encodeURIComponent(id)}&select=*`,
+      )
+      const clash = clashRes.ok ? await clashRes.json() : []
+      if (Array.isArray(clash) && clash.length) {
+        const c = clash[0]
+        if (c.status === 'open') {
+          const del = await sb(`/rest/v1/estate_tours?id=eq.${c.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+          if (!del.ok) return jsonResponse({ error: `Could not free that time slot: ${await del.text()}` }, 500)
+          takenOverSlot = c
+        } else if (c.status === 'blocked') {
+          return jsonResponse({ error: `${fmtWhen(date, time)} is blocked on ${tour.guide_name}'s schedule. Unblock it first, or pick another time.` }, 409)
+        } else {
+          return jsonResponse({ error: `${fmtWhen(date, time)} is already ${c.status === 'booked' ? 'booked' + (c.visitor_name ? ' by ' + c.visitor_name : '') : 'taken (' + c.status + ')'}. Pick another time.` }, 409)
+        }
+      }
+    }
+
     const up = await sb(`/rest/v1/estate_tours?id=eq.${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ date, start_time: time, reminder_24h_sent_at: null, reminder_1h_sent_at: null }),
     })
-    if (!up.ok) return jsonResponse({ error: `Could not save: ${await up.text()}` }, 500)
+    if (!up.ok) {
+      const err = await up.text()
+      // Put the empty slot back if we freed it and the move didn't happen.
+      if (takenOverSlot) await sb('/rest/v1/estate_tours', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(takenOverSlot) }).catch(() => {})
+      return jsonResponse({ error: `Could not save: ${err}` }, 500)
+    }
     if (!changed) return jsonResponse({ ok: true, unchanged: true })
+    // The time this tour left is an open slot again; recreate the standard open slots now rather than at the nightly run.
+    await sb('/rest/v1/rpc/ensure_default_tour_slots', { method: 'POST', body: '{}' }).catch(() => {})
 
     let calendar = 'skipped'
     if (tour.status === 'booked') {
