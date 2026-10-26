@@ -9,7 +9,7 @@ const style = `.cp-page{overflow-x:hidden;--gold:#886c44;--ink:#2c2418;--muted:#
 .cp-sub{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px;flex-wrap:wrap}.cp-sub i{width:1px;height:14px;background:#b9ab92;display:inline-block}
 .cp-head-side{position:relative;z-index:1;align-self:stretch;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end}.cp-countdown{background:var(--gold);color:#fff;padding:12px 28px 10px;text-align:center;display:inline-block;min-width:150px}.cp-countdown strong{display:block;font-family:Cardo,Georgia,serif;font-size:38px;font-weight:400;line-height:1.05}.cp-countdown hr{border:0;border-top:1px solid rgba(255,255,255,.55);margin:5px 16px 7px}.cp-countdown span{font-size:11px;letter-spacing:.2em;text-transform:uppercase}
 .cp-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px;position:relative;z-index:1}
-.cp-tile{display:flex;align-items:center;gap:14px;text-align:left;background:rgba(255,253,250,.9);border:1px solid var(--line);border-left:3px solid #c9a46a;padding:14px 14px 14px 16px;font:inherit;cursor:pointer;color:inherit;box-shadow:0 1px 2px rgba(60,45,20,.05)}.cp-tile:hover{filter:brightness(.98)}.cp-tile.todo{background:rgba(255,245,228,.96);border-color:#efd5a6;border-left:5px solid #d9902a}.cp-tile.todo b{color:#8a5413}.cp-tile.todo .cp-ico{background:#fbe0b0;color:#a5661a}.cp-tile.ok{background:rgba(234,246,236,.96);border-color:#b9d7be;border-left:5px solid #3f7a4a}.cp-tile.ok b{color:#2b6836}.cp-tile.ok .cp-ico{background:#3f7a4a;color:#fff}.cp-tile{position:relative}.cp-badge{position:absolute;top:10px;right:12px;font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 10px;border-radius:999px;color:#fff}@media(max-width:1000px){.cp-badge{display:none}}.cp-tile.ok .cp-badge{background:#3f7a4a}.cp-tile.todo .cp-badge{background:#d9902a}
+.cp-tile{display:flex;align-items:center;gap:14px;text-align:left;background:rgba(255,253,250,.9);border:1px solid var(--line);border-left:3px solid #c9a46a;padding:14px 14px 14px 16px;font:inherit;cursor:pointer;color:inherit;box-shadow:0 1px 2px rgba(60,45,20,.05)}.cp-tile:hover{background:#fff}.cp-ico{position:relative}.cp-tick{position:absolute;right:-5px;bottom:-5px;width:25px;height:25px;border-radius:50%;background:var(--gold);color:#fff;border:2px solid #fffdfa;display:flex;align-items:center;justify-content:center}
 .cp-ico{flex:none;width:46px;height:46px;border-radius:50%;background:#f1e9da;color:#8a6c40;display:flex;align-items:center;justify-content:center}
 .cp-txt{flex:1;min-width:0}.cp-tile small{display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700}.cp-tile b{display:block;font-family:Cardo,Georgia,serif;font-size:22px;font-weight:700;line-height:1.2;margin:3px 0 1px}.cp-tile em{font-style:normal;font-size:12px;color:var(--muted)}.cp-chev{display:none}
 .cp-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}.cp-col{min-width:0}
@@ -23,7 +23,7 @@ const style = `.cp-page{overflow-x:hidden;--gold:#886c44;--ink:#2c2418;--muted:#
 .cp-big{font-family:Cardo,Georgia,serif;font-size:30px;font-weight:700;line-height:1.1}.cp-bar{height:8px;background:#f1e9dc;overflow:hidden;margin:14px 0}.cp-bar span{display:block;height:100%;background:#6b8c6c}
 .cp-next{display:flex;gap:10px;align-items:center;background:#f4eee3;padding:12px 14px;font-size:14px;margin-bottom:14px}.cp-next svg{flex:none;color:var(--gold)}
 .cp-check{display:flex;gap:8px;align-items:center;font-weight:400;margin:4px 0}.cp-check input{width:auto;margin:0}
-.cp-qcols{column-count:2;column-gap:44px;margin-bottom:22px}.cp-qsec-wrap{break-inside:avoid-column}.cp-qsec-wrap .cp-sec:first-child{margin-top:8px}@media(max-width:820px){.cp-badge{display:none}.cp-qcols{column-count:1}}
+.cp-qcols{column-count:2;column-gap:44px;margin-bottom:22px}.cp-qsec-wrap{break-inside:avoid-column}.cp-qsec-wrap .cp-sec:first-child{margin-top:8px}@media(max-width:820px){.cp-qcols{column-count:1}}
 .cp-sec{font-family:Cardo,Georgia,serif;font-weight:700;font-size:19px;color:var(--gold);text-align:center;margin:30px 0 18px;padding:12px 8px;border-top:1px solid var(--gold);border-bottom:1px solid var(--gold)}.cp-lab{display:block;font-weight:400;font-size:15px;line-height:1.45}.cp-note{display:block;font-style:italic;font-weight:400;color:var(--muted);font-size:13px;margin-top:2px}.cp-fieldimg{display:block;width:100%;height:auto;margin:0 0 16px;border:1px solid var(--line)}.cp-field input::placeholder,.cp-field textarea::placeholder{color:#9a9488;font-size:15px;font-weight:400}
 @media(max-width:820px){.cp-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.cp-tile{gap:10px;padding:12px}.cp-ico{width:38px;height:38px}.cp-chev{display:none}.cp-cols{grid-template-columns:1fr}.cp-head{flex-direction:column;min-height:0;padding-top:96px}.cp-head-img{top:-28px;left:-16px;right:-16px;bottom:auto;height:150px;width:auto;opacity:.6;-webkit-mask-image:linear-gradient(to bottom,#000 40%,transparent 100%);mask-image:linear-gradient(to bottom,#000 40%,transparent 100%)}.cp-head-main{max-width:100%}.cp-head-side{width:100%;flex-direction:row;align-items:center;justify-content:flex-start}}`;
 const money = c => (c / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -197,11 +197,9 @@ export function ClientPayPage({ api }) {
     window.dispatchEvent(new CustomEvent('cp-open', { detail: id }));
     setTimeout(() => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
   };
-  const tile = (id, icon, label, value, sub, ok) => {
-    const st = ok === true ? 'ok' : ok === false ? 'todo' : '';
-    return <button type="button" className={'cp-tile ' + st} onClick={() => go(id)}>
-      <span className="cp-ico"><Icon name={ok === true ? 'check' : icon} /></span><span className="cp-txt"><small>{label}</small><b>{value}</b><em>{sub}</em></span>{st && <span className="cp-badge">{ok ? 'Done' : 'To do'}</span>}<span className="cp-chev"><Icon name="chevron" size={18} /></span></button>;
-  };
+  const tile = (id, icon, label, value, sub, ok) => <button type="button" className="cp-tile" onClick={() => go(id)}>
+    <span className="cp-ico"><Icon name={icon} />{ok === true && <span className="cp-tick"><Icon name="check" size={15} /></span>}</span>
+    <span className="cp-txt"><small>{label}</small>{value ? <b>{value}</b> : null}<em>{sub}</em></span></button>;
   return <main className="cp-page"><style>{style}</style><div className={'cp-shell' + (data ? ' wide' : '')}>
     {!data ? <>
       <div className="cp-brandrow">NORTH STAR HOUSE</div>
@@ -229,9 +227,9 @@ export function ClientPayPage({ api }) {
       {error && <div className="cp-error" role="alert">{error}</div>}
       <div className="cp-tiles">
         {tile('cp-payments', 'coins', 'Balance', data.has_schedule ? money(data.balance_cents) : '—', data.has_schedule ? 'of ' + money(data.total_cents) : 'No schedule yet', data.has_schedule ? data.balance_cents === 0 : null)}
-        {tile('cp-insurance', 'shield', 'Insurance', data.insurance_uploaded ? 'Received' : 'Needed', 'Certificate of insurance', data.insurance_uploaded)}
-        {tile('cp-questionnaire', 'clipboard', 'Questionnaire', data.questionnaire_done ? 'Completed' : 'To do', 'Wedding day details', data.questionnaire_done)}
-        {tile('cp-brick', 'doc', 'Legacy brick', data.brick_done ? 'Submitted' : 'To do', '3 lines, 20 characters', data.brick_done)}
+        {tile('cp-insurance', 'shield', 'Insurance', data.insurance_uploaded ? '' : 'To do', 'Certificate of insurance', data.insurance_uploaded)}
+        {tile('cp-questionnaire', 'clipboard', 'Questionnaire', data.questionnaire_done ? '' : 'To do', 'Wedding day details', data.questionnaire_done)}
+        {tile('cp-brick', 'doc', 'Legacy brick', data.brick_done ? '' : 'To do', '3 lines, 20 characters', data.brick_done)}
       </div>
       <div className="cp-cols">
         <div className="cp-col">
