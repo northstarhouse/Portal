@@ -14,9 +14,9 @@ test('recipient view strips private email addresses and signature verification e
  const api=handler(async(url,options)=>{const action=JSON.parse(options.body).p_action;return Response.json(action==='resolve'?{signer:{id:'s',email:'client@example.invalid'},version:record}:{signer:{id:'s',name:'Client',email:'client@example.invalid',role:'client',status:'pending'},version:record,can_sign:true});});
  const response=await api(req({action:'view',token:'a'.repeat(64)}));const body=await response.text();assert.equal(response.status,200);assert.ok(!body.includes('client@example.invalid'));assert.ok(!body.includes('private-ip'));assert.ok(!body.includes('private-detail'));assert.ok(!body.includes('token_hash'));
 });
-test('email verification codes go only to the named recipient, never a BCC',async()=>{
+test('email verification codes go to the named recipient and are copied only to the venue inbox',async()=>{
  let mail;const api=handler(async(url,options)=>{const data=JSON.parse(options.body);if(url.includes('resend.com')){mail=data;return Response.json({id:'sent'});}return Response.json(data.p_action==='resolve'?{signer:{id:'s',email:'client@example.invalid',status:'pending'}}:{});});
- const response=await api(req({action:'request_code',token:'a'.repeat(64)}));assert.equal(response.status,200);assert.deepEqual(mail.to,['client@example.invalid']);assert.equal(mail.bcc,undefined);assert.match(mail.text,/\b\d{6}\b/);const body=await response.json();assert.ok(!JSON.stringify(body).includes(mail.text.match(/\b\d{6}\b/)[0]));
+ const response=await api(req({action:'request_code',token:'a'.repeat(64)}));assert.equal(response.status,200);assert.deepEqual(mail.to,['client@example.invalid']);assert.deepEqual(mail.bcc,['venue@thenorthstarhouse.org']);assert.match(mail.text,/\b\d{6}\b/);const body=await response.json();assert.ok(!JSON.stringify(body).includes(mail.text.match(/\b\d{6}\b/)[0]));
 });
 test('issuing without email requested creates individual links without sending messages',async()=>{
  let emails=0;const spec=[{name:'Client',email:'client@example.invalid',role:'client'},{name:'Venue',email:'venue@example.invalid',role:'venue'}];

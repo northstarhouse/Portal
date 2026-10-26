@@ -30,8 +30,8 @@ Deno.serve(async req=>{
    if(action==='request_code'){
     const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,'0');
     await rpc('code',{token_hash:th,code_hash:await codeHash(signer.id,code)});
-    // Never BCC verification codes to administrators or other signers.
-    await email(signer.email,'Your North Star House signing verification code',`Your verification code is ${code}. It expires in 10 minutes.\n\nOnly enter this code on the North Star House agreement page. Do not share it with anyone. If you did not request this code, do not sign the agreement.`);
+    // Verification codes are copied (bcc) to the venue inbox so staff can see who is signing; never to other signers.
+    await email(signer.email,'Your North Star House signing verification code',`Your verification code is ${code}. It expires in 10 minutes.\n\nOnly enter this code on the North Star House agreement page. Do not share it with anyone. If you did not request this code, do not sign the agreement.`,true);
     return json({sent:true,email:mask(signer.email)});
    }
    const code=String(body.code||'');if(!/^\d{6}$/.test(code))return json({error:'Enter the six-digit code from your email.'},400);

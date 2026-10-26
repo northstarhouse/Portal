@@ -7,7 +7,7 @@ The Contracts & signatures section is inside Venue Rentals → Clients → View 
 1. Create an agreement draft. Existing clients start from their original terms and recorded payment schedule. New clients use the retained wedding or private-event terms. This is an editable draft, never an automatically approved agreement.
 2. Complete every `[TO COMPLETE]` field, review the event-specific terms, and enter each client signer's name/email plus the venue countersigner's name/email. Each person needs a separate email.
 3. Save, review the saved text, and issue it for signatures. Email delivery is optional and off by default. Personal signing links appear for copying; a failed email is reported separately from creating the agreement.
-4. Each signer opens their own page, reviews/downloads the document, requests an email code, types their own full name, and explicitly agrees to sign electronically. Codes are sent only to that recipient and are never BCC'd.
+4. Each signer opens their own page, reviews/downloads the document, requests an email code, types their own full name, and explicitly agrees to sign electronically. Codes are sent to that recipient and copied (bcc) only to the venue inbox, venue@thenorthstarhouse.org, so staff can see who is signing; they are never sent to other signers.
 5. The venue countersigns after all clients have signed, using the venue recipient's personal link and email code. Staff login alone cannot create someone else's signature.
 6. Download the agreement PDF and its signature/audit appendix. Completed copies can also be sent through the recipient controls.
 
