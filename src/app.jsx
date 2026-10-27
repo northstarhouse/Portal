@@ -13689,6 +13689,28 @@ function SuEventPanel({ event, onSaved, onCancel }) {
   var [origSlotIds, setOrigSlotIds] = useState([]);
   var [loadingSlots, setLoadingSlots] = useState(isEdit && event.event_type === 'shift');
   var [saving, setSaving] = useState(false);
+  var [imageUrl, setImageUrl] = useState(event && event.image_url ? event.image_url : '');
+  var [imageUploading, setImageUploading] = useState(false);
+
+  // Event image: stored in the public event-flyers bucket and shown at the top of the public form.
+  function handleImageFile(e) {
+    var file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!/^image\//.test(file.type)) { alert('Please choose an image file (JPG, PNG, WebP).'); return; }
+    if (file.size > 8 * 1024 * 1024) { alert('That image is over 8 MB. Please choose a smaller one.'); return; }
+    setImageUploading(true);
+    var path = 'rsvp/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    fetch(SUPABASE_URL + '/storage/v1/object/event-flyers/' + path, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type },
+      body: file
+    }).then(function(r) {
+      setImageUploading(false);
+      if (!r.ok) { alert('Image upload failed. Please try again.'); return; }
+      setImageUrl(SUPABASE_URL + '/storage/v1/object/public/event-flyers/' + path);
+    }).catch(function() { setImageUploading(false); alert('Image upload failed. Please try again.'); });
+  }
 
   useEffect(function() {
     if (!isEdit || event.event_type !== 'shift') return;
@@ -13744,6 +13766,8 @@ function SuEventPanel({ event, onSaved, onCancel }) {
     if (!form.title.trim() || saving) return;
     setSaving(true);
     var payload = { title: form.title.trim(), date: form.date || null, time: form.time || null, description: form.description.trim() || null, options: eventType === 'rsvp' ? options.filter(function(o) { return o.trim(); }) : [] };
+    // Only touch image_url when there is one to set or clear (so events still save before the column exists).
+    if (imageUrl || (event && event.image_url)) payload.image_url = imageUrl || null;
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
 
     function finish(eventId) {
@@ -13782,6 +13806,17 @@ function SuEventPanel({ event, onSaved, onCancel }) {
           <input value={form.time} onChange={function(e) { setForm(Object.assign({}, form, { time: e.target.value })); }} placeholder="Time (e.g. 6:00 PM)" style={SU_INPUT} />
         </div>
         <textarea value={form.description} onChange={function(e) { setForm(Object.assign({}, form, { description: e.target.value })); }} placeholder="Description (optional)" rows={3} style={SU_INPUT} />
+        <div style={{ border: '0.5px dashed #d8cdb9', borderRadius: 8, padding: '10px 12px', background: '#faf8f4' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Event image (optional)</div>
+          {imageUrl && <img src={imageUrl} alt="Event" style={{ display: 'block', maxWidth: '100%', maxHeight: 220, borderRadius: 6, marginBottom: 8, border: '0.5px solid #e8e0d5' }} />}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: imageUploading ? 'default' : 'pointer', opacity: imageUploading ? 0.6 : 1 }}>
+              {imageUploading ? 'Uploading…' : (imageUrl ? 'Replace image' : 'Upload image')}
+              <input type="file" accept="image/*" onChange={handleImageFile} disabled={imageUploading} style={{ display: 'none' }} />
+            </label>
+            {imageUrl && !imageUploading && <button type="button" onClick={function() { setImageUrl(''); }} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 12 }}>Remove</button>}
+          </div>
+        </div>
       </div>
       {eventType === 'rsvp' ? (
         <div style={{ marginBottom: 16 }}>
