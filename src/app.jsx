@@ -13484,7 +13484,8 @@ var suClipboardIcon = <svg width={15} height={15} viewBox="0 0 24 24" fill="none
 
 function suFmtDate(d) { if (!d) return ''; return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 
-function suPublicLink(kind, id, title) {
+function suPublicLink(kind, id, title, slug) {
+  if (kind === 'event' && slug) return 'https://northstarhouse.github.io/NSH-forms/?e=' + encodeURIComponent(slug);
   var idParam = kind === 'event' ? (suSlugify(title || '') + '__' + id) : id;
   return 'https://northstarhouse.github.io/NSH-forms/?view=' + kind + '&id=' + idParam;
 }
@@ -14050,8 +14051,8 @@ function FormBuilderView({ navigate }) {
     if (!window.confirm('Delete this ' + label + '? This cannot be undone.')) return;
     fetch(SUPABASE_URL + '/rest/v1/' + table + '?id=eq.' + id, { method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } }).then(function() { fetchAll(); });
   }
-  function handleCopyLink(kind, id, title) {
-    navigator.clipboard.writeText(suPublicLink(kind, id, title));
+  function handleCopyLink(kind, id, title, slug) {
+    navigator.clipboard.writeText(suPublicLink(kind, id, title, slug));
     setCopiedId(kind + id);
     setTimeout(function() { setCopiedId(null); }, 2000);
   }
@@ -14107,7 +14108,7 @@ function FormBuilderView({ navigate }) {
               var meta = ev.event_type === 'shift' ? (((ev.vol_shift_slots && ev.vol_shift_slots[0] && ev.vol_shift_slots[0].count) || 0) + ' slots') : (((ev.vol_event_responses && ev.vol_event_responses[0] && ev.vol_event_responses[0].count) || 0) + ' RSVPs');
               return <SuListRow key={ev.id} title={ev.title} subtitle={subtitle} meta={meta}
                 onClick={function() { setEditing({ type: 'events', id: ev.id }); }}
-                onCopyLink={function() { handleCopyLink('event', ev.id, ev.title); }} copied={copiedId === 'event' + ev.id}
+                onCopyLink={function() { handleCopyLink('event', ev.id, ev.title, ev.slug); }} copied={copiedId === 'event' + ev.id}
                 onDelete={function() { handleDelete('event', ev.id, 'vol_events'); }} />;
             }))}
             {tab === 'polls' && (polls.length === 0 ? <SuEmpty text="No polls yet." /> : polls.map(function(pl) {
