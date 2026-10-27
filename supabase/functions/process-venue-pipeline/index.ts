@@ -30,11 +30,11 @@ function estateTourCategory(tour: { category?: string | null; inquiry_form_id?: 
   if (eventType === 'Private Event' || eventType === 'Public Event') return 'Event';
   return 'Tour';
 }
-// Public, no-login scrollable page (guidebook/index.html in this repo's GitHub Pages site).
-const GUIDEBOOK_URL = 'https://northstarhouse.github.io/Portal/guidebook/';
+// Public, no-login Client Guidebook, published from the venue-portal repo at venue.northstarhouse.org.
+const GUIDEBOOK_URL = 'https://venue.northstarhouse.org/guidebook/';
 const AVAILABILITY_CALENDAR_URL = 'https://northstarhouse.github.io/venue/?availability=1';
 // Clients' event page (payments, insurance, questionnaire, brick wording), unlocked by their venue code.
-const CLIENT_PAGE_URL = 'https://northstarhouse.github.io/Portal/#pay';
+const CLIENT_PAGE_URL = 'https://venue.northstarhouse.org/';
 // Venue code = wedding date written like DEC-28-2026.
 const venueCode = (d: unknown) => {
   const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/);

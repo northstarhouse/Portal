@@ -2,7 +2,6 @@
 
 import { VenueClientDashboard, saveVenueInsuranceVerification } from './venue-clients.jsx';
 import { createAgreementApi, AgreementSigningPage } from './venue-contracts.jsx';
-import { ClientPayPage, createClientPayApi } from './venue-client-pay.jsx';
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
@@ -22856,4 +22855,6 @@ function Dashboard() {
 const root = ReactDOM.createRoot(document.getElementById("root"));
 const agreementToken = new URLSearchParams(window.location.hash.slice(1)).get('agreement');
 const isClientPayPage = /^#pay(\/|$)/.test(window.location.hash);
-root.render(agreementToken ? React.createElement(AgreementSigningPage, {api:venueAgreementApi,token:agreementToken}) : isClientPayPage ? React.createElement(ClientPayPage, {api:createClientPayApi({baseUrl:SUPABASE_URL,apiKey:SUPABASE_KEY})}) : React.createElement(AppGate, null, React.createElement(Dashboard)));
+// The client event page now lives at venue.northstarhouse.org; links to the old #pay address keep working.
+if (isClientPayPage && !agreementToken) window.location.replace('https://venue.northstarhouse.org/');
+root.render(agreementToken ? React.createElement(AgreementSigningPage, {api:venueAgreementApi,token:agreementToken}) : isClientPayPage ? null : React.createElement(AppGate, null, React.createElement(Dashboard)));

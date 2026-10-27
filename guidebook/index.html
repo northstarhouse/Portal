@@ -4,113 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Wedding Client Guidebook | North Star House</title>
-<meta name="description" content="Your guide to planning a wedding at North Star House: the spaces, rental details, payment schedule, trusted vendors and contacts.">
-<link rel="icon" href="../favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cardo:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-<style>
-:root{--gold:#886c44;--ink:#2c2418;--muted:#6b6254;--cream:#f8f4ed;--line:#e6dfd3;--card:#fff}
-*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:64px}
-body{margin:0;background:var(--cream);color:var(--ink);font-family:Cardo,Georgia,serif;font-size:19px;line-height:1.7;-webkit-text-size-adjust:100%}
-img{display:block;max-width:100%;height:auto}
-a{color:var(--gold)}
-h1,h2,h3{font-weight:400;line-height:1.2;margin:0}
-.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
-nav{position:sticky;top:0;z-index:10;background:rgba(248,244,237,.96);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
-nav .wrap{display:flex;gap:22px;align-items:center;overflow-x:auto;white-space:nowrap;scrollbar-width:none;height:52px}
-nav .wrap::-webkit-scrollbar{display:none}
-nav b{letter-spacing:2px;font-size:12px;color:var(--gold);flex-shrink:0}
-nav a{font-size:15px;text-decoration:none;color:var(--ink);flex-shrink:0}
-nav a:hover{color:var(--gold)}
-.hero{position:relative;color:#fff;text-align:center;min-height:min(78vh,620px);display:flex;align-items:center;justify-content:center;background:#3a2f22 url(img/hero.jpg) center/cover}
-.hero:before{content:"";position:absolute;inset:0;background:linear-gradient(rgba(30,22,12,.35),rgba(30,22,12,.55))}
-.hero div{position:relative;padding:40px 20px}
-.hero small{display:block;letter-spacing:4px;font-size:13px;margin-bottom:14px}
-.hero h1{font-size:clamp(38px,7vw,72px)}
-.hero p{margin:14px 0 0;font-style:italic;font-size:20px}
-.eyebrow{display:block;letter-spacing:3px;font-size:12px;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
-section{padding:64px 0}
-.welcome{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
-.welcome img,.space-img img,.banner img{border-radius:6px;width:100%}
-h2{font-size:clamp(28px,4vw,40px);margin-bottom:16px}
-h3{font-size:24px;margin-bottom:8px}
-.sig{font-style:italic;color:var(--muted)}
-.lead{max-width:760px;margin:0 auto;text-align:center}
-.divider{border:0;border-top:1px solid var(--line);margin:0}
-.band{background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.space{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;padding:44px 0}
-.space.flip .space-img{order:-1}.space.solo{grid-template-columns:1fr;max-width:760px}
-.space-img.two{display:grid;gap:14px}
-.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-top:28px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:22px 24px}
-.card p{margin:6px 0 0;font-size:17px}
-.steps{list-style:none;padding:0;margin:24px 0 0;display:grid;gap:12px}
-.steps li{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 20px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.steps b{font-weight:700}.steps span{color:var(--muted)}
-.vendors{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;margin-top:28px}
-.vcard{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px 22px}
-.vcard h3{font-size:21px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:10px}
-.vcard ul{list-style:none;margin:0;padding:0}
-.vcard li{padding:7px 0;font-size:16px;line-height:1.45}
-.vcard li span{display:block;color:var(--muted);font-size:15px}
-.vcard li a{text-decoration:none}.vcard li strong a{border-bottom:1px solid var(--line)}
-.contacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-top:24px}
-.banner{padding:0}.banner img{border-radius:0;max-height:520px;object-fit:cover}
-.note{font-size:16px;color:var(--muted)}
-footer{background:#2c2418;color:#d9cdb8;text-align:center;padding:44px 20px;font-size:16px}
-footer a{color:#fff}
-.brick{display:inline-block;margin-top:10px;background:var(--gold);color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:17px}
-.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
-.gallery img{width:100%;height:240px;object-fit:cover;border-radius:6px}
-@media(max-width:780px){body{font-size:18px}section{padding:44px 0}.welcome,.space{grid-template-columns:1fr;gap:22px}.space.flip .space-img{order:0}.gallery{grid-template-columns:1fr}.gallery img{height:200px}}
-@media print{nav{display:none}.hero{min-height:auto;color:#000;background:none}.hero:before{display:none}}
-nav a[aria-current=page]{color:var(--gold);border-bottom:2px solid var(--gold);padding-bottom:2px}
-.pager{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:8px 0 56px}
-.pager a{display:inline-block;text-decoration:none;border:1px solid var(--gold);color:var(--gold);padding:11px 22px;border-radius:6px;font-size:17px}
-.pager a.next{background:var(--gold);color:#fff;margin-left:auto}
-</style>
+<title>Client Guidebook | North Star House</title>
+<link rel="canonical" href="https://venue.northstarhouse.org/guidebook/">
+<meta http-equiv="refresh" content="0; url=https://venue.northstarhouse.org/guidebook/">
+<script>location.replace("https://venue.northstarhouse.org/guidebook/" + location.search + location.hash);</script>
 </head>
-<body>
-<nav><div class="wrap"><b>NORTH STAR HOUSE</b>
-<a href="./" aria-current="page">Welcome</a><a href="spaces.html">The Spaces</a><a href="details.html">Rental Details</a><a href="payments.html">Payments &amp; Questionnaire</a><a href="vendors.html">Trusted Vendors</a><a href="brick.html">Your Brick</a><a href="contacts.html">Contacts</a></div></nav>
-
-<header class="hero"><div>
-  <small>OUR WEDDING TOUR</small>
-  <h1>Client Guidebook</h1>
-  <p>12075 Auburn Rd. Grass Valley, CA 95949</p>
-</div></header>
-<section id="welcome"><div class="wrap welcome">
-  <div>
-    <span class="eyebrow">Welcome to North Star House</span>
-    <h2>Designed by Julia Morgan, Restored by You</h2>
-    <p>We’re honored that you’ve chosen to celebrate your wedding at North Star House – a place where natural beauty, rich history, and community spirit come together to create something truly unforgettable.</p>
-    <p>Nestled in the Sierra Foothills and designed in 1905 by the legendary Julia Morgan, our historic estate is more than a beautiful venue: it’s a living piece of California’s heritage. When you say your vows here, you become part of a long story of resilience, romance, and restoration.</p>
-    <p>This guidebook is your companion through the planning process. Inside, you’ll find all the information you need to bring your vision to life: from logistics and policies to trusted vendors and thoughtful planning tips.</p>
-    <p>As you plan your celebration, know that every detail – every toast, dance, and shared moment – adds to the magic of this place. And every event held here helps preserve the House for future generations.</p>
-    <p class="sig">We can’t wait to see your story unfold.<br>With Heartfelt Thanks,<br>The North Star House Team<br><a href="mailto:venue@thenorthstarhouse.org">venue@thenorthstarhouse.org</a> &middot; <a href="https://www.northstarhouse.org">www.northstarhouse.org</a></p>
-  </div>
-  <img src="img/welcome.jpg" alt="A couple embracing in a doorway at North Star House in golden light">
-</div></section>
-
-<div class="band"><section class="lead"><div class="wrap">
-  <span class="eyebrow">Exclusive Use of the Estate</span>
-  <h2>A Piece of History That’s Entirely Yours for the Day</h2>
-  <p>From historic rooms to sunlit lawns and beautiful garden paths, every inch of the estate is here to support your vision and tell your story.</p>
-  <p>As you plan your celebration, we want you to feel confident, inspired, and at home. The following pages will walk you through each space, offering a closer look at how couples typically use the property and helping you imagine how your day will come to life.</p>
-  <h3 style="margin-top:28px">Personalize Your Wedding</h3>
-  <p>One of the things couples love most about North Star House is the flexibility. We allow you to bring in your own vendors from catering and rentals to music and florals so you can truly customize your day to match your style, budget, and vision.</p>
-</div></section></div>
-
-<section id="venue-code"><div class="wrap lead">
-  <span class="eyebrow">Your Venue Code</span>
-  <h2>Your Wedding Date Is Your Code</h2>
-  <p>Once you book, your venue code is your wedding date, written like <strong>DEC-28-2026</strong>. You’ll use it to sign your agreement, make payments, upload your event insurance, complete your wedding questionnaire, and choose the wording for your legacy brick.</p>
-  <a class="brick" href="https://northstarhouse.github.io/Portal/#pay" target="_blank" rel="noopener">Go to Your Event Page</a>
-</div></section>
-
-<div class="wrap pager"><a class="next" href="spaces.html">The Spaces &rarr;</a></div>
-<footer><p>North Star House &middot; 12075 Auburn Rd. Grass Valley, CA 95949<br><a href="https://www.northstarhouse.org">www.northstarhouse.org</a> &middot; <a href="mailto:venue@thenorthstarhouse.org">venue@thenorthstarhouse.org</a></p></footer>
+<body style="font-family:Georgia,serif;text-align:center;padding:48px 16px;color:#2c2418">
+<p>The North Star House Client Guidebook has moved.</p>
+<p><a href="https://venue.northstarhouse.org/guidebook/" style="color:#886c44">Continue to the guidebook</a></p>
 </body>
 </html>
