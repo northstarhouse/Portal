@@ -315,6 +315,7 @@ Deno.serve(async req => {
 
     // Wedding brick engraving: 3 lines, 20 characters max each (counting spaces and punctuation).
     if (action === 'brick_save') {
+      if (Array.isArray(inq.brick_lines) && inq.brick_lines.some((l: string) => String(l).trim())) throw new Fail('Your brick wording has been submitted and can no longer be changed here. Please contact the venue if something needs to change.', 409);
       const given = Array.isArray(body.lines) ? body.lines : [];
       const lines = [0, 1, 2].map(i => String(given[i] ?? '').replace(/\s+/g, ' ').trim());
       if (lines.some(l => [...l].length > 20)) throw new Fail('Each line can be up to 20 characters, including spaces and punctuation.');
