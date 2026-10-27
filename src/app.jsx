@@ -347,6 +347,15 @@ function isVenueClientSubmission(submission) {
   return submission.form_id === PRE_BOOKING_FORM_ID || submission.form_id === PRE_BOOKING_FORM_ID_EVENT;
 }
 
+// Test bookings (any answer is a "+test@thenorthstarhouse.org" address, e.g.
+// the DEC-24-2026 one used to try the client event page and payments) stay in
+// the database so they keep working, but aren't listed under Clients.
+function isTestVenueBooking(submission) {
+  var a = submission && submission.answers;
+  if (!a) return false;
+  return Object.keys(a).some(function(k) { return typeof a[k] === 'string' && /\+test@thenorthstarhouse\.org/i.test(a[k]); });
+}
+
 // Alternate tour dates await staff coordination, so suppress generic outreach.
 function fetchPendingTourRequestEmails() {
   return fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=visitor_email&status=eq.requested', {
@@ -18515,7 +18524,7 @@ function VenueRentalsView({ navigate, initialTab }) {
 
   // A booked tour is still an inquiry; only pre-booking submissions are clients.
   var inquirySubmissions = inquiries === null ? null : inquiries.filter(function(q) { return !isVenueClientSubmission(q); });
-  var clientSubmissions = inquiries === null ? null : inquiries.filter(isVenueClientSubmission);
+  var clientSubmissions = inquiries === null ? null : inquiries.filter(function(q) { return isVenueClientSubmission(q) && !isTestVenueBooking(q); });
   var upcomingCombined = (tours || []).filter(function(t) { return t.status === 'booked' && t.date; }).map(function(t) {
     var d = new Date(t.date + 'T' + (t.start_time || '00:00:00'));
     return { key: 't-' + t.id, kind: 'Tour', title: tourTitleFor(t), date: d, raw: t };
@@ -19346,7 +19355,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
   const [tours, setTours] = useState(null);
   const [toursMonth, setToursMonth] = useState(null);
 
-  function load() { fetchVenueInquiries().then(function(r) { setRows(r.filter(function(sub) { return isVenueClientSubmission(sub) === !!clientsOnly; })); }); }
+  function load() { fetchVenueInquiries().then(function(r) { setRows(r.filter(function(sub) { return isVenueClientSubmission(sub) === !!clientsOnly && !(clientsOnly && isTestVenueBooking(sub)); })); }); }
   useEffect(function() { load(); }, []);
   useEffect(function() { fetchToursThisMonth().then(setToursMonth); }, []);
   useEffect(function() {
