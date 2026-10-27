@@ -3,7 +3,11 @@
 // wrong code can never reach payment or upload. Payments are captured and
 // verified server-side with PayPal before anything is recorded.
 //
-// Secrets: PAYPAL_CLIENT_ID, PAYPAL_SECRET, PAYPAL_ENV ("live" | "sandbox", default live)
+// PayPal: with PAYPAL_CLIENT_ID + PAYPAL_SECRET set here (PAYPAL_ENV "live" |
+// "sandbox", default live) it calls PayPal directly. Without them it goes
+// through the website's worker (/api/_internal/venue-paypal), which already
+// holds the PayPal credentials; the key for that is the service-role-only
+// private_config row 'venue_paypal_proxy_key'.
 
 const URL_ = Deno.env.get('SUPABASE_URL')!, KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const PP_ID = Deno.env.get('PAYPAL_CLIENT_ID') || '', PP_SECRET = Deno.env.get('PAYPAL_SECRET') || '';
@@ -89,6 +93,41 @@ function view(date: string, inq: any) {
   };
 }
 
+const SITE_PAYPAL = 'https://www.northstarhouse.org/api/_internal/venue-paypal';
+let proxy: { key: string; clientId: string } | null = null;
+async function ppProxy() {
+  if (proxy) return proxy;
+  const rows = await rest(`private_config?select=value&key=eq.venue_paypal_proxy_key`);
+  const key = rows?.[0]?.value;
+  if (!key) return null;
+  const r = await fetch(SITE_PAYPAL, { method: 'POST', headers: { 'x-venue-pay-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'config' }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.client_id) return null;
+  return (proxy = { key, clientId: d.client_id });
+}
+async function proxyCall(body: Record<string, unknown>) {
+  const p = await ppProxy();
+  if (!p) throw new Fail('Online payments are not available yet.', 503);
+  const r = await fetch(SITE_PAYPAL, { method: 'POST', headers: { 'x-venue-pay-key': p.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return { ok: r.ok, body: await r.json().catch(() => ({})) };
+}
+async function ppClientId() {
+  if (PP_ID && PP_SECRET) return PP_ID;
+  return (await ppProxy().catch(() => null))?.clientId || null;
+}
+async function ppCreate(inqId: string, date: string, cents: number) {
+  if (!(PP_ID && PP_SECRET)) return proxyCall({ op: 'create', inquiry_id: inqId, date, amount_cents: cents });
+  const tok = await ppToken();
+  const r = await fetch(PP_BASE + '/v2/checkout/orders', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ custom_id: 'inq:' + inqId, description: 'North Star House venue payment - ' + date, amount: { currency_code: 'USD', value: (cents / 100).toFixed(2) } }] }) });
+  return { ok: r.ok, body: await r.json().catch(() => ({})) };
+}
+async function ppCapture(orderId: string) {
+  if (!(PP_ID && PP_SECRET)) return proxyCall({ op: 'capture', order_id: orderId });
+  const tok = await ppToken();
+  const r = await fetch(PP_BASE + `/v2/checkout/orders/${orderId}/capture`, { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: '{}' });
+  return { ok: r.ok, body: await r.json().catch(() => ({})) };
+}
+
 async function ppToken() {
   if (!PP_ID || !PP_SECRET) throw new Fail('Online payments are not available yet.', 503);
   const r = await fetch(PP_BASE + '/v1/oauth2/token', { method: 'POST', headers: { Authorization: 'Basic ' + btoa(PP_ID + ':' + PP_SECRET), 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=client_credentials' });
@@ -162,23 +201,21 @@ Deno.serve(async req => {
     const { date, inq } = await resolve(body, ip);
     const code = String(body.code).trim();
 
-    if (action === 'lookup') return json({ ...view(date, inq), paypal_client_id: PP_ID || null });
+    if (action === 'lookup') return json({ ...view(date, inq), paypal_client_id: await ppClientId() });
 
     if (action === 'create_order') {
       const cents = Math.round(Number(body.amount_cents));
       if (!Number.isInteger(cents) || cents < 100 || cents > 2_000_000) throw new Fail('Enter an amount between $1.00 and $20,000.00.');
-      const tok = await ppToken();
-      const r = await fetch(PP_BASE + '/v2/checkout/orders', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ custom_id: 'inq:' + inq.id, description: 'North Star House venue payment - ' + date, amount: { currency_code: 'USD', value: (cents / 100).toFixed(2) } }] }) });
-      if (!r.ok) throw new Fail('Could not start the payment. Please try again.', 502);
-      return json({ id: (await r.json()).id });
+      const r = await ppCreate(inq.id, date, cents);
+      if (!r.ok || !r.body.id) throw new Fail('Could not start the payment. Please try again.', 502);
+      return json({ id: r.body.id });
     }
 
     if (action === 'capture_order') {
       const orderId = String(body.order_id || '');
       if (!/^[A-Z0-9]{10,30}$/.test(orderId)) throw new Fail('Invalid payment.');
-      const tok = await ppToken();
-      const r = await fetch(PP_BASE + `/v2/checkout/orders/${orderId}/capture`, { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: '{}' });
-      const order = await r.json().catch(() => ({}));
+      const r = await ppCapture(orderId);
+      const order = r.body;
       const cap = order?.purchase_units?.[0]?.payments?.captures?.[0];
       if (!r.ok && order?.details?.[0]?.issue !== 'ORDER_ALREADY_CAPTURED') throw new Fail('The payment was not completed. You have not been charged.', 402);
       if (!cap) throw new Fail('We could not confirm the payment. Please contact us before paying again.', 502);
