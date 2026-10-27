@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          summary: `Estate Tour with ${tour.visitor_name || "a Visitor"}`,
+          summary: `${(tour as { category?: string | null }).category === "Wedding second walk-through" ? "Wedding Walk Through" : "Estate Tour"} with ${tour.visitor_name || "a Visitor"}`,
           description: contactLines || undefined,
           start: { dateTime: startDateTime, timeZone: TIME_ZONE },
           end: { dateTime: endDateTime, timeZone: TIME_ZONE },
