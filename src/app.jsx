@@ -50,6 +50,7 @@ function AppGate({ children }) {
   var [hasToken, setHasToken] = useState(function() {
     try { return !!localStorage.getItem(APP_TOKEN_KEY); } catch (e) { return false; }
   });
+  var [email, setEmail] = useState('');
   var [pwd, setPwd] = useState('');
   var [busy, setBusy] = useState(false);
   var [err, setErr] = useState('');
@@ -82,17 +83,30 @@ function AppGate({ children }) {
 
   function attempt(e) {
     e.preventDefault();
-    if (!pwd || busy) return;
+    if (!email.trim() || !pwd || busy) return;
     setBusy(true); setErr('');
-    fetch(SUPABASE_URL + '/rest/v1/rpc/verify_app_password', {
+    // Same accounts as the Volunteer Hub. A good login is traded for a Portal session
+    // (only staff, board members and team leads get one).
+    fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
       method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ p_password: pwd, p_user_agent: (navigator.userAgent || '').slice(0, 200) })
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim(), password: pwd })
     }).then(function(r) {
-      return r.json().then(function(data) { return { ok: r.ok, data: data }; });
+      return r.json().then(function(data) { return { ok: r.ok, status: r.status, data: data }; });
     }).then(function(res) {
+      if (!res.ok) {
+        setErr(res.status === 400 || res.status === 401 ? 'Wrong email or password.' : 'Something went wrong. Try again.');
+        setBusy(false); setPwd(''); return null;
+      }
+      return fetch(SUPABASE_URL + '/rest/v1/rpc/issue_app_session', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + res.data.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_user_agent: (navigator.userAgent || '').slice(0, 200) })
+      }).then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); });
+    }).then(function(res) {
+      if (!res) return;
       if (!res.ok) { setErr('Something went wrong. Try again.'); setBusy(false); return; }
-      if (!res.data) { setErr('Wrong password.'); setBusy(false); setPwd(''); return; }
+      if (!res.data) { setErr('This account does not have Portal access. Ask Haley.'); setBusy(false); setPwd(''); return; }
       try { localStorage.setItem(APP_TOKEN_KEY, res.data); } catch (e) {}
       // Clear stale data cache from before the gate landed — pre-token requests
       // would have returned [] (RLS denial) and gotten cached as empty.
@@ -117,19 +131,25 @@ function AppGate({ children }) {
     },
       React.createElement('form', { onSubmit: attempt, style: { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 16, padding: '40px 36px', width: '100%', maxWidth: 360, boxShadow: '0 2px 16px rgba(0,0,0,0.06)', textAlign: 'center' } },
         React.createElement('div', { style: { fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 8 } }, 'North Star House'),
-        React.createElement('div', { style: { fontSize: 13, color: '#888', marginBottom: 28 } }, expired ? 'Session expired — please re-enter the password. Anything you had open is still here.' : 'Enter the password to view portal data.'),
+        React.createElement('div', { style: { fontSize: 13, color: '#888', marginBottom: 28 } }, expired ? 'Session expired — please sign in again. Anything you had open is still here.' : 'Sign in with your Volunteer Hub email and password.'),
         React.createElement('input', {
-          autoFocus: true, type: 'password', value: pwd, disabled: busy,
+          autoFocus: true, type: 'email', value: email, disabled: busy, autoComplete: 'username',
+          onChange: function(e) { setEmail(e.target.value); setErr(''); },
+          placeholder: 'Email',
+          style: { width: '100%', padding: '10px 14px', border: '0.5px solid ' + (err ? '#e05050' : '#e0d8cc'), borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: 10, outline: 'none', textAlign: 'center' }
+        }),
+        React.createElement('input', {
+          type: 'password', value: pwd, disabled: busy, autoComplete: 'current-password',
           onChange: function(e) { setPwd(e.target.value); setErr(''); },
           placeholder: 'Password',
           style: { width: '100%', padding: '10px 14px', border: '0.5px solid ' + (err ? '#e05050' : '#e0d8cc'), borderRadius: 8, fontSize: 14, boxSizing: 'border-box', marginBottom: err ? 6 : 16, outline: 'none', textAlign: 'center', letterSpacing: 2 }
         }),
         err && React.createElement('div', { style: { fontSize: 12, color: '#e05050', marginBottom: 12 } }, err),
         React.createElement('button', {
-          type: 'submit', disabled: busy || !pwd,
-          style: { width: '100%', padding: '11px', background: '#b5a185', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: busy || !pwd ? 'not-allowed' : 'pointer', opacity: busy || !pwd ? 0.6 : 1 }
+          type: 'submit', disabled: busy || !pwd || !email.trim(),
+          style: { width: '100%', padding: '11px', background: '#b5a185', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: busy || !pwd || !email.trim() ? 'not-allowed' : 'pointer', opacity: busy || !pwd || !email.trim() ? 0.6 : 1 }
         }, busy ? 'Checking…' : 'Sign in'),
-        React.createElement('div', { style: { fontSize: 11, color: '#bbb', marginTop: 24 } }, 'Need access? Ask Haley.')
+        React.createElement('div', { style: { fontSize: 11, color: '#bbb', marginTop: 24, lineHeight: 1.6 } }, 'First time or forgot your password? Use ', React.createElement('a', { href: 'https://volunteerhub.northstarhouse.org/', target: '_blank', rel: 'noopener noreferrer', style: { color: '#886c44' } }, 'the Volunteer Hub'), ' to set it up.', React.createElement('br'), 'Need access? Ask Haley.')
       )
     )
   );
@@ -6365,9 +6385,9 @@ function BoardView() {
       subtext: 'A new item is up for a board vote. Please review the materials and submit your vote inside the portal.',
       buttonText: 'Click Here to Review Materials & Cast Vote',
       buttonUrl: PORTAL_URL + '#board',
-      note: 'Password is NSH'
+      note: 'Sign in with your Volunteer Hub email and password'
     });
-    var text = item.title + '\n\nA new item is up for a board vote. Please review the materials and submit your vote inside the portal.\n\nClick Here to Review Materials & Cast Vote: ' + PORTAL_URL + '#board\n\nPassword is NSH';
+    var text = item.title + '\n\nA new item is up for a board vote. Please review the materials and submit your vote inside the portal.\n\nClick Here to Review Materials & Cast Vote: ' + PORTAL_URL + '#board\n\nSign in with your Volunteer Hub email and password';
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
