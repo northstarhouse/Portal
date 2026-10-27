@@ -18078,12 +18078,13 @@ var TOUR_CATEGORY_COLORS = {
   Tour: { bg: '#f0ece6', color: '#888', dark: '#d35400' },
 };
 function tourCategoryColor(label) {
-  return TOUR_CATEGORY_COLORS[label] || TOUR_CATEGORY_COLORS.Tour;
+  return TOUR_CATEGORY_COLORS[label] || (label === 'Second Walk-Through' ? TOUR_CATEGORY_COLORS.Wedding : null) || TOUR_CATEGORY_COLORS.Tour;
 }
 function tourCategoryLabel(e) {
   var raw = e.raw || {};
   // A manual override (set by staff, e.g. for tours booked directly through
   // the Portal with no public inquiry form behind them) always wins.
+  if (raw.category === 'Wedding second walk-through') return 'Second Walk-Through';
   if (raw.category) return raw.category;
   if (e.kind === 'Wedding') return 'Wedding';
   if (raw.inquiry_form_id === TOUR_WEDDING_FORM_ID) return 'Wedding';
