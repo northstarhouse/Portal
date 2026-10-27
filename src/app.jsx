@@ -1238,7 +1238,7 @@ const typeColors = {
           {calEvents === null && <div style={{ fontSize: 12, color: "#777" }}>Loading…</div>}
           {calEventsError && <div style={{ fontSize: 12, color: "#c62828", marginBottom: 8 }}>Could not load calendar: {calEventsError}</div>}
           {calEvents !== null && !calEventsError && calEvents.length === 0 && <div style={{ fontSize: 12, color: "#777" }}>No upcoming events in the next 2 weeks.</div>}
-          <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+          <div>
           {calEvents !== null && calEvents.map(function(ev, i) {
             var start = ev._occStart || parseIcalDate(ev['DTSTART']);
             var isAllDay = ev['DTSTART'] && ev['DTSTART'].replace(/[^0-9TZ]/g,'').length === 8;
