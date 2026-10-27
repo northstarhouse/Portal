@@ -15,6 +15,7 @@ class Fail extends Error { constructor(m: string, public status = 400, public ex
 const QUESTIONNAIRE_FORM_ID = 'e9be06b9-6788-41bc-a78a-28e02b8b749a';
 const EMAIL_FIELD = 'nzic6lad';
 const INQUIRY_SELECT = 'id,name,email,status,event_type,event_date,insurance_uploaded_at,questionnaire_form_response_id,brick_lines,venue_payment_schedule(id,sequence,label,amount_cents,amount_paid_cents,due_date,status)';
+const TOUR_ADDRESS = '12075 Auburn Rd. Grass Valley, CA 95949';
 
 async function rest(path: string, init: RequestInit = {}) {
   const r = await fetch(URL_ + '/rest/v1/' + path, { ...init, headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json', ...init.headers } });
@@ -238,6 +239,30 @@ Deno.serve(async req => {
         if (!mail.ok) console.error('client-pay message email failed', mail.status);
       } catch (e) { console.error('client-pay message email', e instanceof Error ? e.message : e); }
       return json({ sent: true });
+    }
+
+    // Second walk-through: the same open tour times the website offers.
+    if (action === 'tour_slots') {
+      const today = new Date().toISOString().slice(0, 10);
+      const slots = await rest(`estate_tours?select=id,date,start_time&status=eq.open&date=gte.${today}&order=date.asc,start_time.asc&limit=200`);
+      return json({ slots });
+    }
+    if (action === 'tour_book') {
+      const slotId = String(body.slot_id || '');
+      if (!/^[0-9a-f-]{8,40}$/i.test(slotId) && !/^\d+$/.test(slotId)) throw new Fail('Please pick a time.');
+      const phone = String(body.phone || '').trim().slice(0, 40);
+      messageBrake(ip);
+      const claim = await rest(`estate_tours?id=eq.${encodeURIComponent(slotId)}&status=eq.open`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'booked', visitor_name: inq.name, visitor_email: inq.email || null, visitor_phone: phone || null, category: 'Wedding second walk-through' }) });
+      const row = claim?.[0];
+      if (!row) throw new Fail('That time was just taken. Please pick another.', 409);
+      const d = new Date(`${row.date}T${row.start_time}`);
+      const when = `${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+      const guide = row.guide_name && String(row.guide_name).toLowerCase() !== 'default' ? row.guide_name : ([1, 2, 4].includes(new Date(`${row.date}T12:00:00`).getDay()) ? 'Jen' : '');
+      try {
+        await fetch(`${URL_}/functions/v1/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ to: 'venue@thenorthstarhouse.org', subject: `Second walk-through booked: ${inq.name} (${code})`, body: `${inq.name} booked a second walk-through from the client event page.\n\n${when}\nPhone: ${phone || 'not given'}\nEmail: ${inq.email || 'none on file'}`, sender: 'Event Page' }) });
+        if (inq.email) await fetch(`${URL_}/functions/v1/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ to: inq.email, subject: `Your North Star House walk-through is confirmed - ${when}`, body: `Hi,\n\nYour second walk-through is booked.\n\nDate & Time: ${when}\n${guide ? `Your guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\nNorth Star House`, sender: 'Estate Tours', fromEmail: 'venue@northstarhouse.org', replyTo: 'venue@thenorthstarhouse.org' }) });
+      } catch (e) { console.error('client-pay tour email', e instanceof Error ? e.message : e); }
+      return json({ booked: true, when });
     }
 
     // Wedding brick engraving: 3 lines, 20 characters max each (counting spaces and punctuation).
