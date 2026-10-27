@@ -21,6 +21,25 @@ const EMAIL_FIELD = 'nzic6lad';
 const INQUIRY_SELECT = 'id,name,email,status,event_type,event_date,insurance_uploaded_at,questionnaire_form_response_id,brick_lines,venue_payment_schedule(id,sequence,label,amount_cents,amount_paid_cents,due_date,status)';
 const TOUR_ADDRESS = '12075 Auburn Rd. Grass Valley, CA 95949';
 
+const PAGE_URL = 'https://venue.northstarhouse.org/';
+const TOUR_DIRECTIONS_TEXT = `When you arrive, please enter through the main gate on Auburn Road and disregard any event parking signs. You're welcome to park directly in front of the house.
+
+Apple Maps users: make sure your directions take you to Auburn Road, not Allison Ranch Road.
+
+Enter through the courtyard to arrive at the front door of the estate. Your coordinator will meet you in this general area.`;
+const esc = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] as string));
+
+// Branded confirmation email (same look as the website's tour confirmation) with a button to the client page.
+function walkthroughEmailHtml(when: string, guide: string) {
+  const gold = '#886c44';
+  return `<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:${gold};"></div><div style="padding:44px 40px 36px;text-align:center;">`
+    + `<div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:3px;color:${gold};font-weight:bold;margin-bottom:14px;">NORTH STAR HOUSE</div>`
+    + `<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">Your Walk-Through is Confirmed</h1><div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>`
+    + `<p style="margin:0 0 28px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.6;text-align:left;">Your second walk-through of North Star House is booked.<br><br>Date &amp; Time: <strong>${esc(when)}</strong><br>${guide ? `Your guide: <strong>${esc(guide)}</strong><br>` : ''}Address: <strong>${esc(TOUR_ADDRESS)}</strong><br><br>${esc(TOUR_DIRECTIONS_TEXT).replace(/\n\n/g, '<br><br>')}</p>`
+    + `<a href="${PAGE_URL}" style="display:inline-block;background:${gold};color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:15px;padding:16px 32px;">Go to Your Event Page</a>`
+    + `<p style="margin:22px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Questions? Just reply to this email.</i></p></div></div></div>`;
+}
+
 async function rest(path: string, init: RequestInit = {}) {
   const r = await fetch(URL_ + '/rest/v1/' + path, { ...init, headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json', ...init.headers } });
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message || 'Database request failed.');
@@ -318,7 +337,7 @@ Deno.serve(async req => {
       const guide = row.guide_name && String(row.guide_name).toLowerCase() !== 'default' ? row.guide_name : ([1, 2, 4].includes(new Date(`${row.date}T12:00:00`).getDay()) ? 'Jen' : '');
       try {
         await fetch(`${URL_}/functions/v1/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ to: 'venue@thenorthstarhouse.org', subject: `Second walk-through booked: ${inq.name} (${code})`, body: `${inq.name} booked a second walk-through from the client event page.\n\n${when}\nPhone: ${phone || 'not given'}\nEmail: ${inq.email || 'none on file'}`, sender: 'Event Page' }) });
-        if (inq.email) await fetch(`${URL_}/functions/v1/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ to: inq.email, subject: `Your North Star House walk-through is confirmed - ${when}`, body: `Hi,\n\nYour second walk-through is booked.\n\nDate & Time: ${when}\n${guide ? `Your guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\nNorth Star House`, sender: 'Estate Tours', fromEmail: 'venue@northstarhouse.org', replyTo: 'venue@thenorthstarhouse.org' }) });
+        if (inq.email) await fetch(`${URL_}/functions/v1/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ to: inq.email, subject: `Your North Star House walk-through is confirmed - ${when}`, body: `Hi,\n\nYour second walk-through is booked.\n\nDate & Time: ${when}\n${guide ? `Your guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nGo to your event page: ${PAGE_URL}\n\nNorth Star House`, html: walkthroughEmailHtml(when, guide), sender: 'Estate Tours', fromEmail: 'venue@northstarhouse.org', replyTo: 'venue@thenorthstarhouse.org' }) });
       } catch (e) { console.error('client-pay tour email', e instanceof Error ? e.message : e); }
       return json({ booked: true, when, walkthrough: { date: row.date, start_time: row.start_time } });
     }

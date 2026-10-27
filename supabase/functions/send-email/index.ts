@@ -18,6 +18,20 @@ const VENUE_REPLY_TO = 'venue@thenorthstarhouse.org'
 // Wedding/private-event emails are also copied (bcc) to the venue inbox.
 const VENUE_BCC = 'venue@thenorthstarhouse.org'
 
+// Plain-text emails addressed to the venue inbox (client messages, booking notices, codes) get
+// the same branded look as client emails. Callers that pass their own html are left alone.
+const LOGO_URL = 'https://northstarhouse.github.io/venue/assets/logo.png'
+const escHtml = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+function brandPlain(subject: string, text: string) {
+  const inner = text.split(/\n{2,}/).map((p) => '<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#444;">'
+    + escHtml(p).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#886c44;">$1</a>').replace(/\n/g, '<br>') + '</p>').join('')
+  return `<div style="background:#f7f3ec;padding:32px 16px;font-family:Helvetica,Arial,sans-serif;"><div style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e8e0d5;overflow:hidden;">
+<div style="background:#2a2a2e;padding:22px;text-align:center;"><img src="${LOGO_URL}" alt="North Star House" width="170" style="display:block;margin:0 auto;max-width:170px;height:auto;"></div>
+<div style="height:4px;background:#886c44;"></div>
+<div style="padding:30px 36px;"><h1 style="margin:0 0 20px;font-family:Georgia,serif;font-size:22px;font-weight:400;color:#2a2420;">${escHtml(subject)}</h1>${inner}</div>
+<div style="background:#f7f3ec;padding:16px 36px;border-top:1px solid #e8e0d5;text-align:center;font-size:11px;color:#999;">North Star House</div></div></div>`
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -46,6 +60,9 @@ Deno.serve(async (req) => {
       : []
     const bccList: string[] = Array.from(new Set([ADMIN_BCC, ...callerBcc, ...(wantedFrom ? [VENUE_BCC] : [])]))
 
+    const toVenue = [...recipients, ...ccList].some((e) => e.toLowerCase() === VENUE_BCC)
+    const finalHtml = html || (toVenue ? brandPlain(String(subject || ''), String(body || '')) : '')
+
     const fromName = sender ? `${sender} · North Star House` : 'North Star House'
 
     const send = (fromAddr: string, replyTo: string | null) => fetch('https://api.resend.com/emails', {
@@ -59,7 +76,7 @@ Deno.serve(async (req) => {
         to: recipients,
         subject,
         text: body || '',
-        ...(html ? { html } : {}),
+        ...(finalHtml ? { html: finalHtml } : {}),
         ...(replyTo ? { reply_to: replyTo } : {}),
         ...(ccList.length ? { cc: ccList } : {}),
         ...(bccList.length ? { bcc: bccList } : {}),
