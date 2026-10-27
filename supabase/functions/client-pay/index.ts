@@ -93,6 +93,13 @@ function view(date: string, inq: any) {
   };
 }
 
+// The couple's second walk-through, if they've booked one (estate_tours row
+// linked by venue_inquiry_id when booked from this page).
+async function walkthroughFor(inq: any) {
+  const rows = await rest(`estate_tours?select=date,start_time&venue_inquiry_id=eq.${inq.id}&status=eq.booked&order=date.desc,start_time.desc&limit=1`).catch(() => []);
+  return rows?.[0] || null;
+}
+
 const SITE_PAYPAL = 'https://www.northstarhouse.org/api/_internal/venue-paypal';
 let proxy: { key: string; clientId: string } | null = null;
 async function ppProxy() {
@@ -212,7 +219,10 @@ Deno.serve(async req => {
     const { date, inq } = await resolve(body, ip);
     const code = String(body.code).trim();
 
-    if (action === 'lookup') return json({ ...view(date, inq), paypal_client_id: await ppClientId() });
+    if (action === 'lookup') {
+      const [paypal_client_id, walkthrough] = await Promise.all([ppClientId(), walkthroughFor(inq)]);
+      return json({ ...view(date, inq), walkthrough, paypal_client_id });
+    }
 
     if (action === 'create_order') {
       const cents = Math.round(Number(body.amount_cents));
@@ -300,7 +310,7 @@ Deno.serve(async req => {
       if (!/^[0-9a-f-]{8,40}$/i.test(slotId) && !/^\d+$/.test(slotId)) throw new Fail('Please pick a time.');
       const phone = String(body.phone || '').trim().slice(0, 40);
       messageBrake(ip);
-      const claim = await rest(`estate_tours?id=eq.${encodeURIComponent(slotId)}&status=eq.open`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'booked', visitor_name: inq.name, visitor_email: inq.email || null, visitor_phone: phone || null, category: 'Wedding second walk-through' }) });
+      const claim = await rest(`estate_tours?id=eq.${encodeURIComponent(slotId)}&status=eq.open`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'booked', visitor_name: inq.name, visitor_email: inq.email || null, visitor_phone: phone || null, category: 'Wedding second walk-through', venue_inquiry_id: inq.id }) });
       const row = claim?.[0];
       if (!row) throw new Fail('That time was just taken. Please pick another.', 409);
       const d = new Date(`${row.date}T${row.start_time}`);
@@ -310,7 +320,7 @@ Deno.serve(async req => {
         await fetch(`${URL_}/functions/v1/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ to: 'venue@thenorthstarhouse.org', subject: `Second walk-through booked: ${inq.name} (${code})`, body: `${inq.name} booked a second walk-through from the client event page.\n\n${when}\nPhone: ${phone || 'not given'}\nEmail: ${inq.email || 'none on file'}`, sender: 'Event Page' }) });
         if (inq.email) await fetch(`${URL_}/functions/v1/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ to: inq.email, subject: `Your North Star House walk-through is confirmed - ${when}`, body: `Hi,\n\nYour second walk-through is booked.\n\nDate & Time: ${when}\n${guide ? `Your guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\nNorth Star House`, sender: 'Estate Tours', fromEmail: 'venue@northstarhouse.org', replyTo: 'venue@thenorthstarhouse.org' }) });
       } catch (e) { console.error('client-pay tour email', e instanceof Error ? e.message : e); }
-      return json({ booked: true, when });
+      return json({ booked: true, when, walkthrough: { date: row.date, start_time: row.start_time } });
     }
 
     // Wedding brick engraving: 3 lines, 20 characters max each (counting spaces and punctuation).
