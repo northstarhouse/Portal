@@ -115,10 +115,21 @@ async function ppClientId() {
   if (PP_ID && PP_SECRET) return PP_ID;
   return (await ppProxy().catch(() => null))?.clientId || null;
 }
-async function ppCreate(inqId: string, date: string, cents: number) {
-  if (!(PP_ID && PP_SECRET)) return proxyCall({ op: 'create', inquiry_id: inqId, date, amount_cents: cents });
+// What PayPal shows for the payment (transaction details, both sides):
+// "Emily DeWolfe & Sebastian Leon Wedding - Oct 23, 2027 (OCT-23-2027) - North Star House venue payment".
+// The trailing staff tag on booking names, like "(S)", is left off.
+function ppLabel(inq: any, date: string) {
+  const [y, m, d] = date.split('-').map(Number);
+  const when = MONTHS[m - 1].charAt(0) + MONTHS[m - 1].slice(1).toLowerCase() + ' ' + d + ', ' + y;
+  const code = MONTHS[m - 1] + '-' + String(d).padStart(2, '0') + '-' + y;
+  const name = String(inq.name || '').replace(/\s*\([A-Za-z]{1,3}\)\s*$/, '').trim().slice(0, 70);
+  return [name || 'Venue booking', when + ' (' + code + ')', 'North Star House venue payment'].join(' - ').slice(0, 127);
+}
+
+async function ppCreate(inqId: string, date: string, cents: number, label: string) {
+  if (!(PP_ID && PP_SECRET)) return proxyCall({ op: 'create', inquiry_id: inqId, date, amount_cents: cents, label });
   const tok = await ppToken();
-  const r = await fetch(PP_BASE + '/v2/checkout/orders', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ custom_id: 'inq:' + inqId, description: 'North Star House venue payment - ' + date, amount: { currency_code: 'USD', value: (cents / 100).toFixed(2) } }] }) });
+  const r = await fetch(PP_BASE + '/v2/checkout/orders', { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ custom_id: 'inq:' + inqId, description: label, amount: { currency_code: 'USD', value: (cents / 100).toFixed(2) } }] }) });
   return { ok: r.ok, body: await r.json().catch(() => ({})) };
 }
 async function ppCapture(orderId: string) {
@@ -206,7 +217,7 @@ Deno.serve(async req => {
     if (action === 'create_order') {
       const cents = Math.round(Number(body.amount_cents));
       if (!Number.isInteger(cents) || cents < 100 || cents > 2_000_000) throw new Fail('Enter an amount between $1.00 and $20,000.00.');
-      const r = await ppCreate(inq.id, date, cents);
+      const r = await ppCreate(inq.id, date, cents, ppLabel(inq, date));
       if (!r.ok || !r.body.id) throw new Fail('Could not start the payment. Please try again.', 502);
       return json({ id: r.body.id });
     }
