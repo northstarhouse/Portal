@@ -26,7 +26,7 @@ function brandPlain(subject: string, text: string) {
   const inner = text.split(/\n{2,}/).map((p) => '<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#444;">'
     + escHtml(p).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#886c44;">$1</a>').replace(/\n/g, '<br>') + '</p>').join('')
   return `<div style="background:#f7f3ec;padding:32px 16px;font-family:Helvetica,Arial,sans-serif;"><div style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e8e0d5;overflow:hidden;">
-<div style="background:#2a2a2e;padding:22px;text-align:center;"><img src="${LOGO_URL}" alt="North Star House" width="170" style="display:block;margin:0 auto;max-width:170px;height:auto;"></div>
+<div style="background:#6b5232;padding:22px;text-align:center;"><img src="${LOGO_URL}" alt="North Star House" width="170" style="display:block;margin:0 auto;max-width:170px;height:auto;"></div>
 <div style="height:4px;background:#886c44;"></div>
 <div style="padding:30px 36px;"><h1 style="margin:0 0 20px;font-family:Georgia,serif;font-size:22px;font-weight:400;color:#2a2420;">${escHtml(subject)}</h1>${inner}</div>
 <div style="background:#f7f3ec;padding:16px 36px;border-top:1px solid #e8e0d5;text-align:center;font-size:11px;color:#999;">North Star House</div></div></div>`
