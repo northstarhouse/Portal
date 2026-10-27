@@ -16313,6 +16313,9 @@ function VolEmailListsView({ navigate }) {
   var [expandedTeams, setExpandedTeams] = useS({});
   var [copied, setCopied] = useS(null);
   var [modal, setModal] = useS(null);
+  // "Review & Send": a confirmation screen showing exactly what will go out before anything is sent.
+  var [review, setReview] = useS(null); // null | 'compose' | 'template'
+  var [reviewHtml, setReviewHtml] = useS('');
   var [subject, setSubject] = useS('');
   var [body, setBody] = useS('');
   var [sent, setSent] = useS(false);
@@ -16719,6 +16722,19 @@ function VolEmailListsView({ navigate }) {
     );
   }
 
+  useE(function() { if (sent || tplSent) setReview(null); }, [sent, tplSent]);
+
+  function openReviewCompose() {
+    if (!modal || !subject.trim()) return;
+    setSendError(null);
+    setReviewHtml(editorRef.current ? editorRef.current.innerHTML : body);
+    setReview('compose');
+  }
+  function openReviewTemplate() {
+    setTplSendError(null);
+    setReview('template');
+  }
+
   function handleSend() {
     if (!modal) return;
     var htmlBody = editorRef.current ? editorRef.current.innerHTML : body;
@@ -17013,6 +17029,50 @@ function VolEmailListsView({ navigate }) {
 
   return (
     <div>
+      {review && (function() {
+        var isTpl = review === 'template';
+        var people = isTpl
+          ? (volunteers || []).filter(function(v) { return tplSelected[String(v.id)] && v['Email'] && v['Email'].trim(); })
+          : (modal ? modal.members.filter(function(v) { return v['Email'] && v['Email'].trim(); }) : []);
+        var subj = isTpl ? tplSubject : subject;
+        var html = isTpl
+          ? buildBoardNotificationEmailHtml({ headline: tplHeadline, subtext: tplSubtext, buttonText: tplButtonText, buttonUrl: tplButtonUrl, note: tplNote, footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS })
+          : '<div style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.6;color:#2a2a2a;padding:18px 20px">' + reviewHtml + '</div>';
+        var busyNow = isTpl ? tplSending : sending;
+        var errNow = isTpl ? tplSendError : sendError;
+        var scheduledNow = !isTpl && scheduled && scheduleAt;
+        var lbl = { fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 };
+        return (
+          <div role="dialog" aria-label="Review email before sending" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 680, maxHeight: '92vh', overflowY: 'auto', padding: 22, boxShadow: '0 12px 40px rgba(0,0,0,0.25)' }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 2 }}>Review before sending</div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>This is exactly what your volunteers will receive. Nothing has been sent yet.</div>
+              <div style={lbl}>To ({people.length} volunteer{people.length === 1 ? '' : 's'})</div>
+              <div style={{ background: '#faf8f4', borderRadius: 8, padding: '8px 10px', maxHeight: 100, overflowY: 'auto', fontSize: 12, color: '#444', lineHeight: 1.6, marginBottom: 12 }}>
+                {people.map(function(v) { return (v['First Name'] || '') + ' ' + (v['Last Name'] || '') + ' <' + v['Email'].trim() + '>'; }).join(', ') || 'No recipients with an email address'}
+              </div>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 12 }}>
+                <div><div style={lbl}>Subject</div><div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{subj}</div></div>
+                <div><div style={lbl}>From</div><div style={{ fontSize: 13, color: '#2a2a2a' }}>North Star House &lt;info@northstarhouse.org&gt;</div></div>
+                {scheduledNow && <div><div style={lbl}>Sends</div><div style={{ fontSize: 13, color: '#2a2a2a' }}>{new Date(scheduleAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div></div>}
+              </div>
+              <div style={lbl}>Preview</div>
+              <div style={{ border: '0.5px solid #e0d8cc', borderRadius: 8, overflow: 'hidden', marginBottom: 14, maxHeight: '42vh', overflowY: 'auto' }} dangerouslySetInnerHTML={{ __html: html }} />
+              {errNow && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px', marginBottom: 12 }}>{errNow}</div>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={isTpl ? handleTemplateSend : handleSend} disabled={busyNow || people.length === 0}
+                  style={{ flex: 1, padding: '10px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (busyNow || people.length === 0) ? 'not-allowed' : 'pointer', opacity: (busyNow || people.length === 0) ? 0.6 : 1 }}>
+                  {busyNow ? (scheduledNow ? 'Scheduling…' : 'Sending…') : (scheduledNow ? 'Schedule for ' + people.length + ' volunteer' + (people.length === 1 ? '' : 's') : 'Send to ' + people.length + ' volunteer' + (people.length === 1 ? '' : 's'))}
+                </button>
+                <button onClick={function() { setReview(null); }} disabled={busyNow}
+                  style={{ padding: '10px 18px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: busyNow ? 'not-allowed' : 'pointer' }}>
+                  Back to edit
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap', rowGap: 10 }}>
         <div>
@@ -17266,8 +17326,8 @@ function VolEmailListsView({ navigate }) {
                 </div>
                 {sendError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{sendError}</div>}
                 <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
-                  <button onClick={handleSend} disabled={!subject.trim() || sending || (scheduled && !scheduleAt)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!subject.trim() || sending || (scheduled && !scheduleAt)) ? 0.5 : 1 }}>
-                    {sending ? 'Saving…' : scheduled ? '🕐 Schedule Email' : '✉ Send Email'}
+                  <button onClick={openReviewCompose} disabled={!subject.trim() || sending || (scheduled && !scheduleAt)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!subject.trim() || sending || (scheduled && !scheduleAt)) ? 0.5 : 1 }}>
+                    {sending ? 'Saving…' : scheduled ? '🕐 Review & Schedule' : '✉ Review & Send'}
                   </button>
                   <button onClick={function() { setModal(null); }} disabled={sending} style={{ padding: '9px 16px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
                 </div>
@@ -17392,11 +17452,11 @@ function VolEmailListsView({ navigate }) {
                 {tplSendError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{tplSendError}</div>}
                 <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
                   <button
-                    onClick={handleTemplateSend}
+                    onClick={openReviewTemplate}
                     disabled={tplSending || !Object.keys(tplSelected).some(function(id) { return tplSelected[id]; }) || !tplSubject.trim() || !tplHeadline.trim() || !tplButtonText.trim() || !tplButtonUrl.trim()}
                     style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (tplSending || !Object.keys(tplSelected).some(function(id) { return tplSelected[id]; }) || !tplSubject.trim() || !tplHeadline.trim() || !tplButtonText.trim() || !tplButtonUrl.trim()) ? 0.5 : 1 }}
                   >
-                    {tplSending ? 'Sending…' : '✉ Send Email'}
+                    {tplSending ? 'Sending…' : '✉ Review & Send'}
                   </button>
                   <button onClick={function() { setShowTemplateModal(false); }} disabled={tplSending} style={{ padding: '9px 16px', background: '#f0ece6', border: 'none', borderRadius: 8, fontSize: 13, color: '#666', cursor: 'pointer' }}>Cancel</button>
                 </div>
