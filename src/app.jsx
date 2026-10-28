@@ -10175,10 +10175,16 @@ function SponsorsView() {
       }
       return fetch(SUPABASE_URL + '/rest/v1/site_content?page_key=eq.sponsors', {
         method: 'PATCH',
-        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
         body: JSON.stringify({ content: Object.assign({}, content, { sponsors: list }) })
-      });
-    }).catch(function() {});
+      }).then(function(r) { return r.json().catch(function() { return null; }).then(function(out) { return { ok: r.ok, rows: out }; }); })
+        .then(function(res) {
+          // The database ignores an edit it isn't allowed to make without saying so, so check a row actually changed.
+          if (!res.ok || !Array.isArray(res.rows) || !res.rows.length) {
+            alert('Saved here, but the website could not be updated, so ' + name + ' will not show on the website Sponsors page yet. Tell Claude and it will be fixed.');
+          }
+        });
+    }).catch(function() { alert('Saved here, but the website could not be updated. Tell Claude and it will be fixed.'); });
   }
 
   function handleLogoUpload(e) {
