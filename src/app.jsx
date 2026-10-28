@@ -5585,6 +5585,10 @@ function DonorsView({ navigate }) {
               <span style={{fontSize:11,borderRadius:20,padding:'2px 8px',fontWeight:500,...(NSH_STATUS_PILLS[selected.status]||{background:'#f3f4f6',color:'#6b7280'})}}>
                 {NSH_STATUS_LABELS[selected.status]||selected.status}
               </span>
+              <button type="button" onClick={toggleDeceased} title={selected.deceased?'Click to mark as living again':'Mark this donor as deceased (left out of mailings)'}
+                style={{fontSize:11,borderRadius:20,padding:'2px 10px',fontWeight:600,cursor:'pointer',border:selected.deceased?'1px solid #6b7280':'1px solid #d1d5db',background:selected.deceased?'#e5e7eb':'#fff',color:selected.deceased?'#374151':'#6b7280'}}>
+                {selected.deceased?'✓ Deceased (undo)':'Mark deceased'}
+              </button>
               {(selected.tags||[]).map(function(tag){return <span key={tag.id} style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,background:tag.color+'22',color:tag.color}}>{tag.name}</span>;})}
             </div>
             {/* Giving summary */}
@@ -5614,9 +5618,6 @@ function DonorsView({ navigate }) {
             </div>
 
             {/* Letter greeting + structured mailing address, used for acknowledgment generation */}
-            <div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}>
-              <button type="button" onClick={toggleDeceased} style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:selected.deceased?'#2e6b4f':'#a04545',textDecoration:'underline',padding:0}}>{selected.deceased?'Marked deceased — click to undo':'Mark as deceased'}</button>
-            </div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={sec}>Letter & Mailing</span>
               {!donorFieldsForm && <button onClick={function(){setDonorFieldsForm({preferred_letter_greeting:selected.preferred_letter_greeting||'',joint_donor_name:selected.joint_donor_name||'',mailing_address_line1:selected.mailing_address_line1||'',mailing_address_line2:selected.mailing_address_line2||'',mailing_city:selected.mailing_city||'',mailing_state:selected.mailing_state||'',mailing_zip:selected.mailing_zip||''});}} style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'2px 10px',cursor:'pointer'}}>Edit</button>}
