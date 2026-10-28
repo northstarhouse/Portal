@@ -10574,26 +10574,27 @@ function SponsorsView() {
                         </div>
                       );
                     }
+                    var when = e.date ? new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
                     return (
-                      <div key={e.id} style={{ padding: '8px 0', borderBottom: '0.5px solid #f5f0ea', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>${(parseFloat(e.value)||0).toLocaleString()}</span>
-                            <span style={{ fontSize: 11, color: '#aaa' }}>{e.date}</span>
-                            {e.contribution_type && <span style={{ fontSize: 10, fontWeight: 600, color: '#886c44', background: '#f5f0ea', padding: '2px 7px', borderRadius: 10 }}>{e.contribution_type}</span>}
-                          </div>
-                          <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{e.description}</div>
+                      <div key={e.id} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', padding: '13px 0', borderBottom: '0.5px solid #ece5da' }}>
+                        <div style={{ minWidth: 78, flexShrink: 0 }}>
+                          <div style={{ fontFamily: "'Cardo', Georgia, serif", fontSize: 19, fontWeight: 700, color: '#2a2a2a', lineHeight: 1.1 }}>${(parseFloat(e.value)||0).toLocaleString()}</div>
+                          <div style={{ fontSize: 11, color: '#999', marginTop: 4, letterSpacing: 0.2 }}>{when}</div>
                         </div>
-                        <button onClick={function() { printThankYouNote(selected, e); }} title="Print a thank-you letter for this contribution"
-                          style={{ background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: gold, cursor: 'pointer', flexShrink: 0 }}>Thank-You Note</button>
-                        <button onClick={function() { setPdfGeneratingId(e.id); downloadThankYouPdf(selected, e, function() { setPdfGeneratingId(null); }); }}
-                          disabled={pdfGeneratingId === e.id} title="Download a PDF of the thank-you letter to attach to an email"
-                          style={{ background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: gold, cursor: 'pointer', flexShrink: 0, opacity: pdfGeneratingId === e.id ? 0.6 : 1 }}>{pdfGeneratingId === e.id ? 'Preparing…' : 'Download PDF'}</button>
-                        <button onClick={function() { printEnvelope(selected); }} title="Print a #10 envelope addressed to this sponsor"
-                          style={{ background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: gold, cursor: 'pointer', flexShrink: 0 }}>Envelope</button>
-                        <button onClick={function() { setEditingInKindId(e.id); setEditInKindForm({ description: e.description || '', date: e.date || '', value: e.value != null ? String(e.value) : '', contribution_type: e.contribution_type || '' }); }}
-                          style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, color: '#886c44', cursor: 'pointer', flexShrink: 0 }}>Edit</button>
-                        <button onClick={function() { deleteInKind(e.id); }} style={{ background: 'none', border: 'none', color: '#ddd', fontSize: 14, cursor: 'pointer', flexShrink: 0, padding: '2px 4px' }}>×</button>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {e.contribution_type && <div style={{ display: 'inline-block', fontSize: 9.5, fontWeight: 700, color: '#886c44', letterSpacing: 0.9, textTransform: 'uppercase', border: '0.5px solid #d8c9aa', background: '#faf6ee', padding: '2px 8px', borderRadius: 3, marginBottom: 5 }}>{e.contribution_type}</div>}
+                          <div style={{ fontSize: 12.5, color: '#444', lineHeight: 1.5 }}>{e.description}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        <button type="button" onClick={function() { printThankYouNote(selected, e); }} title="Print a thank-you letter" aria-label="Print a thank-you letter"
+                          style={{ width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #c9b896', borderRadius: 6, color: gold, cursor: 'pointer', padding: 0, flexShrink: 0 }}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>
+                        <button type="button" onClick={function() { printEnvelope(selected); }} title="Print an envelope" aria-label="Print an envelope"
+                          style={{ width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #c9b896', borderRadius: 6, color: gold, cursor: 'pointer', padding: 0, flexShrink: 0 }}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg></button>
+                        <button type="button" onClick={function() { setEditingInKindId(e.id); setEditInKindForm({ description: e.description || '', date: e.date || '', value: e.value != null ? String(e.value) : '', contribution_type: e.contribution_type || '' }); }} title="Edit" aria-label="Edit"
+                          style={{ width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #c9b896', borderRadius: 6, color: gold, cursor: 'pointer', padding: 0, flexShrink: 0 }}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+                        <button type="button" onClick={function() { deleteInKind(e.id); }} title="Delete" aria-label="Delete"
+                          style={{ width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #e6dcd0', borderRadius: 6, color: '#b9b2a6', cursor: 'pointer', padding: 0, flexShrink: 0 }}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
+                        </div>
                       </div>
                     );
                   })
