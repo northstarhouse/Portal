@@ -9792,6 +9792,9 @@ function SponsorsView() {
   var [inkind, setInkind] = useState([]);
   var [inkindForm, setInkindForm] = useState({ description: '', date: new Date().toISOString().slice(0,10), value: '', contribution_type: '' });
   var [inkindSaving, setInkindSaving] = useState(false);
+  var [showInkindForm, setShowInkindForm] = useState(false); // the "add a contribution" form slides open
+  var [showBenefits, setShowBenefits] = useState(false); // the level's benefits checklist drops open
+  var [showAckForm, setShowAckForm] = useState(false); // the "log an acknowledgment" form slides open
   var [editingInKindId, setEditingInKindId] = useState(null);
   var [editInKindForm, setEditInKindForm] = useState({});
   var [inkindSavingId, setInkindSavingId] = useState(null);
@@ -9912,6 +9915,7 @@ function SponsorsView() {
       setAllInKind(function(prev) { return prev.concat([rows[0]]); });
       clearCache('Sponsor In-Kind');
       setInkindForm({ description: '', date: new Date().toISOString().slice(0,10), value: '', contribution_type: '' });
+      setShowInkindForm(false);
     }).catch(function(err) { alert('Error saving in-kind: ' + err.message); setInkindSaving(false); });
   }
 
@@ -10241,6 +10245,7 @@ function SponsorsView() {
       setAckSaving(false);
       if (Array.isArray(rows) && rows[0]) setAcks(function(prev) { return [rows[0]].concat(prev); });
       setAckForm({ date: new Date().toISOString().slice(0,10), method: '', notes: '' });
+      setShowAckForm(false);
     }).catch(function() { setAckSaving(false); });
   }
 
@@ -10305,6 +10310,20 @@ function SponsorsView() {
   }
 
   var inpStyle = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, background: '#fff', boxSizing: 'border-box' };
+
+  // A bar that slides its content open and closed.
+  function slideToggle(label, open, setOpen, content) {
+    return (
+      <div style={{ marginTop: 10 }}>
+        <button type="button" onClick={function() { setOpen(!open); }} aria-expanded={open}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#faf8f5', border: '0.5px dashed #d8cdb9', borderRadius: 8, padding: '9px 14px', fontSize: 12, fontWeight: 600, color: gold, cursor: 'pointer' }}>
+          <span>{label}</span>
+          <span style={{ display: 'inline-block', transition: 'transform 0.25s', transform: open ? 'rotate(45deg)' : 'none', fontSize: 17, lineHeight: 1 }}>+</span>
+        </button>
+        <div style={{ maxHeight: open ? 700 : 0, opacity: open ? 1 : 0, overflow: 'hidden', transition: 'max-height 0.35s ease, opacity 0.25s ease', marginTop: open ? 10 : 0 }}>{content}</div>
+      </div>
+    );
+  }
 
   function resolvedTab(s) {
     // gave this year (any contribution dated this year) = Current
@@ -10501,10 +10520,15 @@ function SponsorsView() {
                       var doneCount = tier.benefits.filter(function(b) { return checklist[b]; }).length;
                       return (
                         <div style={{ background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 8, padding: '10px 14px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <button type="button" onClick={function() { setShowBenefits(!showBenefits); }} aria-expanded={showBenefits}
+                            style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: tier.color }}>{tier.name} Benefits · {tier.range}</div>
-                            <div style={{ fontSize: 10, fontWeight: 600, color: tier.color, opacity: 0.75 }}>{doneCount}/{tier.benefits.length} done</div>
-                          </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 10, fontWeight: 600, color: tier.color, opacity: 0.75 }}>{doneCount}/{tier.benefits.length} done</span>
+                              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={tier.color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform 0.25s', transform: showBenefits ? 'rotate(180deg)' : 'none' }}><polyline points="6 9 12 15 18 9" /></svg>
+                            </div>
+                          </button>
+                          <div style={{ maxHeight: showBenefits ? 600 : 0, opacity: showBenefits ? 1 : 0, overflow: 'hidden', transition: 'max-height 0.35s ease, opacity 0.25s ease', marginTop: showBenefits ? 8 : 0 }}>
                           {tier.benefits.map(function(b, i) {
                             var checked = !!checklist[b];
                             return (
@@ -10515,38 +10539,13 @@ function SponsorsView() {
                               </label>
                             );
                           })}
+                          </div>
                         </div>
                       );
                     })()}
                   </div>
                 );
               })()}
-              <form onSubmit={submitInKind} style={{ background: '#faf8f5', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Type of Donation or In-Kind Work *</div>
-                  <textarea value={inkindForm.description} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{description:e.target.value});});}} rows={2} style={Object.assign({}, inpStyle, { resize: 'vertical' })} placeholder="e.g. Monetary donation, catering, printing services…" required />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Date *</div>
-                    <input type="date" value={inkindForm.date} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={inpStyle} required />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Ballpark Value ($) *</div>
-                    <input type="number" min="0" step="1" value={inkindForm.value} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{value:e.target.value});});}} style={inpStyle} placeholder="e.g. 1500" required />
-                  </div>
-                </div>
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Type</div>
-                  <select value={inkindForm.contribution_type} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{contribution_type:e.target.value});});}} style={inpStyle}>
-                    <option value="">Untagged</option>
-                    <option value="Monetary Value">Monetary Value</option>
-                    <option value="In-Kind (Work)">In-Kind (Work)</option>
-                    <option value="Discount">Discount</option>
-                  </select>
-                </div>
-                <button type="submit" disabled={inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: (inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value) ? 0.6 : 1, width: '100%' }}>{inkindSaving ? 'Saving…' : 'Add In-Kind Entry'}</button>
-              </form>
               {inkind.length === 0
                 ? <div style={{ fontSize: 12, color: '#ccc', fontStyle: 'italic' }}>No in-kind entries yet.</div>
                 : inkind.map(function(e) {
@@ -10600,28 +10599,39 @@ function SponsorsView() {
                     );
                   })
               }
+              {slideToggle('+ Add a contribution', showInkindForm, setShowInkindForm, (
+<form onSubmit={submitInKind} style={{ background: '#faf8f5', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Type of Donation or In-Kind Work *</div>
+                  <textarea value={inkindForm.description} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{description:e.target.value});});}} rows={2} style={Object.assign({}, inpStyle, { resize: 'vertical' })} placeholder="e.g. Monetary donation, catering, printing services…" required />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Date *</div>
+                    <input type="date" value={inkindForm.date} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{date:e.target.value});});}} style={inpStyle} required />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Ballpark Value ($) *</div>
+                    <input type="number" min="0" step="1" value={inkindForm.value} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{value:e.target.value});});}} style={inpStyle} placeholder="e.g. 1500" required />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Type</div>
+                  <select value={inkindForm.contribution_type} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{contribution_type:e.target.value});});}} style={inpStyle}>
+                    <option value="">Untagged</option>
+                    <option value="Monetary Value">Monetary Value</option>
+                    <option value="In-Kind (Work)">In-Kind (Work)</option>
+                    <option value="Discount">Discount</option>
+                  </select>
+                </div>
+                <button type="submit" disabled={inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: (inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value) ? 0.6 : 1, width: '100%' }}>{inkindSaving ? 'Saving…' : 'Add In-Kind Entry'}</button>
+              </form>
+              ))}
             </div>
 
             {/* Acknowledgments */}
             <div style={{ borderTop: '0.5px solid #f0ece6', paddingTop: 16, marginTop: 8 }}>
               <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, marginBottom: 12 }}>Acknowledgment Log</div>
-              <form onSubmit={submitAck} style={{ background: '#faf8f5', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Date</div>
-                    <input type="date" value={ackForm.date} onChange={function(e) { setAckForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={inpStyle} required />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Method</div>
-                    <input value={ackForm.method} onChange={function(e) { setAckForm(function(f) { return Object.assign({}, f, { method: e.target.value }); }); }} style={inpStyle} placeholder="Letter, email, call…" />
-                  </div>
-                </div>
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Notes</div>
-                  <textarea value={ackForm.notes} onChange={function(e) { setAckForm(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={2} style={Object.assign({}, inpStyle, { resize: 'vertical' })} placeholder="Details…" />
-                </div>
-                <button type="submit" disabled={ackSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: ackSaving ? 0.7 : 1, width: '100%' }}>{ackSaving ? 'Saving…' : 'Log Acknowledgment'}</button>
-              </form>
               {acks.length === 0
                 ? <div style={{ fontSize: 12, color: '#ccc', fontStyle: 'italic' }}>No acknowledgments logged yet.</div>
                 : acks.map(function(a) {
@@ -10639,6 +10649,25 @@ function SponsorsView() {
                     );
                   })
               }
+              {slideToggle('+ Log an acknowledgment', showAckForm, setShowAckForm, (
+<form onSubmit={submitAck} style={{ background: '#faf8f5', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Date</div>
+                    <input type="date" value={ackForm.date} onChange={function(e) { setAckForm(function(f) { return Object.assign({}, f, { date: e.target.value }); }); }} style={inpStyle} required />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Method</div>
+                    <input value={ackForm.method} onChange={function(e) { setAckForm(function(f) { return Object.assign({}, f, { method: e.target.value }); }); }} style={inpStyle} placeholder="Letter, email, call…" />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Notes</div>
+                  <textarea value={ackForm.notes} onChange={function(e) { setAckForm(function(f) { return Object.assign({}, f, { notes: e.target.value }); }); }} rows={2} style={Object.assign({}, inpStyle, { resize: 'vertical' })} placeholder="Details…" />
+                </div>
+                <button type="submit" disabled={ackSaving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: ackSaving ? 0.7 : 1, width: '100%' }}>{ackSaving ? 'Saving…' : 'Log Acknowledgment'}</button>
+              </form>
+              ))}
             </div>
           </div>
         )}
