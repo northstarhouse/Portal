@@ -4791,6 +4791,58 @@ function DonorsView({ navigate }) {
     var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='donors.csv';a.click();URL.revokeObjectURL(url);
   }
 
+  // One CSV for the year's mail merge: Members (donors who gave $50+ this year, not counting brick purchases or
+  // in-kind gifts, since those come with something in return) plus current Sponsors.
+  function exportMembersAndSponsors() {
+    var YEAR = String(THIS_YEAR);
+    var cell = function(v) { v = v == null ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var splitAddr = function(a) {
+      a = String(a || '').replace(/\s*\n\s*/g, ', ').trim();
+      var m = a.match(/^(.*?),\s*([^,]+?),?\s+([A-Za-z]{2})\.?\s+(\d{5})(?:-\d{4})?$/);
+      return m ? { l1: m[1], city: m[2], state: m[3].toUpperCase(), zip: m[4] } : { l1: a, city: '', state: '', zip: '' };
+    };
+    var members = [];
+    donors.forEach(function(d) {
+      if (d.deceased) return;
+      var yearGifts = (d.donations || []).filter(function(x) { return x.date && String(x.date).slice(0, 4) === YEAR && x.type !== 'Brick Purchase' && x.type !== 'In-Kind Gift'; });
+      var total = yearGifts.reduce(function(t, x) { return t + (Number(x.amount) || 0); }, 0);
+      if (total < 50) return;
+      var latest = yearGifts.slice().sort(function(a, b) { return a.date < b.date ? 1 : -1; })[0] || {};
+      var memGift = yearGifts.filter(function(x) { return x.membership_level; }).sort(function(a, b) { return a.date < b.date ? 1 : -1; })[0];
+      var a1 = d.mailing_address_line1 || '', city = d.mailing_city || '', st = d.mailing_state || '', zip = d.mailing_zip || '', a2 = d.mailing_address_line2 || '';
+      if (!a1 && d.address) { var p = splitAddr(d.address); a1 = p.l1; city = p.city; st = p.state; zip = p.zip; }
+      members.push({
+        type: 'Member', name: d.formal_name || '', greeting: d.preferred_letter_greeting || d.informal_first_name || d.formal_name || '',
+        joint: d.joint_donor_name || '', contact: '', a1: a1, a2: a2, city: city, state: st, zip: zip, email: d.email || '', phone: d.phone || '',
+        level: memGift ? memGift.membership_level : '', amount: total.toFixed(2), last: latest.date || ''
+      });
+    });
+    fetch(SUPABASE_URL + '/rest/v1/Sponsors?select=*&sponsor_status=eq.current', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(rows) {
+        var sponsors = (Array.isArray(rows) ? rows : []).map(function(r) {
+          var p = splitAddr(r['Mailing Address']);
+          var first = String(r['Main Contact'] || '').trim().split(/\s+/)[0];
+          return {
+            type: 'Sponsor', name: r['Business Name'] || '', greeting: first || r['Business Name'] || '', joint: '', contact: r['Main Contact'] || '',
+            a1: p.l1, a2: '', city: p.city, state: p.state, zip: p.zip, email: r['Email Address'] || '', phone: r['Phone Number'] || '',
+            level: r['Donation'] || '', amount: '', last: ''
+          };
+        });
+        var all = members.sort(function(a, b) { return a.name.localeCompare(b.name); }).concat(sponsors.sort(function(a, b) { return a.name.localeCompare(b.name); }));
+        var headers = ['Type', 'Name', 'Greeting', 'Joint Donor', 'Contact Name', 'Address 1', 'Address 2', 'City', 'State', 'Zip', 'Missing Address', 'Email', 'Phone', 'Level / Sponsorship', 'Given ' + YEAR, 'Last Gift'];
+        var lines = [headers.join(',')].concat(all.map(function(x) {
+          var missing = !(x.a1 && x.city && x.state && x.zip) ? 'Yes' : '';
+          return [x.type, x.name, x.greeting, x.joint, x.contact, x.a1, x.a2, x.city, x.state, x.zip, missing, x.email, x.phone, x.level, x.amount, x.last].map(cell).join(',');
+        }));
+        var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+        var url = URL.createObjectURL(blob); var a = document.createElement('a');
+        a.href = url; a.download = 'members-and-sponsors-' + YEAR + '.csv'; a.click(); URL.revokeObjectURL(url);
+        var noAddr = all.filter(function(x) { return !(x.a1 && x.city && x.state && x.zip); }).length;
+        alert('Exported ' + members.length + ' members and ' + sponsors.length + ' sponsors for ' + YEAR + '.' + (noAddr ? '\n\n' + noAddr + ' are missing part of a mailing address (marked "Yes" in the Missing Address column).' : ''));
+      }).catch(function() { alert('Could not load the sponsors list. Please try again.'); });
+  }
+
   function updateDonorInState(donorId, updater) {
     setDonors(function(prev){return prev.map(function(d){if(d.id!==donorId)return d;var newD=updater(d);return buildDonor(Object.assign({},d),newD.donations);});});
     setSelected(function(prev){if(!prev||prev.id!==donorId)return prev;var newD=updater(prev);return buildDonor(Object.assign({},prev),newD.donations);});
@@ -5375,6 +5427,7 @@ function DonorsView({ navigate }) {
             navigate && { label: 'Acknowledgments to Process', onClick: function() { navigate('acknowledgments-queue'); } },
             { label: bulkFilling ? 'Filling addresses…' : 'Bulk-Fill Addresses', onClick: bulkFillAddresses, disabled: bulkFilling, title: "Fill blank structured mailing address fields from each donor's existing Address field" },
             { label: 'Download CSV', onClick: exportCSV },
+            { label: 'Members + Sponsors CSV (mail merge)', onClick: exportMembersAndSponsors, title: 'One file for this year: donors who gave $50 or more (not counting brick purchases or in-kind gifts) plus current sponsors' },
             { label: 'Import Donations', onClick: function() { setImportText(''); setImportRows(null); setImportStatus(''); setShowImport(true); } },
           ]} />
           <button onClick={function(){setAddForm(emptyAddForm);setAddGiftForm(emptyGiftForm);setAddExistingDonor(null);setAddSearchQuery('');setAddMode('search');setShowAdd(true);}} style={{padding:'6px 12px',background:gold,color:'#fff',border:'none',borderRadius:6,fontSize:11,fontWeight:600,cursor:'pointer'}}>+ Add Donation</button>
