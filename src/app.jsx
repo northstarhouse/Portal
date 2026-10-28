@@ -10561,7 +10561,7 @@ function SponsorsView() {
                           <div style={{ marginBottom: 8 }}>
                             <select value={editInKindForm.contribution_type || ''} onChange={function(ev){setEditInKindForm(function(f){return Object.assign({},f,{contribution_type:ev.target.value});});}} style={inpStyle}>
                               <option value="">Untagged</option>
-                              <option value="Monetary Value">Monetary Value</option>
+                              <option value="Monetary Value">Monetary Donation</option>
                               <option value="In-Kind (Work)">In-Kind (Work)</option>
                               <option value="Discount">Discount</option>
                             </select>
@@ -10582,7 +10582,7 @@ function SponsorsView() {
                           <div style={{ fontSize: 11, color: '#999', marginTop: 4, letterSpacing: 0.2 }}>{when}</div>
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          {e.contribution_type && <div style={{ display: 'inline-block', fontSize: 9.5, fontWeight: 700, color: '#886c44', letterSpacing: 0.9, textTransform: 'uppercase', border: '0.5px solid #d8c9aa', background: '#faf6ee', padding: '2px 8px', borderRadius: 3, marginBottom: 5 }}>{e.contribution_type}</div>}
+                          {e.contribution_type && <div style={{ display: 'inline-block', fontSize: 9.5, fontWeight: 700, color: '#886c44', letterSpacing: 0.9, textTransform: 'uppercase', border: '0.5px solid #d8c9aa', background: '#faf6ee', padding: '2px 8px', borderRadius: 3, marginBottom: 5 }}>{e.contribution_type === 'Monetary Value' ? 'Monetary Donation' : e.contribution_type}</div>}
                           <div style={{ fontSize: 12.5, color: '#444', lineHeight: 1.5 }}>{e.description}</div>
                         </div>
                         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -10619,7 +10619,7 @@ function SponsorsView() {
                   <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Type</div>
                   <select value={inkindForm.contribution_type} onChange={function(e){setInkindForm(function(f){return Object.assign({},f,{contribution_type:e.target.value});});}} style={inpStyle}>
                     <option value="">Untagged</option>
-                    <option value="Monetary Value">Monetary Value</option>
+                    <option value="Monetary Value">Monetary Donation</option>
                     <option value="In-Kind (Work)">In-Kind (Work)</option>
                     <option value="Discount">Discount</option>
                   </select>
@@ -11912,7 +11912,7 @@ function FinancialOverviewView({ navigate }) {
             <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Current sponsors only, summed from each sponsor's contributions dated in {year}</div>
             <div style={{ display: 'flex', gap: 24, marginBottom: 14 }}>
               <div><div style={cardLabel}>Current Sponsors</div><div style={{ ...cardValue, fontSize: 16 }}>{stats.currentSponsors.length}</div></div>
-              <div><div style={cardLabel}>Monetary Value</div><div style={{ ...cardValue, fontSize: 16, color: '#2e7d32' }}>{money(stats.sponsorCash)}</div></div>
+              <div><div style={cardLabel}>Monetary Donations</div><div style={{ ...cardValue, fontSize: 16, color: '#2e7d32' }}>{money(stats.sponsorCash)}</div></div>
               <div><div style={cardLabel}>In-Kind (Work)</div><div style={{ ...cardValue, fontSize: 16, color: '#886c44' }}>{money(stats.sponsorInKind)}</div></div>
               <div><div style={cardLabel}>Discount</div><div style={{ ...cardValue, fontSize: 16, color: '#1565c0' }}>{money(stats.sponsorDiscount)}</div></div>
               {stats.sponsorUntagged > 0 && <div><div style={cardLabel}>Untagged</div><div style={{ ...cardValue, fontSize: 16, color: '#b45309' }}>{money(stats.sponsorUntagged)}</div></div>}
