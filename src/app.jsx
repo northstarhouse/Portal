@@ -2508,10 +2508,10 @@ function EventsView({ navigate, initialTab }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>Marketing Checklist</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#777', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={!!c.marketingNA} onChange={function(e) { upsertCardMeta(c.name, { marketing_na: e.target.checked }); }} style={{ accentColor: gold, width: 14, height: 14 }} />
-                      Not applicable
-                    </label>
+                    <button onClick={function() { upsertCardMeta(c.name, { marketing_na: !c.marketingNA }); }}
+                      style={{ background: '#fff', border: '1px solid ' + (c.marketingNA ? gold : '#e4b8b0'), color: c.marketingNA ? gold : '#a04545', borderRadius: 7, padding: '3px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                      {c.marketingNA ? 'Turn on' : 'Turn off'}
+                    </button>
                     <div style={{ fontSize: 11, color: '#999' }}>{c.marketingNA ? 'N/A' : doneCount + '/' + checklist.length + ' done'}</div>
                   </div>
                 </div>

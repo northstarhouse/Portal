@@ -507,6 +507,12 @@ function OverviewTab({ ev, onUpdate, onEdit, volunteers, session, volunteer }) {
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{s.title}{s.key === 'marketing' && marketingNA && <span className="badge" style={{ marginLeft: 8, background: 'var(--light)', color: 'var(--muted)' }}>N/A</span>}</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>{s.desc}</div>
                 </div>
+                {s.key === 'marketing' && (
+                  <button className="btn-ghost" onClick={e => { e.stopPropagation(); toggleMarketingNA(!marketingNA); }}
+                    style={{ padding: '3px 12px', fontSize: 11, flexShrink: 0, color: marketingNA ? 'var(--gold)' : '#a04545' }}>
+                    {marketingNA ? 'Turn on' : 'Turn off'}
+                  </button>
+                )}
                 <span style={{ color: 'var(--muted)', flexShrink: 0, transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>&rsaquo;</span>
               </div>
               {isOpen && (
