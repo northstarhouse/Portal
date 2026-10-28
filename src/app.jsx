@@ -4817,16 +4817,25 @@ function DonorsView({ navigate }) {
         level: memGift ? memGift.membership_level : '', amount: total.toFixed(2), last: latest.date || ''
       });
     });
-    fetch(SUPABASE_URL + '/rest/v1/Sponsors?select=*&sponsor_status=eq.current', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
-      .then(function(r) { return r.json(); })
-      .then(function(rows) {
-        var sponsors = (Array.isArray(rows) ? rows : []).map(function(r) {
+    var hdrs = { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } };
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/Sponsors?select=*', hdrs).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?select=sponsor_id,value', hdrs).then(function(r) { return r.json(); }).catch(function() { return []; })
+    ])
+      .then(function(res) {
+        var rows = res[0], inkindRows = Array.isArray(res[1]) ? res[1] : [];
+        // same levels the Sponsors page uses, from each sponsor's total contributions
+        var TIER_MINS = [['Presenting Sponsor', 10000], ['Keystone Sponsor', 5000], ['Preservation Leader', 2500], ['Heritage Partner', 1000], ['Friend of the North Star House', 300], ['Community Supporter', 0]];
+        var tierOf = function(total) { var t = TIER_MINS.find(function(x) { return total >= x[1]; }); return t ? t[0] : ''; };
+        var totalFor = function(id) { return inkindRows.filter(function(e) { return e.sponsor_id === id; }).reduce(function(t, e) { return t + (parseFloat(e.value) || 0); }, 0); };
+        // same rule as the Sponsors page: no status set counts as current
+        var sponsors = (Array.isArray(rows) ? rows : []).filter(function(r) { return (r['sponsor_status'] || 'current') === 'current'; }).map(function(r) {
           var p = splitAddr(r['Mailing Address']);
           var first = String(r['Main Contact'] || '').trim().split(/\s+/)[0];
           return {
             type: 'Sponsor', name: r['Business Name'] || '', greeting: first || r['Business Name'] || '', joint: '', contact: r['Main Contact'] || '',
             a1: p.l1, a2: '', city: p.city, state: p.state, zip: p.zip, email: r['Email Address'] || '', phone: r['Phone Number'] || '',
-            level: r['Donation'] || '', amount: '', last: ''
+            level: tierOf(totalFor(r.id)), amount: totalFor(r.id) ? totalFor(r.id).toFixed(2) : '', last: '', details: r['Donation'] || ''
           };
         });
         var all = members.sort(function(a, b) { return a.name.localeCompare(b.name); }).concat(sponsors.sort(function(a, b) { return a.name.localeCompare(b.name); }));
@@ -4837,10 +4846,10 @@ function DonorsView({ navigate }) {
           if (!x.a1) g.push('street'); if (!x.city) g.push('city'); if (!x.state) g.push('state'); if (!x.zip) g.push('zip');
           return g.length === 4 ? 'no address on file' : g.join(', ');
         };
-        var headers = ['Type', 'Name', 'Greeting', 'Joint Donor', 'Contact Name', 'Address 1', 'Address 2', 'City', 'State', 'Zip', 'Missing Address', 'What\'s Missing', 'Email', 'Phone', 'Level / Sponsorship', 'Given ' + YEAR, 'Last Gift'];
+        var headers = ['Type', 'Name', 'Greeting', 'Joint Donor', 'Contact Name', 'Address 1', 'Address 2', 'City', 'State', 'Zip', 'Missing Address', 'What\'s Missing', 'Email', 'Phone', 'Level', 'Given ' + YEAR, 'Last Gift', 'Sponsorship Details'];
         var lines = [headers.join(',')].concat(all.map(function(x) {
           var gaps = whatsMissing(x);
-          return [x.type, x.name, x.greeting, x.joint, x.contact, x.a1, x.a2, x.city, x.state, x.zip, gaps ? 'Yes' : '', gaps, x.email, x.phone, x.level, x.amount, x.last].map(cell).join(',');
+          return [x.type, x.name, x.greeting, x.joint, x.contact, x.a1, x.a2, x.city, x.state, x.zip, gaps ? 'Yes' : '', gaps, x.email, x.phone, x.level, x.amount, x.last, x.details || ''].map(cell).join(',');
         }));
         var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
         var url = URL.createObjectURL(blob); var a = document.createElement('a');
