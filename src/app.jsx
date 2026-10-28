@@ -2,6 +2,7 @@
 
 import { VenueClientDashboard, saveVenueInsuranceVerification } from './venue-clients.jsx';
 import { createAgreementApi, AgreementSigningPage } from './venue-contracts.jsx';
+import HubEventsCommittee from './hub/entry.jsx';
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
@@ -1477,12 +1478,12 @@ const typeColors = {
 
 var DEFAULT_EVENT_CHECKLIST = ['Flyer designed', 'Posted on social media', 'Newsletter mention', 'Tickets / RSVP page live', 'Reminder sent'].map(function(l) { return { label: l, done: false }; });
 
-function EventsView({ navigate }) {
+function EventsView({ navigate, initialTab }) {
   var { useState, useEffect, useMemo } = React;
   // Event Overviews opens on the card-based Events tab, except when arriving
   // via the "Save to Event Overviews" flow (event-overviews/plans), which
   // should land straight on the plan the user just saved.
-  var [tab, setTab] = useState(function() { return window.location.hash.replace(/^#/, '').indexOf('event-overviews/plans') === 0 ? 'plans' : 'overview'; });
+  var [tab, setTab] = useState(function() { return initialTab || (window.location.hash.replace(/^#/, '').indexOf('event-overviews/plans') === 0 ? 'plans' : 'overview'); });
   var [loading, setLoading] = useState(true);
   var [budgetRows, setBudgetRows] = useState([]);
   var [earningsRows, setEarningsRows] = useState([]);
@@ -2106,7 +2107,7 @@ function EventsView({ navigate }) {
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 20, borderBottom: '0.5px solid #e8dece' }}>
+      <div style={{ display: initialTab ? 'none' : 'flex', gap: 6, marginBottom: 20, borderBottom: '0.5px solid #e8dece' }}>
         <button onClick={function() { setTab('overview'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'overview' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, fontSize: 13, fontWeight: tab === 'overview' ? 600 : 400, color: tab === 'overview' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Events</button>
         <button onClick={function() { setTab('pnl'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'pnl' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, marginLeft: 16, fontSize: 13, fontWeight: tab === 'pnl' ? 600 : 400, color: tab === 'pnl' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Profit & Loss</button>
         <button onClick={function() { setTab('feedback'); }} style={{ background: 'none', border: 'none', borderBottom: tab === 'feedback' ? '2px solid ' + gold : '2px solid transparent', padding: '8px 4px', marginBottom: -1, marginLeft: 16, fontSize: 13, fontWeight: tab === 'feedback' ? 600 : 400, color: tab === 'feedback' ? '#2a2a2a' : '#999', cursor: 'pointer' }}>Reviews & Feedback{feedback.length > 0 ? ' (' + feedback.length + ')' : ''}</button>
@@ -22223,9 +22224,10 @@ function WebsitePaymentsView({ navigate }) {
   );
 }
 
-// Event Overviews is the Volunteer Hub's Events Committee page, shown here so the two always match
-// (same cards, same editing tools, same data). "Classic view" is the Portal's older version.
-var HUB_EVENTS_URL = 'https://volunteerhub.northstarhouse.org/?embed=1#/events-committee-planning';
+// Event Overviews is the Volunteer Hub's Events Committee page, mirrored natively (src/hub, kept in step by
+// scripts/sync-hub-events-committee.mjs): same cards, same editing tools, same database. Its Reports dropdown
+// (P&L, Feedback, Plans) opens this Portal's own Event Overviews view in a popout. "Classic view" is the older page.
+window.__NSH_EVENT_REPORTS = EventsView;
 function EventsHubView({ navigate }) {
   var [classic, setClassic] = useState(function() { return window.location.hash.replace(/^#/, '').indexOf('event-overviews/plans') === 0; });
   var linkBtn = { background: 'none', border: 'none', color: gold, fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: 0 };
@@ -22242,8 +22244,7 @@ function EventsHubView({ navigate }) {
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
         <button onClick={function() { setClassic(true); }} style={linkBtn}>Classic view</button>
       </div>
-      <iframe title="Events Committee" src={HUB_EVENTS_URL} style={{ width: '100%', height: 'calc(100vh - 170px)', minHeight: 640, border: '0.5px solid #e8e0d5', borderRadius: 12, background: '#fff' }} />
-      <div style={{ fontSize: 11, color: '#aaa', marginTop: 6 }}>Signed out of the frame? Sign in once with your Volunteer Hub email and password.</div>
+      <HubEventsCommittee navigate={navigate} />
     </div>
   );
 }

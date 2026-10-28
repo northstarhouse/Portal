@@ -4,8 +4,8 @@
   "description": "Strategic plan tracker for North Star House board and leadership updates",
   "main": "index.js",
   "scripts": {
-    "build": "esbuild src/app.jsx --bundle --outfile=assets/app.js --minify --format=iife --jsx-factory=React.createElement --jsx-fragment=React.Fragment --target=es2017 && node scripts/bump-version.js",
-    "watch": "esbuild src/app.jsx --bundle --outfile=assets/app.js --format=iife --jsx-factory=React.createElement --jsx-fragment=React.Fragment --target=es2017 --watch"
+    "build": "esbuild src/app.jsx --bundle --alias:react=./src/hub/react-shim.js --outfile=assets/app.js --minify --format=iife --jsx-factory=React.createElement --jsx-fragment=React.Fragment --target=es2017 && node scripts/bump-version.js",
+    "watch": "esbuild src/app.jsx --bundle --alias:react=./src/hub/react-shim.js --outfile=assets/app.js --format=iife --jsx-factory=React.createElement --jsx-fragment=React.Fragment --target=es2017 --watch"
   },
   "keywords": [
     "strategic-plan",
