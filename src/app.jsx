@@ -4830,16 +4830,23 @@ function DonorsView({ navigate }) {
           };
         });
         var all = members.sort(function(a, b) { return a.name.localeCompare(b.name); }).concat(sponsors.sort(function(a, b) { return a.name.localeCompare(b.name); }));
-        var headers = ['Type', 'Name', 'Greeting', 'Joint Donor', 'Contact Name', 'Address 1', 'Address 2', 'City', 'State', 'Zip', 'Missing Address', 'Email', 'Phone', 'Level / Sponsorship', 'Given ' + YEAR, 'Last Gift'];
+        var whatsMissing = function(x) {
+          // a whole address typed on one line (street, city, state and zip together) counts as complete
+          if (x.a1 && !x.city && /\b\d{5}\b/.test(x.a1)) return '';
+          var g = [];
+          if (!x.a1) g.push('street'); if (!x.city) g.push('city'); if (!x.state) g.push('state'); if (!x.zip) g.push('zip');
+          return g.length === 4 ? 'no address on file' : g.join(', ');
+        };
+        var headers = ['Type', 'Name', 'Greeting', 'Joint Donor', 'Contact Name', 'Address 1', 'Address 2', 'City', 'State', 'Zip', 'Missing Address', 'What\'s Missing', 'Email', 'Phone', 'Level / Sponsorship', 'Given ' + YEAR, 'Last Gift'];
         var lines = [headers.join(',')].concat(all.map(function(x) {
-          var missing = !(x.a1 && x.city && x.state && x.zip) ? 'Yes' : '';
-          return [x.type, x.name, x.greeting, x.joint, x.contact, x.a1, x.a2, x.city, x.state, x.zip, missing, x.email, x.phone, x.level, x.amount, x.last].map(cell).join(',');
+          var gaps = whatsMissing(x);
+          return [x.type, x.name, x.greeting, x.joint, x.contact, x.a1, x.a2, x.city, x.state, x.zip, gaps ? 'Yes' : '', gaps, x.email, x.phone, x.level, x.amount, x.last].map(cell).join(',');
         }));
         var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
         var url = URL.createObjectURL(blob); var a = document.createElement('a');
         a.href = url; a.download = 'members-and-sponsors-' + YEAR + '.csv'; a.click(); URL.revokeObjectURL(url);
-        var noAddr = all.filter(function(x) { return !(x.a1 && x.city && x.state && x.zip); }).length;
-        alert('Exported ' + members.length + ' members and ' + sponsors.length + ' sponsors for ' + YEAR + '.' + (noAddr ? '\n\n' + noAddr + ' are missing part of a mailing address (marked "Yes" in the Missing Address column).' : ''));
+        var noAddr = all.filter(function(x) { return whatsMissing(x); });
+        alert('Exported ' + members.length + ' members and ' + sponsors.length + ' sponsors for ' + YEAR + '.' + (noAddr.length ? '\n\nStill need a full mailing address (' + noAddr.length + '):\n' + noAddr.map(function(x) { return '• ' + x.name + ' (' + x.type + ': ' + whatsMissing(x) + ')'; }).join('\n') + '\n\nThey are in the file, marked Yes in the Missing Address column.' : ''));
       }).catch(function() { alert('Could not load the sponsors list. Please try again.'); });
   }
 
