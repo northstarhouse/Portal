@@ -1810,6 +1810,7 @@ function EventsView({ navigate }) {
       b.date = c.event_date || b.date;
       b.image_url = c.image_url || null;
       b.checklist = Array.isArray(c.checklist) ? c.checklist : [];
+      b.rsvpOnly = !!c.rsvp_only;
     });
     return Object.keys(byKey).map(function(k) { return byKey[k]; });
   }, [groups, overviewCards, ticketOrders]);
@@ -1834,7 +1835,9 @@ function EventsView({ navigate }) {
           <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
           <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{dateStr || 'No date set'}</div>
           <div style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 11 }}>
-            <span style={{ color: '#5a8a5a', fontWeight: 600 }}>{fmt(c.earnings + c.ticketRevenue)}</span>
+            {c.rsvpOnly
+              ? <span style={{ background: '#f0ebe2', color: gold, fontSize: 10, fontWeight: 700, padding: '1px 8px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: 0.4 }}>RSVP</span>
+              : <span style={{ color: '#5a8a5a', fontWeight: 600 }}>{fmt(c.earnings + c.ticketRevenue)}</span>}
             <span style={{ color: '#c07040', fontWeight: 600 }}>-{fmt(c.costs)}</span>
           </div>
         </div>
@@ -2456,11 +2459,17 @@ function EventsView({ navigate }) {
                   <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a' }}>{c.name}</div>
                   <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{dateStr}</div>
                   {c.link && <a href={c.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: gold, textDecoration: 'none', marginTop: 4, display: 'inline-block' }}>Event details ↗</a>}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#555', marginTop: 10, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!c.rsvpOnly} onChange={function(e) { upsertCardMeta(c.name, { rsvp_only: e.target.checked }); }} style={{ accentColor: gold, width: 15, height: 15 }} />
+                    RSVP event (no ticket sales)
+                  </label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
-                    <StatCard label="Ticket Sales" value={fmt(c.ticketRevenue)} sub={c.ticketQty + ' sold' + (c.rsvpQty > 0 ? ', ' + c.rsvpQty + ' RSVP' : '')} />
+                    {c.rsvpOnly
+                      ? <StatCard label="RSVPs" value={String(c.rsvpQty)} sub="no ticket sales" />
+                      : <StatCard label="Ticket Sales" value={fmt(c.ticketRevenue)} sub={c.ticketQty + ' sold' + (c.rsvpQty > 0 ? ', ' + c.rsvpQty + ' RSVP' : '')} />}
                     <StatCard label="Other Earnings" value={fmt(c.earnings)} />
                     <StatCard label="Expenses" value={fmt(c.costs)} />
-                    <StatCard label="Net" value={fmt(c.ticketNet + c.net)} />
+                    <StatCard label="Net" value={fmt((c.rsvpOnly ? 0 : c.ticketNet) + c.net)} />
                   </div>
                 </div>
                 <div style={{ width: 260, flexShrink: 0, background: '#faf8f4', borderLeft: '0.5px solid #e8e0d5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16, gap: 10 }}>
@@ -2503,7 +2512,9 @@ function EventsView({ navigate }) {
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>Website Ticket Sales</div>
                   <a onClick={function() { navigate('website-payments'); }} style={{ fontSize: 11, color: gold, textDecoration: 'underline', cursor: 'pointer' }}>View orders ↗</a>
                 </div>
-                {(c.ticketQty === 0 && c.rsvpQty === 0) ? (
+                {c.rsvpOnly ? (
+                  <div style={{ fontSize: 12, color: '#777' }}>RSVP event: no tickets are sold for this one.{c.rsvpQty > 0 ? ' ' + c.rsvpQty + ' RSVPs so far.' : ''}</div>
+                ) : (c.ticketQty === 0 && c.rsvpQty === 0) ? (
                   <div style={{ fontSize: 12, color: '#aaa' }}>No website ticket orders for this event yet.</div>
                 ) : (
                   <div style={{ display: 'flex', gap: 18, fontSize: 12, color: '#555' }}>
