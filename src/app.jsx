@@ -1786,6 +1786,7 @@ function EventsView({ navigate }) {
     (ticketOrders || []).forEach(function(o) {
       var name = o.event_title || o.event_slug;
       if (!name) return;
+      if (/commemorative brick/i.test(name)) return; // brick sales are not events
       var b = ensure(name);
       b.date = b.date || o.event_date || null;
       // Per-date split, for multi-night shows (e.g. Fri + Sat) that share a card.
