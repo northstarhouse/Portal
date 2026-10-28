@@ -18294,9 +18294,9 @@ function VenueRentalsView({ navigate, initialTab }) {
     if (detailSaving) return;
     var t = detailEntry.raw;
     var who = t.visitor_name || 'this visitor';
-    if (!window.confirm('Cancel the tour for ' + who + '? It comes off the calendar and the time opens back up.')) return;
-    var notify = false;
-    if (t.visitor_email) notify = window.confirm('Email ' + who + ' to let them know it was cancelled?\n\nOK = send the email\nCancel = cancel quietly (no email)');
+    if (!window.confirm('Cancel the tour for ' + who + '? It comes off the calendar, the time opens back up, and ' + (t.visitor_email ? 'they are emailed that it was cancelled.' : 'there is no email on file to notify them.'))) return;
+    // Tours are cancelled at the visitor's request, so they always get the confirmation email.
+    var notify = !!t.visitor_email;
     setDetailSaving(true);
     cancelEstateTour(t.id, notify)
       .then(function(res) {

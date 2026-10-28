@@ -139,10 +139,10 @@ Deno.serve(async (req) => {
       emailed = await sendMail(
         tour.visitor_email,
         `Your North Star House tour on ${when} has been cancelled`,
-        `Hi ${name},\n\nWe're sorry, but your estate tour of North Star House scheduled for ${when} has been cancelled.\n\nWe'd love to help you find another time. You can pick a new one here: ${rebook}\n\nOr just reply to this email and we'll find a time together.\n\nNorth Star House`,
+        `Hi ${name},\n\nAs you requested, your estate tour of North Star House scheduled for ${when} has been cancelled.\n\nWhenever you'd like to visit, you can pick a new time here: ${rebook}\n\nOr just reply to this email and we'll find a time together.\n\nNorth Star House`,
         buildEmailHtml(
           'Your Tour Has Been Cancelled',
-          `Hi ${esc(name)}, we're sorry, but your estate tour of North Star House scheduled for <strong>${esc(when)}</strong> has been cancelled.<br><br>We'd love to help you find another time. Pick a new one below, or just reply to this email and we'll find a time together.`,
+          `Hi ${esc(name)}, as you requested, your estate tour of North Star House scheduled for <strong>${esc(when)}</strong> has been cancelled.<br><br>Whenever you'd like to visit, you can pick a new time below, or just reply to this email and we'll find a time together.`,
           rebook,
           wedding ? 'Book Another Tour' : 'Visit Our Website',
         ),
