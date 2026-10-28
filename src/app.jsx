@@ -9850,13 +9850,13 @@ function SponsorsView() {
   // items regardless of which tier a sponsor is in.
   var TIERS = [
     { name: 'Presenting Sponsor', min: 10000, color: '#7c3aed', bg: '#f3f0ff', border: '#c4b5fd', range: '$10,000+', tickets: 6,
-      ownBenefits: ['"Presented by" naming & press release inclusion', 'Welcome remarks & materials table at event', '"2027 Presenting Sponsor" personalized brick placed on grounds'] },
+      ownBenefits: ['"Presented by" naming & press release inclusion', 'Welcome remarks & materials table at event', '"2026 Presenting Sponsor" personalized brick placed on grounds'] },
     { name: 'Keystone Sponsor', min: 5000, color: '#1565c0', bg: '#e3f2fd', border: '#90caf9', range: '$5,000–$9,999', tickets: 6,
-      ownBenefits: ['6 complimentary North Star House event tickets', '"2027 Keystone Sponsor" personalized brick placed on grounds'] },
+      ownBenefits: ['6 complimentary North Star House event tickets', '"2026 Keystone Sponsor" personalized brick placed on grounds'] },
     { name: 'Preservation Leader', min: 2500, color: '#2e7d32', bg: '#e8f5e9', border: '#a5d6a7', range: '$2,500–$4,999', tickets: 2,
-      ownBenefits: ['Large logo placement on banner', '"2027 Preservation Leader" personalized brick placed on grounds'] },
+      ownBenefits: ['Large logo placement on banner', '"2026 Preservation Leader" personalized brick placed on grounds'] },
     { name: 'Heritage Partner', min: 1000, color: '#b45309', bg: '#fffbeb', border: '#fcd34d', range: '$1,000–$2,499', tickets: 2,
-      ownBenefits: ['Website & newsletter feature', '"2027 Heritage Partner" personalized brick placed on grounds'] },
+      ownBenefits: ['Website & newsletter feature', '"2026 Heritage Partner" personalized brick placed on grounds'] },
     { name: 'Friend of the North Star House', min: 300, color: '#0f766e', bg: '#f0fdfa', border: '#5eead4', range: '$300–$999', tickets: 2,
       ownBenefits: ['Sponsorship recognition & logo on website', 'Logo placement on banner', '2 complimentary North Star House event tickets'] },
     { name: 'Community Supporter', min: 0, color: '#6b7280', bg: '#f3f4f6', border: '#d1d5db', range: 'Under $300', tickets: 0,
@@ -9864,7 +9864,9 @@ function SponsorsView() {
   ];
   for (var tierIdx = TIERS.length - 1; tierIdx >= 0; tierIdx--) {
     var below = tierIdx < TIERS.length - 1 ? TIERS[tierIdx + 1].benefits : [];
-    TIERS[tierIdx].benefits = below.concat(TIERS[tierIdx].ownBenefits);
+    // one brick per sponsor, for their own tier only (not the lower tiers' bricks)
+    var inherited = below.filter(function(b) { return b.indexOf('personalized brick') === -1; });
+    TIERS[tierIdx].benefits = inherited.concat(TIERS[tierIdx].ownBenefits);
   }
 
   function getTier(total) {
