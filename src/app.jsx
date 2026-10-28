@@ -10504,7 +10504,7 @@ function SponsorsView() {
 
             {/* In-Kind Contributions */}
             <div style={{ borderTop: '0.5px solid #f0ece6', paddingTop: 16, marginTop: 8, marginBottom: 8 }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, marginBottom: 12 }}>In-Kind Contributions</div>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, marginBottom: 12 }}>Contributions</div>
               {(function() {
                 var total = inkind.reduce(function(s,e){return s+(parseFloat(e.value)||0);},0);
                 var tier = getTier(total);
@@ -10512,7 +10512,7 @@ function SponsorsView() {
                   <div style={{ marginBottom: 14 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: tier ? 10 : 0 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>${total.toLocaleString()}</span>
-                      <span style={{ fontSize: 12, color: '#aaa' }}>total in-kind value</span>
+                      <span style={{ fontSize: 12, color: '#aaa' }}>total given</span>
                       {tier && <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '2px 10px' }}>{tier.name}</span>}
                     </div>
                     {tier && (function() {
@@ -10547,7 +10547,7 @@ function SponsorsView() {
                 );
               })()}
               {inkind.length === 0
-                ? <div style={{ fontSize: 12, color: '#ccc', fontStyle: 'italic' }}>No in-kind entries yet.</div>
+                ? <div style={{ fontSize: 12, color: '#ccc', fontStyle: 'italic' }}>No contributions yet.</div>
                 : inkind.map(function(e) {
                     var isEditing = editingInKindId === e.id;
                     var isSaving = inkindSavingId === e.id;
@@ -10624,7 +10624,7 @@ function SponsorsView() {
                     <option value="Discount">Discount</option>
                   </select>
                 </div>
-                <button type="submit" disabled={inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: (inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value) ? 0.6 : 1, width: '100%' }}>{inkindSaving ? 'Saving…' : 'Add In-Kind Entry'}</button>
+                <button type="submit" disabled={inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: (inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value) ? 0.6 : 1, width: '100%' }}>{inkindSaving ? 'Saving…' : 'Add Contribution'}</button>
               </form>
               ))}
             </div>
