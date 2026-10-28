@@ -1811,6 +1811,7 @@ function EventsView({ navigate }) {
       b.image_url = c.image_url || null;
       b.checklist = Array.isArray(c.checklist) ? c.checklist : [];
       b.rsvpOnly = !!c.rsvp_only;
+      b.marketingNA = !!c.marketing_na;
     });
     return Object.keys(byKey).map(function(k) { return byKey[k]; });
   }, [groups, overviewCards, ticketOrders]);
@@ -2489,9 +2490,16 @@ function EventsView({ navigate }) {
               <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>Marketing Checklist</div>
-                  <div style={{ fontSize: 11, color: '#999' }}>{doneCount}/{checklist.length} done</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#777', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={!!c.marketingNA} onChange={function(e) { upsertCardMeta(c.name, { marketing_na: e.target.checked }); }} style={{ accentColor: gold, width: 14, height: 14 }} />
+                      Not applicable
+                    </label>
+                    <div style={{ fontSize: 11, color: '#999' }}>{c.marketingNA ? 'N/A' : doneCount + '/' + checklist.length + ' done'}</div>
+                  </div>
                 </div>
-                {checklist.map(function(item, idx) {
+                {c.marketingNA ? <div style={{ fontSize: 12, color: '#999' }}>Marketing is not applicable for this event.</div> : null}
+                {(c.marketingNA ? [] : checklist).map(function(item, idx) {
                   return (
                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid #f5f1eb' }}>
                       <input type="checkbox" checked={!!item.done} onChange={function() { toggleChecklistItem(c.name, idx); }} style={{ width: 15, height: 15, accentColor: gold, cursor: 'pointer' }} />
@@ -2500,7 +2508,7 @@ function EventsView({ navigate }) {
                     </div>
                   );
                 })}
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <div style={{ display: c.marketingNA ? 'none' : 'flex', gap: 8, marginTop: 10 }}>
                   <input value={newChecklistItem} onChange={function(e) { setNewChecklistItem(e.target.value); }} placeholder="Add a checklist item…" style={fieldSt}
                     onKeyDown={function(e) { if (e.key === 'Enter') { e.preventDefault(); addChecklistItem(c.name, newChecklistItem); } }} />
                   <button onClick={function() { addChecklistItem(c.name, newChecklistItem); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>Add</button>
