@@ -4881,6 +4881,20 @@ function DonorsView({ navigate }) {
     e.target.value='';
   }
 
+  // Mark a donor deceased (or living again). Deceased donors are greyed out in the list and left out of the
+  // Members + Sponsors mail-merge export.
+  function toggleDeceased(){
+    var next=!selected.deceased;
+    if(!window.confirm(next?('Mark '+(selected.formal_name||'this donor')+' as deceased? They will be left out of mailings.'):('Mark '+(selected.formal_name||'this donor')+' as living again?')))return;
+    fetch(SUPABASE_URL+'/rest/v1/donors?id=eq.'+selected.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({deceased:next})})
+      .then(function(r){return r.json();}).then(function(rows){
+        var updated=Array.isArray(rows)?rows[0]:null;
+        if(!updated){alert('Could not save. Please try again.');return;}
+        setDonors(function(prev){return prev.map(function(d){return d.id===selected.id?Object.assign({},d,{deceased:updated.deceased}):d;});});
+        setSelected(function(prev){return prev?Object.assign({},prev,{deceased:updated.deceased}):prev;});
+      }).catch(function(){alert('Could not save. Please try again.');});
+  }
+
   function saveDonorFields(e){
     e.preventDefault();setSavingDonorFields(true);
     var patch={preferred_letter_greeting:donorFieldsForm.preferred_letter_greeting||null,joint_donor_name:donorFieldsForm.joint_donor_name||null,
@@ -5590,6 +5604,9 @@ function DonorsView({ navigate }) {
             </div>
 
             {/* Letter greeting + structured mailing address, used for acknowledgment generation */}
+            <div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}>
+              <button type="button" onClick={toggleDeceased} style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:selected.deceased?'#2e6b4f':'#a04545',textDecoration:'underline',padding:0}}>{selected.deceased?'Marked deceased — click to undo':'Mark as deceased'}</button>
+            </div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={sec}>Letter & Mailing</span>
               {!donorFieldsForm && <button onClick={function(){setDonorFieldsForm({preferred_letter_greeting:selected.preferred_letter_greeting||'',joint_donor_name:selected.joint_donor_name||'',mailing_address_line1:selected.mailing_address_line1||'',mailing_address_line2:selected.mailing_address_line2||'',mailing_city:selected.mailing_city||'',mailing_state:selected.mailing_state||'',mailing_zip:selected.mailing_zip||''});}} style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'2px 10px',cursor:'pointer'}}>Edit</button>}
