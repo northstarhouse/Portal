@@ -4820,7 +4820,7 @@ function DonorsView({ navigate }) {
     var hdrs = { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } };
     Promise.all([
       fetch(SUPABASE_URL + '/rest/v1/Sponsors?select=*', hdrs).then(function(r) { return r.json(); }),
-      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?select=sponsor_id,value', hdrs).then(function(r) { return r.json(); }).catch(function() { return []; })
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?select=sponsor_id,value,date', hdrs).then(function(r) { return r.json(); }).catch(function() { return []; })
     ])
       .then(function(res) {
         var rows = res[0], inkindRows = Array.isArray(res[1]) ? res[1] : [];
@@ -4829,7 +4829,8 @@ function DonorsView({ navigate }) {
         var tierOf = function(total) { var t = TIER_MINS.find(function(x) { return total >= x[1]; }); return t ? t[0] : ''; };
         var totalFor = function(id) { return inkindRows.filter(function(e) { return e.sponsor_id === id; }).reduce(function(t, e) { return t + (parseFloat(e.value) || 0); }, 0); };
         // same rule as the Sponsors page: no status set counts as current
-        var sponsors = (Array.isArray(rows) ? rows : []).filter(function(r) { return (r['sponsor_status'] || 'current') === 'current'; }).map(function(r) {
+        var gaveThisYear = function(id) { return inkindRows.some(function(e) { return e.sponsor_id === id && e.date && String(e.date).slice(0, 4) === YEAR; }); };
+        var sponsors = (Array.isArray(rows) ? rows : []).filter(function(r) { return gaveThisYear(r.id) || (r['sponsor_status'] || 'current') === 'current'; }).map(function(r) {
           var p = splitAddr(r['Mailing Address']);
           var first = String(r['Main Contact'] || '').trim().split(/\s+/)[0];
           return {
@@ -10298,6 +10299,10 @@ function SponsorsView() {
   var inpStyle = { width: '100%', padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 7, fontSize: 12, background: '#fff', boxSizing: 'border-box' };
 
   function resolvedTab(s) {
+    // gave this year (any contribution dated this year) = Current
+    var thisYear = String(new Date().getFullYear());
+    var gaveThisYear = allInKind.some(function(e) { return e.sponsor_id === s.id && e.date && String(e.date).slice(0, 4) === thisYear; });
+    if (gaveThisYear) return 'current';
     if (s.sponsor_status) return s.sponsor_status;
     return 'current';
   }
