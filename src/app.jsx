@@ -2716,6 +2716,20 @@ function rescheduleEstateTour(id, date, startTime, notify) {
     });
   });
 }
+// Cancels a booked tour through the cancel-estate-tour edge function: removes its calendar event,
+// optionally emails the visitor, and puts a future time back as an open slot.
+function cancelEstateTour(id, notify) {
+  return fetch(SUPABASE_URL + '/functions/v1/cancel-estate-tour', {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: id, notify: notify })
+  }).then(function(r) {
+    return r.json().catch(function() { return {}; }).then(function(j) {
+      if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      return j;
+    });
+  });
+}
 function rescheduleProblems(res, notify) {
   var issues = [];
   if (res.unchanged) return issues;
@@ -18276,6 +18290,26 @@ function VenueRentalsView({ navigate, initialTab }) {
       .finally(function() { setDetailSaving(false); });
   }
 
+  function cancelTour() {
+    if (detailSaving) return;
+    var t = detailEntry.raw;
+    var who = t.visitor_name || 'this visitor';
+    if (!window.confirm('Cancel the tour for ' + who + '? It comes off the calendar and the time opens back up.')) return;
+    var notify = false;
+    if (t.visitor_email) notify = window.confirm('Email ' + who + ' to let them know it was cancelled?\n\nOK = send the email\nCancel = cancel quietly (no email)');
+    setDetailSaving(true);
+    cancelEstateTour(t.id, notify)
+      .then(function(res) {
+        var issues = [];
+        if (res.calendar && res.calendar !== 'removed' && res.calendar !== 'skipped') issues.push('Google Calendar was not updated (' + res.calendar + ').');
+        if (notify && !res.emailed) issues.push('The email to the visitor did not send.');
+        if (issues.length) alert('Tour cancelled, but:\n' + issues.join('\n'));
+        loadTours();
+        setDetailEntry(null);
+      }).catch(function(e) { alert('Could not cancel: ' + e.message); })
+      .finally(function() { setDetailSaving(false); });
+  }
+
   function markNoShow() {
     if (detailSaving) return;
     if (!window.confirm('Mark ' + (detailEntry.raw.visitor_name || 'this visitor') + ' as a no-show? This removes them from the upcoming list.')) return;
@@ -19246,6 +19280,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                   ) : (
                     <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
                       <button onClick={startReschedule} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Reschedule</button>
+                      <button onClick={cancelTour} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: '#fff', color: '#c0392b', border: '1px solid #e4b8b0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel Tour</button>
                       <button onClick={markNoShow} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: '#fff', color: '#c0392b', border: '1px solid #e4b8b0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Didn't Show Up</button>
                     </div>
                   )}
