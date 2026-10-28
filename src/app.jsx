@@ -1529,6 +1529,8 @@ function EventsView({ navigate }) {
   var [uploadingFlyerFor, setUploadingFlyerFor] = useState(null);
   var [newChecklistItem, setNewChecklistItem] = useState('');
   var [ticketOrders, setTicketOrders] = useState(null);
+  // Events Committee list (Volunteer Hub planning page): hidden, cancelled and committee-only events. Overviews mirrors it.
+  var [committeeRows, setCommitteeRows] = useState(null);
   var flyerInputRef = React.useRef(null);
 
   useEffect(function() {
@@ -1537,6 +1539,11 @@ function EventsView({ navigate }) {
     }).then(function(r) { return r.json(); }).then(function(rows) {
       setOverviewCards(Array.isArray(rows) ? rows : []);
     }).catch(function() { setOverviewCards([]); });
+    fetch(SUPABASE_URL + '/rest/v1/events_committee?select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      setCommitteeRows(Array.isArray(rows) ? rows : []);
+    }).catch(function() { setCommitteeRows([]); });
     // Real website ticket sales -- may not exist yet on installs that haven't
     // run the ticketing migration, so a failure here just means "no ticket
     // data to show" rather than a broken page (same handling as WebsitePaymentsView).
@@ -1813,8 +1820,17 @@ function EventsView({ navigate }) {
       b.rsvpOnly = !!c.rsvp_only;
       b.marketingNA = !!c.marketing_na;
     });
+    // Same event list as the Events Committee page: committee-only events appear, hidden ones don't, cancelled ones are marked.
+    (committeeRows || []).forEach(function(r) {
+      var nm = String(r.name || '').trim();
+      if (!nm || /commemorative brick/i.test(nm) || nm.toLowerCase() === 'general donation') return;
+      if (r.hidden) { delete byKey[keyOfName(nm)]; return; }
+      var b = ensure(nm);
+      if (!b.date && r.date) b.date = r.date;
+      b.status = r.status || null;
+    });
     return Object.keys(byKey).map(function(k) { return byKey[k]; });
-  }, [groups, overviewCards, ticketOrders]);
+  }, [groups, overviewCards, ticketOrders, committeeRows]);
 
   var todayForBuckets = new Date(); todayForBuckets.setHours(0, 0, 0, 0);
   var upcomingCards = eventCards.filter(function(c) { return c.date && new Date(c.date + 'T00:00:00') >= todayForBuckets; })
@@ -1827,14 +1843,14 @@ function EventsView({ navigate }) {
     var dateStr = c.date ? new Date(c.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
     return (
       <div key={c.name} onClick={function() { setSelectedEvent(c.name); }}
-        style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', transition: 'box-shadow 0.15s, transform 0.15s' }}
+        style={{ background: '#fff', border: '0.5px solid ' + (c.status === 'cancelled' ? '#a04545' : '#e8e0d5'), opacity: c.status === 'cancelled' ? 0.65 : 1, borderRadius: 14, overflow: 'hidden', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', transition: 'box-shadow 0.15s, transform 0.15s' }}
         onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.1)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
         onMouseLeave={function(e) { e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.05)'; e.currentTarget.style.transform = 'none'; }}
       >
-        <div style={{ width: '100%', aspectRatio: '4/3', backgroundColor: '#f0ebe2', backgroundImage: c.image_url ? 'url(' + c.image_url + ')' : 'linear-gradient(135deg,#f0ebe2,#e4d9c6)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
+        <div style={{ width: '100%', aspectRatio: '4/3', filter: c.status === 'cancelled' ? 'grayscale(0.6)' : 'none', backgroundColor: '#f0ebe2', backgroundImage: c.image_url ? 'url(' + c.image_url + ')' : 'linear-gradient(135deg,#f0ebe2,#e4d9c6)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
         <div style={{ padding: '12px 14px' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
-          <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{dateStr || 'No date set'}</div>
+          <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{dateStr || 'No date set'}{c.status === 'cancelled' ? ' · Cancelled' : ''}</div>
           <div style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 11 }}>
             {c.rsvpOnly
               ? <span style={{ background: '#f0ebe2', color: gold, fontSize: 10, fontWeight: 700, padding: '1px 8px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: 0.4 }}>RSVP</span>
