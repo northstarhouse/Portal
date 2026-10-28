@@ -22223,10 +22223,35 @@ function WebsitePaymentsView({ navigate }) {
   );
 }
 
+// Event Overviews is the Volunteer Hub's Events Committee page, shown here so the two always match
+// (same cards, same editing tools, same data). "Classic view" is the Portal's older version.
+var HUB_EVENTS_URL = 'https://volunteerhub.northstarhouse.org/?embed=1#/events-committee-planning';
+function EventsHubView({ navigate }) {
+  var [classic, setClassic] = useState(function() { return window.location.hash.replace(/^#/, '').indexOf('event-overviews/plans') === 0; });
+  var linkBtn = { background: 'none', border: 'none', color: gold, fontSize: 12, cursor: 'pointer', textDecoration: 'underline', padding: 0 };
+  if (classic) {
+    return (
+      <div>
+        <div style={{ marginBottom: 10 }}><button onClick={function() { setClassic(false); }} style={linkBtn}>← Back to the Events Committee view</button></div>
+        <EventsView navigate={navigate} />
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <button onClick={function() { setClassic(true); }} style={linkBtn}>Classic view</button>
+      </div>
+      <iframe title="Events Committee" src={HUB_EVENTS_URL} style={{ width: '100%', height: 'calc(100vh - 170px)', minHeight: 640, border: '0.5px solid #e8e0d5', borderRadius: 12, background: '#fff' }} />
+      <div style={{ fontSize: 11, color: '#aaa', marginTop: 6 }}>Signed out of the frame? Sign in once with your Volunteer Hub email and password.</div>
+    </div>
+  );
+}
+
 const views = {
   home: HomeView,
   birthdays: BirthdaysView,
-  events: EventsView,
+  events: EventsHubView,
   'website-payments': WebsitePaymentsView,
   quarterly: QuarterlyView,
   volunteers: VolunteersView,
@@ -22253,7 +22278,7 @@ const views = {
   'quarter-workspace': QuarterWorkspaceView,
   admin: AdminView,
   planning: PlanningView,
-  'event-overviews': EventsView, // alias -- EventsView always opens on its card-based "Events" tab
+  'event-overviews': EventsHubView, // the Volunteer Hub's Events Committee page (Classic view = the older EventsView)
   'event-plan': EventPlanLinkView,
   'vol-email-lists': VolEmailListsView,
   'email-notices': EmailNoticesView,
