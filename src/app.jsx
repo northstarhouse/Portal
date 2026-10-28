@@ -10639,7 +10639,7 @@ function SponsorsView() {
                       <div key={a.id} style={{ padding: '8px 0', borderBottom: '0.5px solid #f5f0ea', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{a.date}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{a.date ? new Date(a.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''}</span>
                             {a.method && <span style={{ fontSize: 11, color: gold, background: '#faf5ee', borderRadius: 20, padding: '1px 8px' }}>{a.method}</span>}
                           </div>
                           {a.notes && <div style={{ fontSize: 12, color: '#666', lineHeight: 1.5 }}>{a.notes}</div>}
