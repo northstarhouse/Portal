@@ -10504,15 +10504,14 @@ function SponsorsView() {
 
             {/* In-Kind Contributions */}
             <div style={{ borderTop: '0.5px solid #f0ece6', paddingTop: 16, marginTop: 8, marginBottom: 8 }}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600, marginBottom: 12 }}>Contributions</div>
               {(function() {
                 var total = inkind.reduce(function(s,e){return s+(parseFloat(e.value)||0);},0);
                 var tier = getTier(total);
                 return (
                   <div style={{ marginBottom: 14 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: tier ? 10 : 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>${total.toLocaleString()}</span>
-                      <span style={{ fontSize: 12, color: '#aaa' }}>total given</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: tier ? 10 : 0 }}>
+                      <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Total Contributions:</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a' }}>${total.toLocaleString()}</span>
                       {tier && <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '2px 10px' }}>{tier.name}</span>}
                     </div>
                     {tier && (function() {
