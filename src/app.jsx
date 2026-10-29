@@ -4824,10 +4824,10 @@ function DonorsView({ navigate }) {
     ])
       .then(function(res) {
         var rows = res[0], inkindRows = Array.isArray(res[1]) ? res[1] : [];
-        // same levels the Sponsors page uses, from each sponsor's total contributions
+        // same levels the Sponsors page uses, from each sponsor's contributions this year
         var TIER_MINS = [['Presenting Sponsor', 10000], ['Keystone Sponsor', 5000], ['Preservation Leader', 2500], ['Heritage Partner', 1000], ['Friend of the North Star House', 300], ['Community Supporter', 0]];
         var tierOf = function(total) { var t = TIER_MINS.find(function(x) { return total >= x[1]; }); return t ? t[0] : ''; };
-        var totalFor = function(id) { return inkindRows.filter(function(e) { return e.sponsor_id === id; }).reduce(function(t, e) { return t + (parseFloat(e.value) || 0); }, 0); };
+        var totalFor = function(id) { return inkindRows.filter(function(e) { return e.sponsor_id === id && e.date && String(e.date).slice(0, 4) === YEAR; }).reduce(function(t, e) { return t + (parseFloat(e.value) || 0); }, 0); };
         // same rule as the Sponsors page: no status set counts as current
         var gaveThisYear = function(id) { return inkindRows.some(function(e) { return e.sponsor_id === id && e.date && String(e.date).slice(0, 4) === YEAR; }); };
         var sponsors = (Array.isArray(rows) ? rows : []).filter(function(r) { return gaveThisYear(r.id) || (r['sponsor_status'] || 'current') === 'current'; }).map(function(r) {
@@ -9876,8 +9876,11 @@ function SponsorsView() {
     return TIERS.find(function(t) { return total >= t.min; }) || null;
   }
 
+  // Level is based on contributions made in the current year only (not all-time totals).
+  var LEVEL_YEAR = String(new Date().getFullYear());
+  function inLevelYear(e) { return e && e.date && String(e.date).slice(0, 4) === LEVEL_YEAR; }
   function sponsorInKindTotal(sponsorId) {
-    return allInKind.filter(function(e) { return e.sponsor_id === sponsorId; })
+    return allInKind.filter(function(e) { return e.sponsor_id === sponsorId && inLevelYear(e); })
       .reduce(function(sum, e) { return sum + (parseFloat(e.value) || 0); }, 0);
   }
 
@@ -10505,12 +10508,12 @@ function SponsorsView() {
             {/* In-Kind Contributions */}
             <div style={{ borderTop: '0.5px solid #f0ece6', paddingTop: 16, marginTop: 8, marginBottom: 8 }}>
               {(function() {
-                var total = inkind.reduce(function(s,e){return s+(parseFloat(e.value)||0);},0);
+                var total = inkind.filter(inLevelYear).reduce(function(s,e){return s+(parseFloat(e.value)||0);},0);
                 var tier = getTier(total);
                 return (
                   <div style={{ marginBottom: 14 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: tier ? 10 : 0 }}>
-                      <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>Total Contributions:</span>
+                      <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>{LEVEL_YEAR} Total Contributions:</span>
                       <span style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a' }}>${total.toLocaleString()}</span>
                       {tier && <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '2px 10px' }}>{tier.name}</span>}
                     </div>
