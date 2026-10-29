@@ -19613,6 +19613,34 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
   // has already booked (or requested) a property tour.
   const [tours, setTours] = useState(null);
   const [toursMonth, setToursMonth] = useState(null);
+  // Pre-booking form emails sent from this list: { [response id]: sent_at }
+  const [prebookSent, setPrebookSent] = useState({});
+  const [prebookSending, setPrebookSending] = useState(null);
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/prebooking_form_sends?select=response_id,sent_at', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(rows) { if (!Array.isArray(rows)) return; var m = {}; rows.forEach(function(x) { m[x.response_id] = x.sent_at; }); setPrebookSent(m); })
+      .catch(function() {});
+  }, []);
+  function prebookDate(ts) { return ts ? new Date(ts).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''; }
+  function sendPrebooking(sub) {
+    if (prebookSending) return;
+    var p = inquiryPreviewFields(sub);
+    var already = prebookSent[sub.id];
+    var who = (p.name || p.email || 'this person');
+    if (!window.confirm((already ? 'The pre-booking form was already sent on ' + prebookDate(already) + '. Send it again to ' : 'Email the pre-booking form to ') + who + (p.email ? ' (' + p.email + ')' : '') + '?')) return;
+    setPrebookSending(sub.id);
+    fetch(SUPABASE_URL + '/functions/v1/send-prebooking-form', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ response_id: sub.id, resend: !!already })
+    }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok, j: j }; }); })
+      .then(function(res) {
+        if (!res.ok || !res.j.ok) { alert(res.j && res.j.error ? res.j.error : 'Could not send the pre-booking form.'); return; }
+        setPrebookSent(function(prev) { var n = Object.assign({}, prev); n[sub.id] = res.j.sent_at; return n; });
+      }).catch(function() { alert('Could not send the pre-booking form. Please try again.'); })
+      .finally(function() { setPrebookSending(null); });
+  }
 
   function load() { fetchVenueInquiries().then(function(r) { setRows(r.filter(function(sub) { return isVenueClientSubmission(sub) === !!clientsOnly && !(clientsOnly && isTestVenueBooking(sub)); })); }); }
   useEffect(function() { load(); }, []);
@@ -19916,6 +19944,17 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
               })()}
               {pendingTourEmails && !inquiryFollowUpAllowed(selected, pendingTourEmails) && (
                 <div style={{ fontSize: 12, color: '#a15c00', marginBottom: 12 }}>Follow-up paused while different tour times await coordination.</div>
+              )}
+              {!clientsOnly && RENTAL_INQUIRY_FORM_IDS.indexOf(selected.form_id) !== -1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <button onClick={function() { sendPrebooking(selected); }} disabled={prebookSending === selected.id}
+                    title="Email this person the pre-booking form (wedding inquiries get the wedding form, everything else the event form)"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: prebookSent[selected.id] ? '#eef7ee' : gold, color: prebookSent[selected.id] ? '#2e7d32' : '#fff', border: '1px solid ' + (prebookSent[selected.id] ? '#bfe0bf' : gold), borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: prebookSending === selected.id ? 'default' : 'pointer', opacity: prebookSending === selected.id ? 0.7 : 1 }}>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+                    {prebookSending === selected.id ? 'Sending…' : (prebookSent[selected.id] ? 'Pre-booking form sent' : 'Send Pre-Booking Form')}
+                  </button>
+                  {prebookSent[selected.id] && <span style={{ fontSize: 11, color: '#888' }}>{prebookDate(prebookSent[selected.id])} · click to resend</span>}
+                </div>
               )}
               {!clientsOnly && RENTAL_INQUIRY_FORM_IDS.indexOf(selected.form_id) !== -1 && inquiryFollowUpAllowed(selected, pendingTourEmails) && (
                 <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
