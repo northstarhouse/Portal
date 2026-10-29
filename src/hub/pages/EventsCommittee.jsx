@@ -8,6 +8,7 @@ import {
 } from '../lib/db.js';
 import AreasTab from './eventsCommitteeAreas.jsx';
 import EventOverviews from './EventOverviews.jsx';
+import RsvpPanel from './RsvpPanel.jsx';
 
 const cryptoId = () => Math.random().toString(36).slice(2, 10);
 const nextDate = (offsetDays) => {
@@ -418,6 +419,7 @@ function OverviewTab({ ev, onUpdate, onEdit, volunteers, session, volunteer }) {
             <StatBox label="Expenses" value={money(expenses)} />
             <StatBox label="Net" value={money(netProfit)} color={netProfit >= 0 ? '#4a5d3a' : '#8a4a2e'} />
           </div>
+          <RsvpPanel eventName={ev.name} />
         </div>
 
         <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>

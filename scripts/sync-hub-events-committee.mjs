@@ -25,6 +25,7 @@ const files = {};
 
 files['pages/EventsCommittee.jsx'] = banner('pages/EventsCommittee.jsx') + read(path.join(hub, 'pages/EventsCommittee.jsx'));
 files['pages/eventsCommitteeAreas.jsx'] = banner('pages/eventsCommitteeAreas.jsx') + read(path.join(hub, 'pages/eventsCommitteeAreas.jsx'));
+files['pages/RsvpPanel.jsx'] = banner('pages/RsvpPanel.jsx') + read(path.join(hub, 'pages/RsvpPanel.jsx'));
 
 let db = read(path.join(hub, 'lib/db.js'));
 const envUrl = 'import.meta.env.VITE_SUPABASE_URL';

@@ -3,6 +3,7 @@
 import { VenueClientDashboard, saveVenueInsuranceVerification } from './venue-clients.jsx';
 import { createAgreementApi, AgreementSigningPage } from './venue-contracts.jsx';
 import HubEventsCommittee from './hub/entry.jsx';
+import RsvpPanel from './hub/pages/RsvpPanel.jsx';
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
@@ -2477,10 +2478,13 @@ function EventsView({ navigate, initialTab }) {
                   <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a' }}>{c.name}</div>
                   <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{dateStr}</div>
                   {c.link && <a href={c.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: gold, textDecoration: 'none', marginTop: 4, display: 'inline-block' }}>Event details ↗</a>}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#555', marginTop: 10, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={!!c.rsvpOnly} onChange={function(e) { upsertCardMeta(c.name, { rsvp_only: e.target.checked }); }} style={{ accentColor: gold, width: 15, height: 15 }} />
-                    RSVP event (no ticket sales)
-                  </label>
+                  <RsvpPanel eventName={c.name} onSaved={function(patch) {
+                    setOverviewCards(function(prev) {
+                      var list = prev || [], key = keyOfName(c.name), found = false;
+                      var next = list.map(function(x) { if (keyOfName(x.event_name) === key) { found = true; return Object.assign({}, x, patch); } return x; });
+                      return found ? next : next.concat([Object.assign({ event_name: c.name }, patch)]);
+                    });
+                  }} />
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
                     {c.rsvpOnly
                       ? <StatCard label="RSVPs" value={String(c.rsvpQty)} sub="no ticket sales" />

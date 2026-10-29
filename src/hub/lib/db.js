@@ -1019,6 +1019,24 @@ export async function syncOverviewCardsFromCommittee(events) {
   if (toCreate.length) await post('event_overview_cards?on_conflict=event_name', toCreate, { Prefer: 'resolution=ignore-duplicates,return=minimal' });
 }
 
+// RSVP events: tie an event to one RSVP form (vol_events, event_type 'rsvp') and read that form's responses.
+export async function fetchRsvpForms() {
+  const rows = await get('vol_events?select=id,title,date,slug&event_type=eq.rsvp&order=date.desc.nullslast,created_at.desc');
+  return Array.isArray(rows) ? rows : [];
+}
+export async function fetchRsvpResponses(eventId) {
+  const rows = await get(`vol_event_responses?select=id,name,response,created_at&event_id=eq.${encodeURIComponent(eventId)}&order=created_at.desc`);
+  return Array.isArray(rows) ? rows : [];
+}
+export async function fetchEventCardMeta(name) {
+  const rows = await get(`event_overview_cards?select=*&event_name=eq.${encodeURIComponent(name)}`);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+export async function saveEventCardMeta(name, patch) {
+  const res = await post('event_overview_cards?on_conflict=event_name', { event_name: name, ...patch, updated_at: new Date().toISOString() }, { Prefer: 'resolution=merge-duplicates,return=representation' });
+  if (res && res.message) throw new Error(res.message);
+}
+
 // Events hidden from the cards (Events Committee page lists them so they can be brought back).
 export async function fetchHiddenCommitteeEvents() {
   const rows = await get('events_committee?select=id,name,date&hidden=eq.true&order=name.asc');
@@ -1098,6 +1116,16 @@ export async function setEventMarketingNA(name, value) {
     { event_name: name, marketing_na: !!value, updated_at: new Date().toISOString() },
     { Prefer: 'resolution=merge-duplicates,return=representation' });
   if (res && res.message) throw new Error(res.message);
+}
+
+// Admin password for committee voting: checked in the database (hashed), never in the app code.
+// Resolves true only on a confirmed match; any error (including the function not existing yet) is "no".
+export async function verifyVoteAdminPassword(password) {
+  try {
+    const r = await fetch(`${URL}/rest/v1/rpc/verify_vote_admin_password`, { method: 'POST', headers: await hdr(), body: JSON.stringify({ p_password: password }) });
+    if (!r.ok) return false;
+    return (await r.json()) === true;
+  } catch { return false; }
 }
 
 export async function fetchVoteItems() {
