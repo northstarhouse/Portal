@@ -1,5 +1,6 @@
 // Journal (blog) editor for the Portal. Posts live in public.site_posts, which the website reads live.
 // Writes go through the site-posts-admin edge function (it checks the Portal sign-in).
+import { MediaPicker } from './media-library.jsx';
 import { buildBlogPrompt, parseBlogPackage, markdownToHtml } from './blog-prompt.js';
 const GOLD = '#886c44';
 const SITE = 'https://www.northstarhouse.org';
@@ -108,12 +109,11 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
   const [editorKey, setEditorKey] = React.useState(0);
   const [htmlMode, setHtmlMode] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
-  const [uploading, setUploading] = React.useState(false);
+  const uploading = false;
+  const [picker, setPicker] = React.useState(false);
   const [msg, setMsg] = React.useState(null);        // { ok, text }
   const [slugTouched, setSlugTouched] = React.useState(false);
   const bodyRef = React.useRef(null);
-  const fileRef = React.useRef(null);
-  const heroRef = React.useRef(null);
   const picking = React.useRef('body');
   const savedRange = React.useRef(null);
   const tickT = React.useRef(null);
@@ -227,38 +227,22 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
     document.execCommand('insertHTML', false, videoHtml(id));
   }
 
-  async function uploadFile(file) {
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const path = 'journal/' + new Date().getFullYear() + '/' + Date.now().toString(36) + '-' + slugify(file.name.replace(/\.[^.]+$/, '')) + '.' + ext;
-    const r = await fetch(supabaseUrl + '/storage/v1/object/site-images/' + path, {
-      method: 'POST',
-      headers: { apikey: supabaseKey, Authorization: 'Bearer ' + supabaseKey, 'Content-Type': file.type || 'image/jpeg', 'x-upsert': 'true' },
-      body: file,
-    });
-    if (!r.ok) throw new Error('Image upload failed (' + r.status + ').');
-    return supabaseUrl + '/storage/v1/object/public/site-images/' + path;
-  }
   function pickImage(forWhat) {
     picking.current = forWhat;
     if (forWhat === 'body') rememberSelection();
-    (forWhat === 'hero' || forWhat === 'og' ? heroRef : fileRef).current.click();
+    setPicker(true);
   }
-  async function onFile(e) {
-    const file = e.target.files && e.target.files[0];
-    e.target.value = '';
-    if (!file) return;
-    setUploading(true); setMsg(null);
-    try {
-      const url = await uploadFile(file);
-      if (picking.current === 'hero') { set('hero_image_url', url); }
-      else if (picking.current === 'og') { set('og_image_url', url); }
-      else if (htmlMode) { set('body_html', (post.body_html || '') + '\n<p><img src="' + url + '" alt=""></p>'); }
-      else {
-        restoreSelection();
-        document.execCommand('insertHTML', false, '<p><img src="' + url + '" alt="" style="max-width:100%"></p>');
-      }
-    } catch (err) { setMsg({ ok: false, text: err.message }); }
-    setUploading(false);
+  function onPicked(img) {
+    setPicker(false);
+    const url = img.url;
+    const alt = '';
+    if (picking.current === 'hero') { set('hero_image_url', url); }
+    else if (picking.current === 'og') { set('og_image_url', url); }
+    else if (htmlMode) { set('body_html', (post.body_html || '') + '\n<p><img src="' + url + '" alt="' + alt + '"></p>'); }
+    else {
+      restoreSelection();
+      document.execCommand('insertHTML', false, '<p><img src="' + url + '" alt="' + alt + '" style="max-width:100%"></p>');
+    }
   }
 
   function switchMode() {
@@ -345,7 +329,7 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           {post.hero_image_url && <img src={post.hero_image_url} alt="" style={{ width: 150, height: 100, objectFit: 'cover', borderRadius: 8, border: '0.5px solid #d8d0c4' }} />}
           <div style={{ flex: 1, minWidth: 220 }}>
-            <button type="button" onClick={() => pickImage('hero')} style={btn(false)}>{uploading ? 'Uploading…' : post.hero_image_url ? 'Replace image' : 'Upload image'}</button>
+            <button type="button" onClick={() => pickImage('hero')} style={btn(false)}>{uploading ? 'Uploading…' : post.hero_image_url ? 'Replace image' : 'Choose or upload image'}</button>
             {post.hero_image_url && <button type="button" onClick={() => set('hero_image_url', '')} style={{ ...btn(false), marginLeft: 8, color: '#888', borderColor: '#d8d0c4' }}>Remove</button>}
             <input value={post.hero_image_alt || ''} onChange={(e) => set('hero_image_alt', e.target.value)} placeholder="Describe the image (for screen readers and search)" style={{ ...inputStyle, marginTop: 8 }} />
           </div>
@@ -371,8 +355,7 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
         <div style={{ textAlign: 'right', marginTop: 6 }}>
           <button type="button" onClick={switchMode} style={{ background: 'none', border: 'none', color: '#888', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>{htmlMode ? 'Back to the editor' : 'Edit as HTML'}</button>
         </div>
-        <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
-        <input ref={heroRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
+        {picker && <MediaPicker supabaseUrl={supabaseUrl} supabaseKey={supabaseKey} onPick={onPicked} onClose={() => setPicker(false)} />}
 
         <div style={{ ...cardBox, marginTop: 18 }}>
           <div style={cardHead}>Organize</div>

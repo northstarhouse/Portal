@@ -5,6 +5,7 @@ import { createAgreementApi, AgreementSigningPage } from './venue-contracts.jsx'
 import HubEventsCommittee from './hub/entry.jsx';
 import RsvpPanel from './hub/pages/RsvpPanel.jsx';
 import { BlogEditorView as JournalEditor } from './blog-editor.jsx';
+import { MediaLibraryView as SiteMediaLibrary } from './media-library.jsx';
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
@@ -772,6 +773,7 @@ var NAV_ICONS = {
   'form-responses': '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
   announcements: '<path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
   'maintenance-request': '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  'site-media': '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
   'blog-editor': '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   'website-payments': '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/>',
   'venue-inquiries': '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
@@ -15895,6 +15897,15 @@ function AdminView({ navigate }) {
           <span style={{ color: '#b5a185', flexShrink: 0 }}>{suClipboardIcon}</span>
           Blog Editor
         </div>
+        <div
+          onClick={function() { navigate('site-media'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{suClipboardIcon}</span>
+          Media Library
+        </div>
       </div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Financials</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 28 }}>
@@ -22178,6 +22189,10 @@ function BlogEditorPage({ navigate }) {
   return <JournalEditor navigate={navigate} supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} />;
 }
 
+function SiteMediaPage({ navigate }) {
+  return <SiteMediaLibrary navigate={navigate} supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} />;
+}
+
 function WebsitePaymentsView({ navigate }) {
   var [orders, setOrders] = useState(null);
   var [err, setErr] = useState(false);
@@ -22450,6 +22465,7 @@ const views = {
   events: EventsHubView,
   'website-payments': WebsitePaymentsView,
   'blog-editor': BlogEditorPage,
+  'site-media': SiteMediaPage,
   quarterly: QuarterlyView,
   volunteers: VolunteersView,
   donors: DonorsView,
@@ -23199,7 +23215,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "blog-editor" ? "Blog Editor" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
