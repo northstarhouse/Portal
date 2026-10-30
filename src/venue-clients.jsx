@@ -35,7 +35,7 @@ export async function saveVenueInsuranceVerification({ baseUrl, apiKey, request 
 export function buildVenueClient(sub, live = null, today = venueDateKey(), nativeVersions = []) {
   const a = sub.answers || {}, hb = a.__honeybook, p = hb?.project || {};
   const insuranceCheck = a.__venue_checklist?.insurance;
-  const insuranceVerified = typeof insuranceCheck?.verified === 'boolean' ? insuranceCheck.verified : !!live?.insurance_uploaded_at;
+  const insuranceVerified = !!live?.insurance_uploaded_at || (typeof insuranceCheck?.verified === 'boolean' && insuranceCheck.verified);
   const eventDate = live?.event_date || p.project_date || a.sn9urgfr || a.evp_date || null;
   const eventEnd = p.project_end_date || eventDate;
   const responses = hb?.file_responses || [];
@@ -81,7 +81,7 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   if (!insuranceVerified) task('insurance', 'Confirm insurance on file', requirementsDue, 'Coverage not verified in the portal', 'insurance');
   if (!eventDate) task('date', 'Confirm event date', null, 'No date recorded', 'booking');
   tasks.sort((x, y) => x.rank - y.rank || (x.due || eventDate || '9999').localeCompare(y.due || eventDate || '9999'));
-  return { id:sub.id, sub, name, email, contacts, hb, eventDate, eventEnd, nativeAgreement, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments?.amount_paid?.amount ?? null, balance:payments?.balance_due?.amount ?? null, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
+  return { id:sub.id, sub, name, email, contacts, hb, eventDate, eventEnd, nativeAgreement, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments?.amount_paid?.amount ?? null, balance:payments?.balance_due?.amount ?? null, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
 }
 
 const css = `
@@ -101,9 +101,10 @@ function InsuranceVerification({ client, onVerify }) {
     finally { setSaving(false); }
   }
   return <div className="vc-modal-section" aria-labelledby="vc-insurance-title">
-    <div className="vc-modal-section-title"><span id="vc-insurance-title">Insurance</span><span className={'vc-pill '+(client.insuranceVerified?'good':'alert')}>{client.insuranceVerified?'Verified on file':'Needs verification'}</span></div>
-    <p className="vc-muted" style={{marginTop:0}}>{client.insuranceVerified ? (client.insuranceCheck?.verified_at ? 'Verified '+dateLabel(client.insuranceCheck.verified_at)+'.' : 'Certificate received '+dateLabel(client.insuranceUploadedAt)+'.') : 'After reviewing the certificate, mark it verified here—even if it was received by email or in HoneyBook.'}</p>
-    {client.sourceUrl && <p><a href={client.sourceUrl} target="_blank" rel="noopener noreferrer">Review documents in HoneyBook ↗</a></p>}
+    <div className="vc-modal-section-title"><span id="vc-insurance-title">Insurance</span><span className={'vc-pill '+(client.insuranceVerified?'good':'alert')}>{client.insuranceUploadedAt?'Uploaded on Client Portal':client.insuranceVerified?'Verified on file':'Needs verification'}</span></div>
+    <p className="vc-muted" style={{marginTop:0}}>{client.insuranceUploadedAt ? 'Uploaded '+dateLabel(client.insuranceUploadedAt)+' by the client.' : client.insuranceVerified ? (client.insuranceCheck?.verified_at ? 'Verified '+dateLabel(client.insuranceCheck.verified_at)+'.' : 'Certificate received '+dateLabel(client.insuranceUploadedAt)+'.') : 'After reviewing the certificate, mark it verified here—even if it was received by email or in HoneyBook.'}</p>
+    {client.insuranceUploadedAt && client.insuranceDriveUrl && <p><a href={client.insuranceDriveUrl} target="_blank" rel="noopener noreferrer">View in client folder on Google Drive ↗</a></p>}
+    {!client.insuranceUploadedAt && client.sourceUrl && <p><a href={client.sourceUrl} target="_blank" rel="noopener noreferrer">Review documents in HoneyBook ↗</a></p>}
     {editingNote ? (
       <>
         <textarea aria-label="Insurance verification note" autoFocus value={note} onChange={e=>{setNote(e.target.value);setSaved(false);}} disabled={saving} maxLength={2000} rows={2} placeholder="For example: certificate received by email; reviewed coverage and event date." style={{display:'block',width:'100%',marginTop:4,border:'1px solid #ded7cb',borderRadius:7,padding:10,font:'inherit',resize:'vertical'}}/>
@@ -118,7 +119,7 @@ function InsuranceVerification({ client, onVerify }) {
         <button type="button" onClick={()=>setEditingNote(true)} style={{marginTop:8,border:'1px solid #e0d8cc',borderRadius:6,padding:'5px 10px',background:'#fff',color:'#886c44',fontSize:11,fontWeight:600}}>{note?'Edit note':'+ Add note'}</button>
       </>
     )}
-    <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',marginTop:12}}><button type="button" disabled={saving || !onVerify} onClick={()=>save(!client.insuranceVerified)} style={{border:client.insuranceVerified?'1px solid #ded7cb':'1px solid #886c44',borderRadius:7,padding:'9px 13px',background:client.insuranceVerified?'white':'#886c44',color:client.insuranceVerified?'#6f685c':'white',opacity:saving?.6:1}}>{saving?'Saving…':client.insuranceVerified?'Undo verification':'Mark insurance verified'}</button>{saved&&<span role="status" className="vc-muted">{client.insuranceVerified?'Verification saved.':'Verification removed.'}</span>}</div>
+    {!client.insuranceUploadedAt && <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',marginTop:12}}><button type="button" disabled={saving || !onVerify} onClick={()=>save(!client.insuranceVerified)} style={{border:client.insuranceVerified?'1px solid #ded7cb':'1px solid #886c44',borderRadius:7,padding:'9px 13px',background:client.insuranceVerified?'white':'#886c44',color:client.insuranceVerified?'#6f685c':'white',opacity:saving?.6:1}}>{saving?'Saving…':client.insuranceVerified?'Undo verification':'Mark insurance verified'}</button>{saved&&<span role="status" className="vc-muted">{client.insuranceVerified?'Verification saved.':'Verification removed.'}</span>}</div>}
     {error&&<p role="alert" style={{fontSize:12,color:'#a64f3c',marginBottom:0}}>{error}</p>}
   </div>;
 }
