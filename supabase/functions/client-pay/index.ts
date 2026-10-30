@@ -174,11 +174,11 @@ async function ppToken() {
 
 // ---------- Google Drive (same service account + Shared Drive as upload-receipt / upload-mail) ----------
 
-// Portal Backend Shared Drive root; insurance lands in Admin / Venue Insurance.
+// Portal Backend Shared Drive root; each client gets a folder in Admin / Venue Clients named
+// "<event date> - <couple> - <event type>", and their insurance certificate lands inside it.
 const DRIVE_ROOT_FOLDER_ID = '1M4p35h-L_V0Ikgz2YNJh5eklp62Dp0wx';
 const b64url = (b: ArrayBuffer | Uint8Array) => { const a = b instanceof Uint8Array ? b : new Uint8Array(b); let s = ''; for (const x of a) s += String.fromCharCode(x); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 let driveToken: { token: string; exp: number } | null = null;
-let insuranceFolderId: string | null = null;
 
 async function driveAccessToken(): Promise<string> {
   if (driveToken && driveToken.exp > Date.now() + 30_000) return driveToken.token;
@@ -204,14 +204,17 @@ async function driveFolder(name: string, parentId: string, token: string): Promi
   return (await made.json()).id;
 }
 
-async function uploadInsuranceToDrive(filename: string, bytes: Uint8Array, mimeType: string): Promise<string> {
+// Returns the link to the client's folder (not the file), so staff land on everything for that event.
+async function uploadInsuranceToDrive(folderName: string, filename: string, bytes: Uint8Array, mimeType: string): Promise<string> {
   const token = await driveAccessToken();
-  if (!insuranceFolderId) insuranceFolderId = await driveFolder('Venue Insurance', await driveFolder('Admin', DRIVE_ROOT_FOLDER_ID, token), token);
+  const clientsFolder = await driveFolder('Venue Clients', await driveFolder('Admin', DRIVE_ROOT_FOLDER_ID, token), token);
+  const insuranceFolderId = await driveFolder(folderName, clientsFolder, token);
   const boundary = 'nsh-' + crypto.randomUUID(), enc = new TextEncoder();
   const body = new Blob([enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: filename, parents: [insuranceFolderId] })}\r\n`), enc.encode(`--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`), bytes, enc.encode(`\r\n--${boundary}--`)]);
-  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': `multipart/related; boundary=${boundary}` }, body });
+  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': `multipart/related; boundary=${boundary}` }, body });
   if (!r.ok) throw new Error('Drive upload failed: ' + r.status + ' ' + await r.text());
-  return (await r.json()).webViewLink as string;
+  await r.json();
+  return `https://drive.google.com/drive/folders/${insuranceFolderId}`;
 }
 
 // Apply a payment to the unpaid schedule rows in order.
@@ -279,8 +282,10 @@ Deno.serve(async req => {
       if (!bin.length || bin.length > 8 * 1024 * 1024) throw new Fail('The file must be under 8 MB.');
       const safeName = String(inq.name || 'Client').replace(/[^\w .+&-]/g, '').trim().slice(0, 80);
       const filename = `${date} - ${safeName} - Insurance.${ext}`;
+      const kind = String(inq.event_type || 'Event').replace(/[^\w .+&-]/g, '').trim().slice(0, 40) || 'Event';
+      const folderName = `${date} - ${safeName} - ${kind}`;
       let url: string;
-      try { url = await uploadInsuranceToDrive(filename, bin, type); }
+      try { url = await uploadInsuranceToDrive(folderName, filename, bin, type); }
       catch (e) { console.error('client-pay drive', e instanceof Error ? e.message : e); throw new Fail('The upload failed. Please try again.', 502); }
       await rest(`venue_inquiries?id=eq.${inq.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ insurance_uploaded_at: new Date().toISOString(), insurance_drive_url: url }) });
       return json({ uploaded: true });
