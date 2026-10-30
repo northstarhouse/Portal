@@ -10,6 +10,7 @@ const STATUS_STYLE = {
 };
 const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '9px 11px', border: '0.5px solid #d8d0c4', borderRadius: 8, fontSize: 14, fontFamily: 'inherit', background: '#fff' };
 const labelStyle = { display: 'block', fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 0.8, margin: '14px 0 5px' };
+const iconBtn = { background: '#fff', border: '0.5px solid #e4e0ea', borderRadius: 8, width: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a9a6b8', cursor: 'pointer', padding: 0, flexShrink: 0 };
 const cardBox = { background: '#fdfbf7', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '4px 16px 16px' };
 const cardHead = { fontSize: 12, fontWeight: 700, color: GOLD, textTransform: 'uppercase', letterSpacing: 1, padding: '12px 0 2px' };
 const chipRow = { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 };
@@ -318,8 +319,8 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
         <label style={labelStyle}>Title</label>
         <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
           <input value={post.title} onChange={(e) => { set('title', e.target.value); if (!slugTouched) set('slug', slugify(e.target.value)); }} style={{ ...inputStyle, fontSize: 20, fontFamily: "'Cardo', serif", flex: 1 }} placeholder="Post title" />
-          <button type="button" onClick={copyPrompt} title="Copy the ChatGPT writing prompt with this title filled in" style={{ ...btn(false), fontSize: 18, padding: '0 14px' }}>✂</button>
-          <button type="button" onClick={pasteDraft} title="Paste ChatGPT's finished blog to fill in this post" style={{ ...btn(true), padding: '0 14px', whiteSpace: 'nowrap' }}>Paste AI draft</button>
+          <button type="button" onClick={copyPrompt} title="Copy the ChatGPT writing prompt with this title" style={iconBtn}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg></button>
+          <button type="button" onClick={pasteDraft} title="Paste ChatGPT's finished blog to fill in this post" style={iconBtn}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></button>
         </div>
         {pasteBox !== null && (
           <div style={{ marginTop: 8 }}>
