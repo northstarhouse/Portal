@@ -18366,6 +18366,9 @@ function tourCategoryLabel(e) {
 }
 // "Jennifer Oceguera Tour" -> "Jennifer Oceguera Wedding Tour", "Danielle
 // Simpson Memorial Tour", etc. Generic (uncategorized) tours keep just "Tour".
+// A tour booked on a slot with no guide chosen ("default") is Jen's.
+function guideLabel(name) { return !name ? '' : String(name).toLowerCase() === 'default' ? 'Jen' : name; }
+
 function tourTitleFor(raw) {
   var cat = tourCategoryLabel({ kind: 'Tour', raw: raw || {} });
   var catSingular = cat === 'Memorials' ? 'Memorial' : cat;
@@ -18919,7 +18922,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                   var month = e.date.toLocaleDateString('en-US', { month: 'short', timeZone: 'America/Los_Angeles' }).toUpperCase();
                   var day = e.date.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'America/Los_Angeles' });
                   var when = e.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) + ' • ' + e.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
-                  var guideName = e.kind === 'Tour' && e.raw.guide_name ? e.raw.guide_name : '';
+                  var guideName = e.kind === 'Tour' && e.raw.guide_name ? guideLabel(e.raw.guide_name) : '';
                   var dateColors = colorCoding ? tourCategoryColor(tourCategoryLabel(e)) : null;
                   return (
                     <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}
@@ -19288,7 +19291,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                   {detailEntry.raw && detailEntry.raw.status && (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: detailEntry.raw.status === 'booked' ? '#e3f3e9' : '#f0ece6', color: detailEntry.raw.status === 'booked' ? '#2e7d4f' : '#777' }}>
-                      {detailEntry.raw.status === 'booked' ? ('✓ Booked' + (detailEntry.raw.guide_name ? ' Tour with ' + detailEntry.raw.guide_name : '')) : detailEntry.raw.status}
+                      {detailEntry.raw.status === 'booked' ? ('✓ Booked' + (detailEntry.raw.guide_name ? ' Tour with ' + guideLabel(detailEntry.raw.guide_name) : '')) : detailEntry.raw.status}
                     </span>
                   )}
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: dColor.bg, color: dColor.color }}>{dCat}</span>
@@ -20852,7 +20855,7 @@ function EstateToursView() {
                       Preferred: {(t.requested_slots || []).map(function(s) { return fmtPreferredDate(s.date) + (s.time_label ? ' (' + s.time_label + ')' : ''); }).join('  ·  ')}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{fmtDate(t.date)} at {fmtTime(t.start_time)} · {t.guide_name}</div>
+                    <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{fmtDate(t.date)} at {fmtTime(t.start_time)} · {guideLabel(t.guide_name)}</div>
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
