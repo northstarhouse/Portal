@@ -9876,6 +9876,8 @@ function SponsorsView() {
     TIERS[tierIdx].benefits = inherited.concat(TIERS[tierIdx].ownBenefits);
     // every sponsor, at any level, is invited to State of the Star
     TIERS[tierIdx].benefits.push('Invitation to State of the Star');
+    // the thank-you note always sits at the top of the checklist
+    TIERS[tierIdx].benefits.unshift('Thank you note sent');
   }
 
   function getTier(total) {
