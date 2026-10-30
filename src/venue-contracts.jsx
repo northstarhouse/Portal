@@ -50,7 +50,7 @@ export function prepareAgreementDraft(client,extras={}){
     '',
     'Signatures',
     ...(people.length?people.map(c=>'Client: '+c.name):['Client: '+client.name]),
-    'For North Star Historic Conservancy: [VENUE SIGNER — TO COMPLETE]',
+    'For North Star Historic Conservancy: Venue countersigner',
     'Contract Date: '+todayLong(),
   ];
   return {title:client.name+' — Rental Agreement',body:lines.join('\n'),signers:[...clientSigners,{name:'',email:'venue@thenorthstarhouse.org',role:'venue'}],change_summary:''};
