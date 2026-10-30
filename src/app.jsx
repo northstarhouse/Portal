@@ -18489,7 +18489,22 @@ function VenueRentalsView({ navigate, initialTab }) {
         if (issues.length) alert('Tour cancelled, but:\n' + issues.join('\n'));
         loadTours();
         setDetailEntry(null);
-      }).catch(function(e) { alert('Could not cancel: ' + e.message); })
+      }).catch(function(e) {
+        // The server may have cancelled it and then failed to answer (slow email or calendar step): check before reporting a failure.
+        return fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=status&id=eq.' + encodeURIComponent(t.id), { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+          .then(function(r) { return r.json(); })
+          .then(function(rows) {
+            var st = rows && rows[0] && rows[0].status;
+            if (Array.isArray(rows) && (!rows.length || (st !== 'booked' && st !== 'requested'))) {
+              loadTours();
+              setDetailEntry(null);
+              alert('The tour was cancelled. The confirmation email or calendar update may not have finished (' + e.message + '). Check the calendar and the visitor email.');
+            } else {
+              alert('Could not cancel: ' + e.message);
+            }
+          })
+          .catch(function() { alert('Could not cancel: ' + e.message); });
+      })
       .finally(function() { setDetailSaving(false); });
   }
 
