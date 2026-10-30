@@ -57,12 +57,14 @@ export function prepareAgreementDraft(client,extras={}){
   return {title:client.name+' — Rental Agreement',body:lines.join('\n'),signers:[...clientSigners,{name:'',email:'venue@thenorthstarhouse.org',role:'venue'}],change_summary:''};
 }
 // A readable, document-style view of the contract text (the saved text stays plain).
+// Contracts issued before the venue signature line lost its placeholder still carry it in their locked text: show neutral wording.
+const tidy=t=>String(t||'').replace(/\[VENUE SIGNER\s*[—-]\s*TO COMPLETE\]/g,'Venue countersigner');
 export function ContractPreview({body,initials}){
   const out=[];let list=[];let next=1,open=false;const flush=()=>{if(list.length){out.push(<ul key={'u'+out.length}>{list}</ul>);list=[];}};
   // With `initials` ({values,onChange}) every numbered term ends with a box for the client's initials.
   // `initials`: {signers:[{id,name}] (one box each), mine:id|null (the box the viewer fills in), values, onChange, recorded:{signerId:{term:initials}}}
   const close=()=>{if(initials&&open){const n=next-1;out.push(<div key={'ini'+n} className="va-initial">{initials.signers.map(sg=>{const first=String(sg.name||'').split(' ')[0]||'Client';return sg.id===initials.mine?<label key={sg.id}><small>{first} (you)</small><button type="button" className={'va-initbtn'+(initials.values[n]?' filled':'')} aria-label={'Initial term '+n} onClick={()=>initials.onChange(n,initials.values[n]?'':initials.auto)}>{initials.values[n]||'Click to initial'}</button></label>:<div key={sg.id} className="va-initbox"><small>{first}</small><span>{initials.recorded?.[sg.id]?.[n]||'\u00a0'}</span></div>;})}</div>);open=false;}};
-  String(body||'').split('\n').forEach((raw,i)=>{
+  tidy(body).split('\n').forEach((raw,i)=>{
     const line=raw.trimEnd();
     if(/^- /.test(line)){list.push(<li key={i}>{line.slice(2)}</li>);return;}
     flush();

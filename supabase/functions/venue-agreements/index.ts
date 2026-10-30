@@ -10,6 +10,8 @@ function token(){return Array.from(crypto.getRandomValues(new Uint8Array(32)),x=
 const tokenHash=(value:string)=>hash('agreement-link:'+KEY+':'+value);
 const codeHash=(id:string,code:string)=>hash('agreement-code:'+KEY+':'+id+':'+code);
 // Clients sign on their own event page (venue.northstarhouse.org); only the venue countersigner signs in the Portal.
+// Locked text issued before the venue signature line lost its placeholder: show the neutral wording in downloads.
+const tidyBody=(t:string)=>String(t||'').replace(/\[VENUE SIGNER\s*[—-]\s*TO COMPLETE\]/g,'Venue countersigner');
 const EVENT_PAGE='https://venue.northstarhouse.org/';
 // Clients sign on their own event page: they enter their venue code there and the agreement opens first. The venue countersigner signs in the Portal.
 const link=(value:string,role='client',code='')=>role==='venue'?BASE+'#agreement='+value:EVENT_PAGE+(code?'#code='+code:'');
@@ -56,7 +58,7 @@ Deno.serve(async req=>{
    const raw=String(body.token||'');if(!/^[a-f0-9]{64}$/.test(raw))return json({error:'Invalid signing link.'},401);
    const th=await tokenHash(raw);const resolved=await rpc('resolve',{token_hash:th});const signer=resolved.signer;
    if(action==='view'){const result=await rpc('view',{token_hash:th});let initials:any[]=[];try{initials=await rest('venue_agreement_initials?select=signer_id,section,initials&version_id=eq.'+result.version.id)||[];}catch(_e){/* table not created yet */}return json({...result,initials,signer:{id:result.signer.id,name:result.signer.name,email:mask(result.signer.email),role:result.signer.role,status:result.signer.status},version:publicRecord(result.version)});}
-   if(action==='client_pdf')return new Response(await agreementPdf(resolved.version),{headers:{...CORS,'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="North-Star-House-agreement-v'+resolved.version.version+'.pdf"'}});
+   if(action==='client_pdf')return new Response(await agreementPdf({...resolved.version,body:tidyBody(resolved.version.body)}),{headers:{...CORS,'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="North-Star-House-agreement-v'+resolved.version.version+'.pdf"'}});
    if(signer.status!=='pending')return json({error:'This signature response is already recorded and locked. You can view or download the agreement; changes require a new version.'},409);
    if(action==='request_code'){
     const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,'0');
@@ -85,7 +87,7 @@ Deno.serve(async req=>{
   }
   if(action==='staff_pdf'){
    const version=await rest('rpc/venue_agreement_record',{method:'POST',body:JSON.stringify({p_id:body.version_id})});if(!version)return json({error:'Agreement not found.'},404);
-   return new Response(await agreementPdf(version),{headers:{...CORS,'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="North-Star-House-agreement-v'+version.version+'.pdf"'}});
+   return new Response(await agreementPdf({...version,body:tidyBody(version.body)}),{headers:{...CORS,'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="North-Star-House-agreement-v'+version.version+'.pdf"'}});
   }
   if(action==='issue'){
    const draft=await rest('rpc/venue_agreement_record',{method:'POST',body:JSON.stringify({p_id:body.version_id})});if(!draft)return json({error:'Draft not found.'},404);
