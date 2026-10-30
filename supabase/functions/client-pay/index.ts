@@ -324,6 +324,11 @@ Deno.serve(async req => {
       const recent = await rest(`venue_client_messages?select=id&inquiry_id=eq.${inq.id}&created_at=gte.${since}`);
       if (recent.length >= 10) throw new Fail('You have sent several messages recently. Please call or email us directly.', 429);
       await rest('venue_client_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ inquiry_id: inq.id, event_title: inq.name, from_name: fromName, from_email: fromEmail || null, body: text }) });
+      // Also saved to the Portal's Messages list (event_uid 'client:<pre-booking id>' marks it as from a couple's event page),
+      // so it shows in Needs your attention until it is marked handled.
+      try {
+        await rest('venue_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ event_uid: 'client:' + inq.prebooking_form_response_id, event_title: inq.name, subject: 'Message from the event page', body: text, from_name: fromName, from_email: fromEmail || null, direction: 'incoming' }) });
+      } catch (e) { console.error('client-pay venue_messages', e instanceof Error ? e.message : e); }
       // The saved message is the record, so an email hiccup doesn't lose it.
       try {
         const mail = await fetch(`${URL_}/functions/v1/send-email`, {

@@ -199,8 +199,10 @@ function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChan
   </dialog>;
 }
 
-export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, agreementApi, filter, setFilter, query, setQuery }) {
+export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, agreementApi, filter, setFilter, query, setQuery, loadClientMessages, onOpenMessages }) {
   const [events,setEvents] = React.useState([]), [error,setError] = React.useState('');
+  const [clientMessages,setClientMessages] = React.useState([]);
+  React.useEffect(() => { let off=false; if(loadClientMessages)loadClientMessages().then(rows=>{if(!off)setClientMessages(Array.isArray(rows)?rows:[]);}).catch(()=>{}); return () => {off=true;}; }, []);
   const [savedResponses,setSavedResponses] = React.useState({});
   const [nativeVersions,setNativeVersions] = React.useState([]);
   React.useEffect(()=>{let cancelled=false;function refresh(){if(agreementApi)agreementApi('summary').then(rows=>{if(!cancelled)setNativeVersions(rows);}).catch(()=>{if(!cancelled)setError('Live agreement status is unavailable. Showing the saved client records.');});}refresh();const timer=setInterval(refresh,60000);window.addEventListener('focus',refresh);return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',refresh);};},[agreementApi]);
@@ -208,7 +210,8 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, a
   React.useEffect(() => { let cancelled=false; loadEvents().then(rows => {if(!cancelled)setEvents(rows);}).catch(() => {if(!cancelled)setError('Live requirement updates are unavailable. Showing the saved client records.');}); return()=>{cancelled=true;}; }, [loadEvents]);
   const today = venueDateKey();
   const clients = (submissions || []).map(sub => buildVenueClient(savedResponses[sub.id] ? {...sub,...savedResponses[sub.id]} : sub,events.find(e=>e.prebooking_form_response_id===sub.id),today,nativeVersions)).filter(c => !c.eventEnd || c.eventEnd >= today).sort((a,b)=>(a.eventDate || '9999').localeCompare(b.eventDate || '9999'));
-  const urgent = clients.flatMap(client=>client.urgent.map(task=>({...task,client}))).sort((a,b)=>a.rank-b.rank || (a.due || a.client.eventDate || '9999').localeCompare(b.due || b.client.eventDate || '9999'));
+  const messageTasks = clientMessages.map(m=>({key:'msg-'+m.id,title:'New message from '+(m.from_name||'a client'),detail:String(m.body||'').replace(/\s+/g,' ').slice(0,70)+(String(m.body||'').length>70?'…':''),due:null,overdue:false,urgent:true,rank:0,kind:'message',client:{name:m.event_title||m.from_name||'Client',eventDate:null},action:()=>{const cid=String(m.event_uid||'').replace('client:','');if(submissions&&submissions.some(s=>s.id===cid))setSelected(cid);else if(onOpenMessages)onOpenMessages();}}));
+  const urgent = messageTasks.concat(clients.flatMap(client=>client.urgent.map(task=>({...task,client})))).sort((a,b)=>a.rank-b.rank || (a.due || a.client.eventDate || '9999').localeCompare(b.due || b.client.eventDate || '9999'));
   const upcoming = clients.flatMap(client=>client.tasks.filter(t=>t.due && t.due>=today).map(task=>({...task,client}))).sort((a,b)=>a.due.localeCompare(b.due));
   const dueSoon = clients.flatMap(c=>c.duePayments).filter(p=>p.due && p.due<=shiftDate(today,30));
   const matches = clients.filter(c=>(filter!=='attention'||c.urgent.length>0)&&(!query || (c.name+' '+c.email+' '+c.eventDate).toLowerCase().includes(query.toLowerCase())));
@@ -236,7 +239,7 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, a
         </article>;
       })}
     </section><aside className="vc-sidebar" aria-label="Client priorities">
-      <section className="vc-side-card priority"><h2 className="vc-side-title">Needs your attention <span className="vc-counter">{submissions===null?'—':urgent.length}</span></h2>{submissions===null?<p className="vc-muted">Loading priorities…</p>:urgent.length===0?<p className="vc-muted">No urgent items recorded.</p>:(allTasks?urgent:urgent.slice(0,6)).map(t=><button className="vc-task" key={t.key} onClick={()=>open(t.client)}><div className="vc-task-head">{t.title}</div><div className="vc-task-name">{t.client.name}</div><div className={'vc-task-date '+(t.overdue?'late':'')}>{t.due?(t.overdue?'Past due · ':'Due ')+dateLabel(t.due):t.detail}</div></button>)}{urgent.length>6&&<button className="vc-text-button" onClick={()=>setAllTasks(!allTasks)}>{allTasks?'Show fewer priorities':'See all '+urgent.length+' priorities ↓'}</button>}</section>
+      <section className="vc-side-card priority"><h2 className="vc-side-title">Needs your attention <span className="vc-counter">{submissions===null?'—':urgent.length}</span></h2>{submissions===null?<p className="vc-muted">Loading priorities…</p>:urgent.length===0?<p className="vc-muted">No urgent items recorded.</p>:(allTasks?urgent:urgent.slice(0,6)).map(t=><button className="vc-task" key={t.key} onClick={()=>t.action?t.action():open(t.client)}><div className="vc-task-head">{t.title}</div><div className="vc-task-name">{t.client.name}</div><div className={'vc-task-date '+(t.overdue?'late':'')}>{t.due?(t.overdue?'Past due · ':'Due ')+dateLabel(t.due):t.detail}</div></button>)}{urgent.length>6&&<button className="vc-text-button" onClick={()=>setAllTasks(!allTasks)}>{allTasks?'Show fewer priorities':'See all '+urgent.length+' priorities ↓'}</button>}</section>
     </aside></div>
     {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} onClose={()=>setSelected(null)} onVerify={verifyInsurance} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;

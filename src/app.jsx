@@ -460,6 +460,13 @@ function fetchToursThisMonth() {
   }).then(function(r) { return r.json(); }).then(function(rows) { return Array.isArray(rows) ? rows.length : null; }).catch(function() { return null; });
 }
 
+// Messages couples sent from their event page that nobody has marked handled yet.
+function loadUnhandledClientMessages() {
+  return fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&event_uid=like.client:*&handled_at=is.null&order=created_at.desc&limit=50', {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+  }).then(function(r) { return r.ok ? r.json() : []; });
+}
+
 function loadVenueClientEvents() {
   return fetch(SUPABASE_URL + '/rest/v1/venue_inquiries?select=id,name,event_type,event_date,prebooking_form_response_id,insurance_uploaded_at,insurance_drive_url,brick_lines,brick_submitted_at,questionnaire_form_response_id,questionnaire_sent_at,venue_payment_schedule(sequence,kind,label,amount_cents,amount_paid_cents,due_date,status)&prebooking_form_response_id=not.is.null', {
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -2757,7 +2764,10 @@ function cancelEstateTour(id, notify) {
 }
 function rescheduleProblems(res, notify) {
   var issues = [];
-  if (res.unchanged) return issues;
+  if (res.unchanged) {
+    if (notify && !res.emailed) issues.push('The time did not change, and the confirmation email to the visitor did not send.');
+    return issues;
+  }
   if (res.calendar && res.calendar !== 'moved' && res.calendar !== 'created' && res.calendar !== 'skipped') issues.push('Google Calendar was not updated (' + res.calendar + ').');
   if (notify && !res.emailed) issues.push('The email to the visitor did not send.');
   return issues;
@@ -18964,7 +18974,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
 
           {venueTab === 'clients' && (
-            !inquiriesError && <VenueClientDashboard submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
+            !inquiriesError && <VenueClientDashboard loadClientMessages={loadUnhandledClientMessages} onOpenMessages={function() { navigate('venue-messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
           )}
 
           {venueTab === 'inquiries' && (
@@ -19559,6 +19569,18 @@ function VenueMessagesView({ navigate }) {
     fetchWeddings().then(setWeddings);
   }, []);
 
+  function markMessageHandled(id) {
+    var stamp = new Date().toISOString();
+    fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ handled_at: stamp })
+    }).then(function(r) {
+      if (!r.ok) { alert('Could not mark it handled. Please try again.'); return; }
+      setMessages(function(rows) { return (rows || []).map(function(m) { return m.id === id ? Object.assign({}, m, { handled_at: stamp }) : m; }); });
+    });
+  }
+
   function handleSave() {
     if (!form.body.trim() || saving) return;
     setSaving(true);
@@ -19624,7 +19646,12 @@ function VenueMessagesView({ navigate }) {
                 </div>
                 {m.event_title && <div style={{ fontSize: 11, color: gold, fontWeight: 600, marginBottom: 4 }}>{m.event_title}</div>}
                 <div style={{ fontSize: 13, color: '#555', whiteSpace: 'pre-wrap' }}>{m.body}</div>
-                <div style={{ fontSize: 10, color: '#ccc', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>{m.direction}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                  <span style={{ fontSize: 10, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.5 }}>{m.direction}</span>
+                  {String(m.event_uid || '').indexOf('client:') === 0 && (m.handled_at
+                    ? <span style={{ fontSize: 10, fontWeight: 700, color: '#2e7d32' }}>Handled</span>
+                    : <button onClick={function() { markMessageHandled(m.id); }} style={{ fontSize: 11, fontWeight: 600, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '2px 10px', cursor: 'pointer' }}>Mark handled</button>)}
+                </div>
               </div>
             );
           })}
@@ -20230,6 +20257,7 @@ function TourRequestCalendarRow({ tour, onBooked, accentDark }) {
         setSaving(false);
         if (res.ok && res.body.row) {
           logActivity('Booked a venue tour for ' + (tour.visitor_name || 'a visitor') + ' with ' + guide + ' and added it to the calendar', 'tour_booked');
+          if (tour.visitor_email && !res.body.emailed) alert('Booked, but the confirmation email to ' + tour.visitor_email + ' did not send.');
           setOpen(false);
           if (onBooked) onBooked(res.body.row);
         } else {

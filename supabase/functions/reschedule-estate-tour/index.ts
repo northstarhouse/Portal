@@ -248,7 +248,32 @@ Deno.serve(async (req) => {
       if (takenOverSlot) await sb('/rest/v1/estate_tours', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(takenOverSlot) }).catch(() => {})
       return jsonResponse({ error: `Could not save: ${err}` }, 500)
     }
-    if (!changed) return jsonResponse({ ok: true, unchanged: true })
+    if (!changed) {
+      // Nothing moved. If staff asked to notify, send the visitor a confirmation of the booking as it stands
+      // (this is how a booking that never got its confirmation email gets one).
+      let emailedSame = false
+      if (notify !== false && tour.status === 'booked' && tour.visitor_email) {
+        const when = fmtWhen(date, time)
+        const guide = tourGuideFor(date, tour.guide_name)
+        const name = tour.visitor_name || 'there'
+        emailedSame = await sendMail(
+          tour.visitor_email,
+          `Your North Star House tour is confirmed — ${when}`,
+          `Hi ${name},\n\nYour estate tour of North Star House is confirmed.\n\nTour Date & Time: ${when}\n${guide ? `Your tour guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you then!\nNorth Star House`,
+          buildBrandedEmailHtml({
+            headline: 'Your Tour is Confirmed',
+            subtext:
+              `Hi ${esc(name)}, your estate tour of North Star House is confirmed:<br><br>` +
+              `Tour Date &amp; Time: <strong>${esc(when)}</strong><br>` +
+              (guide ? `Your tour guide: <strong>${esc(guide)}</strong><br>` : '') +
+              `Address: <strong>${esc(TOUR_ADDRESS)}</strong><br><br>` +
+              TOUR_DIRECTIONS_HTML_INLINE,
+            note: 'A reminder email will be sent to you 24 hours before the tour, and another 1-hour courtesy email the day of.',
+          }),
+        )
+      }
+      return jsonResponse({ ok: true, unchanged: true, emailed: emailedSame })
+    }
     // The time this tour left is an open slot again; recreate the standard open slots now rather than at the nightly run.
     await sb('/rest/v1/rpc/ensure_default_tour_slots', { method: 'POST', body: '{}' }).catch(() => {})
 
