@@ -312,7 +312,6 @@ Deno.serve(async req => {
     }
 
     // The people on this booking, taken from their pre-booking form (not typed in by whoever is on the page).
-    // Names, emails and phone numbers shown on the page are masked; the real ones are used when a message is sent.
     async function bookingContacts() {
       const out: { name: string; email: string; phone: string }[] = [];
       try {
@@ -326,12 +325,10 @@ Deno.serve(async req => {
       if (!out.length) out.push({ name: String(inq.name || 'Client'), email: String(inq.email || ''), phone: '' });
       return out;
     }
-    const maskEmail = (e: string) => (e ? e.replace(/^(.).*(@.*)$/, '$1•••$2') : '');
-    const maskPhone = (p: string) => { const d = p.replace(/\D/g, ''); return d.length >= 4 ? '•••-•••-' + d.slice(-4) : ''; };
 
     if (action === 'message_contacts') {
       const list = await bookingContacts();
-      return json({ contacts: list.map((c, i) => ({ id: i, name: c.name, email: maskEmail(c.email), phone: maskPhone(c.phone) })) });
+      return json({ contacts: list.map((c, i) => ({ id: i, name: c.name, email: c.email, phone: c.phone })) });
     }
 
     if (action === 'send_message') {
