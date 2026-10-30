@@ -18406,6 +18406,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   const [justBooked, setJustBooked] = useS(null); // tour request booked via "Add to Calendar" (for the confirmation line)
   const [scheduleOpen, setScheduleOpen] = useS(false);
   // Tours stay in Inquiries. Clients begin with an official pre-booking submission.
+  const [guideFilter, setGuideFilter] = useS('all');
   const [venueTab, setVenueTab] = useS(function() {
     if (initialTab) return initialTab;
     try { return sessionStorage.getItem('nsh-venue-tab') === 'clients' ? 'clients' : 'inquiries'; } catch (e) { return 'inquiries'; }
@@ -18852,6 +18853,8 @@ function VenueRentalsView({ navigate, initialTab }) {
     return { key: 't-' + t.id, kind: 'Tour', title: tourTitleFor(t), date: d, raw: t };
   }).filter(function(e) { return e.date && e.date.getTime() >= Date.now() - 24 * 60 * 60 * 1000; })
     .sort(function(a, b) { return a.date - b.date; });
+  // Only Jen's or only Derek's tours (a booking on the default slot counts as Jen's).
+  var shownTours = guideFilter === 'all' ? upcomingCombined : upcomingCombined.filter(function(e) { return guideLabel(e.raw.guide_name) === guideFilter; });
 
   return (
     <div className={colorCoding ? 'venue-color-coding' : 'venue-neutral'}>
@@ -18939,14 +18942,22 @@ function VenueRentalsView({ navigate, initialTab }) {
             title="Upcoming Tours"
             tone="tours"
             colorCoding={colorCoding}
+            headerRight={
+              <select value={guideFilter} onChange={function(ev) { setGuideFilter(ev.target.value); }} aria-label="Filter tours by guide"
+                style={{ marginLeft: 'auto', marginRight: 10, fontSize: 12, fontWeight: 600, color: gold, background: '#fff', border: '0.5px solid ' + gold, borderRadius: 8, padding: '4px 8px', cursor: 'pointer' }}>
+                <option value="all">All guides</option>
+                <option value="Jen">Jen</option>
+                <option value="Derek">Derek</option>
+              </select>
+            }
           >
             {tours === null ? (
               <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Loading…</div>
-            ) : upcomingCombined.length === 0 ? (
-              <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>Nothing scheduled yet.</div>
+            ) : shownTours.length === 0 ? (
+              <div style={{ fontSize: 13, color: '#bbb', padding: '20px 0', textAlign: 'center' }}>{guideFilter === 'all' ? 'Nothing scheduled yet.' : 'No upcoming tours with ' + guideFilter + '.'}</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {upcomingCombined.map(function(e) {
+                {shownTours.map(function(e) {
                   var month = e.date.toLocaleDateString('en-US', { month: 'short', timeZone: 'America/Los_Angeles' }).toUpperCase();
                   var day = e.date.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'America/Los_Angeles' });
                   var when = e.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) + ' • ' + e.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
@@ -19511,7 +19522,7 @@ function VenueRentalsView({ navigate, initialTab }) {
 // Overview card shell for the new (non-legacy) Venue Rentals landing page --
 // icon + title + "View all" header, arbitrary content below.
 var VENUE_TONE_DARK = { tours: '#2d5a8a', requests: '#c6690f', inquiries: '#8a7020' };
-function VenueOverviewCard({ icon, title, onViewAll, children, tone, colorCoding }) {
+function VenueOverviewCard({ icon, title, onViewAll, headerRight, children, tone, colorCoding }) {
   var dark = colorCoding ? VENUE_TONE_DARK[tone] : gold;
   return (
     <div data-venue-tone={tone} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden', boxShadow: dark ? 'none' : undefined }}>
@@ -19520,6 +19531,7 @@ function VenueOverviewCard({ icon, title, onViewAll, children, tone, colorCoding
           {dark ? React.cloneElement(icon, { stroke: '#fff' }) : icon}
           <div style={{ fontSize: 15, fontWeight: 700, color: dark ? '#fff' : '#2a2a2a', fontFamily: "'Cardo', serif" }}>{title}</div>
         </div>
+        {headerRight}
         {onViewAll && <div onClick={onViewAll} style={{ fontSize: 12, color: dark ? '#fff' : gold, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>View all →</div>}
       </div>
       <div style={{ padding: dark ? '14px 18px 18px' : '0 18px 18px' }}>{children}</div>
