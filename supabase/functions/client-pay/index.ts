@@ -18,7 +18,7 @@ class Fail extends Error { constructor(m: string, public status = 400, public ex
 
 const QUESTIONNAIRE_FORM_ID = 'e9be06b9-6788-41bc-a78a-28e02b8b749a';
 const EMAIL_FIELD = 'nzic6lad';
-const INQUIRY_SELECT = 'id,name,email,status,event_type,event_date,insurance_uploaded_at,questionnaire_form_response_id,brick_lines,venue_payment_schedule(id,sequence,label,amount_cents,amount_paid_cents,due_date,status)';
+const INQUIRY_SELECT = 'id,name,email,status,event_type,event_date,prebooking_form_response_id,insurance_uploaded_at,questionnaire_form_response_id,brick_lines,venue_payment_schedule(id,sequence,label,amount_cents,amount_paid_cents,due_date,status)';
 const TOUR_ADDRESS = '12075 Auburn Rd. Grass Valley, CA 95949';
 
 const PAGE_URL = 'https://venue.northstarhouse.org/';
