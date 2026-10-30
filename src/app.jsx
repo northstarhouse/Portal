@@ -18930,7 +18930,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
-                        <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{when}{guideName ? <span> • <strong style={{ color: '#4a4a4a', fontWeight: 700 }}>{guideName}</strong></span> : null}</div>
+                        <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{when}{guideName ? <span> • <strong style={{ color: gold, fontWeight: 700 }}>{guideName}</strong></span> : null}</div>
                       </div>
                       <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
