@@ -235,8 +235,8 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
   function onPicked(img) {
     setPicker(false);
     const url = img.url;
-    const alt = '';
-    if (picking.current === 'hero') { set('hero_image_url', url); }
+    const alt = String(img.alt || '').replace(/"/g, '&quot;');
+    if (picking.current === 'hero') { set('hero_image_url', url); if (img.alt && !post.hero_image_alt) set('hero_image_alt', img.alt); }
     else if (picking.current === 'og') { set('og_image_url', url); }
     else if (htmlMode) { set('body_html', (post.body_html || '') + '\n<p><img src="' + url + '" alt="' + alt + '"></p>'); }
     else {
