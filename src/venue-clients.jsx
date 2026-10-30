@@ -10,6 +10,27 @@ function dateLabel(date) { return date ? new Date(date.includes('T') ? date : da
 function text(html) { return String(html || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(); }
 function amount(cents, currency = 'USD') { return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format((cents || 0) / 100); }
 
+// Payments received outside this system (for clients booked before it existed), kept beside the form response.
+// list: [{ id, cents, date: 'YYYY-MM-DD', note }]
+export async function saveVenueManualPayments({ baseUrl, apiKey, request = fetch }, responseId, list) {
+  if (!responseId || !Array.isArray(list)) throw new Error('Choose a client.');
+  const headers = { apikey:apiKey, Authorization:'Bearer '+apiKey, 'Content-Type':'application/json' };
+  const resource = baseUrl + '/rest/v1/nsh_form_responses?id=eq.' + encodeURIComponent(responseId);
+  async function readResponse(res) {
+    if (!res.ok) throw new Error('Payments could not be saved. Please try again.');
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length !== 1) throw new Error('Client record is unavailable or you do not have permission to update it.');
+    return rows[0];
+  }
+  const current = await readResponse(await request(resource+'&select=id,form_id,answers', {headers}));
+  if (!['a3a383f7-e1db-4344-9dec-ea879ad3406d','668f27d4-7e2d-4ce6-ba0c-bac5ddf9d8f8'].includes(current.form_id)) throw new Error('This record is not a venue client.');
+  const clean = list.map(p => ({ id:String(p.id), cents:Math.round(Number(p.cents)), date:String(p.date || '').slice(0,10), note:String(p.note || '').trim().slice(0,200) })).filter(p => p.cents > 0);
+  const answers = { ...current.answers, __venue_checklist:{ ...current.answers?.__venue_checklist, manual_payments:clean } };
+  const saved = await readResponse(await request(resource+'&form_id=eq.'+encodeURIComponent(current.form_id), {method:'PATCH',headers:{...headers,Prefer:'return=representation'},body:JSON.stringify({answers})}));
+  if ((saved.answers?.__venue_checklist?.manual_payments || []).length !== clean.length) throw new Error('Payments were not saved. Please try again.');
+  return saved;
+}
+
 // Store staff verification beside the form response, separately from the
 // immutable HoneyBook snapshot and the actual certificate-upload timestamp.
 export async function saveVenueInsuranceVerification({ baseUrl, apiKey, request = fetch }, responseId, verified, note = '') {
@@ -59,7 +80,12 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   const nativeAgreement = nativeVersions.filter(v=>v.response_id===sub.id&&!['draft','void'].includes(v.status)).sort((a,b)=>b.version-a.version)[0] || null;
   const signatures = nativeAgreement ? {all_required_signed:nativeAgreement.status==='completed',signatures:(nativeAgreement.recipients||[]).map(s=>({signee_name:s.name,signee_type:s.role==='venue'?'vendor':'client',required:true,signed:s.status==='signed',signed_at:s.signed_at}))} : contract?.responses?.signatures || null;
   const currency = payments?.total?.currency || 'USD';
-  const schedule = (payments?.schedule || []).map((payment, index) => ({ ...payment, cents: payment.amount?.amount || 0, currency: payment.amount?.currency || currency, label: payment.__nativeLabel || (index === 0 ? 'Booking payment' : 'Scheduled payment ' + (index + 1)), due: payment.due_date?.slice(0, 10) || null })).sort((x, y) => (x.due || '9999').localeCompare(y.due || '9999'));
+  const baseSchedule = (payments?.schedule || []).map((payment, index) => ({ ...payment, cents: payment.amount?.amount || 0, currency: payment.amount?.currency || currency, label: payment.__nativeLabel || (index === 0 ? 'Booking payment' : 'Scheduled payment ' + (index + 1)), due: payment.due_date?.slice(0, 10) || null })).sort((x, y) => (x.due || '9999').localeCompare(y.due || '9999'));
+  // Payments logged by hand are applied to the unpaid scheduled payments in date order.
+  const manualPayments = Array.isArray(a.__venue_checklist?.manual_payments) ? a.__venue_checklist.manual_payments.filter(p => p && p.cents > 0) : [];
+  const manualTotal = manualPayments.reduce((sum, p) => sum + p.cents, 0);
+  let manualLeft = manualTotal;
+  const schedule = baseSchedule.map(s => { if (s.paid || !(s.cents > 0) || manualLeft < s.cents) return s; manualLeft -= s.cents; return { ...s, paid: true, manual: true }; });
   const duePayments = schedule.filter(s => !s.paid);
   const unsigned = signatures?.signatures?.filter(s => s.required && !s.signed) || [];
   const legacy = !nativeAgreement && !signatures && !!sub.created_at && String(sub.created_at).slice(0, 10) < LEGACY_BEFORE;
@@ -85,7 +111,7 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   if (!insuranceVerified) task('insurance', 'Confirm insurance on file', requirementsDue, 'Coverage not verified in the portal', 'insurance');
   if (!eventDate) task('date', 'Confirm event date', null, 'No date recorded', 'booking');
   tasks.sort((x, y) => x.rank - y.rank || (x.due || eventDate || '9999').localeCompare(y.due || eventDate || '9999'));
-  return { id:sub.id, sub, name, email, contacts, hb, eventDate, eventEnd, nativeAgreement, legacy, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments?.amount_paid?.amount ?? null, balance:payments?.balance_due?.amount ?? null, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
+  return { id:sub.id, sub, name, email, contacts, hb, eventDate, eventEnd, nativeAgreement, legacy, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
 }
 
 const css = `
@@ -128,7 +154,37 @@ function InsuranceVerification({ client, onVerify }) {
   </div>;
 }
 
-function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChange, messages, onHandleMessage }) {
+// Clients booked before this system: payments received elsewhere are logged here by hand.
+function ManualPayments({ client, onSave }) {
+  const [amt,setAmt] = React.useState(''), [date,setDate] = React.useState(venueDateKey()), [note,setNote] = React.useState('');
+  const [busy,setBusy] = React.useState(false), [err,setErr] = React.useState('');
+  const list = client.manualPayments || [];
+  async function save(next) { setBusy(true); setErr(''); try { await onSave(client.id, next); } catch(e) { setErr(e.message || 'Could not save.'); } finally { setBusy(false); } }
+  async function add(e) {
+    e.preventDefault();
+    const cents = Math.round(parseFloat(String(amt).replace(/[^0-9.]/g,'')) * 100);
+    if (!(cents > 0)) { setErr('Enter the amount received.'); return; }
+    await save([...list, { id:String(Date.now()), cents, date, note }]);
+    setAmt(''); setNote('');
+  }
+  const inp = {border:'1px solid #ded7cb',borderRadius:7,padding:'8px 10px',font:'inherit',background:'#fff'};
+  return <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid #eee7dd'}}>
+    <div className="vc-label" style={{marginBottom:6}}>Payments received (logged by hand)</div>
+    {list.length===0 ? <p className="vc-muted" style={{margin:'0 0 8px'}}>None logged yet. Add a payment when one comes in; it is applied to the next unpaid payment.</p> : list.map(p => <div key={p.id} className="vc-line" style={{justifyContent:'space-between'}}>
+      <span>{amount(p.cents,'USD')} · {dateLabel(p.date)}{p.note?' · '+p.note:''}</span>
+      <button type="button" disabled={busy} onClick={()=>{ if (window.confirm('Remove this logged payment?')) save(list.filter(x=>x.id!==p.id)); }} style={{border:'none',background:'none',color:'#a64f3c',fontSize:12}}>Remove</button>
+    </div>)}
+    <form onSubmit={add} style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginTop:8}}>
+      <input aria-label="Amount received" inputMode="decimal" placeholder="Amount ($)" value={amt} onChange={e=>setAmt(e.target.value)} style={{...inp,width:120}}/>
+      <input aria-label="Date received" type="date" value={date} onChange={e=>setDate(e.target.value)} style={inp}/>
+      <input aria-label="Note" placeholder="Note (optional)" value={note} onChange={e=>setNote(e.target.value)} style={{...inp,flex:1,minWidth:140}}/>
+      <button type="submit" disabled={busy} style={{border:'none',borderRadius:7,padding:'9px 14px',background:'#886c44',color:'#fff',fontSize:12,fontWeight:600}}>{busy?'Saving…':'Log payment'}</button>
+    </form>
+    {err&&<p role="alert" style={{fontSize:12,color:'#a64f3c',marginBottom:0}}>{err}</p>}
+  </div>;
+}
+
+function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
   return <dialog ref={ref} className="vc-dialog" aria-labelledby="vc-client-title" onCancel={onClose} onClick={e => { if(e.target === ref.current) onClose(); }}>
@@ -165,7 +221,9 @@ function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChan
         <div className="vc-modal-section-title"><span id="vc-brick-title">Wedding brick</span><span className={'vc-pill '+(client.brickLines?.some(l => String(l).trim())?'good':'alert')}>{client.brickLines?.some(l => String(l).trim())?'Wording submitted':'Not submitted yet'}</span></div>
         {client.brickLines?.some(l => String(l).trim()) ? <><div style={{fontFamily:'Cardo,Georgia,serif',letterSpacing:2,lineHeight:1.9,background:'#faf8f3',border:'1px solid #eee7dd',borderRadius:7,padding:'10px 14px'}}>{client.brickLines.map((l,i) => <div key={i}>{l || ' '}</div>)}</div>{client.brickSubmittedAt && <p className="vc-muted" style={{marginBottom:0}}>Submitted {dateLabel(client.brickSubmittedAt.slice(0,10))}</p>}</> : <p className="vc-muted" style={{margin:0}}>The client chooses 3 lines of up to 20 characters on their event page.</p>}
       </div>
-      {agreementApi&&<ContractManager client={client} api={agreementApi} onChange={onContractsChange}/>}
+      {agreementApi&&(client.legacy
+        ? <div style={{opacity:.4,pointerEvents:'none',userSelect:'none'}} aria-disabled="true"><div className="vc-modal-section"><div className="vc-modal-section-title"><span>Agreement</span><span className="vc-pill good">Signed</span></div><p className="vc-muted" style={{margin:0}}>Booked before this system. The signed agreement is on file, so nothing is managed here.</p></div></div>
+        : <ContractManager client={client} api={agreementApi} onChange={onContractsChange}/>)}
       <div className="vc-modal-section">
         <div className="vc-modal-section-title">Payment timeline</div>
         {client.payments ? <>
@@ -186,6 +244,7 @@ function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChan
           })}</div>
           <p className="vc-muted" style={{marginBottom:0}}>Original invoice schedule, including any security deposit. Payment names follow the source schedule order.</p>
         </> : <p className="vc-muted" style={{margin:0}}>A payment schedule has not been recorded.</p>}
+        {client.legacy&&<ManualPayments client={client} onSave={onSavePayments}/>}
       </div>
       <div className="vc-modal-section">
         <div className="vc-modal-section-title">Still to do</div>
@@ -203,7 +262,7 @@ function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChan
   </dialog>;
 }
 
-export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, agreementApi, filter, setFilter, query, setQuery, messages, onHandleMessage, onOpenMessages }) {
+export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, savePayments, agreementApi, filter, setFilter, query, setQuery, messages, onHandleMessage, onOpenMessages }) {
   const [events,setEvents] = React.useState([]), [error,setError] = React.useState('');
   const clientMessages = (messages||[]).filter(m=>m.direction!=='outgoing'&&!m.handled_at);
   const [savedResponses,setSavedResponses] = React.useState({});
@@ -223,6 +282,11 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, a
   // opened from an Activity Log entry
   React.useEffect(() => { const id = window.__nshOpenClient; if (id && submissions && submissions.some(sub => sub.id === id)) { setSelected(id); window.__nshOpenClient = null; } }, [submissions]);
   const selectedClient = clients.find(c=>c.id===selected);
+  async function recordPayments(id,list) {
+    if (!savePayments) throw new Error('Saving payments is unavailable. Please reload and try again.');
+    const record = await savePayments(id,list);
+    setSavedResponses(prev=>({...prev,[id]:record}));
+  }
   async function verifyInsurance(id,verified,note) {
     if (!saveInsurance) throw new Error('Insurance verification is unavailable. Please reload and try again.');
     const record = await saveInsurance(id,verified,note);
@@ -244,6 +308,6 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, a
     </section><aside className="vc-sidebar" aria-label="Client priorities">
       <section className="vc-side-card priority"><h2 className="vc-side-title">Needs your attention <span className="vc-counter">{submissions===null?'—':urgent.length}</span></h2>{submissions===null?<p className="vc-muted">Loading priorities…</p>:urgent.length===0?<p className="vc-muted">No urgent items recorded.</p>:(allTasks?urgent:urgent.slice(0,6)).map(t=><button className="vc-task" key={t.key} onClick={()=>t.action?t.action():open(t.client)}><div className="vc-task-head">{t.title}</div><div className="vc-task-name">{t.client.name}</div><div className={'vc-task-date '+(t.overdue?'late':'')}>{t.due?(t.overdue?'Past due · ':'Due ')+dateLabel(t.due):t.detail}</div></button>)}{urgent.length>6&&<button className="vc-text-button" onClick={()=>setAllTasks(!allTasks)}>{allTasks?'Show fewer priorities':'See all '+urgent.length+' priorities ↓'}</button>}</section>
     </aside></div>
-    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>setSelected(null)} onVerify={verifyInsurance} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
+    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>setSelected(null)} onVerify={verifyInsurance} onSavePayments={recordPayments} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }

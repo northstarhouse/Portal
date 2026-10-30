@@ -1,6 +1,6 @@
 ﻿const { useState, useEffect } = React;
 
-import { VenueClientDashboard, saveVenueInsuranceVerification } from './venue-clients.jsx';
+import { VenueClientDashboard, saveVenueInsuranceVerification, saveVenueManualPayments } from './venue-clients.jsx';
 import { createAgreementApi, AgreementSigningPage } from './venue-contracts.jsx';
 import HubEventsCommittee from './hub/entry.jsx';
 import RsvpPanel from './hub/pages/RsvpPanel.jsx';
@@ -464,6 +464,10 @@ function loadVenueClientEvents() {
   return fetch(SUPABASE_URL + '/rest/v1/venue_inquiries?select=id,name,event_type,event_date,prebooking_form_response_id,insurance_uploaded_at,insurance_drive_url,brick_lines,brick_submitted_at,questionnaire_form_response_id,questionnaire_sent_at,venue_payment_schedule(sequence,kind,label,amount_cents,amount_paid_cents,due_date,status)&prebooking_form_response_id=not.is.null', {
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
   }).then(function(r) { if (!r.ok) throw new Error('Could not load live event requirements'); return r.json(); }).then(function(rows) { if (!Array.isArray(rows)) throw new Error('Invalid event requirements'); return rows; });
+}
+
+function saveClientPayments(responseId, list) {
+  return saveVenueManualPayments({ baseUrl:SUPABASE_URL, apiKey:SUPABASE_KEY }, responseId, list);
 }
 
 function saveClientInsurance(responseId, verified, note) {
@@ -18458,6 +18462,12 @@ function VenueRentalsView({ navigate, initialTab }) {
     setInquiriesError('');
     fetchVenueInquiries({ strict: true }).then(setInquiries).catch(function(error) { setInquiriesError(error.message); });
   }
+  function savePayments(responseId, list) {
+    return saveClientPayments(responseId, list).then(function(saved) {
+      setInquiries(function(rows) { return rows && rows.map(function(row) { return row.id === saved.id ? Object.assign({}, row, saved) : row; }); });
+      return saved;
+    });
+  }
   function saveInsurance(responseId, verified, note) {
     return saveClientInsurance(responseId, verified, note).then(function(saved) {
       setInquiries(function(rows) { return rows && rows.map(function(row) { return row.id === saved.id ? Object.assign({}, row, saved) : row; }); });
@@ -19028,7 +19038,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
 
           {venueTab === 'clients' && (
-            !inquiriesError && <VenueClientDashboard messages={clientMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
+            !inquiriesError && <VenueClientDashboard messages={clientMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} savePayments={savePayments} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
           )}
 
           {venueTab === 'messages' && (
