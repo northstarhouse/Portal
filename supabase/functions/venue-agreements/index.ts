@@ -55,7 +55,7 @@ Deno.serve(async req=>{
   if(['view','request_code','sign','decline','client_pdf'].includes(action)){
    const raw=String(body.token||'');if(!/^[a-f0-9]{64}$/.test(raw))return json({error:'Invalid signing link.'},401);
    const th=await tokenHash(raw);const resolved=await rpc('resolve',{token_hash:th});const signer=resolved.signer;
-   if(action==='view'){const result=await rpc('view',{token_hash:th});return json({...result,signer:{id:result.signer.id,name:result.signer.name,email:mask(result.signer.email),role:result.signer.role,status:result.signer.status},version:publicRecord(result.version)});}
+   if(action==='view'){const result=await rpc('view',{token_hash:th});let initials:any[]=[];try{initials=await rest('venue_agreement_initials?select=signer_id,section,initials&version_id=eq.'+result.version.id)||[];}catch(_e){/* table not created yet */}return json({...result,initials,signer:{id:result.signer.id,name:result.signer.name,email:mask(result.signer.email),role:result.signer.role,status:result.signer.status},version:publicRecord(result.version)});}
    if(action==='client_pdf')return new Response(await agreementPdf(resolved.version),{headers:{...CORS,'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="North-Star-House-agreement-v'+resolved.version.version+'.pdf"'}});
    if(signer.status!=='pending')return json({error:'This signature response is already recorded and locked. You can view or download the agreement; changes require a new version.'},409);
    if(action==='request_code'){
