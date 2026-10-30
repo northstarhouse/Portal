@@ -12,6 +12,8 @@ const codeHash=(id:string,code:string)=>hash('agreement-code:'+KEY+':'+id+':'+co
 const link=(value:string)=>BASE+'#agreement='+value;
 const mask=(email:string)=>email.replace(/^(.).+(@.*)$/,'$1•••$2');
 function publicRecord(record:any){return {...record,signers:(record.signers||[]).map((s:any)=>({name:s.name,email:mask(s.email),role:s.role})),recipients:(record.recipients||[]).map((s:any)=>({id:s.id,name:s.name,email:mask(s.email),role:s.role,status:s.status,signed_at:s.signed_at,signed_name:s.signed_name})),events:(record.events||[]).map((e:any)=>({action:e.action,actor:e.actor,created_at:e.created_at}))};}
+// How many numbered terms ("1. ..." through "18. ...") the agreement text has; each needs the client's initials.
+function termCount(body:string){let next=1;for(const p of body.split(/\n{2,}/)){if(new RegExp('^'+next+'\\. ').test(p))next++;}return next-1;}
 const MONTHS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 // Venue code = wedding date written like DEC-28-2026 (also accepts DEC 28 2026, 12/28/2026, 2026-12-28) -> "2026-12-28".
 function parseVenueCode(raw:string):string|null{const t=String(raw||'').trim().toUpperCase();let y:number,m:number,d:number,x:RegExpMatchArray|null;if((x=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))){y=+x[1];m=+x[2];d=+x[3];}else{const s=t.replace(/[,.\-\/]/g,' ').replace(/\s+/g,' ').trim();if((x=s.match(/^(\d{1,2}) (\d{1,2}) (\d{4})$/))){m=+x[1];d=+x[2];y=+x[3];}else if((x=s.match(/^([A-Z]{3,9}) (\d{1,2})(?:ST|ND|RD|TH)? (\d{4})$/))){m=MONTHS.indexOf(x[1].slice(0,3))+1;d=+x[2];y=+x[3];if(!m)return null;}else return null;}const dt=new Date(Date.UTC(y,m-1,d));if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==m-1||dt.getUTCDate()!==d)return null;return dt.toISOString().slice(0,10);}
@@ -39,9 +41,12 @@ Deno.serve(async req=>{
     await email(signer.email,'Your North Star House signing verification code',`Your verification code is ${code}. It expires in 10 minutes.\n\nOnly enter this code on the North Star House agreement page. Do not share it with anyone. If you did not request this code, do not sign the agreement.`,true);
     return json({sent:true,email:mask(signer.email)});
    }
+   let initialRows:any[]=[];
+   if(action==='sign'&&signer.role!=='venue'){const count=termCount(String(resolved.version?.body||''));if(count>0){const given=(body.initials&&typeof body.initials==='object')?body.initials:{};for(let n=1;n<=count;n++){const v=String((given as any)[n]||'').trim();if(!/^[A-Za-z][A-Za-z .'-]{0,5}$/.test(v))return json({error:'Please initial every numbered term before signing.'},400);initialRows.push({version_id:resolved.version.id,signer_id:signer.id,section:n,initials:v.toUpperCase()});}}}
    if(action==='sign'&&signer.role!=='venue'){const expected=await eventDateFor(resolved.version.response_id);if(!expected)return json({error:'We could not confirm the venue code for this agreement. Please contact the venue.'},400);if(parseVenueCode(String(body.venue_code||''))!==expected)return json({error:'That venue code does not match this booking. Enter your wedding date, like DEC-28-2026.'},400);}
    const code=String(body.code||'');if(!/^\d{6}$/.test(code))return json({error:'Enter the six-digit code from your email.'},400);
    const result=await rpc(action,{token_hash:th,code_hash:await codeHash(signer.id,code),document_hash:body.document_hash,signed_name:body.signed_name,consent:body.consent===true,reason:body.reason,ip:req.headers.get('x-forwarded-for')?.split(',')[0]||null,user_agent:req.headers.get('user-agent')});
+   if(!result.error&&initialRows.length){try{await rest('venue_agreement_initials?on_conflict=signer_id,section',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(initialRows)});}catch(e){console.error('initials not saved',(e as Error).message);}}
    return result.error?json(result,400):json({version:publicRecord(result),saved:true});
   }
   const staffToken=req.headers.get('x-app-token')||'';
