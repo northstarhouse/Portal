@@ -18505,7 +18505,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           })
           .catch(function() { alert('Could not cancel: ' + e.message); });
       })
-      .finally(function() { setDetailSaving(false); });
+      .finally(function() { setDetailSaving(false); loadTours(); }); // always refresh, so the lists match what the server did
   }
 
   function markNoShow() {
