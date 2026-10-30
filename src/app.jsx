@@ -20592,7 +20592,7 @@ function EstateToursView() {
       ) : (
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '0.5px solid #f0ece6' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{tourTitleFor(selectedTour)}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{tourTitleFor(selectedTour)}{selectedTour.confirmed_at && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: '#2e7d32', background: '#e8f5e9', borderRadius: 10, padding: '2px 8px', fontFamily: 'sans-serif', verticalAlign: 'middle' }}>✓ Confirmed</span>}</div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               <button onClick={function() { startPanelReschedule(selectedTour); }} title="Reschedule" style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f0e8', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
                 <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>

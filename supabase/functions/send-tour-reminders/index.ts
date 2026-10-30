@@ -100,7 +100,7 @@ async function sendMail(to: string, subject: string, text: string, html: string)
   return res.ok
 }
 
-type Tour = { id: string; visitor_name: string; visitor_email: string; date: string; start_time: string; guide_name?: string | null }
+type Tour = { id: string; visitor_name: string; visitor_email: string; date: string; start_time: string; guide_name?: string | null; confirm_token?: string | null }
 
 // Who leads a tour: a guide assigned to that slot in the Portal wins;
 // otherwise Jen leads every Monday, Tuesday and Thursday tour. "" = no one to
@@ -122,9 +122,10 @@ async function run24h(): Promise<number> {
     const ok = await sendMail(
       t.visitor_email,
       `Reminder: your North Star House tour is tomorrow — ${when}`,
-      `Hi ${t.visitor_name},\n\nJust a reminder — your estate tour is tomorrow.\n\nTour Date & Time: ${when}\n${guide ? `Your tour guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you then!\nNorth Star House`,
+      `Hi ${t.visitor_name},\n\nJust a reminder — your estate tour is tomorrow.\n\nTour Date & Time: ${when}\n${guide ? `Your tour guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\n${t.confirm_token ? `Please confirm your tour: ${WEBSITE_URL}/api/tours/confirm?t=${t.confirm_token}\n\n` : ''}${TOUR_DIRECTIONS_TEXT}\n\nSee you then!\nNorth Star House`,
       buildBrandedEmailHtml({
         headline: 'Your Tour is Tomorrow',
+        ...(t.confirm_token ? { buttonText: 'Confirm My Tour', buttonUrl: `${WEBSITE_URL}/api/tours/confirm?t=${t.confirm_token}` } : {}),
         subtext:
           `Hi ${esc(t.visitor_name)}, just a reminder — your estate tour is tomorrow:<br><br>` +
           `Tour Date &amp; Time: <strong>${esc(when)}</strong><br>` +
