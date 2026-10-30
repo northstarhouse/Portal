@@ -144,7 +144,6 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
       const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
       document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
     }
-    setMsg({ ok: true, text: 'Prompt copied. Paste it into ChatGPT, then come back and press the clipboard icon.' });
   }
   function applyDraft(text) {
     const d = parseBlogPackage(text);
