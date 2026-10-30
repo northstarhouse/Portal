@@ -311,14 +311,38 @@ Deno.serve(async req => {
       return json({ token: value });
     }
 
+    // The people on this booking, taken from their pre-booking form (not typed in by whoever is on the page).
+    // Names, emails and phone numbers shown on the page are masked; the real ones are used when a message is sent.
+    async function bookingContacts() {
+      const out: { name: string; email: string; phone: string }[] = [];
+      try {
+        const rows = await rest(`nsh_form_responses?select=answers&id=eq.${inq.prebooking_form_response_id}`);
+        const a = (rows && rows[0] && rows[0].answers) || {};
+        const nice = (n: string) => { const t = String(n || '').trim(); const m = t.match(/^([^,]+),\s*(.+)$/); return m ? `${m[2].trim()} ${m[1].trim()}` : t; };
+        const add = (n: unknown, e: unknown, p: unknown) => { if (n && String(n).trim()) out.push({ name: nice(String(n)), email: String(e || '').trim(), phone: String(p || '').trim() }); };
+        add(a['7fnabd0i'] || a.evp_name, a.c9u1sxb4 || a.evp_email, a['163otrai'] || a.evp_phone);
+        add(a['7leui2ic'], a.pt4mail1, a.pt4phon1);
+      } catch (_e) { /* fall back to the booking itself below */ }
+      if (!out.length) out.push({ name: String(inq.name || 'Client'), email: String(inq.email || ''), phone: '' });
+      return out;
+    }
+    const maskEmail = (e: string) => (e ? e.replace(/^(.).*(@.*)$/, '$1•••$2') : '');
+    const maskPhone = (p: string) => { const d = p.replace(/\D/g, ''); return d.length >= 4 ? '•••-•••-' + d.slice(-4) : ''; };
+
+    if (action === 'message_contacts') {
+      const list = await bookingContacts();
+      return json({ contacts: list.map((c, i) => ({ id: i, name: c.name, email: maskEmail(c.email), phone: maskPhone(c.phone) })) });
+    }
+
     if (action === 'send_message') {
       const text = String(body.message || '').trim();
-      const fromName = String(body.contact_name || '').trim().slice(0, 100);
-      const fromEmail = String(body.contact_email || '').trim().slice(0, 200);
-      if (!fromName) throw new Fail('Please enter your name.');
+      const people = await bookingContacts();
+      const who = people[Number(body.contact_id)] || people[0];
+      const fromName = who.name, fromEmail = who.email, fromPhone = who.phone;
+      const prefers = body.reply_via === 'phone' ? 'phone' : 'email';
+      const replyLine = prefers === 'phone' ? `Prefers a phone call${fromPhone ? ': ' + fromPhone : ' (no phone number on file)'}` : `Prefers an email reply${fromEmail ? ': ' + fromEmail : ' (no email on file)'}`;
       if (!text) throw new Fail('Please type a message.');
       if (text.length > 2000) throw new Fail('Please keep your message under 2,000 characters.');
-      if (fromEmail && !/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(fromEmail)) throw new Fail('That email address does not look right.');
       messageBrake(ip);
       const since = encodeURIComponent(new Date(Date.now() - 3600_000).toISOString());
       const recent = await rest(`venue_client_messages?select=id&inquiry_id=eq.${inq.id}&created_at=gte.${since}`);
@@ -327,7 +351,7 @@ Deno.serve(async req => {
       // Also saved to the Portal's Messages list (event_uid 'client:<pre-booking id>' marks it as from a couple's event page),
       // so it shows in Needs your attention until it is marked handled.
       try {
-        await rest('venue_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ event_uid: 'client:' + inq.prebooking_form_response_id, event_title: inq.name, subject: 'Message from the event page', body: text, from_name: fromName, from_email: fromEmail || null, direction: 'incoming' }) });
+        await rest('venue_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ event_uid: 'client:' + inq.prebooking_form_response_id, event_title: inq.name, subject: 'Message from the event page · ' + (prefers === 'phone' ? 'wants a call' : 'wants an email'), body: text + '\n\n' + replyLine, from_name: fromName, from_email: fromEmail || null, direction: 'incoming' }) });
       } catch (e) { console.error('client-pay venue_messages', e instanceof Error ? e.message : e); }
       // The saved message is the record, so an email hiccup doesn't lose it.
       try {
@@ -336,8 +360,8 @@ Deno.serve(async req => {
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY },
           body: JSON.stringify({
             to: 'venue@thenorthstarhouse.org',
-            subject: `Message from ${inq.name} (${code})`,
-            body: `${fromName} sent a message from the client event page.\n\nBooking: ${inq.name}\nEvent date: ${new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}\nBooking email on file: ${inq.email || 'none'}\nReply goes to: ${fromEmail || inq.email || 'none on file'}\n\n${text}\n\nReply to this email to answer them. A copy is saved with the booking.`,
+            subject: `Message from ${fromName} · ${inq.name} (${code})`,
+            body: `${fromName} sent a message from their client event page.\n\n${replyLine}\n\nBooking: ${inq.name}\nEvent date: ${new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}\n\n${text}\n\nReply to this email to answer them. A copy is saved with the booking.`,
             sender: 'Event Page',
             replyTo: fromEmail || inq.email || undefined,
           }),
