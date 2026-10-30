@@ -18407,18 +18407,48 @@ function VenueRentalsView({ navigate, initialTab }) {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.ok ? r.json() : []; }).then(function(rows) { setClientMsgs(Array.isArray(rows) ? rows : []); }).catch(function() { setClientMsgs([]); });
   }
-  function handleClientMsg(id) {
+  // Handled by Jen or Derek: the person is recorded on the message.
+  function handleClientMsg(id, by) {
+    if (!by) { alert('Choose who handled it (Jen or Derek) first.'); return Promise.resolve(false); }
     var stamp = new Date().toISOString();
-    fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + id, {
+    return fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + id, {
       method: 'PATCH',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ handled_at: stamp })
+      body: JSON.stringify({ handled_at: stamp, handled_by: by })
     }).then(function(r) {
-      if (!r.ok) { alert('Could not mark it handled. Please try again.'); return; }
-      setClientMsgs(function(rows) { return (rows || []).map(function(m) { return m.id === id ? Object.assign({}, m, { handled_at: stamp }) : m; }); });
+      if (!r.ok) { alert('Could not mark it handled. Please try again.'); return false; }
+      setClientMsgs(function(rows) { return (rows || []).map(function(m) { return m.id === id ? Object.assign({}, m, { handled_at: stamp, handled_by: by }) : m; }); });
+      return true;
     });
   }
-  var unhandledClientMsgs = (clientMsgs || []).filter(function(m) { return !m.handled_at; }).length;
+  // Reply by email right from the Messages tab: sent from venue@northstarhouse.org (replies come back to the venue inbox),
+  // filed in the client's profile as a reply, and the original message is marked handled by the person replying.
+  function replyToClientMsg(m, by, text) {
+    var stamp = new Date().toISOString();
+    return fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: m.from_email,
+        subject: 'Re: Your message to North Star House',
+        body: 'Hi ' + String(m.from_name || 'there').split(' ')[0] + ',\n\n' + text + '\n\n' + by + '\nNorth Star House',
+        html: buildClientReplyHtml(m.from_name, text, by),
+        sender: by,
+        fromEmail: 'venue@northstarhouse.org'
+      })
+    }).then(function(r) {
+      if (!r.ok) throw new Error('The email could not be sent. Please try again.');
+      return fetch(SUPABASE_URL + '/rest/v1/venue_messages', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ event_uid: m.event_uid, event_title: m.event_title, subject: 'Reply from ' + by, body: text, from_name: by, from_email: 'venue@northstarhouse.org', direction: 'outgoing', handled_at: stamp, handled_by: by })
+      }).then(function(r2) { return r2.ok ? r2.json() : []; });
+    }).then(function(saved) {
+      setClientMsgs(function(rows) { return (Array.isArray(saved) ? saved : []).concat(rows || []); });
+      return handleClientMsg(m.id, by);
+    });
+  }
+  var unhandledClientMsgs = (clientMsgs || []).filter(function(m) { return m.direction !== 'outgoing' && !m.handled_at; }).length;
   const [venueTab, setVenueTab] = useS(function() {
     if (initialTab) return initialTab;
     try { var saved = sessionStorage.getItem('nsh-venue-tab'); return saved === 'clients' || saved === 'messages' ? saved : 'inquiries'; } catch (e) { return 'inquiries'; }
@@ -19004,24 +19034,12 @@ function VenueRentalsView({ navigate, initialTab }) {
           {venueTab === 'messages' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 760 }}>
               {clientMsgs === null && <div style={{ color: '#bbb', fontSize: 13 }}>Loading…</div>}
-              {clientMsgs && clientMsgs.filter(function(m) { return !m.handled_at; }).length === 0 && (
-                <div style={{ color: '#aaa', fontSize: 13, padding: '24px 0' }}>No new messages. Handled messages are kept in each client's file.</div>
+              {clientMsgs && clientMsgs.filter(function(m) { return m.direction !== 'outgoing' && !m.handled_at; }).length === 0 && (
+                <div style={{ color: '#aaa', fontSize: 13, padding: '24px 0' }}>No new messages. Handled messages and replies are kept in each client's file.</div>
               )}
-              {(clientMsgs || []).filter(function(m) { return !m.handled_at; }).map(function(m) {
-                var clientId = String(m.event_uid || '').replace('client:', '');
-                return (
-                  <div key={m.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid #c79535', borderRadius: 10, padding: '12px 16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{m.from_name || 'Client'}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
-                      <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{new Date(m.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
-                    </div>
-                    <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{m.body}</div>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                      <button onClick={function() { handleClientMsg(m.id); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Mark handled</button>
-                      <button onClick={function() { window.__nshOpenClient = clientId; setVenueTab('clients'); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Open client file</button>
-                    </div>
-                  </div>
-                );
+              {(clientMsgs || []).filter(function(m) { return m.direction !== 'outgoing' && !m.handled_at; }).map(function(m) {
+                return <ClientMessageCard key={m.id} m={m} onHandle={handleClientMsg} onReply={replyToClientMsg}
+                  onOpenClient={function() { window.__nshOpenClient = String(m.event_uid || '').replace('client:', ''); setVenueTab('clients'); }} />;
               })}
             </div>
           )}
@@ -19619,15 +19637,15 @@ function VenueMessagesView({ navigate }) {
     fetchWeddings().then(setWeddings);
   }, []);
 
-  function markMessageHandled(id) {
+  function markMessageHandled(id, by) {
     var stamp = new Date().toISOString();
     fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + id, {
       method: 'PATCH',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ handled_at: stamp })
+      body: JSON.stringify({ handled_at: stamp, handled_by: by })
     }).then(function(r) {
       if (!r.ok) { alert('Could not mark it handled. Please try again.'); return; }
-      setMessages(function(rows) { return (rows || []).map(function(m) { return m.id === id ? Object.assign({}, m, { handled_at: stamp }) : m; }); });
+      setMessages(function(rows) { return (rows || []).map(function(m) { return m.id === id ? Object.assign({}, m, { handled_at: stamp, handled_by: by }) : m; }); });
     });
   }
 
@@ -19700,13 +19718,81 @@ function VenueMessagesView({ navigate }) {
                   <span style={{ fontSize: 10, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.5 }}>{m.direction}</span>
                   {String(m.event_uid || '').indexOf('client:') === 0 && (m.handled_at
                     ? <span style={{ fontSize: 10, fontWeight: 700, color: '#2e7d32' }}>Handled</span>
-                    : <button onClick={function() { markMessageHandled(m.id); }} style={{ fontSize: 11, fontWeight: 600, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '2px 10px', cursor: 'pointer' }}>Mark handled</button>)}
+                    : <button onClick={function() { var who = window.prompt('Handled by (Jen or Derek)?'); if (who && /^(jen|derek)$/i.test(who.trim())) markMessageHandled(m.id, who.trim().charAt(0).toUpperCase() + who.trim().slice(1).toLowerCase()); else if (who) alert('Please enter Jen or Derek.'); }} style={{ fontSize: 11, fontWeight: 600, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '2px 10px', cursor: 'pointer' }}>Mark handled</button>)}
                 </div>
               </div>
             );
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// Email shown to a couple when the venue team replies to their event-page message (branded like the other venue emails).
+function buildClientReplyHtml(name, text, by) {
+  function esc(t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  var first = String(name || 'there').split(' ')[0];
+  var paras = String(text || '').split(/\n{2,}/).map(function(p) {
+    return '<p style="margin:0 0 18px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.6;text-align:left;">' + esc(p).replace(/\n/g, '<br>') + '</p>';
+  }).join('');
+  return '<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,\'Times New Roman\',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;">' +
+    '<div style="height:14px;background:#886c44;"></div><div style="padding:44px 40px 36px;text-align:center;">' +
+    '<div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:3px;color:#886c44;font-weight:bold;margin-bottom:14px;">NORTH STAR HOUSE</div>' +
+    '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">A Reply From North Star House</h1>' +
+    '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>' +
+    '<p style="margin:0 0 18px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;text-align:left;">Hi ' + esc(first) + ',</p>' + paras +
+    '<p style="margin:8px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;text-align:left;">' + esc(by) + '<br>North Star House</p>' +
+    '<p style="margin:26px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Just reply to this email to write back to us.</i></p>' +
+    '</div></div></div>';
+}
+
+// One unhandled message from a couple: who handled it, and (if they asked for email) a reply box that sends from venue@.
+function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
+  var [by, setBy] = useState('');
+  var [reply, setReply] = useState('');
+  var [busy, setBusy] = useState(false);
+  var [err, setErr] = useState('');
+  var wantsEmail = /wants an email/i.test(m.subject || '');
+  var wantsCall = /wants a call/i.test(m.subject || '');
+  var canReply = wantsEmail && !!m.from_email;
+  function sendReply() {
+    if (!by) { setErr('Choose who is replying (Jen or Derek).'); return; }
+    if (!reply.trim()) { setErr('Type your reply first.'); return; }
+    setBusy(true); setErr('');
+    onReply(m, by, reply.trim()).catch(function(e) { setErr(e.message || 'Could not send.'); setBusy(false); });
+  }
+  var pill = { fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '2px 9px' };
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid #c79535', borderRadius: 10, padding: '12px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{m.from_name || 'Client'}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
+        <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{new Date(m.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+      </div>
+      <div style={{ marginBottom: 6 }}>
+        {wantsEmail && <span style={Object.assign({}, pill, { background: '#e3f2fd', color: '#1565c0' })}>WANTS AN EMAIL REPLY</span>}
+        {wantsCall && <span style={Object.assign({}, pill, { background: '#e8f5e9', color: '#2e7d32' })}>WANTS A PHONE CALL</span>}
+      </div>
+      <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{m.body}</div>
+
+      {canReply && (
+        <div style={{ marginTop: 10 }}>
+          <textarea value={reply} onChange={function(e) { setReply(e.target.value); }} rows={4} placeholder={'Reply to ' + (m.from_name || 'them') + ' (sent from venue@northstarhouse.org to ' + m.from_email + ')'}
+            style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'system-ui, sans-serif', resize: 'vertical' }} />
+        </div>
+      )}
+      {err && <div style={{ color: '#b3261e', fontSize: 12, marginTop: 6 }}>{err}</div>}
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select value={by} onChange={function(e) { setBy(e.target.value); setErr(''); }} aria-label="Who is handling this"
+          style={{ fontSize: 12, fontWeight: 600, color: gold, background: '#fff', border: '0.5px solid ' + gold, borderRadius: 8, padding: '6px 8px' }}>
+          <option value="">Handled by…</option>
+          <option value="Jen">Jen</option>
+          <option value="Derek">Derek</option>
+        </select>
+        {canReply && <button disabled={busy} onClick={sendReply} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Sending…' : 'Send reply & mark handled'}</button>}
+        <button disabled={busy} onClick={function() { if (!by) { setErr('Choose who handled it (Jen or Derek).'); return; } onHandle(m.id, by); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{canReply ? 'Mark handled without replying' : 'Mark handled'}</button>
+        <button onClick={onOpenClient} style={{ background: 'none', color: gold, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Open client file</button>
+      </div>
     </div>
   );
 }
