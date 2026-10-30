@@ -55,7 +55,7 @@ async function refreshSite() {
   }
 }
 
-const WRITABLE = ['title', 'slug', 'status', 'excerpt', 'body_html', 'body_text', 'hero_image_url', 'hero_image_alt', 'category', 'categories', 'author_name',
+const WRITABLE = ['title', 'slug', 'status', 'excerpt', 'body_html', 'body_text', 'hero_image_url', 'hero_image_alt', 'category', 'categories', 'tags', 'author_name',
   'featured', 'seo_title', 'seo_description', 'og_image_url', 'canonical_url', 'focus_keyword', 'min_read', 'published_at', 'scheduled_for', 'hide_hero_banner']
 
 Deno.serve(async (req) => {
