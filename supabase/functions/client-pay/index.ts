@@ -313,7 +313,7 @@ Deno.serve(async req => {
           body: JSON.stringify({
             to: 'venue@thenorthstarhouse.org',
             subject: `Message from ${inq.name} (${code})`,
-            body: `${fromName} sent a message from the client event page.\n\nBooking: ${inq.name}\nEvent date: ${date}\nBooking email on file: ${inq.email || 'none'}\nReply goes to: ${fromEmail || inq.email || 'none on file'}\n\n${text}\n\nReply to this email to answer them. A copy is saved with the booking.`,
+            body: `${fromName} sent a message from the client event page.\n\nBooking: ${inq.name}\nEvent date: ${new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}\nBooking email on file: ${inq.email || 'none'}\nReply goes to: ${fromEmail || inq.email || 'none on file'}\n\n${text}\n\nReply to this email to answer them. A copy is saved with the booking.`,
             sender: 'Event Page',
             replyTo: fromEmail || inq.email || undefined,
           }),

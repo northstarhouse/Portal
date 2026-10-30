@@ -43,7 +43,6 @@ export function prepareAgreementDraft(client,extras={}){
     'Event Date: '+(longDate(client.eventDate)||'[TO COMPLETE]'),
     ...(people.length?people.map(c=>c.name+' — '+(c.email||'[EMAIL TO COMPLETE]')):[client.name+' — [EMAIL TO COMPLETE]']),
     'Max Estimated Guest Count: '+guests,
-    'Rental hours / access times: [TO COMPLETE]',
     ...(client.total!==null&&client.total!==undefined?['Venue rental invoice total, including any security deposit: '+money(client.total,client.currency)]:[]),
     ...(schedule.length?['Payment schedule:',...schedule.map(p=>'- '+p.label+': '+money(p.cents,p.currency)+' due '+(p.due||'[TO COMPLETE]')+(p.paid?' (already paid)':''))]:[]),
     '',
@@ -69,7 +68,7 @@ export function ContractPreview({body}){
     if(/^(Event Details:|Signatures|Payment schedule:)$/.test(line.trim())){out.push(<h3 key={i}>{line.replace(/:$/,'')}</h3>);return;}
     const clause=line.match(/^(\d{1,2}\.\s+[^.]{2,80}\.)(\s.*)?$/);
     if(clause){out.push(<p key={i}><strong>{clause[1]}</strong>{clause[2]||''}</p>);return;}
-    const kv=line.match(/^(Event Date|Max Estimated Guest Count|Rental hours \/ access times|Contract Date|Client|For North Star Historic Conservancy|Venue rental invoice total[^:]*):\s*(.*)$/);
+    const kv=line.match(/^(Event Date|Max Estimated Guest Count|Contract Date|Client|For North Star Historic Conservancy|Venue rental invoice total[^:]*):\s*(.*)$/);
     if(kv){out.push(<p key={i} className="va-pv-kv"><strong>{kv[1]}:</strong> {/\[.*TO COMPLETE.*\]/.test(kv[2])?<mark>{kv[2]}</mark>:kv[2]}</p>);return;}
     out.push(<p key={i}>{line.split(/(\[[^\]]*TO COMPLETE[^\]]*\])/).map((t,j)=>/TO COMPLETE/.test(t)?<mark key={j}>{t}</mark>:t)}</p>);
   });
