@@ -34,7 +34,7 @@ function walkthroughEmailHtml(when: string, guide: string) {
   const gold = '#886c44';
   return `<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:${gold};"></div><div style="padding:44px 40px 36px;text-align:center;">`
     + `<div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:3px;color:${gold};font-weight:bold;margin-bottom:14px;">NORTH STAR HOUSE</div>`
-    + `<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">Your Walk-Through is Confirmed</h1><div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>`
+    + `<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">Your Walk-Through Is Confirmed</h1><div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>`
     + `<p style="margin:0 0 28px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.6;text-align:left;">Your second walk-through of North Star House is booked.<br><br>Date &amp; Time: <strong>${esc(when)}</strong><br>${guide ? `Your guide: <strong>${esc(guide)}</strong><br>` : ''}Address: <strong>${esc(TOUR_ADDRESS)}</strong><br><br>${esc(TOUR_DIRECTIONS_TEXT).replace(/\n\n/g, '<br><br>')}</p>`
     + `<a href="${PAGE_URL}" style="display:inline-block;background:${gold};color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:15px;padding:16px 32px;">Go to Your Event Page</a>`
     + `<p style="margin:22px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Questions? Just reply to this email.</i></p></div></div></div>`;

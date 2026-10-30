@@ -36,6 +36,14 @@ const TOUR_EMAIL_FOOTER_LINKS = [
   { label: 'Directions', url: `${WEBSITE_URL}/directions-parking` },
 ]
 
+// Email headlines: capitalise each word, keeping small words (a, of, the, for...) lowercase unless first or last.
+const SMALL_WORDS = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'of', 'in', 'on', 'at', 'to', 'by', 'up', 'as', 'vs'])
+function titleCase(t: string): string {
+  if (/[<&]/.test(t)) return t
+  const w = String(t).split(' ')
+  return w.map((x, i) => (!x || (i > 0 && i < w.length - 1 && SMALL_WORDS.has(x.toLowerCase())) ? x : x.charAt(0).toUpperCase() + x.slice(1))).join(' ')
+}
+
 // Branded HTML shell matching north-star-portal's own template (gold top bar,
 // serif headline, gold CTA button, footer links) — ported from
 // buildBoardNotificationEmailHtml in src/app.jsx so every email the org sends
@@ -54,7 +62,7 @@ function buildBrandedEmailHtml(opts: { headline: string; subtext: string; button
     `<div style="max-width:560px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">` +
     `<div style="height:14px;background:${GOLD};"></div>` +
     `<div style="padding:48px 40px 32px;text-align:center;">` +
-    `<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">${headline}</h1>` +
+    `<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">${titleCase(headline)}</h1>` +
     `<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>` +
     `<p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;text-align:left;">${subtext}</p>` +
     (buttonUrl ? `<a href="${buttonUrl}" style="display:inline-block;background:${GOLD};color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:16px;padding:16px 32px;border-radius:6px;margin-bottom:8px;">${buttonText}</a>` : '') +

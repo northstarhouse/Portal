@@ -22641,6 +22641,14 @@ var TEMPLATE_EMAIL_FOOTER_LINKS = [
 
 // Styled HTML email matching the brand's existing "New Item for Board Review"
 // template (gold top bar, serif headline, gold CTA button, 3-link footer).
+// Email headlines: capitalise each word, keeping small words (a, of, the, for...) lowercase unless first or last.
+var SMALL_WORDS = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'of', 'in', 'on', 'at', 'to', 'by', 'up', 'as', 'vs'])
+function titleCase(t) {
+  if (/[<&]/.test(t)) return t
+  const w = String(t).split(' ')
+  return w.map((x, i) => (!x || (i > 0 && i < w.length - 1 && SMALL_WORDS.has(x.toLowerCase())) ? x : x.charAt(0).toUpperCase() + x.slice(1))).join(' ')
+}
+
 function buildBoardNotificationEmailHtml(opts) {
   var headline = opts.headline;
   var subtext = opts.subtext;
@@ -22695,7 +22703,7 @@ function buildBoardNotificationEmailHtml(opts) {
       '<div style="max-width:560px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">' +
         '<div style="height:14px;background:' + gold + ';"></div>' +
         '<div style="padding:48px 40px 32px;text-align:center;">' +
-          '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">' + headline + '</h1>' +
+          '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">' + titleCase(headline) + '</h1>' +
           '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>' +
           '<div style="margin:0 0 16px;">' + subtextHtml + '</div>' +
           boxHtml +

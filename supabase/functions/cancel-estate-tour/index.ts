@@ -33,6 +33,14 @@ function fmtWhen(date: string, time: string) {
   return `${day} at ${t}`
 }
 
+// Email headlines: capitalise each word, keeping small words (a, of, the, for...) lowercase unless first or last.
+const SMALL_WORDS = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'of', 'in', 'on', 'at', 'to', 'by', 'up', 'as', 'vs'])
+function titleCase(t: string): string {
+  if (/[<&]/.test(t)) return t
+  const w = String(t).split(' ')
+  return w.map((x, i) => (!x || (i > 0 && i < w.length - 1 && SMALL_WORDS.has(x.toLowerCase())) ? x : x.charAt(0).toUpperCase() + x.slice(1))).join(' ')
+}
+
 // Same look as the tour confirmation / reschedule emails, with a button to book another time.
 function buildEmailHtml(headline: string, subtext: string, buttonUrl: string, buttonText: string) {
   return (
@@ -41,7 +49,7 @@ function buildEmailHtml(headline: string, subtext: string, buttonUrl: string, bu
     `<div style="height:14px;background:${GOLD};"></div>` +
     `<div style="padding:44px 40px 36px;text-align:center;">` +
     `<div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:3px;color:${GOLD};font-weight:bold;margin-bottom:14px;">NORTH STAR HOUSE</div>` +
-    `<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">${headline}</h1>` +
+    `<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">${titleCase(headline)}</h1>` +
     `<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>` +
     `<p style="margin:0 0 28px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.6;text-align:left;">${subtext}</p>` +
     `<a href="${buttonUrl}" style="display:inline-block;background:${GOLD};color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:15px;padding:16px 32px;">${buttonText}</a>` +
