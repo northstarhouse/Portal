@@ -292,6 +292,24 @@ Deno.serve(async req => {
     }
 
     // "Message our team": saved (server-only table) and emailed to the venue team.
+    // The couple's rental agreement, shown on their event page. They sign through the same verified flow as the emailed link
+    // (emailed six-digit code + venue code); the link minted here replaces any earlier link for that signer.
+    if (action === 'agreement_status' || action === 'agreement_link') {
+      const resp = inq.prebooking_form_response_id;
+      const vs = await rest(`venue_agreement_versions?select=id,version,status,title,issued_at,completed_at&response_id=eq.${resp}&status=in.(pending,completed)&order=version.desc&limit=1`);
+      const v = vs && vs[0];
+      if (!v) return json({ agreement: null });
+      const signers = await rest(`venue_agreement_signers?select=id,name,role,status,signed_at&version_id=eq.${v.id}&order=role.asc,name.asc`);
+      if (action === 'agreement_status') return json({ agreement: { ...v, signers } });
+      const signer = signers.find((s: any) => s.id === String(body.signer_id || ''));
+      if (!signer || signer.role !== 'client') throw new Fail('That signer was not found on this agreement.', 404);
+      const value = Array.from(crypto.getRandomValues(new Uint8Array(32)), (x) => x.toString(16).padStart(2, '0')).join('');
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('agreement-link:' + KEY + ':' + value));
+      const hash = Array.from(new Uint8Array(digest), (x) => x.toString(16).padStart(2, '0')).join('');
+      await rest('rpc/venue_agreement_action', { method: 'POST', body: JSON.stringify({ p_action: 'link', p_data: { version_id: v.id, signer_id: signer.id, hash } }) });
+      return json({ token: value });
+    }
+
     if (action === 'send_message') {
       const text = String(body.message || '').trim();
       const fromName = String(body.contact_name || '').trim().slice(0, 100);
