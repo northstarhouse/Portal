@@ -1,5 +1,6 @@
 // Journal (blog) editor for the Portal. Posts live in public.site_posts, which the website reads live.
 // Writes go through the site-posts-admin edge function (it checks the Portal sign-in).
+import { buildBlogPrompt, parseBlogPackage, markdownToHtml } from './blog-prompt.js';
 const GOLD = '#886c44';
 const SITE = 'https://www.northstarhouse.org';
 const STATUS_STYLE = {
@@ -115,6 +116,7 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
   const picking = React.useRef('body');
   const savedRange = React.useRef(null);
   const tickT = React.useRef(null);
+  const [pasteBox, setPasteBox] = React.useState(null);
   const [, setTick] = React.useState(0);
 
   async function api(action, data) {
@@ -133,6 +135,45 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
   React.useEffect(loadList, []);
 
   function set(k, v) { setPost((p) => ({ ...p, [k]: v })); }
+  async function copyPrompt() {
+    if (!String(post.title || '').trim()) { setMsg({ ok: false, text: 'Type the blog title first, then copy the prompt.' }); return; }
+    const text = buildBlogPrompt(post.title, post.focus_keyword);
+    try { await navigator.clipboard.writeText(text); }
+    catch (e) {
+      const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    setMsg({ ok: true, text: 'Prompt copied. Paste it into ChatGPT, then come back and press Paste AI draft.' });
+  }
+  function applyDraft(text) {
+    const d = parseBlogPackage(text);
+    if (!d.body_md && !d.title) { setMsg({ ok: false, text: 'That does not look like the blog package (no TITLE or BODY found).' }); return false; }
+    const html = markdownToHtml(d.body_md);
+    setPost((p) => ({
+      ...p,
+      title: d.title || p.title,
+      slug: d.slug ? slugify(d.slug) : p.slug,
+      seo_title: d.seo_title || p.seo_title,
+      seo_description: d.seo_description || p.seo_description,
+      excerpt: p.excerpt || d.seo_description || '',
+      focus_keyword: d.focus_keyword || p.focus_keyword,
+      _cats: d.category || p._cats,
+      _tags: d.tags || p._tags,
+      body_html: html || p.body_html,
+    }));
+    setSlugTouched(true); setHtmlMode(false); setEditorKey((k) => k + 1); setPasteBox(null);
+    setMsg({ ok: true, text: 'Filled in from the draft. Read it over, add a main image, then publish.' });
+    return true;
+  }
+  async function pasteDraft() {
+    if (String(currentHtmlSafe()).replace(/<[^>]+>|&nbsp;/g, '').trim() && !window.confirm('This replaces the text already in this post. Continue?')) return;
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) { applyDraft(text); return; }
+    } catch (e) { /* the browser blocked reading the clipboard; fall back to a box */ }
+    setPasteBox('');
+  }
+
   function currentHtmlSafe() { return htmlMode ? post.body_html || '' : bodyRef.current ? bodyRef.current.innerHTML : post.body_html || ''; }
   function currentHtml() {
     if (htmlMode) return post.body_html || '';
@@ -275,7 +316,20 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
         {msg && <div style={{ background: msg.ok ? '#e8f5e9' : '#fdecea', color: msg.ok ? '#2e7d32' : '#b3261e', borderRadius: 8, padding: '9px 13px', fontSize: 13, margin: '8px 0' }}>{msg.text}</div>}
 
         <label style={labelStyle}>Title</label>
-        <input value={post.title} onChange={(e) => { set('title', e.target.value); if (!slugTouched) set('slug', slugify(e.target.value)); }} style={{ ...inputStyle, fontSize: 20, fontFamily: "'Cardo', serif" }} placeholder="Post title" />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+          <input value={post.title} onChange={(e) => { set('title', e.target.value); if (!slugTouched) set('slug', slugify(e.target.value)); }} style={{ ...inputStyle, fontSize: 20, fontFamily: "'Cardo', serif", flex: 1 }} placeholder="Post title" />
+          <button type="button" onClick={copyPrompt} title="Copy the ChatGPT writing prompt with this title filled in" style={{ ...btn(false), fontSize: 18, padding: '0 14px' }}>✂</button>
+          <button type="button" onClick={pasteDraft} title="Paste ChatGPT's finished blog to fill in this post" style={{ ...btn(true), padding: '0 14px', whiteSpace: 'nowrap' }}>Paste AI draft</button>
+        </div>
+        {pasteBox !== null && (
+          <div style={{ marginTop: 8 }}>
+            <textarea value={pasteBox} onChange={(e) => setPasteBox(e.target.value)} rows={8} autoFocus placeholder="Paste ChatGPT's answer here (starting at TITLE:)" style={{ ...inputStyle, fontFamily: 'Consolas, monospace', fontSize: 12 }} />
+            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+              <button type="button" onClick={() => applyDraft(pasteBox)} style={btn(true)}>Fill in the post</button>
+              <button type="button" onClick={() => setPasteBox(null)} style={btn(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
 
         <label style={labelStyle}>Web address</label>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#888' }}>
