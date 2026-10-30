@@ -94,6 +94,21 @@ Deno.serve(async req=>{
    const links=await Promise.all((draft.signers||[]).map(async(s:any,index:number)=>{const recipient=version.recipients.find((r:any)=>r.email===s.email.trim().toLowerCase());return {signer_id:recipient.id,name:recipient.name,email:recipient.email,url:link(values[index]),...(body.send_email===true?await mailLink(version,recipient,values[index]):{})};}));
    return json({version,links});
   }
+  // The venue countersigner is already signed in to the Portal, so no emailed code: the server runs the same
+  // challenge-and-sign steps itself with a one-time code that is never sent anywhere.
+  if(action==='countersign'){
+   const vid=String(body.version_id||''),sid=String(body.signer_id||'');
+   const vs=await rest('venue_agreement_versions?select=id,status,document_hash&id=eq.'+encodeURIComponent(vid));const ver=vs?.[0];
+   if(!ver)return json({error:'Agreement not found.'},404);
+   const ss=await rest('venue_agreement_signers?select=id,role,status&id=eq.'+encodeURIComponent(sid)+'&version_id=eq.'+encodeURIComponent(vid));const sg=ss?.[0];
+   if(!sg||sg.role!=='venue')return json({error:'Only the venue countersigner can sign here.'},400);
+   const value=token(),hash=await tokenHash(value);
+   await rpc('link',{version_id:vid,signer_id:sid,hash});
+   const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,'0'),ch=await codeHash(sid,code);
+   await rpc('code',{token_hash:hash,code_hash:ch});
+   const result=await rpc('sign',{token_hash:hash,code_hash:ch,document_hash:ver.document_hash,signed_name:body.signed_name,consent:body.consent===true,ip:req.headers.get('x-forwarded-for')?.split(',')[0]||null,user_agent:req.headers.get('user-agent')});
+   return result.error?json(result,400):json({version:publicRecord(result),saved:true});
+  }
   if(action==='link'){
    const value=token();const version=await rpc('link',{version_id:body.version_id,signer_id:body.signer_id,hash:await tokenHash(value)});const signer=version.recipients.find((s:any)=>s.id===body.signer_id);
    return json({version,links:[{signer_id:signer.id,name:signer.name,email:signer.email,url:link(value,signer.role),...(body.send_email===true?await mailLink(version,signer,value):{})}]});
