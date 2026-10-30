@@ -15395,6 +15395,9 @@ function ActivityLogView({ navigate }) {
                                 tagStyle && <span onClick={function() { setEditingTagId(a.id); }} title="Click to change tag" style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 8px', flexShrink: 0, cursor: 'pointer' }}>{a.tag}</span>
                               )}
                               <span>{boldBeforeColon(a.description)}</span>
+                              {a.action === 'form_submission' && a.detail && a.detail.response_id && (a.detail.form_id === PRE_BOOKING_FORM_ID || a.detail.form_id === PRE_BOOKING_FORM_ID_EVENT) && (
+                                <a onClick={function() { window.__nshOpenClient = a.detail.response_id; try { sessionStorage.setItem('nsh-venue-tab', 'clients'); } catch (e) {} navigate('venue'); }} style={{ color: gold, textDecoration: 'underline', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>View client ↗</a>
+                              )}
                             </div>
                             {isHandled && a.handled_by && <span style={{ fontSize: 10, fontWeight: 700, color: '#2e7d32', flexShrink: 0 }}>{a.handled_by}</span>}
                             {adminAuthed && (

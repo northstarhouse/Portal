@@ -18,7 +18,7 @@ class Fail extends Error { constructor(m: string, public status = 400, public ex
 
 const QUESTIONNAIRE_FORM_ID = 'e9be06b9-6788-41bc-a78a-28e02b8b749a';
 const EMAIL_FIELD = 'nzic6lad';
-const INQUIRY_SELECT = 'id,name,email,status,event_type,event_date,prebooking_form_response_id,insurance_uploaded_at,questionnaire_form_response_id,brick_lines,venue_payment_schedule(id,sequence,label,amount_cents,amount_paid_cents,due_date,status)';
+const INQUIRY_SELECT = 'id,name,email,status,event_type,event_date,created_at,prebooking_form_response_id,insurance_uploaded_at,questionnaire_form_response_id,brick_lines,venue_payment_schedule(id,sequence,label,amount_cents,amount_paid_cents,due_date,status)';
 const TOUR_ADDRESS = '12075 Auburn Rd. Grass Valley, CA 95949';
 
 const PAGE_URL = 'https://venue.northstarhouse.org/';
@@ -298,7 +298,8 @@ Deno.serve(async req => {
       const resp = inq.prebooking_form_response_id;
       const vs = await rest(`venue_agreement_versions?select=id,version,status,title,issued_at,completed_at&response_id=eq.${resp}&status=in.(pending,completed)&order=version.desc&limit=1`);
       const v = vs && vs[0];
-      if (!v) return json({ agreement: null });
+      // Bookings made before this date are grandfathered: their agreement is already signed and on file.
+      if (!v) return json({ agreement: String(inq.created_at || '9999').slice(0, 10) < '2026-10-30' ? { legacy: true, status: 'completed', signers: [] } : null });
       const signers = await rest(`venue_agreement_signers?select=id,name,role,status,signed_at&version_id=eq.${v.id}&order=role.asc,name.asc`);
       if (action === 'agreement_status') return json({ agreement: { ...v, signers } });
       const signer = signers.find((s: any) => s.id === String(body.signer_id || ''));
