@@ -9872,7 +9872,7 @@ function SponsorsView() {
   for (var tierIdx = TIERS.length - 1; tierIdx >= 0; tierIdx--) {
     var below = tierIdx < TIERS.length - 1 ? TIERS[tierIdx + 1].benefits : [];
     // one brick per sponsor, for their own tier only (not the lower tiers' bricks)
-    var inherited = below.filter(function(b) { return b.indexOf('personalized brick') === -1; });
+    var inherited = below.filter(function(b) { return b.indexOf('personalized brick') === -1 && b !== 'Thank you note sent' && b !== 'Invitation to State of the Star'; });
     TIERS[tierIdx].benefits = inherited.concat(TIERS[tierIdx].ownBenefits);
     // every sponsor, at any level, is invited to State of the Star
     TIERS[tierIdx].benefits.push('Invitation to State of the Star');
