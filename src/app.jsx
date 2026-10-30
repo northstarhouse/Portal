@@ -460,13 +460,6 @@ function fetchToursThisMonth() {
   }).then(function(r) { return r.json(); }).then(function(rows) { return Array.isArray(rows) ? rows.length : null; }).catch(function() { return null; });
 }
 
-// Messages couples sent from their event page that nobody has marked handled yet.
-function loadUnhandledClientMessages() {
-  return fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&event_uid=like.client:*&handled_at=is.null&order=created_at.desc&limit=50', {
-    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-  }).then(function(r) { return r.ok ? r.json() : []; });
-}
-
 function loadVenueClientEvents() {
   return fetch(SUPABASE_URL + '/rest/v1/venue_inquiries?select=id,name,event_type,event_date,prebooking_form_response_id,insurance_uploaded_at,insurance_drive_url,brick_lines,brick_submitted_at,questionnaire_form_response_id,questionnaire_sent_at,venue_payment_schedule(sequence,kind,label,amount_cents,amount_paid_cents,due_date,status)&prebooking_form_response_id=not.is.null', {
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -18407,9 +18400,28 @@ function VenueRentalsView({ navigate, initialTab }) {
   const [scheduleOpen, setScheduleOpen] = useS(false);
   // Tours stay in Inquiries. Clients begin with an official pre-booking submission.
   const [guideFilter, setGuideFilter] = useS('all');
+  // Messages couples send from their event page (the Messages tab shows the unhandled ones; each client's file keeps all of them).
+  const [clientMsgs, setClientMsgs] = useS(null);
+  function loadClientMsgs() {
+    fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&event_uid=like.client:*&order=created_at.desc&limit=300', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.ok ? r.json() : []; }).then(function(rows) { setClientMsgs(Array.isArray(rows) ? rows : []); }).catch(function() { setClientMsgs([]); });
+  }
+  function handleClientMsg(id) {
+    var stamp = new Date().toISOString();
+    fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ handled_at: stamp })
+    }).then(function(r) {
+      if (!r.ok) { alert('Could not mark it handled. Please try again.'); return; }
+      setClientMsgs(function(rows) { return (rows || []).map(function(m) { return m.id === id ? Object.assign({}, m, { handled_at: stamp }) : m; }); });
+    });
+  }
+  var unhandledClientMsgs = (clientMsgs || []).filter(function(m) { return !m.handled_at; }).length;
   const [venueTab, setVenueTab] = useS(function() {
     if (initialTab) return initialTab;
-    try { return sessionStorage.getItem('nsh-venue-tab') === 'clients' ? 'clients' : 'inquiries'; } catch (e) { return 'inquiries'; }
+    try { var saved = sessionStorage.getItem('nsh-venue-tab'); return saved === 'clients' || saved === 'messages' ? saved : 'inquiries'; } catch (e) { return 'inquiries'; }
   });
   useE(function() { try { sessionStorage.setItem('nsh-venue-tab', venueTab); } catch (e) {} }, [venueTab]);
   function loadInquiries() {
@@ -18602,6 +18614,7 @@ function VenueRentalsView({ navigate, initialTab }) {
       setLoading(false);
     }).catch(function(err) { setCalError(err.message); setLoading(false); });
 
+    loadClientMsgs();
     fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&order=created_at.desc&limit=50', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) { setMessages(Array.isArray(rows) ? rows : []); }).catch(function() { setMessages([]); });
@@ -18889,14 +18902,14 @@ function VenueRentalsView({ navigate, initialTab }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
         {!SHOW_LEGACY_VENUE_DASHBOARD && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexShrink: 0 }}>
-            {[['inquiries', 'Inquiries'], ['clients', 'Clients']].map(function(pair, index) {
+            {[['inquiries', 'Inquiries'], ['clients', 'Clients'], ['messages', 'Messages']].map(function(pair, index) {
               var isActive = venueTab === pair[0];
               return (
                 <React.Fragment key={pair[0]}>
                   {index > 0 && <span aria-hidden="true" style={{ width: 2, height: 26, background: gold, flexShrink: 0 }} />}
                   <button type="button" aria-pressed={isActive} onClick={function() { setVenueTab(pair[0]); }}
                     style={{ padding: '7px 0', border: 'none', fontSize: 20, fontFamily: "'Cardo', serif", fontWeight: isActive ? 700 : 500, background: 'none', color: isActive ? '#2a2a2a' : '#888', cursor: 'pointer', textDecoration: isActive ? 'underline' : 'none', textDecorationColor: gold, textDecorationThickness: 2, textUnderlineOffset: 8, whiteSpace: 'nowrap' }}>
-                    {pair[1]}
+                    {pair[1]}{pair[0] === 'messages' && unhandledClientMsgs > 0 && <span style={{ marginLeft: 6, background: '#c0392b', color: '#fff', fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '1px 7px', verticalAlign: 'middle', fontFamily: 'system-ui, sans-serif' }}>{unhandledClientMsgs}</span>}
                   </button>
                 </React.Fragment>
               );
@@ -18985,7 +18998,32 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
 
           {venueTab === 'clients' && (
-            !inquiriesError && <VenueClientDashboard loadClientMessages={loadUnhandledClientMessages} onOpenMessages={function() { navigate('venue-messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
+            !inquiriesError && <VenueClientDashboard messages={clientMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
+          )}
+
+          {venueTab === 'messages' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 760 }}>
+              {clientMsgs === null && <div style={{ color: '#bbb', fontSize: 13 }}>Loading…</div>}
+              {clientMsgs && clientMsgs.filter(function(m) { return !m.handled_at; }).length === 0 && (
+                <div style={{ color: '#aaa', fontSize: 13, padding: '24px 0' }}>No new messages. Handled messages are kept in each client's file.</div>
+              )}
+              {(clientMsgs || []).filter(function(m) { return !m.handled_at; }).map(function(m) {
+                var clientId = String(m.event_uid || '').replace('client:', '');
+                return (
+                  <div key={m.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid #c79535', borderRadius: 10, padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{m.from_name || 'Client'}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
+                      <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{new Date(m.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+                    </div>
+                    <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{m.body}</div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <button onClick={function() { handleClientMsg(m.id); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Mark handled</button>
+                      <button onClick={function() { window.__nshOpenClient = clientId; setVenueTab('clients'); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Open client file</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
 
           {venueTab === 'inquiries' && (

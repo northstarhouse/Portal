@@ -128,7 +128,7 @@ function InsuranceVerification({ client, onVerify }) {
   </div>;
 }
 
-function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChange }) {
+function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
   return <dialog ref={ref} className="vc-dialog" aria-labelledby="vc-client-title" onCancel={onClose} onClick={e => { if(e.target === ref.current) onClose(); }}>
@@ -157,6 +157,10 @@ function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChan
         <div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div>{c.address && <div className="vc-muted">{c.address}</div>}</div>)}</div>
       </div>
       <InsuranceVerification client={client} onVerify={onVerify}/>
+      {messages&&messages.length>0&&<div className="vc-modal-section">
+        <div className="vc-modal-section-title"><span>Messages from the couple</span><span className={'vc-pill '+(messages.some(m=>!m.handled_at)?'alert':'good')}>{messages.some(m=>!m.handled_at)?'New':'All handled'}</span></div>
+        {messages.map(m=><div key={m.id} className="vc-note-box" style={{marginTop:8}}><div className="vc-muted" style={{marginBottom:4}}>{m.from_name||'Client'} · {new Date(m.created_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}{m.handled_at?' · handled':''}</div><div style={{whiteSpace:'pre-wrap'}}>{m.body}</div>{!m.handled_at&&onHandleMessage&&<button type="button" onClick={()=>onHandleMessage(m.id)} style={{marginTop:8,border:'1px solid #e0d8cc',borderRadius:6,padding:'5px 10px',background:'#fff',color:'#886c44',fontSize:11,fontWeight:600}}>Mark handled</button>}</div>)}
+      </div>}
       <div className="vc-modal-section" aria-labelledby="vc-brick-title">
         <div className="vc-modal-section-title"><span id="vc-brick-title">Wedding brick</span><span className={'vc-pill '+(client.brickLines?.some(l => String(l).trim())?'good':'alert')}>{client.brickLines?.some(l => String(l).trim())?'Wording submitted':'Not submitted yet'}</span></div>
         {client.brickLines?.some(l => String(l).trim()) ? <><div style={{fontFamily:'Cardo,Georgia,serif',letterSpacing:2,lineHeight:1.9,background:'#faf8f3',border:'1px solid #eee7dd',borderRadius:7,padding:'10px 14px'}}>{client.brickLines.map((l,i) => <div key={i}>{l || ' '}</div>)}</div>{client.brickSubmittedAt && <p className="vc-muted" style={{marginBottom:0}}>Submitted {dateLabel(client.brickSubmittedAt.slice(0,10))}</p>}</> : <p className="vc-muted" style={{margin:0}}>The client chooses 3 lines of up to 20 characters on their event page.</p>}
@@ -199,10 +203,9 @@ function ClientDetail({ client, onClose, onVerify, agreementApi, onContractsChan
   </dialog>;
 }
 
-export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, agreementApi, filter, setFilter, query, setQuery, loadClientMessages, onOpenMessages }) {
+export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, agreementApi, filter, setFilter, query, setQuery, messages, onHandleMessage, onOpenMessages }) {
   const [events,setEvents] = React.useState([]), [error,setError] = React.useState('');
-  const [clientMessages,setClientMessages] = React.useState([]);
-  React.useEffect(() => { let off=false; if(loadClientMessages)loadClientMessages().then(rows=>{if(!off)setClientMessages(Array.isArray(rows)?rows:[]);}).catch(()=>{}); return () => {off=true;}; }, []);
+  const clientMessages = (messages||[]).filter(m=>!m.handled_at);
   const [savedResponses,setSavedResponses] = React.useState({});
   const [nativeVersions,setNativeVersions] = React.useState([]);
   React.useEffect(()=>{let cancelled=false;function refresh(){if(agreementApi)agreementApi('summary').then(rows=>{if(!cancelled)setNativeVersions(rows);}).catch(()=>{if(!cancelled)setError('Live agreement status is unavailable. Showing the saved client records.');});}refresh();const timer=setInterval(refresh,60000);window.addEventListener('focus',refresh);return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',refresh);};},[agreementApi]);
@@ -241,6 +244,6 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, a
     </section><aside className="vc-sidebar" aria-label="Client priorities">
       <section className="vc-side-card priority"><h2 className="vc-side-title">Needs your attention <span className="vc-counter">{submissions===null?'—':urgent.length}</span></h2>{submissions===null?<p className="vc-muted">Loading priorities…</p>:urgent.length===0?<p className="vc-muted">No urgent items recorded.</p>:(allTasks?urgent:urgent.slice(0,6)).map(t=><button className="vc-task" key={t.key} onClick={()=>t.action?t.action():open(t.client)}><div className="vc-task-head">{t.title}</div><div className="vc-task-name">{t.client.name}</div><div className={'vc-task-date '+(t.overdue?'late':'')}>{t.due?(t.overdue?'Past due · ':'Due ')+dateLabel(t.due):t.detail}</div></button>)}{urgent.length>6&&<button className="vc-text-button" onClick={()=>setAllTasks(!allTasks)}>{allTasks?'Show fewer priorities':'See all '+urgent.length+' priorities ↓'}</button>}</section>
     </aside></div>
-    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} onClose={()=>setSelected(null)} onVerify={verifyInsurance} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
+    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id)} onHandleMessage={onHandleMessage} onClose={()=>setSelected(null)} onVerify={verifyInsurance} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }
