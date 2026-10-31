@@ -133,6 +133,15 @@ async function donationTotals(b: ReturnType<typeof monthBounds>) {
   return { count: rows.length, total: rows.reduce((s, r) => s + (Number(r.amount) || 0), 0) }
 }
 
+// Upcoming events (from the Events Committee list, the same source as Event Overviews).
+async function upcomingEvents() {
+  const today = laDay(new Date().toISOString())
+  try {
+    const rows: { name: string; date: string; status?: string }[] = await rest(`events_committee?select=name,date,status&hidden=eq.false&date=gte.${today}&order=date.asc&limit=20`)
+    return rows.filter((e) => e.name && String(e.status || '').toLowerCase() !== 'cancelled').slice(0, 12)
+  } catch { return [] }
+}
+
 // What got done in the month, and what is coming up, from the Portal's "North Star House Updates".
 type Upd = { kind: string; title: string; details?: string | null; happened_on?: string | null; area?: string | null }
 async function houseUpdates(b: ReturnType<typeof monthBounds>) {
@@ -186,16 +195,20 @@ const tiles = (items: [string, string][]) => {
 
 function build(label: string, d: {
   h: Awaited<ReturnType<typeof volunteerHours>>; f: Awaited<ReturnType<typeof formCounts>>; t: Awaited<ReturnType<typeof tourCounts>>
-  don: Awaited<ReturnType<typeof donationTotals>>; sp: Awaited<ReturnType<typeof newSponsors>>; qs: Awaited<ReturnType<typeof quarterlyStatus>>; up: Awaited<ReturnType<typeof houseUpdates>>
+  don: Awaited<ReturnType<typeof donationTotals>>; sp: Awaited<ReturnType<typeof newSponsors>>; qs: Awaited<ReturnType<typeof quarterlyStatus>>; up: Awaited<ReturnType<typeof houseUpdates>>; ev: Awaited<ReturnType<typeof upcomingEvents>>
 }, test: boolean) {
-  const { h, f, t, don, sp, qs, up } = d
+  const { h, f, t, don, sp, qs, up, ev } = d
   let html = ''
   let text = `NORTH STAR HOUSE — BOARD UPDATE, ${label.toUpperCase()}\n\n`
   const section = (title: string, bodyHtml: string, bodyText: string) => { html += `<h3 style="${H3}">${esc(title)}</h3>${bodyHtml}`; text += `${title.toUpperCase()}\n${bodyText}\n\n` }
 
   const when = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : '')
-  const item = (u: Upd) => `<p style="${P}margin:0 0 10px;"><strong style="color:#2a2420;">${esc(u.title)}</strong>${u.area && u.area !== 'General' ? ` <span style="font-size:12px;color:${GOLD};">· ${esc(u.area)}</span>` : ''}${u.happened_on ? `<br><span style="font-size:13px;color:#888;">${esc(when(u.happened_on))}</span>` : ''}${u.details ? `<br><span style="font-size:14px;">${esc(u.details)}</span>` : ''}</p>`
-  const itemText = (u: Upd) => `- ${u.title}${u.happened_on ? ' (' + when(u.happened_on) + ')' : ''}${u.details ? ': ' + u.details : ''}`
+  // Title on the first line; the area and the date together on the line under it.
+  const item = (u: Upd) => {
+    const meta = [u.area && u.area !== 'General' ? u.area : '', when(u.happened_on)].filter(Boolean).join(' · ')
+    return `<p style="${P}margin:0 0 12px;"><strong style="color:#2a2420;">${esc(u.title)}</strong>${meta ? `<br><span style="font-size:13px;color:#888;">${esc(meta)}</span>` : ''}${u.details ? `<br><span style="font-size:14px;">${esc(u.details)}</span>` : ''}</p>`
+  }
+  const itemText = (u: Upd) => `- ${u.title}${[u.area && u.area !== 'General' ? u.area : '', when(u.happened_on)].filter(Boolean).length ? ' (' + [u.area && u.area !== 'General' ? u.area : '', when(u.happened_on)].filter(Boolean).join(' · ') + ')' : ''}${u.details ? ': ' + u.details : ''}`
   if (up.done.length > 0) section('What Got Done', up.done.map(item).join(''), up.done.map(itemText).join('\n'))
 
   section('Volunteer Hours', tiles([[hrs(h.month), `volunteer hours in ${label.split(' ')[0]}`], [hrs(h.ytd), 'volunteer hours this year'], [hrs(h.bMonth), `board volunteer hours in ${label.split(' ')[0]}`], [hrs(h.bYear), 'board volunteer hours this year']]),
@@ -223,6 +236,11 @@ function build(label: string, d: {
       sp.fresh.map((x) => `- ${x.name}: ${money(x.total)}${x.what.length ? ' (' + x.what.join(', ') + ')' : ''}`).join('\n'))
   }
 
+  if (ev.length > 0) {
+    const nice = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+    section('Upcoming Events', ev.map((e) => `<p style="${P}margin:0 0 8px;"><strong style="color:#2a2420;">${esc(e.name)}</strong><br><span style="font-size:13px;color:#888;">${esc(nice(e.date))}</span></p>`).join(''),
+      ev.map((e) => `- ${e.name}: ${nice(e.date)}`).join('\n'))
+  }
   if (up.upcoming.length > 0) section('Coming Up', up.upcoming.map(item).join(''), up.upcoming.map(itemText).join('\n'))
 
   const qTitle = `Quarterly Reports (${qs.quarter} ${qs.year})`
@@ -252,11 +270,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}))
     const ym = pickMonth(body)
     const b = monthBounds(ym)
-    const [h, f, t, don, sp, qs, up] = await Promise.all([volunteerHours(b), formCounts(b), tourCounts(b), donationTotals(b), newSponsors(b), quarterlyStatus(), houseUpdates(b)])
+    const [h, f, t, don, sp, qs, up, ev] = await Promise.all([volunteerHours(b), formCounts(b), tourCounts(b), donationTotals(b), newSponsors(b), quarterlyStatus(), houseUpdates(b), upcomingEvents()])
 
     const mode = (await rest('private_config?select=value&key=eq.board_report_mode').catch(() => []))[0]?.value || 'test'
     const live = mode === 'live' && !body.to
-    const { html, text } = build(b.label, { h, f, t, don, sp, qs, up }, !live)
+    const { html, text } = build(b.label, { h, f, t, don, sp, qs, up, ev }, !live)
 
     const boardEmails = Array.from(new Set(h.boardRows.filter((p) => p.Email && (p.Status || 'Active') === 'Active').map((p) => String(p.Email).trim().toLowerCase()))).filter((e) => /.+@.+\..+/.test(e))
     const to = live && boardEmails.length ? boardEmails : [body.to || TEST_TO]
@@ -265,7 +283,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ to, subject: `${live ? '' : 'TEST: '}Board Update: ${b.label}`, body: text, html, sender: 'Board Update', fromEmail: 'venue@northstarhouse.org' }),
     })
     if (!res.ok) throw new Error(`send-email HTTP ${res.status}: ${await res.text()}`)
-    return json({ ok: true, month: b.label, mode: live ? 'live' : 'test', sent_to: to.length, summary: { hours: h.month, ytd: h.ytd, board_ytd: h.bYear, inquiries: f.inquiries, tours: t.booked, docent: f.docent, volunteer_inquiries: f.volunteers, new_sponsors: sp.fresh.length, donations: don.count, donation_total: don.total, q_missing: qs.missing } })
+    return json({ ok: true, month: b.label, mode: live ? 'live' : 'test', sent_to: to.length, summary: { hours: h.month, ytd: h.ytd, board_ytd: h.bYear, inquiries: f.inquiries, tours: t.booked, docent: f.docent, volunteer_inquiries: f.volunteers, new_sponsors: sp.fresh.length, upcoming_events: ev.length, donations: don.count, donation_total: don.total, q_missing: qs.missing } })
   } catch (e) {
     console.error('send-board-monthly-report', e instanceof Error ? e.message : e)
     return json({ error: e instanceof Error ? e.message : String(e) }, 500)
