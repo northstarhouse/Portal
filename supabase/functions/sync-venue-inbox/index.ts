@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
     }
 
     // Recent inbox mail from people (not our own BCC copies, not automated, not voicemail notices).
-    const q = 'in:inbox newer_than:3d -category:promotions -category:social -from:(noreply OR no-reply OR mailer-daemon OR notifications OR voice-noreply@google.com OR info@northstarhouse.org OR venue@northstarhouse.org OR venue@thenorthstarhouse.org)'
+    const q = 'in:inbox newer_than:3d -category:promotions -category:social -from:(noreply OR no-reply OR mailer-daemon OR notifications OR voice-noreply@google.com OR info@northstarhouse.org OR venue@northstarhouse.org OR venue@thenorthstarhouse.org OR eventective OR globaleventsupply.com OR paypal)'
     const list = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q=${encodeURIComponent(q)}`, { headers: auth }).then((r) => r.json())
     if (list.error) throw new Error(`Gmail: ${list.error.message || JSON.stringify(list.error)}`)
     const ids: string[] = (list.messages || []).map((m: { id: string }) => m.id)
