@@ -176,7 +176,7 @@ Deno.serve(async (req) => {
       ? {
           status: 'open', visitor_name: null, visitor_email: null, visitor_phone: null, inquiry_form_id: null, inquiry_answers: null,
           category: null, gcal_event_id: null, staff_notes: null, requested_slots: [], reminder_24h_sent_at: null, reminder_1h_sent_at: null,
-          request_handled: false, request_status: 'not_handled', made_contact_at: null, request_handled_by: null,
+          request_handled: false, request_status: 'not_handled', made_contact_at: null,
         }
       : { status: 'cancelled', gcal_event_id: null }
     const up = await sb(`/rest/v1/estate_tours?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) })
