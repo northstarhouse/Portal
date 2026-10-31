@@ -144,19 +144,22 @@ async function houseUpdates(b: ReturnType<typeof monthBounds>) {
   return { done, upcoming }
 }
 
-// A sponsor is "new" when their first contribution on record falls in the reported month.
+// Sponsors who gave in the reported month. "New" = their first contribution on record is in that month; "returning" = they gave before.
 async function newSponsors(b: ReturnType<typeof monthBounds>) {
   const [sponsors, gifts]: [{ id: string; 'Business Name'?: string }[], { sponsor_id: string; value: number | string; date: string; description?: string; contribution_type?: string }[]] =
     await Promise.all([rest('Sponsors?select=id,Business%20Name'), rest('Sponsor%20In-Kind?select=sponsor_id,value,date,description,contribution_type&limit=5000')])
-  const out: { name: string; total: number; what: string[] }[] = []
+  const fresh: { name: string; total: number; what: string[] }[] = []
+  const returning: { name: string; total: number; what: string[] }[] = []
   for (const s of sponsors) {
     const mine = gifts.filter((g) => g.sponsor_id === s.id && g.date).sort((x, y) => String(x.date).localeCompare(String(y.date)))
     if (!mine.length) continue
-    if (String(mine[0].date) < b.start || String(mine[0].date) > b.end) continue
     const inMonth = mine.filter((g) => String(g.date) >= b.start && String(g.date) <= b.end)
-    out.push({ name: s['Business Name'] || 'Sponsor', total: inMonth.reduce((t, g) => t + (Number(g.value) || 0), 0), what: inMonth.map((g) => g.contribution_type || g.description || '').filter(Boolean) })
+    if (!inMonth.length) continue
+    const row = { name: s['Business Name'] || 'Sponsor', total: inMonth.reduce((t, g) => t + (Number(g.value) || 0), 0), what: inMonth.map((g) => g.contribution_type || g.description || '').filter(Boolean) }
+    if (String(mine[0].date) >= b.start) fresh.push(row)
+    else returning.push(row)
   }
-  return out.sort((a, c) => c.total - a.total)
+  return { fresh: fresh.sort((a, c) => c.total - a.total), returning: returning.sort((a, c) => c.total - a.total) }
 }
 
 // The most recent quarter that has ended, and which areas haven't turned in its update.
@@ -214,9 +217,14 @@ function build(label: string, d: {
     const interest = areas.length ? `Areas they are interested in: ${areas.join(', ')}.` : ''
     section('Volunteer Inquiries', `<p style="${P}">${esc(v)}</p>` + (interest ? `<p style="${P}">${esc(interest)}</p>` : ''), v + (interest ? ' ' + interest : ''))
   }
-  if (sp.length > 0) {
-    const lines = sp.map((s) => `${s.name}: ${money(s.total)}${s.what.length ? ' (' + s.what.join(', ') + ')' : ''}`)
-    section('New Sponsors', `<p style="${P}">Welcome to ${sp.length} new ${plural(sp.length, 'sponsor', 'sponsors')}:</p>` + sp.map((s, i) => `<p style="${P}margin:0 0 6px;"><strong style="color:#2a2420;">${esc(s.name)}</strong> &mdash; ${esc(money(s.total))}${s.what.length ? `<br><span style="font-size:13px;color:#888;">${esc(s.what.join(', '))}</span>` : ''}</p>`).join(''), lines.join('\n'))
+  if (sp.fresh.length > 0 || sp.returning.length > 0) {
+    const group = (title: string, list: typeof sp.fresh) => list.length === 0 ? '' :
+      `<p style="${P}margin:14px 0 6px;"><strong style="color:#2a2420;">${esc(title)}</strong></p>` +
+      list.map((s) => `<p style="${P}margin:0 0 6px;"><strong style="color:#2a2420;">${esc(s.name)}</strong> &mdash; ${esc(money(s.total))}${s.what.length ? `<br><span style="font-size:13px;color:#888;">${esc(s.what.join(', '))}</span>` : ''}</p>`).join('')
+    const line = (s: { name: string; total: number; what: string[] }) => `- ${s.name}: ${money(s.total)}${s.what.length ? ' (' + s.what.join(', ') + ')' : ''}`
+    section('Sponsors',
+      group(`New this month (${sp.fresh.length})`, sp.fresh) + group(`Returning sponsors (${sp.returning.length})`, sp.returning),
+      (sp.fresh.length ? 'New this month:\n' + sp.fresh.map(line).join('\n') + '\n' : '') + (sp.returning.length ? 'Returning sponsors:\n' + sp.returning.map(line).join('\n') : ''))
   }
 
   if (up.upcoming.length > 0) section('Coming Up', up.upcoming.map(item).join(''), up.upcoming.map(itemText).join('\n'))
@@ -261,7 +269,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ to, subject: `${live ? '' : 'TEST: '}Board Update: ${b.label}`, body: text, html, sender: 'Board Update', fromEmail: 'venue@northstarhouse.org' }),
     })
     if (!res.ok) throw new Error(`send-email HTTP ${res.status}: ${await res.text()}`)
-    return json({ ok: true, month: b.label, mode: live ? 'live' : 'test', sent_to: to.length, summary: { hours: h.month, ytd: h.ytd, board_ytd: h.bYear, inquiries: f.inquiries, tours: t.booked, docent: f.docent, volunteer_inquiries: f.volunteers, new_sponsors: sp.length, donations: don.count, donation_total: don.total, q_missing: qs.missing } })
+    return json({ ok: true, month: b.label, mode: live ? 'live' : 'test', sent_to: to.length, summary: { hours: h.month, ytd: h.ytd, board_ytd: h.bYear, inquiries: f.inquiries, tours: t.booked, docent: f.docent, volunteer_inquiries: f.volunteers, new_sponsors: sp.fresh.length, returning_sponsors: sp.returning.length, donations: don.count, donation_total: don.total, q_missing: qs.missing } })
   } catch (e) {
     console.error('send-board-monthly-report', e instanceof Error ? e.message : e)
     return json({ error: e instanceof Error ? e.message : String(e) }, 500)
