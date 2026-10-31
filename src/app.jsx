@@ -11334,8 +11334,40 @@ function ReviewsView({ navigate }) {
   var ccLbl = { fontSize: 11, color: '#888', fontWeight: 500, marginBottom: 4, display: 'block' };
   var ccGrp = { marginBottom: 14 };
 
+  // Quick reference: each quarter's timeframe and its review dates (same schedule as the Quarterly Update form).
+  var QUARTER_SHEET = [
+    { q: 'Q1', dates: 'Jan 1 – Mar 31', due: 'Mar 31', champion: 'Apr 2', board: 'Apr 16' },
+    { q: 'Q2', dates: 'Apr 1 – Jun 30', due: 'Jun 30', champion: 'Jul 2', board: 'Jul 16' },
+    { q: 'Q3', dates: 'Jul 1 – Sep 30', due: 'Sep 30', champion: 'Oct 1', board: 'Oct 15' },
+    { q: 'Q4', dates: 'Oct 1 – Dec 31', due: 'Dec 10', champion: 'Dec 10', board: 'Dec 17' }
+  ];
+  var curQ = currentQuarterStr();
+
   return (
     <div>
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', marginBottom: 16, overflow: 'hidden' }}>
+        <div style={{ padding: '12px 20px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600 }}>Quarter Cheat Sheet</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
+          {QUARTER_SHEET.map(function(x, i) {
+            var now = x.q === curQ;
+            return (
+              <div key={x.q} style={{ padding: '14px 18px', borderLeft: i ? '0.5px solid #f0ece6' : 'none', background: now ? '#fbf6ec' : '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: now ? gold : '#555', fontFamily: "'Cardo', serif" }}>{x.q}</span>
+                  {now && <span style={{ fontSize: 10, background: gold, color: '#fff', borderRadius: 20, padding: '1px 8px', fontWeight: 600 }}>Current</span>}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', marginBottom: 8 }}>{x.dates}</div>
+                <div style={{ fontSize: 12, color: '#666', lineHeight: 1.9 }}>
+                  <div><span style={{ color: '#999' }}>Updates due:</span> <strong style={{ color: '#2a2a2a' }}>{x.due}</strong></div>
+                  <div><span style={{ color: '#999' }}>Co-Champions review:</span> <strong style={{ color: '#2a2a2a' }}>{x.champion}</strong></div>
+                  <div><span style={{ color: '#999' }}>Board meeting:</span> <strong style={{ color: '#2a2a2a' }}>{x.board}</strong></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', marginBottom: 24, overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600 }}>Quarterly Updates — {year}</div>
