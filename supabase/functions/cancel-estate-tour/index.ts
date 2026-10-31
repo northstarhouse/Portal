@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
     const patch = reopen
       ? {
           status: 'open', visitor_name: null, visitor_email: null, visitor_phone: null, inquiry_form_id: null, inquiry_answers: null,
-          category: null, gcal_event_id: null, staff_notes: null, requested_slots: null, reminder_24h_sent_at: null, reminder_1h_sent_at: null,
+          category: null, gcal_event_id: null, staff_notes: null, requested_slots: [], reminder_24h_sent_at: null, reminder_1h_sent_at: null,
           request_handled: null, request_status: null, made_contact_at: null,
         }
       : { status: 'cancelled', gcal_event_id: null }
