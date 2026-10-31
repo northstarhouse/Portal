@@ -197,7 +197,7 @@ function build(label: string, d: {
   const itemText = (u: Upd) => `- ${u.title}${u.happened_on ? ' (' + when(u.happened_on) + ')' : ''}${u.details ? ': ' + u.details : ''}`
   if (up.done.length > 0) section('What Got Done', up.done.map(item).join(''), up.done.map(itemText).join('\n'))
 
-  section('Volunteer Hours', tiles([[hrs(h.month), `hours in ${label.split(' ')[0]}`], [hrs(h.ytd), 'hours this year'], [hrs(h.bYear), 'board hours this year'], [hrs(h.bMonth), `board hours in ${label.split(' ')[0]}`]]),
+  section('Volunteer Hours', tiles([[hrs(h.month), 'volunteer hours this month'], [hrs(h.ytd), 'volunteer hours this year'], [hrs(h.bMonth), 'board volunteer hours this month'], [hrs(h.bYear), 'board volunteer hours this year']]),
     `${hrs(h.month)} hours this past month; ${hrs(h.ytd)} this year. Board members: ${hrs(h.bMonth)} this past month; ${hrs(h.bYear)} this year.`)
 
   const kindBits = Object.entries(f.kinds).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${k.toLowerCase()}`).join(', ')
