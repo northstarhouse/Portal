@@ -4,8 +4,9 @@
 //
 // - Mail from a known client (their pre-booking form email) is filed under that client: event_uid = 'client:<id>'.
 // - Mail from anyone else is kept as 'inbox:' so it still shows up, marked as an unknown sender.
-// - Skipped: our own emails (BCC copies), no-reply / automated senders, and Google Voice voicemails (the Volunteer Hub
-//   already turns those into voicemail entries).
+// - Google Voice voicemail emails (voice-noreply@google.com) are imported as voicemails (event_uid = 'voicemail:'), with the
+//   transcript as the message. This replaces the old spreadsheet-based voicemail list.
+// - Skipped: our own emails (BCC copies) and no-reply / automated senders.
 // - Each Gmail message is imported once (venue_messages.gmail_id is unique).
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -103,7 +104,9 @@ Deno.serve(async (req) => {
     const q = 'in:inbox newer_than:3d -category:promotions -category:social -from:(noreply OR no-reply OR mailer-daemon OR notifications OR voice-noreply@google.com OR info@northstarhouse.org OR venue@northstarhouse.org OR venue@thenorthstarhouse.org OR eventective OR globaleventsupply.com OR paypal)'
     const list = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q=${encodeURIComponent(q)}`, { headers: auth }).then((r) => r.json())
     if (list.error) throw new Error(`Gmail: ${list.error.message || JSON.stringify(list.error)}`)
-    const ids: string[] = (list.messages || []).map((m: { id: string }) => m.id)
+    // Google Voice voicemails come from voice-noreply@google.com (excluded from the people query above).
+    const vmList = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q=${encodeURIComponent('in:inbox newer_than:3d from:voice-noreply@google.com')}`, { headers: auth }).then((r) => r.json())
+    const ids: string[] = Array.from(new Set([...(list.messages || []), ...(vmList.messages || [])].map((m: { id: string }) => m.id)))
     if (!ids.length) return json({ ok: true, imported: 0 })
 
     // Skip anything already imported.
@@ -128,10 +131,25 @@ Deno.serve(async (req) => {
       const from = parseFrom(header(m, 'From'))
       if (!from.email) continue
       const text = findBody(m.payload, 'text/plain') || htmlToText(findBody(m.payload, 'text/html'))
+      const when = Number(m.internalDate) ? new Date(Number(m.internalDate)).toISOString() : new Date().toISOString()
+      if (from.email === 'voice-noreply@google.com') {
+        // "New voicemail from Name (###) ###-####": keep the transcript, drop Google's footer lines.
+        const subject = header(m, 'Subject')
+        const caller = subject.replace(/^new voicemail from\s*/i, '').trim() || 'Unknown caller'
+        const lines = text.split('\n').map((l) => l.trim()).filter(Boolean).filter((l) => !/^(play message|to play|reply|this message|you received|google voice|view in|\[?image|https?:\/\/)/i.test(l))
+        const transcript = lines.join(' ').replace(/\s{2,}/g, ' ').slice(0, 3000)
+        if (!transcript) continue
+        const vm = await sb('/rest/v1/venue_messages?on_conflict=gmail_id', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+          body: JSON.stringify({ gmail_id: id, event_uid: 'voicemail:', event_title: null, subject: `Voicemail: ${caller}`, body: transcript, from_name: caller, from_email: null, direction: 'incoming', created_at: when }),
+        })
+        if (vm.ok) imported++
+        continue
+      }
       const body = newTextOnly(text)
       if (!body) continue
       const known = clients.get(from.email)
-      const when = Number(m.internalDate) ? new Date(Number(m.internalDate)).toISOString() : new Date().toISOString()
       const res = await sb('/rest/v1/venue_messages?on_conflict=gmail_id', {
         method: 'POST',
         headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },

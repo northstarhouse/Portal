@@ -18428,7 +18428,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   // Messages couples send from their event page (the Messages tab shows the unhandled ones; each client's file keeps all of them).
   const [clientMsgs, setClientMsgs] = useS(null);
   function loadClientMsgs() {
-    fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&or=(event_uid.like.client:*,event_uid.like.inbox:*)&order=created_at.desc&limit=300', {
+    fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&or=(event_uid.like.client:*,event_uid.like.inbox:*,event_uid.like.voicemail:*)&order=created_at.desc&limit=300', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.ok ? r.json() : []; }).then(function(rows) { setClientMsgs(Array.isArray(rows) ? rows : []); }).catch(function() { setClientMsgs([]); });
   }
@@ -18491,6 +18491,10 @@ function VenueRentalsView({ navigate, initialTab }) {
   // Venue voicemails (Google Voice transcripts) arrive in the Activity Log with these tags.
   const [voicemails, setVoicemails] = useS(null);
   function loadVoicemails() {
+    setVoicemails([]); // voicemails now come from the venue@ inbox (Google Voice emails), not the spreadsheet-fed Activity Log
+    return;
+  }
+  function loadVoicemailsFromActivityLog() {
     var tags = ['Wedding - Voicemail', 'Event - Voicemail', 'Venue Inquiry - Voicemail'].map(function(t) { return '"' + t + '"'; }).join(',');
     fetch(SUPABASE_URL + '/rest/v1/activity_log?select=*&tag=in.(' + encodeURIComponent(tags) + ')&order=created_at.desc&limit=100', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
@@ -19881,11 +19885,12 @@ function PastMessages({ msgs, voicemails }) {
         }
         var m = it.m;
         var fromInbox = /^Email: /.test(m.subject || '');
+        var isVm = String(m.event_uid || '') === 'voicemail:';
         var reps = repliesFor(m);
         return (
           <div key={m.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid ' + (m.handled_at ? '#65965a' : '#c9bfae'), borderRadius: 10, padding: '12px 16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{m.from_name || 'Client'}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{isVm ? 'Voicemail · ' : ''}{m.from_name || 'Client'}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
               <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{day(m.created_at)}</div>
             </div>
             {fromInbox && <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 4 }}>{String(m.subject || '').replace(/^Email: /, '')}</div>}
@@ -19942,6 +19947,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
   var wantsEmail = /wants an email/i.test(m.subject || '');
   var wantsCall = /wants a call/i.test(m.subject || '');
   var fromInbox = /^Email: /.test(m.subject || '');
+  var isVoicemail = String(m.event_uid || '') === 'voicemail:';
   var knownClient = String(m.event_uid || '').indexOf('client:') === 0;
   var canReply = (wantsEmail || fromInbox) && !!m.from_email;
   function sendReply() {
@@ -19960,6 +19966,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
       {fromInbox && <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 4 }}>{String(m.subject || '').replace(/^Email: /, '')}</div>}
       <div style={{ marginBottom: 6 }}>
         {wantsEmail && <span style={Object.assign({}, pill, { background: '#e3f2fd', color: '#1565c0' })}>WANTS AN EMAIL REPLY</span>}
+        {isVoicemail && <span style={Object.assign({}, pill, { background: '#fbeaf0', color: '#b5457a' })}>VOICEMAIL</span>}
         {fromInbox && <span style={Object.assign({}, pill, { background: '#e3f2fd', color: '#1565c0' })}>EMAIL TO VENUE@</span>}
         {fromInbox && !knownClient && <span style={Object.assign({}, pill, { background: '#fff3e0', color: '#b45309', marginLeft: 6 })}>UNKNOWN SENDER</span>}
         {wantsCall && <span style={Object.assign({}, pill, { background: '#e8f5e9', color: '#2e7d32' })}>WANTS A PHONE CALL</span>}
