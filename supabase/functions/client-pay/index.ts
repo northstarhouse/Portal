@@ -96,6 +96,29 @@ async function resolve(body: any, ip: string) {
   return { date, inq: rows[0] };
 }
 
+// Clients booked before the native payment schedule existed: build their schedule from the HoneyBook invoice stored with
+// their record, plus any payments staff logged by hand in the Portal. Shown to the couple read-only.
+async function legacySchedule(inq: any) {
+  try {
+    const rows = await rest(`nsh_form_responses?select=answers&id=eq.${inq.prebooking_form_response_id}`);
+    const a = (rows && rows[0] && rows[0].answers) || {};
+    const hb = a.__honeybook;
+    const files: any[] = hb?.files || [];
+    const order = (id: string) => String(files.find((f: any) => f.id === id)?.updated_at || '');
+    const invoice = (hb?.file_responses || []).filter((r: any) => r.responses?.payments).sort((x: any, y: any) => order(y.id).localeCompare(order(x.id)))[0];
+    const items: any[] = invoice?.responses?.payments?.schedule || [];
+    if (!items.length) return [];
+    const base = items.map((p: any) => ({ cents: Number(p.amount?.amount) || 0, due: String(p.due_date || '').slice(0, 10) || null, paid: !!p.paid }))
+      .sort((x, y) => (x.due || '9999').localeCompare(y.due || '9999'));
+    let manual = (Array.isArray(a.__venue_checklist?.manual_payments) ? a.__venue_checklist.manual_payments : []).reduce((s: number, p: any) => s + (Number(p?.cents) || 0), 0);
+    return base.map((p, i) => {
+      let paid = p.paid;
+      if (!paid && p.cents > 0 && manual >= p.cents) { manual -= p.cents; paid = true; }
+      return { sequence: i + 1, label: i === 0 ? 'Booking payment' : `Scheduled payment ${i + 1}`, amount_cents: p.cents, amount_paid_cents: paid ? p.cents : 0, due_date: p.due, status: paid ? 'paid' : 'due' };
+    });
+  } catch (_e) { return []; }
+}
+
 function view(date: string, inq: any) {
   const sched = (inq.venue_payment_schedule || []).slice().sort((a: any, b: any) => a.sequence - b.sequence);
   const total = sched.reduce((s: number, r: any) => s + (r.amount_cents || 0), 0);
@@ -104,6 +127,7 @@ function view(date: string, inq: any) {
   return {
     name: inq.name, event_type: inq.event_type, event_date: date,
     has_schedule: sched.length > 0, total_cents: total, paid_cents: paid, balance_cents: Math.max(0, total - paid),
+    schedule: sched.map((r: any) => ({ label: r.label, due_date: r.due_date, amount_cents: r.amount_cents, paid: (r.amount_paid_cents || 0) >= r.amount_cents })),
     next_due: next ? { label: next.label, due_date: next.due_date, amount_cents: next.amount_cents - (next.amount_paid_cents || 0) } : null,
     insurance_uploaded: !!inq.insurance_uploaded_at,
     questionnaire_done: !!inq.questionnaire_form_response_id,
@@ -243,6 +267,10 @@ Deno.serve(async req => {
 
     if (action === 'lookup') {
       const [paypal_client_id, walkthrough] = await Promise.all([ppClientId(), walkthroughFor(inq)]);
+      if (!(inq.venue_payment_schedule || []).length) {
+        const old = await legacySchedule(inq);
+        if (old.length) return json({ ...view(date, { ...inq, venue_payment_schedule: old }), walkthrough, paypal_client_id: null, schedule_readonly: true });
+      }
       return json({ ...view(date, inq), walkthrough, paypal_client_id });
     }
 
