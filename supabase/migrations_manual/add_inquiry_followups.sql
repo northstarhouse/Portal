@@ -1,4 +1,4 @@
--- 48-hour follow-up for website wedding inquiries (send-inquiry-followups function).
+-- 48-hour follow-up for website inquiries: wedding, event, memorial and nonprofit (send-inquiry-followups function).
 -- One row per inquiry that has been followed up. Server-only: RLS on, no policies.
 create table if not exists inquiry_followups (
   response_id uuid primary key references nsh_form_responses(id) on delete cascade,
