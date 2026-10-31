@@ -127,6 +127,17 @@ async function donationTotals(b: ReturnType<typeof monthBounds>) {
   return { count: rows.length, total: rows.reduce((s, r) => s + (Number(r.amount) || 0), 0) }
 }
 
+// What got done in the month, and what is coming up, from the Portal's "North Star House Updates".
+type Upd = { kind: string; title: string; details?: string | null; happened_on?: string | null; area?: string | null }
+async function houseUpdates(b: ReturnType<typeof monthBounds>) {
+  let rows: Upd[] = []
+  try { rows = await rest('nsh_updates?select=kind,title,details,happened_on,area&include_in_email=eq.true&order=happened_on.asc.nullslast&limit=500') } catch { rows = [] }
+  const today = laDay(new Date().toISOString())
+  const done = rows.filter((u) => u.kind === 'done' && u.happened_on && u.happened_on >= b.start && u.happened_on <= b.end)
+  const upcoming = rows.filter((u) => u.kind === 'upcoming' && (!u.happened_on || u.happened_on >= today)).slice(0, 15)
+  return { done, upcoming }
+}
+
 // A sponsor is "new" when their first contribution on record falls in the reported month.
 async function newSponsors(b: ReturnType<typeof monthBounds>) {
   const [sponsors, gifts]: [{ id: string; 'Business Name'?: string }[], { sponsor_id: string; value: number | string; date: string; description?: string; contribution_type?: string }[]] =
@@ -168,12 +179,17 @@ const tiles = (items: [string, string][]) => {
 
 function build(label: string, d: {
   h: Awaited<ReturnType<typeof volunteerHours>>; f: Awaited<ReturnType<typeof formCounts>>; t: Awaited<ReturnType<typeof tourCounts>>
-  don: Awaited<ReturnType<typeof donationTotals>>; sp: Awaited<ReturnType<typeof newSponsors>>; qs: Awaited<ReturnType<typeof quarterlyStatus>>
+  don: Awaited<ReturnType<typeof donationTotals>>; sp: Awaited<ReturnType<typeof newSponsors>>; qs: Awaited<ReturnType<typeof quarterlyStatus>>; up: Awaited<ReturnType<typeof houseUpdates>>
 }, test: boolean) {
-  const { h, f, t, don, sp, qs } = d
+  const { h, f, t, don, sp, qs, up } = d
   let html = ''
   let text = `NORTH STAR HOUSE — BOARD UPDATE, ${label.toUpperCase()}\n\n`
   const section = (title: string, bodyHtml: string, bodyText: string) => { html += `<h3 style="${H3}">${esc(title)}</h3>${bodyHtml}`; text += `${title.toUpperCase()}\n${bodyText}\n\n` }
+
+  const when = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : '')
+  const item = (u: Upd) => `<p style="${P}margin:0 0 10px;"><strong style="color:#2a2420;">${esc(u.title)}</strong>${u.area && u.area !== 'General' ? ` <span style="font-size:12px;color:${GOLD};">· ${esc(u.area)}</span>` : ''}${u.happened_on ? `<br><span style="font-size:13px;color:#888;">${esc(when(u.happened_on))}</span>` : ''}${u.details ? `<br><span style="font-size:14px;">${esc(u.details)}</span>` : ''}</p>`
+  const itemText = (u: Upd) => `- ${u.title}${u.happened_on ? ' (' + when(u.happened_on) + ')' : ''}${u.details ? ': ' + u.details : ''}`
+  if (up.done.length > 0) section('What Got Done', up.done.map(item).join(''), up.done.map(itemText).join('\n'))
 
   section('Volunteer Hours', tiles([[hrs(h.month), `hours in ${label.split(' ')[0]}`], [hrs(h.ytd), 'hours this year'], [hrs(h.bYear), 'board hours this year'], [hrs(h.bMonth), `board hours in ${label.split(' ')[0]}`]]),
     `${hrs(h.month)} hours this past month; ${hrs(h.ytd)} this year. Board members: ${hrs(h.bMonth)} this past month; ${hrs(h.bYear)} this year.`)
@@ -194,6 +210,8 @@ function build(label: string, d: {
     const lines = sp.map((s) => `${s.name}: ${money(s.total)}${s.what.length ? ' (' + s.what.join(', ') + ')' : ''}`)
     section('New Sponsors', `<p style="${P}">Welcome to ${sp.length} new ${plural(sp.length, 'sponsor', 'sponsors')}:</p>` + sp.map((s, i) => `<p style="${P}margin:0 0 6px;"><strong style="color:#2a2420;">${esc(s.name)}</strong> &mdash; ${esc(money(s.total))}${s.what.length ? `<br><span style="font-size:13px;color:#888;">${esc(s.what.join(', '))}</span>` : ''}</p>`).join(''), lines.join('\n'))
   }
+
+  if (up.upcoming.length > 0) section('Coming Up', up.upcoming.map(item).join(''), up.upcoming.map(itemText).join('\n'))
 
   const qTitle = `Quarterly Reports (${qs.quarter} ${qs.year})`
   if (qs.missing.length === 0) {
@@ -222,11 +240,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}))
     const ym = pickMonth(body)
     const b = monthBounds(ym)
-    const [h, f, t, don, sp, qs] = await Promise.all([volunteerHours(b), formCounts(b), tourCounts(b), donationTotals(b), newSponsors(b), quarterlyStatus()])
+    const [h, f, t, don, sp, qs, up] = await Promise.all([volunteerHours(b), formCounts(b), tourCounts(b), donationTotals(b), newSponsors(b), quarterlyStatus(), houseUpdates(b)])
 
     const mode = (await rest('private_config?select=value&key=eq.board_report_mode').catch(() => []))[0]?.value || 'test'
     const live = mode === 'live' && !body.to
-    const { html, text } = build(b.label, { h, f, t, don, sp, qs }, !live)
+    const { html, text } = build(b.label, { h, f, t, don, sp, qs, up }, !live)
 
     const boardEmails = Array.from(new Set(h.boardRows.filter((p) => p.Email && (p.Status || 'Active') === 'Active').map((p) => String(p.Email).trim().toLowerCase()))).filter((e) => /.+@.+\..+/.test(e))
     const to = live && boardEmails.length ? boardEmails : [body.to || TEST_TO]

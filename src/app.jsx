@@ -807,6 +807,7 @@ var NAV_ICONS = {
   announcements: '<path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
   'maintenance-request': '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
   'site-media': '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+  'nsh-updates': '<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.3 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>',
   'voicemail-log': '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>',
   'blog-editor': '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   'website-payments': '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/>',
@@ -13802,6 +13803,11 @@ var ADMIN_FORMS = [
 
 var ADMIN_TOOLS = [
   {
+    label: "North Star House Updates",
+    view: "nsh-updates",
+    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.3 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/></svg>,
+  },
+  {
     label: "Voicemail Log",
     view: "voicemail-log",
     icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.36 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.11 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 5.61 5.61l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
@@ -22756,6 +22762,110 @@ function SiteMediaPage({ navigate }) {
 // Internal voicemail log: every voicemail in one place. Voicemails come from the venue@ inbox (Google Voice emails) and are the
 // same rows as Venue Rentals > Messages, so handling one here or there updates both. The old spreadsheet-fed ones are listed
 // read-only underneath, and a voicemail taken some other way can be added by hand.
+// North Star House Updates: what got done and what is coming up. Entries marked "include" go into the monthly board email.
+var NSH_UPDATE_AREAS = ['General', 'Construction', 'Grounds', 'Interiors', 'Docents', 'Fundraising', 'Events', 'Marketing', 'Venue', 'Volunteers', 'Board'];
+function NshUpdatesView({ navigate }) {
+  var [rows, setRows] = useState(null);
+  var [tab, setTab] = useState('done');
+  var today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+  var blank = { kind: 'done', title: '', details: '', happened_on: today, area: 'General', include_in_email: true };
+  var [form, setForm] = useState(blank);
+  var [editId, setEditId] = useState(null);
+  var [saving, setSaving] = useState(false);
+  var [err, setErr] = useState('');
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/nsh_updates?select=*&order=happened_on.desc.nullslast,created_at.desc&limit=500', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.ok ? r.json() : null; }).then(function(d) { setRows(Array.isArray(d) ? d : []); if (!Array.isArray(d)) setErr('Could not load updates. The updates table may not be set up yet.'); }).catch(function() { setRows([]); });
+  }
+  useEffect(load, []);
+  function set(k, v) { setForm(function(f) { var n = Object.assign({}, f); n[k] = v; return n; }); }
+  function save(e) {
+    e.preventDefault();
+    if (saving || !form.title.trim()) return;
+    setSaving(true); setErr('');
+    var who = whoIsSignedIn();
+    who.then(function(name) {
+      var payload = { kind: form.kind, title: form.title.trim(), details: form.details.trim() || null, happened_on: form.happened_on || null, area: form.area || null, include_in_email: !!form.include_in_email };
+      if (!editId) payload.created_by = name || null;
+      return fetch(SUPABASE_URL + '/rest/v1/nsh_updates' + (editId ? '?id=eq.' + editId : ''), {
+        method: editId ? 'PATCH' : 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(payload)
+      });
+    }).then(function(r) {
+      if (!r.ok) { setErr('Could not save. Please try again.'); return; }
+      setForm(Object.assign({}, blank, { kind: form.kind })); setEditId(null); load();
+    }).catch(function() { setErr('Could not save. Please try again.'); }).finally(function() { setSaving(false); });
+  }
+  function edit(u) { setEditId(u.id); setTab(u.kind); setForm({ kind: u.kind, title: u.title || '', details: u.details || '', happened_on: u.happened_on || '', area: u.area || 'General', include_in_email: u.include_in_email !== false }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function remove(u) {
+    if (!window.confirm('Delete "' + u.title + '"?')) return;
+    fetch(SUPABASE_URL + '/rest/v1/nsh_updates?id=eq.' + u.id, { method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { if (r.ok) setRows(function(l) { return (l || []).filter(function(x) { return x.id !== u.id; }); }); });
+  }
+  function toggleEmail(u) {
+    var next = !(u.include_in_email !== false);
+    fetch(SUPABASE_URL + '/rest/v1/nsh_updates?id=eq.' + u.id, { method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ include_in_email: next }) })
+      .then(function(r) { if (r.ok) setRows(function(l) { return (l || []).map(function(x) { return x.id === u.id ? Object.assign({}, x, { include_in_email: next }) : x; }); }); });
+  }
+  function day(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'No date'; }
+  var shown = (rows || []).filter(function(u) { return u.kind === tab; });
+  if (tab === 'upcoming') shown = shown.slice().sort(function(a, b) { return String(a.happened_on || '9999').localeCompare(String(b.happened_on || '9999')); });
+  var inp = { padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'system-ui, sans-serif', background: '#fff' };
+  var tabBtn = function(k, label) { return <button onClick={function() { setTab(k); if (!editId) set('kind', k); }} style={{ background: tab === k ? gold : '#fff', color: tab === k ? '#fff' : gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}</button>; };
+  return (
+    <div style={{ maxWidth: 780 }}>
+      <div style={{ fontSize: 12, color: '#999', marginBottom: 14 }}>Add things that got done, or things coming up. The ones marked "include" go in the monthly board email.</div>
+      <form onSubmit={save} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 16, marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>{editId ? 'Editing' : 'Add'}</span>
+          {[['done', 'Got done'], ['upcoming', 'Coming up']].map(function(o) {
+            return <button type="button" key={o[0]} onClick={function() { set('kind', o[0]); setTab(o[0]); }} style={{ background: form.kind === o[0] ? gold : '#fff', color: form.kind === o[0] ? '#fff' : gold, border: '0.5px solid ' + gold, borderRadius: 20, padding: '4px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{o[1]}</button>;
+          })}
+        </div>
+        <input value={form.title} onChange={function(e) { set('title', e.target.value); }} placeholder={form.kind === 'done' ? 'What got done (e.g. Courtyard railing repaired)' : 'What is coming up (e.g. Mid-Summer Festival planning kickoff)'} style={Object.assign({}, inp, { fontSize: 15 })} />
+        <textarea value={form.details} onChange={function(e) { set('details', e.target.value); }} rows={3} placeholder="Details (optional): who helped, what it means, how it went" style={Object.assign({}, inp, { resize: 'vertical' })} />
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <label style={{ fontSize: 12, color: '#666' }}>{form.kind === 'done' ? 'Date done' : 'Date'} <input type="date" value={form.happened_on} onChange={function(e) { set('happened_on', e.target.value); }} style={Object.assign({}, inp, { marginLeft: 4 })} /></label>
+          <label style={{ fontSize: 12, color: '#666' }}>Area <select value={form.area} onChange={function(e) { set('area', e.target.value); }} style={Object.assign({}, inp, { marginLeft: 4 })}>{NSH_UPDATE_AREAS.map(function(a) { return <option key={a}>{a}</option>; })}</select></label>
+          <label style={{ fontSize: 12, color: '#666', display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={form.include_in_email} onChange={function(e) { set('include_in_email', e.target.checked); }} /> Include in the board email</label>
+        </div>
+        {err && <div style={{ color: '#b3261e', fontSize: 12 }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="submit" disabled={saving || !form.title.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: saving || !form.title.trim() ? 0.5 : 1 }}>{saving ? 'Saving…' : editId ? 'Save changes' : 'Add it'}</button>
+          {editId && <button type="button" onClick={function() { setEditId(null); setForm(Object.assign({}, blank, { kind: tab })); }} style={{ background: '#fff', color: gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>Cancel</button>}
+        </div>
+      </form>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>{tabBtn('done', 'Got done' + (rows ? ' (' + rows.filter(function(u) { return u.kind === 'done'; }).length + ')' : ''))}{tabBtn('upcoming', 'Coming up' + (rows ? ' (' + rows.filter(function(u) { return u.kind === 'upcoming'; }).length + ')' : ''))}</div>
+      {rows === null && <div style={{ color: '#bbb', fontSize: 13 }}>Loading…</div>}
+      {rows && shown.length === 0 && <div style={{ color: '#aaa', fontSize: 13, padding: '16px 0' }}>{tab === 'done' ? 'Nothing logged as done yet.' : 'Nothing coming up logged yet.'}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {shown.map(function(u) {
+          var inEmail = u.include_in_email !== false;
+          return (
+            <div key={u.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid ' + (u.kind === 'done' ? '#65965a' : gold), borderRadius: 10, padding: '11px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{u.title}</div>
+                <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{day(u.happened_on)}</div>
+              </div>
+              {u.details && <div style={{ fontSize: 13, color: '#555', marginTop: 3, whiteSpace: 'pre-wrap' }}>{u.details}</div>}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+                {u.area && <span style={{ fontSize: 10, fontWeight: 700, background: '#f3ede2', color: '#8a6d1d', borderRadius: 10, padding: '2px 9px' }}>{u.area}</span>}
+                <button onClick={function() { toggleEmail(u); }} title="Click to change" style={{ fontSize: 10, fontWeight: 700, background: inEmail ? '#e8f5e9' : '#f3f4f6', color: inEmail ? '#2e7d32' : '#888', border: 'none', borderRadius: 10, padding: '2px 9px', cursor: 'pointer' }}>{inEmail ? 'In board email' : 'Not in email'}</button>
+                {u.created_by && <span style={{ fontSize: 11, color: '#aaa' }}>added by {u.created_by}</span>}
+                <span style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
+                  <button onClick={function() { edit(u); }} style={{ background: 'none', border: 'none', color: gold, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Edit</button>
+                  <button onClick={function() { remove(u); }} style={{ background: 'none', border: 'none', color: '#b3261e', fontSize: 12, cursor: 'pointer' }}>Delete</button>
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function VoicemailLogView({ navigate }) {
   var [rows, setRows] = useState(null);
   var [old, setOld] = useState([]);
@@ -23158,6 +23268,7 @@ const views = {
   events: EventsHubView,
   'website-payments': WebsitePaymentsView,
   'voicemail-log': VoicemailLogView,
+  'nsh-updates': NshUpdatesView,
   'blog-editor': BlogEditorPage,
   'site-media': SiteMediaPage,
   quarterly: QuarterlyView,
@@ -23917,7 +24028,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "voicemail-log" ? "Voicemail Log" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
