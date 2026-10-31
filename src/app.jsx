@@ -7898,6 +7898,22 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
   var [saving, setSaving] = useState(false);
   var [saved, setSaved] = useState(false);
   var [existingReflection, setExistingReflection] = useState(null);
+  var [areaHistory, setAreaHistory] = useState(null); // { updates: [quarter...], goals: [quarter...] } for this area and year
+
+  // What this area has on file for the year, so the form can say what is still missing.
+  useEffect(function() {
+    if (!area) { setAreaHistory(null); return; }
+    var h = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarterly Updates') + '?area=eq.' + encodeURIComponent(area) + '&year=eq.' + year + '&select=quarter', { headers: h }).then(function(r) { return r.json(); }),
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&year=eq.' + year + '&select=quarter,goal_1', { headers: h }).then(function(r) { return r.json(); })
+    ]).then(function(res) {
+      setAreaHistory({
+        updates: (Array.isArray(res[0]) ? res[0] : []).map(function(r) { return r.quarter; }),
+        goals: (Array.isArray(res[1]) ? res[1] : []).filter(function(r) { return r.goal_1; }).map(function(r) { return r.quarter; })
+      });
+    }).catch(function() { setAreaHistory(null); });
+  }, [area, year, existingReflection, currentGoals]);
 
   useEffect(function() {
     if (!area) return;
@@ -8100,6 +8116,48 @@ function QuarterlyView({ navigateOp, quarterlyArea, navigateToQuarterly }) {
           })()}
         </div>
       </div>
+      {area && areaHistory && (function() {
+        var order = ['Q1', 'Q2', 'Q3', 'Q4'];
+        var qi = order.indexOf(quarter);
+        var items = [];
+        // Earlier quarters this year that were never submitted
+        order.slice(0, qi).forEach(function(q) {
+          if (areaHistory.updates.indexOf(q) === -1) items.push({ text: q + ' ' + year + ' update was never submitted', go: { q: q, y: year, label: 'Fill out ' + q } });
+        });
+        // Goals for the quarter being reported on (they are set at the end of the previous quarter's update)
+        if (areaHistory.goals.indexOf(quarter) === -1) {
+          var prev = qi > 0 ? { q: order[qi - 1], y: year } : { q: 'Q4', y: year - 1 };
+          items.push({ text: quarter + ' ' + year + ' goals were never set for ' + area + ' (they are set in the ' + prev.q + ' ' + prev.y + ' update)', go: { q: prev.q, y: prev.y, label: 'Open ' + prev.q + ' ' + prev.y } });
+        }
+        // Gaps in the form as it stands right now
+        if (!String(form.what_went_well || '').trim()) items.push({ text: 'Describe what went well this quarter' });
+        if (currentGoals) {
+          ['goal_1', 'goal_2', 'goal_3'].forEach(function(k, i) {
+            if (currentGoals[k] && !String(form['goal_' + (i + 1) + '_summary'] || '').trim()) items.push({ text: 'Add a progress summary for goal ' + (i + 1) });
+          });
+        }
+        if (!carryGoalsForward) {
+          var nqL = nextQ(quarter, year).q;
+          if (!String(form.next_focus || '').trim()) items.push({ text: 'Set the primary focus for ' + nqL });
+          if (!String(form.goal_1 || '').trim()) items.push({ text: 'Add at least one goal for ' + nqL });
+        }
+        var done = items.length === 0;
+        return (
+          <div style={{ background: done ? '#f1f8f1' : '#fff8e8', border: '0.5px solid ' + (done ? '#cfe5cf' : '#ecd7a5'), borderLeft: '4px solid ' + (done ? '#65965a' : '#c79535'), borderRadius: 10, padding: '14px 18px', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 700, color: done ? '#2e6b4f' : '#8a641e', marginBottom: done ? 0 : 8 }}>
+              {done ? 'Nothing missing for ' + area + ' — ' + quarter + ' ' + year : 'Missing for ' + area + ' before you submit (' + items.length + ')'}
+            </div>
+            {items.map(function(it, i) {
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between', padding: '5px 0', fontSize: 13, color: '#5a4a30' }}>
+                  <span>○ {it.text}</span>
+                  {it.go && <button type="button" onClick={function() { setQuarter(it.go.q); setYear(it.go.y); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{ background: '#fff', color: gold, border: '0.5px solid ' + gold, borderRadius: 7, padding: '3px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>{it.go.label}</button>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
       <form onSubmit={handleSubmit}>
         <div style={cardFirst}>
           <span style={secStyle}>Area & Period</span>
