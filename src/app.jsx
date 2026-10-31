@@ -22702,8 +22702,6 @@ function VoicemailLogView({ navigate }) {
   var tab = function(key, label) { return <button onClick={function() { setFilter(key); }} style={{ background: filter === key ? gold : '#fff', color: filter === key ? '#fff' : gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}</button>; };
   return (
     <div style={{ maxWidth: 780 }}>
-      <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
-      <div style={{ fontSize: 12, color: '#999', marginBottom: 14 }}>Every voicemail in one place. These are the same voicemails as Venue Rentals → Messages, so handling one here updates both.</div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
         {tab('todo', 'To do' + (rows ? ' (' + todoCount + ')' : ''))}{tab('done', 'Handled')}{tab('all', 'All')}
         <input value={q} onChange={function(e) { setQ(e.target.value); }} placeholder="Search" style={{ flex: 1, minWidth: 140, padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13 }} />
