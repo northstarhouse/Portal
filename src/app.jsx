@@ -12,6 +12,9 @@ const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
 const WIX_FORMS_URL = "https://script.google.com/macros/s/AKfycbzY3c6_xF2ucrZrQnZLa1bcU2TIcFadBH9UEeIbJYMKumvxygql8ulN-67q1Vu_WM4h/exec";
 
 const APP_TOKEN_KEY = 'nsh-app-token';
+// The Messages tab starts fresh on this date: anything older (old voicemails, earlier emails) is not listed there.
+const MESSAGES_START = '2026-10-31';
+function messageIsCurrent(iso) { return !!iso && new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) >= MESSAGES_START; }
 var _whoCache = null;
 // First name of the signed-in account (e.g. Jen or Derek), from the volunteer record with their login email.
 // Resolves to '' when it can't tell (an older session from before this was recorded).
@@ -18506,8 +18509,9 @@ function VenueRentalsView({ navigate, initialTab }) {
       return true;
     });
   }
-  var unhandledVoicemails = (voicemails || []).filter(function(v) { return !voicemailHandled(v); });
-  var unhandledClientMsgs = (clientMsgs || []).filter(function(m) { return m.direction !== 'outgoing' && !m.handled_at; }).length + unhandledVoicemails.length;
+  var unhandledVoicemails = (voicemails || []).filter(function(v) { return !voicemailHandled(v) && messageIsCurrent(v.created_at); });
+  var currentUnhandledMsgs = (clientMsgs || []).filter(function(m) { return m.direction !== 'outgoing' && !m.handled_at && messageIsCurrent(m.created_at); });
+  var unhandledClientMsgs = currentUnhandledMsgs.length + unhandledVoicemails.length;
   const [venueTab, setVenueTab] = useS(function() {
     if (initialTab) return initialTab;
     try { var saved = sessionStorage.getItem('nsh-venue-tab'); return saved === 'clients' || saved === 'messages' ? saved : 'inquiries'; } catch (e) { return 'inquiries'; }
@@ -19108,7 +19112,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
 
           {venueTab === 'clients' && (
-            !inquiriesError && <VenueClientDashboard messages={clientMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} savePayments={savePayments} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
+            !inquiriesError && <VenueClientDashboard messages={clientMsgs} currentMessages={currentUnhandledMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} savePayments={savePayments} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
           )}
 
           {venueTab === 'messages' && (
@@ -19120,7 +19124,7 @@ function VenueRentalsView({ navigate, initialTab }) {
               {clientMsgs && voicemails && unhandledClientMsgs === 0 && (
                 <div style={{ color: '#aaa', fontSize: 13, padding: '24px 0' }}>No new messages or voicemails. Handled messages and replies are kept in each client's file.</div>
               )}
-              {(clientMsgs || []).filter(function(m) { return m.direction !== 'outgoing' && !m.handled_at; }).map(function(m) {
+              {currentUnhandledMsgs.map(function(m) {
                 return <ClientMessageCard key={m.id} m={m} onHandle={handleClientMsg} onReply={replyToClientMsg}
                   onOpenClient={function() { window.__nshOpenClient = String(m.event_uid || '').replace('client:', ''); window.__nshReturnToMessages = true; setVenueTab('clients'); }} />;
               })}
@@ -19346,9 +19350,9 @@ function VenueRentalsView({ navigate, initialTab }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 22 }}>
         <VenueDashCard title="New Messages" onClick={function() { navigate('venue-messages'); }}
-          count={messages === null ? null : messages.length}
-          lines={messages === null ? [] : messages.slice(0, 3).map(function(m) { return (m.from_name || m.from_email || 'Unknown') + (m.subject ? ' — ' + m.subject : ''); })}
-          empty="No messages logged yet" />
+          count={messages === null ? null : messages.filter(function(m) { return messageIsCurrent(m.created_at); }).length}
+          lines={messages === null ? [] : messages.filter(function(m) { return messageIsCurrent(m.created_at); }).slice(0, 3).map(function(m) { return (m.from_name || m.from_email || 'Unknown') + (m.subject ? ' — ' + m.subject : ''); })}
+          empty="No new messages" />
         <VenueDashCard title="Inquiries" onClick={function() { navigate('venue-inquiries'); }}
           count={inquiries === null ? null : inquiries.length}
           lines={inquiries === null ? [] : inquiries.slice(0, 3).map(function(s) { var p = inquiryPreviewFields(s); return (p.name || p.email || 'Unknown') + ' — ' + s.form_name; })}

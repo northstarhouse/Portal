@@ -267,9 +267,9 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
   </dialog>;
 }
 
-export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, savePayments, agreementApi, filter, setFilter, query, setQuery, messages, onHandleMessage, onOpenMessages }) {
+export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, savePayments, agreementApi, filter, setFilter, query, setQuery, messages, currentMessages, onHandleMessage, onOpenMessages }) {
   const [events,setEvents] = React.useState([]), [error,setError] = React.useState('');
-  const clientMessages = (messages||[]).filter(m=>m.direction!=='outgoing'&&!m.handled_at);
+  const clientMessages = currentMessages || (messages||[]).filter(m=>m.direction!=='outgoing'&&!m.handled_at);
   const [savedResponses,setSavedResponses] = React.useState({});
   const [nativeVersions,setNativeVersions] = React.useState([]);
   React.useEffect(()=>{let cancelled=false;function refresh(){if(agreementApi)agreementApi('summary').then(rows=>{if(!cancelled)setNativeVersions(rows);}).catch(()=>{if(!cancelled)setError('Live agreement status is unavailable. Showing the saved client records.');});}refresh();const timer=setInterval(refresh,60000);window.addEventListener('focus',refresh);return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',refresh);};},[agreementApi]);
