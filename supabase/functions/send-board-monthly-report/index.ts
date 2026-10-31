@@ -231,11 +231,11 @@ function build(label: string, d: {
 
   const qTitle = `Quarterly Reports (${qs.quarter} ${qs.year})`
   if (qs.missing.length === 0) {
-    section(qTitle, `<p style="${P}">Every area has turned in its ${esc(qs.quarter)} update. Thank you! Next up: ${esc(qs.next.q)} updates are due <strong>${esc(qs.next.due)}</strong>, Co-Champions review ${esc(qs.next.champion)}, Board meeting ${esc(qs.next.board)}.</p>`,
+    section(qTitle, `<p style="${P}">Every area has turned in its ${esc(qs.quarter)} update. Thank you! Next up: ${esc(qs.next.q)} updates are due <strong>${esc(qs.next.due)}</strong>.</p>`,
       `Every area has turned in its ${qs.quarter} update. Next: ${qs.next.q} updates due ${qs.next.due}.`)
   } else {
-    section(qTitle, `<p style="${P}">Still waiting on the ${esc(qs.quarter)} update from: <strong style="color:#2a2420;">${esc(qs.missing.join(', '))}</strong>.</p><p style="${P}">Next up: ${esc(qs.next.q)} updates are due <strong>${esc(qs.next.due)}</strong>, Co-Champions review ${esc(qs.next.champion)}, Board meeting ${esc(qs.next.board)}.</p>`,
-      `Still waiting on the ${qs.quarter} update from: ${qs.missing.join(', ')}. Next: ${qs.next.q} updates due ${qs.next.due}, Co-Champions ${qs.next.champion}, Board ${qs.next.board}.`)
+    section(qTitle, `<p style="${P}">Still waiting on the ${esc(qs.quarter)} update from: <strong style="color:#2a2420;">${esc(qs.missing.join(', '))}</strong>.</p><p style="${P}">Next up: ${esc(qs.next.q)} updates are due <strong>${esc(qs.next.due)}</strong>.</p>`,
+      `Still waiting on the ${qs.quarter} update from: ${qs.missing.join(', ')}. Next: ${qs.next.q} updates due ${qs.next.due}.`)
   }
   text += 'Thank you for everything you do.\nNorth Star House'
 
