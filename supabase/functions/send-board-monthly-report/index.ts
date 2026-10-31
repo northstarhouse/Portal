@@ -204,9 +204,11 @@ function build(label: string, d: {
     `${hrs(h.month)} hours this past month; ${hrs(h.ytd)} this year. Board members: ${hrs(h.bMonth)} this past month; ${hrs(h.bYear)} this year.`)
 
   const kindBits = Object.entries(f.kinds).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${k.toLowerCase()}`).join(', ')
-  section('Venue', tiles([[num(f.inquiries), plural(f.inquiries, 'venue inquiry', 'venue inquiries')], [num(t.booked), plural(t.booked, 'venue tour', 'venue tours')], [num(f.docent), 'private docent tour ' + plural(f.docent, 'request', 'requests')], [num(t.cancelled + t.noShow), 'cancelled or no-show']]) +
+  section('Venue', tiles([[num(f.inquiries), plural(f.inquiries, 'venue inquiry', 'venue inquiries')], [num(t.booked), plural(t.booked, 'venue tour', 'venue tours')]]) +
     (kindBits ? `<p style="${P}font-size:13px;color:#888;margin:6px 0 0;">Inquiries: ${esc(kindBits)}.</p>` : ''),
-    `${f.inquiries} venue inquiries${kindBits ? ' (' + kindBits + ')' : ''}; ${t.booked} venue tours; ${f.docent} private docent tour requests; ${t.cancelled} cancelled and ${t.noShow} no-shows.`)
+    `${f.inquiries} venue inquiries${kindBits ? ' (' + kindBits + ')' : ''}; ${t.booked} venue tours.`)
+
+  section('Private Docent Tours', tiles([[num(f.docent), 'private docent tour ' + plural(f.docent, 'request', 'requests')]]), `${f.docent} private docent tour ${plural(f.docent, 'request', 'requests')}.`)
 
   const giving = `${num(don.count)} ${plural(don.count, 'donation', 'donations')} totaling ${money(don.total)}.`
   section('Donations', `<p style="${P}"><strong style="color:#2a2420;">${esc(giving)}</strong></p>`, giving)
