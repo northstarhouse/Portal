@@ -201,7 +201,8 @@ function build(label: string, d: {
   const { h, f, t, don, sp, qs, up, ev } = d
   let html = ''
   let text = `NORTH STAR HOUSE — BOARD UPDATE, ${label.toUpperCase()}\n\n`
-  const section = (title: string, bodyHtml: string, bodyText: string) => { html += `<h3 style="${H3}">${esc(title)}</h3>${bodyHtml}`; text += `${title.toUpperCase()}\n${bodyText}\n\n` }
+  // An empty title means the entries stand on their own with no heading above them.
+  const section = (title: string, bodyHtml: string, bodyText: string) => { html += (title ? `<h3 style="${H3}">${esc(title)}</h3>` : '') + bodyHtml; text += (title ? `${title.toUpperCase()}\n` : '') + `${bodyText}\n\n` }
 
   const when = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : '')
   // Title on the first line; the area and the date together on the line under it.
@@ -210,7 +211,7 @@ function build(label: string, d: {
     return `<p style="${P}margin:0 0 12px;"><strong style="color:#2a2420;">${esc(u.title)}</strong>${meta ? `<br><span style="font-size:13px;color:#888;">${esc(meta)}</span>` : ''}${u.details ? `<br><span style="font-size:14px;">${esc(u.details)}</span>` : ''}</p>`
   }
   const itemText = (u: Upd) => `- ${u.title}${[u.area && u.area !== 'General' ? u.area : '', when(u.happened_on)].filter(Boolean).length ? ' (' + [u.area && u.area !== 'General' ? u.area : '', when(u.happened_on)].filter(Boolean).join(' · ') + ')' : ''}${u.details ? ': ' + u.details : ''}`
-  if (up.done.length > 0) section('What Got Done', up.done.map(item).join(''), up.done.map(itemText).join('\n'))
+  if (up.done.length > 0) section('', up.done.map(item).join(''), up.done.map(itemText).join('\n'))
 
   section('Volunteer Hours', tiles([[hrs(h.month), `volunteer hours in ${label.split(' ')[0]}`], [hrs(h.ytd), 'volunteer hours this year'], [hrs(h.bMonth), `board volunteer hours in ${label.split(' ')[0]}`], [hrs(h.bYear), 'board volunteer hours this year']]),
     `${hrs(h.month)} hours this past month; ${hrs(h.ytd)} this year. Board members: ${hrs(h.bMonth)} this past month; ${hrs(h.bYear)} this year.`)
