@@ -101,7 +101,11 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   function task(key, title, due, detail, kind) {
     const overdue = !!due && due < today;
     const soon = !!due && due <= shiftDate(today, 30);
-    tasks.push({ key: sub.id + '-' + key, title, due, detail, kind, overdue, urgent: overdue || soon || kind === 'signature' || kind === 'booking', rank: overdue ? 0 : kind === 'signature' || kind === 'booking' ? 1 : soon ? 2 : 3 });
+    // Needs attention only when something is behind or actually needs action now: late items, a missing signature, a new
+    // pre-booking submission, or the questionnaire once the event is within 60 days. A payment that is simply coming up is not.
+    const daysOut = eventDate ? dayCount(today, eventDate) : null;
+    const needsAction = overdue || kind === 'signature' || kind === 'booking' || (kind === 'survey' && daysOut !== null && daysOut <= 60);
+    tasks.push({ key: sub.id + '-' + key, title, due, detail, kind, overdue, urgent: needsAction, rank: overdue ? 0 : kind === 'signature' || kind === 'booking' ? 1 : soon ? 2 : 3 });
   }
   for (const payment of duePayments) task('payment-' + schedule.indexOf(payment), 'Collect ' + amount(payment.cents, payment.currency), payment.due, payment.label, 'payment');
   if (nativeAgreement && ['declined','expired'].includes(nativeAgreement.status)) task('contract-revision','Prepare revised agreement',null,'Previous request '+nativeAgreement.status,'booking');
