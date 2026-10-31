@@ -19012,7 +19012,7 @@ function VenueRentalsView({ navigate, initialTab }) {
               return (
                 <React.Fragment key={pair[0]}>
                   {index > 0 && <span aria-hidden="true" style={{ width: 2, height: 26, background: gold, flexShrink: 0 }} />}
-                  <button type="button" aria-pressed={isActive} onClick={function() { setVenueTab(pair[0]); }}
+                  <button type="button" aria-pressed={isActive} onClick={function() { window.__nshReturnToMessages = false; setVenueTab(pair[0]); }}
                     style={{ padding: '7px 0', border: 'none', fontSize: 20, fontFamily: "'Cardo', serif", fontWeight: isActive ? 700 : 500, background: 'none', color: isActive ? '#2a2a2a' : '#888', cursor: 'pointer', textDecoration: isActive ? 'underline' : 'none', textDecorationColor: gold, textDecorationThickness: 2, textUnderlineOffset: 8, whiteSpace: 'nowrap' }}>
                     {pair[1]}{pair[0] === 'messages' && unhandledClientMsgs > 0 && <span style={{ marginLeft: 6, background: '#c0392b', color: '#fff', fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '1px 7px', verticalAlign: 'middle', fontFamily: 'system-ui, sans-serif' }}>{unhandledClientMsgs}</span>}
                   </button>
@@ -19117,7 +19117,7 @@ function VenueRentalsView({ navigate, initialTab }) {
               )}
               {(clientMsgs || []).filter(function(m) { return m.direction !== 'outgoing' && !m.handled_at; }).map(function(m) {
                 return <ClientMessageCard key={m.id} m={m} onHandle={handleClientMsg} onReply={replyToClientMsg}
-                  onOpenClient={function() { window.__nshOpenClient = String(m.event_uid || '').replace('client:', ''); setVenueTab('clients'); }} />;
+                  onOpenClient={function() { window.__nshOpenClient = String(m.event_uid || '').replace('client:', ''); window.__nshReturnToMessages = true; setVenueTab('clients'); }} />;
               })}
               {unhandledVoicemails.map(function(v) { return <VoicemailCard key={'vm' + v.id} v={v} onHandle={handleVoicemail} />; })}
             </div>
