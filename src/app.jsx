@@ -18434,7 +18434,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   }
   // Handled by Jen or Derek: the person is recorded on the message.
   function handleClientMsg(id, by) {
-    if (!by) { alert('Choose who handled it (Jen or Derek) first.'); return Promise.resolve(false); }
+    if (!by) { alert('Choose who handled it (Jen, Derek or Haley) first.'); return Promise.resolve(false); }
     var stamp = new Date().toISOString();
     return fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + id, {
       method: 'PATCH',
@@ -18497,7 +18497,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   }
   function voicemailHandled(v) { return v.action === 'voicemail_handled' || v.resolved === true; }
   function handleVoicemail(id, by) {
-    if (!by) { alert('Choose who handled it (Jen or Derek) first.'); return Promise.resolve(false); }
+    if (!by) { alert('Choose who handled it (Jen, Derek or Haley) first.'); return Promise.resolve(false); }
     var stamp = new Date().toISOString();
     return fetch(SUPABASE_URL + '/rest/v1/activity_log?id=eq.' + id, {
       method: 'PATCH',
@@ -18687,11 +18687,11 @@ function VenueRentalsView({ navigate, initialTab }) {
     var madeContactAt = (status === 'made_contact' || status === 'not_interested') ? new Date().toISOString() : null;
     var whoPromise = status === 'not_handled' ? Promise.resolve(null) : whoIsSignedIn().then(function(name) {
       if (name) return name;
-      var typed = window.prompt('Who is marking this handled? (Jen or Derek)');
+      var typed = window.prompt('Who is marking this handled? (Jen, Derek or Haley)');
       return typed && typed.trim() ? typed.trim().charAt(0).toUpperCase() + typed.trim().slice(1).toLowerCase() : null;
     });
     whoPromise.then(function(by) {
-      if (status !== 'not_handled' && !by) { setReqSavingId(null); alert('Choose who handled it (Jen or Derek) first.'); return; }
+      if (status !== 'not_handled' && !by) { setReqSavingId(null); alert('Choose who handled it (Jen, Derek or Haley) first.'); return; }
       return sbPatchById('estate_tours', id, { request_status: status, made_contact_at: madeContactAt, request_handled: status !== 'not_handled', request_handled_by: by })
         .then(function() {
           setTours(function(prev) { return (prev || []).map(function(t) { return t.id === id ? Object.assign({}, t, { request_status: status, made_contact_at: madeContactAt, request_handled: status !== 'not_handled', request_handled_by: by }) : t; }); });
@@ -19075,6 +19075,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                 <option value="all">All guides</option>
                 <option value="Jen">Jen</option>
                 <option value="Derek">Derek</option>
+          <option value="Haley">Haley</option>
               </select>
             }
           >
@@ -19810,7 +19811,7 @@ function VenueMessagesView({ navigate }) {
                   <span style={{ fontSize: 10, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.5 }}>{m.direction}</span>
                   {String(m.event_uid || '').indexOf('client:') === 0 && (m.handled_at
                     ? <span style={{ fontSize: 10, fontWeight: 700, color: '#2e7d32' }}>Handled</span>
-                    : <button onClick={function() { var who = window.prompt('Handled by (Jen or Derek)?'); if (who && /^(jen|derek)$/i.test(who.trim())) markMessageHandled(m.id, who.trim().charAt(0).toUpperCase() + who.trim().slice(1).toLowerCase()); else if (who) alert('Please enter Jen or Derek.'); }} style={{ fontSize: 11, fontWeight: 600, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '2px 10px', cursor: 'pointer' }}>Mark handled</button>)}
+                    : <button onClick={function() { var who = window.prompt('Handled by (Jen, Derek or Haley)?'); if (who && /^(jen|derek|haley)$/i.test(who.trim())) markMessageHandled(m.id, who.trim().charAt(0).toUpperCase() + who.trim().slice(1).toLowerCase()); else if (who) alert('Please enter Jen, Derek or Haley.'); }} style={{ fontSize: 11, fontWeight: 600, color: gold, background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '2px 10px', cursor: 'pointer' }}>Mark handled</button>)}
                 </div>
               </div>
             );
@@ -19858,8 +19859,9 @@ function VoicemailCard({ v, onHandle }) {
           <option value="">Handled by…</option>
           <option value="Jen">Jen</option>
           <option value="Derek">Derek</option>
+          <option value="Haley">Haley</option>
         </select>
-        <button onClick={function() { if (!by) { setErr('Choose who handled it (Jen or Derek).'); return; } onHandle(v.id, by); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Mark handled</button>
+        <button onClick={function() { if (!by) { setErr('Choose who handled it (Jen, Derek or Haley).'); return; } onHandle(v.id, by); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Mark handled</button>
       </div>
     </div>
   );
@@ -19877,7 +19879,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
   var knownClient = String(m.event_uid || '').indexOf('client:') === 0;
   var canReply = (wantsEmail || fromInbox) && !!m.from_email;
   function sendReply() {
-    if (!by) { setErr('Choose who is replying (Jen or Derek).'); return; }
+    if (!by) { setErr('Choose who is replying (Jen, Derek or Haley).'); return; }
     if (!reply.trim()) { setErr('Type your reply first.'); return; }
     setBusy(true); setErr('');
     onReply(m, by, reply.trim()).catch(function(e) { setErr(e.message || 'Could not send.'); setBusy(false); });
@@ -19911,9 +19913,10 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
           <option value="">Handled by…</option>
           <option value="Jen">Jen</option>
           <option value="Derek">Derek</option>
+          <option value="Haley">Haley</option>
         </select>
         {canReply && <button disabled={busy} onClick={sendReply} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Sending…' : 'Send reply & mark handled'}</button>}
-        <button disabled={busy} onClick={function() { if (!by) { setErr('Choose who handled it (Jen or Derek).'); return; } onHandle(m.id, by); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{canReply ? 'Mark handled without replying' : 'Mark handled'}</button>
+        <button disabled={busy} onClick={function() { if (!by) { setErr('Choose who handled it (Jen, Derek or Haley).'); return; } onHandle(m.id, by); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{canReply ? 'Mark handled without replying' : 'Mark handled'}</button>
         {knownClient && <button onClick={onOpenClient} style={{ background: 'none', color: gold, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Open client file</button>}
       </div>
     </div>
@@ -21206,6 +21209,7 @@ function EstateToursView() {
             <select value={addGuide} onChange={function(e) { setAddGuide(e.target.value); }} aria-label="Tour guide" style={inputStyle}>
               <option value="Jen">Jen</option>
               <option value="Derek">Derek</option>
+          <option value="Haley">Haley</option>
             </select>
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#555', padding: '0 4px 10px', cursor: 'pointer' }}>
