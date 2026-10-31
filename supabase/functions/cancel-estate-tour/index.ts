@@ -135,19 +135,21 @@ Deno.serve(async (req) => {
     // Record it, then free the row. A future booked tour goes back to being an open slot (the unique
     // date+time rule means the same row is reused); a past tour or a request is marked cancelled.
     const todayPT = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+    // The booking stays on record as Cancelled (the Portal shows it that way on the upcoming list); the time is offered again
+    // as a brand-new open slot, so the website can book it. Only a row that is still booked/requested can be taken: of two
+    // clicks at the same moment, exactly one wins and sends the email.
     const reopen = tour.status === 'booked' && tour.date && tour.date >= todayPT && tour.guide_name
-    const patch = reopen
-      ? {
-          status: 'open', visitor_name: null, visitor_email: null, visitor_phone: null, inquiry_form_id: null, inquiry_answers: null,
-          category: null, gcal_event_id: null, staff_notes: null, requested_slots: [], reminder_24h_sent_at: null, reminder_1h_sent_at: null,
-          request_handled: false, request_status: 'not_handled', made_contact_at: null,
-        }
-      : { status: 'cancelled', gcal_event_id: null }
-    // Only a row that is still booked/requested can be taken: of two clicks at the same moment, exactly one wins and sends the email.
-    const up = await sb(`/rest/v1/estate_tours?id=eq.${encodeURIComponent(id)}&status=in.(booked,requested)`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) })
+    const up = await sb(`/rest/v1/estate_tours?id=eq.${encodeURIComponent(id)}&status=in.(booked,requested)`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'cancelled', gcal_event_id: null }) })
     if (!up.ok) return jsonResponse({ error: `Could not cancel: ${await up.text()}` }, 500)
     const taken = await up.json().catch(() => [])
     if (!Array.isArray(taken) || !taken.length) return jsonResponse({ error: 'This tour was already cancelled.' }, 409)
+    if (reopen) {
+      const slotGuide = String(tour.guide_name).toLowerCase() === 'default' ? 'Jen' : tour.guide_name
+      const there = await sb(`/rest/v1/estate_tours?date=eq.${tour.date}&start_time=eq.${tour.start_time}&guide_name=eq.${encodeURIComponent(slotGuide)}&status=in.(open,blocked,booked)&select=id`).then((r) => r.json()).catch(() => [])
+      if (!Array.isArray(there) || !there.length) {
+        await sb('/rest/v1/estate_tours', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ date: tour.date, start_time: tour.start_time, duration_min: tour.duration_min || 45, guide_name: slotGuide, status: 'open' }) }).catch(() => {})
+      }
+    }
 
 
     // Calendar first (best-effort).

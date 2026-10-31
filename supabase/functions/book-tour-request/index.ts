@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
     // Same guide, same time: an open slot is taken over, anything else is a conflict.
     let freedSlot: any = null
     const clashRes = await sb(
-      `/rest/v1/estate_tours?date=eq.${date}&start_time=eq.${time}&guide_name=eq.${encodeURIComponent(guide_name)}&id=neq.${encodeURIComponent(id)}&select=*`,
+      `/rest/v1/estate_tours?date=eq.${date}&start_time=eq.${time}&guide_name=eq.${encodeURIComponent(guide_name)}&id=neq.${encodeURIComponent(id)}&status=neq.cancelled&select=*`,
     )
     const clash = clashRes.ok ? await clashRes.json() : []
     if (Array.isArray(clash) && clash.length) {

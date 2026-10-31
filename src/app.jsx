@@ -18415,6 +18415,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   const [bookedEventDates, setBookedEventDates] = useS([]); // [{event_date, status}] across every venue_inquiries category, not just weddings
   const [inquiriesError, setInquiriesError] = useS('');
   const [tours, setTours] = useS(null); // booked/requested estate_tours rows
+  const [cancelledTours, setCancelledTours] = useS([]); // cancelled tours that haven't happened yet: they stay on the upcoming list, marked Cancelled
   const [toursMonth, setToursMonth] = useS(null); // booked tours dated in the current month
   const [reqSavingId, setReqSavingId] = useS(null); // request_handled toggle in-flight for this tour id
   const [justBooked, setJustBooked] = useS(null); // tour request booked via "Add to Calendar" (for the confirmation line)
@@ -18696,6 +18697,10 @@ function VenueRentalsView({ navigate, initialTab }) {
 
   function loadTours() {
     fetchToursThisMonth().then(setToursMonth);
+    var todayKey = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&status=eq.cancelled&date=gte.' + todayKey + '&order=date.asc&limit=100', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) { setCancelledTours(Array.isArray(rows) ? rows : []); }).catch(function() { setCancelledTours([]); });
     fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&status=in.(booked,requested)&order=date.asc.nullslast&limit=100', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) { setTours(Array.isArray(rows) ? rows : []); }).catch(function() { setTours([]); });
@@ -18966,9 +18971,9 @@ function VenueRentalsView({ navigate, initialTab }) {
   // A booked tour is still an inquiry; only pre-booking submissions are clients.
   var inquirySubmissions = inquiries === null ? null : inquiries.filter(function(q) { return !isVenueClientSubmission(q); });
   var clientSubmissions = inquiries === null ? null : inquiries.filter(function(q) { return isVenueClientSubmission(q) && !isTestVenueBooking(q); });
-  var upcomingCombined = (tours || []).filter(function(t) { return t.status === 'booked' && t.date; }).map(function(t) {
+  var upcomingCombined = (tours || []).filter(function(t) { return t.status === 'booked' && t.date; }).concat((cancelledTours || []).filter(function(t) { return t.date && t.visitor_name; })).map(function(t) {
     var d = new Date(t.date + 'T' + (t.start_time || '00:00:00'));
-    return { key: 't-' + t.id, kind: 'Tour', title: tourTitleFor(t), date: d, raw: t };
+    return { key: 't-' + t.id, kind: 'Tour', title: tourTitleFor(t), date: d, raw: t, cancelled: t.status === 'cancelled' };
   }).filter(function(e) { return e.date && e.date.getTime() >= Date.now() - 24 * 60 * 60 * 1000; })
     .sort(function(a, b) { return a.date - b.date; });
   // Only Jen's or only Derek's tours (a booking on the default slot counts as Jen's).
@@ -19082,17 +19087,17 @@ function VenueRentalsView({ navigate, initialTab }) {
                   var guideName = e.kind === 'Tour' && e.raw.guide_name ? guideLabel(e.raw.guide_name) : '';
                   var dateColors = colorCoding ? tourCategoryColor(tourCategoryLabel(e)) : null;
                   return (
-                    <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '0.5px solid #f0ece2', cursor: 'pointer' }}
-                      onClick={function() { openDetail(e); }}>
+                    <div key={e.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '0.5px solid #f0ece2', cursor: e.cancelled ? 'default' : 'pointer', opacity: e.cancelled ? 0.55 : 1 }}
+                      onClick={function() { if (!e.cancelled) openDetail(e); }}>
                       <div style={{ flexShrink: 0, width: 42, textAlign: 'center', background: dateColors ? dateColors.bg : '#faf8f4', border: '0.5px solid ' + (dateColors ? dateColors.color : '#e8e0d5'), borderRadius: 8, padding: '4px 0' }}>
                         <div style={{ fontSize: 9, fontWeight: 700, color: dateColors ? dateColors.color : gold, letterSpacing: 0.5 }}>{month}</div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: dateColors ? dateColors.color : '#2a2a2a' }}>{day}</div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: e.cancelled ? 'line-through' : 'none' }}>{e.title}</div>
                         <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{when}</div>
                       </div>
-                      {guideName ? <span style={{ flexShrink: 0, width: 64, textAlign: 'center', boxSizing: 'border-box', background: 'rgba(136,108,68,0.12)', color: gold, fontSize: 11, fontWeight: 700, borderRadius: 12, padding: '3px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{guideName}</span> : null}
+                      {e.cancelled ? <span style={{ flexShrink: 0, width: 64, textAlign: 'center', boxSizing: 'border-box', background: '#fdecea', color: '#b3261e', fontSize: 11, fontWeight: 700, borderRadius: 12, padding: '3px 0' }}>Cancelled</span> : guideName ? <span style={{ flexShrink: 0, width: 64, textAlign: 'center', boxSizing: 'border-box', background: 'rgba(136,108,68,0.12)', color: gold, fontSize: 11, fontWeight: 700, borderRadius: 12, padding: '3px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{guideName}</span> : null}
                       <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                   );
