@@ -19823,7 +19823,8 @@ function VoicemailCard({ v, onHandle }) {
         <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>Voicemail <span style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 9px', marginLeft: 6 }}>{String(v.tag || '').replace(' - Voicemail', '').toUpperCase()}</span></div>
         <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{new Date(v.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · {new Date(v.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
       </div>
-      <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{v.description}</div>
+      <div style={{ fontSize: 13, color: '#444', lineHeight: 1.5 }}>{String(v.description || '').replace(/s*
+s*/g, ' ').replace(/s{2,}/g, ' ').trim()}</div>
       {err && <div style={{ color: '#b3261e', fontSize: 12, marginTop: 6 }}>{err}</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
         <select value={by} onChange={function(e) { setBy(e.target.value); setErr(''); }} aria-label="Who is handling this"
