@@ -20069,15 +20069,38 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
   useEffect(function() { load(); }, []);
   useEffect(function() { fetchToursThisMonth().then(setToursMonth); }, []);
   useEffect(function() {
-    fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&status=in.(booked,requested)&order=date.asc.nullslast&limit=200', {
+    fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=*&status=in.(booked,requested,cancelled,no_show)&visitor_email=not.is.null&order=date.desc.nullslast&limit=1000', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) { setTours(Array.isArray(rows) ? rows : []); }).catch(function() { setTours([]); });
   }, []);
+  // Where each person stands with a tour: booked, toured, requested, cancelled, didn't show up, or none. If they have more than
+  // one tour, the most recent one counts.
+  var TOUR_STATES = {
+    booked: { label: 'Tour booked', color: '#2e7d32', bg: '#eafaf0' },
+    completed: { label: 'Toured', color: '#1565c0', bg: '#e3f2fd' },
+    requested: { label: 'Tour requested', color: '#a15c00', bg: '#fdf3e3' },
+    cancelled: { label: 'Tour cancelled', color: '#b3261e', bg: '#fdecea' },
+    no_show: { label: "Didn't show up", color: '#8a3d3d', bg: '#f6e4e4' },
+    none: { label: 'No tour', color: '#888', bg: '#f3f0ea' }
+  };
+  var [tourFilter, setTourFilter] = useState('all');
   function matchedTour(sub) {
     if (!tours || !tours.length) return null;
     var email = (inquiryPreviewFields(sub).email || '').trim().toLowerCase();
     if (!email) return null;
-    return tours.find(function(t) { return (t.visitor_email || '').trim().toLowerCase() === email; }) || null;
+    var mine = tours.filter(function(t) { return (t.visitor_email || '').trim().toLowerCase() === email; });
+    if (!mine.length) return null;
+    mine.sort(function(a, b) { return String(b.date || b.created_at || '').localeCompare(String(a.date || a.created_at || '')); });
+    return mine[0];
+  }
+  function tourStateKey(sub) {
+    var t = matchedTour(sub);
+    if (!t) return 'none';
+    if (t.status === 'cancelled') return 'cancelled';
+    if (t.status === 'no_show') return 'no_show';
+    if (t.status === 'requested') return 'requested';
+    var todayKey = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    return t.date && t.date < todayKey ? 'completed' : 'booked';
   }
   function fmtPreferredDate(dateStr) {
     try { return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); }
@@ -20299,6 +20322,22 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
         </div>
       )}
 
+      {!clientsOnly && rows !== null && rows.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <label style={{ fontSize: 12, color: '#888' }}>Show</label>
+          <select value={tourFilter} onChange={function(e) { setTourFilter(e.target.value); }} aria-label="Filter inquiries by tour status"
+            style={{ fontSize: 12, fontWeight: 600, color: gold, background: '#fff', border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 8px', cursor: 'pointer' }}>
+            <option value="all">All inquiries</option>
+            <option value="booked">Tour booked</option>
+            <option value="completed">Toured</option>
+            <option value="requested">Tour requested</option>
+            <option value="cancelled">Tour cancelled</option>
+            <option value="no_show">Didn't show up</option>
+            <option value="none">No tour</option>
+          </select>
+        </div>
+      )}
+
       {rows === null ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
       ) : rows.length === 0 ? (
@@ -20308,13 +20347,16 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
       ) : (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           <div style={{ flex: 1, minWidth: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
-            {rows.map(function(sub, i) {
+            {(clientsOnly || tourFilter === 'all' ? rows : rows.filter(function(sub) { return tourStateKey(sub) === tourFilter; })).length === 0 && (
+              <div style={{ padding: 30, textAlign: 'center', color: '#aaa', fontSize: 13 }}>No inquiries match this filter.</div>
+            )}
+            {(clientsOnly || tourFilter === 'all' ? rows : rows.filter(function(sub) { return tourStateKey(sub) === tourFilter; })).map(function(sub, i, shownRows) {
               var p = inquiryPreviewFields(sub);
               var preview = p.name || p.email || 'Unknown';
               var isHandled = sub.status === 'handled';
               var tour = matchedTour(sub);
               return (
-                <div key={sub.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 18px', borderBottom: i < rows.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
+                <div key={sub.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 18px', borderBottom: i < shownRows.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
                   <input type="checkbox" title="Mark as handled" checked={isHandled} disabled={handlingId === sub.id}
                     onChange={function() { toggleHandled(sub); }}
                     style={{ marginTop: 4, width: 16, height: 16, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0, opacity: handlingId === sub.id ? 0.5 : 1 }} />
@@ -20324,7 +20366,10 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 10, color: '#8a6d1d', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, background: '#fdf3e3', padding: '2px 8px', borderRadius: 20 }}>{sub.form_name}</span>
-                          {tour && (
+                          {tour && (function() { var st = TOUR_STATES[tourStateKey(sub)]; return (
+                            <span title={st.label + ': ' + fmtTourWhen(tour)} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: st.color, background: st.bg }}>{st.label}</span>
+                          ); })()}
+                          {false && tour && (
                             <span title={(tour.status === 'booked' ? 'Tour booked: ' : 'Tour requested: ') + fmtTourWhen(tour)}
                               style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: tour.status === 'booked' ? '#2e7d32' : '#a15c00', background: tour.status === 'booked' ? '#eafaf0' : '#fdf3e3' }}>
                               {tour.status === 'booked' ? 'Tour booked' : 'Tour requested'}
@@ -20358,10 +20403,12 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
               </div>
               {matchedTour(selected) && (function() {
                 var tour = matchedTour(selected);
-                var booked = tour.status === 'booked';
+                var stKey = tourStateKey(selected);
+                var st = TOUR_STATES[stKey];
+                var booked = stKey === 'booked' || stKey === 'completed';
                 return (
                   <div style={{ fontSize: 12, fontWeight: 600, color: booked ? '#2e7d32' : '#a15c00', background: booked ? '#eafaf0' : '#fdf3e3', border: '1px solid ' + (booked ? '#bfe0bf' : '#f0d9a8'), borderRadius: 7, padding: '6px 10px', marginBottom: 12 }}>
-                    🗓 {booked ? 'Tour booked' : 'Tour requested'} — {fmtTourWhen(tour)}
+                    🗓 {st.label} — {fmtTourWhen(tour)}
                   </div>
                 );
               })()}
