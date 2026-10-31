@@ -101,9 +101,10 @@ async function volunteerHours(b: ReturnType<typeof monthBounds>) {
   return { month, ytd, bMonth, bYear, bPeople, boardRows: board as { Email?: string; Status?: string }[] }
 }
 
+// Counts every submission received in the month, including ones staff have since archived or filed away.
 async function formCounts(b: ReturnType<typeof monthBounds>) {
   const ids = [...Object.keys(RENTAL_INQUIRY_FORMS), DOCENT_TOUR_FORM, VOLUNTEER_INTEREST_FORM]
-  const rows: { form_id: string; created_at: string; answers?: Record<string, unknown> }[] = await rest(`nsh_form_responses?select=form_id,created_at,answers&form_id=in.(${ids.join(',')})&archived_at=is.null&created_at=gte.${shift(b.start, -1)}T00:00:00.000Z&created_at=lt.${shift(b.end, 2)}T00:00:00.000Z&limit=2000`)
+  const rows: { form_id: string; created_at: string; answers?: Record<string, unknown> }[] = await rest(`nsh_form_responses?select=form_id,created_at,answers&form_id=in.(${ids.join(',')})&created_at=gte.${shift(b.start, -1)}T00:00:00.000Z&created_at=lt.${shift(b.end, 2)}T00:00:00.000Z&limit=2000`)
   const inMonth = rows.filter((r) => { const d = laDay(r.created_at); return d >= b.start && d <= b.end })
   const kinds: Record<string, number> = { Wedding: 0, Event: 0, Memorial: 0, Nonprofit: 0 }
   let inquiries = 0, docent = 0, volunteers = 0
