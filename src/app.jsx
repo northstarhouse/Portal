@@ -14,6 +14,15 @@ const WIX_FORMS_URL = "https://script.google.com/macros/s/AKfycbzY3c6_xF2ucrZrQn
 const APP_TOKEN_KEY = 'nsh-app-token';
 // The Messages tab starts fresh on this date: anything older (old voicemails, earlier emails) is not listed there.
 const MESSAGES_START = '2026-10-31';
+// Google Voice wraps a voicemail in boilerplate: "Main Office : New voicemail from +1 ..." and "A caller (...) left a voicemail on \"Main Office\": ... - The Google Voice team".
+function cleanVoicemail(m) {
+  var caller = String((m && (m.from_name || '')) || '').replace(/^.*?new voicemail from\s*/i, '').trim() || 'Unknown caller';
+  var text = String((m && (m.body || m.description)) || '')
+    .replace(/^A caller \([^)]*\) left a voicemail on "[^"]*":\s*/i, '')
+    .replace(/\s*-\s*The Google Voice team\s*$/i, '')
+    .replace(/\s*\n\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  return { caller: caller, text: text };
+}
 function messageIsCurrent(iso) { return !!iso && new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) >= MESSAGES_START; }
 var _whoCache = null;
 // First name of the signed-in account (e.g. Jen or Derek), from the volunteer record with their login email.
@@ -19894,11 +19903,11 @@ function PastMessages({ msgs, voicemails }) {
         return (
           <div key={m.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid ' + (m.handled_at ? '#65965a' : '#c9bfae'), borderRadius: 10, padding: '12px 16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{isVm ? 'Voicemail · ' : ''}{m.from_name || 'Client'}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{isVm ? 'Voicemail · ' + cleanVoicemail(m).caller : (m.from_name || 'Client')}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
               <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{day(m.created_at)}</div>
             </div>
             {fromInbox && <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 4 }}>{String(m.subject || '').replace(/^Email: /, '')}</div>}
-            <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{m.body}</div>
+            <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{isVm ? cleanVoicemail(m).text : m.body}</div>
             {reps.map(function(r) {
               return (
                 <div key={r.id} style={{ marginTop: 10, background: '#f7f3ec', borderRadius: 8, padding: '8px 12px' }}>
@@ -19966,7 +19975,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
   return (
     <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid #c79535', borderRadius: 10, padding: '12px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{m.from_name || 'Client'}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{isVoicemail ? cleanVoicemail(m).caller : (m.from_name || 'Client')}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
         <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{new Date(m.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
       </div>
       {fromInbox && <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 4 }}>{String(m.subject || '').replace(/^Email: /, '')}</div>}
@@ -19977,7 +19986,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
         {fromInbox && !knownClient && <span style={Object.assign({}, pill, { background: '#fff3e0', color: '#b45309', marginLeft: 6 })}>UNKNOWN SENDER</span>}
         {wantsCall && <span style={Object.assign({}, pill, { background: '#e8f5e9', color: '#2e7d32' })}>WANTS A PHONE CALL</span>}
       </div>
-      <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{m.body}</div>
+      <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{isVoicemail ? cleanVoicemail(m).text : m.body}</div>
 
       {canReply && (
         <div style={{ marginTop: 10 }}>
@@ -22699,7 +22708,6 @@ function VoicemailLogView({ navigate }) {
         {tab('todo', 'To do' + (rows ? ' (' + todoCount + ')' : ''))}{tab('done', 'Handled')}{tab('all', 'All')}
         <input value={q} onChange={function(e) { setQ(e.target.value); }} placeholder="Search" style={{ flex: 1, minWidth: 140, padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13 }} />
         <button onClick={function() { setAdding(!adding); }} style={{ background: '#fff', color: gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{adding ? 'Cancel' : '+ Add a voicemail'}</button>
-        <button onClick={function() { navigate('venue'); }} style={{ background: 'none', color: gold, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Venue Rentals →</button>
       </div>
       {adding && (
         <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 14, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -22744,10 +22752,10 @@ function VoicemailLogCard({ m, onHandle, day }) {
   return (
     <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid ' + (m.handled_at ? '#65965a' : '#b5457a'), borderRadius: 10, padding: '12px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{m.from_name || 'Unknown caller'}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{cleanVoicemail(m).caller}</div>
         <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{day(m.created_at)}</div>
       </div>
-      <div style={{ fontSize: 13, color: '#444', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{m.body}</div>
+      <div style={{ fontSize: 13, color: '#444', lineHeight: 1.5 }}>{cleanVoicemail(m).text}</div>
       {m.handled_at ? (
         <div style={{ marginTop: 8 }}>
           {m.handled_note && <div style={{ fontSize: 12, color: '#555', background: '#faf8f3', border: '0.5px solid #ece6da', borderRadius: 8, padding: '6px 10px', whiteSpace: 'pre-wrap', marginBottom: 6 }}><strong style={{ color: gold }}>Notes:</strong> {m.handled_note}</div>}

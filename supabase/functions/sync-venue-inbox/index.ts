@@ -135,9 +135,9 @@ Deno.serve(async (req) => {
       if (from.email === 'voice-noreply@google.com') {
         // "New voicemail from Name (###) ###-####": keep the transcript, drop Google's footer lines.
         const subject = header(m, 'Subject')
-        const caller = subject.replace(/^new voicemail from\s*/i, '').trim() || 'Unknown caller'
+        const caller = subject.replace(/^.*?new voicemail from\s*/i, '').trim() || 'Unknown caller'
         const lines = text.split('\n').map((l) => l.trim()).filter(Boolean).filter((l) => !/^(play message|to play|reply|this message|you received|google voice|view in|\[?image|https?:\/\/)/i.test(l))
-        const transcript = lines.join(' ').replace(/\s{2,}/g, ' ').slice(0, 3000)
+        const transcript = lines.join(' ').replace(/^A caller \([^)]*\) left a voicemail on "[^"]*":\s*/i, '').replace(/\s*-\s*The Google Voice team\s*$/i, '').replace(/\s{2,}/g, ' ').slice(0, 3000)
         if (!transcript) continue
         const vm = await sb('/rest/v1/venue_messages?on_conflict=gmail_id', {
           method: 'POST',
