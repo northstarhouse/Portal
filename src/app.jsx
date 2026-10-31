@@ -798,6 +798,7 @@ var NAV_ICONS = {
   announcements: '<path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
   'maintenance-request': '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
   'site-media': '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+  'voicemail-log': '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>',
   'blog-editor': '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   'website-payments': '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/>',
   'venue-inquiries': '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
@@ -13683,8 +13684,8 @@ var ADMIN_FORMS = [
 
 var ADMIN_TOOLS = [
   {
-    label: "Voicemails",
-    url: "https://docs.google.com/spreadsheets/d/1kqVXngOaf_X1lrB6Nbi5U_3NJ4_P_fGMqxhyqdfuDT0/edit?gid=0#gid=0",
+    label: "Voicemail Log",
+    view: "voicemail-log",
     icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.36 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.11 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 5.61 5.61l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
   },
 ];
@@ -15659,22 +15660,24 @@ function DevLogView({ navigate }) {
 
 function AdminToolCard(props) {
   var tool = props.tool;
+  var live = !!(tool.url || tool.view);
   var card = (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
-      background: tool.url ? '#fff' : '#faf8f5',
+      background: live ? '#fff' : '#faf8f5',
       border: '0.5px solid #e0d8cc', borderRadius: 10,
-      padding: '13px 16px', cursor: tool.url ? 'pointer' : 'default',
+      padding: '13px 16px', cursor: live ? 'pointer' : 'default',
       transition: 'border-color 0.15s, box-shadow 0.15s',
-      color: tool.url ? '#3a3226' : '#aaa', fontSize: 13, fontWeight: 500,
+      color: live ? '#3a3226' : '#aaa', fontSize: 13, fontWeight: 500,
     }}
-      onMouseEnter={tool.url ? function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; } : undefined}
-      onMouseLeave={tool.url ? function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; } : undefined}
+      onMouseEnter={live ? function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; } : undefined}
+      onMouseLeave={live ? function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; } : undefined}
     >
-      <span style={{ color: tool.url ? '#b5a185' : '#ccc', flexShrink: 0 }}>{props.icon}</span>
+      <span style={{ color: live ? '#b5a185' : '#ccc', flexShrink: 0 }}>{props.icon}</span>
       {tool.label}
     </div>
   );
+  if (tool.view && props.navigate) return <div onClick={function() { props.navigate(tool.view); }}>{card}</div>;
   if (!tool.url) return card;
   return <a href={tool.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>{card}</a>;
 }
@@ -15757,7 +15760,7 @@ function AdminView({ navigate }) {
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Tools</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 28 }}>
         {ADMIN_TOOLS.map(function(tool) {
-          return <AdminToolCard key={tool.label} tool={tool} icon={tool.icon} />;
+          return <AdminToolCard key={tool.label} tool={tool} icon={tool.icon} navigate={navigate} />;
         })}
         <div
           onClick={function() { if (!uploadingMail && mailFileInputRef.current) mailFileInputRef.current.click(); }}
@@ -22632,6 +22635,142 @@ function SiteMediaPage({ navigate }) {
   return <SiteMediaLibrary navigate={navigate} supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} />;
 }
 
+// Internal voicemail log: every voicemail in one place. Voicemails come from the venue@ inbox (Google Voice emails) and are the
+// same rows as Venue Rentals > Messages, so handling one here or there updates both. The old spreadsheet-fed ones are listed
+// read-only underneath, and a voicemail taken some other way can be added by hand.
+function VoicemailLogView({ navigate }) {
+  var [rows, setRows] = useState(null);
+  var [old, setOld] = useState([]);
+  var [filter, setFilter] = useState('todo');
+  var [q, setQ] = useState('');
+  var [adding, setAdding] = useState(false);
+  var [form, setForm] = useState({ caller: '', phone: '', body: '' });
+  var [saving, setSaving] = useState(false);
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&event_uid=like.voicemail:*&order=created_at.desc&limit=500', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.ok ? r.json() : []; }).then(function(d) { setRows(Array.isArray(d) ? d : []); }).catch(function() { setRows([]); });
+    var tags = ['Wedding - Voicemail', 'Event - Voicemail', 'Venue Inquiry - Voicemail', 'General - Voicemail'].map(function(t) { return '"' + t + '"'; }).join(',');
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?select=*&tag=in.(' + encodeURIComponent(tags) + ')&order=created_at.desc&limit=300', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.ok ? r.json() : []; }).then(function(d) { setOld(Array.isArray(d) ? d : []); }).catch(function() { setOld([]); });
+  }
+  useEffect(load, []);
+  function handle(id, by, note) {
+    if (!by) { alert('Choose who handled it (Jen, Derek or Haley) first.'); return Promise.resolve(false); }
+    var stamp = new Date().toISOString();
+    var clean = note && String(note).trim() ? String(note).trim() : null;
+    return fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ handled_at: stamp, handled_by: by, handled_note: clean })
+    }).then(function(r) {
+      if (!r.ok) { alert('Could not mark it handled. Please try again.'); return false; }
+      setRows(function(list) { return (list || []).map(function(m) { return m.id === id ? Object.assign({}, m, { handled_at: stamp, handled_by: by, handled_note: clean }) : m; }); });
+      return true;
+    });
+  }
+  function addVoicemail() {
+    if (saving || !form.body.trim()) return;
+    setSaving(true);
+    var caller = (form.caller.trim() || form.phone.trim() || 'Unknown caller');
+    fetch(SUPABASE_URL + '/rest/v1/venue_messages', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ event_uid: 'voicemail:', subject: 'Voicemail: ' + caller + (form.phone.trim() && form.caller.trim() ? ' (' + form.phone.trim() + ')' : ''), body: form.body.trim(), from_name: caller, direction: 'incoming' })
+    }).then(function(r) { return r.ok ? r.json() : null; }).then(function(saved) {
+      if (!saved) { alert('Could not save the voicemail.'); return; }
+      setRows(function(list) { return (Array.isArray(saved) ? saved : []).concat(list || []); });
+      setForm({ caller: '', phone: '', body: '' }); setAdding(false);
+    }).finally(function() { setSaving(false); });
+  }
+  var needle = q.trim().toLowerCase();
+  var mine = (rows || []).filter(function(m) {
+    if (filter === 'todo' && m.handled_at) return false;
+    if (filter === 'done' && !m.handled_at) return false;
+    return !needle || JSON.stringify([m.from_name, m.subject, m.body, m.handled_by, m.handled_note]).toLowerCase().indexOf(needle) !== -1;
+  });
+  var todoCount = (rows || []).filter(function(m) { return !m.handled_at; }).length;
+  function day(iso) { return iso ? new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' · ' + new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''; }
+  var tab = function(key, label) { return <button onClick={function() { setFilter(key); }} style={{ background: filter === key ? gold : '#fff', color: filter === key ? '#fff' : gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}</button>; };
+  return (
+    <div style={{ maxWidth: 780 }}>
+      <button onClick={function() { navigate('admin'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Admin</button>
+      <div style={{ fontSize: 12, color: '#999', marginBottom: 14 }}>Every voicemail in one place. These are the same voicemails as Venue Rentals → Messages, so handling one here updates both.</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        {tab('todo', 'To do' + (rows ? ' (' + todoCount + ')' : ''))}{tab('done', 'Handled')}{tab('all', 'All')}
+        <input value={q} onChange={function(e) { setQ(e.target.value); }} placeholder="Search" style={{ flex: 1, minWidth: 140, padding: '6px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13 }} />
+        <button onClick={function() { setAdding(!adding); }} style={{ background: '#fff', color: gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{adding ? 'Cancel' : '+ Add a voicemail'}</button>
+        <button onClick={function() { navigate('venue'); }} style={{ background: 'none', color: gold, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Venue Rentals →</button>
+      </div>
+      {adding && (
+        <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 14, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={form.caller} onChange={function(e) { setForm(Object.assign({}, form, { caller: e.target.value })); }} placeholder="Caller name" style={{ flex: 1, padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13 }} />
+            <input value={form.phone} onChange={function(e) { setForm(Object.assign({}, form, { phone: e.target.value })); }} placeholder="Phone number" style={{ flex: 1, padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13 }} />
+          </div>
+          <textarea value={form.body} onChange={function(e) { setForm(Object.assign({}, form, { body: e.target.value })); }} rows={3} placeholder="What the message says" style={{ padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'system-ui, sans-serif', resize: 'vertical' }} />
+          <div><button onClick={addVoicemail} disabled={saving || !form.body.trim()} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: saving || !form.body.trim() ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save voicemail'}</button></div>
+        </div>
+      )}
+      {rows === null && <div style={{ color: '#bbb', fontSize: 13 }}>Loading…</div>}
+      {rows && mine.length === 0 && <div style={{ color: '#aaa', fontSize: 13, padding: '24px 0' }}>{needle ? 'Nothing matches.' : filter === 'todo' ? 'No voicemails waiting.' : 'No voicemails here yet.'}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {mine.map(function(m) { return <VoicemailLogCard key={m.id} m={m} onHandle={handle} day={day} />; })}
+      </div>
+      {old.length > 0 && filter !== 'todo' && (
+        <details style={{ marginTop: 24 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#999' }}>Earlier voicemails from the old spreadsheet ({old.length})</summary>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+            {old.filter(function(v) { return !needle || JSON.stringify([v.description, v.tag, v.handled_by]).toLowerCase().indexOf(needle) !== -1; }).map(function(v) {
+              var done = v.action === 'voicemail_handled' || v.resolved === true;
+              return (
+                <div key={'o' + v.id} style={{ background: '#faf8f5', border: '0.5px solid #ece6da', borderRadius: 8, padding: '9px 12px' }}>
+                  <div style={{ fontSize: 11, color: '#999', marginBottom: 3 }}>{day(v.created_at)} · {String(v.tag || '').replace(' - Voicemail', '')}</div>
+                  <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{String(v.description || '').replace(/\s*\n\s*/g, ' ').trim()}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: done ? '#2e6b4f' : '#b45309', marginTop: 4 }}>{done ? 'Handled' + (v.handled_by ? ' by ' + v.handled_by : '') : 'Not marked handled'}</div>
+                </div>
+              );
+            })}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function VoicemailLogCard({ m, onHandle, day }) {
+  var [by, setBy] = useState('');
+  var [note, setNote] = useState('');
+  var [busy, setBusy] = useState(false);
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid ' + (m.handled_at ? '#65965a' : '#b5457a'), borderRadius: 10, padding: '12px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{m.from_name || 'Unknown caller'}</div>
+        <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{day(m.created_at)}</div>
+      </div>
+      <div style={{ fontSize: 13, color: '#444', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{m.body}</div>
+      {m.handled_at ? (
+        <div style={{ marginTop: 8 }}>
+          {m.handled_note && <div style={{ fontSize: 12, color: '#555', background: '#faf8f3', border: '0.5px solid #ece6da', borderRadius: 8, padding: '6px 10px', whiteSpace: 'pre-wrap', marginBottom: 6 }}><strong style={{ color: gold }}>Notes:</strong> {m.handled_note}</div>}
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#2e6b4f' }}>Handled{m.handled_by ? ' by ' + m.handled_by : ''} · {day(m.handled_at)}</div>
+        </div>
+      ) : (
+        <div style={{ marginTop: 10 }}>
+          <textarea value={note} onChange={function(e) { setNote(e.target.value); }} rows={2} placeholder="Notes (optional): who you called back, what was said, next steps" style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', border: '0.5px dashed #d8d0c4', borderRadius: 8, fontSize: 12, fontFamily: 'system-ui, sans-serif', resize: 'vertical', background: '#fffdf9' }} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+            <select value={by} onChange={function(e) { setBy(e.target.value); }} aria-label="Who is handling this" style={{ fontSize: 12, fontWeight: 600, color: gold, background: '#fff', border: '0.5px solid ' + gold, borderRadius: 8, padding: '6px 8px' }}>
+              <option value="">Handled by…</option>
+              <option value="Jen">Jen</option>
+              <option value="Derek">Derek</option>
+              <option value="Haley">Haley</option>
+            </select>
+            <button disabled={busy} onClick={function() { setBusy(true); onHandle(m.id, by, note).then(function(ok) { if (!ok) setBusy(false); }); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>Mark handled</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WebsitePaymentsView({ navigate }) {
   var [orders, setOrders] = useState(null);
   var [err, setErr] = useState(false);
@@ -22903,6 +23042,7 @@ const views = {
   birthdays: BirthdaysView,
   events: EventsHubView,
   'website-payments': WebsitePaymentsView,
+  'voicemail-log': VoicemailLogView,
   'blog-editor': BlogEditorPage,
   'site-media': SiteMediaPage,
   quarterly: QuarterlyView,
@@ -23662,7 +23802,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
