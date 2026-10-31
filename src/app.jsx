@@ -1009,6 +1009,7 @@ const typeColors = {
   const [editingTagId, setEditingTagId] = useState(null);
   const [volHoursMonth, setVolHoursMonth] = useState(null);
   const [volHoursYear, setVolHoursYear] = useState(null);
+  const [boardHours, setBoardHours] = useState(null); // { month, year, people } hours logged at the kiosk by board members
 
   function updateActivityTag(id, newTag) {
     setActivity(function(prev) { return prev.map(function(a) { return a.id === id ? Object.assign({}, a, { tag: newTag }) : a; }); });
@@ -1109,6 +1110,7 @@ const typeColors = {
         var now = new Date();
         var curMonth = now.getMonth();
         var monthTotal = 0, yearTotal = 0;
+        var perPerson = {};
         Object.keys(byName).forEach(function(name) {
           var nameLogs = byName[name];
           for (var i = 0; i < nameLogs.length; i++) {
@@ -1119,11 +1121,27 @@ const typeColors = {
             var hrs = (new Date(checkOut.timestamp) - new Date(nameLogs[i].timestamp)) / 3600000;
             if (hrs <= 0 || hrs > 24) continue;
             yearTotal += hrs;
-            if (new Date(nameLogs[i].timestamp).getMonth() === curMonth) monthTotal += hrs;
+            var inMonth = new Date(nameLogs[i].timestamp).getMonth() === curMonth;
+            if (inMonth) monthTotal += hrs;
+            var pk = name.toLowerCase().replace(/\s+/g, ' ').trim();
+            if (!perPerson[pk]) perPerson[pk] = { m: 0, y: 0 };
+            perPerson[pk].y += hrs;
+            if (inMonth) perPerson[pk].m += hrs;
           }
         });
         setVolHoursMonth(monthTotal);
         setVolHoursYear(yearTotal);
+        // Board members' share: volunteers whose Team includes Board Member, matched to kiosk names.
+        fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?select=' + encodeURIComponent('First Name,Last Name,Team') + '&Team=ilike.*board*', {
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+        }).then(function(r) { return r.ok ? r.json() : []; }).then(function(people) {
+          var bm = 0, by = 0, n = 0;
+          (Array.isArray(people) ? people : []).forEach(function(p) {
+            var key = ((p['First Name'] || '') + ' ' + (p['Last Name'] || '')).toLowerCase().replace(/\s+/g, ' ').trim();
+            if (perPerson[key]) { bm += perPerson[key].m; by += perPerson[key].y; n++; }
+          });
+          setBoardHours({ month: bm, year: by, people: n });
+        }).catch(function() { setBoardHours({ month: 0, year: 0, people: 0 }); });
       }).catch(function() { setVolHoursMonth(0); setVolHoursYear(0); });
     })();
     function loadVaRsvps() {
@@ -1267,6 +1285,7 @@ const typeColors = {
 <div onClick={function() { navigate('sponsors'); }} style={{ cursor: 'pointer' }}><StatCard label="Sponsors" value={sponsors === null ? '...' : sponsors.length} /></div>
         <StatCard label="Vol. Hours This Month" value={volHoursMonth === null ? '...' : volHoursMonth.toLocaleString('en-US', { maximumFractionDigits: 1 })} />
         <StatCard label="Vol. Hours This Year" value={volHoursYear === null ? '...' : volHoursYear.toLocaleString('en-US', { maximumFractionDigits: 1 })} />
+        <StatCard label="Board Volunteer Hours" value={boardHours === null ? '...' : boardHours.year.toLocaleString('en-US', { maximumFractionDigits: 1 })} sub={boardHours === null ? '' : boardHours.month.toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' this month · ' + boardHours.people + ' board members logged'} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 16, marginBottom: 16 }}>
