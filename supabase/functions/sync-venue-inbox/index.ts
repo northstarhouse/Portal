@@ -75,11 +75,29 @@ function parseFrom(v: string) {
   return m ? { name: m[1].trim(), email: m[2].trim().toLowerCase() } : { name: '', email: v.trim().toLowerCase() }
 }
 
-Deno.serve(async () => {
+// Gmail tells us the moment something changes: a Pub/Sub topic is "watched" on the mailbox and pushes to this function.
+// The watch lasts 7 days, so a weekly call with { action: 'watch' } renews it. The topic name comes from GMAIL_PUBSUB_TOPIC.
+async function registerWatch(auth: Record<string, string>) {
+  const topicName = Deno.env.get('GMAIL_PUBSUB_TOPIC')
+  if (!topicName) return { error: 'GMAIL_PUBSUB_TOPIC is not set' }
+  const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/watch', {
+    method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ topicName, labelIds: ['INBOX'] }),
+  })
+  const d = await r.json()
+  return r.ok ? { watching: true, expires: d.expiration } : { error: d.error?.message || `Gmail watch failed (${r.status})` }
+}
+
+Deno.serve(async (req) => {
   try {
     if (!GOOGLE_SERVICE_ACCOUNT_KEY) return json({ error: 'Google service account is not configured' }, 503)
     const token = await gmailToken()
     const auth = { Authorization: `Bearer ${token}` }
+    // Renewal call (weekly) or first-time setup.
+    const asked = await req.clone().json().catch(() => ({}))
+    if (asked && asked.action === 'watch') {
+      const w = await registerWatch(auth)
+      return json(w, 'error' in w ? 500 : 200)
+    }
 
     // Recent inbox mail from people (not our own BCC copies, not automated, not voicemail notices).
     const q = 'in:inbox newer_than:3d -category:promotions -category:social -from:(noreply OR no-reply OR mailer-daemon OR notifications OR voice-noreply@google.com OR info@northstarhouse.org OR venue@northstarhouse.org OR venue@thenorthstarhouse.org)'

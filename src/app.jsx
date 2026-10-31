@@ -18469,6 +18469,20 @@ function VenueRentalsView({ navigate, initialTab }) {
       return handleClientMsg(m.id, by);
     });
   }
+  // New email in venue@ is pulled in when staff are here (not on a timer): when Venue Rentals opens, and from the button on the Messages tab.
+  const [checkingInbox, setCheckingInbox] = useS(false);
+  function checkInbox(force) {
+    var last = 0;
+    try { last = Number(sessionStorage.getItem('nsh-inbox-sync') || 0); } catch (e) {}
+    if (!force && Date.now() - last < 120000) return Promise.resolve();
+    try { sessionStorage.setItem('nsh-inbox-sync', String(Date.now())); } catch (e) {}
+    setCheckingInbox(true);
+    return fetch(SUPABASE_URL + '/functions/v1/sync-venue-inbox', { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(res) { if (res && res.imported > 0) loadClientMsgs(); })
+      .catch(function() {})
+      .finally(function() { setCheckingInbox(false); });
+  }
   // Venue voicemails (Google Voice transcripts) arrive in the Activity Log with these tags.
   const [voicemails, setVoicemails] = useS(null);
   function loadVoicemails() {
@@ -18705,6 +18719,7 @@ function VenueRentalsView({ navigate, initialTab }) {
 
     loadClientMsgs();
     loadVoicemails();
+    checkInbox(false);
     fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&order=created_at.desc&limit=50', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) { setMessages(Array.isArray(rows) ? rows : []); }).catch(function() { setMessages([]); });
@@ -19093,6 +19108,9 @@ function VenueRentalsView({ navigate, initialTab }) {
 
           {venueTab === 'messages' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 760 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={function() { checkInbox(true); }} disabled={checkingInbox} style={{ background: 'none', color: gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: checkingInbox ? 0.6 : 1 }}>{checkingInbox ? 'Checking venue@…' : 'Check venue@ for new email'}</button>
+              </div>
               {clientMsgs === null && <div style={{ color: '#bbb', fontSize: 13 }}>Loading…</div>}
               {clientMsgs && voicemails && unhandledClientMsgs === 0 && (
                 <div style={{ color: '#aaa', fontSize: 13, padding: '24px 0' }}>No new messages or voicemails. Handled messages and replies are kept in each client's file.</div>
