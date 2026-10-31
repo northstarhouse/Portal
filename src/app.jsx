@@ -18424,7 +18424,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   // Messages couples send from their event page (the Messages tab shows the unhandled ones; each client's file keeps all of them).
   const [clientMsgs, setClientMsgs] = useS(null);
   function loadClientMsgs() {
-    fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&event_uid=like.client:*&order=created_at.desc&limit=300', {
+    fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&or=(event_uid.like.client:*,event_uid.like.inbox:*)&order=created_at.desc&limit=300', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.ok ? r.json() : []; }).then(function(rows) { setClientMsgs(Array.isArray(rows) ? rows : []); }).catch(function() { setClientMsgs([]); });
   }
@@ -19846,7 +19846,9 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
   var [err, setErr] = useState('');
   var wantsEmail = /wants an email/i.test(m.subject || '');
   var wantsCall = /wants a call/i.test(m.subject || '');
-  var canReply = wantsEmail && !!m.from_email;
+  var fromInbox = /^Email: /.test(m.subject || '');
+  var knownClient = String(m.event_uid || '').indexOf('client:') === 0;
+  var canReply = (wantsEmail || fromInbox) && !!m.from_email;
   function sendReply() {
     if (!by) { setErr('Choose who is replying (Jen or Derek).'); return; }
     if (!reply.trim()) { setErr('Type your reply first.'); return; }
@@ -19860,8 +19862,11 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
         <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{m.from_name || 'Client'}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
         <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{new Date(m.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
       </div>
+      {fromInbox && <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 4 }}>{String(m.subject || '').replace(/^Email: /, '')}</div>}
       <div style={{ marginBottom: 6 }}>
         {wantsEmail && <span style={Object.assign({}, pill, { background: '#e3f2fd', color: '#1565c0' })}>WANTS AN EMAIL REPLY</span>}
+        {fromInbox && <span style={Object.assign({}, pill, { background: '#e3f2fd', color: '#1565c0' })}>EMAIL TO VENUE@</span>}
+        {fromInbox && !knownClient && <span style={Object.assign({}, pill, { background: '#fff3e0', color: '#b45309', marginLeft: 6 })}>UNKNOWN SENDER</span>}
         {wantsCall && <span style={Object.assign({}, pill, { background: '#e8f5e9', color: '#2e7d32' })}>WANTS A PHONE CALL</span>}
       </div>
       <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{m.body}</div>
@@ -19882,7 +19887,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
         </select>
         {canReply && <button disabled={busy} onClick={sendReply} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Sending…' : 'Send reply & mark handled'}</button>}
         <button disabled={busy} onClick={function() { if (!by) { setErr('Choose who handled it (Jen or Derek).'); return; } onHandle(m.id, by); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{canReply ? 'Mark handled without replying' : 'Mark handled'}</button>
-        <button onClick={onOpenClient} style={{ background: 'none', color: gold, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Open client file</button>
+        {knownClient && <button onClick={onOpenClient} style={{ background: 'none', color: gold, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Open client file</button>}
       </div>
     </div>
   );
