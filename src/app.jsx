@@ -12,6 +12,22 @@ const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
 const WIX_FORMS_URL = "https://script.google.com/macros/s/AKfycbzY3c6_xF2ucrZrQnZLa1bcU2TIcFadBH9UEeIbJYMKumvxygql8ulN-67q1Vu_WM4h/exec";
 
 const APP_TOKEN_KEY = 'nsh-app-token';
+var _whoCache = null;
+// First name of the signed-in account (e.g. Jen or Derek), from the volunteer record with their login email.
+// Resolves to '' when it can't tell (an older session from before this was recorded).
+function whoIsSignedIn() {
+  if (_whoCache) return Promise.resolve(_whoCache);
+  var email = '';
+  try { email = localStorage.getItem('nsh-app-email') || ''; } catch (e) {}
+  if (!email) return Promise.resolve('');
+  return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?select=' + encodeURIComponent('First Name') + '&Email=ilike.' + encodeURIComponent(email) + '&limit=1', {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+  }).then(function(r) { return r.ok ? r.json() : []; }).then(function(rows) {
+    var first = rows && rows[0] && rows[0]['First Name'] ? String(rows[0]['First Name']).trim() : '';
+    if (first) _whoCache = first;
+    return first;
+  }).catch(function() { return ''; });
+}
 const venueAgreementApi = createAgreementApi({baseUrl:SUPABASE_URL,apiKey:SUPABASE_KEY,staffToken:function(){try{return localStorage.getItem(APP_TOKEN_KEY);}catch(e){return null;}}});
 
 (function installFetchGate() {
@@ -102,16 +118,17 @@ function AppGate({ children }) {
         setErr(res.status === 400 || res.status === 401 ? 'Wrong email or password.' : 'Something went wrong. Try again.');
         setBusy(false); setPwd(''); return null;
       }
+      var signedInEmail = res.data && res.data.user && res.data.user.email;
       return fetch(SUPABASE_URL + '/rest/v1/rpc/issue_app_session', {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + res.data.access_token, 'Content-Type': 'application/json' },
         body: JSON.stringify({ p_user_agent: (navigator.userAgent || '').slice(0, 200) })
-      }).then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); });
+      }).then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data, email: signedInEmail }; }); });
     }).then(function(res) {
       if (!res) return;
       if (!res.ok) { setErr('Something went wrong. Try again.'); setBusy(false); return; }
       if (!res.data) { setErr('This account does not have Portal access. Ask Haley.'); setBusy(false); setPwd(''); return; }
-      try { localStorage.setItem(APP_TOKEN_KEY, res.data); } catch (e) {}
+      try { localStorage.setItem(APP_TOKEN_KEY, res.data); localStorage.setItem('nsh-app-email', res.email || ''); } catch (e) {}
       // Clear stale data cache from before the gate landed — pre-token requests
       // would have returned [] (RLS denial) and gotten cached as empty.
       try {
@@ -18622,13 +18639,22 @@ function VenueRentalsView({ navigate, initialTab }) {
   // whether the visitor ever actually gets booked into a confirmed slot.
   // "Made Contact" starts a 30-day clock after which the request fades into
   // the Archived section below (a UI-only fade -- status stays 'requested').
+  // Marking a request handled records whose account did it (Jen, Derek...). Un-marking clears it.
   function setRequestStatus(id, status) {
     setReqSavingId(id);
     var madeContactAt = status === 'made_contact' ? new Date().toISOString() : null;
-    sbPatchById('estate_tours', id, { request_status: status, made_contact_at: madeContactAt, request_handled: status !== 'not_handled' })
-      .then(function() {
-        setTours(function(prev) { return (prev || []).map(function(t) { return t.id === id ? Object.assign({}, t, { request_status: status, made_contact_at: madeContactAt, request_handled: status !== 'not_handled' }) : t; }); });
-      }).finally(function() { setReqSavingId(null); });
+    var whoPromise = status === 'not_handled' ? Promise.resolve(null) : whoIsSignedIn().then(function(name) {
+      if (name) return name;
+      var typed = window.prompt('Who is marking this handled? (Jen or Derek)');
+      return typed && typed.trim() ? typed.trim().charAt(0).toUpperCase() + typed.trim().slice(1).toLowerCase() : null;
+    });
+    whoPromise.then(function(by) {
+      if (status !== 'not_handled' && !by) { setReqSavingId(null); alert('Choose who handled it (Jen or Derek) first.'); return; }
+      return sbPatchById('estate_tours', id, { request_status: status, made_contact_at: madeContactAt, request_handled: status !== 'not_handled', request_handled_by: by })
+        .then(function() {
+          setTours(function(prev) { return (prev || []).map(function(t) { return t.id === id ? Object.assign({}, t, { request_status: status, made_contact_at: madeContactAt, request_handled: status !== 'not_handled', request_handled_by: by }) : t; }); });
+        }).finally(function() { setReqSavingId(null); });
+    });
   }
 
   function loadTours() {
@@ -19095,7 +19121,7 @@ function VenueRentalsView({ navigate, initialTab }) {
               '<td>' + esc(t.visitor_email) + '</td>' +
               '<td>' + esc(fmtPhone(t.visitor_phone)) + '</td>' +
               '<td>' + esc(datesStr) + '</td>' +
-              '<td>' + (isArchived(t) ? 'Made Contact (Archived)' : t.request_status === 'made_contact' ? 'Made Contact' : 'Not Handled') + '</td>' +
+              '<td>' + (isArchived(t) ? 'Made Contact (Archived)' : t.request_status === 'made_contact' ? 'Made Contact' + (t.request_handled_by ? ' (' + t.request_handled_by + ')' : '') : 'Not Handled') + '</td>' +
               '</tr>';
           }).join('');
           var html = '<!doctype html><html><head><meta charset="utf-8"><title>Tour Requests</title>' +
@@ -19178,6 +19204,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                         <option value="not_handled">Not Handled</option>
                         <option value="made_contact">Made Contact</option>
                       </select>
+                      {t.request_status === 'made_contact' && t.request_handled_by && <div style={{ fontSize: 11, fontWeight: 700, color: '#2e6b4f' }}>by {t.request_handled_by}</div>}
                       {t.request_status === 'made_contact' && <div style={{ fontSize: 10, color: '#888' }}>Archives {fmtMadeContactDate(new Date(new Date(t.made_contact_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString())}</div>}
                       </div>
                       </div>
@@ -19200,7 +19227,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                             {t.visitor_email && <a href={'mailto:' + t.visitor_email} style={{ color: gold, textDecoration: 'none' }}>{t.visitor_email}</a>}
                             {t.visitor_email && t.visitor_phone && ' · '}
                             {fmtPhone(t.visitor_phone)}
-                            {t.made_contact_at && ' · Made contact ' + fmtMadeContactDate(t.made_contact_at)}
+                            {t.made_contact_at && ' · Made contact ' + fmtMadeContactDate(t.made_contact_at) + (t.request_handled_by ? ' by ' + t.request_handled_by : '')}
                           </div>
                         </div>
                         <select value={t.request_status || 'not_handled'} disabled={reqSavingId === t.id}
