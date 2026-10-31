@@ -177,7 +177,7 @@ async function quarterlyStatus() {
 
 // ---- email ---------------------------------------------------------------------------------------------------------
 const P = 'font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#555;'
-const H3 = `margin:30px 0 10px;font-family:Georgia,serif;font-size:20px;font-weight:400;color:#2a2420;border-bottom:1px solid #e5ddcf;padding-bottom:6px;`
+const H3 = `margin:30px 0 10px;font-family:Georgia,serif;font-size:20px;font-weight:700;color:#2a2420;border-bottom:1px solid #e5ddcf;padding-bottom:6px;`
 const tile = (big: string, label: string) =>
   `<td width="50%" style="padding:6px;"><div style="background:#f6f1e7;border-radius:6px;padding:14px 12px;text-align:center;"><div style="font-family:Georgia,serif;font-size:28px;color:${GOLD};">${esc(big)}</div><div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#777;margin-top:2px;">${esc(label)}</div></div></td>`
 const tiles = (items: [string, string][]) => {
@@ -211,7 +211,7 @@ function build(label: string, d: {
   section('Private Docent Tours', tiles([[num(f.docent), 'private docent tour ' + plural(f.docent, 'request', 'requests')]]), `${f.docent} private docent tour ${plural(f.docent, 'request', 'requests')}.`)
 
   const giving = `${num(don.count)} ${plural(don.count, 'donation', 'donations')} totaling ${money(don.total)}.`
-  section('Donations', `<p style="${P}"><strong style="color:#2a2420;">${esc(giving)}</strong></p>`, giving)
+  section('Donations', `<p style="${P}">${esc(giving)}</p>`, giving)
 
   if (f.volunteers > 0) {
     const areas = Object.entries(f.volAreas).sort((a, c) => c[1] - a[1]).map(([a, n]) => `${a}${n > 1 ? ' (' + n + ')' : ''}`)
