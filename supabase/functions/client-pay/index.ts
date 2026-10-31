@@ -98,6 +98,16 @@ async function resolve(body: any, ip: string) {
 
 // Clients booked before the native payment schedule existed: build their schedule from the HoneyBook invoice stored with
 // their record, plus any payments staff logged by hand in the Portal. Shown to the couple read-only.
+async function recordLegacyPayment(inq: any, captureId: string, cents: number) {
+  const rows = await rest(`nsh_form_responses?select=answers&id=eq.${inq.prebooking_form_response_id}`);
+  const a = (rows && rows[0] && rows[0].answers) || {};
+  const list: any[] = Array.isArray(a.__venue_checklist?.manual_payments) ? a.__venue_checklist.manual_payments : [];
+  const id = 'pp-' + captureId;
+  if (list.some((p) => p.id === id)) return;
+  const answers = { ...a, __venue_checklist: { ...a.__venue_checklist, manual_payments: [...list, { id, cents, date: new Date().toISOString().slice(0, 10), note: 'Paid online (PayPal)' }] } };
+  await rest(`nsh_form_responses?id=eq.${inq.prebooking_form_response_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ answers }) });
+}
+
 async function legacySchedule(inq: any) {
   try {
     const rows = await rest(`nsh_form_responses?select=answers&id=eq.${inq.prebooking_form_response_id}`);
@@ -269,7 +279,7 @@ Deno.serve(async req => {
       const [paypal_client_id, walkthrough] = await Promise.all([ppClientId(), walkthroughFor(inq)]);
       if (!(inq.venue_payment_schedule || []).length) {
         const old = await legacySchedule(inq);
-        if (old.length) return json({ ...view(date, { ...inq, venue_payment_schedule: old }), walkthrough, paypal_client_id: null, schedule_readonly: true });
+        if (old.length) return json({ ...view(date, { ...inq, venue_payment_schedule: old }), walkthrough, paypal_client_id });
       }
       return json({ ...view(date, inq), walkthrough, paypal_client_id });
     }
@@ -297,10 +307,13 @@ Deno.serve(async req => {
       const exists = await rest(`venue_payments?select=id&paypal_capture_id=eq.${cap.id}`);
       if (!exists.length) {
         await rest('venue_payments', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ inquiry_id: inq.id, venue_code: code, amount_cents: cents, currency: cap.amount.currency_code, paypal_order_id: orderId, paypal_capture_id: cap.id, payer_name: [order.payer?.name?.given_name, order.payer?.name?.surname].filter(Boolean).join(' ') || null, payer_email: order.payer?.email_address || null }) });
-        await applyToSchedule(inq, cents);
+        if ((inq.venue_payment_schedule || []).length) await applyToSchedule(inq, cents);
+        else await recordLegacyPayment(inq, cap.id, cents);
       }
       const fresh = await rest(`venue_inquiries?select=${INQUIRY_SELECT}&id=eq.${inq.id}`);
-      return json({ recorded: true, receipt_id: cap.id, paid_cents: cents, ...view(date, fresh[0]) });
+      let shown = fresh[0];
+      if (!(shown.venue_payment_schedule || []).length) { const old = await legacySchedule(shown); if (old.length) shown = { ...shown, venue_payment_schedule: old }; }
+      return json({ recorded: true, receipt_id: cap.id, paid_cents: cents, ...view(date, shown) });
     }
 
     if (action === 'upload_insurance') {
