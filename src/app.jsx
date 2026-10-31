@@ -18642,7 +18642,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   // Marking a request handled records whose account did it (Jen, Derek...). Un-marking clears it.
   function setRequestStatus(id, status) {
     setReqSavingId(id);
-    var madeContactAt = status === 'made_contact' ? new Date().toISOString() : null;
+    var madeContactAt = (status === 'made_contact' || status === 'not_interested') ? new Date().toISOString() : null;
     var whoPromise = status === 'not_handled' ? Promise.resolve(null) : whoIsSignedIn().then(function(name) {
       if (name) return name;
       var typed = window.prompt('Who is marking this handled? (Jen or Derek)');
@@ -19098,7 +19098,8 @@ function VenueRentalsView({ navigate, initialTab }) {
           return '(' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6);
         };
         var THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-        var isArchived = function(t) { return t.request_status === 'made_contact' && t.made_contact_at && (Date.now() - new Date(t.made_contact_at).getTime()) > THIRTY_DAYS_MS; };
+        // Not Interested archives immediately; Made Contact archives after 30 days.
+        var isArchived = function(t) { return t.request_status === 'not_interested' || (t.request_status === 'made_contact' && t.made_contact_at && (Date.now() - new Date(t.made_contact_at).getTime()) > THIRTY_DAYS_MS); };
         var allRequests = (tours || []).filter(function(t) { return t.status === 'requested'; });
         var requests = allRequests.filter(function(t) { return !isArchived(t); })
           .sort(function(a, b) {
@@ -19121,7 +19122,7 @@ function VenueRentalsView({ navigate, initialTab }) {
               '<td>' + esc(t.visitor_email) + '</td>' +
               '<td>' + esc(fmtPhone(t.visitor_phone)) + '</td>' +
               '<td>' + esc(datesStr) + '</td>' +
-              '<td>' + (isArchived(t) ? 'Made Contact (Archived)' : t.request_status === 'made_contact' ? 'Made Contact' + (t.request_handled_by ? ' (' + t.request_handled_by + ')' : '') : 'Not Handled') + '</td>' +
+              '<td>' + (isArchived(t) ? (t.request_status === 'not_interested' ? 'Not Interested (Archived)' : 'Made Contact (Archived)') : t.request_status === 'made_contact' ? 'Made Contact' + (t.request_handled_by ? ' (' + t.request_handled_by + ')' : '') : 'Not Handled') + '</td>' +
               '</tr>';
           }).join('');
           var html = '<!doctype html><html><head><meta charset="utf-8"><title>Tour Requests</title>' +
@@ -19203,6 +19204,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                         style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: t.request_status === 'made_contact' ? '#f0f7f2' : '#fff8e8', color: t.request_status === 'made_contact' ? '#2e6b4f' : '#b45309', fontWeight: 600 }}>
                         <option value="not_handled">Not Handled</option>
                         <option value="made_contact">Made Contact</option>
+                        <option value="not_interested">Not Interested</option>
                       </select>
                       {t.request_status === 'made_contact' && t.request_handled_by && <div style={{ fontSize: 11, fontWeight: 700, color: '#2e6b4f' }}>by {t.request_handled_by}</div>}
                       {t.request_status === 'made_contact' && <div style={{ fontSize: 10, color: '#888' }}>Archives {fmtMadeContactDate(new Date(new Date(t.made_contact_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString())}</div>}
@@ -19216,7 +19218,7 @@ function VenueRentalsView({ navigate, initialTab }) {
             )}
             {archivedRequests.length > 0 && (
               <details style={{ marginTop: 14, borderTop: '0.5px solid #f0ece2', paddingTop: 10 }}>
-                <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#999' }}>Archived &mdash; made contact 30+ days ago ({archivedRequests.length})</summary>
+                <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#999' }}>Archived &mdash; not interested, or made contact 30+ days ago ({archivedRequests.length})</summary>
                 <div style={{ display: 'flex', flexDirection: 'column', marginTop: 6 }}>
                   {archivedRequests.map(function(t) {
                     return (
@@ -19227,7 +19229,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                             {t.visitor_email && <a href={'mailto:' + t.visitor_email} style={{ color: gold, textDecoration: 'none' }}>{t.visitor_email}</a>}
                             {t.visitor_email && t.visitor_phone && ' · '}
                             {fmtPhone(t.visitor_phone)}
-                            {t.made_contact_at && ' · Made contact ' + fmtMadeContactDate(t.made_contact_at) + (t.request_handled_by ? ' by ' + t.request_handled_by : '')}
+                            {t.made_contact_at && (t.request_status === 'not_interested' ? ' · Not interested ' : ' · Made contact ') + fmtMadeContactDate(t.made_contact_at) + (t.request_handled_by ? ' by ' + t.request_handled_by : '')}
                           </div>
                         </div>
                         <select value={t.request_status || 'not_handled'} disabled={reqSavingId === t.id}
@@ -19235,6 +19237,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                           style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: '#fff', color: '#777', fontWeight: 600 }}>
                           <option value="not_handled">Not Handled</option>
                           <option value="made_contact">Made Contact</option>
+                        <option value="not_interested">Not Interested</option>
                         </select>
                       </div>
                     );
