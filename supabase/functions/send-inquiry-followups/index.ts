@@ -102,39 +102,87 @@ ${btn(`${SITE}/weddings#faq`, 'Read the Full Q&amp;A', false)}
   return { html, body }
 }
 
-// Event, memorial and nonprofit follow-ups: shorter, no wedding pricing, same Book a Tour button.
-const KIND_COPY: Record<Exclude<Kind, 'wedding'>, { greeting: string; intro: string; learn: [string, string] }> = {
+// Event, memorial and nonprofit follow-ups: written for that audience, with the same facts and pricing the website shows
+// (copied from the site's pages: src/content/defaults/privateEvents.js, memorials.js and nonprofit.js in the website repo;
+// update these if the site's copy or rates change). Same Book a Tour button on all of them.
+type Row = { a: string; b: string; c?: string }
+const EVENT_TYPES: [string, string][] = [
+  ['Concerts & Performances', 'The courtyard and surrounding grounds create a natural backdrop for live music, performances, and cultural events, with flexible space for audiences, staging, and production needs.'],
+  ['Fundraisers & Galas', 'Bring people together for a cause in a setting that already feels special. North Star House can accommodate up to 400 guests for fundraisers, galas, auctions, and benefit events.'],
+  ['Holiday Parties', 'Celebrate the season somewhere with a little more character. From intimate company dinners to larger community gatherings, North Star House offers a warm, distinctive setting year-round.'],
+  ['Corporate Events', 'Step outside the conference room. North Star House offers a refreshing setting for company retreats, team gatherings, networking events, presentations, and client celebrations.'],
+  ['Private Dinners', 'Host an unforgettable dinner surrounded by historic architecture, gardens, and the character of a century-old estate. Ideal for birthdays, anniversaries, rehearsal dinners, and intimate celebrations.'],
+  ['Showers & Celebrations', 'Baby showers, bridal showers, engagement parties, birthdays, and milestone moments all feel a little more special here. Choose from indoor and outdoor spaces to create a gathering that feels entirely your own.'],
+]
+const MEMORIAL_RATES: Row[] = [{ a: 'Friday', b: '$400' }, { a: 'Saturday', b: '$800' }, { a: 'Sunday', b: '$600' }]
+const NONPROFIT_RATES: Row[] = [
+  { a: 'Large Private Event', b: '$800', c: 'Up to 200 guests, 4 hours. Each extra hour $150.' },
+  { a: 'Small Private Event', b: '$600', c: 'Up to 50 guests, 4 hours. Each extra hour $150.' },
+  { a: 'Public Event', b: '$2,000', c: 'Permit capacity, 6 hours. Each extra hour $300.' },
+]
+
+const P = 'font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#555;'
+const H3 = 'margin:26px 0 8px;font-family:Georgia,serif;font-size:19px;font-weight:400;color:#2a2420;'
+const para = (t: string) => `<p style="${P}">${esc(t)}</p>`
+const rateTable = (rows: Row[]) =>
+  `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:6px 0 14px;border-collapse:collapse;">${rows.map((r) =>
+    `<tr><td style="padding:10px 0;border-bottom:1px solid #e5ddcf;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#2a2420;"><strong>${esc(r.a)}</strong>${r.c ? `<br><span style="font-size:13px;color:#777;">${esc(r.c)}</span>` : ''}</td><td style="padding:10px 0;border-bottom:1px solid #e5ddcf;text-align:right;font-family:Georgia,serif;font-size:20px;color:${GOLD};white-space:nowrap;">${esc(r.b)}</td></tr>`).join('')}</table>`
+const rateText = (rows: Row[]) => rows.map((r) => `- ${r.a}: ${r.b}${r.c ? ' (' + r.c + ')' : ''}`).join('\n')
+
+const KIND_COPY: Record<Exclude<Kind, 'wedding'>, { greeting: string; intro: string; learn: [string, string]; sectionsHtml: string; sectionsText: string }> = {
   event: {
     greeting: 'Thank you for your interest in hosting an event at North Star House.',
-    intro: "We'd love for you to see the house and grounds in person, so you can picture your gathering here and we can talk through what you have in mind.",
-    learn: ['Learn About Events', '/services'],
+    intro: "We'd love for you to see the house and grounds in person, so you can picture your gathering here and we can talk through what you have in mind. One rental gives you exclusive use of the house and grounds for your day.",
+    learn: ['Learn About Events', '/private-events'],
+    sectionsHtml:
+      `<h3 style="${H3}">What You Can Host Here</h3>` +
+      EVENT_TYPES.map(([t, d]) => `<p style="${P}margin:0 0 12px;"><strong style="color:#2a2420;">${esc(t)}.</strong> ${esc(d)}</p>`).join('') +
+      `<h3 style="${H3}">Pricing</h3>` + para("Rates depend on the size and type of your event. We're happy to go over them with you on your tour or by reply.") +
+      `<h3 style="${H3}">Every Event Preserves the House</h3>` + para('Revenue from weddings, private gatherings, programs, and community events supports the ongoing preservation, restoration, and care of the property. When you host something here, you are helping protect a piece of local history.'),
+    sectionsText:
+      'WHAT YOU CAN HOST HERE\n' + EVENT_TYPES.map(([t, d]) => `- ${t}: ${d}`).join('\n') +
+      "\n\nPRICING\nRates depend on the size and type of your event. We're happy to go over them with you on your tour or by reply." +
+      '\n\nEVERY EVENT PRESERVES THE HOUSE\nRevenue from weddings, private gatherings, programs, and community events supports the ongoing preservation, restoration, and care of the property.',
   },
   memorial: {
     greeting: 'Thank you for contacting us about a memorial or celebration of life at North Star House.',
-    intro: "We would be honored to help. A quiet visit to the house and grounds is the best way to see whether it feels right, and we're glad to answer any questions along the way.",
+    intro: 'With the historic Julia Morgan-designed house, Heritage Garden, courtyard, and surrounding grounds, families have the flexibility to create a gathering that feels personal. Whether that means sharing a meal, displaying photographs, gathering in the garden, playing meaningful music, or simply spending time together, the estate offers room to make the day your own.',
     learn: ['About Memorials', '/memorials'],
+    sectionsHtml:
+      `<h3 style="${H3}">A Special Memorial Rate for Our Community</h3>` +
+      para('We believe families should have access to a beautiful, welcoming place to gather without the cost of a traditional private event rental. To help, we offer a special memorial rental option for dates within the upcoming three months. This rolling booking window lets us open dates that remain available on our event calendar at a lower rate.') +
+      rateTable(MEMORIAL_RATES) + para('Each rental is 4 hours, and memorial dates are booked up to 3 months in advance.'),
+    sectionsText:
+      'A SPECIAL MEMORIAL RATE FOR OUR COMMUNITY\nWe believe families should have access to a beautiful, welcoming place to gather without the cost of a traditional private event rental. To help, we offer a special memorial rental option for dates within the upcoming three months. This rolling booking window lets us open dates that remain available on our event calendar at a lower rate.\n\n' +
+      rateText(MEMORIAL_RATES) + '\n\nEach rental is 4 hours, and memorial dates are booked up to 3 months in advance.',
   },
   nonprofit: {
     greeting: "Thank you for your interest in hosting your organization's event at North Star House.",
-    intro: 'Nonprofit organizations can book low-cost event rentals here, with bookings open on a 6-month advance window. A tour is the best next step: you can see the spaces and we can talk about your plans.',
+    intro: "North Star House is operated by the North Star Historic Conservancy, a 501(c)(3) nonprofit, and we love supporting other nonprofits with an accessible, low-cost place to gather. Nonprofit organizations can rent the historic house, courtyard, gardens, and grounds at a reduced rate for private and public events.",
     learn: ['Nonprofit Rentals', '/nonprofit'],
+    sectionsHtml:
+      `<h3 style="${H3}">Nonprofit Pricing</h3>` + para('Saturday and Sunday rates:') + rateTable(NONPROFIT_RATES) +
+      para("To keep pricing low and manage availability fairly across the estate's full calendar, nonprofit bookings open on a 6-month advance window."),
+    sectionsText:
+      'NONPROFIT PRICING (Saturday and Sunday)\n' + rateText(NONPROFIT_RATES) +
+      "\n\nTo keep pricing low and manage availability fairly across the estate's full calendar, nonprofit bookings open on a 6-month advance window.",
   },
 }
 function buildKindEmail(first: string, kind: Exclude<Kind, 'wedding'>) {
   const c = KIND_COPY[kind]
-  const text = 'font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#555;'
   const html = `<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:${GOLD};"></div><div style="padding:40px 36px 34px;">
 <div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:3px;color:${GOLD};font-weight:bold;margin-bottom:14px;">NORTH STAR HOUSE</div>
 <h1 style="margin:0 0 22px;text-align:center;font-size:29px;font-weight:400;color:#2a2420;">Thank You for Your Inquiry</h1>
 <div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>
-<p style="${text}">Hi ${esc(first)},</p>
-<p style="${text}">${esc(c.greeting)}</p>
-<p style="${text}">${esc(c.intro)}</p>
+<p style="${P}">Hi ${esc(first)},</p>
+${para(c.greeting)}
+${para(c.intro)}
 <div style="margin:24px 0 8px;">${btn(TOUR_PAGE(kind), 'Book a Tour', true)}</div>
-${btn(SITE + c.learn[1], esc(c.learn[0]), false)}
+${c.sectionsHtml}
+<div style="margin:22px 0 0;">${btn(SITE + c.learn[1], esc(c.learn[0]), false)}</div>
 <p style="margin:26px 0 0;text-align:center;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Questions? Just reply to this email. We're happy to help.</i></p>
 </div></div></div>`
-  const body = `Hi ${first},\n\n${c.greeting}\n\n${c.intro}\n\nBook a tour: ${TOUR_PAGE(kind)}\n${c.learn[0]}: ${SITE}${c.learn[1]}\n\nQuestions? Just reply to this email. We're happy to help.\n\nNorth Star House`
+  const body = `Hi ${first},\n\n${c.greeting}\n\n${c.intro}\n\nBook a tour: ${TOUR_PAGE(kind)}\n\n${c.sectionsText}\n\n${c.learn[0]}: ${SITE}${c.learn[1]}\n\nQuestions? Just reply to this email. We're happy to help.\n\nNorth Star House`
   return { html, body }
 }
 
