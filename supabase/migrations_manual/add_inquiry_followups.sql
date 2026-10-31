@@ -11,10 +11,10 @@ alter table inquiry_followups enable row level security;
 create extension if not exists pg_net with schema extensions;
 create extension if not exists pg_cron with schema extensions;
 
--- Hourly, at 15 past.
+-- Four times a day (a 48-hour follow-up does not need to be minute-exact, and this keeps database load tiny).
 select cron.schedule(
   'send-inquiry-followups',
-  '15 * * * *',
+  '15 */6 * * *',
   $$
   select net.http_post(
     url := 'https://uvzwhhwzelaelfhfkvdb.supabase.co/functions/v1/send-inquiry-followups',
