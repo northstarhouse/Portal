@@ -18475,6 +18475,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   }
   // New email in venue@ is pulled in when staff are here (not on a timer): when Venue Rentals opens, and from the button on the Messages tab.
   const [checkingInbox, setCheckingInbox] = useS(false);
+  const [showPast, setShowPast] = useS(false);
   function checkInbox(force) {
     var last = 0;
     try { last = Number(sessionStorage.getItem('nsh-inbox-sync') || 0); } catch (e) {}
@@ -19118,18 +19119,20 @@ function VenueRentalsView({ navigate, initialTab }) {
 
           {venueTab === 'messages' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 760 }}>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button onClick={function() { checkInbox(true); }} disabled={checkingInbox} style={{ background: 'none', color: gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: checkingInbox ? 0.6 : 1 }}>{checkingInbox ? 'Checking venue@…' : 'Check venue@ for new email'}</button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button onClick={function() { setShowPast(!showPast); }} style={{ background: showPast ? gold : '#fff', color: showPast ? '#fff' : gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{showPast ? '← New messages' : 'Past messages'}</button>
+                {!showPast && <button onClick={function() { checkInbox(true); }} disabled={checkingInbox} style={{ background: 'none', color: gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: checkingInbox ? 0.6 : 1 }}>{checkingInbox ? 'Checking venue@…' : 'Check venue@ for new email'}</button>}
               </div>
-              {clientMsgs === null && <div style={{ color: '#bbb', fontSize: 13 }}>Loading…</div>}
-              {clientMsgs && voicemails && unhandledClientMsgs === 0 && (
+              {showPast && <PastMessages msgs={clientMsgs} voicemails={voicemails} />}
+              {!showPast && clientMsgs === null && <div style={{ color: '#bbb', fontSize: 13 }}>Loading…</div>}
+              {!showPast && clientMsgs && voicemails && unhandledClientMsgs === 0 && (
                 <div style={{ color: '#aaa', fontSize: 13, padding: '24px 0' }}>No new messages or voicemails. Handled messages and replies are kept in each client's file.</div>
               )}
-              {currentUnhandledMsgs.map(function(m) {
+              {!showPast && currentUnhandledMsgs.map(function(m) {
                 return <ClientMessageCard key={m.id} m={m} onHandle={handleClientMsg} onReply={replyToClientMsg}
                   onOpenClient={function() { window.__nshOpenClient = String(m.event_uid || '').replace('client:', ''); window.__nshReturnToMessages = true; setVenueTab('clients'); }} />;
               })}
-              {unhandledVoicemails.map(function(v) { return <VoicemailCard key={'vm' + v.id} v={v} onHandle={handleVoicemail} />; })}
+              {!showPast && unhandledVoicemails.map(function(v) { return <VoicemailCard key={'vm' + v.id} v={v} onHandle={handleVoicemail} />; })}
             </div>
           )}
 
@@ -19838,6 +19841,69 @@ function buildClientReplyHtml(name, text, by) {
     '<p style="margin:8px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;text-align:left;">' + esc(by) + '<br>North Star House</p>' +
     '<p style="margin:26px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Just reply to this email to write back to us.</i></p>' +
     '</div></div></div>';
+}
+
+// Past messages: what has been handled (and who handled it), the reply we sent, and older messages from before the new list began.
+function PastMessages({ msgs, voicemails }) {
+  var [q, setQ] = useState('');
+  var all = msgs || [];
+  var replies = all.filter(function(m) { return m.direction === 'outgoing'; });
+  var items = all.filter(function(m) { return m.direction !== 'outgoing' && (m.handled_at || !messageIsCurrent(m.created_at)); }).map(function(m) { return { kind: 'msg', m: m, at: m.created_at }; })
+    .concat((voicemails || []).filter(function(v) { return v.action === 'voicemail_handled' || v.resolved === true || !messageIsCurrent(v.created_at); }).map(function(v) { return { kind: 'vm', v: v, at: v.created_at }; }))
+    .sort(function(a, b) { return String(b.at).localeCompare(String(a.at)); });
+  var needle = q.trim().toLowerCase();
+  if (needle) items = items.filter(function(it) { var m = it.kind === 'msg' ? it.m : it.v; return JSON.stringify([m.from_name, m.from_email, m.event_title, m.subject, m.body, m.description]).toLowerCase().indexOf(needle) !== -1; });
+  function day(iso) { return iso ? new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''; }
+  function repliesFor(m) {
+    if (!m.handled_at) return [];
+    var end = new Date(m.handled_at).getTime() + 60000;
+    return replies.filter(function(r) { return r.event_uid === m.event_uid && new Date(r.created_at).getTime() >= new Date(m.created_at).getTime() && new Date(r.created_at).getTime() <= end; });
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <input value={q} onChange={function(e) { setQ(e.target.value); }} placeholder="Search past messages" style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'system-ui, sans-serif' }} />
+      {msgs === null && <div style={{ color: '#bbb', fontSize: 13 }}>Loading…</div>}
+      {msgs !== null && items.length === 0 && <div style={{ color: '#aaa', fontSize: 13, padding: '20px 0' }}>{needle ? 'Nothing matches.' : 'No past messages yet. Once a message is marked handled it is kept here.'}</div>}
+      {items.map(function(it) {
+        if (it.kind === 'vm') {
+          var v = it.v;
+          var done = v.action === 'voicemail_handled' || v.resolved === true;
+          return (
+            <div key={'vm' + v.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid #b5457a', borderRadius: 10, padding: '12px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>Voicemail <span style={{ fontSize: 10, fontWeight: 700, color: '#888', marginLeft: 6 }}>{String(v.tag || '').replace(' - Voicemail', '').toUpperCase()}</span></div>
+                <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{day(v.created_at)}</div>
+              </div>
+              <div style={{ fontSize: 13, color: '#444', lineHeight: 1.5 }}>{String(v.description || '').replace(/\s*\n\s*/g, ' ').replace(/\s{2,}/g, ' ').trim()}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: done ? '#2e6b4f' : '#b45309', marginTop: 8 }}>{done ? 'Handled' + (v.handled_by ? ' by ' + v.handled_by : '') + (v.resolved_at ? ' · ' + day(v.resolved_at) : '') : 'Older, not marked handled'}</div>
+            </div>
+          );
+        }
+        var m = it.m;
+        var fromInbox = /^Email: /.test(m.subject || '');
+        var reps = repliesFor(m);
+        return (
+          <div key={m.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid ' + (m.handled_at ? '#65965a' : '#c9bfae'), borderRadius: 10, padding: '12px 16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{m.from_name || 'Client'}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
+              <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{day(m.created_at)}</div>
+            </div>
+            {fromInbox && <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 4 }}>{String(m.subject || '').replace(/^Email: /, '')}</div>}
+            <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{m.body}</div>
+            {reps.map(function(r) {
+              return (
+                <div key={r.id} style={{ marginTop: 10, background: '#f7f3ec', borderRadius: 8, padding: '8px 12px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: gold, marginBottom: 3 }}>Reply from {r.from_name || 'the team'} · {day(r.created_at)}</div>
+                  <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{r.body}</div>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 11, fontWeight: 700, color: m.handled_at ? '#2e6b4f' : '#b45309', marginTop: 8 }}>{m.handled_at ? 'Handled' + (m.handled_by ? ' by ' + m.handled_by : '') + ' · ' + day(m.handled_at) + (reps.length ? '' : ' · no email reply sent from here') : 'Older, not marked handled'}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // A voicemail transcript (Google Voice) for the venue line: choose who is handling it, then mark it handled.
