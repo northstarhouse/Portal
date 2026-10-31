@@ -18433,22 +18433,23 @@ function VenueRentalsView({ navigate, initialTab }) {
     }).then(function(r) { return r.ok ? r.json() : []; }).then(function(rows) { setClientMsgs(Array.isArray(rows) ? rows : []); }).catch(function() { setClientMsgs([]); });
   }
   // Handled by Jen or Derek: the person is recorded on the message.
-  function handleClientMsg(id, by) {
+  function handleClientMsg(id, by, note) {
     if (!by) { alert('Choose who handled it (Jen, Derek or Haley) first.'); return Promise.resolve(false); }
     var stamp = new Date().toISOString();
+    var cleanNote = note && String(note).trim() ? String(note).trim() : null;
     return fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + id, {
       method: 'PATCH',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ handled_at: stamp, handled_by: by })
+      body: JSON.stringify({ handled_at: stamp, handled_by: by, handled_note: cleanNote })
     }).then(function(r) {
       if (!r.ok) { alert('Could not mark it handled. Please try again.'); return false; }
-      setClientMsgs(function(rows) { return (rows || []).map(function(m) { return m.id === id ? Object.assign({}, m, { handled_at: stamp, handled_by: by }) : m; }); });
+      setClientMsgs(function(rows) { return (rows || []).map(function(m) { return m.id === id ? Object.assign({}, m, { handled_at: stamp, handled_by: by, handled_note: cleanNote }) : m; }); });
       return true;
     });
   }
   // Reply by email right from the Messages tab: sent from venue@northstarhouse.org (replies come back to the venue inbox),
   // filed in the client's profile as a reply, and the original message is marked handled by the person replying.
-  function replyToClientMsg(m, by, text) {
+  function replyToClientMsg(m, by, text, note) {
     var stamp = new Date().toISOString();
     return fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
@@ -18470,7 +18471,7 @@ function VenueRentalsView({ navigate, initialTab }) {
       }).then(function(r2) { return r2.ok ? r2.json() : []; });
     }).then(function(saved) {
       setClientMsgs(function(rows) { return (Array.isArray(saved) ? saved : []).concat(rows || []); });
-      return handleClientMsg(m.id, by);
+      return handleClientMsg(m.id, by, note);
     });
   }
   // New email in venue@ is pulled in when staff are here (not on a timer): when Venue Rentals opens, and from the button on the Messages tab.
@@ -19903,6 +19904,7 @@ function PastMessages({ msgs, voicemails }) {
                 </div>
               );
             })}
+            {m.handled_note && <div style={{ marginTop: 8, fontSize: 12, color: '#555', background: '#faf8f3', border: '0.5px solid #ece6da', borderRadius: 8, padding: '6px 10px', whiteSpace: 'pre-wrap' }}><strong style={{ color: gold }}>Notes:</strong> {m.handled_note}</div>}
             <div style={{ fontSize: 11, fontWeight: 700, color: m.handled_at ? '#2e6b4f' : '#b45309', marginTop: 8 }}>{m.handled_at ? 'Handled' + (m.handled_by ? ' by ' + m.handled_by : '') + ' · ' + day(m.handled_at) + (reps.length ? '' : ' · no email reply sent from here') : 'Older, not marked handled'}</div>
           </div>
         );
@@ -19942,6 +19944,7 @@ function VoicemailCard({ v, onHandle }) {
 function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
   var [by, setBy] = useState('');
   var [reply, setReply] = useState('');
+  var [note, setNote] = useState('');
   var [busy, setBusy] = useState(false);
   var [err, setErr] = useState('');
   var wantsEmail = /wants an email/i.test(m.subject || '');
@@ -19954,7 +19957,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
     if (!by) { setErr('Choose who is replying (Jen, Derek or Haley).'); return; }
     if (!reply.trim()) { setErr('Type your reply first.'); return; }
     setBusy(true); setErr('');
-    onReply(m, by, reply.trim()).catch(function(e) { setErr(e.message || 'Could not send.'); setBusy(false); });
+    onReply(m, by, reply.trim(), note).catch(function(e) { setErr(e.message || 'Could not send.'); setBusy(false); });
   }
   var pill = { fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '2px 9px' };
   return (
@@ -19979,6 +19982,8 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
             style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'system-ui, sans-serif', resize: 'vertical' }} />
         </div>
       )}
+      <textarea value={note} onChange={function(e) { setNote(e.target.value); }} rows={2} placeholder="Notes (optional): what you did, what was said, next steps"
+        style={{ width: '100%', boxSizing: 'border-box', marginTop: 10, padding: '7px 10px', border: '0.5px dashed #d8d0c4', borderRadius: 8, fontSize: 12, fontFamily: 'system-ui, sans-serif', resize: 'vertical', background: '#fffdf9' }} />
       {err && <div style={{ color: '#b3261e', fontSize: 12, marginTop: 6 }}>{err}</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={by} onChange={function(e) { setBy(e.target.value); setErr(''); }} aria-label="Who is handling this"
@@ -19989,7 +19994,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
           <option value="Haley">Haley</option>
         </select>
         {canReply && <button disabled={busy} onClick={sendReply} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Sending…' : 'Send reply & mark handled'}</button>}
-        <button disabled={busy} onClick={function() { if (!by) { setErr('Choose who handled it (Jen, Derek or Haley).'); return; } onHandle(m.id, by); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{canReply ? 'Mark handled without replying' : 'Mark handled'}</button>
+        <button disabled={busy} onClick={function() { if (!by) { setErr('Choose who handled it (Jen, Derek or Haley).'); return; } onHandle(m.id, by, note); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{canReply ? 'Mark handled without replying' : 'Mark handled'}</button>
         {knownClient && <button onClick={onOpenClient} style={{ background: 'none', color: gold, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Open client file</button>}
       </div>
     </div>
