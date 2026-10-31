@@ -1285,7 +1285,7 @@ const typeColors = {
 <div onClick={function() { navigate('sponsors'); }} style={{ cursor: 'pointer' }}><StatCard label="Sponsors" value={sponsors === null ? '...' : sponsors.length} /></div>
         <StatCard label="Vol. Hours This Month" value={volHoursMonth === null ? '...' : volHoursMonth.toLocaleString('en-US', { maximumFractionDigits: 1 })} />
         <StatCard label="Vol. Hours This Year" value={volHoursYear === null ? '...' : volHoursYear.toLocaleString('en-US', { maximumFractionDigits: 1 })} />
-        <StatCard label="Board Volunteer Hours" value={boardHours === null ? '...' : boardHours.year.toLocaleString('en-US', { maximumFractionDigits: 1 })} sub={boardHours === null ? '' : boardHours.month.toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' this month · ' + boardHours.people + ' board members logged'} />
+        <StatCard label="Board Volunteer Hours This Year" value={boardHours === null ? '...' : boardHours.year.toLocaleString('en-US', { maximumFractionDigits: 1 })} sub={boardHours === null ? '' : boardHours.month.toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' this month · ' + boardHours.people + ' board members logged'} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 16, marginBottom: 16 }}>
