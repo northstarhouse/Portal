@@ -103,16 +103,22 @@ async function volunteerHours(b: ReturnType<typeof monthBounds>) {
 
 async function formCounts(b: ReturnType<typeof monthBounds>) {
   const ids = [...Object.keys(RENTAL_INQUIRY_FORMS), DOCENT_TOUR_FORM, VOLUNTEER_INTEREST_FORM]
-  const rows: { form_id: string; created_at: string }[] = await rest(`nsh_form_responses?select=form_id,created_at&form_id=in.(${ids.join(',')})&archived_at=is.null&created_at=gte.${shift(b.start, -1)}T00:00:00.000Z&created_at=lt.${shift(b.end, 2)}T00:00:00.000Z&limit=2000`)
+  const rows: { form_id: string; created_at: string; answers?: Record<string, unknown> }[] = await rest(`nsh_form_responses?select=form_id,created_at,answers&form_id=in.(${ids.join(',')})&archived_at=is.null&created_at=gte.${shift(b.start, -1)}T00:00:00.000Z&created_at=lt.${shift(b.end, 2)}T00:00:00.000Z&limit=2000`)
   const inMonth = rows.filter((r) => { const d = laDay(r.created_at); return d >= b.start && d <= b.end })
   const kinds: Record<string, number> = { Wedding: 0, Event: 0, Memorial: 0, Nonprofit: 0 }
   let inquiries = 0, docent = 0, volunteers = 0
+  const volAreas: Record<string, number> = {} // which areas the new volunteers said they are interested in
   for (const r of inMonth) {
     if (RENTAL_INQUIRY_FORMS[r.form_id]) { inquiries++; kinds[RENTAL_INQUIRY_FORMS[r.form_id]]++ }
     else if (r.form_id === DOCENT_TOUR_FORM) docent++
-    else if (r.form_id === VOLUNTEER_INTEREST_FORM) volunteers++
+    else if (r.form_id === VOLUNTEER_INTEREST_FORM) {
+      volunteers++
+      const raw = r.answers?.v_interest
+      const list = Array.isArray(raw) ? raw : raw ? [raw] : []
+      for (const a of list) { const k = String(a).trim(); if (k) volAreas[k] = (volAreas[k] || 0) + 1 }
+    }
   }
-  return { inquiries, kinds, docent, volunteers }
+  return { inquiries, kinds, docent, volunteers, volAreas }
 }
 
 async function tourCounts(b: ReturnType<typeof monthBounds>) {
@@ -203,8 +209,10 @@ function build(label: string, d: {
   section('Donations', `<p style="${P}"><strong style="color:#2a2420;">${esc(giving)}</strong></p>`, giving)
 
   if (f.volunteers > 0) {
+    const areas = Object.entries(f.volAreas).sort((a, c) => c[1] - a[1]).map(([a, n]) => `${a}${n > 1 ? ' (' + n + ')' : ''}`)
     const v = `${f.volunteers} new volunteer ${plural(f.volunteers, 'inquiry', 'inquiries')} this month.`
-    section('Volunteer Inquiries', `<p style="${P}">${esc(v)}</p>`, v)
+    const interest = areas.length ? `Areas they are interested in: ${areas.join(', ')}.` : ''
+    section('Volunteer Inquiries', `<p style="${P}">${esc(v)}</p>` + (interest ? `<p style="${P}">${esc(interest)}</p>` : ''), v + (interest ? ' ' + interest : ''))
   }
   if (sp.length > 0) {
     const lines = sp.map((s) => `${s.name}: ${money(s.total)}${s.what.length ? ' (' + s.what.join(', ') + ')' : ''}`)
