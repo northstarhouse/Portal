@@ -18469,7 +18469,30 @@ function VenueRentalsView({ navigate, initialTab }) {
       return handleClientMsg(m.id, by);
     });
   }
-  var unhandledClientMsgs = (clientMsgs || []).filter(function(m) { return m.direction !== 'outgoing' && !m.handled_at; }).length;
+  // Venue voicemails (Google Voice transcripts) arrive in the Activity Log with these tags.
+  const [voicemails, setVoicemails] = useS(null);
+  function loadVoicemails() {
+    var tags = ['Wedding - Voicemail', 'Event - Voicemail', 'Venue Inquiry - Voicemail'].map(function(t) { return '"' + t + '"'; }).join(',');
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?select=*&tag=in.(' + encodeURIComponent(tags) + ')&order=created_at.desc&limit=100', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.ok ? r.json() : []; }).then(function(rows) { setVoicemails(Array.isArray(rows) ? rows : []); }).catch(function() { setVoicemails([]); });
+  }
+  function voicemailHandled(v) { return v.action === 'voicemail_handled' || v.resolved === true; }
+  function handleVoicemail(id, by) {
+    if (!by) { alert('Choose who handled it (Jen or Derek) first.'); return Promise.resolve(false); }
+    var stamp = new Date().toISOString();
+    return fetch(SUPABASE_URL + '/rest/v1/activity_log?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ action: 'voicemail_handled', resolved: true, resolved_at: stamp, handled_by: by })
+    }).then(function(r) {
+      if (!r.ok) { alert('Could not mark it handled. Please try again.'); return false; }
+      setVoicemails(function(rows) { return (rows || []).map(function(v) { return v.id === id ? Object.assign({}, v, { action: 'voicemail_handled', resolved: true, resolved_at: stamp, handled_by: by }) : v; }); });
+      return true;
+    });
+  }
+  var unhandledVoicemails = (voicemails || []).filter(function(v) { return !voicemailHandled(v); });
+  var unhandledClientMsgs = (clientMsgs || []).filter(function(m) { return m.direction !== 'outgoing' && !m.handled_at; }).length + unhandledVoicemails.length;
   const [venueTab, setVenueTab] = useS(function() {
     if (initialTab) return initialTab;
     try { var saved = sessionStorage.getItem('nsh-venue-tab'); return saved === 'clients' || saved === 'messages' ? saved : 'inquiries'; } catch (e) { return 'inquiries'; }
@@ -18681,6 +18704,7 @@ function VenueRentalsView({ navigate, initialTab }) {
     }).catch(function(err) { setCalError(err.message); setLoading(false); });
 
     loadClientMsgs();
+    loadVoicemails();
     fetch(SUPABASE_URL + '/rest/v1/venue_messages?select=*&order=created_at.desc&limit=50', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) { setMessages(Array.isArray(rows) ? rows : []); }).catch(function() { setMessages([]); });
@@ -19070,13 +19094,14 @@ function VenueRentalsView({ navigate, initialTab }) {
           {venueTab === 'messages' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 760 }}>
               {clientMsgs === null && <div style={{ color: '#bbb', fontSize: 13 }}>Loading…</div>}
-              {clientMsgs && clientMsgs.filter(function(m) { return m.direction !== 'outgoing' && !m.handled_at; }).length === 0 && (
-                <div style={{ color: '#aaa', fontSize: 13, padding: '24px 0' }}>No new messages. Handled messages and replies are kept in each client's file.</div>
+              {clientMsgs && voicemails && unhandledClientMsgs === 0 && (
+                <div style={{ color: '#aaa', fontSize: 13, padding: '24px 0' }}>No new messages or voicemails. Handled messages and replies are kept in each client's file.</div>
               )}
               {(clientMsgs || []).filter(function(m) { return m.direction !== 'outgoing' && !m.handled_at; }).map(function(m) {
                 return <ClientMessageCard key={m.id} m={m} onHandle={handleClientMsg} onReply={replyToClientMsg}
                   onOpenClient={function() { window.__nshOpenClient = String(m.event_uid || '').replace('client:', ''); setVenueTab('clients'); }} />;
               })}
+              {unhandledVoicemails.map(function(v) { return <VoicemailCard key={'vm' + v.id} v={v} onHandle={handleVoicemail} />; })}
             </div>
           )}
 
@@ -19785,6 +19810,32 @@ function buildClientReplyHtml(name, text, by) {
     '<p style="margin:8px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;text-align:left;">' + esc(by) + '<br>North Star House</p>' +
     '<p style="margin:26px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Just reply to this email to write back to us.</i></p>' +
     '</div></div></div>';
+}
+
+// A voicemail transcript (Google Voice) for the venue line: choose who is handling it, then mark it handled.
+function VoicemailCard({ v, onHandle }) {
+  var [by, setBy] = useState('');
+  var [err, setErr] = useState('');
+  var tagStyle = ACTIVITY_TAG_COLORS[v.tag] || { bg: '#f0ece6', color: '#888' };
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid #b5457a', borderRadius: 10, padding: '12px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>Voicemail <span style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 9px', marginLeft: 6 }}>{String(v.tag || '').replace(' - Voicemail', '').toUpperCase()}</span></div>
+        <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{new Date(v.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · {new Date(v.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
+      </div>
+      <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{v.description}</div>
+      {err && <div style={{ color: '#b3261e', fontSize: 12, marginTop: 6 }}>{err}</div>}
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
+        <select value={by} onChange={function(e) { setBy(e.target.value); setErr(''); }} aria-label="Who is handling this"
+          style={{ fontSize: 12, fontWeight: 600, color: gold, background: '#fff', border: '0.5px solid ' + gold, borderRadius: 8, padding: '6px 8px' }}>
+          <option value="">Handled by…</option>
+          <option value="Jen">Jen</option>
+          <option value="Derek">Derek</option>
+        </select>
+        <button onClick={function() { if (!by) { setErr('Choose who handled it (Jen or Derek).'); return; } onHandle(v.id, by); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Mark handled</button>
+      </div>
+    </div>
+  );
 }
 
 // One unhandled message from a couple: who handled it, and (if they asked for email) a reply box that sends from venue@.
