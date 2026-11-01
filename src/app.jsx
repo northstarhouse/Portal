@@ -11718,6 +11718,15 @@ function FinancialOverviewView({ navigate }) {
   var [cashLog, setCashLog] = useState([]);
   var [rentals, setRentals] = useState([]);
   var [sponsorInKindEntries, setSponsorInKindEntries] = useState([]);
+  var [venueLedger, setVenueLedger] = useState([]);
+
+  // Venue rental payments come from the Treasurer ledger (online payments, hand-logged payments, PayPal fees).
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/rpc/treasurer_payments', { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, body: '{}' })
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(d) { setVenueLedger(Array.isArray(d) ? d.filter(function(p) { return p.source === 'Venue Rental'; }) : []); })
+      .catch(function() {});
+  }, []);
 
   useEffect(function() {
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
@@ -11919,6 +11928,7 @@ function FinancialOverviewView({ navigate }) {
     { id: 'sponsorships', label: 'Sponsorships' },
     { id: 'operational', label: 'Operational Areas' },
     { id: 'events', label: 'Events' },
+    { id: 'venue', label: 'Venue Rentals' },
     { id: 'cashflow', label: 'Office Cash Flow' },
     { id: 'outflow-detail', label: 'Spending Detail' },
   ];
@@ -11934,6 +11944,13 @@ function FinancialOverviewView({ navigate }) {
     if (!ym || ym === 'Unknown') return 'Unknown date';
     var parts = ym.split('-');
     return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  function venueRows() {
+    return venueLedger.filter(function(p) { return inYear(p.paid_on); }).map(function(p) {
+      var m = String(p.reference || '').match(/(Part of payment|Payments?) [^·]*/);
+      return { Date: p.paid_on || '', Client: p.payer || '', Event: p.detail || '', Payment: m ? m[0].trim() : '', Amount: parseFloat(p.amount) || 0, 'PayPal Fee': p.fee == null ? '' : parseFloat(p.fee), Net: p.net == null ? '' : parseFloat(p.net), Method: p.method || '' };
+    });
   }
 
   function exportActiveTab() { exportTab(activeTab); }
@@ -11977,6 +11994,8 @@ function FinancialOverviewView({ navigate }) {
         sheets.push({ name: r.event, headers: ['Date', 'Kind', 'Description', 'By', 'Amount'], rows: itemRows });
       });
       downloadXlsxMultiSheet(sheets, 'events-' + year + '.xlsx');
+    } else if (activeTab === 'venue') {
+      downloadXlsxRows(['Date', 'Client', 'Event', 'Payment', 'Amount', 'PayPal Fee', 'Net', 'Method'], venueRows(), 'venue-rentals-' + year + '.xlsx');
     } else if (activeTab === 'cashflow') {
       var rows = rentals.filter(function(r) { return inYear(r.date); }).map(function(r) {
         return { Date: r.date || '', Source: 'Earning', Category: r.name || 'Other', Direction: 'In', Amount: parseFloat(r.amount) || 0 };
@@ -11994,11 +12013,11 @@ function FinancialOverviewView({ navigate }) {
 
   var [sheetBackup, setSheetBackup] = useState({ busy: false, msg: '' });
   function backUpToSheet() {
-    var labels = { 'donations': 'Donations', 'sponsorships': 'Sponsorships', 'operational-areas': 'Operational Areas', 'events': 'Events', 'office-cash-flow': 'Office Cash Flow', 'spending-detail': 'Spending Detail' };
+    var labels = { 'donations': 'Donations', 'sponsorships': 'Sponsorships', 'operational-areas': 'Operational Areas', 'events': 'Events', 'venue-rentals': 'Venue Rentals', 'office-cash-flow': 'Office Cash Flow', 'spending-detail': 'Spending Detail' };
     var tabs = [];
     XLSX_CAPTURE = [];
     try {
-      ['donations', 'sponsorships', 'operational', 'events', 'cashflow', 'outflow-detail'].forEach(function(t) { exportTab(t); });
+      ['donations', 'sponsorships', 'operational', 'events', 'venue', 'cashflow', 'outflow-detail'].forEach(function(t) { exportTab(t); });
       XLSX_CAPTURE.forEach(function(file) {
         var base = file.filename.replace(/-\d{4}\.xlsx$/, '');
         var label = labels[base] || base;
@@ -12286,6 +12305,39 @@ function FinancialOverviewView({ navigate }) {
               );
             })}
           </div>
+          </div>
+          )}
+
+          {activeTab === 'venue' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ fontSize: 12, color: '#888' }}>Venue rental payments received in {year}: paid online by clients, plus payments the team logged by hand. The Treasurer page and the Google Sheet use the same list.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+              <div style={card}><div style={cardLabel}>Received</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(venueRows().reduce(function(t, r) { return t + r.Amount; }, 0))}</div></div>
+              <div style={card}><div style={cardLabel}>PayPal Fees</div><div style={{ ...cardValue, color: '#c07040' }}>{money(venueRows().reduce(function(t, r) { return t + (parseFloat(r['PayPal Fee']) || 0); }, 0))}</div></div>
+              <div style={card}><div style={cardLabel}>Payments</div><div style={cardValue}>{venueRows().length}</div></div>
+            </div>
+            <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, overflowX: 'auto' }}>
+              {venueRows().length === 0 ? <div style={{ padding: 18, fontSize: 13, color: '#888' }}>No venue payments recorded for {year} yet.</div> : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead><tr style={{ textAlign: 'left', color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                    {['Date', 'Client', 'Payment', 'Amount', 'Fee', 'Net', 'Method'].map(function(h) { return <th key={h} style={{ padding: '10px 12px', borderBottom: '0.5px solid #e0d8cc' }}>{h}</th>; })}
+                  </tr></thead>
+                  <tbody>
+                    {venueRows().map(function(r, i) {
+                      return <tr key={i} style={{ borderBottom: '0.5px solid #f0ebe2' }}>
+                        <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>{r.Date}</td>
+                        <td style={{ padding: '9px 12px', fontWeight: 600, color: '#2a2420' }}>{r.Client}<div style={{ fontSize: 12, color: '#999', fontWeight: 400 }}>{r.Event}</div></td>
+                        <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{r.Payment}</td>
+                        <td style={{ padding: '9px 12px', fontWeight: 600 }}>{money(r.Amount)}</td>
+                        <td style={{ padding: '9px 12px', color: '#888' }}>{r['PayPal Fee'] === '' ? '' : money(r['PayPal Fee'])}</td>
+                        <td style={{ padding: '9px 12px', color: '#888' }}>{r.Net === '' ? '' : money(r.Net)}</td>
+                        <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{r.Method}</td>
+                      </tr>;
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
           )}
 

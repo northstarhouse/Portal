@@ -9,6 +9,9 @@ create table if not exists public.payment_backup_log (
 );
 alter table public.payment_backup_log enable row level security; -- service role only
 
+-- Which installment an online venue payment paid (e.g. "Payment 2 of 4 - Booking payment"), saved when the client pays.
+alter table public.venue_payments add column if not exists installment_note text;
+
 create table if not exists public.treasurer_entries (
   id uuid primary key default gen_random_uuid(),
   paid_on date not null default current_date,
@@ -74,7 +77,7 @@ language sql security definer set search_path = public as $$
     select 'vp:' || p.id::text, (p.created_at at time zone 'America/Los_Angeles')::date, 'Venue Rental'::text, 'Rental payment',
            coalesce(i.name, p.payer_name, 'Venue client'),
            nullif(concat_ws(' · ', i.event_type, i.event_date::text), ''),
-           (p.amount_cents / 100.0)::numeric, p.paypal_fee, p.net_amount, 'PayPal', p.paypal_capture_id, false
+           (p.amount_cents / 100.0)::numeric, p.paypal_fee, p.net_amount, 'PayPal', concat_ws(' · ', p.installment_note, p.paypal_capture_id), false
     from venue_payments p
     left join venue_inquiries i on i.id = p.inquiry_id
 

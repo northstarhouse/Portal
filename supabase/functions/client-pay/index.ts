@@ -252,6 +252,22 @@ async function uploadInsuranceToDrive(folderName: string, filename: string, byte
 }
 
 // Apply a payment to the unpaid schedule rows in order.
+// Which installment(s) a payment pays, e.g. "Payment 2 of 4 - Booking payment". Worked out from what is already paid.
+function installmentNote(sched: any[], cents: number) {
+  const rows = sched.slice().sort((a: any, b: any) => a.sequence - b.sequence);
+  let left = cents; const hit: any[] = []; let partial = false;
+  for (const r of rows) {
+    if (left <= 0) break;
+    const room = (Number(r.amount_cents) || 0) - (Number(r.amount_paid_cents) || 0);
+    if (room <= 0) continue;
+    hit.push(r); if (left < room) partial = true; left -= Math.min(room, left);
+  }
+  if (!hit.length || !rows.length) return null;
+  const n = hit.length === 1 ? String(hit[0].sequence) : hit[0].sequence + '-' + hit[hit.length - 1].sequence;
+  const what = hit.length === 1 && hit[0].label ? ' - ' + hit[0].label : '';
+  return (partial ? 'Part of payment ' : hit.length > 1 ? 'Payments ' : 'Payment ') + n + ' of ' + rows.length + what;
+}
+
 async function applyToSchedule(inq: any, cents: number) {
   let left = cents;
   const sched = (inq.venue_payment_schedule || []).slice().sort((a: any, b: any) => a.sequence - b.sequence);
@@ -305,8 +321,10 @@ Deno.serve(async req => {
       if (cap.status !== 'COMPLETED') throw new Fail('Your payment is pending with PayPal. We will record it once it clears.', 202);
       const cents = Math.round(parseFloat(cap.amount.value) * 100);
       const exists = await rest(`venue_payments?select=id&paypal_capture_id=eq.${cap.id}`);
+      const schedNow = (inq.venue_payment_schedule || []).length ? inq.venue_payment_schedule : await legacySchedule(inq);
+      const installment_note = installmentNote(schedNow, cents);
       if (!exists.length) {
-        await rest('venue_payments', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ inquiry_id: inq.id, venue_code: code, amount_cents: cents, currency: cap.amount.currency_code, paypal_order_id: orderId, paypal_capture_id: cap.id, payer_name: [order.payer?.name?.given_name, order.payer?.name?.surname].filter(Boolean).join(' ') || null, payer_email: order.payer?.email_address || null, paypal_fee: cap.seller_receivable_breakdown?.paypal_fee?.value != null ? Number(cap.seller_receivable_breakdown.paypal_fee.value) : null, net_amount: cap.seller_receivable_breakdown?.net_amount?.value != null ? Number(cap.seller_receivable_breakdown.net_amount.value) : null }) });
+        await rest('venue_payments', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ inquiry_id: inq.id, venue_code: code, amount_cents: cents, currency: cap.amount.currency_code, paypal_order_id: orderId, paypal_capture_id: cap.id, installment_note, payer_name: [order.payer?.name?.given_name, order.payer?.name?.surname].filter(Boolean).join(' ') || null, payer_email: order.payer?.email_address || null, paypal_fee: cap.seller_receivable_breakdown?.paypal_fee?.value != null ? Number(cap.seller_receivable_breakdown.paypal_fee.value) : null, net_amount: cap.seller_receivable_breakdown?.net_amount?.value != null ? Number(cap.seller_receivable_breakdown.net_amount.value) : null }) });
         if ((inq.venue_payment_schedule || []).length) await applyToSchedule(inq, cents);
         else await recordLegacyPayment(inq, cap.id, cents);
       }
