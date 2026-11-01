@@ -500,29 +500,11 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
           // Once the agreement has been sent it stays closed, showing Sent or Signed, until it is clicked open.
           ? <div className="vc-modal-section"><ExpandRow id="vc-agreement" title="Agreement" tone={client.nativeAgreement.status === 'completed' ? 'good' : ['declined','expired'].includes(client.nativeAgreement.status) ? 'alert' : ''} pill={({completed:'Signed',pending:'Sent',declined:'Declined',expired:'Expired'})[client.nativeAgreement.status] || 'Sent'} open={agrOpen} onToggle={() => setAgrOpen(!agrOpen)}><ContractManager client={client} api={agreementApi} onChange={onContractsChange}/></ExpandRow></div>
           : <ContractManager client={client} api={agreementApi} onChange={onContractsChange}/>)}
-      <div className="vc-modal-section">
-        <div className="vc-modal-section-title">Payment timeline</div>
-        {client.payments ? <>
-          <p className="vc-muted" style={{marginTop:0}}>{amount(client.paid,client.currency)} paid · {amount(client.balance,client.currency)} remaining · {amount(client.total,client.currency)} invoice total</p>
-          <div>{client.schedule.map((s,i) => {
-            const pastDue = s.due && s.due < venueDateKey() && !s.paid;
-            const state = s.paid ? 'good' : pastDue ? 'danger' : '';
-            return <div className="vc-timeline-item" key={i}>
-              <div style={{position:'relative'}}><span className={'vc-timeline-dot '+state}/><span className="vc-timeline-line"/></div>
-              <div className="vc-timeline-content">
-                <div style={{display:'flex',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
-                  <strong style={{fontSize:13}}>{s.label}</strong>
-                  <span className={'vc-pill '+state}>{s.paid?'Paid':pastDue?'Past due':'Scheduled'}</span>
-                </div>
-                <div className="vc-muted">{dateLabel(s.due)} · {amount(s.cents,s.currency)}</div>
-                {client.legacy&&!s.paid&&i===client.schedule.findIndex(x=>!x.paid)&&onSavePayments&&<button type="button" onClick={async()=>{if(!window.confirm('Mark '+s.label+' ('+amount(s.cents,s.currency)+') as paid? Nobody is notified.'))return;try{await onSavePayments(client.id,[...(client.manualPayments||[]),{id:String(Date.now()),cents:s.cents,date:venueDateKey(),note:s.label}]);}catch(e){alert(e.message||'Could not save.');}}} style={{marginTop:6,border:'1px solid #886c44',borderRadius:6,padding:'4px 12px',background:'#fff',color:'#886c44',fontSize:11,fontWeight:600}}>Mark paid</button>}
-              </div>
-            </div>;
-          })}</div>
-          <p className="vc-muted" style={{marginBottom:0}}>Original invoice schedule, including any security deposit. Payment names follow the source schedule order.</p>
-        </> : <p className="vc-muted" style={{margin:0}}>A payment schedule has not been recorded.</p>}
-        {client.legacy&&<ManualPayments client={client} onSave={onSavePayments}/>}
-      </div>
+      {client.legacy&&<div className="vc-modal-section">
+        <div className="vc-modal-section-title">Record a payment</div>
+        {(() => { const next = (client.schedule||[]).find(x=>!x.paid); return next && onSavePayments ? <button type="button" onClick={async()=>{if(!window.confirm('Mark '+next.label+' ('+amount(next.cents,next.currency)+') as paid? Nobody is notified.'))return;try{await onSavePayments(client.id,[...(client.manualPayments||[]),{id:String(Date.now()),cents:next.cents,date:venueDateKey(),note:next.label}]);}catch(e){alert(e.message||'Could not save.');}}} style={{marginBottom:10,border:'1px solid #886c44',borderRadius:6,padding:'6px 14px',background:'#fff',color:'#886c44',fontSize:12,fontWeight:600}}>Mark {next.label} ({amount(next.cents,next.currency)}) as paid</button> : null; })()}
+        <ManualPayments client={client} onSave={onSavePayments}/>
+      </div>}
       {client.signatures && !client.legacy && <div className="vc-modal-section">
         <div className="vc-modal-section-title">Contract signatures</div>
         {client.signatures.signatures.map((s,i) => <div className="vc-line" key={i}><span className={'vc-dot '+(s.signed?'good':'')}/><span>{s.signee_name} · {s.signed?'Signed '+dateLabel(s.signed_at):'Awaiting signature'}</span></div>)}
