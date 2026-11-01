@@ -11721,13 +11721,14 @@ function FinancialOverviewView({ navigate }) {
   var [rentals, setRentals] = useState([]);
   var [sponsorInKindEntries, setSponsorInKindEntries] = useState([]);
   var [venueLedger, setVenueLedger] = useState([]);
+  var [venueReady, setVenueReady] = useState(false);
 
   // Venue rental payments come from the Treasurer ledger (online payments, hand-logged payments, PayPal fees).
   useEffect(function() {
     fetch(SUPABASE_URL + '/rest/v1/rpc/treasurer_payments', { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' }, body: '{}' })
       .then(function(r) { return r.ok ? r.json() : []; })
-      .then(function(d) { setVenueLedger(Array.isArray(d) ? d.filter(function(p) { return p.source === 'Venue Rental'; }) : []); })
-      .catch(function() {});
+      .then(function(d) { setVenueLedger(Array.isArray(d) ? d.filter(function(p) { return p.source === 'Venue Rental'; }) : []); setVenueReady(true); })
+      .catch(function() { setVenueReady(true); });
   }, []);
 
   useEffect(function() {
@@ -12014,6 +12015,16 @@ function FinancialOverviewView({ navigate }) {
   }
 
   var [sheetBackup, setSheetBackup] = useState({ busy: false, msg: '' });
+  // Backs the selected year up to the Google Sheet by itself once the numbers have loaded (at most every 30 minutes per year).
+  useEffect(function() {
+    if (loading || !venueReady) return;
+    var key = 'nsh-sheet-backup-' + year, last = 0;
+    try { last = Number(localStorage.getItem(key) || 0); } catch (e) {}
+    if (Date.now() - last < 30 * 60 * 1000) return;
+    try { localStorage.setItem(key, String(Date.now())); } catch (e) {}
+    backUpToSheet();
+  }, [loading, venueReady, year]);
+
   function backUpToSheet() {
     var labels = { 'donations': 'Donations', 'sponsorships': 'Sponsorships', 'operational-areas': 'Operational Areas', 'events': 'Events', 'venue-rentals': 'Venue Rentals', 'office-cash-flow': 'Office Cash Flow', 'spending-detail': 'Spending Detail' };
     var tabs = [];
@@ -12040,7 +12051,7 @@ function FinancialOverviewView({ navigate }) {
         if (d.error) { setSheetBackup({ busy: false, msg: d.error }); return; }
         return fetch(SUPABASE_URL + '/functions/v1/backup-payments-to-sheet', { method: 'POST', headers: H, body: '{}' })
           .then(function(r) { return r.json().catch(function() { return {}; }); })
-          .then(function(p) { setSheetBackup({ busy: false, msg: p.error ? p.error : 'Backed up ' + year + ' to the Google Sheet (' + (d.tabs || 0) + ' tabs' + (p.added ? ', ' + p.added + ' new payments' : '') + ').' }); });
+          .then(function(p) { setSheetBackup({ busy: false, msg: p.error ? p.error : 'Backed up ' + year + ' to the Google Sheet automatically (' + (d.tabs || 0) + ' tabs' + (p.added ? ', ' + p.added + ' new payments' : '') + ').' }); });
       })
       .catch(function() { setSheetBackup({ busy: false, msg: 'Could not reach the backup. Please try again.' }); });
   }
@@ -12079,7 +12090,6 @@ function FinancialOverviewView({ navigate }) {
               );
             })}
             <button onClick={exportActiveTab} style={{ marginLeft: 'auto', marginBottom: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>↓ Export Excel</button>
-            <button onClick={backUpToSheet} disabled={sheetBackup.busy} style={{ marginBottom: 6, marginLeft: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>{sheetBackup.busy ? 'Backing up…' : 'Back up ' + year + ' to Google Sheet'}</button>
           </div>
           {sheetBackup.msg ? <div style={{ fontSize: 12, color: '#6b5d4a', margin: '0 0 8px' }}>{sheetBackup.msg}</div> : null}
 
