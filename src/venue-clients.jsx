@@ -433,9 +433,9 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
   const lastSigned = list => list.map(x => x.signed_at).filter(Boolean).sort().pop();
   step('Agreement sent', client.legacy || !!client.nativeAgreement, client.legacy ? 'Signed before the new system' : client.nativeAgreement?.issued_at ? dateLabel(client.nativeAgreement.issued_at) : 'Not sent yet');
   const clientsSigned = client.legacy || (clientSigs.length > 0 && clientSigs.every(x => x.signed));
-  step('Clients signed', clientsSigned, client.legacy ? '' : clientsSigned ? dateLabel(lastSigned(clientSigs)) : clientSigs.length ? clientSigs.filter(x => x.signed).length + ' of ' + clientSigs.length + ' signed' : 'Waiting on the agreement');
+  step('Clients signed', clientsSigned, client.legacy ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed before the new system') : clientsSigned ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed') : clientSigs.length ? clientSigs.filter(x => x.signed).length + ' of ' + clientSigs.length + ' signed' : 'Waiting on the agreement');
   const venueSigned = client.legacy || (venueSigs.length > 0 && venueSigs.every(x => x.signed));
-  step('Venue countersigned', venueSigned, client.legacy ? '' : venueSigned ? dateLabel(lastSigned(venueSigs)) : 'Waiting on the clients');
+  step('Venue countersigned', venueSigned, client.legacy ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed before the new system') : venueSigned ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed') : 'Waiting on the clients');
   (client.schedule || []).forEach((p, i) => {
     // The first payment is due the moment both clients have signed, not on a calendar date.
     if (i === 0 && !client.legacy) {
