@@ -154,6 +154,172 @@ async function signedIn(req: Request) {
 // PayPal payments (the website's PayPal checkout, and gifts the Portal marks as "Website") vs. everything else.
 const isPayPal = (p: Record<string, unknown>) => ['PayPal', 'Website'].includes(String(p.method || ''))
 
+// ---------- yearly tabs (the same tabs as Financial Overview, built here so they stay current by themselves) ----------
+// Budgets per operational area (same figures the Portal shows).
+const AREA_BUDGETS: Record<string, number | null> = { Construction: 12000, Grounds: 14000, Interiors: 2500, Docents: 1000, Fundraising: null, Events: 7500, Marketing: 1000, Venue: null }
+
+// deno-lint-ignore no-explicit-any
+async function allRows(path: string): Promise<any[]> {
+  const out: any[] = []
+  for (let offset = 0; ; offset += 1000) {
+    const page = await rest(`${path}${path.includes('?') ? '&' : '?'}limit=1000&offset=${offset}`)
+    out.push(...(page || []))
+    if (!page || page.length < 1000) break
+  }
+  return out
+}
+const num = (v: unknown) => parseFloat(String(v ?? '')) || 0
+const byDateDesc = (a: { date?: string }, b: { date?: string }) => String(b.date || '').localeCompare(String(a.date || ''))
+type Tab = { name: string; headers: string[]; rows: Record<string, unknown>[] }
+
+async function buildYearlyTabs(year: number): Promise<Tab[]> {
+  const inYear = (d: unknown) => !!d && String(d).slice(0, 4) === String(year)
+  const enc = encodeURIComponent
+  const [donations, donors, sponsors, budget, earnings, cashLog, rentals, inKind, ledger] = await Promise.all([
+    allRows('donations?select=amount,date,type,donor_id,payment_type,donation_notes'),
+    allRows('donors?select=id,formal_name'),
+    allRows(`${enc('Sponsors')}?select=*`),
+    allRows(`${enc('Op Budget')}?select=area,type,amount,date,needs_reimbursement,description,purchased_by,volunteer_name,event_name`),
+    allRows(`${enc('Op Earnings')}?select=area,event,earning_source,amount,date`),
+    allRows(`${enc('Cash Log')}?select=amount,date,direction,description`),
+    allRows(`${enc('Creative Rentals')}?select=amount,date,name`),
+    allRows(`${enc('Sponsor In-Kind')}?select=*`),
+    rest('rpc/treasurer_payments_all', { method: 'POST', body: '{}' }),
+  ])
+  const tabs: Tab[] = []
+  const donorName: Record<string, string> = {}
+  donors.forEach((d) => { donorName[d.id] = d.formal_name })
+
+  // Donations
+  tabs.push({
+    name: `Donations ${year}`, headers: ['Date', 'Donor', 'Type', 'Payment Type', 'Notes', 'Amount'],
+    rows: donations.filter((d) => inYear(d.date)).map((d) => ({ Date: d.date || '', Donor: donorName[d.donor_id] || 'Unknown donor', Type: d.type || '', 'Payment Type': d.payment_type || '', Notes: d.donation_notes || '', Amount: num(d.amount) })),
+  })
+
+  // Sponsorships (current sponsors only)
+  const current = sponsors.filter((s) => (s['sponsor_status'] || 'current') === 'current')
+  const sponsorRows: Record<string, unknown>[] = []
+  current.forEach((sp) => {
+    inKind.filter((e) => e.sponsor_id === sp.id && inYear(e.date)).forEach((e) => {
+      sponsorRows.push({ Business: sp['Business Name'] || '', Date: e.date || '', Type: e.contribution_type || '', Description: e.description || '', Value: num(e.value) })
+    })
+  })
+  tabs.push({ name: `Sponsorships ${year}`, headers: ['Business', 'Date', 'Type', 'Description', 'Value'], rows: sponsorRows })
+
+  // Operational Areas
+  const yBudget = budget.filter((b) => inYear(b.date)), yEarn = earnings.filter((e) => inYear(e.date))
+  const byArea: Record<string, { area: string; purchases: number; inKind: number; earnings: number; allocated: number | null }> = {}
+  const bucket = (a: string | null) => { const k = a || 'Unassigned'; return byArea[k] ||= { area: k, purchases: 0, inKind: 0, earnings: 0, allocated: AREA_BUDGETS[k] ?? null } }
+  yBudget.forEach((b) => { if (b.type === 'In-Kind') bucket(b.area).inKind += num(b.amount); else bucket(b.area).purchases += num(b.amount) })
+  yEarn.forEach((e) => { bucket(e.area).earnings += num(e.amount) })
+  const areaRows = Object.values(byArea).sort((a, b) => (a.allocated != null ? a.allocated - a.purchases : Infinity) - (b.allocated != null ? b.allocated - b.purchases : Infinity))
+  tabs.push({
+    name: `Operational Areas ${year}`, headers: ['Area', 'Budget', 'Spent', 'Earnings', 'In-Kind', 'Remaining'],
+    rows: areaRows.map((r) => ({ Area: r.area, Budget: r.allocated != null ? r.allocated : '', Spent: r.purchases, Earnings: r.earnings, 'In-Kind': r.inKind, Remaining: r.allocated != null ? r.allocated - r.purchases : '' })),
+  })
+  const areaItems: Record<string, unknown>[] = []
+  areaRows.forEach((r) => {
+    const items = [
+      ...yBudget.filter((b) => (b.area || 'Unassigned') === r.area).map((b) => ({ kind: b.type === 'In-Kind' ? 'In-Kind' : 'Purchase', description: b.description || '—', by: b.purchased_by || (b.needs_reimbursement ? b.volunteer_name : null), amount: num(b.amount), date: b.date })),
+      ...yEarn.filter((e) => (e.area || 'Unassigned') === r.area).map((e) => ({ kind: 'Earning', description: e.event || '—', by: null, amount: num(e.amount), date: e.date })),
+    ].sort(byDateDesc)
+    items.forEach((i) => areaItems.push({ Name: r.area, Date: i.date || '', Kind: i.kind, Description: i.description, By: i.by || '', Amount: i.amount }))
+  })
+  tabs.push({ name: `Operational Areas Items ${year}`, headers: ['Name', 'Date', 'Kind', 'Description', 'By', 'Amount'], rows: areaItems })
+
+  // Events
+  const evBudget = yBudget.filter((b) => b.area === 'Events'), evEarn = yEarn.filter((e) => e.area === 'Events')
+  const byEvent: Record<string, { event: string; expenses: number; inKind: number; earnings: number }> = {}
+  const ebucket = (n: string | null) => { const k = n || 'Unassigned / General Events'; return byEvent[k] ||= { event: k, expenses: 0, inKind: 0, earnings: 0 } }
+  evBudget.forEach((b) => { if (b.type === 'In-Kind') ebucket(b.event_name).inKind += num(b.amount); else ebucket(b.event_name).expenses += num(b.amount) })
+  evEarn.forEach((e) => { ebucket(e.event).earnings += num(e.amount) })
+  const eventRows = Object.values(byEvent).sort((a, b) => b.earnings - a.earnings)
+  tabs.push({
+    name: `Events ${year}`, headers: ['Event', 'Expenses', 'Earnings', 'In-Kind', 'Profit / Loss'],
+    rows: eventRows.map((r) => ({ Event: r.event, Expenses: r.expenses, Earnings: r.earnings, 'In-Kind': r.inKind, 'Profit / Loss': r.earnings - r.expenses })),
+  })
+  const eventItems: Record<string, unknown>[] = []
+  eventRows.forEach((r) => {
+    const items = [
+      ...evBudget.filter((b) => (b.event_name || 'Unassigned / General Events') === r.event).map((b) => ({ kind: b.type === 'In-Kind' ? 'In-Kind' : 'Expense', description: b.description || '—', by: b.purchased_by || (b.needs_reimbursement ? b.volunteer_name : null), amount: num(b.amount), date: b.date })),
+      ...evEarn.filter((e) => (e.event || 'Unassigned / General Events') === r.event).map((e) => ({ kind: 'Earning', description: e.earning_source || '—', by: null, amount: num(e.amount), date: e.date })),
+    ].sort(byDateDesc)
+    items.forEach((i) => eventItems.push({ Name: r.event, Date: i.date || '', Kind: i.kind, Description: i.description, By: i.by || '', Amount: i.amount }))
+  })
+  tabs.push({ name: `Events Items ${year}`, headers: ['Name', 'Date', 'Kind', 'Description', 'By', 'Amount'], rows: eventItems })
+
+  // Venue Rentals (payments received, from the treasurer ledger)
+  tabs.push({
+    name: `Venue Rentals ${year}`, headers: ['Date', 'Client', 'Event', 'Payment', 'Amount', 'PayPal Fee', 'Net', 'Method'],
+    rows: (ledger as Record<string, unknown>[]).filter((p) => p.source === 'Venue Rental' && inYear(p.paid_on)).map((p) => {
+      const m = String(p.reference || '').match(/(Part of payment|Payments?) [^·]*/)
+      return { Date: p.paid_on || '', Client: p.payer || '', Event: p.detail || '', Payment: m ? m[0].trim() : '', Amount: num(p.amount), 'PayPal Fee': p.fee == null ? '' : num(p.fee), Net: p.net == null ? '' : num(p.net), Method: p.method || '' }
+    }),
+  })
+
+  // Office Cash Flow
+  tabs.push({
+    name: `Office Cash Flow ${year}`, headers: ['Date', 'Source', 'Category', 'Direction', 'Amount'],
+    rows: [
+      ...rentals.filter((r) => inYear(r.date)).map((r) => ({ Date: r.date || '', Source: 'Earning', Category: r.name || 'Other', Direction: 'In', Amount: num(r.amount) })),
+      ...cashLog.filter((c) => inYear(c.date)).map((c) => ({ Date: c.date || '', Source: 'Cash Log', Category: c.description || '', Direction: c.direction || '', Amount: num(c.amount) })),
+    ],
+  })
+
+  // Spending Detail
+  const spend = [
+    ...yBudget.filter((b) => b.type !== 'In-Kind').map((b) => ({ source: 'Op Budget', area: b.area || 'Unassigned', description: b.description || '—', by: b.purchased_by || (b.needs_reimbursement ? b.volunteer_name : null), amount: num(b.amount), date: b.date, dup: false })),
+    ...cashLog.filter((c) => inYear(c.date) && c.direction === 'Out').map((c) => ({ source: 'Cash Log', area: 'Office', description: c.description || '—', by: null, amount: num(c.amount), date: c.date, dup: false })),
+  ]
+  const keyOf = (r: { source: string; area: string; description: string; amount: number; date: string }) => [r.source, r.area, r.description, r.amount, r.date].join('|')
+  const seen: Record<string, number> = {}
+  spend.forEach((r) => { seen[keyOf(r)] = (seen[keyOf(r)] || 0) + 1 })
+  spend.forEach((r) => { r.dup = seen[keyOf(r)] > 1 })
+  spend.sort(byDateDesc)
+  tabs.push({
+    name: `Spending Detail ${year}`, headers: ['Date', 'Area', 'Description', 'By', 'Source', 'Amount', 'Possible Duplicate'],
+    rows: spend.map((r) => ({ Date: r.date || '', Area: r.area, Description: r.description, By: r.by || '', Source: r.source, Amount: r.amount, 'Possible Duplicate': r.dup ? 'Yes' : '' })),
+  })
+  return tabs
+}
+
+// Replaces each yearly tab with the latest copy. Only tabs named "Backup - …" are ever written (never the first tab).
+async function writeYearlyTabs(token: string, tabs: Meta[], year: number) {
+  for (const t of await buildYearlyTabs(year)) {
+    const title = tabName(t.name)
+    const own = await ownTab(token, title, tabs)
+    const values = [t.headers, ...t.rows.map((r) => t.headers.map((h) => (r[h] == null ? '' : r[h])))]
+    // Make sure the tab has room for every row.
+    await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [{ updateSheetProperties: { properties: { sheetId: own.sheetId, gridProperties: { rowCount: Math.max(1000, values.length + 50), frozenRowCount: 1 } }, fields: 'gridProperties.rowCount,gridProperties.frozenRowCount' } }] }) })
+    await sheets(token, `/values/${q(title)}:clear`, { method: 'POST', body: '{}' })
+    for (let i = 0; i < values.length; i += 10000) {
+      await sheets(token, `/values/${q(title)}!A${i + 1}?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ values: values.slice(i, i + 10000) }) })
+    }
+  }
+}
+
+// One refresh at a time. Changes that arrive during a refresh are folded into one more pass right after it.
+async function runYearlySync(token: string, tabs: Meta[]) {
+  const iso = (ms: number) => new Date(ms).toISOString()
+  const got = await rest(`sheet_sync_state?id=eq.1&running_until=lt.${encodeURIComponent(iso(Date.now()))}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ running_until: iso(Date.now() + 120000), pending: false }) })
+  if (!got || !got.length) {
+    await rest('sheet_sync_state?id=eq.1', { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ pending: true }) })
+    return { queued: true }
+  }
+  try {
+    for (let pass = 0; pass < 3; pass++) {
+      const year = Number(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }).slice(0, 4))
+      await writeYearlyTabs(token, tabs, year)
+      const st = await rest('sheet_sync_state?id=eq.1&select=pending')
+      if (!st?.[0]?.pending) break
+      await rest('sheet_sync_state?id=eq.1', { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ pending: false }) })
+    }
+    return { refreshed: true }
+  } finally {
+    await rest('sheet_sync_state?id=eq.1', { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ running_until: iso(Date.now() - 1000) }) }).catch(() => {})
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   try {
@@ -167,6 +333,9 @@ Deno.serve(async (req) => {
 
     const token = await sheetsToken()
     const tabs = await listTabs(token)
+
+    // ---- yearly Financial Overview tabs, rebuilt from the database (called by the database whenever the records change)
+    if (body.action === 'yearly') return json(await runYearlySync(token, tabs))
 
     // ---- yearly snapshot tabs: replaced with the latest copy
     if (body.action === 'snapshot') {

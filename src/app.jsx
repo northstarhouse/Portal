@@ -12014,48 +12014,6 @@ function FinancialOverviewView({ navigate }) {
     }
   }
 
-  var [sheetBackup, setSheetBackup] = useState({ busy: false, msg: '' });
-  // Backs the selected year up to the Google Sheet by itself once the numbers have loaded (at most every 30 minutes per year).
-  useEffect(function() {
-    if (loading || !venueReady) return;
-    var key = 'nsh-sheet-backup-' + year, last = 0;
-    try { last = Number(localStorage.getItem(key) || 0); } catch (e) {}
-    if (Date.now() - last < 30 * 60 * 1000) return;
-    try { localStorage.setItem(key, String(Date.now())); } catch (e) {}
-    backUpToSheet();
-  }, [loading, venueReady, year]);
-
-  function backUpToSheet() {
-    var labels = { 'donations': 'Donations', 'sponsorships': 'Sponsorships', 'operational-areas': 'Operational Areas', 'events': 'Events', 'venue-rentals': 'Venue Rentals', 'office-cash-flow': 'Office Cash Flow', 'spending-detail': 'Spending Detail' };
-    var tabs = [];
-    XLSX_CAPTURE = [];
-    try {
-      ['donations', 'sponsorships', 'operational', 'events', 'venue', 'cashflow', 'outflow-detail'].forEach(function(t) { exportTab(t); });
-      XLSX_CAPTURE.forEach(function(file) {
-        var base = file.filename.replace(/-\d{4}\.xlsx$/, '');
-        var label = labels[base] || base;
-        var first = file.sheets[0];
-        tabs.push({ name: label + ' ' + year, headers: first.headers, rows: first.rows });
-        if (file.sheets.length > 1) {
-          var heads = ['Name'].concat(file.sheets[1].headers), items = [];
-          file.sheets.slice(1).forEach(function(sh) { sh.rows.forEach(function(r) { items.push(Object.assign({ Name: sh.name }, r)); }); });
-          tabs.push({ name: label + ' Items ' + year, headers: heads, rows: items });
-        }
-      });
-    } finally { XLSX_CAPTURE = null; }
-    setSheetBackup({ busy: true, msg: '' });
-    var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
-    fetch(SUPABASE_URL + '/functions/v1/backup-payments-to-sheet', { method: 'POST', headers: H, body: JSON.stringify({ action: 'snapshot', tabs: tabs }) })
-      .then(function(r) { return r.json().catch(function() { return {}; }); })
-      .then(function(d) {
-        if (d.error) { setSheetBackup({ busy: false, msg: d.error }); return; }
-        return fetch(SUPABASE_URL + '/functions/v1/backup-payments-to-sheet', { method: 'POST', headers: H, body: '{}' })
-          .then(function(r) { return r.json().catch(function() { return {}; }); })
-          .then(function(p) { setSheetBackup({ busy: false, msg: p.error ? p.error : 'Backed up ' + year + ' to the Google Sheet automatically (' + (d.tabs || 0) + ' tabs' + (p.added ? ', ' + p.added + ' new payments' : '') + ').' }); });
-      })
-      .catch(function() { setSheetBackup({ busy: false, msg: 'Could not reach the backup. Please try again.' }); });
-  }
-
   return (
     <div style={{ paddingBottom: 60 }}>
       <div style={{ fontSize: 19, fontWeight: 700, color: '#2a2a2a', margin: '0 0 4px' }}>Financial Tracking from Staff</div>
@@ -12091,7 +12049,7 @@ function FinancialOverviewView({ navigate }) {
             })}
             <button onClick={exportActiveTab} style={{ marginLeft: 'auto', marginBottom: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>↓ Export Excel</button>
           </div>
-          {sheetBackup.msg ? <div style={{ fontSize: 12, color: '#6b5d4a', margin: '0 0 8px' }}>{sheetBackup.msg}</div> : null}
+          <div style={{ fontSize: 11, color: '#999', margin: '0 0 8px' }}>The Google Sheet updates by itself whenever anything here changes.</div>
 
           {activeTab === 'donations' && (
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
