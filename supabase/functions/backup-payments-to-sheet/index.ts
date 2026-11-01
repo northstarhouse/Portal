@@ -176,7 +176,7 @@ async function styleTable(token: string, title: string, headers: string[]) {
       table: {
         range: { sheetId, startRowIndex: 0, endRowIndex: rows, startColumnIndex: 0, endColumnIndex: cols },
         rowsProperties: {
-          headerColorStyle: colorStyle(163, 132, 104),
+          headerColorStyle: colorStyle(160, 132, 104),
           firstBandColorStyle: colorStyle(255, 255, 255),
           secondBandColorStyle: colorStyle(245, 241, 235),
         },
