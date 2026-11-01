@@ -45,7 +45,7 @@ export function prepareAgreementDraft(client,extras={}){
     ...(people.length?people.map(c=>c.name+' — '+(c.email||'[EMAIL TO COMPLETE]')):[client.name+' — [EMAIL TO COMPLETE]']),
     'Max Estimated Guest Count: '+guests,
     ...(client.total!==null&&client.total!==undefined?['Venue rental invoice total, including any security deposit: '+money(client.total,client.currency)]:[]),
-    ...(schedule.length?['Payment schedule:',...schedule.map(p=>'- '+p.label+': '+money(p.cents,p.currency)+' due '+(p.due?writtenDate(p.due):'[TO COMPLETE]')+(p.paid?' (already paid)':''))]:[]),
+    ...(schedule.length?['Payment schedule:',...schedule.map((p,i)=>'- '+p.label+': '+money(p.cents,p.currency)+' due '+(i===0?'when both clients have signed this agreement':p.due?writtenDate(p.due):'[TO COMPLETE]')+(p.paid?' (already paid)':''))]:[]),
     '',
     agreementTerms,
     '',

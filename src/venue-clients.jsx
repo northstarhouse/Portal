@@ -254,7 +254,12 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
   step('Clients signed', clientsSigned, client.legacy ? '' : clientsSigned ? dateLabel(lastSigned(clientSigs)) : clientSigs.length ? clientSigs.filter(x => x.signed).length + ' of ' + clientSigs.length + ' signed' : 'Waiting on the agreement');
   const venueSigned = client.legacy || (venueSigs.length > 0 && venueSigs.every(x => x.signed));
   step('Venue countersigned', venueSigned, client.legacy ? '' : venueSigned ? dateLabel(lastSigned(venueSigs)) : 'Waiting on the clients');
-  (client.schedule || []).forEach(p => {
+  (client.schedule || []).forEach((p, i) => {
+    // The first payment is due the moment both clients have signed, not on a calendar date.
+    if (i === 0 && !client.legacy) {
+      step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : clientsSigned ? 'Due now' : 'Due when both clients sign', null, !p.paid && clientsSigned);
+      return;
+    }
     const late = !p.paid && p.due && p.due < today;
     step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : p.due ? (late ? 'Past due · ' : 'Due ') + dateLabel(p.due) : 'Awaiting payment', null, late);
   });
@@ -287,6 +292,14 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
       <div className="vc-modal-section">
         <div className="vc-modal-section-title">Contacts</div>
         <div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div>{c.address && <div className="vc-muted">{c.address}</div>}</div>)}</div>
+      </div>
+      <div className="vc-modal-section">
+        <div className="vc-modal-section-title">Timeline of Steps</div>
+        {steps.map((st, i) => <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i?'1px solid #f0ebe2':'none'}}>
+          <span aria-hidden="true" style={{flex:'0 0 20px',height:20,borderRadius:'50%',display:'grid',placeItems:'center',fontSize:12,fontWeight:700,background:st.done?'#2e7d32':'#fff',color:'#fff',border:st.done?'none':'1.5px solid '+(st.late?'#c0392b':'#cfc6b6')}}>{st.done?'✓':''}</span>
+          <div style={{flex:1,fontWeight:600,color:st.done?'#2a2420':'#555'}}>{st.label}{st.extra ? <span style={{fontWeight:400}}> – {st.extra}</span> : null}</div>
+          <div style={{textAlign:'right',fontSize:12,color:st.late?'#c0392b':st.done?'#2e7d32':'#888'}}>{st.when}</div>
+        </div>)}
       </div>
       <PreBookingFormView client={client} open={formOpen} setOpen={setFormOpen}/>
       <InsuranceVerification client={client} onVerify={onVerify}/>
@@ -323,14 +336,6 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
           <p className="vc-muted" style={{marginBottom:0}}>Original invoice schedule, including any security deposit. Payment names follow the source schedule order.</p>
         </> : <p className="vc-muted" style={{margin:0}}>A payment schedule has not been recorded.</p>}
         {client.legacy&&<ManualPayments client={client} onSave={onSavePayments}/>}
-      </div>
-      <div className="vc-modal-section">
-        <div className="vc-modal-section-title">Timeline of Steps</div>
-        {steps.map((st, i) => <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i?'1px solid #f0ebe2':'none'}}>
-          <span aria-hidden="true" style={{flex:'0 0 20px',height:20,borderRadius:'50%',display:'grid',placeItems:'center',fontSize:12,fontWeight:700,background:st.done?'#2e7d32':'#fff',color:'#fff',border:st.done?'none':'1.5px solid '+(st.late?'#c0392b':'#cfc6b6')}}>{st.done?'✓':''}</span>
-          <div style={{flex:1,fontWeight:600,color:st.done?'#2a2420':'#555'}}>{st.label}</div>
-          <div style={{textAlign:'right',fontSize:12,color:st.late?'#c0392b':st.done?'#2e7d32':'#888'}}>{st.when}{st.extra ? <span style={{marginLeft:st.when?10:0}}>{st.extra}</span> : null}</div>
-        </div>)}
       </div>
       {client.signatures && !client.legacy && <div className="vc-modal-section">
         <div className="vc-modal-section-title">Contract signatures</div>
