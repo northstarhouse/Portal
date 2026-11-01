@@ -125,8 +125,7 @@ const css = `
 
 // The pre-booking form the couple filled in, shown question by question (read-only) in their file.
 const PB_URL = 'https://uvzwhhwzelaelfhfkvdb.supabase.co', PB_KEY = 'sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do';
-function PreBookingFormView({ client }) {
-  const [open, setOpen] = React.useState(false);
+function PreBookingFormView({ client, open, setOpen }) {
   const [fields, setFields] = React.useState(null);
   React.useEffect(() => {
     if (!open || fields || !client.sub?.form_id) return;
@@ -145,7 +144,7 @@ function PreBookingFormView({ client }) {
     sec.rows.push({ label: f.label || f.id, value });
   });
   if (!client.sub?.answers) return null;
-  return <div className="vc-modal-section">
+  return <div className="vc-modal-section" id="vc-prebooking">
     <div className="vc-modal-section-title"><span>Pre-booking form</span><button type="button" className="vc-open" onClick={() => setOpen(!open)}>{open ? 'Hide' : 'View the form they filled in'}</button></div>
     {open && (fields === null ? <p className="vc-muted">Loading…</p> : !sections.length ? <p className="vc-muted">No answers on file.</p> : sections.map(sec => <div key={sec.name} style={{marginTop:12}}>
       <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#886c44',marginBottom:6}}>{sec.name}</div>
@@ -221,6 +220,48 @@ function ManualPayments({ client, onSave }) {
 
 function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
+  const [formOpen, setFormOpen] = React.useState(false);
+  const [tl, setTl] = React.useState({ tour: null, sentAt: null, loaded: false });
+  // The tour and the "client guide + pre-booking form" email, found by the couple's email addresses.
+  React.useEffect(() => {
+    let off = false;
+    const emails = [...new Set([client.email, ...(client.contacts || []).map(c => c.email)].filter(Boolean).map(e => String(e).trim().toLowerCase().replace(/[,()"]/g, '')))];
+    if (!emails.length) { setTl({ tour: null, sentAt: null, loaded: true }); return; }
+    const H = { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY };
+    const get = url => fetch(PB_URL + url, { headers: H }).then(r => r.ok ? r.json() : []).catch(() => []);
+    Promise.all([
+      get('/rest/v1/estate_tours?select=date,status,prebooking_form_sent_at&status=eq.booked&order=date.desc&limit=5&or=' + encodeURIComponent('(' + emails.map(e => 'visitor_email.ilike.' + e).join(',') + ')')),
+      get('/rest/v1/prebooking_form_sends?select=sent_at&order=sent_at.desc&limit=1&or=' + encodeURIComponent('(' + emails.map(e => 'email.ilike.' + e).join(',') + ')')),
+    ]).then(([tours, sends]) => {
+      if (off) return;
+      setTl({ tour: tours[0] || null, sentAt: sends[0]?.sent_at || (tours.find(t => t.prebooking_form_sent_at) || {}).prebooking_form_sent_at || null, loaded: true });
+    });
+    return () => { off = true; };
+  }, [client.id]);
+  const today = venueDateKey();
+  const steps = [];
+  const step = (label, done, when, extra, late) => steps.push({ label, done: !!done, when, extra, late: !!late });
+  const tourPast = !!tl.tour && tl.tour.date <= today;
+  step('Toured venue', tourPast, tl.tour ? (tourPast ? dateLabel(tl.tour.date) : 'Tour booked ' + dateLabel(tl.tour.date)) : (tl.loaded ? 'No tour on file' : ''));
+  step('Received Client Guide and Pre-Booking Form', !!tl.sentAt || !!client.sub?.created_at, tl.sentAt ? 'Sent ' + dateLabel(tl.sentAt) : (tl.loaded ? 'Send date not on file' : ''));
+  const hasForm = !!client.sub?.answers && Object.keys(client.sub.answers).some(k => !k.startsWith('__'));
+  step('Filled out Pre-Booking Form', !!client.sub?.created_at, client.sub?.created_at ? dateLabel(client.sub.created_at) : '', hasForm ? <a onClick={() => { setFormOpen(true); setTimeout(() => { const el = ref.current && ref.current.querySelector('#vc-prebooking'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60); }} style={{color:'#886c44',fontWeight:700,textDecoration:'underline',cursor:'pointer'}}>View form</a> : null);
+  const sigs = client.signatures?.signatures || [];
+  const clientSigs = sigs.filter(x => x.signee_type !== 'vendor'), venueSigs = sigs.filter(x => x.signee_type === 'vendor');
+  const lastSigned = list => list.map(x => x.signed_at).filter(Boolean).sort().pop();
+  step('Agreement sent', client.legacy || !!client.nativeAgreement, client.legacy ? 'Signed before the new system' : client.nativeAgreement?.issued_at ? dateLabel(client.nativeAgreement.issued_at) : 'Not sent yet');
+  const clientsSigned = client.legacy || (clientSigs.length > 0 && clientSigs.every(x => x.signed));
+  step('Clients signed', clientsSigned, client.legacy ? '' : clientsSigned ? dateLabel(lastSigned(clientSigs)) : clientSigs.length ? clientSigs.filter(x => x.signed).length + ' of ' + clientSigs.length + ' signed' : 'Waiting on the agreement');
+  const venueSigned = client.legacy || (venueSigs.length > 0 && venueSigs.every(x => x.signed));
+  step('Venue countersigned', venueSigned, client.legacy ? '' : venueSigned ? dateLabel(lastSigned(venueSigs)) : 'Waiting on the clients');
+  (client.schedule || []).forEach(p => {
+    const late = !p.paid && p.due && p.due < today;
+    step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : p.due ? (late ? 'Past due · ' : 'Due ') + dateLabel(p.due) : 'Awaiting payment', null, late);
+  });
+  step('Insurance verified', client.insuranceVerified, client.insuranceVerified ? 'Verified' : client.insuranceUploadedAt ? 'Uploaded ' + dateLabel(client.insuranceUploadedAt) + ', needs checking' : 'Not uploaded yet');
+  step('Event questionnaire', client.surveyComplete, client.surveyComplete ? 'Completed' : client.surveySent ? 'Sent, awaiting answers' : 'Not sent yet', null, !client.surveyComplete && client.requirementsDue && client.requirementsDue < today);
+  step('Wedding brick', !!client.brickSubmittedAt || (client.brickLines || []).length > 0, client.brickSubmittedAt ? dateLabel(client.brickSubmittedAt) : 'Not submitted yet');
+  if (client.eventDate) step('Event day', client.days !== null && client.days <= 0, dateLabel(client.eventDate));
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
   return <dialog ref={ref} className="vc-dialog" aria-labelledby="vc-client-title" onCancel={onClose} onClick={e => { if(e.target === ref.current) onClose(); }}>
     <div className="vc-modal-head"><div style={{flex:1}}><h2 id="vc-client-title" className="vc-name" style={{fontSize:25,margin:0}}>{client.name} - {client.type}</h2><div style={{fontFamily:'Cardo,Georgia,serif',fontSize:22,fontWeight:700,color:'#886c44',marginTop:6}}>{dateLabel(client.eventDate)}</div></div><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button></div>
@@ -247,7 +288,7 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
         <div className="vc-modal-section-title">Contacts</div>
         <div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div>{c.address && <div className="vc-muted">{c.address}</div>}</div>)}</div>
       </div>
-      <PreBookingFormView client={client}/>
+      <PreBookingFormView client={client} open={formOpen} setOpen={setFormOpen}/>
       <InsuranceVerification client={client} onVerify={onVerify}/>
       {messages&&messages.length>0&&<div className="vc-modal-section">
         <div className="vc-modal-section-title"><span>Messages from the couple</span><span className={'vc-pill '+(messages.some(m=>m.direction!=='outgoing'&&!m.handled_at)?'alert':'good')}>{messages.some(m=>m.direction!=='outgoing'&&!m.handled_at)?'New':'All handled'}</span></div>
@@ -284,8 +325,12 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
         {client.legacy&&<ManualPayments client={client} onSave={onSavePayments}/>}
       </div>
       <div className="vc-modal-section">
-        <div className="vc-modal-section-title">Still to do</div>
-        {client.tasks.length ? client.tasks.map(task => <div key={task.key} className="vc-task"><div className="vc-task-head">{task.title}</div><div className="vc-task-name">{task.detail}</div><div className={'vc-task-date '+(task.overdue?'late':'')}>{task.due ? (task.overdue?'Past due · ':'Due ') + dateLabel(task.due) : 'Awaiting completion'}</div></div>) : <p className="vc-muted" style={{margin:0}}>No outstanding items recorded.</p>}
+        <div className="vc-modal-section-title">Timeline of Steps</div>
+        {steps.map((st, i) => <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i?'1px solid #f0ebe2':'none'}}>
+          <span aria-hidden="true" style={{flex:'0 0 20px',height:20,borderRadius:'50%',display:'grid',placeItems:'center',fontSize:12,fontWeight:700,background:st.done?'#2e7d32':'#fff',color:'#fff',border:st.done?'none':'1.5px solid '+(st.late?'#c0392b':'#cfc6b6')}}>{st.done?'✓':''}</span>
+          <div style={{flex:1,fontWeight:600,color:st.done?'#2a2420':'#555'}}>{st.label}</div>
+          <div style={{textAlign:'right',fontSize:12,color:st.late?'#c0392b':st.done?'#2e7d32':'#888'}}>{st.when}{st.extra ? <span style={{marginLeft:st.when?10:0}}>{st.extra}</span> : null}</div>
+        </div>)}
       </div>
       {client.signatures && !client.legacy && <div className="vc-modal-section">
         <div className="vc-modal-section-title">Contract signatures</div>
