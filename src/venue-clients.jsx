@@ -123,6 +123,37 @@ const css = `
 .vc-sidebar{position:sticky;top:110px}@media(max-width:1100px){.vc-layout{grid-template-columns:minmax(0,1fr)}.vc-sidebar{display:grid;grid-template-columns:1fr 1fr}}@media(max-width:650px){.vc-stats{grid-template-columns:1fr 1fr;gap:8px}.vc-stat{padding:13px}.vc-stat strong{font-size:25px}.vc-card-head{padding:15px 13px;gap:10px;flex-wrap:wrap}.vc-card-body{grid-template-columns:1fr 1fr;gap:18px;padding:16px 13px}.vc-card-body>div:last-child{grid-column:1/-1}.vc-card-foot{padding:10px 13px;flex-wrap:wrap}.vc-sidebar{grid-template-columns:1fr}.vc-name{font-size:17px}.vc-contact-grid{grid-template-columns:1fr}.vc-modal-head,.vc-modal-body{padding:18px}.vc-toolbar input{max-width:none;width:100%;flex-basis:100%}}
 `;
 
+// The pre-booking form the couple filled in, shown question by question (read-only) in their file.
+const PB_URL = 'https://uvzwhhwzelaelfhfkvdb.supabase.co', PB_KEY = 'sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do';
+function PreBookingFormView({ client }) {
+  const [open, setOpen] = React.useState(false);
+  const [fields, setFields] = React.useState(null);
+  React.useEffect(() => {
+    if (!open || fields || !client.sub?.form_id) return;
+    fetch(PB_URL + '/rest/v1/nsh_forms?select=title,fields&id=eq.' + encodeURIComponent(client.sub.form_id), { headers: { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY } })
+      .then(r => r.ok ? r.json() : []).then(rows => setFields(Array.isArray(rows?.[0]?.fields) ? rows[0].fields : [])).catch(() => setFields([]));
+  }, [open]);
+  const a = client.sub?.answers || {};
+  const show = v => Array.isArray(v) ? v.filter(x => x !== '' && x != null).map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(', ') : (v && typeof v === 'object') ? Object.entries(v).filter(([, x]) => x !== '' && x != null).map(([k, x]) => k + ': ' + x).join(', ') : v === true ? 'Yes' : v === false ? 'No' : String(v ?? '').trim();
+  const sections = [];
+  (fields || []).forEach(f => {
+    const value = show(a[f.id]);
+    if (!value || f.type === 'heading' || f.type === 'divider') return;
+    const name = f.section || 'Details';
+    let sec = sections.find(x => x.name === name);
+    if (!sec) { sec = { name, rows: [] }; sections.push(sec); }
+    sec.rows.push({ label: f.label || f.id, value });
+  });
+  if (!client.sub?.answers) return null;
+  return <div className="vc-modal-section">
+    <div className="vc-modal-section-title"><span>Pre-booking form</span><button type="button" className="vc-open" onClick={() => setOpen(!open)}>{open ? 'Hide' : 'View the form they filled in'}</button></div>
+    {open && (fields === null ? <p className="vc-muted">Loading…</p> : !sections.length ? <p className="vc-muted">No answers on file.</p> : sections.map(sec => <div key={sec.name} style={{marginTop:12}}>
+      <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#886c44',marginBottom:6}}>{sec.name}</div>
+      {sec.rows.map((r, i) => <div key={i} style={{display:'flex',gap:12,padding:'6px 0',borderTop:'1px solid #f0ebe2'}}><div style={{flex:'0 0 38%',color:'#888'}}>{r.label}</div><div style={{flex:1,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{r.value}</div></div>)}
+    </div>))}
+  </div>;
+}
+
 function InsuranceVerification({ client, onVerify }) {
   const [note,setNote] = React.useState(client.insuranceCheck?.note || '');
   const [editingNote,setEditingNote] = React.useState(false);
@@ -216,6 +247,7 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
         <div className="vc-modal-section-title">Contacts</div>
         <div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div>{c.address && <div className="vc-muted">{c.address}</div>}</div>)}</div>
       </div>
+      <PreBookingFormView client={client}/>
       <InsuranceVerification client={client} onVerify={onVerify}/>
       {messages&&messages.length>0&&<div className="vc-modal-section">
         <div className="vc-modal-section-title"><span>Messages from the couple</span><span className={'vc-pill '+(messages.some(m=>m.direction!=='outgoing'&&!m.handled_at)?'alert':'good')}>{messages.some(m=>m.direction!=='outgoing'&&!m.handled_at)?'New':'All handled'}</span></div>

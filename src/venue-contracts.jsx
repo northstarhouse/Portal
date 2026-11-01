@@ -58,7 +58,8 @@ export function prepareAgreementDraft(client,extras={}){
 }
 // A readable, document-style view of the contract text (the saved text stays plain).
 // Contracts issued before the venue signature line lost its placeholder still carry it in their locked text: show neutral wording.
-const tidy=t=>String(t||'').replace(/\[VENUE SIGNER\s*[—-]\s*TO COMPLETE\]/g,'Venue countersigner');
+// Older drafts were saved with dates like 2026-11-01; show every date written out (November 1, 2026).
+const tidy=t=>String(t||'').replace(/\[VENUE SIGNER\s*[—-]\s*TO COMPLETE\]/g,'Venue countersigner').replace(/\b\d{4}-\d{2}-\d{2}\b/g,d=>writtenDate(d));
 export function ContractPreview({body,initials}){
   const out=[];let list=[];let next=1,open=false;const flush=()=>{if(list.length){out.push(<ul key={'u'+out.length}>{list}</ul>);list=[];}};
   // With `initials` ({values,onChange}) every numbered term ends with a box for the client's initials.

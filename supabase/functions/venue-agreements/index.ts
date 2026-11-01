@@ -11,7 +11,9 @@ const tokenHash=(value:string)=>hash('agreement-link:'+KEY+':'+value);
 const codeHash=(id:string,code:string)=>hash('agreement-code:'+KEY+':'+id+':'+code);
 // Clients sign on their own event page (venue.northstarhouse.org); only the venue countersigner signs in the Portal.
 // Locked text issued before the venue signature line lost its placeholder: show the neutral wording in downloads.
-const tidyBody=(t:string)=>String(t||'').replace(/\[VENUE SIGNER\s*[—-]\s*TO COMPLETE\]/g,'Venue countersigner');
+const writtenDate=(iso:string)=>new Date(iso+'T12:00:00Z').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric',timeZone:'UTC'});
+// Older drafts were saved with dates like 2026-11-01; show every date written out (November 1, 2026).
+const tidyBody=(t:string)=>String(t||'').replace(/\[VENUE SIGNER\s*[—-]\s*TO COMPLETE\]/g,'Venue countersigner').replace(/\b\d{4}-\d{2}-\d{2}\b/g,d=>writtenDate(d));
 const EVENT_PAGE='https://venue.northstarhouse.org/';
 // Clients sign on their own event page: they enter their venue code there and the agreement opens first. The venue countersigner signs in the Portal.
 const link=(value:string,role='client',code='')=>role==='venue'?BASE+'#agreement='+value:EVENT_PAGE+(code?'#code='+code:'');
