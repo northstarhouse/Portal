@@ -1,5 +1,5 @@
 import { ContractManager } from './venue-contracts.jsx';
-import { openSitePacket } from './site-packet.js';
+import { openSitePacket, openSamplePacket } from './site-packet.js';
 // Client dashboard: reads the imported source snapshot without changing signed
 // agreements, invoice schedules, or sending any client communications.
 export function venueDateKey(date = new Date()) {
@@ -191,7 +191,7 @@ function SiteManagersPage({ clients, today, onBack, onAssign }) {
     <button className="vc-text-button" onClick={onBack} style={{marginBottom:12}}>← Back to clients</button>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',marginBottom:6}}>
       <h2 style={{margin:0,fontFamily:'Cardo,Georgia,serif',fontSize:24}}>Assign Site Managers</h2>
-      <button onClick={exportList} disabled={!weddings.length} style={{background:'#886c44',color:'#fff',border:'none',borderRadius:8,padding:'8px 16px',fontWeight:600}}>Export list</button>
+      <span style={{display:'inline-flex',gap:10,alignItems:'center'}}><a onClick={openSamplePacket} style={{color:'#886c44',fontWeight:600,textDecoration:'underline',cursor:'pointer',fontSize:13}}>Preview with sample data</a><button onClick={exportList} disabled={!weddings.length} style={{background:'#886c44',color:'#fff',border:'none',borderRadius:8,padding:'8px 16px',fontWeight:600}}>Export list</button></span>
     </div>
     <p className="vc-muted" style={{marginTop:0}}>Every upcoming wedding. Choose a site manager for each one and it is saved to the client's profile.</p>
     {err && <p role="status" className="vc-pill alert">{err}</p>}

@@ -222,3 +222,23 @@ export function openSitePacket(client) {
   w.document.write(buildSitePacketHtml(client));
   w.document.close();
 }
+
+// A made-up wedding with every question answered, so the packet can be looked at and test-printed without a real client.
+export function openSamplePacket() {
+  const next = new Date(); next.setDate(next.getDate() + 60);
+  openSitePacket({
+    name: 'Sample Couple Wedding',
+    eventDate: next.toLocaleDateString('en-CA'),
+    siteManager: 'Derek',
+    total: 580000,
+    schedule: [{ label: 'Booking payment', cents: 80000 }, { label: 'Refundable Security Deposit', cents: 80000 }],
+    questionnaire: {
+      rs4start1: '10:00 AM', efbv357w: '8:00 AM', pqv3xvhy: '150', '9d4w1mtr': '150', u1dxrj93: '12', '0b8exqpj': '2', fqexadj0: '1',
+      '05wji2y0': 'Terrace', w25d5otp: 'Courtyard', '7xqk8pj0': ['Heritage Garden', 'Library'],
+      lgznkge3: 'Jordan Lee, 530-555-0111, Lee Events Co.',
+      q39vtj2z: '8:00 AM outdoor setup\n10:00 AM house access, getting ready\n3:00 PM guests arrive\n3:30 PM ceremony in the courtyard\n4:15 PM cocktail hour on the terrace\n5:30 PM dinner\n9:30 PM send-off\n10:00 PM vendors load out',
+      ct8rut5k: 'Sierra Catering, 530-555-0122', x69x2wmp: 'DJ Blake, 530-555-0133', '1nlza3rt': 'Foothill Photography, 530-555-0144', '7xbg0y8j': 'Party Rentals Co, 530-555-0155',
+      '2tywmjis': 'Jamie Rivera', qwb19pxp: '123 Main Street, Grass Valley, CA 95945',
+    },
+  });
+}
