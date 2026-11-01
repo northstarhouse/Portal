@@ -20227,6 +20227,34 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
   // Pre-booking form emails sent from this list: { [response id]: sent_at }
   const [prebookSent, setPrebookSent] = useState({});
   const [prebookSending, setPrebookSending] = useState(null);
+  // Send the pre-booking form by hand: for groups that never went through an inquiry (nonprofits, special arrangements).
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({ email: '', name: '', event_type: '', arrangement: 'standard' });
+  const [manualBusy, setManualBusy] = useState(false);
+  const [manualMsg, setManualMsg] = useState(null);
+  function sendManual(e, resend) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (manualBusy) return;
+    if (!manualForm.email.trim() || !manualForm.event_type) { setManualMsg({ bad: true, text: 'Add the email address and choose the event type.' }); return; }
+    setManualBusy(true); setManualMsg(null);
+    whoIsSignedIn().then(function(who) {
+      return fetch(SUPABASE_URL + '/functions/v1/send-prebooking-form', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manual: true, email: manualForm.email.trim(), name: manualForm.name.trim(), event_type: manualForm.event_type, arrangement: manualForm.arrangement, sent_by: who || '', resend: !!resend })
+      });
+    }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok, status: r.status, j: j }; }); })
+      .then(function(res) {
+        if (res.status === 409 && res.j.already_sent_at) {
+          if (window.confirm('A pre-booking form was already sent to ' + manualForm.email.trim() + ' on ' + prebookDate(res.j.already_sent_at) + '. Send it again?')) { setManualBusy(false); sendManual(null, true); }
+          return;
+        }
+        if (!res.ok || !res.j.ok) { setManualMsg({ bad: true, text: res.j && res.j.error ? res.j.error : 'Could not send the pre-booking form.' }); return; }
+        setManualMsg({ bad: false, text: 'Sent to ' + res.j.email + '. It is in the activity log.' });
+        setManualForm({ email: '', name: '', event_type: '', arrangement: 'standard' });
+      }).catch(function() { setManualMsg({ bad: true, text: 'Could not send the pre-booking form. Please try again.' }); })
+      .finally(function() { setManualBusy(false); });
+  }
   useEffect(function() {
     fetch(SUPABASE_URL + '/rest/v1/prebooking_form_sends?select=response_id,sent_at', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
       .then(function(r) { return r.json(); })
@@ -20507,6 +20535,46 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
       {!clientsOnly && toursMonth !== null && (
         <div style={{ fontSize: 12, color: '#666', marginBottom: 20 }}>
           <strong style={{ color: '#2a2a2a' }}>{toursMonth}</strong> {toursMonth === 1 ? 'tour' : 'tours'} booked in {new Date().toLocaleDateString('en-US', { month: 'long' })}
+        </div>
+      )}
+
+      {!clientsOnly && (
+        <div style={{ marginBottom: 14 }}>
+          <button type="button" onClick={function() { setManualOpen(!manualOpen); setManualMsg(null); }}
+            style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{manualOpen ? 'Close' : 'Send Pre-Booking Form'}</button>
+          {manualOpen && (
+            <form onSubmit={function(e) { sendManual(e, false); }} style={{ marginTop: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#888', flex: '2 1 220px' }}>Email address
+                <input type="email" required value={manualForm.email} onChange={function(e) { var v = e.target.value; setManualForm(function(f) { return Object.assign({}, f, { email: v }); }); }}
+                  placeholder="name@example.org" style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit' }} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#888', flex: '1 1 150px' }}>First name (optional)
+                <input value={manualForm.name} onChange={function(e) { var v = e.target.value; setManualForm(function(f) { return Object.assign({}, f, { name: v }); }); }}
+                  style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit' }} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#888', flex: '1 1 170px' }}>Event type
+                <select required value={manualForm.event_type} onChange={function(e) { var v = e.target.value; setManualForm(function(f) { return Object.assign({}, f, { event_type: v }); }); }}
+                  style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
+                  <option value="">Choose…</option>
+                  <option>Wedding</option>
+                  <option>Private Event</option>
+                  <option>Memorial</option>
+                  <option>Nonprofit Event</option>
+                  <option>Other</option>
+                </select>
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#888', flex: '1 1 200px' }}>Special arrangement
+                <select value={manualForm.arrangement} onChange={function(e) { var v = e.target.value; setManualForm(function(f) { return Object.assign({}, f, { arrangement: v }); }); }}
+                  style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
+                  <option value="standard">None (standard rates)</option>
+                  <option value="bylt">BYLT: special rate</option>
+                </select>
+              </label>
+              <button type="submit" disabled={manualBusy}
+                style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: manualBusy ? 0.7 : 1 }}>{manualBusy ? 'Sending…' : 'Send'}</button>
+              {manualMsg && <div style={{ width: '100%', fontSize: 13, color: manualMsg.bad ? '#b3402a' : '#2e7d32' }}>{manualMsg.text}</div>}
+            </form>
+          )}
         </div>
       )}
 

@@ -4,6 +4,8 @@
 // and a second send needs resend: true so a double click can't email someone twice.
 //
 // POST body: { response_id: uuid, resend?: boolean }
+//   or, for someone who never went through an inquiry (nonprofits, special arrangements), from a signed-in Portal session:
+//      { manual: true, email, name?, event_type, arrangement?: 'standard' | 'bylt', sent_by?, resend?: boolean }
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -42,11 +44,61 @@ function emailHtml(first: string, link: string) {
 </div></div></div>`
 }
 
+const MANUAL_EVENT_TYPES = ['Wedding', 'Private Event', 'Memorial', 'Nonprofit Event', 'Other']
+const ARRANGEMENTS: Record<string, string> = { standard: 'Standard', bylt: 'BYLT special rate' }
+
+// Sent by hand: just an email and an event type (plus the arrangement). Needs a signed-in Portal session so it cannot be
+// used to send mail to arbitrary addresses.
+async function manualSend(req: Request, body: Record<string, unknown>) {
+  const token = req.headers.get('x-app-token') || ''
+  const ok = await sb('/rest/v1/rpc/has_valid_app_session', { method: 'POST', headers: { 'x-app-token': token }, body: '{}' }).then((r) => r.json()).catch(() => false)
+  if (ok !== true) return json({ error: 'Please sign in again.' }, 401)
+  const email = String(body.email || '').trim().toLowerCase()
+  const name = String(body.name || '').trim().slice(0, 80)
+  const eventType = String(body.event_type || '')
+  const arrangement = ARRANGEMENTS[String(body.arrangement || 'standard')] ? String(body.arrangement || 'standard') : 'standard'
+  if (!/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(email)) return json({ error: 'Enter a valid email address.' }, 400)
+  if (!MANUAL_EVENT_TYPES.includes(eventType)) return json({ error: 'Choose the event type.' }, 400)
+
+  const recent = await sb(`/rest/v1/prebooking_manual_sends?email=ilike.${encodeURIComponent(email)}&select=sent_at&order=sent_at.desc&limit=1`).then((r) => r.json()).catch(() => [])
+  if (Array.isArray(recent) && recent.length && !body.resend) return json({ error: 'already sent', already_sent_at: recent[0].sent_at }, 409)
+
+  const link = eventType === 'Wedding' ? PREBOOKING_FORM_URL_WEDDING : PREBOOKING_FORM_URL_EVENT
+  const first = name.split(/\s+/)[0] || 'there'
+  const text = `Hi ${first},
+
+Thank you for your interest in North Star House. The next step is our short pre-booking form. It tells us about you and your event so we can prepare your agreement.
+
+${link}
+
+Want a refresher first? Read the Client Guidebook: ${GUIDEBOOK_URL}
+
+If you have any questions, just reply to this email.
+
+North Star House Venue Team`
+  const mail = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
+    body: JSON.stringify({ to: email, subject: 'Your North Star House pre-booking form', body: text, html: emailHtml(first, link), sender: 'Venue Team', fromEmail: 'venue@northstarhouse.org' }),
+  })
+  if (!mail.ok) return json({ error: 'The email could not be sent. Please try again.' }, 502)
+
+  const sentAt = new Date().toISOString()
+  await sb('/rest/v1/prebooking_manual_sends', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ email, name: name || null, event_type: eventType, arrangement, form_url: link, sent_by: String(body.sent_by || '').slice(0, 80) || null, sent_at: sentAt }) })
+  await sb('/rest/v1/activity_log', {
+    method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ description: `Pre-booking form sent to ${name || email} (${eventType}${arrangement !== 'standard' ? ', ' + ARRANGEMENTS[arrangement] : ''})`, volunteer_name: String(body.sent_by || '') || null, action: 'prebooking_form_sent', tag: 'Venue', detail: { email, event_type: eventType, arrangement, form_url: link, manual: true } }),
+  }).catch(() => {})
+  return json({ ok: true, sent_at: sentAt, email })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   try {
     if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
-    const { response_id, resend } = await req.json()
+    const body = await req.json()
+    if (body && body.manual === true) return await manualSend(req, body)
+    const { response_id, resend } = body
     if (!response_id || typeof response_id !== 'string') return json({ error: 'response_id required' }, 400)
 
     const rows = await sb(`/rest/v1/nsh_form_responses?id=eq.${encodeURIComponent(response_id)}&select=id,form_id,answers`).then((r) => r.json())

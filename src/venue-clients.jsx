@@ -232,9 +232,10 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
     Promise.all([
       get('/rest/v1/estate_tours?select=date,status,prebooking_form_sent_at&status=eq.booked&order=date.desc&limit=5&or=' + encodeURIComponent('(' + emails.map(e => 'visitor_email.ilike.' + e).join(',') + ')')),
       get('/rest/v1/prebooking_form_sends?select=sent_at&order=sent_at.desc&limit=1&or=' + encodeURIComponent('(' + emails.map(e => 'email.ilike.' + e).join(',') + ')')),
-    ]).then(([tours, sends]) => {
+      get('/rest/v1/prebooking_manual_sends?select=sent_at&order=sent_at.desc&limit=1&or=' + encodeURIComponent('(' + emails.map(e => 'email.ilike.' + e).join(',') + ')')),
+    ]).then(([tours, sends, manual]) => {
       if (off) return;
-      setTl({ tour: tours[0] || null, sentAt: sends[0]?.sent_at || (tours.find(t => t.prebooking_form_sent_at) || {}).prebooking_form_sent_at || null, loaded: true });
+      setTl({ tour: tours[0] || null, sentAt: sends[0]?.sent_at || manual[0]?.sent_at || (tours.find(t => t.prebooking_form_sent_at) || {}).prebooking_form_sent_at || null, loaded: true });
     });
     return () => { off = true; };
   }, [client.id]);
