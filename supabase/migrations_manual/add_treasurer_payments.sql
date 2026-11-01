@@ -82,6 +82,28 @@ language sql security definer set search_path = public as $$
     left join venue_inquiries i on i.id = p.inquiry_id
 
     union all
+    -- Venue rental payments HoneyBook recorded as paid (clients booked before the Portal took payments), on the date HoneyBook paid them
+    select 'hb:' || i.id::text || ':' || (s.ord)::text,
+           coalesce(((s.item->>'paid_at')::timestamptz at time zone 'America/Los_Angeles')::date, nullif(s.item->>'due_date', '')::date, i.created_at::date),
+           'Venue Rental'::text, 'Rental payment', coalesce(i.name, 'Venue client'),
+           nullif(concat_ws(' · ', i.event_type, to_char(i.event_date, 'Mon FMDD, YYYY')), ''),
+           ((s.item->'amount'->>'amount')::numeric / 100.0), null::numeric, null::numeric, 'HoneyBook',
+           'Payment ' || s.ord || ' of ' || s.n || ' · HoneyBook', false
+    from venue_inquiries i
+    join nsh_form_responses r on r.id = i.prebooking_form_response_id
+    cross join lateral (
+      select fr from jsonb_array_elements(coalesce(r.answers->'__honeybook'->'file_responses', '[]'::jsonb)) fr
+      where jsonb_typeof(fr->'responses'->'payments') = 'object'
+      order by coalesce((select f->>'updated_at' from jsonb_array_elements(coalesce(r.answers->'__honeybook'->'files', '[]'::jsonb)) f where f->>'id' = fr->>'id' limit 1), '') desc
+      limit 1
+    ) inv
+    cross join lateral (
+      select x.item, row_number() over (order by coalesce(x.item->>'due_date', '9999')) as ord, count(*) over () as n
+      from jsonb_array_elements(coalesce(inv.fr->'responses'->'payments'->'schedule', '[]'::jsonb)) as x(item)
+    ) s
+    where coalesce((s.item->>'paid')::boolean, false) and coalesce((s.item->'amount'->>'amount')::numeric, 0) > 0
+
+    union all
     -- Venue rental payments logged by hand (check, cash, paid before the new system)
     select 'vm:' || i.id::text || ':' || (mp->>'id'), coalesce((mp->>'date')::date, i.created_at::date), 'Venue Rental'::text, 'Rental payment',
            coalesce(i.name, 'Venue client'),
