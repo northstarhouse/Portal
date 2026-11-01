@@ -213,25 +213,27 @@ function build(label: string, d: {
   const itemText = (u: Upd) => `- ${u.title}${[u.area && u.area !== 'General' ? u.area : '', when(u.happened_on)].filter(Boolean).length ? ' (' + [u.area && u.area !== 'General' ? u.area : '', when(u.happened_on)].filter(Boolean).join(' · ') + ')' : ''}${u.details ? ': ' + u.details : ''}`
   if (up.done.length > 0) section('', up.done.map(item).join(''), up.done.map(itemText).join('\n'))
 
-  section('Volunteer Hours', tiles([[hrs(h.month), `volunteer hours in ${label.split(' ')[0]}`], [hrs(h.ytd), 'volunteer hours this year'], [hrs(h.bMonth), `board volunteer hours in ${label.split(' ')[0]}`], [hrs(h.bYear), 'board volunteer hours this year']]),
-    `${hrs(h.month)} hours this past month; ${hrs(h.ytd)} this year. Board members: ${hrs(h.bMonth)} this past month; ${hrs(h.bYear)} this year.`)
-
+  // All the numbers together in one set of boxes, with no section headings.
   const kindBits = Object.entries(f.kinds).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${k.toLowerCase()}`).join(', ')
-  section('Venue', tiles([[num(f.inquiries), plural(f.inquiries, 'venue inquiry', 'venue inquiries')], [num(t.booked), plural(t.booked, 'venue tour', 'venue tours')]]) +
-    (kindBits ? `<p style="${P}font-size:13px;color:#888;margin:6px 0 0;">Inquiries: ${esc(kindBits)}.</p>` : ''),
-    `${f.inquiries} venue inquiries${kindBits ? ' (' + kindBits + ')' : ''}; ${t.booked} venue tours.`)
+  const boxes: [string, string][] = [
+    [hrs(h.month), `volunteer hours in ${label.split(' ')[0]}`],
+    [hrs(h.ytd), 'volunteer hours this year'],
+    [hrs(h.bMonth), `board volunteer hours in ${label.split(' ')[0]}`],
+    [hrs(h.bYear), 'board volunteer hours this year'],
+    [num(f.inquiries), plural(f.inquiries, 'venue inquiry', 'venue inquiries')],
+    [num(t.booked), plural(t.booked, 'venue tour', 'venue tours')],
+    [num(f.docent), 'private docent tour ' + plural(f.docent, 'request', 'requests')],
+    [num(don.count), plural(don.count, 'donation', 'donations')],
+    [money(don.total), 'donation value'],
+  ]
+  if (f.volunteers > 0) boxes.push([num(f.volunteers), 'volunteer ' + plural(f.volunteers, 'inquiry', 'inquiries')])
+  const volAreas = Object.entries(f.volAreas).sort((a, c) => c[1] - a[1]).map(([a, n]) => `${a}${n > 1 ? ' (' + n + ')' : ''}`)
+  const notes: string[] = []
+  if (kindBits) notes.push(`Venue inquiries: ${kindBits}.`)
+  if (f.volunteers > 0 && volAreas.length) notes.push(`Volunteers are interested in: ${volAreas.join(', ')}.`)
+  section('', tiles(boxes) + notes.map((n) => `<p style="${P}font-size:13px;color:#888;margin:8px 0 0;">${esc(n)}</p>`).join(''),
+    boxes.map(([n, l]) => `${l}: ${n}`).join('\n') + (notes.length ? '\n' + notes.join(' ') : ''))
 
-  section('Private Docent Tours', tiles([[num(f.docent), 'private docent tour ' + plural(f.docent, 'request', 'requests')]]), `${f.docent} private docent tour ${plural(f.docent, 'request', 'requests')}.`)
-
-  const giving = `${num(don.count)} ${plural(don.count, 'donation', 'donations')} totaling ${money(don.total)}.`
-  section('Donations', `<p style="${P}">${esc(giving)}</p>`, giving)
-
-  if (f.volunteers > 0) {
-    const areas = Object.entries(f.volAreas).sort((a, c) => c[1] - a[1]).map(([a, n]) => `${a}${n > 1 ? ' (' + n + ')' : ''}`)
-    const v = `${f.volunteers} new volunteer ${plural(f.volunteers, 'inquiry', 'inquiries')} this month.`
-    const interest = areas.length ? `Areas they are interested in: ${areas.join(', ')}.` : ''
-    section('Volunteer Inquiries', `<p style="${P}">${esc(v)}</p>` + (interest ? `<p style="${P}">${esc(interest)}</p>` : ''), v + (interest ? ' ' + interest : ''))
-  }
   if (sp.fresh.length > 0) {
     section(`New Sponsors (${sp.fresh.length})`,
       sp.fresh.map((x) => `<p style="${P}margin:0 0 8px;"><strong style="color:#2a2420;">${esc(x.name)}</strong> &mdash; ${esc(money(x.total))}${x.what.length ? `<br><span style="font-size:13px;color:#888;">${esc(x.what.join(', '))}</span>` : ''}</p>`).join(''),
