@@ -1,16 +1,27 @@
-// Backs every payment up to the treasurer's Google Sheet, one row per payment.
-// Reads the ledger (treasurer_payments_all), appends only payments that are not in the Sheet yet (payment_backup_log
-// remembers which), and never edits or deletes existing rows. Runs from a cron every few hours and from the
-// "Back up now" button on the Portal's Treasurer page.
+// Backs the Portal's money records up to the treasurer's Google Sheet.
+//
+// RULE: the Sheet's FIRST tab is never read-modified, cleared or written. Every write goes to a tab this function
+// creates itself (always added after the existing tabs), and a write to the first tab is refused.
+//
+// Two kinds of tabs:
+//   * Payment ledger tabs, add-only: "Backup - PayPal Payments" and "Backup - Checks, Cash & Other". Only payments that
+//     are not in the Sheet yet are appended (payment_backup_log remembers which). Existing rows are never edited.
+//   * Yearly snapshot tabs, one per Financial Overview tab and year (e.g. "Backup - Donations 2026"). The Portal sends
+//     the numbers it shows; each of these tabs is replaced with the latest copy.
 //
 // The Sheet must be shared (Editor) with the Google service account in the GOOGLE_SERVICE_ACCOUNT_KEY secret.
-// POST { action?: 'whoami' } -> { email } tells you which address to share it with (signed-in Portal session only).
+// POST bodies:
+//   {}                                   -> append new ledger payments (safe for the schedule to call; returns only counts)
+//   { action: 'snapshot', tabs: [...] }  -> signed-in Portal session only; tabs: [{ name, headers, rows }]
+//   { action: 'whoami' }                 -> which address to share the Sheet with (signed-in Portal session only)
 
 const URL_ = Deno.env.get('SUPABASE_URL')!
 const KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const SA_KEY = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY')
 const SHEET_ID = '1jnZXxpyAusrTAJSMxFQpdT5seb-d7mFVjEnBp3VrxLQ'
-const TAB = 'Payments'
+const PREFIX = 'Backup - '
+const PAYPAL_TAB = PREFIX + 'PayPal Payments'
+const OTHER_TAB = PREFIX + 'Checks, Cash & Other'
 const HEADER = ['Payment ID', 'Date', 'Source', 'Category', 'From', 'Details', 'Amount', 'PayPal fee', 'Net', 'Method', 'Reference', 'Backed up']
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -68,16 +79,47 @@ async function sheets(token: string, path: string, init: RequestInit = {}) {
   return d
 }
 
-// Make sure the Payments tab and its header row exist.
-async function ensureTab(token: string) {
-  const meta = await sheets(token, '?fields=sheets.properties.title')
-  const has = (meta.sheets || []).some((s: { properties: { title: string } }) => s.properties.title === TAB)
-  if (!has) await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [{ addSheet: { properties: { title: TAB, gridProperties: { frozenRowCount: 1 } } } }] }) })
-  const head = await sheets(token, `/values/${encodeURIComponent(TAB)}!A1:L1`)
+type Meta = { sheetId: number; title: string; index: number }
+async function listTabs(token: string): Promise<Meta[]> {
+  const meta = await sheets(token, '?fields=sheets.properties(sheetId,title,index)')
+  return (meta.sheets || []).map((s: { properties: Meta }) => s.properties)
+}
+
+// Only ever returns a tab this function owns. Creates it (after all existing tabs) when missing.
+async function ownTab(token: string, title: string, tabs: Meta[]): Promise<Meta> {
+  if (!title.startsWith(PREFIX)) throw new Error('Refusing to write outside the backup tabs')
+  const first = [...tabs].sort((a, b) => a.index - b.index)[0]
+  if (first && first.title === title) throw new Error(`Refusing to write to the first tab ("${title}")`)
+  const found = tabs.find((t) => t.title === title)
+  if (found) return found
+  const res = await sheets(token, ':batchUpdate', {
+    method: 'POST',
+    body: JSON.stringify({ requests: [{ addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } } }] }),
+  })
+  const p = res.replies[0].addSheet.properties as Meta
+  tabs.push(p)
+  return p
+}
+
+const q = (title: string) => encodeURIComponent(`'${title.replace(/'/g, "''")}'`)
+
+// Cleans a tab name the way Sheets wants it (no : \ / ? * [ ], max 100 characters).
+const tabName = (n: string) => (PREFIX + String(n).replace(/[:\\/?*[\]]/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 100)
+
+async function ensureHeader(token: string, title: string) {
+  const head = await sheets(token, `/values/${q(title)}!A1:L1`)
   if (!head.values || !head.values.length) {
-    await sheets(token, `/values/${encodeURIComponent(TAB)}!A1:L1?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [HEADER] }) })
+    await sheets(token, `/values/${q(title)}!A1:L1?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [HEADER] }) })
   }
 }
+
+async function signedIn(req: Request) {
+  const ok = await rest('rpc/has_valid_app_session', { method: 'POST', headers: { 'x-app-token': req.headers.get('x-app-token') || '' }, body: '{}' })
+  return ok === true
+}
+
+// PayPal payments (the website's PayPal checkout, and gifts the Portal marks as "Website") vs. everything else.
+const isPayPal = (p: Record<string, unknown>) => ['PayPal', 'Website'].includes(String(p.method || ''))
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -86,31 +128,61 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}))
 
     if (body.action === 'whoami') {
-      const ok = await rest('rpc/has_valid_app_session', { method: 'POST', headers: { 'x-app-token': req.headers.get('x-app-token') || '' }, body: '{}' })
-      if (ok !== true) return json({ error: 'Please sign in again.' }, 401)
+      if (!(await signedIn(req))) return json({ error: 'Please sign in again.' }, 401)
       return json({ email: JSON.parse(SA_KEY).client_email })
     }
 
-    // Adds only what is missing and returns nothing but a count, so it is safe for the schedule to call it.
     const token = await sheetsToken()
-    await ensureTab(token)
+    const tabs = await listTabs(token)
+
+    // ---- yearly snapshot tabs: replaced with the latest copy
+    if (body.action === 'snapshot') {
+      if (!(await signedIn(req))) return json({ error: 'Please sign in again.' }, 401)
+      const incoming: { name: string; headers: string[]; rows: Record<string, unknown>[] }[] = Array.isArray(body.tabs) ? body.tabs : []
+      let written = 0
+      for (const t of incoming) {
+        const title = tabName(t.name)
+        const tab = await ownTab(token, title, tabs)
+        const values = [t.headers, ...t.rows.map((r) => t.headers.map((h) => (r[h] == null ? '' : r[h])))]
+        await sheets(token, `/values/${q(title)}:clear`, { method: 'POST', body: '{}' })
+        // 10,000 rows per request keeps the payload small; snapshots are far below this anyway.
+        for (let i = 0; i < values.length; i += 10000) {
+          const chunk = values.slice(i, i + 10000)
+          await sheets(token, `/values/${q(title)}!A${i + 1}?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ values: chunk }) })
+        }
+        void tab
+        written++
+      }
+      return json({ tabs: written })
+    }
+
+    // ---- add-only ledger tabs
+    await ownTab(token, PAYPAL_TAB, tabs)
+    await ownTab(token, OTHER_TAB, tabs)
+    await ensureHeader(token, PAYPAL_TAB)
+    await ensureHeader(token, OTHER_TAB)
     const [ledger, done]: [Record<string, unknown>[], { payment_key: string }[]] = await Promise.all([
       rest('rpc/treasurer_payments_all', { method: 'POST', body: '{}' }),
       rest('payment_backup_log?select=payment_key&limit=100000'),
     ])
     const have = new Set(done.map((d) => d.payment_key))
     const fresh = ledger.filter((p) => !have.has(String(p.payment_key))).sort((a, b) => String(a.paid_on || '').localeCompare(String(b.paid_on || '')))
-    if (!fresh.length) return json({ added: 0 })
+    if (!fresh.length) return json({ added: 0, paypal: 0, other: 0 })
 
     const stamp = new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })
-    for (let i = 0; i < fresh.length; i += 200) {
-      const chunk = fresh.slice(i, i + 200)
-      const values = chunk.map((p) => [p.payment_key, p.paid_on, p.source, p.category, p.payer, p.detail ?? '', Number(p.amount), p.fee ?? '', p.net ?? '', p.method, p.reference ?? '', stamp])
-      await sheets(token, `/values/${encodeURIComponent(TAB)}!A:L:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, { method: 'POST', body: JSON.stringify({ values }) })
-      // Remember them only after Google accepted the rows, so a failure retries instead of losing payments.
-      await rest('payment_backup_log', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(chunk.map((p) => ({ payment_key: p.payment_key }))) })
+    const counts = { paypal: 0, other: 0 }
+    for (const [title, key, pick] of [[PAYPAL_TAB, 'paypal', true], [OTHER_TAB, 'other', false]] as [string, 'paypal' | 'other', boolean][]) {
+      const mine = fresh.filter((p) => isPayPal(p) === pick)
+      for (let i = 0; i < mine.length; i += 200) {
+        const chunk = mine.slice(i, i + 200)
+        const values = chunk.map((p) => [p.payment_key, p.paid_on, p.source, p.category, p.payer, p.detail ?? '', Number(p.amount), p.fee ?? '', p.net ?? '', p.method, p.reference ?? '', stamp])
+        await sheets(token, `/values/${q(title)}!A:L:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, { method: 'POST', body: JSON.stringify({ values }) })
+        // Remember them only after Google accepted the rows, so a failure retries instead of losing payments.
+        await rest('payment_backup_log', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(chunk.map((p) => ({ payment_key: p.payment_key }))) })
+        counts[key] += chunk.length
+      }
     }
-    return json({ added: fresh.length })
+    return json({ added: counts.paypal + counts.other, ...counts })
   } catch (e) {
     return json({ error: (e as Error).message || 'Backup failed' }, 500)
   }

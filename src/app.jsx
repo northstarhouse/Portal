@@ -4567,7 +4567,10 @@ function sanitizeSheetName(name, usedNames) {
   return candidate;
 }
 
+// While set, the xlsx helpers hand their sheets here instead of downloading (used by the Google Sheet backup).
+var XLSX_CAPTURE = null;
 function downloadXlsxRows(headers, rows, filename) {
+  if (XLSX_CAPTURE) { XLSX_CAPTURE.push({ filename: filename, sheets: [{ name: 'Sheet1', headers: headers, rows: rows }] }); return; }
   var workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, buildXlsxSheet(headers, rows), 'Sheet1');
   XLSX.writeFile(workbook, filename);
@@ -4575,6 +4578,7 @@ function downloadXlsxRows(headers, rows, filename) {
 
 // sheets: [{ name, headers, rows }, ...] -- first sheet is whatever's listed first.
 function downloadXlsxMultiSheet(sheets, filename) {
+  if (XLSX_CAPTURE) { XLSX_CAPTURE.push({ filename: filename, sheets: sheets }); return; }
   var workbook = XLSX.utils.book_new();
   var usedNames = {};
   sheets.forEach(function(s) {
@@ -11932,7 +11936,9 @@ function FinancialOverviewView({ navigate }) {
     return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   }
 
-  function exportActiveTab() {
+  function exportActiveTab() { exportTab(activeTab); }
+
+  function exportTab(activeTab) {
     if (activeTab === 'donations') {
       var rows = donations.filter(function(d) { return inYear(d.date); }).map(function(d) {
         return { Date: d.date || '', Donor: donorNameById[d.donor_id] || 'Unknown donor', Type: d.type || '', 'Payment Type': d.payment_type || '', Notes: d.donation_notes || '', Amount: parseFloat(d.amount) || 0 };
@@ -11986,6 +11992,38 @@ function FinancialOverviewView({ navigate }) {
     }
   }
 
+  var [sheetBackup, setSheetBackup] = useState({ busy: false, msg: '' });
+  function backUpToSheet() {
+    var labels = { 'donations': 'Donations', 'sponsorships': 'Sponsorships', 'operational-areas': 'Operational Areas', 'events': 'Events', 'office-cash-flow': 'Office Cash Flow', 'spending-detail': 'Spending Detail' };
+    var tabs = [];
+    XLSX_CAPTURE = [];
+    try {
+      ['donations', 'sponsorships', 'operational', 'events', 'cashflow', 'outflow-detail'].forEach(function(t) { exportTab(t); });
+      XLSX_CAPTURE.forEach(function(file) {
+        var base = file.filename.replace(/-\d{4}\.xlsx$/, '');
+        var label = labels[base] || base;
+        var first = file.sheets[0];
+        tabs.push({ name: label + ' ' + year, headers: first.headers, rows: first.rows });
+        if (file.sheets.length > 1) {
+          var heads = ['Name'].concat(file.sheets[1].headers), items = [];
+          file.sheets.slice(1).forEach(function(sh) { sh.rows.forEach(function(r) { items.push(Object.assign({ Name: sh.name }, r)); }); });
+          tabs.push({ name: label + ' Items ' + year, headers: heads, rows: items });
+        }
+      });
+    } finally { XLSX_CAPTURE = null; }
+    setSheetBackup({ busy: true, msg: '' });
+    var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+    fetch(SUPABASE_URL + '/functions/v1/backup-payments-to-sheet', { method: 'POST', headers: H, body: JSON.stringify({ action: 'snapshot', tabs: tabs }) })
+      .then(function(r) { return r.json().catch(function() { return {}; }); })
+      .then(function(d) {
+        if (d.error) { setSheetBackup({ busy: false, msg: d.error }); return; }
+        return fetch(SUPABASE_URL + '/functions/v1/backup-payments-to-sheet', { method: 'POST', headers: H, body: '{}' })
+          .then(function(r) { return r.json().catch(function() { return {}; }); })
+          .then(function(p) { setSheetBackup({ busy: false, msg: p.error ? p.error : 'Backed up ' + year + ' to the Google Sheet (' + (d.tabs || 0) + ' tabs' + (p.added ? ', ' + p.added + ' new payments' : '') + ').' }); });
+      })
+      .catch(function() { setSheetBackup({ busy: false, msg: 'Could not reach the backup. Please try again.' }); });
+  }
+
   return (
     <div style={{ paddingBottom: 60 }}>
       <div style={{ fontSize: 19, fontWeight: 700, color: '#2a2a2a', margin: '0 0 4px' }}>Financial Tracking from Staff</div>
@@ -12020,7 +12058,9 @@ function FinancialOverviewView({ navigate }) {
               );
             })}
             <button onClick={exportActiveTab} style={{ marginLeft: 'auto', marginBottom: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>↓ Export Excel</button>
+            <button onClick={backUpToSheet} disabled={sheetBackup.busy} style={{ marginBottom: 6, marginLeft: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>{sheetBackup.busy ? 'Backing up…' : 'Back up ' + year + ' to Google Sheet'}</button>
           </div>
+          {sheetBackup.msg ? <div style={{ fontSize: 12, color: '#6b5d4a', margin: '0 0 8px' }}>{sheetBackup.msg}</div> : null}
 
           {activeTab === 'donations' && (
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
