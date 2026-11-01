@@ -321,7 +321,7 @@ function ExpandRow({ id, title, pill, tone, open, onToggle, children }) {
   return <div id={id} style={{borderTop:'1px solid #f0ebe2'}}>
     <button type="button" onClick={onToggle} aria-expanded={!!open} style={{display:'flex',width:'100%',alignItems:'center',gap:10,background:'none',border:0,padding:'11px 2px',textAlign:'left'}}>
       <span style={{flex:1,fontWeight:600,color:'#2a2420',fontSize:14}}>{title}</span>
-      <span className={'vc-pill '+tone}>{pill}</span>
+      <span className={'vc-pill '+tone} style={{display:'inline-block',width:124,textAlign:'center',boxSizing:'border-box',whiteSpace:'nowrap'}}>{pill}</span>
       <span aria-hidden="true" style={{color:'#886c44',fontSize:13,width:14,textAlign:'center'}}>{open ? '▾' : '▸'}</span>
     </button>
     {open && <div style={{padding:'0 2px 14px'}}>{children}</div>}
