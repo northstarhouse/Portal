@@ -212,6 +212,19 @@ Deno.serve(async (req) => {
     const counts = { paypal: 0, other: 0 }
     for (const [title, key, pick] of [[PAYPAL_TAB, 'paypal', true], [OTHER_TAB, 'other', false]] as [string, 'paypal' | 'other', boolean][]) {
       const mine = fresh.filter((p) => isPayPal(p) === pick)
+      if (pick && mine.length) {
+        // The PayPal tab keeps the newest payment on top: slot the new rows in just under the header, newest first.
+        const newestFirst = [...mine].sort((a, b) => String(b.paid_on || '').localeCompare(String(a.paid_on || '')))
+        const tab = (await listTabs(token)).find((t) => t.title === title)
+        if (!tab) throw new Error('PayPal backup tab is missing')
+        await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [{ insertDimension: { range: { sheetId: tab.sheetId, dimension: 'ROWS', startIndex: 1, endIndex: 1 + newestFirst.length }, inheritFromBefore: false } }] }) })
+        await sheets(token, `/values/${q(title)}!A2?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ values: newestFirst.map(ppRow) }) })
+        for (let i = 0; i < newestFirst.length; i += 200) {
+          await rest('payment_backup_log', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(newestFirst.slice(i, i + 200).map((p) => ({ payment_key: p.payment_key }))) })
+        }
+        counts[key] += newestFirst.length
+        continue
+      }
       for (let i = 0; i < mine.length; i += 200) {
         const chunk = mine.slice(i, i + 200)
         const values = pick ? chunk.map(ppRow) : chunk.map((p) => [p.payment_key, p.paid_on, p.source, p.category, p.payer, p.detail ?? '', Number(p.amount), p.fee ?? '', p.net ?? '', p.method, p.reference ?? '', stamp])
