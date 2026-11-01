@@ -380,17 +380,17 @@ function RequirementsGroup({ client, onVerify, formOpen, setFormOpen }) {
     {client.sub?.answers && <ExpandRow id="vc-prebooking" title="Pre-booking form" tone={hasForm ? 'good' : ''} pill={hasForm ? 'Filled out' : 'Imported record'} open={formOpen} onToggle={() => setFormOpen(!formOpen)}>
       <PreBookingFormView client={client} open={formOpen} setOpen={setFormOpen}/>
     </ExpandRow>}
-    <ExpandRow id="vc-preevent" title="Pre-event form" tone={pre[1]} pill={pre[0]} open={preOpen} onToggle={() => setPreOpen(!preOpen)}>
-      {client.questionnaire ? <FormAnswers formId={QUESTIONNAIRE_FORM} answers={client.questionnaire}/>
-        : hbAnswered.length ? <div>{hbAnswered.map((x, i) => <div key={i} style={{display:'flex',gap:12,padding:'6px 0',borderTop:'1px solid #f0ebe2'}}><div style={{flex:'0 0 38%',color:'#888'}}>{x.label}</div><div style={{flex:1,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{String(x.answer)}</div></div>)}</div>
-        : <p className="vc-muted" style={{margin:0}}>{client.surveySent ? 'Sent. The couple fills it in on their event page.' : 'Not sent yet. The couple fills it in on their event page.'}</p>}
-    </ExpandRow>
     <ExpandRow id="vc-insurance" title="Insurance" tone={client.insuranceVerified ? 'good' : 'alert'} pill={client.insuranceVerified ? 'Verified' : 'Not verified'} open={insOpen} onToggle={() => setInsOpen(!insOpen)}>
       <InsuranceVerification client={client} onVerify={onVerify}/>
     </ExpandRow>
     {client.type === 'Wedding' && <ExpandRow id="vc-brick" title="Wedding brick" tone={brickDone ? 'good' : 'alert'} pill={brickDone ? 'Submitted' : 'Not submitted'} open={brickOpen} onToggle={() => setBrickOpen(!brickOpen)}>
       {brickDone ? <><div style={{fontFamily:'Cardo,Georgia,serif',letterSpacing:2,lineHeight:1.9,background:'#faf8f3',border:'1px solid #eee7dd',borderRadius:7,padding:'10px 14px'}}>{client.brickLines.map((l,i) => <div key={i}>{l || ' '}</div>)}</div>{client.brickSubmittedAt && <p className="vc-muted" style={{marginBottom:0}}>Submitted {dateLabel(client.brickSubmittedAt.slice(0,10))}</p>}</> : <p className="vc-muted" style={{margin:0}}>The client chooses 3 lines of up to 20 characters on their event page.</p>}
     </ExpandRow>}
+    <ExpandRow id="vc-preevent" title="Pre-event form" tone={pre[1]} pill={pre[0]} open={preOpen} onToggle={() => setPreOpen(!preOpen)}>
+      {client.questionnaire ? <FormAnswers formId={QUESTIONNAIRE_FORM} answers={client.questionnaire}/>
+        : hbAnswered.length ? <div>{hbAnswered.map((x, i) => <div key={i} style={{display:'flex',gap:12,padding:'6px 0',borderTop:'1px solid #f0ebe2'}}><div style={{flex:'0 0 38%',color:'#888'}}>{x.label}</div><div style={{flex:1,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{String(x.answer)}</div></div>)}</div>
+        : <p className="vc-muted" style={{margin:0}}>{client.surveySent ? 'Sent. The couple fills it in on their event page.' : 'Not sent yet. The couple fills it in on their event page.'}</p>}
+    </ExpandRow>
     <ExpandRow id="vc-postevent" title="Post-event form" tone={post[1]} pill={post[0]} open={postOpen} onToggle={() => setPostOpen(!postOpen)}>
       {feedback ? <><FormAnswers formId={FEEDBACK_FORM} answers={feedback.answers}/><p className="vc-muted" style={{marginBottom:0}}>Received {dateLabel(String(feedback.created_at).slice(0,10))}</p></>
         : <p className="vc-muted" style={{margin:0}}>{client.feedbackSentAt ? 'The feedback form was sent ' + dateLabel(String(client.feedbackSentAt).slice(0,10)) + '. No response yet.' : 'The feedback form is emailed to the couple after their event.'}</p>}
