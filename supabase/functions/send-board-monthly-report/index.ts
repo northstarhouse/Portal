@@ -200,9 +200,9 @@ function build(label: string, d: {
 }, test: boolean) {
   const { h, f, t, don, sp, qs, up, ev } = d
   let html = ''
-  let text = `NORTH STAR HOUSE — BOARD UPDATE, ${label.toUpperCase()}\n\n`
+  let text = `North Star House — Board Update, ${label}\n\n`
   // An empty title means the entries stand on their own with no heading above them.
-  const section = (title: string, bodyHtml: string, bodyText: string) => { html += (title ? `<h3 style="${H3}">${esc(title)}</h3>` : '') + bodyHtml; text += (title ? `${title.toUpperCase()}\n` : '') + `${bodyText}\n\n` }
+  const section = (title: string, bodyHtml: string, bodyText: string) => { html += (title ? `<h3 style="${H3}">${esc(title)}</h3>` : '') + bodyHtml; text += (title ? `${title}\n` : '') + `${bodyText}\n\n` }
 
   const when = (d?: string | null) => (d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : '')
   // Title on the first line; the area and the date together on the line under it.
@@ -259,7 +259,7 @@ function build(label: string, d: {
 
   const banner = test ? `<div style="background:#fff3cd;color:#664d03;padding:10px 14px;font-family:Helvetica,Arial,sans-serif;font-size:13px;text-align:center;">TEST: this is a preview of the monthly board update. It has not been sent to the board.</div>` : ''
   const full = `${banner}<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;"><div style="max-width:600px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:${GOLD};"></div><div style="padding:38px 36px 32px;">
-<div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:3px;color:${GOLD};font-weight:bold;margin-bottom:14px;">NORTH STAR HOUSE</div>
+<div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:1px;color:${GOLD};font-weight:bold;margin-bottom:14px;">North Star House</div>
 <h1 style="margin:0 0 6px;text-align:center;font-size:30px;font-weight:700;color:#2a2420;">Board Update</h1>
 <p style="margin:0 0 20px;text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#888;">${esc(label)}</p>
 <p style="${P}">Here's a look at the work happening at North Star House last month.</p>

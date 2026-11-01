@@ -48,7 +48,7 @@ function buildEmailHtml(headline: string, subtext: string, buttonUrl: string, bu
     `<div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;">` +
     `<div style="height:14px;background:${GOLD};"></div>` +
     `<div style="padding:44px 40px 36px;text-align:center;">` +
-    `<div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:3px;color:${GOLD};font-weight:bold;margin-bottom:14px;">NORTH STAR HOUSE</div>` +
+    `<div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:1px;color:${GOLD};font-weight:bold;margin-bottom:14px;">North Star House</div>` +
     `<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">${titleCase(headline)}</h1>` +
     `<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>` +
     `<p style="margin:0 0 28px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.6;text-align:left;">${subtext}</p>` +

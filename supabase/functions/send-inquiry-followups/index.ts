@@ -81,7 +81,7 @@ function buildEmail(first: string, day: string, status: 'open' | 'held' | 'unkno
     availText = `The date you asked about, ${prettyDay(day)}, looks like it may already be reserved. We'd still love to help you find a date that works. Book a tour or reply to this email and we'll go over what's open around your dates.`
   }
   const html = `<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:${GOLD};"></div><div style="padding:44px 40px 36px;">
-<div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:3px;color:${GOLD};font-weight:bold;margin-bottom:14px;">NORTH STAR HOUSE</div>
+<div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:1px;color:${GOLD};font-weight:bold;margin-bottom:14px;">North Star House</div>
 <h1 style="margin:0 0 22px;text-align:center;font-size:29px;font-weight:400;color:#2a2420;">Thank You for Your Inquiry</h1>
 <div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>
 <p style="${text}">Hi ${esc(first)},</p>
@@ -171,7 +171,7 @@ const KIND_COPY: Record<Exclude<Kind, 'wedding'>, { greeting: string; intro: str
 function buildKindEmail(first: string, kind: Exclude<Kind, 'wedding'>) {
   const c = KIND_COPY[kind]
   const html = `<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:${GOLD};"></div><div style="padding:40px 36px 34px;">
-<div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:3px;color:${GOLD};font-weight:bold;margin-bottom:14px;">NORTH STAR HOUSE</div>
+<div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:1px;color:${GOLD};font-weight:bold;margin-bottom:14px;">North Star House</div>
 <h1 style="margin:0 0 22px;text-align:center;font-size:29px;font-weight:400;color:#2a2420;">Thank You for Your Inquiry</h1>
 <div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>
 <p style="${P}">Hi ${esc(first)},</p>
