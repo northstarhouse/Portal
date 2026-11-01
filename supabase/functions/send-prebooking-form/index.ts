@@ -96,9 +96,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   try {
     if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
-    const body = await req.json()
-    if (body && body.manual === true) return await manualSend(req, body)
-    const { response_id, resend } = body
+    const payload = await req.json()
+    if (payload && payload.manual === true) return await manualSend(req, payload)
+    const { response_id, resend } = payload
     if (!response_id || typeof response_id !== 'string') return json({ error: 'response_id required' }, 400)
 
     const rows = await sb(`/rest/v1/nsh_form_responses?id=eq.${encodeURIComponent(response_id)}&select=id,form_id,answers`).then((r) => r.json())
