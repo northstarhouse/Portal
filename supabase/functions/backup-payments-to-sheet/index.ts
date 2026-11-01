@@ -1,7 +1,7 @@
 // Backs the Portal's money records up to the treasurer's Google Sheet.
 //
 // RULE: the Sheet's FIRST tab is never read-modified, cleared or written. Every write goes to a tab this function
-// creates itself (always added after the existing tabs), and a write to the first tab is refused.
+// creates itself (always added after the existing tabs), and a write to the original tab (Sheet1) is refused, wherever that tab sits.
 //
 // Two kinds of tabs:
 //   * Payment ledger tabs, add-only: "Backup - PayPal Payments" and "Backup - Checks, Cash & Other". Only payments that
@@ -104,8 +104,9 @@ async function listTabs(token: string): Promise<Meta[]> {
 // Only ever returns a tab this function owns. Creates it (after all existing tabs) when missing.
 async function ownTab(token: string, title: string, tabs: Meta[]): Promise<Meta> {
   if (!title.startsWith(PREFIX)) throw new Error('Refusing to write outside the backup tabs')
-  const first = [...tabs].sort((a, b) => a.index - b.index)[0]
-  if (first && first.title === title) throw new Error(`Refusing to write to the first tab ("${title}")`)
+  // Your original tab (Sheet1, filled by Zapier) is never touched, wherever it sits in the Sheet. Only "Backup - ..." tabs are written.
+  const original = tabs.find((t) => t.sheetId === 0 || t.title === "Sheet1")
+  if (original && original.title === title) throw new Error(`Refusing to write to the original tab ("${title}")`)
   const found = tabs.find((t) => t.title === title)
   if (found) return found
   const res = await sheets(token, ':batchUpdate', {
