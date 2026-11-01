@@ -19227,7 +19227,10 @@ function VenueRentalsView({ navigate, initialTab }) {
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginLeft: 'auto' }}>
           {venueTab === 'clients' && (
-            <React.Fragment>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
+              <button type="button" onClick={function() { setSiteView(!siteView); }}
+                style={{ padding: '9px 16px', background: siteView ? gold : '#fff', color: siteView ? '#fff' : gold, border: '1px solid ' + gold, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>{siteView ? 'Back to clients' : 'Assign Site Managers'}</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               <select aria-label="Filter clients" value={clientFilter} onChange={function(e) { setClientFilter(e.target.value); }}
                 style={{ border: '1px solid #ded7cb', background: '#fff', borderRadius: 7, padding: '9px 11px', fontSize: 12, color: '#333', cursor: 'pointer' }}>
                 <option value="all">All upcoming</option>
@@ -19236,9 +19239,8 @@ function VenueRentalsView({ navigate, initialTab }) {
               </select>
               <input aria-label="Search clients" placeholder="Search names or dates…" value={clientQuery} onChange={function(e) { setClientQuery(e.target.value); }}
                 style={{ border: '1px solid #ded7cb', background: '#fff', borderRadius: 7, padding: '9px 11px', fontSize: 12, minWidth: 180 }} />
-              <button type="button" onClick={function() { setSiteView(!siteView); }}
-                style={{ padding: '9px 16px', background: siteView ? gold : '#fff', color: siteView ? '#fff' : gold, border: '1px solid ' + gold, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>{siteView ? 'Back to clients' : 'Assign Site Managers'}</button>
-            </React.Fragment>
+              </div>
+            </div>
           )}
           {venueTab !== 'clients' && (
             <React.Fragment>
