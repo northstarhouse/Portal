@@ -306,7 +306,7 @@ Deno.serve(async req => {
       const cents = Math.round(parseFloat(cap.amount.value) * 100);
       const exists = await rest(`venue_payments?select=id&paypal_capture_id=eq.${cap.id}`);
       if (!exists.length) {
-        await rest('venue_payments', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ inquiry_id: inq.id, venue_code: code, amount_cents: cents, currency: cap.amount.currency_code, paypal_order_id: orderId, paypal_capture_id: cap.id, payer_name: [order.payer?.name?.given_name, order.payer?.name?.surname].filter(Boolean).join(' ') || null, payer_email: order.payer?.email_address || null }) });
+        await rest('venue_payments', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ inquiry_id: inq.id, venue_code: code, amount_cents: cents, currency: cap.amount.currency_code, paypal_order_id: orderId, paypal_capture_id: cap.id, payer_name: [order.payer?.name?.given_name, order.payer?.name?.surname].filter(Boolean).join(' ') || null, payer_email: order.payer?.email_address || null, paypal_fee: cap.seller_receivable_breakdown?.paypal_fee?.value != null ? Number(cap.seller_receivable_breakdown.paypal_fee.value) : null, net_amount: cap.seller_receivable_breakdown?.net_amount?.value != null ? Number(cap.seller_receivable_breakdown.net_amount.value) : null }) });
         if ((inq.venue_payment_schedule || []).length) await applyToSchedule(inq, cents);
         else await recordLegacyPayment(inq, cap.id, cents);
       }
