@@ -36,9 +36,9 @@ language sql security definer set search_path = public as $$
     select 'don:' || d.id::text, d.date, 'Donations & Memberships'::text, coalesce(d.type, 'Donation'),
            coalesce(dn.formal_name, 'Unknown donor'),
            nullif(concat_ws(' · ', d.event_name, d.sponsorship_level, d.membership_level, d.donation_notes), ''),
-           coalesce(d.amount, 0)::numeric, o.paypal_fee, o.net_amount,
+           coalesce(d.amount, 0)::numeric, coalesce(d.paypal_fee, o.paypal_fee), coalesce(d.net_amount, o.net_amount),
            coalesce(d.payment_type, 'Unknown'),
-           coalesce(d.check_number, o.paypal_capture_id)
+           coalesce(d.check_number, d.paypal_transaction_id, o.paypal_capture_id)
     from donations d
     left join donors dn on dn.id = d.donor_id
     left join ticket_orders o on o.id = d.source_ticket_order_id
@@ -65,7 +65,7 @@ language sql security definer set search_path = public as $$
     select 'vp:' || p.id::text, (p.created_at at time zone 'America/Los_Angeles')::date, 'Venue Rental'::text, 'Rental payment',
            coalesce(i.name, p.payer_name, 'Venue client'),
            nullif(concat_ws(' · ', i.event_type, i.event_date::text), ''),
-           (p.amount_cents / 100.0)::numeric, null::numeric, null::numeric, 'PayPal', p.paypal_capture_id
+           (p.amount_cents / 100.0)::numeric, p.paypal_fee, p.net_amount, 'PayPal', p.paypal_capture_id
     from venue_payments p
     left join venue_inquiries i on i.id = p.inquiry_id
 

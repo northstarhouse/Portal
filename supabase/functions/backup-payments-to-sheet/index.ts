@@ -123,10 +123,10 @@ const tabName = (n: string) => (PREFIX + String(n).replace(/[:\\/?*[\]]/g, ' ').
 
 // Writes the header row if the tab is empty. Returns true when the tab had a different (older) layout and was reset, so
 // the caller can re-add its payments. Only ever called on backup tabs this function owns.
-async function ensureHeader(token: string, title: string, header: string[]) {
+async function ensureHeader(token: string, title: string, header: string[], force = false) {
   const head = await sheets(token, `/values/${q(title)}!A1:L1`)
   const have = (head.values && head.values[0]) || []
-  const same = have.length === header.length && header.every((h, i) => have[i] === h)
+  const same = !force && have.length === header.length && header.every((h, i) => have[i] === h)
   let reset = false
   if (have.length && !same) {
     const tab = (await listTabs(token)).find((t) => t.title === title)
@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
     // ---- add-only ledger tabs
     await ownTab(token, PAYPAL_TAB, tabs)
     await ownTab(token, OTHER_TAB, tabs)
-    const ppReset = await ensureHeader(token, PAYPAL_TAB, PP_HEADER)
+    const ppReset = await ensureHeader(token, PAYPAL_TAB, PP_HEADER, body.rebuild === "paypal")
     await ensureHeader(token, OTHER_TAB, HEADER)
     const [ledger, done]: [Record<string, unknown>[], { payment_key: string }[]] = await Promise.all([
       rest('rpc/treasurer_payments_all', { method: 'POST', body: '{}' }),

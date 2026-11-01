@@ -22827,6 +22827,8 @@ function TreasurerView({ navigate }) {
   var [form, setForm] = useState(blank);
   var [saving, setSaving] = useState(false);
   var [backup, setBackup] = useState({ busy: false, msg: '' });
+  var [unmatched, setUnmatched] = useState([]);
+  var [showUnmatched, setShowUnmatched] = useState(false);
 
   var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
 
@@ -22837,6 +22839,10 @@ function TreasurerView({ navigate }) {
       .catch(function() { setErr('Could not load payments. Please refresh.'); setRows([]); });
   }
   useEffect(load, []);
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/rpc/treasurer_unmatched_paypal', { method: 'POST', headers: H, body: '{}' })
+      .then(function(r) { return r.ok ? r.json() : []; }).then(function(d) { setUnmatched(Array.isArray(d) ? d : []); }).catch(function() {});
+  }, []);
 
   function money(n) { return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function nice(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''; }
@@ -22964,6 +22970,33 @@ function TreasurerView({ navigate }) {
         </div>
         {err ? <div style={{ color: '#b3402a', fontSize: 13, marginTop: 8 }}>{err}</div> : null}
       </form>
+
+      {unmatched.length > 0 ? (
+        <div style={Object.assign({}, card, { background: '#fffaf0', borderColor: '#e8d9b8' })}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 13, color: '#6b5d4a', lineHeight: 1.5 }}>
+              <strong style={{ color: '#2a2420' }}>{unmatched.length} PayPal payment{unmatched.length === 1 ? '' : 's'} ({money(unmatched.reduce(function(t, u) { return t + Number(u.gross || 0); }, 0))}) are in PayPal but not tied to a Portal record.</strong> These are payments such as invoices or older checkout links. Review them so each one is accounted for.
+            </div>
+            <button type="button" onClick={function() { setShowUnmatched(!showUnmatched); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, color: gold, cursor: 'pointer' }}>{showUnmatched ? 'Hide' : 'Show them'}</button>
+          </div>
+          {showUnmatched ? (
+            <div style={{ overflowX: 'auto', marginTop: 10 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <tbody>
+                  {unmatched.map(function(u) {
+                    return <tr key={u.transaction_id} style={{ borderTop: '0.5px solid #f0ebe2' }}>
+                      <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>{nice(u.paid_on)}</td>
+                      <td style={{ padding: '6px 8px', fontWeight: 600 }}>{u.payer_name || u.payer_email || 'Unknown'}</td>
+                      <td style={{ padding: '6px 8px', color: '#888' }}>{u.description || ''}</td>
+                      <td style={{ padding: '6px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(u.gross)} <span style={{ color: '#aaa' }}>fee {money(u.fee)}</span></td>
+                    </tr>;
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div style={Object.assign({}, card, { padding: 0, overflowX: 'auto' })}>
         {rows === null ? <div style={{ padding: 20, color: '#888', fontSize: 13 }}>Loading…</div> : list.length === 0 ? <div style={{ padding: 20, color: '#888', fontSize: 13 }}>No payments match.</div> : (
