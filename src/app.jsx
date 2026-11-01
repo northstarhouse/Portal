@@ -807,6 +807,7 @@ var NAV_ICONS = {
   announcements: '<path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
   'maintenance-request': '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
   'site-media': '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+  'treasurer': '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
   'nsh-updates': '<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.3 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>',
   'voicemail-log': '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>',
   'blog-editor': '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
@@ -13803,6 +13804,11 @@ var ADMIN_FORMS = [
 
 var ADMIN_TOOLS = [
   {
+    label: "Treasurer: All Payments",
+    view: "treasurer",
+    icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  },
+  {
     label: "North Star House Updates",
     view: "nsh-updates",
     icon: <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.3 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/></svg>,
@@ -22764,6 +22770,193 @@ function SiteMediaPage({ navigate }) {
 // read-only underneath, and a voicemail taken some other way can be added by hand.
 // North Star House Updates: what got done and what is coming up. Entries marked "include" go into the monthly board email.
 var NSH_UPDATE_AREAS = ['General', 'Construction', 'Grounds', 'Interiors', 'Docents', 'Fundraising', 'Events', 'Marketing', 'Venue', 'Volunteers', 'Board'];
+// Treasurer page: every payment in one list (venue rentals, website orders, donations and memberships, cash and checks
+// entered by hand), with totals, filters, CSV export, and the Google Sheet backup.
+// Relies on the app's globals (React hooks, SUPABASE_URL/KEY, gold, whoIsSignedIn) like the other views in app.jsx.
+
+var TR_SOURCES = ['Venue Rental', 'Website', 'Donations & Memberships', 'Other'];
+var TR_METHODS = ['Check', 'Cash', 'PayPal', 'Other'];
+var TR_SHEET = 'https://docs.google.com/spreadsheets/d/1jnZXxpyAusrTAJSMxFQpdT5seb-d7mFVjEnBp3VrxLQ/edit';
+
+function TreasurerView({ navigate }) {
+  var [rows, setRows] = useState(null);
+  var [err, setErr] = useState('');
+  var now = new Date();
+  var [year, setYear] = useState(String(now.getFullYear()));
+  var [month, setMonth] = useState('all');
+  var [source, setSource] = useState('all');
+  var [q, setQ] = useState('');
+  var today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+  var blank = { paid_on: today, amount: '', source: 'Other', payer: '', method: 'Check', check_number: '', note: '' };
+  var [form, setForm] = useState(blank);
+  var [saving, setSaving] = useState(false);
+  var [backup, setBackup] = useState({ busy: false, msg: '' });
+
+  var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/rpc/treasurer_payments', { method: 'POST', headers: H, body: '{}' })
+      .then(function(r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function(d) { setRows(Array.isArray(d) ? d : []); })
+      .catch(function() { setErr('Could not load payments. Please refresh.'); setRows([]); });
+  }
+  useEffect(load, []);
+
+  function money(n) { return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function nice(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''; }
+  function set(k, v) { setForm(function(f) { var n = Object.assign({}, f); n[k] = v; return n; }); }
+
+  var all = rows || [];
+  var years = [];
+  all.forEach(function(p) { var y = (p.paid_on || '').slice(0, 4); if (y && years.indexOf(y) < 0) years.push(y); });
+  if (years.indexOf(year) < 0) years.push(year);
+  years.sort().reverse();
+
+  var list = all.filter(function(p) {
+    if (year !== 'all' && (p.paid_on || '').slice(0, 4) !== year) return false;
+    if (month !== 'all' && (p.paid_on || '').slice(5, 7) !== month) return false;
+    if (source !== 'all' && p.source !== source) return false;
+    if (q.trim()) {
+      var hay = [p.payer, p.detail, p.category, p.reference, p.method].join(' ').toLowerCase();
+      if (hay.indexOf(q.trim().toLowerCase()) < 0) return false;
+    }
+    return true;
+  });
+  var total = list.reduce(function(s, p) { return s + Number(p.amount || 0); }, 0);
+  var fees = list.reduce(function(s, p) { return s + Number(p.fee || 0); }, 0);
+  var bySource = {};
+  list.forEach(function(p) { bySource[p.source] = (bySource[p.source] || 0) + Number(p.amount || 0); });
+
+  function addEntry(e) {
+    e.preventDefault();
+    var amt = parseFloat(String(form.amount).replace(/[$,]/g, ''));
+    if (saving || !form.payer.trim() || !(amt > 0)) { setErr('Add who it is from and an amount.'); return; }
+    setSaving(true); setErr('');
+    whoIsSignedIn().then(function(name) {
+      return fetch(SUPABASE_URL + '/rest/v1/treasurer_entries', {
+        method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=minimal' }),
+        body: JSON.stringify({ paid_on: form.paid_on || today, amount: amt, source: form.source, payer: form.payer.trim(), method: form.method, check_number: form.check_number.trim() || null, note: form.note.trim() || null, entered_by: name || null })
+      });
+    }).then(function(r) {
+      if (!r.ok) { setErr('Could not save. Please try again.'); return; }
+      setForm(Object.assign({}, blank, { source: form.source, method: form.method })); load();
+    }).catch(function() { setErr('Could not save. Please try again.'); }).finally(function() { setSaving(false); });
+  }
+
+  function removeEntry(p) {
+    if (!window.confirm('Delete this entry from ' + p.payer + ' (' + money(p.amount) + ')?')) return;
+    var id = p.payment_key.replace('man:', '');
+    fetch(SUPABASE_URL + '/rest/v1/treasurer_entries?id=eq.' + id, { method: 'DELETE', headers: H }).then(function(r) { if (r.ok) load(); });
+  }
+
+  function exportCsv() {
+    var cols = [['Date', 'paid_on'], ['Source', 'source'], ['Category', 'category'], ['From', 'payer'], ['Details', 'detail'], ['Amount', 'amount'], ['PayPal fee', 'fee'], ['Net', 'net'], ['Method', 'method'], ['Reference', 'reference']];
+    function cell(v) { var s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+    var lines = [cols.map(function(c) { return c[0]; }).join(',')].concat(list.map(function(p) { return cols.map(function(c) { return cell(p[c[1]]); }).join(','); }));
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+    a.download = 'nsh-payments-' + year + (month !== 'all' ? '-' + month : '') + '.csv';
+    a.click();
+  }
+
+  function backUpNow() {
+    setBackup({ busy: true, msg: '' });
+    fetch(SUPABASE_URL + '/functions/v1/backup-payments-to-sheet', { method: 'POST', headers: H, body: '{}' })
+      .then(function(r) { return r.json().catch(function() { return {}; }); })
+      .then(function(d) { setBackup({ busy: false, msg: d.error ? d.error : (d.added || 0) + ' new payment' + (d.added === 1 ? '' : 's') + ' added to the Google Sheet.' }); })
+      .catch(function() { setBackup({ busy: false, msg: 'Could not reach the backup. Please try again.' }); });
+  }
+
+  var field = { padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff', fontFamily: 'inherit', boxSizing: 'border-box' };
+  var card = { background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, marginBottom: 14 };
+  var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  return (
+    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '4px 0 40px' }}>
+      <div style={Object.assign({}, card, { display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' })}>
+        <div style={{ fontSize: 13, color: '#6b5d4a', maxWidth: 560, lineHeight: 1.5 }}>
+          Every payment in one place. Online payments come in by themselves; cash and checks are added below. Each payment is also backed up, one row each, to the treasurer's Google Sheet.
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={backUpNow} disabled={backup.busy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{backup.busy ? 'Backing up…' : 'Back up now'}</button>
+          <a href={TR_SHEET} target="_blank" rel="noopener noreferrer" style={{ border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: gold, textDecoration: 'none' }}>Open the Sheet</a>
+          <button onClick={exportCsv} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: '#6b5d4a', cursor: 'pointer' }}>Download CSV</button>
+        </div>
+        {backup.msg ? <div style={{ width: '100%', fontSize: 13, color: '#6b5d4a' }}>{backup.msg}</div> : null}
+      </div>
+
+      <div style={Object.assign({}, card, { display: 'flex', flexWrap: 'wrap', gap: 10 })}>
+        <select value={year} onChange={function(e) { setYear(e.target.value); }} style={field}>
+          <option value="all">All years</option>
+          {years.map(function(y) { return <option key={y} value={y}>{y}</option>; })}
+        </select>
+        <select value={month} onChange={function(e) { setMonth(e.target.value); }} style={field}>
+          <option value="all">All months</option>
+          {months.map(function(m, i) { var v = (i < 9 ? '0' : '') + (i + 1); return <option key={v} value={v}>{m}</option>; })}
+        </select>
+        <select value={source} onChange={function(e) { setSource(e.target.value); }} style={field}>
+          <option value="all">All sources</option>
+          {TR_SOURCES.map(function(s) { return <option key={s} value={s}>{s}</option>; })}
+        </select>
+        <input value={q} onChange={function(e) { setQ(e.target.value); }} placeholder="Search name, check #, PayPal ID…" style={Object.assign({}, field, { flex: 1, minWidth: 180 })} />
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+        <div style={Object.assign({}, card, { marginBottom: 0, flex: '1 1 160px' })}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{money(total)}</div>
+          <div style={{ fontSize: 12, color: '#888' }}>{list.length} payment{list.length === 1 ? '' : 's'}{fees > 0 ? ' · ' + money(fees) + ' PayPal fees' : ''}</div>
+        </div>
+        {Object.keys(bySource).map(function(s) {
+          return <div key={s} style={Object.assign({}, card, { marginBottom: 0, flex: '1 1 160px' })}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2420' }}>{money(bySource[s])}</div>
+            <div style={{ fontSize: 12, color: '#888' }}>{s}</div>
+          </div>;
+        })}
+      </div>
+
+      <form onSubmit={addEntry} style={card}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2420', marginBottom: 10 }}>Add a cash or check payment</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <input type="date" value={form.paid_on} onChange={function(e) { set('paid_on', e.target.value); }} style={field} />
+          <input value={form.payer} onChange={function(e) { set('payer', e.target.value); }} placeholder="From" style={Object.assign({}, field, { flex: 1, minWidth: 150 })} />
+          <input value={form.amount} onChange={function(e) { set('amount', e.target.value); }} placeholder="Amount" inputMode="decimal" style={Object.assign({}, field, { width: 110 })} />
+          <select value={form.method} onChange={function(e) { set('method', e.target.value); }} style={field}>{TR_METHODS.map(function(m) { return <option key={m}>{m}</option>; })}</select>
+          <input value={form.check_number} onChange={function(e) { set('check_number', e.target.value); }} placeholder="Check #" style={Object.assign({}, field, { width: 100 })} />
+          <select value={form.source} onChange={function(e) { set('source', e.target.value); }} style={field}>{TR_SOURCES.map(function(s) { return <option key={s}>{s}</option>; })}</select>
+          <input value={form.note} onChange={function(e) { set('note', e.target.value); }} placeholder="What it is for" style={Object.assign({}, field, { flex: 2, minWidth: 180 })} />
+          <button type="submit" disabled={saving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{saving ? 'Saving…' : 'Add'}</button>
+        </div>
+        {err ? <div style={{ color: '#b3402a', fontSize: 13, marginTop: 8 }}>{err}</div> : null}
+      </form>
+
+      <div style={Object.assign({}, card, { padding: 0, overflowX: 'auto' })}>
+        {rows === null ? <div style={{ padding: 20, color: '#888', fontSize: 13 }}>Loading…</div> : list.length === 0 ? <div style={{ padding: 20, color: '#888', fontSize: 13 }}>No payments match.</div> : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ textAlign: 'left', color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                {['Date', 'From', 'For', 'Source', 'Method', 'Amount', ''].map(function(h, i) { return <th key={i} style={{ padding: '10px 12px', borderBottom: '0.5px solid #e0d8cc', textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</th>; })}
+              </tr>
+            </thead>
+            <tbody>
+              {list.map(function(p) {
+                return <tr key={p.payment_key} style={{ borderBottom: '0.5px solid #f0ebe2' }}>
+                  <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>{nice(p.paid_on)}</td>
+                  <td style={{ padding: '9px 12px', fontWeight: 600, color: '#2a2420' }}>{p.payer}</td>
+                  <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{p.category}{p.detail ? <div style={{ fontSize: 12, color: '#999' }}>{p.detail}</div> : null}</td>
+                  <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{p.source}</td>
+                  <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{p.method}{p.reference ? <div style={{ fontSize: 11, color: '#aaa' }}>{p.reference}</div> : null}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(p.amount)}{Number(p.fee) > 0 ? <div style={{ fontSize: 11, color: '#aaa', fontWeight: 400 }}>fee {money(p.fee)}</div> : null}</td>
+                  <td style={{ padding: '9px 12px' }}>{p.payment_key.indexOf('man:') === 0 ? <a onClick={function() { removeEntry(p); }} style={{ fontSize: 12, color: '#b3402a', cursor: 'pointer' }}>Delete</a> : null}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function NshUpdatesView({ navigate }) {
   var [rows, setRows] = useState(null);
   var [tab, setTab] = useState('done');
@@ -23269,6 +23462,7 @@ const views = {
   'website-payments': WebsitePaymentsView,
   'voicemail-log': VoicemailLogView,
   'nsh-updates': NshUpdatesView,
+  'treasurer': TreasurerView,
   'blog-editor': BlogEditorPage,
   'site-media': SiteMediaPage,
   quarterly: QuarterlyView,
@@ -24028,7 +24222,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "voicemail-log" ? "Voicemail Log" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
