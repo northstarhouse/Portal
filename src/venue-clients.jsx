@@ -1,4 +1,5 @@
 import { ContractManager } from './venue-contracts.jsx';
+import { openSitePacket } from './site-packet.js';
 // Client dashboard: reads the imported source snapshot without changing signed
 // agreements, invoice schedules, or sending any client communications.
 export function venueDateKey(date = new Date()) {
@@ -92,6 +93,9 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   const surveys = responses.filter(r => r.responses?.questionnaire && /(?:wedding|event) info questionnaire/i.test(r.title || ''));
   const surveyComplete = !!live?.questionnaire_form_response_id || surveys.some(r => { const qs = r.responses.questionnaire.questions || []; return qs.some(q => q.answered) && qs.filter(q => q.required).every(q => q.answered); });
   const surveySent = !!live?.questionnaire_sent_at || surveys.length > 0;
+  // Everything the couple answered on the day-of questionnaire, for the Site Manager packet.
+  const questionnaire = live?.questionnaire_answers && typeof live.questionnaire_answers === 'object' ? live.questionnaire_answers : null;
+  const hbQa = responses.filter(r => r.responses?.questionnaire).flatMap(r => (r.responses.questionnaire.questions || []).map(q => ({ label: text(q.question), answer: q.answer })));
   const requirementsDue = eventDate ? shiftDate(eventDate, -30) : null;
   const formContacts = [['7fnabd0i','c9u1sxb4','163otrai','ps4addr1'], ['7leui2ic','pt4mail1','pt4phon1','pt4addr1']].filter(k => a[k[0]]).map((k, i) => ({ id:'form-' + i, full_name:a[k[0]], email:a[k[1]] || '', phone_number:a[k[2]] || '', address:a[k[3]] || '', kind:'client' }));
   const contacts = (hb?.contacts || []).filter(c => c.kind === 'client').concat(hb?.contacts?.some(c => c.kind === 'client') ? [] : formContacts);
@@ -116,7 +120,7 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   if (!eventDate) task('date', 'Confirm event date', null, 'No date recorded', 'booking');
   tasks.sort((x, y) => x.rank - y.rank || (x.due || eventDate || '9999').localeCompare(y.due || eventDate || '9999'));
   const siteManager = a.__venue_checklist?.site_manager?.name || '';
-  return { id:sub.id, sub, name, email, contacts, siteManager, hb, eventDate, eventEnd, nativeAgreement, legacy, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
+  return { id:sub.id, sub, name, email, contacts, siteManager, questionnaire, hbQa, hb, eventDate, eventEnd, nativeAgreement, legacy, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
 }
 
 const css = `
@@ -194,7 +198,7 @@ function SiteManagersPage({ clients, today, onBack, onAssign }) {
     <div style={{background:'#fff',border:'1px solid #eee7dd',borderRadius:12,overflowX:'auto'}}>
       {managers === null ? <p className="vc-muted" style={{padding:16}}>Loading…</p> : weddings.length === 0 ? <p className="vc-muted" style={{padding:16}}>No upcoming weddings.</p> :
         <table style={{width:'100%',borderCollapse:'collapse'}}>
-          <thead><tr style={{textAlign:'left',color:'#888',fontSize:11,textTransform:'uppercase',letterSpacing:.4}}>{['Date','Couple','Site manager'].map(h => <th key={h} style={{padding:'10px 14px',borderBottom:'1px solid #eee7dd'}}>{h}</th>)}</tr></thead>
+          <thead><tr style={{textAlign:'left',color:'#888',fontSize:11,textTransform:'uppercase',letterSpacing:.4}}>{['Date','Couple','Site manager','Packet'].map(h => <th key={h} style={{padding:'10px 14px',borderBottom:'1px solid #eee7dd'}}>{h}</th>)}</tr></thead>
           <tbody>{weddings.map(c => <tr key={c.id} style={{borderBottom:'1px solid #f3eee5'}}>
             <td style={{padding:'10px 14px',whiteSpace:'nowrap'}}>{longDay(c.eventDate)}</td>
             <td style={{padding:'10px 14px',fontWeight:600}}>{c.name}</td>
@@ -202,6 +206,7 @@ function SiteManagersPage({ clients, today, onBack, onAssign }) {
               <option value="">Unassigned</option>
               {options(c.siteManager).map(n => <option key={n} value={n}>{n}</option>)}
             </select></td>
+            <td style={{padding:'10px 14px',whiteSpace:'nowrap'}}><a onClick={() => openSitePacket(c)} style={{color:'#886c44',fontWeight:700,textDecoration:'underline',cursor:'pointer'}}>Print</a>{!c.surveyComplete && <span className="vc-muted" style={{marginLeft:8,fontSize:11}}>questionnaire not in yet</span>}</td>
           </tr>)}</tbody>
         </table>}
     </div>
@@ -361,11 +366,12 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
   });
   step('Insurance verified', client.insuranceVerified, client.insuranceVerified ? 'Verified' : client.insuranceUploadedAt ? 'Uploaded ' + dateLabel(client.insuranceUploadedAt) + ', needs checking' : 'Not uploaded yet');
   step('Event questionnaire', client.surveyComplete, client.surveyComplete ? 'Completed' : client.surveySent ? 'Sent, awaiting answers' : 'Not sent yet', null, !client.surveyComplete && client.requirementsDue && client.requirementsDue < today);
+  step('Site Manager Packet', client.surveyComplete, client.surveyComplete ? (client.siteManager ? 'Ready to print · ' + client.siteManager : 'Ready to print, no site manager assigned yet') : 'Waiting on the questionnaire', client.surveyComplete ? <a onClick={() => openSitePacket(client)} style={{color:'#886c44',fontWeight:700,textDecoration:'underline',cursor:'pointer'}}>Print</a> : null);
   step('Wedding brick', !!client.brickSubmittedAt || (client.brickLines || []).length > 0, client.brickSubmittedAt ? dateLabel(client.brickSubmittedAt) : 'Not submitted yet');
   if (client.eventDate) step('Event day', client.days !== null && client.days <= 0, dateLabel(client.eventDate));
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
   return <dialog ref={ref} className="vc-dialog" aria-labelledby="vc-client-title" onCancel={onClose} onClick={e => { if(e.target === ref.current) onClose(); }}>
-    <div className="vc-modal-head"><div style={{flex:1}}><h2 id="vc-client-title" className="vc-name" style={{fontSize:25,margin:0}}>{client.name} - {client.type}</h2>{client.siteManager&&<div style={{marginTop:4,fontSize:13,color:'#6b5d4a'}}>Site manager: <strong style={{color:'#2a2420'}}>{client.siteManager}</strong></div>}<div style={{fontFamily:'Cardo,Georgia,serif',fontSize:22,fontWeight:700,color:'#886c44',marginTop:6}}>{dateLabel(client.eventDate)}</div></div><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button></div>
+    <div className="vc-modal-head"><div style={{flex:1}}><h2 id="vc-client-title" className="vc-name" style={{fontSize:25,margin:0}}>{client.name} - {client.type}</h2>{client.siteManager&&<div style={{marginTop:4,fontSize:13,color:'#6b5d4a'}}>Site manager: <strong style={{color:'#2a2420'}}>{client.siteManager}</strong></div>}<div style={{marginTop:8}}><button type="button" onClick={()=>openSitePacket(client)} style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'6px 12px',fontWeight:600}}>Print Site Manager Packet</button></div><div style={{fontFamily:'Cardo,Georgia,serif',fontSize:22,fontWeight:700,color:'#886c44',marginTop:6}}>{dateLabel(client.eventDate)}</div></div><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button></div>
     {client.payments && <div className="vc-hstepper" aria-label="Payment timeline">
       {client.schedule.map((s,i) => {
         const pastDue = s.due && s.due < venueDateKey() && !s.paid;
