@@ -108,6 +108,7 @@ export function ContractManager({client,api,onChange}){
  const dirty=!!selected&&JSON.stringify(form)!==JSON.stringify({title:selected.title,body:selected.body,signers:selected.signers,change_summary:selected.change_summary});
  const draft=selected?.status==='draft';
  return <section className="va-panel" aria-label="Manage client contracts"><style>{style}</style><h3 style={{margin:0}}>Contracts &amp; signatures</h3>
+  {client.arrangement==='bylt'&&<p className="va-notice" style={{background:'#faf4e6',border:'1px solid #ecdcb8',padding:'8px 10px'}}><strong>BYLT arrangement.</strong> This group's agreement and payment plan are different from the standard ones and aren't set up yet. Don't send the standard agreement.</p>}
   <p className="va-notice">Create and review a draft, then issue a separate signing link for each person. Revisions require new signatures. Previously completed agreements stay on file.</p>
   {error&&<p role="alert" className="va-error">{error}</p>}
   {versions===null&&!error?<p className="va-notice">Loading agreements…</p>:<>
