@@ -36,7 +36,7 @@ language sql security definer set search_path = public as $$
     select 'don:' || d.id::text, d.date, 'Donations & Memberships'::text, coalesce(d.type, 'Donation'),
            coalesce(dn.formal_name, 'Unknown donor'),
            nullif(concat_ws(' · ', d.event_name, d.sponsorship_level, d.membership_level, d.donation_notes), ''),
-           coalesce(d.amount, 0)::numeric, null::numeric, null::numeric,
+           coalesce(d.amount, 0)::numeric, o.paypal_fee, o.net_amount,
            coalesce(d.payment_type, 'Unknown'),
            coalesce(d.check_number, o.paypal_capture_id)
     from donations d

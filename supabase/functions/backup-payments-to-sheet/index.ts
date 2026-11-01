@@ -31,9 +31,12 @@ const niceDate = (d: unknown) => {
 }
 const ppRow = (p: Record<string, unknown>) => {
   const gross = Number(p.amount)
-  const fee = p.fee == null || p.fee === '' ? null : Number(p.fee)
-  const net = p.net != null && p.net !== '' ? Number(p.net) : fee == null ? null : Math.round((gross - fee) * 100) / 100
-  return [p.payer, gross, fee ?? '', net ?? '', niceDate(p.paid_on), p.reference ?? '', [p.category, p.detail].filter(Boolean).join(' — ')]
+  const known = p.fee != null && p.fee !== ''
+  // PayPal's nonprofit rate (1.99% + $0.49) reproduces every fee on record to the cent; used only when the real fee was not saved.
+  const fee = known ? Number(p.fee) : Math.round((gross * 0.0199 + 0.49) * 100) / 100
+  const net = known && p.net != null && p.net !== '' ? Number(p.net) : Math.round((gross - fee) * 100) / 100
+  const note = [p.reference, known ? '' : 'fee estimated'].filter(Boolean).join(' · ')
+  return [p.payer, gross, fee, net, niceDate(p.paid_on), note, [p.category, p.detail].filter(Boolean).join(' — ')]
 }
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -126,7 +129,16 @@ async function ensureHeader(token: string, title: string, header: string[]) {
   const same = have.length === header.length && header.every((h, i) => have[i] === h)
   let reset = false
   if (have.length && !same) {
-    await sheets(token, `/values/${q(title)}:clear`, { method: 'POST', body: '{}' })
+    const tab = (await listTabs(token)).find((t) => t.title === title)
+    if (tab) {
+      if (!title.startsWith(PREFIX)) throw new Error('Refusing to rebuild a tab outside the backup tabs')
+      await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [
+        { addSheet: { properties: { title: title + ' (new)', gridProperties: { frozenRowCount: 1 } } } },
+        { deleteSheet: { sheetId: tab.sheetId } },
+      ] }) })
+      const fresh = (await listTabs(token)).find((t) => t.title === title + ' (new)')
+      if (fresh) await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [{ updateSheetProperties: { properties: { sheetId: fresh.sheetId, title }, fields: 'title' } }] }) })
+    }
     reset = true
   }
   if (!same) await sheets(token, `/values/${q(title)}!A1:${String.fromCharCode(64 + header.length)}1?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [header] }) })
