@@ -12049,7 +12049,6 @@ function FinancialOverviewView({ navigate }) {
             })}
             <button onClick={exportActiveTab} style={{ marginLeft: 'auto', marginBottom: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>↓ Export Excel</button>
           </div>
-          <div style={{ fontSize: 11, color: '#999', margin: '0 0 8px' }}>The Google Sheet updates by itself whenever anything here changes.</div>
 
           {activeTab === 'donations' && (
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
@@ -12280,7 +12279,6 @@ function FinancialOverviewView({ navigate }) {
 
           {activeTab === 'venue' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontSize: 12, color: '#888' }}>Venue rental payments received in {year}: paid online by clients, plus payments the team logged by hand. The Treasurer page and the Google Sheet use the same list.</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
               <div style={card}><div style={cardLabel}>Received</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(venueRows().reduce(function(t, r) { return t + r.Amount; }, 0))}</div></div>
               <div style={card}><div style={cardLabel}>PayPal Fees</div><div style={{ ...cardValue, color: '#c07040' }}>{money(venueRows().reduce(function(t, r) { return t + (parseFloat(r['PayPal Fee']) || 0); }, 0))}</div></div>
@@ -12400,7 +12398,6 @@ function FinancialOverviewView({ navigate }) {
 
           {activeTab === 'outflow-detail' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontSize: 12, color: '#888' }}>Every line item behind Total Outflow ({money(stats.totalOutflow)}) for {year} — Op Budget purchases (excluding In-Kind, which isn't cash outflow) plus Cash Log "Out" entries. Use this to spot duplicates, mis-dated entries, or anything mistagged as a purchase.</div>
 
             {outflowDetail.duplicateCount > 0 && (
               <div style={{ background: '#fff8e1', border: '0.5px solid #f0d98c', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#8a6200' }}>

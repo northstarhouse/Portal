@@ -155,6 +155,43 @@ async function signedIn(req: Request) {
 // PayPal payments (the website's PayPal checkout, and gifts the Portal marks as "Website") vs. everything else.
 const isPayPal = (p: Record<string, unknown>) => ['PayPal', 'Website'].includes(String(p.method || ''))
 
+// ---------- table look (same as the original tab: a real Sheets table, gold header, banded rows) ----------
+const MONEY_COLS = new Set(['Amount', 'Gross', 'Fee', 'Net', 'PayPal Fee', 'PayPal fee', 'Budget', 'Spent', 'Earnings', 'In-Kind', 'Remaining', 'Expenses', 'Profit / Loss', 'Value'])
+const colorStyle = (r: number, g: number, b: number) => ({ rgbColor: { red: r / 255, green: g / 255, blue: b / 255 } })
+
+// Turns the tab's data into a table, replacing any earlier table in it. Only ever called on "Backup - ..." tabs.
+async function styleTable(token: string, title: string, headers: string[]) {
+  if (!title.startsWith(PREFIX)) throw new Error('Refusing to style a tab outside the backup tabs')
+  const meta = await sheets(token, '?fields=sheets(properties(sheetId,title),tables(tableId))')
+  const tab = (meta.sheets || []).find((s: { properties: { title: string } }) => s.properties.title === title)
+  if (!tab) return
+  const sheetId = tab.properties.sheetId as number
+  const colA = await sheets(token, `/values/${q(title)}!A:A`)
+  const rows = Math.max(2, (colA.values || []).length)
+  const cols = headers.length
+  const requests: unknown[] = []
+  for (const t of tab.tables || []) requests.push({ deleteTable: { tableId: t.tableId } })
+  requests.push({
+    addTable: {
+      table: {
+        range: { sheetId, startRowIndex: 0, endRowIndex: rows, startColumnIndex: 0, endColumnIndex: cols },
+        rowsProperties: {
+          headerColorStyle: colorStyle(163, 132, 104),
+          firstBandColorStyle: colorStyle(255, 255, 255),
+          secondBandColorStyle: colorStyle(245, 241, 235),
+        },
+        columnProperties: headers.map((h, i) => ({ columnIndex: i, columnName: h, columnType: MONEY_COLS.has(h) ? 'DOUBLE' : 'TEXT' })),
+      },
+    },
+  })
+  headers.forEach((h, i) => {
+    if (MONEY_COLS.has(h)) requests.push({ repeatCell: { range: { sheetId, startRowIndex: 1, endRowIndex: rows, startColumnIndex: i, endColumnIndex: i + 1 }, cell: { userEnteredFormat: { numberFormat: { type: 'CURRENCY', pattern: '$#,##0.00' } } }, fields: 'userEnteredFormat.numberFormat' } })
+  })
+  requests.push({ repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: cols }, cell: { userEnteredFormat: { textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } } } }, fields: 'userEnteredFormat.textFormat' } })
+  requests.push({ autoResizeDimensions: { dimensions: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: cols } } })
+  await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests }) })
+}
+
 // ---------- yearly tabs (the same tabs as Financial Overview, built here so they stay current by themselves) ----------
 // Budgets per operational area (same figures the Portal shows).
 const AREA_BUDGETS: Record<string, number | null> = { Construction: 12000, Grounds: 14000, Interiors: 2500, Docents: 1000, Fundraising: null, Events: 7500, Marketing: 1000, Venue: null }
@@ -296,6 +333,7 @@ async function writeYearlyTabs(token: string, tabs: Meta[], year: number) {
     for (let i = 0; i < values.length; i += 10000) {
       await sheets(token, `/values/${q(title)}!A${i + 1}?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ values: values.slice(i, i + 10000) }) })
     }
+    await styleTable(token, title, t.headers)
   }
 }
 
@@ -335,6 +373,16 @@ Deno.serve(async (req) => {
     const token = await sheetsToken()
     const tabs = await listTabs(token)
 
+    // ---- give every backup tab the table look (visual only)
+    if (body.action === 'style') {
+      const done: string[] = []
+      for (const t of tabs.filter((x) => x.title.startsWith(PREFIX))) {
+        const head = await sheets(token, `/values/${q(t.title)}!1:1`)
+        const headers = ((head.values && head.values[0]) || []).map(String).filter(Boolean)
+        if (headers.length) { await styleTable(token, t.title, headers); done.push(t.title) }
+      }
+      return json({ styled: done })
+    }
     // ---- yearly Financial Overview tabs, rebuilt from the database (called by the database whenever the records change)
     if (body.action === 'yearly') return json(await runYearlySync(token, tabs))
 
@@ -424,6 +472,8 @@ Deno.serve(async (req) => {
       for (let i = 0; i < back.length; i += 100) await rest(`payment_backup_log?payment_key=in.(${back.slice(i, i + 100).map((k) => '"' + k + '"').join(',')})`, { method: 'DELETE' }).catch(() => {})
       throw e
     }
+    if (counts.paypal) await styleTable(token, PAYPAL_TAB, PP_HEADER)
+    if (counts.other) await styleTable(token, OTHER_TAB, HEADER)
     return json({ added: counts.paypal + counts.other, ...counts })
   } catch (e) {
     return json({ error: (e as Error).message || 'Backup failed' }, 500)
