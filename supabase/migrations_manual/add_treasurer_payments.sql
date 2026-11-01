@@ -50,7 +50,7 @@ language sql security definer set search_path = public as $$
            case o.kind when 'paid' then 'Tickets' when 'donation' then 'Donation' when 'membership' then 'Membership' when 'brick' then 'Brick' else initcap(o.kind) end,
            coalesce(nullif(o.paypal_payer_name, ''), o.buyer_name, 'Unknown'),
            nullif(concat_ws(' · ', o.event_title, o.event_date), ''),
-           coalesce(o.amount, 0)::numeric, o.paypal_fee, o.net_amount, 'PayPal', o.paypal_capture_id
+           coalesce(o.amount, 0)::numeric, o.paypal_fee, o.net_amount, case when o.paypal_capture_id is null then initcap(coalesce(nullif(o.source, ''), 'Cash')) else 'PayPal' end, coalesce(o.paypal_capture_id, o.note)
     from ticket_orders o
     where o.status = 'completed' and coalesce(o.amount, 0) > 0
       and not exists (select 1 from donations d where d.source_ticket_order_id = o.id)
