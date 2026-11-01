@@ -282,7 +282,7 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
         </div>;
       })}
       <div className="vc-hstep">
-        <span className="vc-hstep-line good"/>
+        <span className={"vc-hstep-line "+((client.schedule||[]).length && client.schedule.every(s=>s.paid)?"good":"")}/>
         <span className="vc-hstep-dot" style={{background:'#886c44',borderColor:'#886c44',color:'#fff'}}>$</span>
         <div className="vc-hstep-label">Total</div>
         <div className="vc-hstep-amt" style={{fontWeight:700,color:'#4a453e'}}>{amount(client.total,client.currency)}</div>
