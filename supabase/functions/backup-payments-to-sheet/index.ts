@@ -31,10 +31,11 @@ const niceDate = (d: unknown) => {
 }
 const ppRow = (p: Record<string, unknown>) => {
   const gross = Number(p.amount)
-  const known = p.fee != null && p.fee !== ''
+  const saved = p.fee != null && p.fee !== ''
+  const known = saved && !p.fee_estimated
   // PayPal's nonprofit rate (1.99% + $0.49) reproduces every fee on record to the cent; used only when the real fee was not saved.
-  const fee = known ? Number(p.fee) : Math.round((gross * 0.0199 + 0.49) * 100) / 100
-  const net = known && p.net != null && p.net !== '' ? Number(p.net) : Math.round((gross - fee) * 100) / 100
+  const fee = saved ? Number(p.fee) : Math.round((gross * 0.0199 + 0.49) * 100) / 100
+  const net = saved && p.net != null && p.net !== '' ? Number(p.net) : Math.round((gross - fee) * 100) / 100
   const note = [p.reference, known ? '' : 'fee estimated'].filter(Boolean).join(' · ')
   return [p.payer, gross, fee, net, niceDate(p.paid_on), note, [p.category, p.detail].filter(Boolean).join(' — ')]
 }

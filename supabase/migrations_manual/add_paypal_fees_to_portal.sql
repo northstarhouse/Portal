@@ -10,7 +10,7 @@ alter table public.venue_payments add column if not exists net_amount numeric;
 create or replace function public.apply_paypal_fees()
 returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare t_n int := 0; v_n int := 0; d_n int := 0;
+declare t_n int := 0; v_n int := 0; d_n int := 0; e_n int := 0;
 begin
   -- Website orders: same capture id
   update ticket_orders o set paypal_fee = t.fee, net_amount = t.net
@@ -49,12 +49,33 @@ begin
   from pick where d.id = pick.donation_id;
   get diagnostics d_n = row_count;
 
+  -- PayPal payments logged by hand on the Treasurer page: match the real PayPal payment (same amount, within 7 days,
+  -- payer shares a name) and swap the estimated fee for the real one.
+  with cand as (
+    select e.id as entry_id, t.transaction_id, t.fee, t.net, abs(t.paid_on - e.paid_on) as gap
+    from treasurer_entries e
+    join paypal_transactions t on t.gross = e.amount and abs(t.paid_on - e.paid_on) <= 7
+    where e.method = 'PayPal' and e.paypal_transaction_id is null
+      and exists (
+        select 1 from regexp_split_to_table(lower(regexp_replace(coalesce(t.payer_name, ''), '[^a-zA-Z ]', '', 'g')), ' ') w
+        where length(w) > 2 and lower(e.payer) like '%' || w || '%')
+      and not exists (select 1 from ticket_orders o where o.paypal_capture_id = t.transaction_id)
+      and not exists (select 1 from venue_payments p where p.paypal_capture_id = t.transaction_id)
+      and not exists (select 1 from donations x where x.paypal_transaction_id = t.transaction_id)
+      and not exists (select 1 from treasurer_entries x where x.paypal_transaction_id = t.transaction_id)
+  ), pick as (
+    select distinct on (transaction_id) entry_id, transaction_id, fee, net from cand order by transaction_id, gap
+  )
+  update treasurer_entries e set paypal_transaction_id = pick.transaction_id, paypal_fee = pick.fee, net_amount = pick.net, fee_estimated = false
+  from pick where e.id = pick.entry_id;
+  get diagnostics e_n = row_count;
+
   -- Gifts already matched earlier: keep their fee in step with PayPal
   update donations d set paypal_fee = t.fee, net_amount = t.net
   from paypal_transactions t
   where d.paypal_transaction_id = t.transaction_id and (d.paypal_fee is distinct from t.fee or d.net_amount is distinct from t.net);
 
-  return jsonb_build_object('orders_updated', t_n, 'venue_updated', v_n, 'gifts_matched', d_n);
+  return jsonb_build_object('orders_updated', t_n, 'venue_updated', v_n, 'gifts_matched', d_n, 'entries_matched', e_n);
 end $$;
 revoke all on function public.apply_paypal_fees() from public, anon, authenticated;
 
@@ -70,6 +91,7 @@ language sql security definer set search_path = public as $$
     and not exists (select 1 from venue_payments p where p.paypal_capture_id = t.transaction_id)
     and not exists (select 1 from donations d where d.paypal_transaction_id = t.transaction_id)
     and not exists (select 1 from donations d where d.check_number = t.transaction_id)
+    and not exists (select 1 from treasurer_entries e where e.paypal_transaction_id = t.transaction_id)
   order by t.paid_on desc;
 $$;
 grant execute on function public.treasurer_unmatched_paypal() to anon, authenticated;

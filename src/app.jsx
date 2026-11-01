@@ -22823,7 +22823,7 @@ function TreasurerView({ navigate }) {
   var [source, setSource] = useState('all');
   var [q, setQ] = useState('');
   var today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
-  var blank = { paid_on: today, amount: '', source: 'Other', payer: '', method: 'Check', check_number: '', note: '' };
+  var blank = { paid_on: today, amount: '', source: 'Other', payer: '', method: 'Check', check_number: '', note: '', fee: '' };
   var [form, setForm] = useState(blank);
   var [saving, setSaving] = useState(false);
   var [backup, setBackup] = useState({ busy: false, msg: '' });
@@ -22847,6 +22847,10 @@ function TreasurerView({ navigate }) {
   function money(n) { return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function nice(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''; }
   function set(k, v) { setForm(function(f) { var n = Object.assign({}, f); n[k] = v; return n; }); }
+
+  // PayPal's nonprofit rate (1.99% + $0.49) matches 135 of the 152 real payments to the cent. It is only an estimate: the
+  // payment's real fee replaces it automatically once PayPal lists the payment.
+  function estFee(amount) { var a = parseFloat(String(amount).replace(/[$,]/g, '')); return a > 0 ? Math.round((a * 0.0199 + 0.49) * 100) / 100 : 0; }
 
   var all = rows || [];
   var years = [];
@@ -22874,10 +22878,14 @@ function TreasurerView({ navigate }) {
     var amt = parseFloat(String(form.amount).replace(/[$,]/g, ''));
     if (saving || !form.payer.trim() || !(amt > 0)) { setErr('Add who it is from and an amount.'); return; }
     setSaving(true); setErr('');
+    var isPP = form.method === 'PayPal';
+    var typedFee = String(form.fee).trim() !== '' ? parseFloat(String(form.fee).replace(/[$,]/g, '')) : null;
+    var feeAmt = isPP ? (typedFee != null && typedFee >= 0 ? typedFee : estFee(amt)) : null;
+    var feeIsEst = isPP && !(typedFee != null && typedFee >= 0);
     whoIsSignedIn().then(function(name) {
       return fetch(SUPABASE_URL + '/rest/v1/treasurer_entries', {
         method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=minimal' }),
-        body: JSON.stringify({ paid_on: form.paid_on || today, amount: amt, source: form.source, payer: form.payer.trim(), method: form.method, check_number: form.check_number.trim() || null, note: form.note.trim() || null, entered_by: name || null })
+        body: JSON.stringify({ paid_on: form.paid_on || today, amount: amt, source: form.source, payer: form.payer.trim(), method: form.method, check_number: form.check_number.trim() || null, note: form.note.trim() || null, entered_by: name || null, paypal_fee: feeAmt, net_amount: isPP ? Math.round((amt - feeAmt) * 100) / 100 : null, fee_estimated: feeIsEst })
       });
     }).then(function(r) {
       if (!r.ok) { setErr('Could not save. Please try again.'); return; }
@@ -22963,11 +22971,12 @@ function TreasurerView({ navigate }) {
           <input value={form.payer} onChange={function(e) { set('payer', e.target.value); }} placeholder="From" style={Object.assign({}, field, { flex: 1, minWidth: 150 })} />
           <input value={form.amount} onChange={function(e) { set('amount', e.target.value); }} placeholder="Amount" inputMode="decimal" style={Object.assign({}, field, { width: 110 })} />
           <select value={form.method} onChange={function(e) { set('method', e.target.value); }} style={field}>{TR_METHODS.map(function(m) { return <option key={m}>{m}</option>; })}</select>
-          <input value={form.check_number} onChange={function(e) { set('check_number', e.target.value); }} placeholder="Check #" style={Object.assign({}, field, { width: 100 })} />
+          {form.method === 'PayPal' ? <input value={form.fee} onChange={function(e) { set('fee', e.target.value); }} placeholder={'PayPal fee ' + (estFee(form.amount) ? '$' + estFee(form.amount).toFixed(2) + ' (est.)' : '')} inputMode="decimal" style={Object.assign({}, field, { width: 150 })} /> : <input value={form.check_number} onChange={function(e) { set('check_number', e.target.value); }} placeholder="Check #" style={Object.assign({}, field, { width: 100 })} />}
           <select value={form.source} onChange={function(e) { set('source', e.target.value); }} style={field}>{TR_SOURCES.map(function(s) { return <option key={s}>{s}</option>; })}</select>
           <input value={form.note} onChange={function(e) { set('note', e.target.value); }} placeholder="What it is for" style={Object.assign({}, field, { flex: 2, minWidth: 180 })} />
           <button type="submit" disabled={saving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{saving ? 'Saving…' : 'Add'}</button>
         </div>
+        {form.method === 'PayPal' && estFee(form.amount) ? <div style={{ fontSize: 12, color: '#6b5d4a', marginTop: 8 }}>Estimated PayPal fee {money(String(form.fee).trim() !== '' ? parseFloat(form.fee) || 0 : estFee(form.amount))}, so about {money(parseFloat(String(form.amount).replace(/[$,]/g, '')) - (String(form.fee).trim() !== '' ? parseFloat(form.fee) || 0 : estFee(form.amount)))} reaches the bank. Leave the fee blank to use the estimate; PayPal's exact fee replaces it once the payment shows up in PayPal.</div> : null}
         {err ? <div style={{ color: '#b3402a', fontSize: 13, marginTop: 8 }}>{err}</div> : null}
       </form>
 
@@ -23014,7 +23023,7 @@ function TreasurerView({ navigate }) {
                   <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{p.category}{p.detail ? <div style={{ fontSize: 12, color: '#999' }}>{p.detail}</div> : null}</td>
                   <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{p.source}</td>
                   <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{p.method}{p.reference ? <div style={{ fontSize: 11, color: '#aaa' }}>{p.reference}</div> : null}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(p.amount)}{Number(p.fee) > 0 ? <div style={{ fontSize: 11, color: '#aaa', fontWeight: 400 }}>fee {money(p.fee)}</div> : null}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(p.amount)}{Number(p.fee) > 0 ? <div style={{ fontSize: 11, color: '#aaa', fontWeight: 400 }}>fee {money(p.fee)}{p.fee_estimated ? ' (est.)' : ''}</div> : null}</td>
                   <td style={{ padding: '9px 12px' }}>{p.payment_key.indexOf('man:') === 0 ? <a onClick={function() { removeEntry(p); }} style={{ fontSize: 12, color: '#b3402a', cursor: 'pointer' }}>Delete</a> : null}</td>
                 </tr>;
               })}
