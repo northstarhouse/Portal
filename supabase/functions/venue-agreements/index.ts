@@ -53,6 +53,8 @@ async function mailLink(version:any,signer:any,value:string,copyTo=''){try{
  }
  if(copyTo){await email(copyTo,'[Copy of what '+signer.name+' receives] '+subject,'(This is a copy for the venue. It was NOT sent to '+signer.email+'.)\n\n'+text,false,html);return {delivered:true,copy:true};}
  await email(signer.email,subject,text,true,html);
+ // Activity log: who got which agreement email, so the team can see it was sent.
+ try{await rest('activity_log',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({description:(signed?'Signed agreement copy sent to ':venue?'Countersignature request sent to ':'Contract sent to ')+(signer.name||signer.email),action:signed?'contract_copy_sent':venue?'contract_countersign_requested':'contract_sent',tag:'Venue',detail:{version_id:version.id,signer_id:signer.id,email:signer.email,title:version.title}})});}catch(_e){/* the email already went out */}
  await rpc('delivery',{version_id:version.id,detail:{signer_id:signer.id,delivered:true}});return {delivered:true};}catch(e){await rpc('delivery',{version_id:version.id,detail:{signer_id:signer.id,delivered:false}});return {delivered:false,error:(e as Error).message};}}
 
 Deno.serve(async req=>{
