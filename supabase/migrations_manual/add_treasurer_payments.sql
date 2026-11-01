@@ -76,7 +76,7 @@ language sql security definer set search_path = public as $$
     -- Venue rental payments made online (PayPal)
     select 'vp:' || p.id::text, (p.created_at at time zone 'America/Los_Angeles')::date, 'Venue Rental'::text, 'Rental payment',
            coalesce(i.name, p.payer_name, 'Venue client'),
-           nullif(concat_ws(' · ', i.event_type, i.event_date::text), ''),
+           nullif(concat_ws(' · ', i.event_type, to_char(i.event_date, 'Mon FMDD, YYYY')), ''),
            (p.amount_cents / 100.0)::numeric, p.paypal_fee, p.net_amount, 'PayPal', concat_ws(' · ', p.installment_note, p.paypal_capture_id), false
     from venue_payments p
     left join venue_inquiries i on i.id = p.inquiry_id
@@ -85,7 +85,7 @@ language sql security definer set search_path = public as $$
     -- Venue rental payments logged by hand (check, cash, paid before the new system)
     select 'vm:' || i.id::text || ':' || (mp->>'id'), coalesce((mp->>'date')::date, i.created_at::date), 'Venue Rental'::text, 'Rental payment',
            coalesce(i.name, 'Venue client'),
-           nullif(concat_ws(' · ', i.event_type, i.event_date::text, mp->>'note'), ''),
+           nullif(concat_ws(' · ', i.event_type, to_char(i.event_date, 'Mon FMDD, YYYY'), mp->>'note'), ''),
            ((mp->>'cents')::numeric / 100.0), null::numeric, null::numeric, 'Recorded by hand', mp->>'id', false
     from venue_inquiries i
     join nsh_form_responses r on r.id = i.prebooking_form_response_id
