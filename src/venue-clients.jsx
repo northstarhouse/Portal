@@ -244,8 +244,7 @@ function PreBookingFormView({ client, open, setOpen }) {
     sec.rows.push({ label: f.label || f.id, value });
   });
   if (!client.sub?.answers) return null;
-  return <div className="vc-modal-section" id="vc-prebooking">
-    <div className="vc-modal-section-title"><span>Pre-booking form</span><button type="button" className="vc-open" onClick={() => setOpen(!open)}>{open ? 'Hide' : 'View the form they filled in'}</button></div>
+  return <div>
     {open && (fields === null ? <p className="vc-muted">Loading…</p> : !sections.length ? <p className="vc-muted">No answers on file.</p> : sections.map(sec => <div key={sec.name} style={{marginTop:12}}>
       <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#886c44',marginBottom:6}}>{sec.name}</div>
       {sec.rows.map((r, i) => <div key={i} style={{display:'flex',gap:12,padding:'6px 0',borderTop:'1px solid #f0ebe2'}}><div style={{flex:'0 0 38%',color:'#888'}}>{r.label}</div><div style={{flex:1,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{r.value}</div></div>)}
@@ -264,8 +263,7 @@ function InsuranceVerification({ client, onVerify }) {
     catch(e) { setError(e.message || 'Could not save insurance verification.'); }
     finally { setSaving(false); }
   }
-  return <div className="vc-modal-section" aria-labelledby="vc-insurance-title">
-    <div className="vc-modal-section-title"><span id="vc-insurance-title">Insurance</span><span className={'vc-pill '+(client.insuranceVerified?'good':'alert')}>{client.insuranceUploadedAt?'Uploaded on Client Portal':client.insuranceVerified?'Verified on file':'Needs verification'}</span></div>
+  return <div>
     <p className="vc-muted" style={{marginTop:0}}>{client.insuranceUploadedAt ? 'Uploaded '+dateLabel(client.insuranceUploadedAt)+' by the client.' : client.insuranceVerified ? (client.insuranceCheck?.verified_at ? 'Verified '+dateLabel(client.insuranceCheck.verified_at)+'.' : 'Certificate received '+dateLabel(client.insuranceUploadedAt)+'.') : 'After reviewing the certificate, mark it verified here—even if it was received by email or in HoneyBook.'}</p>
     {client.insuranceUploadedAt && client.insuranceDriveUrl && <p><a href={client.insuranceDriveUrl} target="_blank" rel="noopener noreferrer">View in client folder on Google Drive ↗</a></p>}
     {!client.insuranceUploadedAt && client.sourceUrl && <p><a href={client.sourceUrl} target="_blank" rel="noopener noreferrer">Review documents in HoneyBook ↗</a></p>}
@@ -315,6 +313,35 @@ function ManualPayments({ client, onSave }) {
       <button type="submit" disabled={busy} style={{border:'none',borderRadius:7,padding:'9px 14px',background:'#886c44',color:'#fff',fontSize:12,fontWeight:600}}>{busy?'Saving…':'Log payment'}</button>
     </form>
     {err&&<p role="alert" style={{fontSize:12,color:'#a64f3c',marginBottom:0}}>{err}</p>}
+  </div>;
+}
+
+// One row per requirement (pre-booking form, insurance, wedding brick): its name, whether it is done, and click to expand.
+function ExpandRow({ id, title, pill, tone, open, onToggle, children }) {
+  return <div id={id} style={{borderTop:'1px solid #f0ebe2'}}>
+    <button type="button" onClick={onToggle} aria-expanded={!!open} style={{display:'flex',width:'100%',alignItems:'center',gap:10,background:'none',border:0,padding:'11px 2px',textAlign:'left'}}>
+      <span style={{flex:1,fontWeight:600,color:'#2a2420',fontSize:14}}>{title}</span>
+      <span className={'vc-pill '+tone}>{pill}</span>
+      <span aria-hidden="true" style={{color:'#886c44',fontSize:13,width:14,textAlign:'center'}}>{open ? '▾' : '▸'}</span>
+    </button>
+    {open && <div style={{padding:'0 2px 14px'}}>{children}</div>}
+  </div>;
+}
+function RequirementsGroup({ client, onVerify, formOpen, setFormOpen }) {
+  const [insOpen, setInsOpen] = React.useState(false), [brickOpen, setBrickOpen] = React.useState(false);
+  const hasForm = !!client.sub?.answers && Object.keys(client.sub.answers).some(k => !k.startsWith('__'));
+  const brickDone = !!client.brickLines?.some(l => String(l).trim());
+  return <div className="vc-modal-section">
+    <div className="vc-modal-section-title">Forms &amp; Requirements</div>
+    {client.sub?.answers && <ExpandRow id="vc-prebooking" title="Pre-booking form" tone={hasForm ? 'good' : ''} pill={hasForm ? 'Filled out' : 'Imported record'} open={formOpen} onToggle={() => setFormOpen(!formOpen)}>
+      <PreBookingFormView client={client} open={formOpen} setOpen={setFormOpen}/>
+    </ExpandRow>}
+    <ExpandRow id="vc-insurance" title="Insurance" tone={client.insuranceVerified ? 'good' : 'alert'} pill={client.insuranceVerified ? 'Verified' : 'Not verified'} open={insOpen} onToggle={() => setInsOpen(!insOpen)}>
+      <InsuranceVerification client={client} onVerify={onVerify}/>
+    </ExpandRow>
+    {client.type === 'Wedding' && <ExpandRow id="vc-brick" title="Wedding brick" tone={brickDone ? 'good' : 'alert'} pill={brickDone ? 'Submitted' : 'Not submitted'} open={brickOpen} onToggle={() => setBrickOpen(!brickOpen)}>
+      {brickDone ? <><div style={{fontFamily:'Cardo,Georgia,serif',letterSpacing:2,lineHeight:1.9,background:'#faf8f3',border:'1px solid #eee7dd',borderRadius:7,padding:'10px 14px'}}>{client.brickLines.map((l,i) => <div key={i}>{l || ' '}</div>)}</div>{client.brickSubmittedAt && <p className="vc-muted" style={{marginBottom:0}}>Submitted {dateLabel(client.brickSubmittedAt.slice(0,10))}</p>}</> : <p className="vc-muted" style={{margin:0}}>The client chooses 3 lines of up to 20 characters on their event page.</p>}
+    </ExpandRow>}
   </div>;
 }
 
@@ -408,15 +435,10 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
           <div style={{textAlign:'right',fontSize:12,color:st.late?'#c0392b':st.done?'#2e7d32':'#888'}}>{st.when}</div>
         </div>)}
       </div>
-      <PreBookingFormView client={client} open={formOpen} setOpen={setFormOpen}/>
-      <InsuranceVerification client={client} onVerify={onVerify}/>
+      <RequirementsGroup client={client} onVerify={onVerify} formOpen={formOpen} setFormOpen={setFormOpen}/>
       {messages&&messages.length>0&&<div className="vc-modal-section">
         <div className="vc-modal-section-title"><span>Messages from the couple</span><span className={'vc-pill '+(messages.some(m=>m.direction!=='outgoing'&&!m.handled_at)?'alert':'good')}>{messages.some(m=>m.direction!=='outgoing'&&!m.handled_at)?'New':'All handled'}</span></div>
         {messages.map(m=><div key={m.id} className="vc-note-box" style={{marginTop:8}}><div className="vc-muted" style={{marginBottom:4}}>{m.direction==='outgoing'?'Reply from '+(m.from_name||'the team'):(m.from_name||'Client')} · {new Date(m.created_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}{m.direction!=='outgoing'&&m.handled_at?' · handled'+(m.handled_by?' by '+m.handled_by:''):''}</div><div style={{whiteSpace:'pre-wrap'}}>{m.body}</div>{m.handled_note&&<div className="vc-muted" style={{marginTop:6,whiteSpace:'pre-wrap'}}><strong>Notes:</strong> {m.handled_note}</div>}{m.direction!=='outgoing'&&!m.handled_at&&onHandleMessage&&<button type="button" onClick={()=>{const who=window.prompt('Handled by (Jen, Derek or Haley)?');if(who&&/^(jen|derek|haley)$/i.test(who.trim()))onHandleMessage(m.id,who.trim().charAt(0).toUpperCase()+who.trim().slice(1).toLowerCase());else if(who)alert('Please enter Jen, Derek or Haley.');}} style={{marginTop:8,border:'1px solid #e0d8cc',borderRadius:6,padding:'5px 10px',background:'#fff',color:'#886c44',fontSize:11,fontWeight:600}}>Mark handled</button>}</div>)}
-      </div>}
-      {client.type==='Wedding'&&<div className="vc-modal-section" aria-labelledby="vc-brick-title">
-        <div className="vc-modal-section-title"><span id="vc-brick-title">Wedding brick</span><span className={'vc-pill '+(client.brickLines?.some(l => String(l).trim())?'good':'alert')}>{client.brickLines?.some(l => String(l).trim())?'Wording submitted':'Not submitted yet'}</span></div>
-        {client.brickLines?.some(l => String(l).trim()) ? <><div style={{fontFamily:'Cardo,Georgia,serif',letterSpacing:2,lineHeight:1.9,background:'#faf8f3',border:'1px solid #eee7dd',borderRadius:7,padding:'10px 14px'}}>{client.brickLines.map((l,i) => <div key={i}>{l || ' '}</div>)}</div>{client.brickSubmittedAt && <p className="vc-muted" style={{marginBottom:0}}>Submitted {dateLabel(client.brickSubmittedAt.slice(0,10))}</p>}</> : <p className="vc-muted" style={{margin:0}}>The client chooses 3 lines of up to 20 characters on their event page.</p>}
       </div>}
       {agreementApi&&(client.legacy
         ? <div style={{opacity:.4,pointerEvents:'none',userSelect:'none'}} aria-disabled="true"><div className="vc-modal-section"><div className="vc-modal-section-title"><span>Agreement</span><span className="vc-pill good">Signed</span></div><p className="vc-muted" style={{margin:0}}>Booked before this system. The signed agreement is on file, so nothing is managed here.</p></div></div>
