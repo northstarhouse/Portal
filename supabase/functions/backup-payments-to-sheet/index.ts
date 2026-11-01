@@ -205,11 +205,23 @@ Deno.serve(async (req) => {
       }
     }
     const have = new Set(ppReset ? done.map((d) => d.payment_key).filter((k) => !ledger.some((p) => p.payment_key === k && isPayPal(p))) : done.map((d) => d.payment_key))
-    const fresh = ledger.filter((p) => !have.has(String(p.payment_key))).sort((a, b) => String(a.paid_on || '').localeCompare(String(b.paid_on || '')))
+    const candidates = ledger.filter((p) => !have.has(String(p.payment_key))).sort((a, b) => String(a.paid_on || '').localeCompare(String(b.paid_on || '')))
+    if (!candidates.length) return json({ added: 0, paypal: 0, other: 0 })
+    // Claim the payments first. If two backups run at once (instant triggers), only one of them gets each payment,
+    // so nothing is written to the Sheet twice. A failed write gives its claims back so the next run retries them.
+    const claimedRows: { payment_key: string }[] = []
+    for (let i = 0; i < candidates.length; i += 200) {
+      const got = await rest('payment_backup_log?on_conflict=payment_key', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(candidates.slice(i, i + 200).map((p) => ({ payment_key: p.payment_key }))) })
+      claimedRows.push(...(got || []))
+    }
+    const claimed = new Set(claimedRows.map((c) => c.payment_key))
+    const fresh = candidates.filter((p) => claimed.has(String(p.payment_key)))
     if (!fresh.length) return json({ added: 0, paypal: 0, other: 0 })
+    const written = new Set<string>()
 
     const stamp = new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })
     const counts = { paypal: 0, other: 0 }
+    try {
     for (const [title, key, pick] of [[PAYPAL_TAB, 'paypal', true], [OTHER_TAB, 'other', false]] as [string, 'paypal' | 'other', boolean][]) {
       const mine = fresh.filter((p) => isPayPal(p) === pick)
       if (pick && mine.length) {
@@ -222,6 +234,7 @@ Deno.serve(async (req) => {
         for (let i = 0; i < newestFirst.length; i += 200) {
           await rest('payment_backup_log', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(newestFirst.slice(i, i + 200).map((p) => ({ payment_key: p.payment_key }))) })
         }
+        newestFirst.forEach((p) => written.add(String(p.payment_key)))
         counts[key] += newestFirst.length
         continue
       }
@@ -231,8 +244,14 @@ Deno.serve(async (req) => {
         await sheets(token, `/values/${q(title)}!A:L:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, { method: 'POST', body: JSON.stringify({ values }) })
         // Remember them only after Google accepted the rows, so a failure retries instead of losing payments.
         await rest('payment_backup_log', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(chunk.map((p) => ({ payment_key: p.payment_key }))) })
+        chunk.forEach((p) => written.add(String(p.payment_key)))
         counts[key] += chunk.length
       }
+    }
+    } catch (e) {
+      const back = fresh.map((p) => String(p.payment_key)).filter((k) => !written.has(k))
+      for (let i = 0; i < back.length; i += 100) await rest(`payment_backup_log?payment_key=in.(${back.slice(i, i + 100).map((k) => '"' + k + '"').join(',')})`, { method: 'DELETE' }).catch(() => {})
+      throw e
     }
     return json({ added: counts.paypal + counts.other, ...counts })
   } catch (e) {
