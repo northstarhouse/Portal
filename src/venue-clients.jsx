@@ -456,9 +456,11 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
   </dialog>;
 }
 
-export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, savePayments, agreementApi, filter, setFilter, query, setQuery, messages, currentMessages, onHandleMessage, onOpenMessages }) {
+export function VenueClientDashboard({ showSite: showSiteProp, setShowSite: setShowSiteProp, submissions, loadEvents, saveInsurance, savePayments, agreementApi, filter, setFilter, query, setQuery, messages, currentMessages, onHandleMessage, onOpenMessages }) {
   const [events,setEvents] = React.useState([]), [error,setError] = React.useState('');
-  const [showSite,setShowSite] = React.useState(false);
+  const [localSite,setLocalSite] = React.useState(false);
+  const showSite = showSiteProp !== undefined ? showSiteProp : localSite;
+  const setShowSite = setShowSiteProp || setLocalSite;
   const clientMessages = currentMessages || (messages||[]).filter(m=>m.direction!=='outgoing'&&!m.handled_at);
   const [savedResponses,setSavedResponses] = React.useState({});
   const [nativeVersions,setNativeVersions] = React.useState([]);
@@ -506,7 +508,6 @@ export function VenueClientDashboard({ submissions, loadEvents, saveInsurance, s
     <style>{css}</style>
     {error && <p role="status" className="vc-pill alert">{error}</p>}
     {showSite ? <SiteManagersPage clients={clients} today={today} onBack={()=>setShowSite(false)} onAssign={assignSite}/> : <>
-    <div style={{display:'flex',justifyContent:'flex-end',marginBottom:10}}><button onClick={()=>setShowSite(true)} style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600}}>Assign Site Managers</button></div>
     <div className="vc-layout"><section aria-label="Upcoming client events">
       {submissions===null ? <div role="status" className="vc-empty">Loading client events…</div> : shown.length===0 ? <div className="vc-empty">{clients.length?'No events match this view.':'No upcoming client events yet.'}{clients.length>0&&<div><button className="vc-text-button" onClick={()=>{setQuery('');setFilter('all');}}>Show all upcoming events</button></div>}</div> : shown.map(c=>{
         const pastDue=c.duePayments.find(p=>p.due && p.due<today), next=c.duePayments[0];

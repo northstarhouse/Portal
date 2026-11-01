@@ -18738,6 +18738,7 @@ function VenueRentalsView({ navigate, initialTab }) {
     setInquiriesColorCoding(next);
     try { localStorage.setItem('nsh-venue-color-coding', next ? 'on' : 'off'); } catch (e) {}
   }
+  var [siteView, setSiteView] = useState(false); // Clients tab: the Assign Site Managers page
   var colorCoding = venueTab === 'clients' ? true : inquiriesColorCoding;
   const [clientFilter, setClientFilter] = useS('all');
   const [clientQuery, setClientQuery] = useS('');
@@ -19235,6 +19236,8 @@ function VenueRentalsView({ navigate, initialTab }) {
               </select>
               <input aria-label="Search clients" placeholder="Search names or dates…" value={clientQuery} onChange={function(e) { setClientQuery(e.target.value); }}
                 style={{ border: '1px solid #ded7cb', background: '#fff', borderRadius: 7, padding: '9px 11px', fontSize: 12, minWidth: 180 }} />
+              <button type="button" onClick={function() { setSiteView(!siteView); }}
+                style={{ padding: '9px 16px', background: siteView ? gold : '#fff', color: siteView ? '#fff' : gold, border: '1px solid ' + gold, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>{siteView ? 'Back to clients' : 'Assign Site Managers'}</button>
             </React.Fragment>
           )}
           {venueTab !== 'clients' && (
@@ -19307,7 +19310,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
 
           {venueTab === 'clients' && (
-            !inquiriesError && <VenueClientDashboard messages={clientMsgs} currentMessages={currentUnhandledMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} savePayments={savePayments} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
+            !inquiriesError && <VenueClientDashboard showSite={siteView} setShowSite={setSiteView} messages={clientMsgs} currentMessages={currentUnhandledMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} savePayments={savePayments} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
           )}
 
           {venueTab === 'messages' && (
