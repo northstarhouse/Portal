@@ -120,7 +120,8 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   if (!eventDate) task('date', 'Confirm event date', null, 'No date recorded', 'booking');
   tasks.sort((x, y) => x.rank - y.rank || (x.due || eventDate || '9999').localeCompare(y.due || eventDate || '9999'));
   const siteManager = a.__venue_checklist?.site_manager?.name || '';
-  return { id:sub.id, sub, name, email, contacts, siteManager, questionnaire, hbQa, hb, eventDate, eventEnd, nativeAgreement, legacy, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
+  const feedbackSentAt = live?.feedback_sent_at || null;
+  return { id:sub.id, sub, name, email, contacts, siteManager, questionnaire, hbQa, feedbackSentAt, hb, eventDate, eventEnd, nativeAgreement, legacy, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : live?.event_type || 'Private event', days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
 }
 
 const css = `
@@ -316,6 +317,34 @@ function ManualPayments({ client, onSave }) {
   </div>;
 }
 
+// The answers to any form, question by question, using the form's own questions and section headings.
+function FormAnswers({ formId, answers }) {
+  const [fields, setFields] = React.useState(null);
+  React.useEffect(() => {
+    let off = false;
+    fetch(PB_URL + '/rest/v1/nsh_forms?select=fields&id=eq.' + encodeURIComponent(formId), { headers: { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY } })
+      .then(r => r.ok ? r.json() : []).then(rows => { if (!off) setFields(Array.isArray(rows?.[0]?.fields) ? rows[0].fields : []); }).catch(() => { if (!off) setFields([]); });
+    return () => { off = true; };
+  }, [formId]);
+  const show = v => Array.isArray(v) ? v.filter(x => x !== '' && x != null).map(String).join(', ') : v === true ? 'Yes' : v === false ? 'No' : String(v ?? '').trim();
+  const sections = [];
+  (fields || []).forEach(f => {
+    const value = show((answers || {})[f.id]);
+    if (!value || f.type === 'heading' || f.type === 'divider') return;
+    const name = f.section || 'Answers';
+    let sec = sections.find(x => x.name === name);
+    if (!sec) { sec = { name, rows: [] }; sections.push(sec); }
+    sec.rows.push({ label: f.label || f.id, value });
+  });
+  if (fields === null) return <p className="vc-muted" style={{margin:0}}>Loading…</p>;
+  if (!sections.length) return <p className="vc-muted" style={{margin:0}}>No answers yet.</p>;
+  return <div>{sections.map(sec => <div key={sec.name} style={{marginTop:10}}>
+    <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#886c44',marginBottom:6}}>{sec.name}</div>
+    {sec.rows.map((r, i) => <div key={i} style={{display:'flex',gap:12,padding:'6px 0',borderTop:'1px solid #f0ebe2'}}><div style={{flex:'0 0 38%',color:'#888'}}>{r.label}</div><div style={{flex:1,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{r.value}</div></div>)}
+  </div>)}</div>;
+}
+const QUESTIONNAIRE_FORM = 'e9be06b9-6788-41bc-a78a-28e02b8b749a', FEEDBACK_FORM = '5ebe4961-d50e-47f1-9071-e81c2ada6233', FEEDBACK_EMAIL_FIELD = 'w2yhaoaf';
+
 // One row per requirement (pre-booking form, insurance, wedding brick): its name, whether it is done, and click to expand.
 function ExpandRow({ id, title, pill, tone, open, onToggle, children }) {
   return <div id={id} style={{borderTop:'1px solid #f0ebe2'}}>
@@ -329,6 +358,21 @@ function ExpandRow({ id, title, pill, tone, open, onToggle, children }) {
 }
 function RequirementsGroup({ client, onVerify, formOpen, setFormOpen }) {
   const [insOpen, setInsOpen] = React.useState(false), [brickOpen, setBrickOpen] = React.useState(false);
+  const [preOpen, setPreOpen] = React.useState(false), [postOpen, setPostOpen] = React.useState(false);
+  // The post-event (final feedback) response, matched to the couple by the email they gave on it.
+  const [feedback, setFeedback] = React.useState(undefined);
+  React.useEffect(() => {
+    let off = false;
+    const emails = [...new Set([client.email, ...(client.contacts || []).map(c => c.email)].filter(Boolean).map(e => String(e).trim().toLowerCase().replace(/[,()"]/g, '')))];
+    if (!emails.length) { setFeedback(null); return; }
+    const or = '(' + emails.map(e => 'answers->>' + FEEDBACK_EMAIL_FIELD + '.ilike.' + e).join(',') + ')';
+    fetch(PB_URL + '/rest/v1/nsh_form_responses?select=answers,created_at&form_id=eq.' + FEEDBACK_FORM + '&order=created_at.desc&limit=1&or=' + encodeURIComponent(or), { headers: { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY } })
+      .then(r => r.ok ? r.json() : []).then(rows => { if (!off) setFeedback(rows && rows[0] ? rows[0] : null); }).catch(() => { if (!off) setFeedback(null); });
+    return () => { off = true; };
+  }, [client.id]);
+  const hbAnswered = (client.hbQa || []).filter(x => String(x.answer || '').trim());
+  const pre = client.surveyComplete ? ['Complete', 'good'] : client.surveySent ? ['Sent', ''] : ['Not sent', client.days !== null && client.days <= 60 ? 'alert' : ''];
+  const post = feedback ? ['Received', 'good'] : client.feedbackSentAt ? ['Sent', ''] : (client.days !== null && client.days > 0) ? ['After the event', ''] : ['Not sent', 'alert'];
   const hasForm = !!client.sub?.answers && Object.keys(client.sub.answers).some(k => !k.startsWith('__'));
   const brickDone = !!client.brickLines?.some(l => String(l).trim());
   return <div className="vc-modal-section">
@@ -336,12 +380,21 @@ function RequirementsGroup({ client, onVerify, formOpen, setFormOpen }) {
     {client.sub?.answers && <ExpandRow id="vc-prebooking" title="Pre-booking form" tone={hasForm ? 'good' : ''} pill={hasForm ? 'Filled out' : 'Imported record'} open={formOpen} onToggle={() => setFormOpen(!formOpen)}>
       <PreBookingFormView client={client} open={formOpen} setOpen={setFormOpen}/>
     </ExpandRow>}
+    <ExpandRow id="vc-preevent" title="Pre-event form" tone={pre[1]} pill={pre[0]} open={preOpen} onToggle={() => setPreOpen(!preOpen)}>
+      {client.questionnaire ? <FormAnswers formId={QUESTIONNAIRE_FORM} answers={client.questionnaire}/>
+        : hbAnswered.length ? <div>{hbAnswered.map((x, i) => <div key={i} style={{display:'flex',gap:12,padding:'6px 0',borderTop:'1px solid #f0ebe2'}}><div style={{flex:'0 0 38%',color:'#888'}}>{x.label}</div><div style={{flex:1,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{String(x.answer)}</div></div>)}</div>
+        : <p className="vc-muted" style={{margin:0}}>{client.surveySent ? 'Sent. The couple fills it in on their event page.' : 'Not sent yet. The couple fills it in on their event page.'}</p>}
+    </ExpandRow>
     <ExpandRow id="vc-insurance" title="Insurance" tone={client.insuranceVerified ? 'good' : 'alert'} pill={client.insuranceVerified ? 'Verified' : 'Not verified'} open={insOpen} onToggle={() => setInsOpen(!insOpen)}>
       <InsuranceVerification client={client} onVerify={onVerify}/>
     </ExpandRow>
     {client.type === 'Wedding' && <ExpandRow id="vc-brick" title="Wedding brick" tone={brickDone ? 'good' : 'alert'} pill={brickDone ? 'Submitted' : 'Not submitted'} open={brickOpen} onToggle={() => setBrickOpen(!brickOpen)}>
       {brickDone ? <><div style={{fontFamily:'Cardo,Georgia,serif',letterSpacing:2,lineHeight:1.9,background:'#faf8f3',border:'1px solid #eee7dd',borderRadius:7,padding:'10px 14px'}}>{client.brickLines.map((l,i) => <div key={i}>{l || ' '}</div>)}</div>{client.brickSubmittedAt && <p className="vc-muted" style={{marginBottom:0}}>Submitted {dateLabel(client.brickSubmittedAt.slice(0,10))}</p>}</> : <p className="vc-muted" style={{margin:0}}>The client chooses 3 lines of up to 20 characters on their event page.</p>}
     </ExpandRow>}
+    <ExpandRow id="vc-postevent" title="Post-event form" tone={post[1]} pill={post[0]} open={postOpen} onToggle={() => setPostOpen(!postOpen)}>
+      {feedback ? <><FormAnswers formId={FEEDBACK_FORM} answers={feedback.answers}/><p className="vc-muted" style={{marginBottom:0}}>Received {dateLabel(String(feedback.created_at).slice(0,10))}</p></>
+        : <p className="vc-muted" style={{margin:0}}>{client.feedbackSentAt ? 'The feedback form was sent ' + dateLabel(String(client.feedbackSentAt).slice(0,10)) + '. No response yet.' : 'The feedback form is emailed to the couple after their event.'}</p>}
+    </ExpandRow>
   </div>;
 }
 
