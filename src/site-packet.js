@@ -91,12 +91,12 @@ export function buildSitePacketHtml(client) {
   const access = a('houseAccess');
   const accessMins = clock(access);
   const times = {
-    setup: a('outdoorSetup'), house: access, arrive: sched.arrive || '', ceremony: sched.ceremony || '', cocktail: sched.cocktail || '',
+    setup: a('outdoorSetup'), house: access, ceremony: sched.ceremony || '', cocktail: sched.cocktail || '',
     dining: sched.dining || '', leave: sched.leave || '',
     // the rental is 10 hours from the time inside access begins
     out: accessMins != null ? showClock(accessMins + 600) : '',
   };
-  const schedule = [['Outdoor Setup', times.setup], ['House Access', times.house], ['Guests Arrive', times.arrive], ['Ceremony', times.ceremony], ['Cocktail Hour', times.cocktail], ['Dining', times.dining], ['Guests Leave', times.leave], ['Out Time', times.out]];
+  const schedule = [['Outdoor Setup', times.setup], ['House Access', times.house], ['Ceremony', times.ceremony], ['Cocktail Hour', times.cocktail], ['Dining', times.dining], ['Guests Leave', times.leave], ['Out Time', times.out]];
 
   const deposit = (() => {
     const rows = client.schedule || [];
