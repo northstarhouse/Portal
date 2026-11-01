@@ -104,14 +104,36 @@ export function buildSitePacketHtml(client) {
     return hit ? hit.cents : null;
   })();
   const notes = [
-    ['Ceremony', a('ceremony')], ['Dining', a('dining')], ['Other areas', a('areas')], ['Caterer', a('caterer')], ['DJ', a('dj')], ['Photographer', a('photographer')],
-    ['Rentals', a('rentals')], ['Other vendors', a('otherVendors')],
+    ['Ceremony', a('ceremony')], ['Dining', a('dining')], ['Other areas', a('areas')],
   ].filter((r) => r[1]);
   const itinerary = a('itinerary');
+
+  // Who to call: the couple, the day-of coordinator, and the vendors (the questionnaire stores each as "name, phone").
+  const people = (client.contacts || []).filter((c) => c && c.full_name).slice(0, 2);
+  const contactRows = [
+    ...people.map((c) => ['Couple', c.full_name + (c.phone_number ? ', ' + c.phone_number : '')]),
+    ['Day of Coordinator', a('coordinator')], ['Caterer', a('caterer')], ['DJ', a('dj')], ['Photographer', a('photographer')], ['Rentals', a('rentals')], ['Other vendors', a('otherVendors')],
+  ].filter((r) => r[1]);
+
+  // Setup checklist: one tick box per item the crew has to set out.
+  const num = (v) => { const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10); return Number.isFinite(n) && n > 0 ? n : 0; };
+  const setupItems = [
+    [num(a('round')), '60" round tables'], [num(a('rect8')), "8' rectangle tables"], [num(a('rect6')), "6' rectangle tables"], [num(a('chairs')), 'folding chairs'],
+  ].filter((x) => x[0]).map((x) => x[0] + ' ' + x[1]);
+
+  // The couple's itinerary, one row per line: a time when the line starts with one, then what happens.
+  const itinRows = String(itinerary || '').split(/\n|;/).map((l) => l.trim()).filter(Boolean).map((l) => {
+    const m = l.match(/^(\d{1,2}(?::\d{2})?\s*[ap]\.?m\.?|noon)\s*[-:\u2013\u2014]?\s*(.*)$/i);
+    return m ? [m[1].toUpperCase().replace(/\./g, ''), m[2] || ''] : ['', l];
+  });
+  // Page 1 is one sheet: estimate what has been printed and leave the rest as writing lines.
+  const contactPairs = []; for (let i = 0; i < contactRows.length; i += 2) contactPairs.push(contactRows.slice(i, i + 2));
+  const used = 500 + (contactPairs.length ? 50 + contactPairs.length * 24 : 0) + (setupItems.length ? 30 : 0) + (notes.length ? 44 : 0) + (itinRows.length ? 28 + itinRows.length * 21 : 0);
+  const freeLines = Math.max(1, Math.min(6, Math.floor((930 - used) / 44)));
   const rule = (n) => Array.from({ length: n }, () => '<div class="ruled"></div>').join('');
 
   const page1 = `
-<section class="page">
+<section class="page p1">
   <h1>Event Information for Site Managers</h1>
   <div class="row"><span class="lab">Event Name:</span><span class="val">${esc(eventName)}</span></div>
   <div class="row"><span class="lab">Date:</span><span class="val">${esc(date)}</span></div>
@@ -123,17 +145,21 @@ export function buildSitePacketHtml(client) {
     <td><span class="lab">Rectangle Tables:</span> 6'- ${esc(a('rect6'))} &nbsp; 8'- ${esc(a('rect8'))}</td>
     <td><span class="lab">Chairs:</span> ${esc(a('chairs'))}</td>
   </tr></table>
+  ${setupItems.length ? `<div class="setup"><span class="lab">Setup checklist:</span> ${setupItems.map((i) => `<span class="tick">&#9633; ${esc(i)}</span>`).join('')}</div>` : ''}
   <h2>Schedule of Event Activities:</h2>
-  <table class="sched"><tr>${schedule.map((s) => `<th>${esc(s[0])}</th>`).join('')}</tr><tr>${schedule.map((s) => `<td>${esc(s[1])}</td>`).join('')}</tr></table>
+  <table class="sched"><tr>${schedule.map((x) => `<th>${esc(x[0])}</th>`).join('')}</tr><tr>${schedule.map((x) => `<td>${esc(x[1])}</td>`).join('')}</tr></table>
+  ${contactRows.length ? `<h2>Contacts:</h2><table class="contacts">${contactPairs.map((p) => `<tr>${p.map((r) => `<th>${esc(r[0])}</th><td>${esc(r[1])}</td>`).join('')}${p.length < 2 ? '<th></th><td></td>' : ''}</tr>`).join('')}</table>` : ''}
   <h2>Site Manager Notes:</h2>
-  ${notes.length ? `<div class="notes">${notes.map((n) => `<div><b>${esc(n[0])}:</b> ${esc(n[1])}</div>`).join('')}</div>` : ''}
-  ${itinerary ? `<div class="notes"><b>Couple's itinerary:</b><div class="itin">${esc(itinerary)}</div></div>` : ''}
-  ${rule(notes.length || itinerary ? 4 : 7)}
+  ${notes.length ? `<div class="notes">${notes.map((n) => `<b>${esc(n[0])}:</b> ${esc(n[1])}`).join(' &nbsp;&middot;&nbsp; ')}</div>` : ''}
+  ${itinRows.length ? `<div class="itinhead">Couple's itinerary</div><table class="itin">${itinRows.map((r) => `<tr><th>${esc(r[0])}</th><td>${esc(r[1])}</td></tr>`).join('')}</table>` : ''}
+  ${rule(freeLines)}
   <div class="version">Version 2.26</div>
 </section>`;
 
+  const phead = `<div class="phead"><b>${esc(eventName)}</b>${date ? ' &middot; ' + esc(date) : ''}</div>`;
   const page2 = `
 <section class="page">
+  ${phead}
   <div class="smallcap">Top Half to Be Completed by Site Manager</div>
   <div class="checks"><div class="cb">&#9633; All rentals put away</div><div class="cb">&#9633; Trash &amp; recycling handled properly</div><div class="cb">&#9633; No pets on site</div><div class="cb">&#9633; No evidence of smoking or fire</div></div>
   <div class="attn">Areas of Immediate Attention/Need:</div>
@@ -154,6 +180,7 @@ export function buildSitePacketHtml(client) {
 
   const walkPage = (sections, idx) => `
 <section class="page walk">
+  ${phead}
   ${idx === 0 ? '<h1>Walk-Through &amp; Checklist</h1>' : ''}
   <div class="ba"><span>Before</span><span>After</span></div>
   ${sections.map(([title, items]) => `<div class="wrow"><div class="wl"><b>${esc(title)}</b><ul>${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul></div><div class="boxes" style="height:${Math.max(64, items.length * 22 + 28)}px"><div></div><div></div></div></div>`).join('')}
@@ -179,11 +206,22 @@ export function buildSitePacketHtml(client) {
   .counts { width: 100%; border-collapse: collapse; margin-top: 18px; border: 2px solid #bbb; }
   .counts td { border: 1.5px solid #bbb; padding: 10px 8px; font-size: 13px; vertical-align: top; }
   .sched { width: 100%; border-collapse: collapse; border: 2px solid #bbb; table-layout: fixed; }
-  .sched th { border: 1.5px solid #bbb; padding: 8px 4px; font-size: 12px; color: #666; text-align: center; font-weight: 700; }
-  .sched td { border: 1.5px solid #bbb; height: 70px; text-align: center; font-size: 12px; color: #222; font-weight: 600; padding: 4px; }
-  .notes { font-size: 12px; color: #333; margin: 4px 0 6px; line-height: 1.5; }
-  .itin { white-space: pre-wrap; font-weight: 600; font-size: 11px; }
-  .ruled { border-top: 1.5px solid #999; height: 44px; }
+  .sched th { border: 1.5px solid #bbb; padding: 8px 4px; font-size: 13px; color: #555; text-align: center; font-weight: 700; }
+  .sched td { border: 1.5px solid #bbb; height: 54px; text-align: center; font-size: 16px; color: #111; font-weight: 700; padding: 4px; }
+  .p1 .row { min-height: 34px; padding: 6px 2px; }
+  .p1 h2 { margin: 14px 0 8px; font-size: 22px; }
+  .setup { margin-top: 8px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; }
+  .tick { font-weight: 600; color: #222; }
+  .contacts { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .contacts th { text-align: left; width: 14%; padding: 3px 8px 3px 0; color: #555; font-weight: 700; vertical-align: top; }
+  .contacts td { padding: 3px 12px 3px 0; color: #111; font-weight: 600; width: 36%; }
+  .notes { font-size: 14px; color: #222; margin: 2px 0 6px; line-height: 1.45; }
+  .itinhead { font-weight: 700; font-size: 13px; color: #555; margin: 6px 0 3px; }
+  .itin { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .itin th { text-align: right; width: 16%; padding: 2px 10px 2px 0; color: #7a5c14; font-weight: 700; white-space: nowrap; vertical-align: top; }
+  .itin td { padding: 2px 0; color: #111; font-weight: 600; border-bottom: 1px dotted #ccc; }
+  .phead { position: absolute; top: 0.18in; left: 0.55in; right: 0.55in; font-size: 11px; color: #777; text-align: right; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
+  .ruled { border-top: 1.5px solid #999; height: 40px; }
   .version { position: absolute; right: 0.55in; bottom: 0.4in; font-weight: 700; font-size: 11px; color: #222; }
   .smallcap { text-align: center; font-weight: 700; font-size: 12px; padding: 8px 0; border-bottom: 1.5px solid #888; }
   .smallcap.mid { border-top: 1.5px solid #888; margin-top: 8px; }
@@ -208,7 +246,7 @@ export function buildSitePacketHtml(client) {
   .wl li { line-height: 1.55; }
   .boxes { width: 48%; display: grid; grid-template-columns: 1fr 1fr; border: 1.5px solid #222; }
   .boxes div:first-child { border-right: 1.5px solid #222; }
-  @media print { body { background: #fff; } .bar { display: none; } .page { margin: 0; box-shadow: none; width: auto; min-height: 9.95in; padding: 0.1in 0.1in; } }
+  @media print { body { background: #fff; } .bar { display: none; } .page { margin: 0; box-shadow: none; width: auto; min-height: 9.95in; padding: 0.34in 0.1in 0.1in; } .phead { left: 0.1in; right: 0.1in; top: 0.02in; } .version { right: 0.1in; bottom: 0.05in; } }
 </style></head><body>
 <div class="bar"><button onclick="window.print()">Print packet</button><span>${esc(eventName)}${date ? ' &middot; ' + esc(date) : ''}. 4 pages. In the print window you can also choose Save as PDF.</span></div>
 ${page1}${page2}${walkPage(WALK[0], 0)}${walkPage(WALK[1], 1)}
