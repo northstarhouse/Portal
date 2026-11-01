@@ -23,6 +23,18 @@ const PREFIX = 'Backup - '
 const PAYPAL_TAB = PREFIX + 'PayPal Payments'
 const OTHER_TAB = PREFIX + 'Checks, Cash & Other'
 const HEADER = ['Payment ID', 'Date', 'Source', 'Category', 'From', 'Details', 'Amount', 'PayPal fee', 'Net', 'Method', 'Reference', 'Backed up']
+// The PayPal tab follows the layout the treasurer uses on the first tab: fee and net get their own columns.
+const PP_HEADER = ['Name', 'Gross', 'Fee', 'Net', 'Date', 'Notes', 'For:']
+const niceDate = (d: unknown) => {
+  const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/)
+  return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : String(d || '')
+}
+const ppRow = (p: Record<string, unknown>) => {
+  const gross = Number(p.amount)
+  const fee = p.fee == null || p.fee === '' ? null : Number(p.fee)
+  const net = p.net != null && p.net !== '' ? Number(p.net) : fee == null ? null : Math.round((gross - fee) * 100) / 100
+  return [p.payer, gross, fee ?? '', net ?? '', niceDate(p.paid_on), p.reference ?? '', [p.category, p.detail].filter(Boolean).join(' — ')]
+}
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-app-token',
@@ -73,7 +85,7 @@ async function sheets(token: string, path: string, init: RequestInit = {}) {
   const d = await r.json().catch(() => ({}))
   if (r.status === 403 || r.status === 404) {
     const email = JSON.parse(SA_KEY!).client_email
-    throw new Error(`The Google Sheet is not shared with the backup account. Share it (Editor) with ${email}.`)
+    throw new Error(`Google said (${r.status}): ${d?.error?.message || "no detail"}. Backup account: ${email}`)
   }
   if (!r.ok) throw new Error(d?.error?.message || `Google Sheets error (${r.status})`)
   return d
@@ -106,11 +118,19 @@ const q = (title: string) => encodeURIComponent(`'${title.replace(/'/g, "''")}'`
 // Cleans a tab name the way Sheets wants it (no : \ / ? * [ ], max 100 characters).
 const tabName = (n: string) => (PREFIX + String(n).replace(/[:\\/?*[\]]/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 100)
 
-async function ensureHeader(token: string, title: string) {
+// Writes the header row if the tab is empty. Returns true when the tab had a different (older) layout and was reset, so
+// the caller can re-add its payments. Only ever called on backup tabs this function owns.
+async function ensureHeader(token: string, title: string, header: string[]) {
   const head = await sheets(token, `/values/${q(title)}!A1:L1`)
-  if (!head.values || !head.values.length) {
-    await sheets(token, `/values/${q(title)}!A1:L1?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [HEADER] }) })
+  const have = (head.values && head.values[0]) || []
+  const same = have.length === header.length && header.every((h, i) => have[i] === h)
+  let reset = false
+  if (have.length && !same) {
+    await sheets(token, `/values/${q(title)}:clear`, { method: 'POST', body: '{}' })
+    reset = true
   }
+  if (!same) await sheets(token, `/values/${q(title)}!A1:${String.fromCharCode(64 + header.length)}1?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [header] }) })
+  return reset
 }
 
 async function signedIn(req: Request) {
@@ -159,13 +179,20 @@ Deno.serve(async (req) => {
     // ---- add-only ledger tabs
     await ownTab(token, PAYPAL_TAB, tabs)
     await ownTab(token, OTHER_TAB, tabs)
-    await ensureHeader(token, PAYPAL_TAB)
-    await ensureHeader(token, OTHER_TAB)
+    const ppReset = await ensureHeader(token, PAYPAL_TAB, PP_HEADER)
+    await ensureHeader(token, OTHER_TAB, HEADER)
     const [ledger, done]: [Record<string, unknown>[], { payment_key: string }[]] = await Promise.all([
       rest('rpc/treasurer_payments_all', { method: 'POST', body: '{}' }),
       rest('payment_backup_log?select=payment_key&limit=100000'),
     ])
-    const have = new Set(done.map((d) => d.payment_key))
+    // The PayPal tab was just rebuilt in the new layout: forget its payments so they are written again.
+    if (ppReset) {
+      const ppKeys = ledger.filter(isPayPal).map((p) => String(p.payment_key))
+      for (let i = 0; i < ppKeys.length; i += 100) {
+        await rest(`payment_backup_log?payment_key=in.(${ppKeys.slice(i, i + 100).map((k) => '"' + k + '"').join(',')})`, { method: 'DELETE' })
+      }
+    }
+    const have = new Set(ppReset ? done.map((d) => d.payment_key).filter((k) => !ledger.some((p) => p.payment_key === k && isPayPal(p))) : done.map((d) => d.payment_key))
     const fresh = ledger.filter((p) => !have.has(String(p.payment_key))).sort((a, b) => String(a.paid_on || '').localeCompare(String(b.paid_on || '')))
     if (!fresh.length) return json({ added: 0, paypal: 0, other: 0 })
 
@@ -175,7 +202,7 @@ Deno.serve(async (req) => {
       const mine = fresh.filter((p) => isPayPal(p) === pick)
       for (let i = 0; i < mine.length; i += 200) {
         const chunk = mine.slice(i, i + 200)
-        const values = chunk.map((p) => [p.payment_key, p.paid_on, p.source, p.category, p.payer, p.detail ?? '', Number(p.amount), p.fee ?? '', p.net ?? '', p.method, p.reference ?? '', stamp])
+        const values = pick ? chunk.map(ppRow) : chunk.map((p) => [p.payment_key, p.paid_on, p.source, p.category, p.payer, p.detail ?? '', Number(p.amount), p.fee ?? '', p.net ?? '', p.method, p.reference ?? '', stamp])
         await sheets(token, `/values/${q(title)}!A:L:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, { method: 'POST', body: JSON.stringify({ values }) })
         // Remember them only after Google accepted the rows, so a failure retries instead of losing payments.
         await rest('payment_backup_log', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(chunk.map((p) => ({ payment_key: p.payment_key }))) })
