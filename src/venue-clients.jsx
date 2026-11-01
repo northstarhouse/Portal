@@ -401,6 +401,7 @@ function RequirementsGroup({ client, onVerify, formOpen, setFormOpen }) {
 function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
   const [formOpen, setFormOpen] = React.useState(false);
+  const [agrOpen, setAgrOpen] = React.useState(false);
   const [tl, setTl] = React.useState({ tour: null, sentAt: null, loaded: false });
   // The tour and the "client guide + pre-booking form" email, found by the couple's email addresses.
   React.useEffect(() => {
@@ -495,7 +496,10 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
       </div>}
       {agreementApi&&(client.legacy
         ? <div style={{opacity:.4,pointerEvents:'none',userSelect:'none'}} aria-disabled="true"><div className="vc-modal-section"><div className="vc-modal-section-title"><span>Agreement</span><span className="vc-pill good">Signed</span></div><p className="vc-muted" style={{margin:0}}>Booked before this system. The signed agreement is on file, so nothing is managed here.</p></div></div>
-        : <ContractManager client={client} api={agreementApi} onChange={onContractsChange}/>)}
+        : client.nativeAgreement
+          // Once the agreement has been sent it stays closed, showing Sent or Signed, until it is clicked open.
+          ? <div className="vc-modal-section"><ExpandRow id="vc-agreement" title="Agreement" tone={client.nativeAgreement.status === 'completed' ? 'good' : ['declined','expired'].includes(client.nativeAgreement.status) ? 'alert' : ''} pill={({completed:'Signed',pending:'Sent',declined:'Declined',expired:'Expired'})[client.nativeAgreement.status] || 'Sent'} open={agrOpen} onToggle={() => setAgrOpen(!agrOpen)}><ContractManager client={client} api={agreementApi} onChange={onContractsChange}/></ExpandRow></div>
+          : <ContractManager client={client} api={agreementApi} onChange={onContractsChange}/>)}
       <div className="vc-modal-section">
         <div className="vc-modal-section-title">Payment timeline</div>
         {client.payments ? <>
