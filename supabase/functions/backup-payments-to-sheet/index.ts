@@ -42,6 +42,8 @@ const ppRow = (p: Record<string, unknown>) => {
   const note = [p.reference, known ? '' : 'fee estimated'].filter(Boolean).join(' · ')
   return [p.payer, gross, fee, net, niceDate(p.paid_on), note, [p.category, p.detail].filter(Boolean).join(' — ')]
 }
+const ppObj = (p: Record<string, unknown>) => { const a = ppRow(p); return Object.fromEntries(PP_HEADER.map((h, i) => [h, a[i]])) as Record<string, unknown> }
+const otherObj = (p: Record<string, unknown>, stamp: string) => ({ Date: p.paid_on, Source: p.source, Category: p.category, From: p.payer, Details: p.detail ?? '', Amount: Number(p.amount), 'PayPal fee': p.fee ?? '', Net: p.net ?? '', Method: p.method, Reference: p.reference ?? '', 'Backed up': stamp, 'Payment ID': p.payment_key }) as Record<string, unknown>
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-app-token',
@@ -85,17 +87,22 @@ async function sheetsToken(): Promise<string> {
   return d.access_token
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+// Google allows about 60 reads a minute. When it says slow down (429), wait for the minute to roll over and try again.
 async function sheets(token: string, path: string, init: RequestInit = {}) {
-  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}${path}`, {
-    ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
-  })
-  const d = await r.json().catch(() => ({}))
-  if (r.status === 403 || r.status === 404) {
-    const email = JSON.parse(SA_KEY!).client_email
-    throw new Error(`Google said (${r.status}): ${d?.error?.message || "no detail"}. Backup account: ${email}`)
+  for (let attempt = 0; ; attempt++) {
+    const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}${path}`, {
+      ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
+    })
+    const d = await r.json().catch(() => ({}))
+    if (r.status === 429 && attempt < 4) { await sleep(15000 + attempt * 5000); continue }
+    if (r.status === 403 || r.status === 404) {
+      const email = JSON.parse(SA_KEY!).client_email
+      throw new Error(`Google said (${r.status}): ${d?.error?.message || "no detail"}. Backup account: ${email}`)
+    }
+    if (!r.ok) throw new Error(d?.error?.message || `Google Sheets error (${r.status})`)
+    return d
   }
-  if (!r.ok) throw new Error(d?.error?.message || `Google Sheets error (${r.status})`)
-  return d
 }
 
 type Meta = { sheetId: number; title: string; index: number }
@@ -121,19 +128,19 @@ async function ownTab(token: string, title: string, tabs: Meta[]): Promise<Meta>
   return p
 }
 
+const colLetter = (n: number) => { let s = ''; for (let c = n; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + ((c - 1) % 26)) + s; return s }
 const q = (title: string) => encodeURIComponent(`'${title.replace(/'/g, "''")}'`)
 
 // Cleans a tab name the way Sheets wants it (no : \ / ? * [ ], max 100 characters).
 const tabName = (n: string) => String(n).replace(/[:\\/?*[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100)
 
-// Writes the header row if the tab is empty. Returns true when the tab had a different (older) layout and was reset, so
-// the caller can re-add its payments. Only ever called on backup tabs this function owns.
+// Writes the header row only when the tab is empty. An existing header is the treasurer's to arrange (column order, extra columns),
+// so it is never rebuilt or reordered. Returns true only when a rebuild was explicitly requested.
 async function ensureHeader(token: string, title: string, header: string[], force = false) {
-  const head = await sheets(token, `/values/${q(title)}!A1:L1`)
+  const head = await sheets(token, `/values/${q(title)}!1:1`)
   const have = (head.values && head.values[0]) || []
-  const same = !force && have.length === header.length && header.every((h, i) => have[i] === h)
   let reset = false
-  if (have.length && !same) {
+  if (have.length && force) {
     const tab = (await listTabs(token)).find((t) => t.title === title)
     if (tab) {
       if (!isOurTab(title)) throw new Error('Refusing to rebuild a tab outside the backup tabs')
@@ -146,9 +153,19 @@ async function ensureHeader(token: string, title: string, header: string[], forc
     }
     reset = true
   }
-  if (!same) await sheets(token, `/values/${q(title)}!A1:${String.fromCharCode(64 + header.length)}1?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [header] }) })
+  if (!have.length || force) await sheets(token, `/values/${q(title)}!A1:${String.fromCharCode(64 + header.length)}1?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [header] }) })
   return reset
 }
+
+// The tab's current header row, in the order the treasurer has arranged it.
+async function tabHeader(token: string, title: string): Promise<string[]> {
+  const r = await sheets(token, `/values/${q(title)}!1:1`)
+  const h = ((r.values && r.values[0]) || []).map(String)
+  while (h.length && !h[h.length - 1]) h.pop()
+  return h
+}
+// Our row, laid out in whatever column order the tab has now (columns we don't know about stay blank).
+const inOrder = (cols: string[], obj: Record<string, unknown>) => cols.map((c) => (obj[c] == null ? '' : obj[c]))
 
 async function signedIn(req: Request) {
   const ok = await rest('rpc/has_valid_app_session', { method: 'POST', headers: { 'x-app-token': req.headers.get('x-app-token') || '' }, body: '{}' })
@@ -160,42 +177,110 @@ const isPayPal = (p: Record<string, unknown>) => ['PayPal', 'Website'].includes(
 
 // ---------- table look (same as the original tab: a real Sheets table, gold header, banded rows) ----------
 const MONEY_COLS = new Set(['Amount', 'Gross', 'Fee', 'Net', 'PayPal Fee', 'PayPal fee', 'Budget', 'Spent', 'Earnings', 'In-Kind', 'Remaining', 'Expenses', 'Profit / Loss', 'Value'])
+const RECON = 'Last Reconciled Here' // a checkbox column on every tab, for ticking off what has been checked
 const colorStyle = (r: number, g: number, b: number) => ({ rgbColor: { red: r / 255, green: g / 255, blue: b / 255 } })
 
-// Turns the tab's data into a table, replacing any earlier table in it. Only ever called on "Backup - ..." tabs.
-async function styleTable(token: string, title: string, headers: string[]) {
+// Comfortable column widths, wide enough for the header and its dropdown arrow.
+function widthFor(h: string): number {
+  if (MONEY_COLS.has(h)) return 115
+  if (/^(Date|Backed up)$/.test(h)) return 130
+  if (/^(Details|Description|For:)$/.test(h)) return 380
+  if (/^(Client|Donor|From|Name|Business|Area)$/.test(h)) return 250
+  if (/^(Event|Items)$/.test(h)) return 300
+  if (/^(Payment ID)$/.test(h)) return 280
+  if (/^(Notes|Reference)$/.test(h)) return 200
+  return 150
+}
+const widthRequests = (sheetId: number, headers: string[]) => headers.map((h, i) => ({ updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: i, endIndex: i + 1 }, properties: { pixelSize: widthFor(h) }, fields: 'pixelSize' } }))
+
+// Makes the tab's data a table (or resizes the table that is already there). A table is never deleted, because deleting it
+// deletes its rows. The grid is trimmed to the table, so there are no extra empty rows or columns.
+async function styleTable(token: string, title: string, _headers?: string[], withWidths = false, resetTypes = false) {
   if (!isOurTab(title)) throw new Error('Refusing to style a tab outside the backup tabs')
-  const meta = await sheets(token, '?fields=sheets(properties(sheetId,title),tables(tableId))')
+  const headers = await tabHeader(token, title)
+  if (!headers.length) return
+  const meta = await sheets(token, '?fields=sheets(properties(sheetId,title),tables(tableId,columnProperties))')
   const tab = (meta.sheets || []).find((s: { properties: { title: string } }) => s.properties.title === title)
   if (!tab) return
   const sheetId = tab.properties.sheetId as number
-  const colA = await sheets(token, `/values/${q(title)}!A:A`)
+  const colA = await sheets(token, `/values/${q(title)}`) // every column, so the row count never depends on one column
   const rows = Math.max(2, (colA.values || []).length)
   const cols = headers.length
   const requests: unknown[] = []
   const existing = (tab.tables || [])[0]
+  const range = { sheetId, startRowIndex: 0, endRowIndex: rows, startColumnIndex: 0, endColumnIndex: cols }
+  // Trim (or grow) the grid to the table first, so the table range is always valid.
+  requests.push({ updateSheetProperties: { properties: { sheetId, gridProperties: { rowCount: rows, columnCount: cols, frozenRowCount: 1 } }, fields: 'gridProperties.rowCount,gridProperties.columnCount,gridProperties.frozenRowCount' } })
   if (existing) {
-    // Keep the table (deleting a table deletes its rows) and just resize it to the data.
-    requests.push({ updateTable: { table: { tableId: existing.tableId, range: { sheetId, startRowIndex: 0, endRowIndex: rows, startColumnIndex: 0, endColumnIndex: cols } }, fields: 'range' } })
-  } else requests.push({
-    addTable: {
-      table: {
-        range: { sheetId, startRowIndex: 0, endRowIndex: rows, startColumnIndex: 0, endColumnIndex: cols },
-        rowsProperties: {
-          headerColorStyle: colorStyle(160, 132, 104),
-          firstBandColorStyle: colorStyle(255, 255, 255),
-          secondBandColorStyle: colorStyle(245, 241, 235),
+    // Keep whatever column settings the table already has; give any new column its type (the checkbox column is a checkbox).
+    // deno-lint-ignore no-explicit-any
+    const cur: any[] = existing.columnProperties || []
+    const props = headers.map((h, i) => (resetTypes ? null : cur.find((c) => c.columnIndex === i)) || { columnIndex: i, columnName: h, columnType: h === RECON ? 'BOOLEAN' : MONEY_COLS.has(h) ? 'DOUBLE' : 'TEXT' })
+    requests.push({ updateTable: { table: { tableId: existing.tableId, range, columnProperties: props }, fields: 'range,columnProperties' } })
+  } else {
+    requests.push({
+      addTable: {
+        table: {
+          range,
+          rowsProperties: {
+            headerColorStyle: colorStyle(160, 132, 104),
+            firstBandColorStyle: colorStyle(255, 255, 255),
+            secondBandColorStyle: colorStyle(245, 241, 235),
+          },
+          columnProperties: headers.map((h, i) => ({ columnIndex: i, columnName: h, columnType: h === RECON ? 'BOOLEAN' : MONEY_COLS.has(h) ? 'DOUBLE' : 'TEXT' })),
         },
-        columnProperties: headers.map((h, i) => ({ columnIndex: i, columnName: h, columnType: MONEY_COLS.has(h) ? 'DOUBLE' : 'TEXT' })),
       },
-    },
-  })
+    })
+    requests.push({ repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: cols }, cell: { userEnteredFormat: { textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } } } }, fields: 'userEnteredFormat.textFormat' } })
+    withWidths = true
+  }
   headers.forEach((h, i) => {
     if (MONEY_COLS.has(h)) requests.push({ repeatCell: { range: { sheetId, startRowIndex: 1, endRowIndex: rows, startColumnIndex: i, endColumnIndex: i + 1 }, cell: { userEnteredFormat: { numberFormat: { type: 'CURRENCY', pattern: '$#,##0.00' } } }, fields: 'userEnteredFormat.numberFormat' } })
   })
-  requests.push({ repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: cols }, cell: { userEnteredFormat: { textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } } } }, fields: 'userEnteredFormat.textFormat' } })
-  requests.push({ autoResizeDimensions: { dimensions: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: cols } } })
+  const reconIdx = headers.indexOf(RECON)
+  if (withWidths) requests.push(...widthRequests(sheetId, headers))
   await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests }) })
+}
+
+// Writes one yearly tab by column NAME, so the treasurer can reorder columns and add her own (like "Last Reconciled Here").
+// Her extra columns travel with their rows: a row is recognised by its own values, so a checked box stays on its row even
+// when new rows arrive above it. Columns she deleted are not put back.
+async function syncTab(token: string, tabs: Meta[], t: { name: string; headers: string[]; rows: Record<string, unknown>[] }) {
+  const title = tabName(t.name)
+  await ownTab(token, title, tabs)
+  const existing: unknown[][] = ((await sheets(token, `/values/${q(title)}?valueRenderOption=UNFORMATTED_VALUE`)).values) || []
+  let cols = (existing[0] || []).map(String)
+  while (cols.length && !cols[cols.length - 1]) cols.pop()
+  const fresh = cols.length === 0
+  if (fresh) cols = [...t.headers, RECON]
+  const ours = new Set(t.headers)
+  const keyCols = t.headers.filter((c) => cols.includes(c))
+  const norm = (col: string, v: unknown) => {
+    if (v == null || v === '') return ''
+    if (typeof v === 'number') return col === 'Date' ? new Date(Math.round((v - 25569) * 86400000)).toISOString().slice(0, 10) : String(Math.round(v * 100) / 100)
+    const s = String(v).trim()
+    return /^-?\d+(\.\d+)?$/.test(s) ? String(Math.round(Number(s) * 100) / 100) : s
+  }
+  const keyOfRow = (row: unknown[]) => keyCols.map((c) => norm(c, row[cols.indexOf(c)])).join('\u0001')
+  const keyOfRec = (r: Record<string, unknown>) => keyCols.map((c) => norm(c, r[c])).join('\u0001')
+  const carry = new Map<string, unknown[]>()
+  const seenOld: Record<string, number> = {}
+  if (!fresh) for (const row of existing.slice(1)) {
+    const k = keyOfRow(row), n = (seenOld[k] = (seenOld[k] || 0) + 1)
+    carry.set(k + '#' + n, row)
+  }
+  const seenNew: Record<string, number> = {}
+  const out = t.rows.map((r) => {
+    const k = keyOfRec(r), n = (seenNew[k] = (seenNew[k] || 0) + 1)
+    const prev = carry.get(k + '#' + n)
+    return cols.map((c, i) => (ours.has(c) ? (r[c] == null ? '' : r[c]) : (prev?.[i] ?? '')))
+  })
+  if (fresh) await sheets(token, `/values/${q(title)}!A1?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ values: [cols] }) })
+  await sheets(token, `/values/${q(title)}!A2:ZZ:clear`, { method: 'POST', body: '{}' })
+  for (let i = 0; i < out.length; i += 5000) {
+    await sheets(token, `/values/${q(title)}!A${i + 2}?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ values: out.slice(i, i + 5000) }) })
+  }
+  await styleTable(token, title)
 }
 
 // ---------- yearly tabs (the same tabs as Financial Overview, built here so they stay current by themselves) ----------
@@ -329,18 +414,7 @@ async function buildYearlyTabs(year: number): Promise<Tab[]> {
 
 // Replaces each yearly tab with the latest copy. Only tabs named "Backup - …" are ever written (never the first tab).
 async function writeYearlyTabs(token: string, tabs: Meta[], year: number) {
-  for (const t of await buildYearlyTabs(year)) {
-    const title = tabName(t.name)
-    const own = await ownTab(token, title, tabs)
-    const values = [t.headers, ...t.rows.map((r) => t.headers.map((h) => (r[h] == null ? '' : r[h])))]
-    // Make sure the tab has room for every row.
-    await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [{ updateSheetProperties: { properties: { sheetId: own.sheetId, gridProperties: { rowCount: Math.max(1000, values.length + 50), frozenRowCount: 1 } }, fields: 'gridProperties.rowCount,gridProperties.frozenRowCount' } }] }) })
-    await sheets(token, `/values/${q(title)}:clear`, { method: 'POST', body: '{}' })
-    for (let i = 0; i < values.length; i += 10000) {
-      await sheets(token, `/values/${q(title)}!A${i + 1}?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ values: values.slice(i, i + 10000) }) })
-    }
-    await styleTable(token, title, t.headers)
-  }
+  for (const t of await buildYearlyTabs(year)) await syncTab(token, tabs, t)
 }
 
 // One refresh at a time. Changes that arrive during a refresh are folded into one more pass right after it.
@@ -390,6 +464,63 @@ Deno.serve(async (req) => {
       }
       return json({ renamed })
     }
+    // ---- add the "Last Reconciled Here" checkbox column to any tab that does not have one yet
+    if (body.action === 'reconcile') {
+      const added: string[] = []
+      for (const t of tabs.filter((x) => isOurTab(x.title))) {
+        const head = await tabHeader(token, t.title)
+        if (!head.length || head.includes(RECON)) continue
+        await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [{ appendDimension: { sheetId: t.sheetId, dimension: 'COLUMNS', length: 1 } }] }) })
+        await sheets(token, `/values/${q(t.title)}!${colLetter(head.length + 1)}1?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [[RECON]] }) })
+        await styleTable(token, t.title)
+        added.push(t.title)
+      }
+      return json({ added })
+    }
+    // ---- repair: put back a header that the checkbox step overwrote, and move the checkbox column after it
+    if (body.action === 'repair') {
+      const year = Number(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }).slice(0, 4))
+      const expected: Record<string, string[]> = { [PAYPAL_TAB]: PP_HEADER, [OTHER_TAB]: HEADER }
+      for (const t of await buildYearlyTabs(year)) expected[tabName(t.name)] = t.headers
+      const fixed: string[] = []
+      for (const t of tabs.filter((x) => isOurTab(x.title))) {
+        const head = await tabHeader(token, t.title)
+        const want = expected[t.title] || []
+        const missing = want.filter((h) => !head.includes(h))
+        if (missing.length !== 1 || !head.includes(RECON)) continue
+        const next = head.map((h) => (h === RECON ? missing[0] : h))
+        next.push(RECON)
+        await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [{ updateSheetProperties: { properties: { sheetId: t.sheetId, gridProperties: { columnCount: Math.max(next.length, 1) } }, fields: 'gridProperties.columnCount' } }] }) })
+        await sheets(token, `/values/${q(t.title)}!A1?valueInputOption=RAW`, { method: 'PUT', body: JSON.stringify({ values: [next] }) })
+        await styleTable(token, t.title, undefined, true, true)
+        fixed.push(t.title + ': ' + missing[0])
+      }
+      return json({ fixed })
+    }
+    // ---- remove columns that have no header and nothing in them (never a column with any data)
+    if (body.action === 'cleancols') {
+      const cleaned: string[] = []
+      for (const t of tabs.filter((x) => isOurTab(x.title))) {
+        const all: string[][] = (await sheets(token, `/values/${q(t.title)}`)).values || []
+        const head = all[0] || []
+        const blank: number[] = []
+        for (let i = 0; i < head.length; i++) {
+          if ((!String(head[i] || '').trim() || /^Column \d+$/.test(String(head[i]))) && all.slice(1).every((r) => String(r[i] ?? '').trim() === '')) blank.push(i)
+        }
+        if (!blank.length) continue
+        const requests = blank.sort((x, y) => y - x).map((i) => ({ deleteDimension: { range: { sheetId: t.sheetId, dimension: 'COLUMNS', startIndex: i, endIndex: i + 1 } } }))
+        await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests }) })
+        await styleTable(token, t.title)
+        cleaned.push(t.title + ' (' + blank.length + ')')
+      }
+      return json({ cleaned })
+    }
+    // ---- one-time: set comfortable column widths on every tab
+    if (body.action === 'widths') {
+      const done: string[] = []
+      for (const t of tabs.filter((x) => isOurTab(x.title))) { await styleTable(token, t.title, undefined, true); done.push(t.title) }
+      return json({ widths: done })
+    }
     // ---- give every backup tab the table look (visual only)
     if (body.action === 'style') {
       const done: string[] = []
@@ -402,27 +533,6 @@ Deno.serve(async (req) => {
     }
     // ---- yearly Financial Overview tabs, rebuilt from the database (called by the database whenever the records change)
     if (body.action === 'yearly') return json(await runYearlySync(token, tabs))
-
-    // ---- yearly snapshot tabs: replaced with the latest copy
-    if (body.action === 'snapshot') {
-      if (!(await signedIn(req))) return json({ error: 'Please sign in again.' }, 401)
-      const incoming: { name: string; headers: string[]; rows: Record<string, unknown>[] }[] = Array.isArray(body.tabs) ? body.tabs : []
-      let written = 0
-      for (const t of incoming) {
-        const title = tabName(t.name)
-        const tab = await ownTab(token, title, tabs)
-        const values = [t.headers, ...t.rows.map((r) => t.headers.map((h) => (r[h] == null ? '' : r[h])))]
-        await sheets(token, `/values/${q(title)}:clear`, { method: 'POST', body: '{}' })
-        // 10,000 rows per request keeps the payload small; snapshots are far below this anyway.
-        for (let i = 0; i < values.length; i += 10000) {
-          const chunk = values.slice(i, i + 10000)
-          await sheets(token, `/values/${q(title)}!A${i + 1}?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ values: chunk }) })
-        }
-        void tab
-        written++
-      }
-      return json({ tabs: written })
-    }
 
     // ---- add-only ledger tabs
     await ownTab(token, PAYPAL_TAB, tabs)
@@ -468,8 +578,9 @@ Deno.serve(async (req) => {
         const newestFirst = [...mine].sort((a, b) => String(b.paid_on || '').localeCompare(String(a.paid_on || '')))
         const tab = (await listTabs(token)).find((t) => t.title === title)
         if (!tab) throw new Error('PayPal backup tab is missing')
+        const ppCols = await tabHeader(token, PAYPAL_TAB)
         await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [{ insertDimension: { range: { sheetId: tab.sheetId, dimension: 'ROWS', startIndex: 1, endIndex: 1 + newestFirst.length }, inheritFromBefore: false } }] }) })
-        await sheets(token, `/values/${q(title)}!A2?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ values: newestFirst.map(ppRow) }) })
+        await sheets(token, `/values/${q(title)}!A2?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ values: newestFirst.map((p) => inOrder(ppCols, ppObj(p))) }) })
         for (let i = 0; i < newestFirst.length; i += 200) {
           await rest('payment_backup_log', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(newestFirst.slice(i, i + 200).map((p) => ({ payment_key: p.payment_key }))) })
         }
@@ -479,8 +590,9 @@ Deno.serve(async (req) => {
       }
       for (let i = 0; i < mine.length; i += 200) {
         const chunk = mine.slice(i, i + 200)
-        const values = pick ? chunk.map(ppRow) : chunk.map((p) => [p.paid_on, p.source, p.category, p.payer, p.detail ?? '', Number(p.amount), p.fee ?? '', p.net ?? '', p.method, p.reference ?? '', stamp, p.payment_key])
-        await sheets(token, `/values/${q(title)}!A:L:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, { method: 'POST', body: JSON.stringify({ values }) })
+        const otherCols = await tabHeader(token, OTHER_TAB)
+        const values = chunk.map((p) => inOrder(otherCols, otherObj(p, stamp)))
+        await sheets(token, `/values/${q(title)}!A:A:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, { method: 'POST', body: JSON.stringify({ values }) })
         // Remember them only after Google accepted the rows, so a failure retries instead of losing payments.
         await rest('payment_backup_log', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(chunk.map((p) => ({ payment_key: p.payment_key }))) })
         chunk.forEach((p) => written.add(String(p.payment_key)))
