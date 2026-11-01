@@ -19,10 +19,13 @@ const URL_ = Deno.env.get('SUPABASE_URL')!
 const KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const SA_KEY = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY')
 const SHEET_ID = '1jnZXxpyAusrTAJSMxFQpdT5seb-d7mFVjEnBp3VrxLQ'
-const PREFIX = 'Backup - '
-const PAYPAL_TAB = PREFIX + 'PayPal Payments'
-const OTHER_TAB = PREFIX + 'Checks, Cash & Other'
-const HEADER = ['Payment ID', 'Date', 'Source', 'Category', 'From', 'Details', 'Amount', 'PayPal fee', 'Net', 'Method', 'Reference', 'Backed up']
+const LEGACY_PREFIX = 'Backup - ' // tabs used to be named "Backup - ..."; they are renamed to plain names by the 'rename' action
+const PAYPAL_TAB = 'PayPal Payments'
+const OTHER_TAB = 'Checks, Cash & Other'
+// The only tab names this function may write. Anything else (your original Sheet1, or tabs you add yourself) is never touched.
+const YEARLY_NAMES = ['Donations', 'Sponsorships', 'Operational Areas', 'Operational Areas Items', 'Events', 'Events Items', 'Venue Rentals', 'Office Cash Flow', 'Spending Detail']
+const isOurTab = (title: string) => title === PAYPAL_TAB || title === OTHER_TAB || YEARLY_NAMES.some((n) => new RegExp('^' + n + ' \\d{4}$').test(title))
+const HEADER = ['Date', 'Source', 'Category', 'From', 'Details', 'Amount', 'PayPal fee', 'Net', 'Method', 'Reference', 'Backed up', 'Payment ID'] // Payment ID is always last
 // The PayPal tab follows the layout the treasurer uses on the first tab: fee and net get their own columns.
 const PP_HEADER = ['Name', 'Gross', 'Fee', 'Net', 'Date', 'Notes', 'For:']
 const niceDate = (d: unknown) => {
@@ -103,7 +106,7 @@ async function listTabs(token: string): Promise<Meta[]> {
 
 // Only ever returns a tab this function owns. Creates it (after all existing tabs) when missing.
 async function ownTab(token: string, title: string, tabs: Meta[]): Promise<Meta> {
-  if (!title.startsWith(PREFIX)) throw new Error('Refusing to write outside the backup tabs')
+  if (!isOurTab(title)) throw new Error('Refusing to write outside the backup tabs')
   // Your original tab (Sheet1, filled by Zapier) is never touched, wherever it sits in the Sheet. Only "Backup - ..." tabs are written.
   const original = tabs.find((t) => t.sheetId === 0 || t.title === "Sheet1")
   if (original && original.title === title) throw new Error(`Refusing to write to the original tab ("${title}")`)
@@ -121,7 +124,7 @@ async function ownTab(token: string, title: string, tabs: Meta[]): Promise<Meta>
 const q = (title: string) => encodeURIComponent(`'${title.replace(/'/g, "''")}'`)
 
 // Cleans a tab name the way Sheets wants it (no : \ / ? * [ ], max 100 characters).
-const tabName = (n: string) => (PREFIX + String(n).replace(/[:\\/?*[\]]/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 100)
+const tabName = (n: string) => String(n).replace(/[:\\/?*[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100)
 
 // Writes the header row if the tab is empty. Returns true when the tab had a different (older) layout and was reset, so
 // the caller can re-add its payments. Only ever called on backup tabs this function owns.
@@ -133,9 +136,9 @@ async function ensureHeader(token: string, title: string, header: string[], forc
   if (have.length && !same) {
     const tab = (await listTabs(token)).find((t) => t.title === title)
     if (tab) {
-      if (!title.startsWith(PREFIX)) throw new Error('Refusing to rebuild a tab outside the backup tabs')
+      if (!isOurTab(title)) throw new Error('Refusing to rebuild a tab outside the backup tabs')
       await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [
-        { addSheet: { properties: { title: title + ' (new)', gridProperties: { frozenRowCount: 1 } } } },
+        { addSheet: { properties: { title: title + ' (new)', index: tab.index, gridProperties: { frozenRowCount: 1 } } } },
         { deleteSheet: { sheetId: tab.sheetId } },
       ] }) })
       const fresh = (await listTabs(token)).find((t) => t.title === title + ' (new)')
@@ -161,7 +164,7 @@ const colorStyle = (r: number, g: number, b: number) => ({ rgbColor: { red: r / 
 
 // Turns the tab's data into a table, replacing any earlier table in it. Only ever called on "Backup - ..." tabs.
 async function styleTable(token: string, title: string, headers: string[]) {
-  if (!title.startsWith(PREFIX)) throw new Error('Refusing to style a tab outside the backup tabs')
+  if (!isOurTab(title)) throw new Error('Refusing to style a tab outside the backup tabs')
   const meta = await sheets(token, '?fields=sheets(properties(sheetId,title),tables(tableId))')
   const tab = (meta.sheets || []).find((s: { properties: { title: string } }) => s.properties.title === title)
   if (!tab) return
@@ -170,8 +173,11 @@ async function styleTable(token: string, title: string, headers: string[]) {
   const rows = Math.max(2, (colA.values || []).length)
   const cols = headers.length
   const requests: unknown[] = []
-  for (const t of tab.tables || []) requests.push({ deleteTable: { tableId: t.tableId } })
-  requests.push({
+  const existing = (tab.tables || [])[0]
+  if (existing) {
+    // Keep the table (deleting a table deletes its rows) and just resize it to the data.
+    requests.push({ updateTable: { table: { tableId: existing.tableId, range: { sheetId, startRowIndex: 0, endRowIndex: rows, startColumnIndex: 0, endColumnIndex: cols } }, fields: 'range' } })
+  } else requests.push({
     addTable: {
       table: {
         range: { sheetId, startRowIndex: 0, endRowIndex: rows, startColumnIndex: 0, endColumnIndex: cols },
@@ -373,10 +379,21 @@ Deno.serve(async (req) => {
     const token = await sheetsToken()
     const tabs = await listTabs(token)
 
+    // ---- one-time: take "Backup - " off the tab names (keeps each tab where it is)
+    if (body.action === 'rename') {
+      const renamed: string[] = []
+      for (const t of tabs.filter((x) => x.title.startsWith(LEGACY_PREFIX))) {
+        const plain = t.title.slice(LEGACY_PREFIX.length)
+        if (!isOurTab(plain) || tabs.some((x) => x.title === plain)) continue
+        await sheets(token, ':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: [{ updateSheetProperties: { properties: { sheetId: t.sheetId, title: plain }, fields: 'title' } }] }) })
+        renamed.push(plain)
+      }
+      return json({ renamed })
+    }
     // ---- give every backup tab the table look (visual only)
     if (body.action === 'style') {
       const done: string[] = []
-      for (const t of tabs.filter((x) => x.title.startsWith(PREFIX))) {
+      for (const t of tabs.filter((x) => isOurTab(x.title))) {
         const head = await sheets(token, `/values/${q(t.title)}!1:1`)
         const headers = ((head.values && head.values[0]) || []).map(String).filter(Boolean)
         if (headers.length) { await styleTable(token, t.title, headers); done.push(t.title) }
@@ -411,19 +428,22 @@ Deno.serve(async (req) => {
     await ownTab(token, PAYPAL_TAB, tabs)
     await ownTab(token, OTHER_TAB, tabs)
     const ppReset = await ensureHeader(token, PAYPAL_TAB, PP_HEADER, body.rebuild === "paypal")
-    await ensureHeader(token, OTHER_TAB, HEADER)
+    const otherReset = await ensureHeader(token, OTHER_TAB, HEADER)
     const [ledger, done]: [Record<string, unknown>[], { payment_key: string }[]] = await Promise.all([
       rest('rpc/treasurer_payments_all', { method: 'POST', body: '{}' }),
       rest('payment_backup_log?select=payment_key&limit=100000'),
     ])
     // The PayPal tab was just rebuilt in the new layout: forget its payments so they are written again.
-    if (ppReset) {
-      const ppKeys = ledger.filter(isPayPal).map((p) => String(p.payment_key))
-      for (let i = 0; i < ppKeys.length; i += 100) {
-        await rest(`payment_backup_log?payment_key=in.(${ppKeys.slice(i, i + 100).map((k) => '"' + k + '"').join(',')})`, { method: 'DELETE' })
+    // A tab that was just rebuilt (new layout) has forgotten its payments: clear their log entries so they are written again.
+    const resetCats: boolean[] = [...(ppReset ? [true] : []), ...(otherReset ? [false] : [])]
+    const inReset = (p: Record<string, unknown>) => resetCats.includes(isPayPal(p))
+    if (resetCats.length) {
+      const keys = ledger.filter(inReset).map((p) => String(p.payment_key))
+      for (let i = 0; i < keys.length; i += 100) {
+        await rest(`payment_backup_log?payment_key=in.(${keys.slice(i, i + 100).map((k) => '"' + k + '"').join(',')})`, { method: 'DELETE' })
       }
     }
-    const have = new Set(ppReset ? done.map((d) => d.payment_key).filter((k) => !ledger.some((p) => p.payment_key === k && isPayPal(p))) : done.map((d) => d.payment_key))
+    const have = new Set(done.map((d) => d.payment_key).filter((k) => !ledger.some((p) => p.payment_key === k && inReset(p))))
     const candidates = ledger.filter((p) => !have.has(String(p.payment_key))).sort((a, b) => String(a.paid_on || '').localeCompare(String(b.paid_on || '')))
     if (!candidates.length) return json({ added: 0, paypal: 0, other: 0 })
     // Claim the payments first. If two backups run at once (instant triggers), only one of them gets each payment,
@@ -459,7 +479,7 @@ Deno.serve(async (req) => {
       }
       for (let i = 0; i < mine.length; i += 200) {
         const chunk = mine.slice(i, i + 200)
-        const values = pick ? chunk.map(ppRow) : chunk.map((p) => [p.payment_key, p.paid_on, p.source, p.category, p.payer, p.detail ?? '', Number(p.amount), p.fee ?? '', p.net ?? '', p.method, p.reference ?? '', stamp])
+        const values = pick ? chunk.map(ppRow) : chunk.map((p) => [p.paid_on, p.source, p.category, p.payer, p.detail ?? '', Number(p.amount), p.fee ?? '', p.net ?? '', p.method, p.reference ?? '', stamp, p.payment_key])
         await sheets(token, `/values/${q(title)}!A:L:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, { method: 'POST', body: JSON.stringify({ values }) })
         // Remember them only after Google accepted the rows, so a failure retries instead of losing payments.
         await rest('payment_backup_log', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(chunk.map((p) => ({ payment_key: p.payment_key }))) })
