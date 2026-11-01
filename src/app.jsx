@@ -6,6 +6,8 @@ import HubEventsCommittee from './hub/entry.jsx';
 import RsvpPanel from './hub/pages/RsvpPanel.jsx';
 import { BlogEditorView as JournalEditor } from './blog-editor.jsx';
 import { MediaLibraryView as SiteMediaLibrary } from './media-library.jsx';
+import { installDateFormatter } from './date-format.js';
+installDateFormatter();
 
 const SUPABASE_URL = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const SUPABASE_KEY = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
