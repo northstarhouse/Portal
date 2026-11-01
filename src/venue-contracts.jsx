@@ -14,7 +14,7 @@ function localDate(value){return value?new Date(value).toLocaleString('en-US',{t
 function money(cents,currency='USD'){return new Intl.NumberFormat('en-US',{style:'currency',currency}).format((cents||0)/100);}
 const SB_URL='https://uvzwhhwzelaelfhfkvdb.supabase.co',SB_KEY='sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do';
 const longDate=iso=>{const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?new Date(m[1]+'-'+m[2]+'-'+m[3]+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):'';};
-const writtenDate=iso=>{const m=String(iso||'').match(/^(d{4})-(d{2})-(d{2})/);return m?new Date(m[1]+'-'+m[2]+'-'+m[3]+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):String(iso||'');};
+const writtenDate=iso=>{const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?new Date(m[1]+'-'+m[2]+'-'+m[3]+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):String(iso||'');};
 const todayLong=()=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',month:'long',day:'numeric',year:'numeric'}).format(new Date());
 // Extra facts that are not on the pre-booking form: the guest count the couple gave on their original wedding inquiry.
 export async function contractExtras(client){
