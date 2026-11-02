@@ -18861,6 +18861,7 @@ function VenueRentalsView({ navigate, initialTab }) {
     try { localStorage.setItem('nsh-venue-color-coding', next ? 'on' : 'off'); } catch (e) {}
   }
   var [siteView, setSiteView] = useState(false); // Clients tab: the Assign Site Managers page
+  var [addTourOpen, setAddTourOpen] = useState(false);
   var colorCoding = venueTab === 'clients' ? true : inquiriesColorCoding;
   const [clientFilter, setClientFilter] = useS('all');
   const [clientQuery, setClientQuery] = useS('');
@@ -19366,6 +19367,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
           {venueTab !== 'clients' && (
             <React.Fragment>
+              <button type="button" onClick={function() { setAddTourOpen(true); }} style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, padding: '10px 18px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Add a tour to the calendar</button>
               <button onClick={function() { navigate('estate-tours'); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0, padding: '10px 18px', background: '#fff', color: gold, border: '1.5px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 Edit Tour Schedule
@@ -19381,6 +19383,7 @@ function VenueRentalsView({ navigate, initialTab }) {
         </div>
       </div>
 
+      {addTourOpen && <AddTourModal onClose={function() { setAddTourOpen(false); }} />}
       {inquiriesError && <div role="alert" style={{ padding: 16, border: '1px solid #e7c9be', borderRadius: 10, background: '#fff5ef', marginBottom: 16, color: '#8c4c35', fontSize: 13 }}>{inquiriesError}. <button type="button" onClick={loadInquiries} style={{background:'none',border:0,textDecoration:'underline',color:'inherit',cursor:'pointer'}}>Try again</button></div>}
       {!SHOW_LEGACY_VENUE_DASHBOARD && (
         <div style={{ display: 'grid', gridTemplateColumns: venueTab === 'clients' ? 'minmax(0, 1fr)' : 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 16 }}>
@@ -20990,6 +20993,70 @@ function QuarterHourSelect({ value, onChange, disabled, style, ariaLabel }) {
         {minutes.map(function(m) { return <option key={m} value={m}>{m}</option>; })}
       </select>
     </span>
+  );
+}
+
+// "Add a tour to the calendar": for a visitor who has no tour yet (someone who emailed, or could not find an open slot).
+// Staff give their details and pick the actual date, time and guide. The tour is saved as a request and booked right away through
+// book-tour-request, which puts it on the Google Calendar, moves it into Upcoming Tours and emails the visitor their confirmation.
+function AddTourModal({ onClose, onAdded }) {
+  var [f, setF] = useState({ name: '', email: '', phone: '', date: '', time: '', guide: 'Jen' });
+  var [busy, setBusy] = useState(false);
+  var [msg, setMsg] = useState(null);
+  var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+  function set(k, v) { setF(function(o) { var n = Object.assign({}, o); n[k] = v; return n; }); }
+  function save(e) {
+    e.preventDefault();
+    if (busy) return;
+    if (!f.name.trim() || !f.date || !f.time) { setMsg({ bad: true, text: 'Add their name, the date and the time.' }); return; }
+    if (f.email.trim() && !/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(f.email.trim())) { setMsg({ bad: true, text: 'That email address does not look right.' }); return; }
+    setBusy(true); setMsg(null);
+    // 1) a tour request for them...
+    fetch(SUPABASE_URL + '/rest/v1/estate_tours', {
+      method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=representation' }),
+      body: JSON.stringify({ status: 'requested', request_status: 'not_handled', visitor_name: f.name.trim(), visitor_email: f.email.trim().toLowerCase() || null, visitor_phone: f.phone.trim() || null, duration_min: 45, requested_slots: [{ date: f.date, time_label: f.time }] })
+    }).then(function(r) { return r.json().catch(function() { return null; }).then(function(j) { return { ok: r.ok, j: j }; }); })
+      .then(function(res) {
+        if (!res.ok || !Array.isArray(res.j) || !res.j[0]) throw new Error('Could not save the tour.');
+        // 2) ...booked onto the chosen date, time and guide
+        return fetch(SUPABASE_URL + '/functions/v1/book-tour-request', { method: 'POST', headers: H, body: JSON.stringify({ id: res.j[0].id, date: f.date, start_time: f.time, guide_name: f.guide }) })
+          .then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok && j.ok === true, j: j }; }); });
+      })
+      .then(function(res) {
+        if (!res.ok) { setMsg({ bad: true, text: (res.j && res.j.error) || 'It was saved as a tour request, but that time could not be booked. Check Tour Requests.' }); return; }
+        logActivity('Added a tour to the calendar for ' + f.name.trim() + ' with ' + f.guide, 'tour_booked');
+        setMsg({ bad: false, text: 'Booked with ' + f.guide + (f.email.trim() ? '. A confirmation email was sent to ' + f.email.trim() + '.' : '. No email was sent, since no address was given.') });
+        if (onAdded) onAdded();
+        setF({ name: '', email: '', phone: '', date: '', time: '', guide: f.guide });
+      })
+      .catch(function(err) { setMsg({ bad: true, text: err.message || 'Could not add the tour.' }); })
+      .finally(function() { setBusy(false); });
+  }
+  var field = { padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff', width: '100%', boxSizing: 'border-box' };
+  var label = { fontSize: 12, color: '#888', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 };
+  return (
+    <div onClick={function(e) { if (e.target === e.currentTarget && !busy) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <form onSubmit={save} role="dialog" aria-label="Add a tour to the calendar" style={{ background: '#fff', borderRadius: 14, maxWidth: 460, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 22 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Add a tour to the calendar</div>
+          <a onClick={onClose} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Close ×</a>
+        </div>
+        <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Pick any date and time. It goes on the Google Calendar and into Upcoming Tours, and they get a confirmation email.</div>
+        <label style={label}>Name<input value={f.name} onChange={function(e) { set('name', e.target.value); }} style={field} /></label>
+        <label style={label}>Email (for the confirmation)<input type="email" value={f.email} onChange={function(e) { set('email', e.target.value); }} style={field} /></label>
+        <label style={label}>Phone (optional)<input value={f.phone} onChange={function(e) { set('phone', e.target.value); }} style={field} /></label>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <label style={Object.assign({}, label, { flex: 1 })}>Date<input type="date" value={f.date} onChange={function(e) { set('date', e.target.value); }} style={field} /></label>
+          <label style={Object.assign({}, label, { flex: 1 })}>Time<input type="time" step="900" value={f.time} onChange={function(e) { set('time', e.target.value); }} style={field} /></label>
+        </div>
+        <label style={label}>Guide<select value={f.guide} onChange={function(e) { set('guide', e.target.value); }} style={field}><option>Jen</option><option>Derek</option></select></label>
+        {msg && <div style={{ fontSize: 13, marginBottom: 12, color: msg.bad ? '#b3402a' : '#2e7d32' }}>{msg.text}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button type="button" onClick={onClose} disabled={busy} style={{ background: '#fff', color: '#888', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Done</button>
+          <button type="submit" disabled={busy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.7 : 1 }}>{busy ? 'Adding…' : 'Add to calendar'}</button>
+        </div>
+      </form>
+    </div>
   );
 }
 
