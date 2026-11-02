@@ -17,6 +17,16 @@ const APP_TOKEN_KEY = 'nsh-app-token';
 // The Messages tab starts fresh on this date: anything older (old voicemails, earlier emails) is not listed there.
 const MESSAGES_START = '2026-10-31';
 // Google Voice wraps a voicemail in boilerplate: "Main Office : New voicemail from +1 ..." and "A caller (...) left a voicemail on \"Main Office\": ... - The Google Voice team".
+// "Message 1 (September 29):" and "(Sent October 18)" lines are shown in bold, so a follow-up is easy to tell from the first message.
+function boldMessageHeaders(text) {
+  var out = [];
+  String(text || '').split(/\n/).forEach(function(line, i) {
+    var isHeader = /^Message \d+ \(.*\):\s*$/.test(line) || /^\(Sent .*\)\s*$/.test(line);
+    if (i) out.push('\n');
+    out.push(isHeader ? React.createElement('strong', { key: i, style: { color: '#2a2420' } }, line) : line);
+  });
+  return out;
+}
 function cleanVoicemail(m) {
   var caller = String((m && (m.from_name || '')) || '').replace(/^.*?new voicemail from\s*/i, '').trim() || 'Unknown caller';
   var text = String((m && (m.body || m.description)) || '')
@@ -20292,7 +20302,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
         {fromHb && <span style={Object.assign({}, pill, { background: '#fff3e0', color: '#b45309' })}>Unanswered HoneyBook Message</span>}
         {wantsCall && <span style={Object.assign({}, pill, { background: '#e8f5e9', color: '#2e7d32' })}>WANTS A PHONE CALL</span>}
       </div>
-      <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{isVoicemail ? cleanVoicemail(m).text : m.body}</div>
+      <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{isVoicemail ? cleanVoicemail(m).text : boldMessageHeaders(m.body)}</div>
 
       {canReply && (
         <div style={{ marginTop: 10 }}>
