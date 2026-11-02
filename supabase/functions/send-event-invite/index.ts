@@ -56,7 +56,6 @@ ${img ? `<td class="ev-img" valign="top" width="230" style="vertical-align:top;w
 <div style="font-family:Cardo,Georgia,serif;font-size:24px;font-weight:700;color:#1e1a14;margin:0 0 4px;">${isShift ? 'Sign up' : 'RSVP'}</div>
 <div style="font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#a08060;margin:0 0 20px;">${isShift ? 'Pick a shift that works for you' : 'Let us know if you can make it'}</div>
 <a href="${esc(link)}" style="display:inline-block;background:#886c44;color:#ffffff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:16px;padding:16px 36px;">${button}</a>
-<div style="margin-top:16px;font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#999;word-break:break-all;">Or open this link: <a href="${esc(link)}" style="color:#886c44;">${esc(link)}</a></div>
 </div>
 </div>
 </div></div>`
