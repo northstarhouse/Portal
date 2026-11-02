@@ -34,24 +34,19 @@ function buildHtml(ev: any, note: string) {
   const button = isShift ? 'Click here to sign up' : 'Click here to RSVP'
   const when = [longDate(ev.date), ev.time].filter(Boolean).join(' · ')
   const para = (t: string) => t.split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px;font-family:Georgia,serif;font-size:16px;line-height:1.65;color:#5a4a35;">${esc(p).replace(/\n/g, '<br>')}</p>`).join('')
-  const img = ev.image_url ? `<img src="${esc(ev.image_url)}" alt="${esc(ev.title)}" width="230" style="display:block;width:100%;max-width:230px;height:auto;border:0;">` : ''
-  // The same layout as the event page: the text on the left, the picture beside it, then the RSVP card.
-  return `<style>@media only screen and (max-width:540px){.ev-text,.ev-img{display:block!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important}.ev-img{padding:0 0 22px!important}.ev-img img{max-width:100%!important}}</style>
-<div style="background:#ece8e1;padding:24px 12px;font-family:Georgia,'Times New Roman',serif;">
+  const img = ev.image_url ? `<img src="${esc(ev.image_url)}" alt="${esc(ev.title)}" width="576" style="display:block;width:100%;max-width:576px;height:auto;border:0;">` : ''
+  // Same look as the event page: the event heading first, then the picture, then the details and the RSVP card.
+  return `<div style="background:#ece8e1;padding:24px 12px;font-family:Georgia,'Times New Roman',serif;">
 <div style="max-width:640px;margin:0 auto;">
 <div style="height:14px;background:#886c44;line-height:14px;font-size:1px;">&nbsp;</div>
 <div style="background:#fdfbf7;padding:32px 30px 30px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>
-<td class="ev-text" valign="top" style="vertical-align:top;${img ? 'padding-right:26px;' : ''}">
 <div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:1px;color:#886c44;font-weight:bold;margin:0 0 14px;">${isShift ? 'Volunteer sign-up' : 'Event'}</div>
-<h1 style="margin:0 0 20px;font-family:Cardo,Georgia,serif;font-size:32px;line-height:1.15;font-weight:700;color:#1e1a14;">${esc(ev.title)}</h1>
+<h1 style="margin:0 0 20px;font-family:Cardo,Georgia,serif;font-size:34px;line-height:1.15;font-weight:700;color:#1e1a14;">${esc(ev.title)}</h1>
 ${when ? `<div style="font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:bold;color:#2c2418;margin:0 0 8px;"><span style="color:#886c44;">When</span> &nbsp; ${esc(when)}</div>` : ''}
-<div style="font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:bold;color:#2c2418;margin:0 0 20px;"><span style="color:#886c44;">Where</span> &nbsp; The North Star House</div>
+<div style="font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:bold;color:#2c2418;margin:0 0 22px;"><span style="color:#886c44;">Where</span> &nbsp; The North Star House</div>
 ${note ? para(note) : ''}
+${img ? `<div style="margin:0 0 22px;">${img}</div>` : ''}
 ${ev.description ? para(ev.description) : ''}
-</td>
-${img ? `<td class="ev-img" valign="top" width="230" style="vertical-align:top;width:230px;">${img}</td>` : ''}
-</tr></table>
 <div style="margin-top:26px;background:#ffffff;border:1px solid #886c44;padding:26px 24px;text-align:center;">
 <div style="font-family:Cardo,Georgia,serif;font-size:24px;font-weight:700;color:#1e1a14;margin:0 0 4px;">${isShift ? 'Sign up' : 'RSVP'}</div>
 <div style="font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#a08060;margin:0 0 20px;">${isShift ? 'Pick a shift that works for you' : 'Let us know if you can make it'}</div>
