@@ -56,10 +56,35 @@ async function signedUpdateEmail(version:any,names:string[],venueCode:string,url
  const list='<ul style="margin:6px 0 0;padding-left:20px;text-align:left;">'+items.map(i=>'<li style="margin:0 0 8px;text-align:left;"><strong>'+i[0]+'</strong>'+(i[1]?' '+i[1]:'')+'</li>').join('')+'</ul>';
  const text='Hello '+whoText+',\n\nWe are so excited that you have chosen North Star House for your special day! Your rental agreement now has every signature it needs, and we could not be happier to welcome you.\n\n'
   +(pay&&pay.state==='paid'?'Your first payment has been received, so your date is officially booked.':'There is just one step left to officially book your date: your first payment'+(amt?' of '+amt:'')+'. You can make it any time on your client portal. Open it and enter your venue code: '+code+'. As soon as your payment comes in, your date is officially booked.')
-  +'\n\nYour client portal: '+url+'\n\nHere is everything you can do there:\n'+items.map(i=>'- '+i[0]+(i[1]?' '+i[1]:'')).join('\n')
+  +'\n\nTip: bookmark your client portal page so it is always one click away. Your venue code is all you need to get back in.'+'\n\nYour client portal: '+url+'\n\nHere is everything you can do there:\n'+items.map(i=>'- '+i[0]+(i[1]?' '+i[1]:'')).join('\n')
   +'\n\nWe are so excited to celebrate with you. If you have any questions at all, just reply to this email or send us a message from your portal.\n\nNorth Star House';
- const html=brandedHtml('Your Agreement Is Fully Signed',['Hello '+who+', we are so excited that you have chosen North Star House for your special day! Your rental agreement now has every signature it needs, and we could not be happier to welcome you.',stepHtml,'Here is everything you can do on your client portal:'+list,'We are so excited to celebrate with you. If you have any questions at all, just reply to this email or send us a message from your portal.'],'Open My Client Portal',url);
+ const tip='<strong>Tip:</strong> bookmark your client portal page so it is always one click away. Your venue code is all you need to get back in.';
+ const html=brandedHtml('Your Agreement Is Fully Signed',['Hello '+who+', we are so excited that you have chosen North Star House for your special day! Your rental agreement now has every signature it needs, and we could not be happier to welcome you.',stepHtml,tip,'Here is everything you can do on your client portal:'+list,'We are so excited to celebrate with you. If you have any questions at all, just reply to this email or send us a message from your portal.'],'Open My Client Portal',url);
  return {subject,text,html};
+}
+// Emails both clients, in one message, that the agreement is fully signed. auto: sent by the system when the venue countersigns;
+// it is skipped when the first payment is already paid, and never sent twice for the same agreement.
+async function sendSignedUpdate(versionId:string,auto:boolean):Promise<any>{
+ const rec=await rest('rpc/venue_agreement_record',{method:'POST',body:JSON.stringify({p_id:versionId})});
+ if(!rec)return {error:'Agreement not found.',status:404};
+ if(rec.status!=='completed')return {error:'Everyone has to sign first.',status:400};
+ if(auto){
+  const pay=await depositFor(rec.response_id);
+  if(pay&&pay.state==='paid')return {skipped:'paid'};
+  const prior=await rest('activity_log?select=id&action=eq.contract_signed_update_sent&detail->>version_id=eq.'+rec.id+'&limit=1');
+  if(prior&&prior.length)return {skipped:'already_sent'};
+ }
+ const clients=(rec.recipients||[]).filter((x:any)=>x.role!=='venue'&&x.status==='signed');
+ if(!clients.length)return {error:'There are no client signers on this agreement.',status:400};
+ const order=(rec.signers||[]).map((x:any)=>String(x.email||'').toLowerCase());
+ clients.sort((a:any,b:any)=>order.indexOf(String(a.email).toLowerCase())-order.indexOf(String(b.email).toLowerCase()));
+ let venueCode='';try{const d=await eventDateFor(rec.response_id);if(d){const [y,m,dd]=d.split('-');venueCode=MONTHS[+m-1]+'-'+dd+'-'+y;}}catch(_e){/* sent without the code */}
+ const names=clients.map((x:any)=>String(x.name||'').split(' ')[0]).filter(Boolean);
+ const u=await signedUpdateEmail(rec,names,venueCode,link('x','client',venueCode));
+ try{await email(clients.map((x:any)=>x.email),u.subject,u.text,true,u.html);}catch(e){for(const c of clients)await rpc('delivery',{version_id:rec.id,detail:{signer_id:c.id,delivered:false}});return {delivered:false,error:(e as Error).message};}
+ for(const c of clients)await rpc('delivery',{version_id:rec.id,detail:{signer_id:c.id,delivered:true}});
+ try{await rest('activity_log',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({description:'Signed agreement update sent to '+joinNames(clients.map((x:any)=>x.name||x.email))+(auto?' (automatically)':''),action:'contract_signed_update_sent',tag:'Venue',detail:{version_id:rec.id,emails:clients.map((x:any)=>x.email),title:rec.title,auto}})});}catch(_e){/* the email already went out */}
+ return {delivered:true,to:clients.map((x:any)=>x.email)};
 }
 async function mailLink(version:any,signer:any,value:string,copyTo=''){try{
  let venueCode='';try{const d=await eventDateFor(version.response_id);if(d){const [y,m,dd]=d.split('-');venueCode=MONTHS[+m-1]+'-'+dd+'-'+y;}}catch(_e){/* the email still goes out without the code */}
@@ -147,23 +172,13 @@ Deno.serve(async req=>{
    const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,'0'),ch=await codeHash(sid,code);
    await rpc('code',{token_hash:hash,code_hash:ch});
    const result=await rpc('sign',{token_hash:hash,code_hash:ch,document_hash:ver.document_hash,signed_name:body.signed_name,consent:body.consent===true,ip:req.headers.get('x-forwarded-for')?.split(',')[0]||null,user_agent:req.headers.get('user-agent')});
+   if(!result.error){try{await sendSignedUpdate(vid,true);}catch(e){console.error('automatic signed update',(e as Error).message);}}
    return result.error?json(result,400):json({version:publicRecord(result),saved:true});
   }
   if(action==='signed_update'){
-   const rec=await rest('rpc/venue_agreement_record',{method:'POST',body:JSON.stringify({p_id:body.version_id})});
-   if(!rec)return json({error:'Agreement not found.'},404);
-   if(rec.status!=='completed')return json({error:'Everyone has to sign first.'},400);
-   const clients=(rec.recipients||[]).filter((x:any)=>x.role!=='venue'&&x.status==='signed');
-   if(!clients.length)return json({error:'There are no client signers on this agreement.'},400);
-   const order=(rec.signers||[]).map((x:any)=>String(x.email||'').toLowerCase());
-   clients.sort((a:any,b:any)=>order.indexOf(String(a.email).toLowerCase())-order.indexOf(String(b.email).toLowerCase()));
-   let venueCode='';try{const d=await eventDateFor(rec.response_id);if(d){const [y,m,dd]=d.split('-');venueCode=MONTHS[+m-1]+'-'+dd+'-'+y;}}catch(_e){/* sent without the code */}
-   const names=clients.map((x:any)=>String(x.name||'').split(' ')[0]).filter(Boolean);
-   const u=await signedUpdateEmail(rec,names,venueCode,link('x','client',venueCode));
-   try{await email(clients.map((x:any)=>x.email),u.subject,u.text,true,u.html);}catch(e){for(const c of clients)await rpc('delivery',{version_id:rec.id,detail:{signer_id:c.id,delivered:false}});return json({delivered:false,error:(e as Error).message});}
-   for(const c of clients)await rpc('delivery',{version_id:rec.id,detail:{signer_id:c.id,delivered:true}});
-   try{await rest('activity_log',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({description:'Signed agreement update sent to '+joinNames(clients.map((x:any)=>x.name||x.email)),action:'contract_signed_update_sent',tag:'Venue',detail:{version_id:rec.id,emails:clients.map((x:any)=>x.email),title:rec.title}})});}catch(_e){/* the email already went out */}
-   return json({delivered:true,to:clients.map((x:any)=>x.email)});
+   const r=await sendSignedUpdate(String(body.version_id||''),false);
+   if(r.error&&r.status)return json({error:r.error},r.status);
+   return json(r);
   }
   if(action==='link'){
    const value=token();const version=await rpc('link',{version_id:body.version_id,signer_id:body.signer_id,hash:await tokenHash(value)});const signer=version.recipients.find((s:any)=>s.id===body.signer_id);
