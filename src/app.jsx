@@ -1195,6 +1195,8 @@ const typeColors = {
         </div>
       </div>
 
+      <div style={{ marginBottom: 14, border: '1px solid #e8dcc3', borderRadius: 8, overflow: 'hidden' }}><RsvpBar /></div>
+
       {(function() {
         var next = nextUpcomingDue();
         var due = next.date;
@@ -24502,7 +24504,6 @@ function Dashboard() {
             </div>
           </div>
         )}
-        <RsvpBar />
         <div style={{ background: "#fdfcfb", padding: isMobile ? "12px 16px 10px" : "24px 32px 18px", borderBottom: "3px solid rgba(136,108,68,0.35)", position: "sticky", top: 0, zIndex: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14 }}>
             {isMobile && (
