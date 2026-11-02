@@ -20209,7 +20209,7 @@ function PastMessages({ msgs, voicemails }) {
         return (
           <div key={m.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid ' + (m.handled_at ? '#65965a' : '#c9bfae'), borderRadius: 10, padding: '12px 16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{isVm ? 'Voicemail · ' + cleanVoicemail(m).caller : (m.from_name || 'Client')}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{isVm ? 'Voicemail · ' + cleanVoicemail(m).caller : (m.from_name || 'Client')}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}{m.from_phone ? <span style={{ fontWeight: 500, color: '#6b5d4a' }}> · <a href={'tel:' + String(m.from_phone).replace(/[^0-9+]/g, '')} style={{ color: gold, textDecoration: 'none' }}>{m.from_phone}</a></span> : null}</div>
               <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{day(m.created_at)}</div>
             </div>
             {fromInbox && <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 4 }}>{String(m.subject || '').replace(/^Email: /, '')}</div>}
@@ -20282,7 +20282,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
   return (
     <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid #c79535', borderRadius: 10, padding: '12px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{isVoicemail ? cleanVoicemail(m).caller : (m.from_name || 'Client')}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{isVoicemail ? cleanVoicemail(m).caller : (m.from_name || 'Client')}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}{m.from_phone ? <span style={{ fontWeight: 500, color: '#6b5d4a' }}> · <a href={'tel:' + String(m.from_phone).replace(/[^0-9+]/g, '')} style={{ color: gold, textDecoration: 'none' }}>{m.from_phone}</a></span> : null}</div>
         <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{new Date(m.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
       </div>
       {fromInbox && <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 4 }}>{String(m.subject || '').replace(/^Email: /, '')}</div>}
