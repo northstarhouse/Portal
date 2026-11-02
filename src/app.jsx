@@ -13919,6 +13919,49 @@ function SuBuilderBack({ onBack, label }) {
 function SuEmpty({ text }) {
   return <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>{text}</div>;
 }
+// A slim bar across the top of the Portal: upcoming RSVP events with how many have RSVPed. Click one for its RSVP list.
+function RsvpBar() {
+  var [events, setEvents] = useState([]);
+  var [openEv, setOpenEv] = useState(null);
+  var [mailEv, setMailEv] = useState(null);
+  function load() {
+    var today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    fetch(SUPABASE_URL + '/rest/v1/vol_events?select=id,title,date,time,slug,event_type,image_url,description,vol_event_responses(count)&event_type=eq.rsvp&date=gte.' + today + '&order=date.asc&limit=6', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(rows) { setEvents(Array.isArray(rows) ? rows : []); })
+      .catch(function() {});
+  }
+  useEffect(function() { load(); var t = setInterval(load, 60000); return function() { clearInterval(t); }; }, []);
+  if (!events.length) return null;
+  function count(ev) { return (ev.vol_event_responses && ev.vol_event_responses[0] && ev.vol_event_responses[0].count) || 0; }
+  return (
+    <div>
+      <div style={{ background: '#f6efe2', borderBottom: '1px solid #e8dcc3', padding: '8px 24px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: gold }}>RSVP list</span>
+        {events.map(function(ev) {
+          var n = count(ev);
+          return <button key={ev.id} type="button" onClick={function() { setOpenEv(ev); }}
+            style={{ background: '#fff', color: '#2a2420', border: '1px solid ' + gold, borderRadius: 16, padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            {ev.title} <span style={{ color: '#a08060', fontWeight: 500 }}>· {suFmtDate(ev.date)}</span> <span style={{ color: gold }}>· {n} {n === 1 ? 'RSVP' : 'RSVPs'}</span>
+          </button>;
+        })}
+      </div>
+      {openEv && (
+        <div onClick={function(e) { if (e.target === e.currentTarget) setOpenEv(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div role="dialog" aria-label="RSVP list" style={{ background: '#fdfcfb', borderRadius: 14, maxWidth: 560, width: '100%', maxHeight: '88vh', overflowY: 'auto', padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 14, marginBottom: 8 }}>
+              {openEv.slug && <a onClick={function() { setMailEv(openEv); setOpenEv(null); }} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Send email</a>}
+              <a onClick={function() { setOpenEv(null); }} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Close ×</a>
+            </div>
+            <SuEventResponses event={openEv} />
+          </div>
+        </div>
+      )}
+      {mailEv && <EventEmailModal ev={mailEv} onClose={function() { setMailEv(null); }} />}
+    </div>
+  );
+}
+
 // Emails an event announcement that looks like the event's RSVP page, with a "Click here to RSVP" button.
 function EventEmailModal({ ev, onClose }) {
   var [subject, setSubject] = useState('');
@@ -24459,6 +24502,7 @@ function Dashboard() {
             </div>
           </div>
         )}
+        <RsvpBar />
         <div style={{ background: "#fdfcfb", padding: isMobile ? "12px 16px 10px" : "24px 32px 18px", borderBottom: "3px solid rgba(136,108,68,0.35)", position: "sticky", top: 0, zIndex: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14 }}>
             {isMobile && (
