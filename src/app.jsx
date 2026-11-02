@@ -16297,6 +16297,14 @@ function AdminView({ navigate }) {
           <span style={{ color: '#b5a185', flexShrink: 0 }}>{cashIcon}</span>
           Operational Budgets
         </div>
+        <a href={TR_SHEET} target="_blank" rel="noopener noreferrer"
+          style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{cashIcon}</span>
+          Open the Google Sheet
+        </a>
       </div>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>Other Applications & Outside Tools</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -23214,18 +23222,6 @@ function TreasurerView({ navigate }) {
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '4px 0 40px' }}>
-      <div style={Object.assign({}, card, { display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' })}>
-        <div style={{ fontSize: 13, color: '#6b5d4a', maxWidth: 560, lineHeight: 1.5 }}>
-          Every payment in one place. Online payments come in by themselves; cash and checks are added below. Each payment is also backed up, one row each, to the treasurer's Google Sheet.
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={backUpNow} disabled={backup.busy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{backup.busy ? 'Backing up…' : 'Back up now'}</button>
-          <a href={TR_SHEET} target="_blank" rel="noopener noreferrer" style={{ border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: gold, textDecoration: 'none' }}>Open the Sheet</a>
-          <button onClick={exportCsv} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: '#6b5d4a', cursor: 'pointer' }}>Download CSV</button>
-        </div>
-        {backup.msg ? <div style={{ width: '100%', fontSize: 13, color: '#6b5d4a' }}>{backup.msg}</div> : null}
-      </div>
-
       <div style={Object.assign({}, card, { display: 'flex', flexWrap: 'wrap', gap: 10 })}>
         <select value={year} onChange={function(e) { setYear(e.target.value); }} style={field}>
           <option value="all">All years</option>
