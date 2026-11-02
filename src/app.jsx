@@ -4991,7 +4991,7 @@ function DonorsView({ navigate }) {
 
   function saveDonorFields(e){
     e.preventDefault();setSavingDonorFields(true);
-    var patch={preferred_letter_greeting:donorFieldsForm.preferred_letter_greeting||null,joint_donor_name:donorFieldsForm.joint_donor_name||null,
+    var patch={address:(donorFieldsForm.address||'').trim()||null,preferred_letter_greeting:donorFieldsForm.preferred_letter_greeting||null,joint_donor_name:donorFieldsForm.joint_donor_name||null,
       mailing_address_line1:donorFieldsForm.mailing_address_line1||null,mailing_address_line2:donorFieldsForm.mailing_address_line2||null,
       mailing_city:donorFieldsForm.mailing_city||null,mailing_state:donorFieldsForm.mailing_state||null,mailing_zip:donorFieldsForm.mailing_zip||null};
     fetch(SUPABASE_URL+'/rest/v1/donors?id=eq.'+selected.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(patch)})
@@ -5704,14 +5704,17 @@ function DonorsView({ navigate }) {
 
             {/* Letter greeting + structured mailing address, used for acknowledgment generation */}
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <span style={sec}>Letter & Mailing</span>
-              {!donorFieldsForm && <button onClick={function(){setDonorFieldsForm({preferred_letter_greeting:selected.preferred_letter_greeting||'',joint_donor_name:selected.joint_donor_name||'',mailing_address_line1:selected.mailing_address_line1||'',mailing_address_line2:selected.mailing_address_line2||'',mailing_city:selected.mailing_city||'',mailing_state:selected.mailing_state||'',mailing_zip:selected.mailing_zip||''});}} style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'2px 10px',cursor:'pointer'}}>Edit</button>}
+              <span style={sec}>Address & Letter</span>
+              {!donorFieldsForm && <button onClick={function(){setDonorFieldsForm({address:selected.address||'',preferred_letter_greeting:selected.preferred_letter_greeting||'',joint_donor_name:selected.joint_donor_name||'',mailing_address_line1:selected.mailing_address_line1||'',mailing_address_line2:selected.mailing_address_line2||'',mailing_city:selected.mailing_city||'',mailing_state:selected.mailing_state||'',mailing_zip:selected.mailing_zip||''});}} style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'2px 10px',cursor:'pointer'}}>Edit</button>}
             </div>
             {donorFieldsForm ? (
               <form onSubmit={saveDonorFields} style={{background:'#faf8f4',borderRadius:8,padding:'12px 14px',border:'0.5px solid #e0d8cc',marginBottom:10}}>
-                {selected.address && (
+                <div style={{marginBottom:10}}><label style={lStyle}>Address <span style={{fontWeight:400,color:'#aaa'}}>(the full address shown under Contact)</span></label>
+                  <textarea value={donorFieldsForm.address} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{address:e.target.value});});}} rows={3} style={Object.assign({},iStyle,{resize:'vertical'})} />
+                </div>
+                {donorFieldsForm.address && (
                   <button type="button" onClick={function(){
-                    var parsed=parseAddressBlock(selected.address);
+                    var parsed=parseAddressBlock(donorFieldsForm.address);
                     if(!parsed)return;
                     setDonorFieldsForm(function(f){return Object.assign({},f,{mailing_address_line1:parsed.line1,mailing_address_line2:parsed.line2,mailing_city:parsed.city,mailing_state:parsed.state,mailing_zip:parsed.zip});});
                   }} style={{width:'100%',marginBottom:10,padding:'6px 10px',background:'#fff',border:'0.5px dashed #b5a185',borderRadius:6,fontSize:11,color:'#8a6200',cursor:'pointer'}}>↓ Auto-fill from existing Address field</button>
