@@ -20264,6 +20264,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
   var [err, setErr] = useState('');
   var wantsEmail = /wants an email/i.test(m.subject || '');
   var wantsCall = /wants a call/i.test(m.subject || '');
+  var fromHb = /^HoneyBook: /.test(m.subject || '');
   var fromInbox = /^Email: /.test(m.subject || '');
   var isVoicemail = String(m.event_uid || '') === 'voicemail:';
   var knownClient = String(m.event_uid || '').indexOf('client:') === 0;
@@ -20285,8 +20286,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
       <div style={{ marginBottom: 6 }}>
         {wantsEmail && <span style={Object.assign({}, pill, { background: '#e3f2fd', color: '#1565c0' })}>WANTS AN EMAIL REPLY</span>}
         {isVoicemail && <span style={Object.assign({}, pill, { background: '#fbeaf0', color: '#b5457a' })}>VOICEMAIL</span>}
-        {fromInbox && <span style={Object.assign({}, pill, { background: '#e3f2fd', color: '#1565c0' })}>EMAIL TO VENUE@</span>}
-        {fromInbox && !knownClient && <span style={Object.assign({}, pill, { background: '#fff3e0', color: '#b45309', marginLeft: 6 })}>UNKNOWN SENDER</span>}
+        {fromHb && <span style={Object.assign({}, pill, { background: '#fff3e0', color: '#b45309' })}>Unanswered HoneyBook Message</span>}
         {wantsCall && <span style={Object.assign({}, pill, { background: '#e8f5e9', color: '#2e7d32' })}>WANTS A PHONE CALL</span>}
       </div>
       <div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap' }}>{isVoicemail ? cleanVoicemail(m).text : m.body}</div>
