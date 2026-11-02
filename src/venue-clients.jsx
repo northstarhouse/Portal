@@ -81,7 +81,15 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   const nativeAgreement = nativeVersions.filter(v=>v.response_id===sub.id&&!['draft','void'].includes(v.status)).sort((a,b)=>b.version-a.version)[0] || null;
   const signatures = nativeAgreement ? {all_required_signed:nativeAgreement.status==='completed',signatures:(nativeAgreement.recipients||[]).map(s=>({signee_name:s.name,signee_type:s.role==='venue'?'vendor':'client',required:true,signed:s.status==='signed',signed_at:s.signed_at}))} : contract?.responses?.signatures || null;
   const currency = payments?.total?.currency || 'USD';
-  const baseSchedule = (payments?.schedule || []).map((payment, index) => ({ ...payment, cents: payment.amount?.amount || 0, currency: payment.amount?.currency || currency, label: payment.__nativeLabel || (index === 0 ? 'Booking payment' : 'Scheduled payment ' + (index + 1)), due: payment.due_date?.slice(0, 10) || null })).sort((x, y) => (x.due || '9999').localeCompare(y.due || '9999'));
+  // Payments are shown in date order, and the Refundable Security Deposit is always last. Older (HoneyBook) schedules have no
+  // names, so their security deposit is the $800 payment at the end of the invoice.
+  const rawSchedule = payments?.schedule || [];
+  const baseSchedule = rawSchedule.map((payment, index) => {
+    const cents = payment.amount?.amount || 0;
+    const deposit = /security deposit/i.test(payment.__nativeLabel || '') || (!payment.__nativeLabel && rawSchedule.length > 1 && index === rawSchedule.length - 1 && cents === 80000);
+    return { ...payment, cents, currency: payment.amount?.currency || currency, deposit, label: payment.__nativeLabel || (deposit ? 'Refundable Security Deposit' : ''), due: payment.due_date?.slice(0, 10) || null };
+  }).sort((x, y) => (x.deposit ? 1 : 0) - (y.deposit ? 1 : 0) || (x.due || '9999').localeCompare(y.due || '9999'));
+  baseSchedule.filter(p => !p.label).forEach((p, i) => { p.label = i === 0 ? 'Booking payment' : 'Scheduled payment ' + (i + 1); });
   // Payments logged by hand are applied to the unpaid scheduled payments in date order.
   const manualPayments = Array.isArray(a.__venue_checklist?.manual_payments) ? a.__venue_checklist.manual_payments.filter(p => p && p.cents > 0) : [];
   const manualTotal = manualPayments.reduce((sum, p) => sum + p.cents, 0);
@@ -291,7 +299,7 @@ function InsuranceVerification({ client, onVerify }) {
 function ManualPayments({ client, onSave }) {
   const [amt,setAmt] = React.useState(''), [date,setDate] = React.useState(venueDateKey()), [note,setNote] = React.useState('');
   const [busy,setBusy] = React.useState(false), [err,setErr] = React.useState('');
-  const list = client.manualPayments || [];
+  const list = (client.manualPayments || []).slice().sort((x, y) => String(x.date || '').localeCompare(String(y.date || '')));
   async function save(next) { setBusy(true); setErr(''); try { await onSave(client.id, next); } catch(e) { setErr(e.message || 'Could not save.'); } finally { setBusy(false); } }
   async function add(e) {
     e.preventDefault();

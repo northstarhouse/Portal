@@ -31,34 +31,43 @@ const MONTHS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV',
 function parseVenueCode(raw:string):string|null{const t=String(raw||'').trim().toUpperCase();let y:number,m:number,d:number,x:RegExpMatchArray|null;if((x=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))){y=+x[1];m=+x[2];d=+x[3];}else{const s=t.replace(/[,.\-\/]/g,' ').replace(/\s+/g,' ').trim();if((x=s.match(/^(\d{1,2}) (\d{1,2}) (\d{4})$/))){m=+x[1];d=+x[2];y=+x[3];}else if((x=s.match(/^([A-Z]{3,9}) (\d{1,2})(?:ST|ND|RD|TH)? (\d{4})$/))){m=MONTHS.indexOf(x[1].slice(0,3))+1;d=+x[2];y=+x[3];if(!m)return null;}else return null;}const dt=new Date(Date.UTC(y,m-1,d));if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==m-1||dt.getUTCDate()!==d)return null;return dt.toISOString().slice(0,10);}
 // The booking's event date: live booking row first, else the pre-booking / imported record.
 async function eventDateFor(responseId:string):Promise<string|null>{const inq=await rest('venue_inquiries?select=event_date&limit=1&prebooking_form_response_id=eq.'+responseId);if(inq?.[0]?.event_date)return String(inq[0].event_date).slice(0,10);const r=await rest('nsh_form_responses?select=answers&id=eq.'+responseId);const a=r?.[0]?.answers||{};const v=a.sn9urgfr||a.evp_date||a.__honeybook?.project?.project_date;if(!v)return null;const raw=String(v);return /^\d{4}-\d{2}-\d{2}/.test(raw)?raw.slice(0,10):parseVenueCode(raw);}
-async function email(to:string,subject:string,text:string,copyVenue=false,html?:string){const key=Deno.env.get('RESEND_API_KEY');if(!key)throw new Error('Email delivery is not configured.');// Wedding/private-event mail comes from venue@northstarhouse.org (replies go to venue@thenorthstarhouse.org); if Resend refuses it, fall back to info@.
- const send=(from:string)=>fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({from,reply_to:'venue@thenorthstarhouse.org',to:[to],bcc:['venue@thenorthstarhouse.org','media@thenorthstarhouse.org'].filter(b=>b.toLowerCase()!==String(to).toLowerCase()),subject,text,...(html?{html}:{})})});let r=await send('North Star House <venue@northstarhouse.org>');if(!r.ok)r=await send('North Star House <info@northstarhouse.org>');if(!r.ok)throw new Error('Email could not be delivered. The contract is saved; retry sending or copy the signing link.');}
+async function email(to:string|string[],subject:string,text:string,copyVenue=false,html?:string){const toList=(Array.isArray(to)?to:[to]).map(String);const key=Deno.env.get('RESEND_API_KEY');if(!key)throw new Error('Email delivery is not configured.');// Wedding/private-event mail comes from venue@northstarhouse.org (replies go to venue@thenorthstarhouse.org); if Resend refuses it, fall back to info@.
+ const send=(from:string)=>fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({from,reply_to:'venue@thenorthstarhouse.org',to:toList,bcc:['venue@thenorthstarhouse.org','media@thenorthstarhouse.org'].filter(b=>!toList.some(t=>t.toLowerCase()===b.toLowerCase())),subject,text,...(html?{html}:{})})});let r=await send('North Star House <venue@northstarhouse.org>');if(!r.ok)r=await send('North Star House <info@northstarhouse.org>');if(!r.ok)throw new Error('Email could not be delivered. The contract is saved; retry sending or copy the signing link.');}
 // What is still owed on the first scheduled payment: { state: 'due', cents } or { state: 'paid' }; null when there is no schedule.
 async function depositFor(responseId:string):Promise<{state:string,cents?:number}|null>{try{const r=await rest('venue_inquiries?select=venue_payment_schedule(sequence,amount_cents,amount_paid_cents)&prebooking_form_response_id=eq.'+responseId);const rows=((r&&r[0]&&r[0].venue_payment_schedule)||[]).slice().sort((a:any,b:any)=>a.sequence-b.sequence);if(!rows.length)return null;const left=(rows[0].amount_cents||0)-(rows[0].amount_paid_cents||0);return left>0?{state:'due',cents:left}:{state:'paid'};}catch(_e){return null;}}
+// Weddings get the Wedding Day wording and the brick; other events do not.
+async function isWeddingFor(responseId:string,title:string):Promise<boolean>{try{const r=await rest('venue_inquiries?select=event_type&limit=1&prebooking_form_response_id=eq.'+responseId);if(r&&r[0]&&r[0].event_type)return /wedding/i.test(String(r[0].event_type));const f=await rest('nsh_form_responses?select=form_id&limit=1&id=eq.'+responseId);if(f&&f[0])return f[0].form_id==='a3a383f7-e1db-4344-9dec-ea879ad3406d';}catch(_e){/* fall through */}return /wedding/i.test(title);}
+const joinNames=(n:string[])=>n.length<=1?(n[0]||'there'):n.slice(0,-1).join(', ')+' and '+n[n.length-1];
+// The "everyone has signed" email: celebrate, say what is left (the first payment), and show what the client portal can do.
+async function signedUpdateEmail(version:any,names:string[],venueCode:string,url:string){
+ const pay=await depositFor(version.response_id);
+ const amt=pay&&pay.cents?'$'+(pay.cents/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
+ const wedding=await isWeddingFor(version.response_id,String(version.title||''));
+ const code=venueCode||'your wedding date, written like DEC-28-2026';
+ const who=joinNames(names.map(n=>esc(n)));
+ const whoText=joinNames(names);
+ const subject='Your agreement is fully signed! One step left to book your date';
+ const stepHtml=pay&&pay.state==='paid'
+  ?'Your first payment has been received, so your date is <strong>officially booked</strong>. We could not be happier!'
+  :'There is just one step left to officially book your date: your first payment'+(amt?' of <strong>'+amt+'</strong>':'')+'. You can make it any time on your client portal. Open it and enter your venue code, <strong style="font-size:17px;letter-spacing:2px;">'+esc(code)+'</strong>. As soon as your payment comes in, your date is officially booked.';
+ const items:string[][]=[['Make your payments','securely online, and see your full payment schedule.'],['Review and download your signed agreement','and signature record whenever you need them.'],['Upload your certificate of insurance.',''],['Fill out your '+(wedding?'Wedding Day':'Event Day')+' Questionnaire','with your timeline, tables and chairs, vendors and day-of contacts.']];
+ if(wedding)items.push(['Choose the wording for your engraved legacy brick.','']);
+ items.push(['Message our team','any time, and see your walk-through details.']);
+ const list='<ul style="margin:6px 0 0;padding-left:20px;text-align:left;">'+items.map(i=>'<li style="margin:0 0 8px;text-align:left;"><strong>'+i[0]+'</strong>'+(i[1]?' '+i[1]:'')+'</li>').join('')+'</ul>';
+ const text='Hello '+whoText+',\n\nWe are so excited that you have chosen North Star House for your special day! Your rental agreement now has every signature it needs, and we could not be happier to welcome you.\n\n'
+  +(pay&&pay.state==='paid'?'Your first payment has been received, so your date is officially booked.':'There is just one step left to officially book your date: your first payment'+(amt?' of '+amt:'')+'. You can make it any time on your client portal. Open it and enter your venue code: '+code+'. As soon as your payment comes in, your date is officially booked.')
+  +'\n\nYour client portal: '+url+'\n\nHere is everything you can do there:\n'+items.map(i=>'- '+i[0]+(i[1]?' '+i[1]:'')).join('\n')
+  +'\n\nWe are so excited to celebrate with you. If you have any questions at all, just reply to this email or send us a message from your portal.\n\nNorth Star House';
+ const html=brandedHtml('Your Agreement Is Fully Signed',['Hello '+who+', we are so excited that you have chosen North Star House for your special day! Your rental agreement now has every signature it needs, and we could not be happier to welcome you.',stepHtml,'Here is everything you can do on your client portal:'+list,'We are so excited to celebrate with you. If you have any questions at all, just reply to this email or send us a message from your portal.'],'Open My Client Portal',url);
+ return {subject,text,html};
+}
 async function mailLink(version:any,signer:any,value:string,copyTo=''){try{
  let venueCode='';try{const d=await eventDateFor(version.response_id);if(d){const [y,m,dd]=d.split('-');venueCode=MONTHS[+m-1]+'-'+dd+'-'+y;}}catch(_e){/* the email still goes out without the code */}
  const signed=signer.status==='signed',venue=signer.role==='venue',url=link(value,signer.role,venueCode),first=String(signer.name||'').split(' ')[0]||'there';
  const expires=version.expires_at?new Date(version.expires_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'';
  let subject:string,text:string,html:string;
  if(signed&&!venue&&version.status==='completed'){
-  // Everyone has signed: celebrate, say what is left (the first payment), and show what they can do on their client portal.
-  const pay=await depositFor(version.response_id);
-  const amt=pay&&pay.cents?'$'+(pay.cents/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
-  const wedding=/wedding/i.test(String(version.title||''));
-  const code=venueCode||'your wedding date, written like DEC-28-2026';
-  subject='Your agreement is fully signed! One step left to book your date';
-  const stepHtml=pay&&pay.state==='paid'
-   ?'Your first payment has been received, so your date is <strong>officially booked</strong>. We could not be happier!'
-   :'There is just one step left to officially book your date: your first payment'+(amt?' of <strong>'+amt+'</strong>':'')+'. You can make it any time on your client portal. Open it and enter your venue code, <strong style="font-size:17px;letter-spacing:2px;">'+esc(code)+'</strong>. As soon as your payment comes in, your date is officially booked.';
-  const items=[['Make your payments','securely online, and see your full payment schedule.'],['Review and download your signed agreement','and signature record whenever you need them.'],['Upload your certificate of insurance.',''],['Fill out your '+(wedding?'Wedding Day':'event day')+' Questionnaire','with your timeline, tables and chairs, vendors and day-of contacts.']];
-  if(wedding)items.push(['Choose the wording for your engraved legacy brick.','']);
-  items.push(['Message our team','any time, and see your walk-through details.']);
-  const list='<ul style="margin:6px 0 0;padding-left:20px;">'+items.map(i=>'<li style="margin:0 0 8px;"><strong>'+i[0]+'</strong>'+(i[1]?' '+i[1]:'')+'</li>').join('')+'</ul>';
-  text='Hello '+first+',\n\nWe are so excited that you have chosen North Star House for your special day! Your rental agreement now has every signature it needs, and we could not be happier to welcome you.\n\n'
-   +(pay&&pay.state==='paid'?'Your first payment has been received, so your date is officially booked.':'There is just one step left to officially book your date: your first payment'+(amt?' of '+amt:'')+'. You can make it any time on your client portal. Open it and enter your venue code: '+code+'. As soon as your payment comes in, your date is officially booked.')
-   +'\n\nYour client portal: '+url+'\n\nHere is everything you can do there:\n'+items.map(i=>'- '+i[0]+(i[1]?' '+i[1]:'')).join('\n')
-   +'\n\nWe are so excited to celebrate with you. If you have any questions at all, just reply to this email or send us a message from your portal.\n\nNorth Star House';
-  html=brandedHtml('Your Agreement Is Fully Signed',['Hello '+esc(first)+', we are so excited that you have chosen North Star House for your special day! Your rental agreement now has every signature it needs, and we could not be happier to welcome you.',stepHtml,'Here is everything you can do on your client portal:'+list,'We are so excited to celebrate with you. If you have any questions at all, just reply to this email or send us a message from your portal.'],'Open My Client Portal',url);
+  const u=await signedUpdateEmail(version,[first],venueCode,url);subject=u.subject;text=u.text;html=u.html;
  }else if(signed){
   subject=version.title+' — your agreement copy';
   text='Hello '+signer.name+',\n\nYour North Star House agreement and signature record are available on your event page:\n'+url+'\n\n'+(venueCode?'Your venue code: '+venueCode+'\n':'')+'Enter your venue code (your wedding date, like DEC-28-2026) to review and download your copy.\n\nNorth Star House';
@@ -139,6 +148,22 @@ Deno.serve(async req=>{
    await rpc('code',{token_hash:hash,code_hash:ch});
    const result=await rpc('sign',{token_hash:hash,code_hash:ch,document_hash:ver.document_hash,signed_name:body.signed_name,consent:body.consent===true,ip:req.headers.get('x-forwarded-for')?.split(',')[0]||null,user_agent:req.headers.get('user-agent')});
    return result.error?json(result,400):json({version:publicRecord(result),saved:true});
+  }
+  if(action==='signed_update'){
+   const rec=await rest('rpc/venue_agreement_record',{method:'POST',body:JSON.stringify({p_id:body.version_id})});
+   if(!rec)return json({error:'Agreement not found.'},404);
+   if(rec.status!=='completed')return json({error:'Everyone has to sign first.'},400);
+   const clients=(rec.recipients||[]).filter((x:any)=>x.role!=='venue'&&x.status==='signed');
+   if(!clients.length)return json({error:'There are no client signers on this agreement.'},400);
+   const order=(rec.signers||[]).map((x:any)=>String(x.email||'').toLowerCase());
+   clients.sort((a:any,b:any)=>order.indexOf(String(a.email).toLowerCase())-order.indexOf(String(b.email).toLowerCase()));
+   let venueCode='';try{const d=await eventDateFor(rec.response_id);if(d){const [y,m,dd]=d.split('-');venueCode=MONTHS[+m-1]+'-'+dd+'-'+y;}}catch(_e){/* sent without the code */}
+   const names=clients.map((x:any)=>String(x.name||'').split(' ')[0]).filter(Boolean);
+   const u=await signedUpdateEmail(rec,names,venueCode,link('x','client',venueCode));
+   try{await email(clients.map((x:any)=>x.email),u.subject,u.text,true,u.html);}catch(e){for(const c of clients)await rpc('delivery',{version_id:rec.id,detail:{signer_id:c.id,delivered:false}});return json({delivered:false,error:(e as Error).message});}
+   for(const c of clients)await rpc('delivery',{version_id:rec.id,detail:{signer_id:c.id,delivered:true}});
+   try{await rest('activity_log',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({description:'Signed agreement update sent to '+joinNames(clients.map((x:any)=>x.name||x.email)),action:'contract_signed_update_sent',tag:'Venue',detail:{version_id:rec.id,emails:clients.map((x:any)=>x.email),title:rec.title}})});}catch(_e){/* the email already went out */}
+   return json({delivered:true,to:clients.map((x:any)=>x.email)});
   }
   if(action==='link'){
    const value=token();const version=await rpc('link',{version_id:body.version_id,signer_id:body.signer_id,hash:await tokenHash(value)});const signer=version.recipients.find((s:any)=>s.id===body.signer_id);
