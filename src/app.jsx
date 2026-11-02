@@ -13919,7 +13919,80 @@ function SuBuilderBack({ onBack, label }) {
 function SuEmpty({ text }) {
   return <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>{text}</div>;
 }
-function SuListRow({ title, subtitle, meta, unread, onClick, onViewResponses, onCopyLink, copied, onDelete }) {
+// Emails an event announcement that looks like the event's RSVP page, with a "Click here to RSVP" button.
+function EventEmailModal({ ev, onClose }) {
+  var [subject, setSubject] = useState('');
+  var [note, setNote] = useState('');
+  var [audience, setAudience] = useState('test');
+  var [emails, setEmails] = useState('');
+  var [volCount, setVolCount] = useState(null);
+  var [busy, setBusy] = useState(false);
+  var [msg, setMsg] = useState(null);
+  var isShift = ev.event_type === 'shift';
+  var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+  function call(payload) {
+    return whoIsSignedIn().then(function(who) {
+      return fetch(SUPABASE_URL + '/functions/v1/send-event-invite', { method: 'POST', headers: H, body: JSON.stringify(Object.assign({ event_id: ev.id, subject: subject, note: note, audience: audience, emails: emails, sent_by: who || '' }, payload)) });
+    }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok, status: r.status, j: j }; }); });
+  }
+  useEffect(function() { call({ action: 'count' }).then(function(res) { if (res.ok) setVolCount(res.j.volunteers); }).catch(function() {}); }, []);
+  var customCount = emails.split(/[\s,;]+/).filter(function(x) { return /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(x); }).length;
+  var people = audience === 'volunteers' ? volCount : audience === 'custom' ? customCount : 1;
+  function preview() {
+    setBusy(true); setMsg(null);
+    call({ action: 'preview' }).then(function(res) {
+      if (!res.ok || !res.j.html) { setMsg({ bad: true, text: (res.j && res.j.error) || 'Could not build the preview.' }); return; }
+      var w = window.open('', '_blank');
+      if (!w) { setMsg({ bad: true, text: 'Allow pop-ups to see the preview.' }); return; }
+      w.document.open(); w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Preview</title></head><body style="margin:0">' + res.j.html + '</body></html>'); w.document.close();
+    }).catch(function() { setMsg({ bad: true, text: 'Could not build the preview.' }); }).finally(function() { setBusy(false); });
+  }
+  function send(resend) {
+    if (busy) return;
+    if (audience === 'custom' && !customCount) { setMsg({ bad: true, text: 'Paste at least one email address.' }); return; }
+    if (audience !== 'test' && !resend && !window.confirm('Send "' + ev.title + '" to ' + people + (people === 1 ? ' person' : ' people') + '? Recipients cannot see each other.')) return;
+    setBusy(true); setMsg(null);
+    call({ action: 'send', confirm: audience !== 'test', resend: !!resend }).then(function(res) {
+      if (res.status === 409 && res.j.already_sent_at) {
+        setBusy(false);
+        if (window.confirm('This was already sent to this group on ' + new Date(res.j.already_sent_at).toLocaleString('en-US') + '. Send it again?')) send(true);
+        return;
+      }
+      if (!res.ok || !res.j.ok) { setMsg({ bad: true, text: (res.j && res.j.error) || 'Could not send.' }); return; }
+      setMsg({ bad: false, text: audience === 'test' ? 'A test was sent to the office inbox.' : 'Sent to ' + res.j.recipients + (res.j.recipients === 1 ? ' person.' : ' people.') + ' It is in the activity log.' });
+    }).catch(function() { setMsg({ bad: true, text: 'Could not send. Please try again.' }); }).finally(function() { setBusy(false); });
+  }
+  var field = { padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff', width: '100%', boxSizing: 'border-box' };
+  var label = { fontSize: 12, color: '#888', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 };
+  return (
+    <div onClick={function(e) { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div role="dialog" aria-label="Send event email" style={{ background: '#fff', borderRadius: 14, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 22 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Send email</div>
+          <a onClick={onClose} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Close ×</a>
+        </div>
+        <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>{ev.title}. Looks like the {isShift ? 'sign-up' : 'RSVP'} page, with a button that says "{isShift ? 'Click here to sign up' : 'Click here to RSVP'}".</div>
+        <label style={label}>Subject<input value={subject} onChange={function(e) { setSubject(e.target.value); }} placeholder={isShift ? 'Volunteer sign-up: ' + ev.title : "You're invited: " + ev.title} style={field} /></label>
+        <label style={label}>A note at the top (optional)<textarea rows={3} value={note} onChange={function(e) { setNote(e.target.value); }} placeholder="Add a personal message before the event details" style={Object.assign({}, field, { resize: 'vertical' })} /></label>
+        <label style={label}>Send to
+          <select value={audience} onChange={function(e) { setAudience(e.target.value); setMsg(null); }} style={field}>
+            <option value="test">Send me a test (office inbox only)</option>
+            <option value="volunteers">Active volunteers{volCount != null ? ' (' + volCount + ')' : ''}</option>
+            <option value="custom">Email addresses I paste</option>
+          </select>
+        </label>
+        {audience === 'custom' && <label style={label}>Email addresses (commas, spaces or new lines)<textarea rows={4} value={emails} onChange={function(e) { setEmails(e.target.value); }} style={Object.assign({}, field, { resize: 'vertical' })} /><span>{customCount} valid address{customCount === 1 ? '' : 'es'}</span></label>}
+        {msg && <div style={{ fontSize: 13, marginBottom: 12, color: msg.bad ? '#b3402a' : '#2e7d32' }}>{msg.text}</div>}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button type="button" onClick={preview} disabled={busy} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Preview</button>
+          <button type="button" onClick={function() { send(false); }} disabled={busy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.7 : 1 }}>{busy ? 'Working…' : audience === 'test' ? 'Send test' : 'Send to ' + (people == null ? '…' : people)}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SuListRow({ title, subtitle, meta, unread, onClick, onViewResponses, onCopyLink, copied, onDelete, onSendEmail }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '0.5px solid #f0ece6' }}>
       <div onClick={onClick} style={{ flex: 1, minWidth: 0, cursor: onClick ? 'pointer' : 'default' }}>
@@ -13932,6 +14005,7 @@ function SuListRow({ title, subtitle, meta, unread, onClick, onViewResponses, on
       </div>
       {onViewResponses && <button onClick={onViewResponses} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#888', flexShrink: 0 }}>Responses</button>}
       {onCopyLink && <button onClick={onCopyLink} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: copied ? '#2e7d32' : '#888', flexShrink: 0 }}>{copied ? '✓ Copied' : 'Copy link'}</button>}
+      {onSendEmail && <button onClick={onSendEmail} style={{ background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: gold, flexShrink: 0 }}>Send email</button>}
       {onDelete && <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#c88', cursor: 'pointer', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Delete</button>}
     </div>
   );
@@ -14427,6 +14501,7 @@ var SU_FORM_CATEGORY_TABS = ['All'].concat(FORM_CATEGORIES);
 
 function FormBuilderView({ navigate }) {
   var [tab, setTab] = useState('forms');
+  var [emailEvent, setEmailEvent] = useState(null);
   var [formCategory, setFormCategory] = useState('All');
   var [events, setEvents] = useState([]);
   var [polls, setPolls] = useState([]);
@@ -14490,6 +14565,7 @@ function FormBuilderView({ navigate }) {
 
   return (
     <div style={{ maxWidth: 720 }}>
+      {emailEvent && <EventEmailModal ev={emailEvent} onClose={function() { setEmailEvent(null); }} />}
       <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Form Builder</div>
       <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Create and manage sign-up events, polls, forms, and question templates.</div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
@@ -14518,6 +14594,7 @@ function FormBuilderView({ navigate }) {
               return <SuListRow key={ev.id} title={ev.title} subtitle={subtitle} meta={meta}
                 onClick={function() { setEditing({ type: 'events', id: ev.id }); }}
                 onCopyLink={function() { handleCopyLink('event', ev.id, ev.title, ev.slug); }} copied={copiedId === 'event' + ev.id}
+                onSendEmail={ev.slug ? function() { setEmailEvent(ev); } : null}
                 onDelete={function() { handleDelete('event', ev.id, 'vol_events'); }} />;
             }))}
             {tab === 'polls' && (polls.length === 0 ? <SuEmpty text="No polls yet." /> : polls.map(function(pl) {
