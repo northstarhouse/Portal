@@ -15,7 +15,7 @@ const LA = 'America/Los_Angeles'
 const GOLD = '#886c44'
 const TEST_TO = 'media@thenorthstarhouse.org'
 // Also receive the board update (Jen, Derek, Kaelen, Haley), on top of the active board members.
-const ALSO_SEND_TO = ['jen@thenorthstarhouse.org', 'derekcheeseman@comcast.net', 'development@thenorthstarhouse.org', 'media@thenorthstarhouse.org']
+const ALSO_SEND_TO = ['jen@thenorthstarhouse.org', 'derek@thenorthstarhouse.org', 'development@thenorthstarhouse.org', 'media@thenorthstarhouse.org']
 const AREAS = ['Construction', 'Grounds', 'Interiors', 'Docents', 'Fundraising', 'Events', 'Marketing', 'Venue']
 const RENTAL_INQUIRY_FORMS: Record<string, string> = {
   '1eea2137-f94d-414b-a977-4ed622214580': 'Wedding',
