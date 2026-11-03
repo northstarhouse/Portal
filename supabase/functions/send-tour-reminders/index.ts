@@ -132,8 +132,15 @@ function guideTextNumbers(guide: string): string {
 const guideTextLine = (guide: string) => `${TEXT_INTRO} ${guideTextNumbers(guide)}\n`
 const guideTextLineHtml = (guide: string) => `${esc(TEXT_INTRO)} <strong>${esc(guideTextNumbers(guide))}</strong><br>`
 
-async function run24h(): Promise<number> {
-  const rows: Tour[] = await sb('/rest/v1/rpc/tours_due_for_24h_reminder', { method: 'POST', body: '{}' }).then((r) => r.json())
+// One tour at a time: each booked tour has its own scheduled sends (see schedule_tour_reminders.sql). tour_for_reminder only returns the
+// tour if it is still booked, the reminder has not gone out, and the tour has not been moved far from the time it was scheduled for.
+async function dueFor(kind: '24h' | '1h', only?: string): Promise<Tour[]> {
+  if (only) return sb('/rest/v1/rpc/tour_for_reminder', { method: 'POST', body: JSON.stringify({ p_id: only, p_kind: kind }) }).then((r) => r.json())
+  return sb(`/rest/v1/rpc/tours_due_for_${kind}_reminder`, { method: 'POST', body: '{}' }).then((r) => r.json())
+}
+
+async function run24h(only?: string): Promise<number> {
+  const rows: Tour[] = await dueFor('24h', only)
   let sent = 0
   for (const t of rows || []) {
     const when = fmtWhen(t.date, t.start_time)
@@ -166,8 +173,8 @@ async function run24h(): Promise<number> {
   return sent
 }
 
-async function run1h(): Promise<number> {
-  const rows: Tour[] = await sb('/rest/v1/rpc/tours_due_for_1h_reminder', { method: 'POST', body: '{}' }).then((r) => r.json())
+async function run1h(only?: string): Promise<number> {
+  const rows: Tour[] = await dueFor('1h', only)
   let sent = 0
   for (const t of rows || []) {
     const when = fmtWhen(t.date, t.start_time)
@@ -199,9 +206,13 @@ async function run1h(): Promise<number> {
   return sent
 }
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
   try {
-    const [sent24, sent1] = await Promise.all([run24h(), run1h()])
+    // { tour_id, kind } sends one tour's reminder (called at the scheduled time); no body scans for anything due.
+    const body = await req.json().catch(() => ({}))
+    const only = body && body.tour_id ? String(body.tour_id) : undefined
+    const kind = body && body.kind
+    const [sent24, sent1] = await Promise.all([only && kind !== '24h' ? 0 : run24h(only), only && kind !== '1h' ? 0 : run1h(only)])
     return new Response(JSON.stringify({ ok: true, sent24, sent1 }), { headers: { 'Content-Type': 'application/json' } })
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: { 'Content-Type': 'application/json' } })
