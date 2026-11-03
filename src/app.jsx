@@ -19401,6 +19401,11 @@ function VenueRentalsView({ navigate, initialTab }) {
               <React.Fragment>
                 <div onClick={function() { setToolsOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
                 <div role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 41, background: '#fff', border: '1px solid #ded7cb', borderRadius: 10, boxShadow: '0 8px 24px rgba(42,36,32,.14)', minWidth: 270, padding: 6 }}>
+                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setAddTourOpen(true); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <div style={{ fontWeight: 700 }}>Add a tour to the calendar</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Pick the date and time; they get a confirmation email</div>
+                  </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setManualFormOpen(true); }}
                     style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
                     <div style={{ fontWeight: 700 }}>Fill out a pre-booking form</div>
@@ -19443,7 +19448,6 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
           {venueTab !== 'clients' && (
             <React.Fragment>
-              <button type="button" onClick={function() { setAddTourOpen(true); }} style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, padding: '10px 18px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Add a tour to the calendar</button>
               <button onClick={function() { navigate('estate-tours'); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0, padding: '10px 18px', background: '#fff', color: gold, border: '1.5px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 Edit Tour Schedule
