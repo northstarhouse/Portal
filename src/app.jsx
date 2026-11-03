@@ -18883,6 +18883,8 @@ function VenueRentalsView({ navigate, initialTab }) {
   }
   var [siteView, setSiteView] = useState(false); // Clients tab: the Assign Site Managers page
   var [addTourOpen, setAddTourOpen] = useState(false);
+  var [toolsOpen, setToolsOpen] = useState(false);
+  var [manualFormOpen, setManualFormOpen] = useState(false);
   var colorCoding = venueTab === 'clients' ? true : inquiriesColorCoding;
   const [clientFilter, setClientFilter] = useS('all');
   const [clientQuery, setClientQuery] = useS('');
@@ -19370,6 +19372,22 @@ function VenueRentalsView({ navigate, initialTab }) {
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginLeft: 'auto' }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button type="button" aria-haspopup="menu" aria-expanded={toolsOpen} onClick={function() { setToolsOpen(!toolsOpen); }}
+              style={{ padding: '9px 16px', background: toolsOpen ? gold : '#fff', color: toolsOpen ? '#fff' : gold, border: '1px solid ' + gold, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Tools ▾</button>
+            {toolsOpen && (
+              <React.Fragment>
+                <div onClick={function() { setToolsOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                <div role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 41, background: '#fff', border: '1px solid #ded7cb', borderRadius: 10, boxShadow: '0 8px 24px rgba(42,36,32,.14)', minWidth: 270, padding: 6 }}>
+                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setManualFormOpen(true); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <div style={{ fontWeight: 700 }}>Fill out a pre-booking form</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>For a client who skipped the form</div>
+                  </button>
+                </div>
+              </React.Fragment>
+            )}
+          </div>
           {venueTab === 'clients' && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
               <button type="button" onClick={function() { setSiteView(!siteView); }}
@@ -19405,6 +19423,7 @@ function VenueRentalsView({ navigate, initialTab }) {
       </div>
 
       {addTourOpen && <AddTourModal onClose={function() { setAddTourOpen(false); }} />}
+      {manualFormOpen && <ManualPreBookingModal onClose={function() { setManualFormOpen(false); }} onSaved={function(id) { window.__nshOpenClient = id; setVenueTab('clients'); loadInquiries(); }} />}
       {inquiriesError && <div role="alert" style={{ padding: 16, border: '1px solid #e7c9be', borderRadius: 10, background: '#fff5ef', marginBottom: 16, color: '#8c4c35', fontSize: 13 }}>{inquiriesError}. <button type="button" onClick={loadInquiries} style={{background:'none',border:0,textDecoration:'underline',color:'inherit',cursor:'pointer'}}>Try again</button></div>}
       {!SHOW_LEGACY_VENUE_DASHBOARD && (
         <div style={{ display: 'grid', gridTemplateColumns: venueTab === 'clients' ? 'minmax(0, 1fr)' : 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 16 }}>
@@ -21014,6 +21033,101 @@ function QuarterHourSelect({ value, onChange, disabled, style, ariaLabel }) {
         {minutes.map(function(m) { return <option key={m} value={m}>{m}</option>; })}
       </select>
     </span>
+  );
+}
+
+// Tools > "Fill out a pre-booking form": staff fill in the same form a client would, for someone who skipped the system. It is saved
+// exactly like a form the client submitted (same table, so it shows up under Clients and goes on the calendar), and is marked as
+// entered by staff. Nothing is emailed to the client.
+function ManualPreBookingModal({ onClose, onSaved }) {
+  var [kind, setKind] = useState('wedding');
+  var [fields, setFields] = useState(null);
+  var [vals, setVals] = useState({});
+  var [busy, setBusy] = useState(false);
+  var [msg, setMsg] = useState(null);
+  var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+  var formId = kind === 'wedding' ? PRE_BOOKING_FORM_ID : PRE_BOOKING_FORM_ID_EVENT;
+  useEffect(function() {
+    var off = false;
+    setFields(null); setVals({}); setMsg(null);
+    fetch(SUPABASE_URL + '/rest/v1/nsh_forms?select=fields&id=eq.' + formId, { headers: H })
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(rows) { if (!off) setFields(Array.isArray(rows && rows[0] && rows[0].fields) ? rows[0].fields : []); })
+      .catch(function() { if (!off) setFields([]); });
+    return function() { off = true; };
+  }, [formId]);
+  function set(id, v) { setVals(function(o) { var n = Object.assign({}, o); n[id] = v; return n; }); }
+  var input = { padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff', width: '100%', boxSizing: 'border-box' };
+  function save(e) {
+    e.preventDefault();
+    if (busy || !fields) return;
+    var missing = fields.filter(function(f) { return f.required && !String(vals[f.id] || '').trim(); });
+    if (missing.length) { setMsg({ bad: true, text: 'Still needed: ' + missing.map(function(f) { return (f.section ? f.section + ' - ' : '') + f.label; }).join('; ') + '.' }); return; }
+    var bad = fields.filter(function(f) { return /^email/i.test(f.label || '') && String(vals[f.id] || '').trim() && !/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(String(vals[f.id]).trim()); });
+    if (bad.length) { setMsg({ bad: true, text: 'That email address does not look right.' }); return; }
+    setBusy(true); setMsg(null);
+    var answers = {};
+    fields.forEach(function(f) { var v = String(vals[f.id] || '').trim(); if (v) answers[f.id] = v; });
+    whoIsSignedIn().then(function(name) {
+      answers.__entered_by_staff = { by: name || null, at: new Date().toISOString() };
+      return fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses', { method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=representation' }), body: JSON.stringify({ form_id: formId, answers: answers }) });
+    }).then(function(r) { return r.json().catch(function() { return null; }).then(function(j) { return { ok: r.ok, j: j }; }); })
+      .then(function(res) {
+        if (!res.ok || !Array.isArray(res.j) || !res.j[0]) throw new Error('Could not save the form. Please try again.');
+        var primary = fields.find(function(f) { return f.label === 'Full Legal Name' || f.label === 'Primary Signer - Full Name'; });
+        logActivity('Pre-booking form filled out by staff for ' + ((primary && vals[primary.id]) || 'a client'), 'prebooking_manual_entry');
+        onSaved(res.j[0].id);
+        onClose();
+      })
+      .catch(function(err) { setMsg({ bad: true, text: err.message || 'Could not save the form.' }); })
+      .finally(function() { setBusy(false); });
+  }
+  var sections = [];
+  (fields || []).forEach(function(f) {
+    var name = f.section || '';
+    var sec = sections.find(function(x) { return x.name === name; });
+    if (!sec) { sec = { name: name, fields: [] }; sections.push(sec); }
+    sec.fields.push(f);
+  });
+  var tabBtn = function(k, label) { return <button type="button" onClick={function() { setKind(k); }} style={{ background: kind === k ? gold : '#fff', color: kind === k ? '#fff' : gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}</button>; };
+  return (
+    <div onClick={function(e) { if (e.target === e.currentTarget && !busy) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <form onSubmit={save} role="dialog" aria-label="Fill out a pre-booking form" style={{ background: '#fff', borderRadius: 14, maxWidth: 560, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Fill out a pre-booking form</div>
+          <a onClick={function() { if (!busy) onClose(); }} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Close ×</a>
+        </div>
+        <div style={{ fontSize: 13, color: '#888', marginBottom: 14 }}>For a client who skipped the form. It is saved as if they submitted it, so they appear under Clients. Nothing is emailed to them.</div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>{tabBtn('wedding', 'Wedding')}{tabBtn('event', 'Event, nonprofit or memorial')}</div>
+        {fields === null && <div style={{ color: '#999', fontSize: 13, padding: '20px 0' }}>Loading the form…</div>}
+        {sections.map(function(sec) {
+          return (
+            <div key={sec.name || 'main'} style={{ marginBottom: 6 }}>
+              {sec.name && <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gold, margin: '10px 0 8px' }}>{sec.name}</div>}
+              {sec.fields.map(function(f) {
+                var isSecondaryAddress = f.id === 'pt4addr1';
+                return (
+                  <label key={f.id} style={{ fontSize: 12, color: '#666', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+                    <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                      <span>{f.label}{f.required ? ' *' : ''}</span>
+                      {isSecondaryAddress && vals.ps4addr1 && <a onClick={function() { set('pt4addr1', vals.ps4addr1); }} style={{ cursor: 'pointer', color: gold, fontWeight: 600, whiteSpace: 'nowrap' }}>Same as above</a>}
+                    </span>
+                    {f.type === 'long_text'
+                      ? <textarea rows={3} value={vals[f.id] || ''} onChange={function(e) { set(f.id, e.target.value); }} style={Object.assign({}, input, { resize: 'vertical' })} />
+                      : <input type={f.type === 'date' ? 'date' : 'text'} value={vals[f.id] || ''} onChange={function(e) { set(f.id, e.target.value); }} style={input} />}
+                  </label>
+                );
+              })}
+            </div>
+          );
+        })}
+        {msg && <div style={{ fontSize: 13, marginBottom: 12, color: msg.bad ? '#b3402a' : '#2e7d32' }}>{msg.text}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button type="button" onClick={onClose} disabled={busy} style={{ background: '#fff', color: '#888', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+          <button type="submit" disabled={busy || !fields} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: busy || !fields ? 0.7 : 1 }}>{busy ? 'Saving…' : 'Save the form'}</button>
+        </div>
+      </form>
+    </div>
   );
 }
 
