@@ -18886,6 +18886,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   var [toolsOpen, setToolsOpen] = useState(false);
   var [manualFormOpen, setManualFormOpen] = useState(false);
   var [vendorToolOpen, setVendorToolOpen] = useState(false);
+  var [sendFormOpen, setSendFormOpen] = useState(false);
   var colorCoding = venueTab === 'clients' ? true : inquiriesColorCoding;
   const [clientFilter, setClientFilter] = useS('all');
   const [clientQuery, setClientQuery] = useS('');
@@ -19404,6 +19405,11 @@ function VenueRentalsView({ navigate, initialTab }) {
                     <div style={{ fontWeight: 700 }}>Fill out a pre-booking form</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>For a client who skipped the form</div>
                   </button>
+                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setSendFormOpen(true); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <div style={{ fontWeight: 700 }}>Send out a pre-booking form</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Email the form and client guide to someone</div>
+                  </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVendorToolOpen(true); }}
                     style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
                     <div style={{ fontWeight: 700 }}>Add a vendor recommendation</div>
@@ -19448,6 +19454,7 @@ function VenueRentalsView({ navigate, initialTab }) {
       </div>
 
       {addTourOpen && <AddTourModal onClose={function() { setAddTourOpen(false); }} />}
+      {sendFormOpen && <SendPreBookingModal onClose={function() { setSendFormOpen(false); }} />}
       {vendorToolOpen && <VendorToolModal onClose={function() { setVendorToolOpen(false); }} />}
       {manualFormOpen && <ManualPreBookingModal onClose={function() { setManualFormOpen(false); }} onSaved={function(id) { window.__nshOpenClient = id; setVenueTab('clients'); loadInquiries(); }} />}
       {inquiriesError && <div role="alert" style={{ padding: 16, border: '1px solid #e7c9be', borderRadius: 10, background: '#fff5ef', marginBottom: 16, color: '#8c4c35', fontSize: 13 }}>{inquiriesError}. <button type="button" onClick={loadInquiries} style={{background:'none',border:0,textDecoration:'underline',color:'inherit',cursor:'pointer'}}>Try again</button></div>}
@@ -21073,6 +21080,77 @@ function QuarterHourSelect({ value, onChange, disabled, style, ariaLabel }) {
         {minutes.map(function(m) { return <option key={m} value={m}>{m}</option>; })}
       </select>
     </span>
+  );
+}
+
+// Tools > "Send out a pre-booking form": emails the pre-booking form (with the client guide) to someone who never went through an
+// inquiry, such as a nonprofit or a group with a special arrangement. Same sending as the form on the Inquiries tab.
+function SendPreBookingModal({ onClose }) {
+  var blank = { email: '', name: '', event_type: '', arrangement: 'standard' };
+  var [f, setF] = useState(blank);
+  var [busy, setBusy] = useState(false);
+  var [msg, setMsg] = useState(null);
+  function set(k, v) { setF(function(o) { var n = Object.assign({}, o); n[k] = v; return n; }); }
+  function send(resend) {
+    if (busy) return;
+    if (!f.email.trim() || !f.event_type) { setMsg({ bad: true, text: 'Add the email address and choose the event type.' }); return; }
+    if (!/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(f.email.trim())) { setMsg({ bad: true, text: 'That email address does not look right.' }); return; }
+    setBusy(true); setMsg(null);
+    whoIsSignedIn().then(function(who) {
+      return fetch(SUPABASE_URL + '/functions/v1/send-prebooking-form', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manual: true, email: f.email.trim(), name: f.name.trim(), event_type: f.event_type, arrangement: f.arrangement, sent_by: who || '', resend: !!resend })
+      });
+    }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok, status: r.status, j: j }; }); })
+      .then(function(res) {
+        if (res.status === 409 && res.j.already_sent_at) {
+          var when = new Date(res.j.already_sent_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+          setBusy(false);
+          if (window.confirm('A pre-booking form was already sent to ' + f.email.trim() + ' on ' + when + '. Send it again?')) send(true);
+          return;
+        }
+        if (!res.ok || !res.j.ok) { setMsg({ bad: true, text: (res.j && res.j.error) || 'Could not send the pre-booking form.' }); return; }
+        setMsg({ bad: false, text: 'Sent to ' + res.j.email + '. It is in the activity log.' });
+        setF(blank);
+      }).catch(function() { setMsg({ bad: true, text: 'Could not send the pre-booking form. Please try again.' }); })
+      .finally(function() { setBusy(false); });
+  }
+  var field = { padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff', width: '100%', boxSizing: 'border-box' };
+  var label = { fontSize: 12, color: '#888', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 };
+  return (
+    <div onClick={function(e) { if (e.target === e.currentTarget && !busy) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <form onSubmit={function(e) { e.preventDefault(); send(false); }} role="dialog" aria-label="Send out a pre-booking form" style={{ background: '#fff', borderRadius: 14, maxWidth: 460, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 22 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Send out a pre-booking form</div>
+          <a onClick={onClose} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Close ×</a>
+        </div>
+        <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Emails them the client guide and the right pre-booking form for their event. It is copied to media@.</div>
+        <label style={label}>Email address<input type="email" value={f.email} onChange={function(e) { set('email', e.target.value); }} placeholder="name@example.org" style={field} /></label>
+        <label style={label}>First name (optional)<input value={f.name} onChange={function(e) { set('name', e.target.value); }} style={field} /></label>
+        <label style={label}>Event type
+          <select value={f.event_type} onChange={function(e) { set('event_type', e.target.value); }} style={field}>
+            <option value="">Choose…</option>
+            <option>Wedding</option>
+            <option>Private Event</option>
+            <option>Memorial</option>
+            <option>Nonprofit Event</option>
+            <option>Other</option>
+          </select>
+        </label>
+        <label style={label}>Special arrangement
+          <select value={f.arrangement} onChange={function(e) { set('arrangement', e.target.value); }} style={field}>
+            <option value="standard">None (standard rates)</option>
+            <option value="bylt">BYLT: special rate</option>
+          </select>
+        </label>
+        {msg && <div style={{ fontSize: 13, marginBottom: 12, color: msg.bad ? '#b3402a' : '#2e7d32' }}>{msg.text}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button type="button" onClick={onClose} disabled={busy} style={{ background: '#fff', color: '#888', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Close</button>
+          <button type="submit" disabled={busy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.7 : 1 }}>{busy ? 'Sending…' : 'Send it'}</button>
+        </div>
+      </form>
+    </div>
   );
 }
 
