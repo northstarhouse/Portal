@@ -19052,9 +19052,9 @@ function VenueRentalsView({ navigate, initialTab }) {
   function reqOptions(t) {
     return [
       <option key="nh" value="not_handled">Not Handled</option>,
-      <option key="hj" value="made_contact:Jen">Handled by Jen</option>,
-      <option key="hd" value="made_contact:Derek">Handled by Derek</option>,
-      reqChoice(t) === 'made_contact' ? <option key="mc" value="made_contact">{'Made Contact' + (t.request_handled_by ? ' (' + t.request_handled_by + ')' : '')}</option> : null,
+      <option key="hj" value="made_contact:Jen">Jen Made Contact</option>,
+      <option key="hd" value="made_contact:Derek">Derek Made Contact</option>,
+      reqChoice(t) === 'made_contact' ? <option key="mc" value="made_contact">{t.request_handled_by ? t.request_handled_by + ' Made Contact' : 'Made Contact'}</option> : null,
       <option key="ni" value="not_interested">Not Interested</option>
     ];
   }
@@ -19560,7 +19560,7 @@ function VenueRentalsView({ navigate, initialTab }) {
               '<td>' + esc(t.visitor_email) + '</td>' +
               '<td>' + esc(fmtPhone(t.visitor_phone)) + '</td>' +
               '<td>' + esc(datesStr) + '</td>' +
-              '<td>' + (isArchived(t) ? (t.request_status === 'not_interested' ? 'Not Interested (Archived)' : 'Made Contact (Archived)') : t.request_status === 'made_contact' ? 'Made Contact' + (t.request_handled_by ? ' (' + t.request_handled_by + ')' : '') : 'Not Handled') + '</td>' +
+              '<td>' + (isArchived(t) ? (t.request_status === 'not_interested' ? 'Not Interested (Archived)' : 'Made Contact (Archived)') : t.request_status === 'made_contact' ? (t.request_handled_by ? t.request_handled_by + ' Made Contact' : 'Made Contact') : 'Not Handled') + '</td>' +
               '</tr>';
           }).join('');
           var html = '<!doctype html><html><head><meta charset="utf-8"><title>Tour Requests</title>' +
