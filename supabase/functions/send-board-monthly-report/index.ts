@@ -143,6 +143,28 @@ async function upcomingEvents() {
   } catch { return [] }
 }
 
+// Digital RSVP invitations: what was emailed out in the month (from the Portal's event emails), and where each RSVP event stands now.
+async function rsvpUpdate(b: ReturnType<typeof monthBounds>) {
+  let sent: { title: string; count: number; on: string }[] = []
+  try {
+    // deno-lint-ignore no-explicit-any
+    const rows: any[] = await rest(`activity_log?select=created_at,detail&action=eq.event_email_sent&created_at=gte.${b.start}&created_at=lt.${b.y + (b.m === 12 ? 1 : 0)}-${String(b.m === 12 ? 1 : b.m + 1).padStart(2, "0")}-02&order=created_at.asc&limit=200`)
+    const ids = [...new Set(rows.map((r) => r.detail?.event_id).filter(Boolean))]
+    // deno-lint-ignore no-explicit-any
+    const evs: any[] = ids.length ? await rest(`vol_events?select=id,title&id=in.(${ids.join(',')})`) : []
+    const names = new Map(evs.map((e) => [e.id, e.title]))
+    sent = rows.map((r) => ({ title: names.get(r.detail?.event_id) || 'Event', count: Number(r.detail?.count) || 0, on: laDay(r.created_at) })).filter((r) => r.on >= b.start && r.on <= b.end)
+  } catch { sent = [] }
+  let open: { title: string; date: string; responses: number }[] = []
+  try {
+    const today = laDay(new Date().toISOString())
+    // deno-lint-ignore no-explicit-any
+    const rows: any[] = await rest(`vol_events?select=title,date,vol_event_responses(count)&event_type=eq.rsvp&date=gte.${today}&order=date.asc&limit=10`)
+    open = rows.map((r) => ({ title: r.title, date: r.date, responses: Number(r.vol_event_responses?.[0]?.count) || 0 }))
+  } catch { open = [] }
+  return { sent, open }
+}
+
 // What got done in the month, and what is coming up, from the Portal's "North Star House Updates".
 type Upd = { kind: string; title: string; details?: string | null; happened_on?: string | null; area?: string | null }
 async function houseUpdates(b: ReturnType<typeof monthBounds>) {
@@ -196,9 +218,9 @@ const tiles = (items: [string, string][]) => {
 
 function build(label: string, d: {
   h: Awaited<ReturnType<typeof volunteerHours>>; f: Awaited<ReturnType<typeof formCounts>>; t: Awaited<ReturnType<typeof tourCounts>>
-  don: Awaited<ReturnType<typeof donationTotals>>; sp: Awaited<ReturnType<typeof newSponsors>>; qs: Awaited<ReturnType<typeof quarterlyStatus>>; up: Awaited<ReturnType<typeof houseUpdates>>; ev: Awaited<ReturnType<typeof upcomingEvents>>
+  don: Awaited<ReturnType<typeof donationTotals>>; sp: Awaited<ReturnType<typeof newSponsors>>; qs: Awaited<ReturnType<typeof quarterlyStatus>>; up: Awaited<ReturnType<typeof houseUpdates>>; ev: Awaited<ReturnType<typeof upcomingEvents>>; rs: Awaited<ReturnType<typeof rsvpUpdate>>
 }, test: boolean) {
-  const { h, f, t, don, sp, qs, up, ev } = d
+  const { h, f, t, don, sp, qs, up, ev, rs } = d
   let html = ''
   let text = `North Star House — Board Update, ${label}\n\n`
   // An empty title means the entries stand on their own with no heading above them.
@@ -245,6 +267,14 @@ function build(label: string, d: {
     section('Upcoming Events', ev.map((e) => `<p style="${P}margin:0 0 8px;"><strong style="color:#2a2420;">${esc(e.name)}</strong><br><span style="font-size:13px;color:#888;">${esc(nice(e.date))}</span></p>`).join(''),
       ev.map((e) => `- ${e.name}: ${nice(e.date)}`).join('\n'))
   }
+  if (rs.sent.length > 0 || rs.open.length > 0) {
+    const nice = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+    const total = rs.sent.reduce((n, x) => n + x.count, 0)
+    const sentHtml = rs.sent.length ? `<p style="${P}margin:0 0 8px;">${rs.sent.length === 1 ? 'One RSVP invitation was' : rs.sent.length + ' RSVP invitations were'} emailed out in ${esc(label.split(' ')[0])}, reaching ${total} ${plural(total, 'person', 'people')}.</p>` + rs.sent.map((x) => `<p style="${P}margin:0 0 6px;"><strong style="color:#2a2420;">${esc(x.title)}</strong><br><span style="font-size:13px;color:#888;">Sent ${esc(nice(x.on))} to ${x.count} ${plural(x.count, 'person', 'people')}</span></p>`).join('') : `<p style="${P}margin:0 0 8px;">No RSVP invitations were emailed out in ${esc(label.split(' ')[0])}.</p>`
+    const openHtml = rs.open.length ? `<p style="${P}margin:14px 0 8px;"><strong style="color:#2a2420;">RSVPs so far</strong></p>` + rs.open.map((x) => `<p style="${P}margin:0 0 6px;"><strong style="color:#2a2420;">${esc(x.title)}</strong><br><span style="font-size:13px;color:#888;">${esc(nice(x.date))} &middot; ${x.responses} ${plural(x.responses, 'RSVP', 'RSVPs')}</span></p>`).join('') : ''
+    section('RSVP Invitations', sentHtml + openHtml,
+      (rs.sent.length ? rs.sent.map((x) => `- ${x.title}: sent ${nice(x.on)} to ${x.count} ${plural(x.count, 'person', 'people')}`).join('\n') : `No RSVP invitations were emailed out in ${label.split(' ')[0]}.`) + (rs.open.length ? '\nRSVPs so far:\n' + rs.open.map((x) => `- ${x.title} (${nice(x.date)}): ${x.responses} ${plural(x.responses, 'RSVP', 'RSVPs')}`).join('\n') : ''))
+  }
   if (up.upcoming.length > 0) section('Coming Up', up.upcoming.map(item).join(''), up.upcoming.map(itemText).join('\n'))
 
   const qTitle = `Quarterly Reports (${qs.quarter} ${qs.year})`
@@ -274,11 +304,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}))
     const ym = pickMonth(body)
     const b = monthBounds(ym)
-    const [h, f, t, don, sp, qs, up, ev] = await Promise.all([volunteerHours(b), formCounts(b), tourCounts(b), donationTotals(b), newSponsors(b), quarterlyStatus(), houseUpdates(b), upcomingEvents()])
+    const [h, f, t, don, sp, qs, up, ev, rs] = await Promise.all([volunteerHours(b), formCounts(b), tourCounts(b), donationTotals(b), newSponsors(b), quarterlyStatus(), houseUpdates(b), upcomingEvents(), rsvpUpdate(b)])
 
     const mode = (await rest('private_config?select=value&key=eq.board_report_mode').catch(() => []))[0]?.value || 'test'
     const live = mode === 'live' && !body.to
-    const { html, text } = build(b.label, { h, f, t, don, sp, qs, up, ev }, !live)
+    const { html, text } = build(b.label, { h, f, t, don, sp, qs, up, ev, rs }, !live)
 
     const boardEmails = Array.from(new Set(h.boardRows.filter((p) => p.Email && (p.Status || 'Active') === 'Active').map((p) => String(p.Email).trim().toLowerCase()))).filter((e) => /.+@.+\..+/.test(e))
     const to = live && boardEmails.length ? boardEmails : [body.to || TEST_TO]
