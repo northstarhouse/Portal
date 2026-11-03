@@ -18885,6 +18885,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   var [addTourOpen, setAddTourOpen] = useState(false);
   var [toolsOpen, setToolsOpen] = useState(false);
   var [manualFormOpen, setManualFormOpen] = useState(false);
+  var [vendorToolOpen, setVendorToolOpen] = useState(false);
   var colorCoding = venueTab === 'clients' ? true : inquiriesColorCoding;
   const [clientFilter, setClientFilter] = useS('all');
   const [clientQuery, setClientQuery] = useS('');
@@ -19403,6 +19404,11 @@ function VenueRentalsView({ navigate, initialTab }) {
                     <div style={{ fontWeight: 700 }}>Fill out a pre-booking form</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>For a client who skipped the form</div>
                   </button>
+                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVendorToolOpen(true); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <div style={{ fontWeight: 700 }}>Add a vendor recommendation</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Shows up in the client guides right away</div>
+                  </button>
                 </div>
               </React.Fragment>
             )}
@@ -19442,6 +19448,7 @@ function VenueRentalsView({ navigate, initialTab }) {
       </div>
 
       {addTourOpen && <AddTourModal onClose={function() { setAddTourOpen(false); }} />}
+      {vendorToolOpen && <VendorToolModal onClose={function() { setVendorToolOpen(false); }} />}
       {manualFormOpen && <ManualPreBookingModal onClose={function() { setManualFormOpen(false); }} onSaved={function(id) { window.__nshOpenClient = id; setVenueTab('clients'); loadInquiries(); }} />}
       {inquiriesError && <div role="alert" style={{ padding: 16, border: '1px solid #e7c9be', borderRadius: 10, background: '#fff5ef', marginBottom: 16, color: '#8c4c35', fontSize: 13 }}>{inquiriesError}. <button type="button" onClick={loadInquiries} style={{background:'none',border:0,textDecoration:'underline',color:'inherit',cursor:'pointer'}}>Try again</button></div>}
       {!SHOW_LEGACY_VENUE_DASHBOARD && (
@@ -21066,6 +21073,109 @@ function QuarterHourSelect({ value, onChange, disabled, style, ariaLabel }) {
         {minutes.map(function(m) { return <option key={m} value={m}>{m}</option>; })}
       </select>
     </span>
+  );
+}
+
+// Tools > "Add a vendor recommendation": the vendor list in every client guide (venue.northstarhouse.org/guidebook) comes from the
+// venue_vendors table, so a vendor added here appears in the guides right away. Removing one hides it from the guides.
+function VendorToolModal({ onClose }) {
+  var blank = { category: '', newCategory: '', name: '', website: '', phone: '', instagram: '', email: '' };
+  var [vendors, setVendors] = useState(null);
+  var [f, setF] = useState(blank);
+  var [busy, setBusy] = useState(false);
+  var [msg, setMsg] = useState(null);
+  var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/venue_vendors?select=*&active=eq.true&order=category_order.asc,category.asc,sort_order.asc,name.asc&limit=1000', { headers: H })
+      .then(function(r) { return r.ok ? r.json() : []; }).then(function(rows) { setVendors(Array.isArray(rows) ? rows : []); }).catch(function() { setVendors([]); });
+  }
+  useEffect(load, []);
+  function set(k, v) { setF(function(o) { var n = Object.assign({}, o); n[k] = v; return n; }); }
+  var categories = [];
+  (vendors || []).forEach(function(v) { if (categories.indexOf(v.category) === -1) categories.push(v.category); });
+  var NEW = '__new__';
+  function add(e) {
+    e.preventDefault();
+    if (busy || !vendors) return;
+    var category = (f.category === NEW ? f.newCategory : f.category).trim();
+    if (!category) { setMsg({ bad: true, text: 'Pick a category, or write a new one.' }); return; }
+    if (!f.name.trim()) { setMsg({ bad: true, text: 'Add the vendor\'s name.' }); return; }
+    if (f.email.trim() && !/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(f.email.trim())) { setMsg({ bad: true, text: 'That email address does not look right.' }); return; }
+    var existing = vendors.filter(function(v) { return v.category.toLowerCase() === category.toLowerCase(); });
+    var catName = existing.length ? existing[0].category : category;
+    var catOrder = existing.length ? existing[0].category_order : (vendors.reduce(function(m, v) { return Math.max(m, v.category_order || 0); }, 0) + 1);
+    var sort = existing.reduce(function(m, v) { return Math.max(m, v.sort_order || 0); }, 0) + 1;
+    var site = f.website.trim();
+    if (site && !/^https?:\/\//i.test(site)) site = 'https://' + site;
+    setBusy(true); setMsg(null);
+    whoIsSignedIn().then(function(name) {
+      return fetch(SUPABASE_URL + '/rest/v1/venue_vendors', { method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=minimal' }),
+        body: JSON.stringify({ category: catName, category_order: catOrder, name: f.name.trim(), website: site || null, phone: f.phone.trim() || null, instagram: f.instagram.trim() || null, email: f.email.trim() || null, sort_order: sort, added_by: name || null }) });
+    }).then(function(r) {
+      if (!r.ok) throw new Error('Could not save. Please try again.');
+      logActivity('Added ' + f.name.trim() + ' to the vendor list (' + catName + ')', 'vendor_added');
+      setMsg({ bad: false, text: f.name.trim() + ' was added to ' + catName + '. It is in the client guides now.' });
+      setF(Object.assign({}, blank, { category: f.category === NEW ? catName : f.category }));
+      load();
+    }).catch(function(err) { setMsg({ bad: true, text: err.message || 'Could not save.' }); }).finally(function() { setBusy(false); });
+  }
+  function remove(v) {
+    if (!window.confirm('Take ' + v.name + ' off the vendor list? It disappears from the client guides.')) return;
+    fetch(SUPABASE_URL + '/rest/v1/venue_vendors?id=eq.' + v.id, { method: 'PATCH', headers: Object.assign({}, H, { Prefer: 'return=minimal' }), body: JSON.stringify({ active: false }) })
+      .then(function(r) { if (r.ok) { logActivity('Removed ' + v.name + ' from the vendor list (' + v.category + ')', 'vendor_removed'); load(); } else setMsg({ bad: true, text: 'Could not remove ' + v.name + '.' }); });
+  }
+  var field = { padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff', width: '100%', boxSizing: 'border-box' };
+  var label = { fontSize: 12, color: '#888', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 };
+  return (
+    <div onClick={function(e) { if (e.target === e.currentTarget && !busy) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div role="dialog" aria-label="Add a vendor recommendation" style={{ background: '#fff', borderRadius: 14, maxWidth: 560, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Add a vendor recommendation</div>
+          <a onClick={onClose} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Close ×</a>
+        </div>
+        <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>It is added to the Trusted Vendors page of the client guides right away.</div>
+        <form onSubmit={add}>
+          <label style={label}>Category
+            <select value={f.category} onChange={function(e) { set('category', e.target.value); }} style={field}>
+              <option value="">Choose a category…</option>
+              {categories.map(function(c) { return <option key={c} value={c}>{c}</option>; })}
+              <option value={NEW}>+ A new category…</option>
+            </select>
+          </label>
+          {f.category === NEW && <label style={label}>New category name<input value={f.newCategory} onChange={function(e) { set('newCategory', e.target.value); }} placeholder="For example: Live Music" style={field} /></label>}
+          <label style={label}>Vendor name<input value={f.name} onChange={function(e) { set('name', e.target.value); }} style={field} /></label>
+          <label style={label}>Website (optional)<input value={f.website} onChange={function(e) { set('website', e.target.value); }} placeholder="example.com" style={field} /></label>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <label style={Object.assign({}, label, { flex: 1 })}>Phone (optional)<input value={f.phone} onChange={function(e) { set('phone', e.target.value); }} style={field} /></label>
+            <label style={Object.assign({}, label, { flex: 1 })}>Instagram (optional)<input value={f.instagram} onChange={function(e) { set('instagram', e.target.value); }} placeholder="@handle" style={field} /></label>
+          </div>
+          <label style={label}>Email (optional)<input type="email" value={f.email} onChange={function(e) { set('email', e.target.value); }} style={field} /></label>
+          {msg && <div style={{ fontSize: 13, marginBottom: 12, color: msg.bad ? '#b3402a' : '#2e7d32' }}>{msg.text}</div>}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="submit" disabled={busy || !vendors} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: busy || !vendors ? 0.7 : 1 }}>{busy ? 'Adding…' : 'Add to the vendor list'}</button>
+          </div>
+        </form>
+        <div style={{ borderTop: '0.5px solid #e8e0d5', marginTop: 20, paddingTop: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gold, marginBottom: 8 }}>The list right now{vendors ? ' (' + vendors.length + ')' : ''}</div>
+          {vendors === null && <div style={{ color: '#999', fontSize: 13 }}>Loading…</div>}
+          {categories.map(function(c) {
+            return (
+              <div key={c} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#2a2a2a', marginBottom: 2 }}>{c}</div>
+                {vendors.filter(function(v) { return v.category === c; }).map(function(v) {
+                  return (
+                    <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, color: '#555', padding: '3px 0', borderTop: '0.5px solid #f3eee6' }}>
+                      <span>{v.name}</span>
+                      <a onClick={function() { remove(v); }} style={{ cursor: 'pointer', color: '#c0392b', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>Remove</a>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
