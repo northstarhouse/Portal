@@ -21538,14 +21538,24 @@ function ScheduleTourModal({ onClose, onScheduled, prefill }) {
     if (prefill && prefill.inquiry_form_id) patch.inquiry_form_id = prefill.inquiry_form_id;
     if (prefill && prefill.inquiry_answers) patch.inquiry_answers = prefill.inquiry_answers;
     sbPatchById('estate_tours', slotId, patch).then(function(r) {
-      setSaving(false);
       if (Array.isArray(r) && r.length) {
         logActivity('Booked an estate tour for ' + name.trim(), 'tour_booked');
-        if (onScheduled) onScheduled(r[0]);
-        onClose();
-      } else {
-        setError((r && (r.message || r.error || r.hint)) || 'Could not book that slot — it may have just been taken.');
+        // The visitor gets their confirmation email now, the same one they get when a tour request is scheduled.
+        return fetch(SUPABASE_URL + '/functions/v1/book-tour-request', {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirm_email_for: r[0].id })
+        }).then(function(x) { return x.json().catch(function() { return {}; }); })
+          .catch(function() { return {}; })
+          .then(function(j) {
+            setSaving(false);
+            if (!j.emailed) alert('The tour is booked, but the confirmation email to ' + email.trim() + ' did not send. Please email them the details.');
+            if (onScheduled) onScheduled(r[0]);
+            onClose();
+          });
       }
+      setSaving(false);
+      setError((r && (r.message || r.error || r.hint)) || 'Could not book that slot — it may have just been taken.');
     }).catch(function() { setSaving(false); setError('Network error.'); });
   }
 

@@ -29,18 +29,40 @@ async function sb(path: string, init: RequestInit = {}) {
   })
 }
 
+const AVAILABILITY_URL = 'https://northstarhouse.github.io/venue/?availability=1'
+
+function emailText(first: string, link: string) {
+  return `Hi ${first},
+
+Thank you for your interest in North Star House. When you're ready to reserve your date, the next step is our short pre-booking form. It tells us about you and your event so we can prepare your agreement: ${link}
+
+Our Client Guidebook has everything about the estate, the spaces and how renting works: ${GUIDEBOOK_URL}
+
+You can also see our booking availability here: ${AVAILABILITY_URL}
+(Note: if you have asked a venue coordinator to put a date on hold, that date may appear unavailable.)
+
+If you have any questions, just reply to this email. We're here to support you every step of the way.
+
+The North Star House Venue Team
+www.NorthStarHouse.org`
+}
+
 function emailHtml(first: string, link: string) {
-  const text = 'font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#555;'
-  return `<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:${GOLD};"></div><div style="padding:44px 40px 36px;">
-<div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:1px;color:${GOLD};font-weight:bold;margin-bottom:14px;">North Star House</div>
-<h1 style="margin:0 0 22px;text-align:center;font-size:29px;font-weight:400;color:#2a2420;">Ready to Book? Start Here</h1>
-<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>
-<p style="${text}">Hi ${esc(first)},</p>
-<p style="${text}">Thank you for your interest in North Star House. When you're ready to reserve your date, the next step is our short pre-booking form. It tells us about you and your event so we can prepare your agreement.</p>
-<p style="${text}">There's no obligation. Your date isn't held until the agreement is signed.</p>
-<div style="margin:26px 0 12px;text-align:center;"><a href="${link}" style="display:inline-block;background:${GOLD};color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:15px;padding:16px 32px;">Fill Out the Pre-Booking Form</a></div>
-<p style="${text}text-align:center;font-size:13px;">Want a refresher first? <a href="${GUIDEBOOK_URL}" style="color:${GOLD};">Read the Client Guidebook</a>.</p>
-<p style="margin:24px 0 0;text-align:center;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Questions? Just reply to this email. We're happy to help.</i></p>
+  const p = 'margin:0 0 16px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:#444;'
+  return `<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:${GOLD};"></div><div style="padding:40px 40px 32px;">
+<h1 style="margin:0 0 16px;font-family:'Cardo',Georgia,'Times New Roman',serif;font-size:22px;font-weight:400;color:#2a2420;">Your Pre-Booking Form</h1>
+<p style="${p}">Hi ${esc(first)},</p>
+<p style="${p}">Thank you for your interest in North Star House. When you're ready to reserve your date, the next step is our short pre-booking form. It tells us about you and your event so we can prepare your agreement.</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 20px;"><tr>
+<td style="padding:0 8px 0 0;"><a href="${GUIDEBOOK_URL}" style="display:inline-block;background:${GOLD};color:#ffffff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;">View Guidebook</a></td>
+<td style="padding:0 0 0 8px;"><a href="${link}" style="display:inline-block;background:transparent;color:${GOLD};text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;border:1.5px solid ${GOLD};">Pre-Booking Form</a></td>
+</tr></table>
+<p style="${p}">If you have any questions or need further details, just reply to this email. We're here to support you every step of the way.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f7f3ec;border-radius:10px;"><tr><td style="padding:16px 20px;text-align:center;">
+<a href="${AVAILABILITY_URL}" style="font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:${GOLD};text-decoration:none;">View Venue Availability Calendar &rarr;</a>
+<div style="font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#999;margin-top:6px;">If you've asked a venue coordinator to put a date on hold, that date may appear unavailable.</div>
+</td></tr></table>
+<p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#888;">The North Star House Venue Team<br/>www.NorthStarHouse.org</p>
 </div></div></div>`
 }
 
@@ -65,17 +87,7 @@ async function manualSend(req: Request, body: Record<string, unknown>) {
 
   const link = eventType === 'Wedding' ? PREBOOKING_FORM_URL_WEDDING : PREBOOKING_FORM_URL_EVENT
   const first = name.split(/\s+/)[0] || 'there'
-  const text = `Hi ${first},
-
-Thank you for your interest in North Star House. The next step is our short pre-booking form. It tells us about you and your event so we can prepare your agreement.
-
-${link}
-
-Want a refresher first? Read the Client Guidebook: ${GUIDEBOOK_URL}
-
-If you have any questions, just reply to this email.
-
-North Star House Venue Team`
+  const text = emailText(first, link)
   const mail = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
@@ -123,7 +135,7 @@ Deno.serve(async (req) => {
 
     const link = resp.form_id === WEDDING_INQUIRY_FORM_ID ? PREBOOKING_FORM_URL_WEDDING : PREBOOKING_FORM_URL_EVENT
     const first = name.split(/\s+/)[0] || 'there'
-    const body = `Hi ${first},\n\nThank you for your interest in North Star House. When you're ready to reserve your date, the next step is our short pre-booking form. It tells us about you and your event so we can prepare your agreement.\n\nThere's no obligation. Your date isn't held until the agreement is signed.\n\nFill out the pre-booking form: ${link}\n\nWant a refresher first? Client Guidebook: ${GUIDEBOOK_URL}\n\nQuestions? Just reply to this email.\n\nNorth Star House`
+    const body = emailText(first, link)
     const mail = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },

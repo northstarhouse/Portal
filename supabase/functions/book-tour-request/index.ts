@@ -124,6 +124,29 @@ const sb = (path: string, init: RequestInit = {}) =>
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
   })
 
+// The tour confirmation email. Returns whether it went out (false when there is no email address on the tour).
+async function sendConfirmation(row: any): Promise<boolean> {
+  if (!row || !row.visitor_email || !row.date || !row.start_time) return false
+  const whenLong = fmtWhen(row.date, row.start_time)
+  const guide = tourGuideFor(row.date, row.guide_name)
+  const name = row.visitor_name || 'there'
+  return await sendMail(
+    row.visitor_email,
+    `Your North Star House tour is confirmed — ${whenLong}`,
+    `Hi ${name},\n\nYour estate tour of North Star House is confirmed.\n\nTour Date & Time: ${whenLong}\n${guide ? `Your tour guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you then!\nNorth Star House`,
+    buildBrandedEmailHtml({
+      headline: 'Your Tour is Confirmed',
+      subtext:
+        `Hi ${esc(name)}, your estate tour of North Star House is confirmed:<br><br>` +
+        `Tour Date &amp; Time: <strong>${esc(whenLong)}</strong><br>` +
+        (guide ? `Your tour guide: <strong>${esc(guide)}</strong><br>` : '') +
+        `Address: <strong>${esc(TOUR_ADDRESS)}</strong><br><br>` +
+        TOUR_DIRECTIONS_HTML_INLINE,
+      note: 'A reminder email will be sent to you 24 hours before the tour, and another 1-hour courtesy email the day of.',
+    }),
+  ).catch(() => false)
+}
+
 function when(date: string, time: string) {
   const d = new Date(`${date}T${time}`)
   if (Number.isNaN(d.getTime())) return `${date} ${time}`
@@ -134,7 +157,15 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   try {
     if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
-    const { id, date, start_time, guide_name, notify } = await req.json()
+    const payload = await req.json()
+    // A tour booked by claiming an open slot ("Schedule a Tour") still needs its confirmation email.
+    if (payload && payload.confirm_email_for) {
+      const found = await sb(`/rest/v1/estate_tours?id=eq.${encodeURIComponent(String(payload.confirm_email_for))}&select=*`).then((r) => r.json())
+      const t = Array.isArray(found) ? found[0] : null
+      if (!t || t.status !== 'booked') return json({ error: 'That tour is not booked.' }, 409)
+      return json({ ok: true, emailed: await sendConfirmation(t) })
+    }
+    const { id, date, start_time, guide_name, notify } = payload
     if (!id || typeof id !== 'string') return json({ error: 'id required' }, 400)
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return json({ error: 'date must be YYYY-MM-DD' }, 400)
     if (!/^\d{2}:\d{2}(:\d{2})?$/.test(start_time || '')) return json({ error: 'start_time must be HH:MM' }, 400)
@@ -183,27 +214,7 @@ Deno.serve(async (req) => {
     const row = Array.isArray(updated) ? updated[0] : updated
 
     // Confirmation to the visitor (they asked for these dates, so they hear back as soon as it is scheduled).
-    let emailed = false
-    if (notify !== false && row && row.visitor_email) {
-      const whenLong = fmtWhen(date, time)
-      const guide = tourGuideFor(date, guide_name)
-      const name = row.visitor_name || 'there'
-      emailed = await sendMail(
-        row.visitor_email,
-        `Your North Star House tour is confirmed — ${whenLong}`,
-        `Hi ${name},\n\nYour estate tour of North Star House is confirmed.\n\nTour Date & Time: ${whenLong}\n${guide ? `Your tour guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you then!\nNorth Star House`,
-        buildBrandedEmailHtml({
-          headline: 'Your Tour is Confirmed',
-          subtext:
-            `Hi ${esc(name)}, your estate tour of North Star House is confirmed:<br><br>` +
-            `Tour Date &amp; Time: <strong>${esc(whenLong)}</strong><br>` +
-            (guide ? `Your tour guide: <strong>${esc(guide)}</strong><br>` : '') +
-            `Address: <strong>${esc(TOUR_ADDRESS)}</strong><br><br>` +
-            TOUR_DIRECTIONS_HTML_INLINE,
-          note: 'A reminder email will be sent to you 24 hours before the tour, and another 1-hour courtesy email the day of.',
-        }),
-      ).catch(() => false)
-    }
+    const emailed = notify !== false && row ? await sendConfirmation(row) : false
     return json({ ok: true, row, emailed })
   } catch (err) {
     return json({ error: String(err) }, 500)
