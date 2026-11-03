@@ -244,10 +244,10 @@ function build(label: string, d: {
     [hrs(h.ytd), 'volunteer hours this year'],
     [hrs(h.bMonth), `board volunteer hours in ${label.split(' ')[0]}`],
     [hrs(h.bYear), 'board volunteer hours this year'],
-    [num(f.inquiries), plural(f.inquiries, 'venue inquiry', 'venue inquiries')],
-    [num(t.booked), plural(t.booked, 'venue tour', 'venue tours')],
-    [num(f.docent), 'private docent tour ' + plural(f.docent, 'request', 'requests')],
-    [num(f.volunteers), 'volunteer ' + plural(f.volunteers, 'inquiry', 'inquiries')],
+    [num(f.inquiries), plural(f.inquiries, 'venue inquiry', 'venue inquiries') + ` in ${label.split(' ')[0]}`],
+    [num(t.booked), plural(t.booked, 'venue tour', 'venue tours') + ` in ${label.split(' ')[0]}`],
+    [num(f.docent), 'private docent tour ' + plural(f.docent, 'request', 'requests') + ` in ${label.split(' ')[0]}`],
+    [num(f.volunteers), 'volunteer ' + plural(f.volunteers, 'inquiry', 'inquiries') + ` in ${label.split(' ')[0]}`],
   ]
   section('', tiles(boxes), boxes.map(([n, l]) => `${l}: ${n}`).join('\n'))
 
