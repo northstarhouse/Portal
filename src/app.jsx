@@ -18887,6 +18887,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   var [manualFormOpen, setManualFormOpen] = useState(false);
   var [vendorToolOpen, setVendorToolOpen] = useState(false);
   var [sendFormOpen, setSendFormOpen] = useState(false);
+  var [movementOpen, setMovementOpen] = useState(false);
   var colorCoding = venueTab === 'clients' ? true : inquiriesColorCoding;
   const [clientFilter, setClientFilter] = useS('all');
   const [clientQuery, setClientQuery] = useS('');
@@ -19410,6 +19411,11 @@ function VenueRentalsView({ navigate, initialTab }) {
                     <div style={{ fontWeight: 700 }}>Send out a pre-booking form</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Email the form to someone</div>
                   </button>
+                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setMovementOpen(true); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <div style={{ fontWeight: 700 }}>Pending movement</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>What was sent, and what is waiting to go out</div>
+                  </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVendorToolOpen(true); }}
                     style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
                     <div style={{ fontWeight: 700 }}>Add a vendor recommendation</div>
@@ -19454,6 +19460,7 @@ function VenueRentalsView({ navigate, initialTab }) {
       </div>
 
       {addTourOpen && <AddTourModal onClose={function() { setAddTourOpen(false); }} />}
+      {movementOpen && <PendingMovementModal onClose={function() { setMovementOpen(false); }} />}
       {sendFormOpen && <SendPreBookingModal onClose={function() { setSendFormOpen(false); }} />}
       {vendorToolOpen && <VendorToolModal onClose={function() { setVendorToolOpen(false); }} />}
       {manualFormOpen && <ManualPreBookingModal onClose={function() { setManualFormOpen(false); }} onSaved={function(id) { window.__nshOpenClient = id; setVenueTab('clients'); loadInquiries(); }} />}
@@ -21080,6 +21087,100 @@ function QuarterHourSelect({ value, onChange, disabled, style, ariaLabel }) {
         {minutes.map(function(m) { return <option key={m} value={m}>{m}</option>; })}
       </select>
     </span>
+  );
+}
+
+// Tools > "Pending movement": what has gone out to people (pre-booking forms, tour confirmations, reminders, contracts) and what is
+// waiting to go out (reminders coming up, forms due after a tour, tour requests nobody has handled yet).
+function PendingMovementModal({ onClose }) {
+  var [data, setData] = useState(null);
+  var [tab, setTab] = useState('sent');
+  var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+  useEffect(function() {
+    var since = new Date(Date.now() - 14 * 86400000).toISOString();
+    var actions = 'in.(prebooking_form_sent,tour_confirmation_sent,tour_booked,tour_cancelled,contract_sent,contract_signed_update_sent,event_email_sent,board_report_sent)';
+    var today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    var weekAgo = new Date(Date.now() - 4 * 86400000).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/activity_log?select=created_at,description,action&action=' + actions + '&created_at=gte.' + since + '&order=created_at.desc&limit=300', { headers: H }).then(function(r) { return r.ok ? r.json() : []; }),
+      fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=id,visitor_name,date,start_time,status,request_status,reminder_24h_sent_at,reminder_1h_sent_at,prebooking_form_sent_at&or=(date.gte.' + weekAgo + ',status.eq.requested)&order=date.asc&limit=400', { headers: H }).then(function(r) { return r.ok ? r.json() : []; })
+    ]).then(function(res) { setData({ log: Array.isArray(res[0]) ? res[0] : [], tours: Array.isArray(res[1]) ? res[1] : [], today: today }); })
+      .catch(function() { setData({ log: [], tours: [], today: today, failed: true }); });
+  }, []);
+  function stamp(ts) { return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }); }
+  function dayKey(ts) { return new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }); }
+  function dayLabel(k) { return k === data.today ? 'Today' : new Date(k + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }); }
+  function tourStart(t) { return new Date(t.date + 'T' + (t.start_time || '00:00:00')); }
+  function tourWhen(t) { return tourStart(t).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+
+  var sent = [], pending = [];
+  if (data) {
+    data.log.forEach(function(r) {
+      var text = r.description;
+      if (r.action === 'tour_booked' && /^Tour booked:/.test(text)) text = text.replace(/^Tour booked: /, '') + ' (booked online, confirmation sent by the website)';
+      var label = { prebooking_form_sent: 'Pre-booking form', tour_confirmation_sent: 'Tour confirmation', tour_booked: 'Tour booked', tour_cancelled: 'Tour cancelled', contract_sent: 'Contract', contract_signed_update_sent: 'Signed update', event_email_sent: 'Event email', board_report_sent: 'Board update' }[r.action] || 'Sent';
+      sent.push({ at: r.created_at, kind: label, text: text });
+    });
+    data.tours.forEach(function(t) {
+      var who = t.visitor_name || 'A visitor';
+      if (t.reminder_24h_sent_at) sent.push({ at: t.reminder_24h_sent_at, kind: 'Reminder', text: '24-hour reminder sent to ' + who + ' (tour ' + tourWhen(t) + ')' });
+      if (t.reminder_1h_sent_at) sent.push({ at: t.reminder_1h_sent_at, kind: 'Reminder', text: '1-hour reminder sent to ' + who + ' (tour ' + tourWhen(t) + ')' });
+      if (t.prebooking_form_sent_at) sent.push({ at: t.prebooking_form_sent_at, kind: 'Pre-booking form', text: 'Pre-booking form sent to ' + who + ' after their tour (' + tourWhen(t) + ')' });
+      if (t.status === 'booked' && t.date) {
+        var start = tourStart(t), now = Date.now();
+        var due24 = new Date(start.getTime() - 24 * 3600000), due1 = new Date(start.getTime() - 3600000);
+        if (!t.reminder_24h_sent_at && due24.getTime() > now) pending.push({ at: due24.toISOString(), kind: 'Reminder', text: '24-hour reminder to ' + who + ' (tour ' + tourWhen(t) + ')' });
+        if (!t.reminder_1h_sent_at && due1.getTime() > now) pending.push({ at: due1.toISOString(), kind: 'Reminder', text: '1-hour reminder to ' + who + ' (tour ' + tourWhen(t) + ')' });
+        var formDue = new Date(start.getTime() + 3600000);
+        if (!t.prebooking_form_sent_at && formDue.getTime() > now - 2 * 3600000 && start.getTime() > now - 3 * 3600000) pending.push({ at: formDue.toISOString(), kind: 'Pre-booking form', text: 'Pre-booking form to ' + who + ' about an hour after their tour (' + tourWhen(t) + ')' });
+      }
+      if (t.status === 'requested' && (t.request_status || 'not_handled') === 'not_handled') pending.push({ at: null, kind: 'Tour request', text: who + ' asked for a tour and nobody has handled it yet' });
+    });
+    sent.sort(function(a, b) { return String(b.at).localeCompare(String(a.at)); });
+    pending.sort(function(a, b) { return (a.at === null ? 1 : 0) - (b.at === null ? 1 : 0) || String(a.at).localeCompare(String(b.at)); });
+  }
+  var list = tab === 'sent' ? sent : pending;
+  var groups = [];
+  list.forEach(function(it) {
+    var k = it.at ? dayKey(it.at) : 'needs';
+    var g = groups.find(function(x) { return x.k === k; });
+    if (!g) { g = { k: k, items: [] }; groups.push(g); }
+    g.items.push(it);
+  });
+  var tabBtn = function(k, label, n) { return <button type="button" onClick={function() { setTab(k); }} style={{ background: tab === k ? gold : '#fff', color: tab === k ? '#fff' : gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}{data ? ' (' + n + ')' : ''}</button>; };
+  return (
+    <div onClick={function(e) { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div role="dialog" aria-label="Pending movement" style={{ background: '#fff', borderRadius: 14, maxWidth: 640, width: '100%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '18px 22px 12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Pending movement</div>
+            <a onClick={onClose} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Close ×</a>
+          </div>
+          <div style={{ fontSize: 13, color: '#888', marginBottom: 12 }}>What went out to people in the last two weeks, and what is waiting to go out.</div>
+          <div style={{ display: 'flex', gap: 8 }}>{tabBtn('sent', 'Sent', sent.length)}{tabBtn('pending', 'Waiting to go out', pending.length)}</div>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '0 22px 20px', flex: 1 }}>
+          {!data && <div style={{ color: '#999', fontSize: 13, padding: '20px 0' }}>Loading…</div>}
+          {data && data.failed && <div style={{ color: '#b3402a', fontSize: 13, padding: '10px 0' }}>Could not load everything. Try again in a moment.</div>}
+          {data && list.length === 0 && <div style={{ color: '#999', fontSize: 13, padding: '20px 0' }}>{tab === 'sent' ? 'Nothing has been sent in the last two weeks.' : 'Nothing is waiting.'}</div>}
+          {groups.map(function(g) {
+            return (
+              <div key={g.k} style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gold, marginBottom: 4 }}>{g.k === 'needs' ? 'Needs someone' : dayLabel(g.k)}</div>
+                {g.items.map(function(it, i) {
+                  return (
+                    <div key={i} style={{ display: 'flex', gap: 10, padding: '7px 0', borderTop: '0.5px solid #f3eee6', fontSize: 13, color: '#444' }}>
+                      <div style={{ flex: '0 0 74px', color: '#999', fontSize: 11, paddingTop: 2 }}>{it.at ? new Date(it.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) : ''}</div>
+                      <div style={{ flex: 1 }}><span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, color: '#8a6d1d', background: '#fdf3e3', borderRadius: 10, padding: '1px 7px', marginRight: 6 }}>{it.kind}</span>{it.text}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 

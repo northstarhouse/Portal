@@ -130,7 +130,7 @@ async function sendConfirmation(row: any): Promise<boolean> {
   const whenLong = fmtWhen(row.date, row.start_time)
   const guide = tourGuideFor(row.date, row.guide_name)
   const name = row.visitor_name || 'there'
-  return await sendMail(
+  const sent = await sendMail(
     row.visitor_email,
     `Your North Star House tour is confirmed — ${whenLong}`,
     `Hi ${name},\n\nYour estate tour of North Star House is confirmed.\n\nTour Date & Time: ${whenLong}\n${guide ? `Your tour guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nSee you then!\nNorth Star House`,
@@ -145,6 +145,10 @@ async function sendConfirmation(row: any): Promise<boolean> {
       note: 'A reminder email will be sent to you 24 hours before the tour, and another 1-hour courtesy email the day of.',
     }),
   ).catch(() => false)
+  if (sent) {
+    await sb('/rest/v1/activity_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ description: `Tour confirmation sent to ${name} — ${whenLong}`, action: 'tour_confirmation_sent', tag: 'Tour' }) }).catch(() => {})
+  }
+  return sent
 }
 
 function when(date: string, time: string) {
