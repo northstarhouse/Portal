@@ -245,7 +245,7 @@ function build(label: string, d: {
     [num(f.inquiries), plural(f.inquiries, 'venue inquiry', 'venue inquiries')],
     [num(t.booked), plural(t.booked, 'venue tour', 'venue tours')],
     [num(f.docent), 'private docent tour ' + plural(f.docent, 'request', 'requests')],
-    [num(don.count), plural(don.count, 'donation', 'donations')],
+    [num(f.volunteers), 'volunteer ' + plural(f.volunteers, 'inquiry', 'inquiries')],
   ]
   section('', tiles(boxes), boxes.map(([n, l]) => `${l}: ${n}`).join('\n'))
 
