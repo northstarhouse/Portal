@@ -237,7 +237,6 @@ function build(label: string, d: {
   if (up.done.length > 0) section('', up.done.map(item).join(''), up.done.map(itemText).join('\n'))
 
   // All the numbers together in one set of boxes, with no section headings.
-  const kindBits = Object.entries(f.kinds).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${k.toLowerCase()}`).join(', ')
   const boxes: [string, string][] = [
     [hrs(h.month), `volunteer hours in ${label.split(' ')[0]}`],
     [hrs(h.ytd), 'volunteer hours this year'],
@@ -247,15 +246,8 @@ function build(label: string, d: {
     [num(t.booked), plural(t.booked, 'venue tour', 'venue tours')],
     [num(f.docent), 'private docent tour ' + plural(f.docent, 'request', 'requests')],
     [num(don.count), plural(don.count, 'donation', 'donations')],
-    [money(don.total), 'donation value'],
   ]
-  if (f.volunteers > 0) boxes.push([num(f.volunteers), 'volunteer ' + plural(f.volunteers, 'inquiry', 'inquiries')])
-  const volAreas = Object.entries(f.volAreas).sort((a, c) => c[1] - a[1]).map(([a, n]) => `${a}${n > 1 ? ' (' + n + ')' : ''}`)
-  const notes: string[] = []
-  if (kindBits) notes.push(`Venue inquiries: ${kindBits}.`)
-  if (f.volunteers > 0 && volAreas.length) notes.push(`Volunteers are interested in: ${volAreas.join(', ')}.`)
-  section('', tiles(boxes) + notes.map((n) => `<p style="${P}font-size:13px;color:#888;margin:8px 0 0;">${esc(n)}</p>`).join(''),
-    boxes.map(([n, l]) => `${l}: ${n}`).join('\n') + (notes.length ? '\n' + notes.join(' ') : ''))
+  section('', tiles(boxes), boxes.map(([n, l]) => `${l}: ${n}`).join('\n'))
 
   if (sp.fresh.length > 0) {
     section(`New Sponsors (${sp.fresh.length})`,
