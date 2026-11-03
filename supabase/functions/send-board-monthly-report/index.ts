@@ -260,14 +260,6 @@ function build(label: string, d: {
     section('Upcoming Events', ev.map((e) => `<p style="${P}margin:0 0 8px;"><strong style="color:#2a2420;">${esc(e.name)}</strong><br><span style="font-size:13px;color:#888;">${esc(nice(e.date))}</span></p>`).join(''),
       ev.map((e) => `- ${e.name}: ${nice(e.date)}`).join('\n'))
   }
-  if (rs.sent.length > 0 || rs.open.length > 0) {
-    const nice = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
-    const total = rs.sent.reduce((n, x) => n + x.count, 0)
-    const sentHtml = rs.sent.length ? `<p style="${P}margin:0 0 8px;">${rs.sent.length === 1 ? 'One RSVP invitation was' : rs.sent.length + ' RSVP invitations were'} emailed out digitally, reaching ${total} ${plural(total, 'person', 'people')} in all.</p>` + rs.sent.map((x) => `<p style="${P}margin:0 0 6px;"><strong style="color:#2a2420;">${esc(x.title)}</strong><br><span style="font-size:13px;color:#888;">Sent ${esc(nice(x.on))} to ${x.count} ${plural(x.count, 'person', 'people')}</span></p>`).join('') : `<p style="${P}margin:0 0 8px;">No RSVP invitations have been emailed out yet.</p>`
-    const openHtml = rs.open.length ? `<p style="${P}margin:14px 0 8px;"><strong style="color:#2a2420;">RSVPs so far</strong></p>` + rs.open.map((x) => `<p style="${P}margin:0 0 6px;"><strong style="color:#2a2420;">${esc(x.title)}</strong><br><span style="font-size:13px;color:#888;">${esc(nice(x.date))} &middot; ${x.responses} ${plural(x.responses, 'RSVP', 'RSVPs')}</span></p>`).join('') : ''
-    section('RSVP Invitations', sentHtml + openHtml,
-      (rs.sent.length ? rs.sent.map((x) => `- ${x.title}: sent ${nice(x.on)} to ${x.count} ${plural(x.count, 'person', 'people')}`).join('\n') : `No RSVP invitations have been emailed out yet.`) + (rs.open.length ? '\nRSVPs so far:\n' + rs.open.map((x) => `- ${x.title} (${nice(x.date)}): ${x.responses} ${plural(x.responses, 'RSVP', 'RSVPs')}`).join('\n') : ''))
-  }
   if (up.upcoming.length > 0) section('Coming Up', up.upcoming.map(item).join(''), up.upcoming.map(itemText).join('\n'))
 
   const qTitle = `Quarterly Reports (${qs.quarter} ${qs.year})`
