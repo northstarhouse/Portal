@@ -160,6 +160,8 @@ Deno.serve(async (req) => {
     const payload = await req.json()
     // A tour booked by claiming an open slot ("Schedule a Tour") still needs its confirmation email.
     if (payload && payload.confirm_email_for) {
+      const ok = await sb('/rest/v1/rpc/has_valid_app_session', { method: 'POST', headers: { 'x-app-token': req.headers.get('x-app-token') || '' }, body: '{}' }).then((r) => r.json()).catch(() => false)
+      if (ok !== true) return json({ error: 'Please sign in again.' }, 401)
       const found = await sb(`/rest/v1/estate_tours?id=eq.${encodeURIComponent(String(payload.confirm_email_for))}&select=*`).then((r) => r.json())
       const t = Array.isArray(found) ? found[0] : null
       if (!t || t.status !== 'booked') return json({ error: 'That tour is not booked.' }, 409)
