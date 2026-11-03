@@ -302,16 +302,38 @@ ${html}
 Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}))
+    // From the Portal's Board Emails button (staff only): preview, send a test to the office, or send to the board.
+    const action = String(body.action || '')
+    if (action) {
+      const ok = await fetch(`${SUPABASE_URL}/rest/v1/rpc/has_valid_app_session`, { method: 'POST', headers: { ...H, 'x-app-token': req.headers.get('x-app-token') || '' }, body: '{}' }).then((r) => r.json()).catch(() => false)
+      if (ok !== true) return json({ error: 'Please sign in again.' }, 401)
+    }
     const ym = pickMonth(body)
     const b = monthBounds(ym)
     const [h, f, t, don, sp, qs, up, ev, rs] = await Promise.all([volunteerHours(b), formCounts(b), tourCounts(b), donationTotals(b), newSponsors(b), quarterlyStatus(), houseUpdates(b), upcomingEvents(), rsvpUpdate(b)])
 
     const mode = (await rest('private_config?select=value&key=eq.board_report_mode').catch(() => []))[0]?.value || 'test'
-    const live = mode === 'live' && !body.to
+    const live = !action && mode === 'live' && !body.to
     const { html, text } = build(b.label, { h, f, t, don, sp, qs, up, ev, rs }, !live)
 
-    const boardEmails = Array.from(new Set(h.boardRows.filter((p) => p.Email && (p.Status || 'Active') === 'Active').map((p) => String(p.Email).trim().toLowerCase()))).filter((e) => /.+@.+\..+/.test(e))
-    const to = live && boardEmails.length ? boardEmails : [body.to || TEST_TO]
+    const boardEmails =Array.from(new Set(h.boardRows.filter((p) => p.Email && (p.Status || 'Active') === 'Active').map((p) => String(p.Email).trim().toLowerCase()))).filter((e) => /.+@.+\..+/.test(e))
+    if (action === 'preview') {
+      const full = build(b.label, { h, f, t, don, sp, qs, up, ev, rs }, false)
+      const prior = await rest(`activity_log?select=created_at&action=eq.board_report_sent&detail->>month=eq.${ym}&order=created_at.desc&limit=1`).catch(() => [])
+      return json({ html: full.html, label: b.label, subject: `Board Update: ${b.label}`, recipients: boardEmails, already_sent_at: prior[0]?.created_at || null })
+    }
+    if (action === 'send') {
+      if (body.confirm !== true) return json({ error: 'Please confirm the send.' }, 400)
+      if (!boardEmails.length) return json({ error: 'There are no active board members with an email.' }, 400)
+      const prior = await rest(`activity_log?select=created_at&action=eq.board_report_sent&detail->>month=eq.${ym}&order=created_at.desc&limit=1`).catch(() => [])
+      if (prior.length && body.resend !== true) return json({ error: 'already sent', already_sent_at: prior[0].created_at }, 409)
+      const full = build(b.label, { h, f, t, don, sp, qs, up, ev, rs }, false)
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, { method: 'POST', headers: H, body: JSON.stringify({ to: boardEmails, subject: `Board Update: ${b.label}`, body: full.text, html: full.html, sender: 'Board Update', fromEmail: 'venue@northstarhouse.org' }) })
+      if (!res.ok) throw new Error(`send-email HTTP ${res.status}: ${await res.text()}`)
+      await fetch(`${SUPABASE_URL}/rest/v1/activity_log`, { method: 'POST', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ description: `Board update for ${b.label} sent to ${boardEmails.length} board ${boardEmails.length === 1 ? 'member' : 'members'}`, action: 'board_report_sent', tag: 'Board', detail: { month: ym, count: boardEmails.length } }) }).catch(() => {})
+      return json({ ok: true, sent_to: boardEmails.length })
+    }
+    const to = live && boardEmails.length ? boardEmails : [(!action && body.to) || TEST_TO]
     const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
       method: 'POST', headers: H,
       body: JSON.stringify({ to, subject: `${live ? '' : 'TEST: '}Board Update: ${b.label}`, body: text, html, sender: 'Board Update', fromEmail: 'venue@northstarhouse.org' }),

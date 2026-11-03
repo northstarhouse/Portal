@@ -23325,7 +23325,75 @@ function TreasurerView({ navigate }) {
   );
 }
 
+// Board Emails: preview the monthly board update for a month, send a test to the office, or send it to the board.
+function BoardEmailsModal({ onClose }) {
+  var pacific = function() { return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })); };
+  var lastMonth = (function() { var d = pacific(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
+  var [month, setMonth] = useState(lastMonth);
+  var [data, setData] = useState(null);
+  var [loading, setLoading] = useState(false);
+  var [busy, setBusy] = useState('');
+  var [msg, setMsg] = useState('');
+  var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+  function call(payload) {
+    return fetch(SUPABASE_URL + '/functions/v1/send-board-monthly-report', { method: 'POST', headers: H, body: JSON.stringify(Object.assign({ month: month }, payload)) })
+      .then(function(r) { return r.json().then(function(j) { return { status: r.status, body: j }; }); });
+  }
+  function preview() {
+    setLoading(true); setMsg(''); setData(null);
+    call({ action: 'preview' }).then(function(r) {
+      if (r.status !== 200) setMsg('Could not build the preview. ' + (r.body.error || '')); else setData(r.body);
+    }).catch(function() { setMsg('Could not build the preview.'); }).finally(function() { setLoading(false); });
+  }
+  useEffect(preview, [month]);
+  function sendTest() {
+    setBusy('test'); setMsg('');
+    call({ action: 'test' }).then(function(r) { setMsg(r.status === 200 ? 'A test copy was sent to media@thenorthstarhouse.org.' : 'Could not send the test. ' + (r.body.error || '')); })
+      .catch(function() { setMsg('Could not send the test.'); }).finally(function() { setBusy(''); });
+  }
+  function sendBoard(resend) {
+    var n = data.recipients.length;
+    if (!resend && !window.confirm('Send the ' + data.label + ' board update to ' + n + ' board ' + (n === 1 ? 'member' : 'members') + ' now?' + '\n\n' + data.recipients.join('\n'))) return;
+    setBusy('send'); setMsg('');
+    call({ action: 'send', confirm: true, resend: !!resend }).then(function(r) {
+      if (r.status === 409) {
+        if (window.confirm("This month's board update was already sent. Send it again?")) sendBoard(true);
+        return;
+      }
+      if (r.status === 200) { setMsg('Sent to ' + r.body.sent_to + ' board ' + (r.body.sent_to === 1 ? 'member' : 'members') + '.'); preview(); }
+      else setMsg('Could not send. ' + (r.body.error || ''));
+    }).catch(function() { setMsg('Could not send.'); }).finally(function() { setBusy(''); });
+  }
+  var months = (function() { var out = [], d = pacific(); d.setDate(1); for (var i = 0; i < 14; i++) { out.push({ v: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'), l: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) }); d.setMonth(d.getMonth() - 1); } return out; })();
+  var btn = { border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' };
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 760, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '0.5px solid #e8e0d5', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: 20, fontWeight: 700, color: '#2a2420', flex: 1 }}>Board emails</div>
+          <select value={month} onChange={function(e) { setMonth(e.target.value); }} style={{ padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, background: '#fff' }}>
+            {months.map(function(m) { return <option key={m.v} value={m.v}>{m.l}</option>; })}
+          </select>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, color: '#999', cursor: 'pointer' }}>×</button>
+        </div>
+        <div style={{ padding: '10px 20px', fontSize: 12, color: '#777', borderBottom: '0.5px solid #f0e9de' }}>
+          {loading ? 'Building the preview…' : data ? (<span>This goes to <b>{data.recipients.length}</b> active board {data.recipients.length === 1 ? 'member' : 'members'}: {data.recipients.join(', ') || 'none'}.{data.already_sent_at ? <b style={{ color: '#b45309' }}> Already sent {new Date(data.already_sent_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.</b> : null}</span>) : null}
+        </div>
+        <div style={{ flex: 1, overflow: 'auto', background: '#f4efe6' }}>
+          {data ? <iframe title="Board email preview" srcDoc={data.html} style={{ width: '100%', height: '60vh', border: 'none', background: '#f4efe6' }} /> : <div style={{ padding: 40, textAlign: 'center', color: '#999', fontSize: 13 }}>{loading ? 'Loading…' : ''}</div>}
+        </div>
+        <div style={{ padding: '12px 20px', borderTop: '0.5px solid #e8e0d5', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, fontSize: 12, color: msg.indexOf('Could not') === 0 ? '#c0392b' : '#2e7d32', minWidth: 160 }}>{msg}</div>
+          <button disabled={!data || !!busy} onClick={sendTest} style={Object.assign({}, btn, { background: '#f5f0ea', color: '#666', opacity: !data || busy ? 0.6 : 1 })}>{busy === 'test' ? 'Sending…' : 'Send me a test'}</button>
+          <button disabled={!data || !!busy} onClick={function() { sendBoard(false); }} style={Object.assign({}, btn, { background: gold, color: '#fff', opacity: !data || busy ? 0.6 : 1 })}>{busy === 'send' ? 'Sending…' : 'Send to the board'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NshUpdatesView({ navigate }) {
+  var [showBoardEmails, setShowBoardEmails] = useState(false);
   var [rows, setRows] = useState(null);
   var [tab, setTab] = useState('done');
   var today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
@@ -23376,7 +23444,11 @@ function NshUpdatesView({ navigate }) {
   var tabBtn = function(k, label) { return <button onClick={function() { setTab(k); if (!editId) set('kind', k); }} style={{ background: tab === k ? gold : '#fff', color: tab === k ? '#fff' : gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}</button>; };
   return (
     <div style={{ maxWidth: 780 }}>
-      <div style={{ fontSize: 12, color: '#999', marginBottom: 14 }}>Add things that got done, or things coming up. The ones marked "include" go in the monthly board email.</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 12, color: '#999', flex: 1, minWidth: 220 }}>Add things that got done, or things coming up. The ones marked "include" go in the monthly board email.</div>
+        <button onClick={function() { setShowBoardEmails(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Board emails</button>
+      </div>
+      {showBoardEmails && <BoardEmailsModal onClose={function() { setShowBoardEmails(false); }} />}
       <form onSubmit={save} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: 16, marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>{editId ? 'Editing' : 'Add'}</span>
