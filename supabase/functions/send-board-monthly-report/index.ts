@@ -33,7 +33,8 @@ const QUARTERS = [
   { q: 'Q4', end: [12, 31], due: 'December 10', champion: 'December 10', board: 'December 17' },
 ]
 
-const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } })
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-app-token', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
+const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
 const H = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' }
 async function rest(path: string) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: H })
@@ -300,6 +301,7 @@ ${html}
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   try {
     const body = await req.json().catch(() => ({}))
     // From the Portal's Board Emails button (staff only): preview, send a test to the office, or send to the board.
