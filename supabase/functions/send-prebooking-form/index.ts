@@ -31,10 +31,78 @@ async function sb(path: string, init: RequestInit = {}) {
 
 const AVAILABILITY_URL = 'https://northstarhouse.github.io/venue/?availability=1'
 
-function emailText(first: string, link: string) {
+type Kind = 'wedding' | 'memorial' | 'nonprofit' | 'event'
+const SITE = 'https://www.northstarhouse.org'
+const kindFromForm = (formId: string): Kind =>
+  formId === WEDDING_INQUIRY_FORM_ID ? 'wedding' : formId === '952bc156-e89d-4790-814d-d2c2e9738a8b' ? 'memorial' : formId === 'e8cc69a1-1693-4fb4-8518-b8bb486dd055' ? 'nonprofit' : 'event'
+const kindFromType = (t: string): Kind => (t === 'Wedding' ? 'wedding' : t === 'Memorial' ? 'memorial' : t === 'Nonprofit Event' ? 'nonprofit' : 'event')
+
+type Row = { a: string; b: string; c?: string }
+const MEMORIAL_RATES: Row[] = [{ a: 'Friday', b: '$400' }, { a: 'Saturday', b: '$800' }, { a: 'Sunday', b: '$600' }]
+const NONPROFIT_RATES: Row[] = [
+  { a: 'Large Private Event', b: '$800', c: 'Up to 200 guests, 4 hours. Each extra hour $150.' },
+  { a: 'Small Private Event', b: '$600', c: 'Up to 50 guests, 4 hours. Each extra hour $150.' },
+  { a: 'Public Event', b: '$2,000', c: 'Permit capacity, 6 hours. Each extra hour $300.' },
+]
+const P = 'font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#555;'
+const H3 = 'margin:26px 0 8px;font-family:Georgia,serif;font-size:19px;font-weight:400;color:#2a2420;'
+const para = (t: string) => `<p style="${P}">${t}</p>`
+const linkBtn = (href: string, label: string) => `<a href="${href}" style="display:block;margin:0 0 10px;padding:13px 24px;text-align:center;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:14px;background:#ffffff;color:${GOLD};border:1px solid ${GOLD};">${label}</a>`
+const rateTable = (rows: Row[]) =>
+  `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:6px 0 14px;border-collapse:collapse;">${rows.map((r) =>
+    `<tr><td style="padding:10px 0;border-bottom:1px solid #e5ddcf;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#2a2420;"><strong>${esc(r.a)}</strong>${r.c ? `<br><span style="font-size:13px;color:#777;">${esc(r.c)}</span>` : ''}</td><td style="padding:10px 0;border-bottom:1px solid #e5ddcf;text-align:right;font-family:Georgia,serif;font-size:20px;color:${GOLD};white-space:nowrap;">${esc(r.b)}</td></tr>`).join('')}</table>`
+const rateText = (rows: Row[]) => rows.map((r) => `- ${r.a}: ${r.b}${r.c ? ' (' + r.c + ')' : ''}`).join('\n')
+
+function detailsHtml(kind: Kind): string {
+  if (kind === 'wedding') {
+    return `<h3 style="${H3}">Pricing</h3>` +
+      para('<strong>$5,000</strong>, one price. It makes the estate yours for the day. A non-refundable <strong>$800 retainer</strong> reserves your date and counts toward the total, and an <strong>$800 refundable security deposit</strong> is due one month before your wedding.') +
+      linkBtn(`${SITE}/weddings`, 'View Pricing &amp; Details') +
+      `<h3 style="${H3}">Common Questions</h3>` +
+      para('<strong>How do I reserve my date?</strong><br>Sign the venue agreement and pay the $800 retainer, which counts toward your total.') +
+      para('<strong>Is the security deposit refundable?</strong><br>Yes. It is returned after your event if there is no damage and policies are followed.') +
+      para('<strong>Do we need insurance?</strong><br>Yes, a $1 million liability policy naming North Star Historic Conservancy as additionally insured. These policies are typically inexpensive for a single event.') +
+      linkBtn(`${SITE}/weddings#faq`, 'Read the Full Q&amp;A')
+  }
+  if (kind === 'memorial') {
+    return `<h3 style="${H3}">Memorial Pricing</h3>` + rateTable(MEMORIAL_RATES) + para('Each rental is 4 hours, and memorial dates are booked up to 3 months in advance.') + linkBtn(`${SITE}/memorials`, 'About Memorials')
+  }
+  if (kind === 'nonprofit') {
+    return `<h3 style="${H3}">Nonprofit Pricing</h3>` + para('Saturday and Sunday rates:') + rateTable(NONPROFIT_RATES) + linkBtn(`${SITE}/nonprofit`, 'Nonprofit Rentals')
+  }
+  return `<h3 style="${H3}">Pricing</h3>` + para("Rates depend on the size and type of your event. We're happy to go over them with you by reply.") + linkBtn(`${SITE}/private-events`, 'Learn About Events')
+}
+
+function detailsText(kind: Kind): string {
+  if (kind === 'wedding') {
+    return `PRICING
+$5,000, one price. A non-refundable $800 retainer reserves your date and counts toward the total, and an $800 refundable security deposit is due one month before your wedding.
+Pricing & details: ${SITE}/weddings
+
+COMMON QUESTIONS
+How do I reserve my date? Sign the venue agreement and pay the $800 retainer, which counts toward your total.
+Is the security deposit refundable? Yes. It is returned after your event if there is no damage and policies are followed.
+Do we need insurance? Yes, a $1 million liability policy naming North Star Historic Conservancy as additionally insured.
+Full Q&A: ${SITE}/weddings#faq`
+  }
+  if (kind === 'memorial') return `MEMORIAL PRICING
+${rateText(MEMORIAL_RATES)}
+Each rental is 4 hours, and memorial dates are booked up to 3 months in advance.
+${SITE}/memorials`
+  if (kind === 'nonprofit') return `NONPROFIT PRICING (Saturday and Sunday)
+${rateText(NONPROFIT_RATES)}
+${SITE}/nonprofit`
+  return `PRICING
+Rates depend on the size and type of your event. We're happy to go over them with you by reply.
+${SITE}/private-events`
+}
+
+function emailText(first: string, link: string, kind: Kind) {
   return `Hi ${first},
 
 Thank you for your interest in North Star House. When you're ready to reserve your date, the next step is our short pre-booking form. It tells us about you and your event so we can prepare your agreement: ${link}
+
+${detailsText(kind)}
 
 You can also see our booking availability here: ${AVAILABILITY_URL}
 (Note: if you have asked a venue coordinator to put a date on hold, that date may appear unavailable.)
@@ -45,7 +113,7 @@ The North Star House Venue Team
 www.NorthStarHouse.org`
 }
 
-function emailHtml(first: string, link: string) {
+function emailHtml(first: string, link: string, kind: Kind) {
   const p = 'margin:0 0 16px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:#444;'
   return `<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:${GOLD};"></div><div style="padding:40px 40px 32px;">
 <h1 style="margin:0 0 16px;font-family:'Cardo',Georgia,'Times New Roman',serif;font-size:22px;font-weight:400;color:#2a2420;">Your Pre-Booking Form</h1>
@@ -54,6 +122,7 @@ function emailHtml(first: string, link: string) {
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 20px;"><tr>
 <td><a href="${link}" style="display:inline-block;background:${GOLD};color:#ffffff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px;">Fill Out the Pre-Booking Form</a></td>
 </tr></table>
+${detailsHtml(kind)}
 <p style="${p}">If you have any questions or need further details, just reply to this email. We're here to support you every step of the way.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f7f3ec;border-radius:10px;"><tr><td style="padding:16px 20px;text-align:center;">
 <a href="${AVAILABILITY_URL}" style="font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;color:${GOLD};text-decoration:none;">View Venue Availability Calendar &rarr;</a>
@@ -84,11 +153,11 @@ async function manualSend(req: Request, body: Record<string, unknown>) {
 
   const link = eventType === 'Wedding' ? PREBOOKING_FORM_URL_WEDDING : PREBOOKING_FORM_URL_EVENT
   const first = name.split(/\s+/)[0] || 'there'
-  const text = emailText(first, link)
+  const text = emailText(first, link, kindFromType(eventType))
   const mail = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
-    body: JSON.stringify({ to: email, subject: 'Your North Star House pre-booking form', body: text, html: emailHtml(first, link), sender: 'Venue Team', fromEmail: 'venue@northstarhouse.org' }),
+    body: JSON.stringify({ to: email, subject: 'Your North Star House pre-booking form', body: text, html: emailHtml(first, link, kindFromType(eventType)), sender: 'Venue Team', fromEmail: 'venue@northstarhouse.org' }),
   })
   if (!mail.ok) return json({ error: 'The email could not be sent. Please try again.' }, 502)
 
@@ -132,11 +201,12 @@ Deno.serve(async (req) => {
 
     const link = resp.form_id === WEDDING_INQUIRY_FORM_ID ? PREBOOKING_FORM_URL_WEDDING : PREBOOKING_FORM_URL_EVENT
     const first = name.split(/\s+/)[0] || 'there'
-    const body = emailText(first, link)
+    const kind = kindFromForm(resp.form_id)
+    const body = emailText(first, link, kind)
     const mail = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
-      body: JSON.stringify({ to: email, subject: 'Your North Star House pre-booking form', body, html: emailHtml(first, link), sender: 'Venue Team', fromEmail: 'venue@northstarhouse.org' }),
+      body: JSON.stringify({ to: email, subject: 'Your North Star House pre-booking form', body, html: emailHtml(first, link, kind), sender: 'Venue Team', fromEmail: 'venue@northstarhouse.org' }),
     })
     if (!mail.ok) return json({ error: 'The email could not be sent. Please try again.' }, 502)
 
