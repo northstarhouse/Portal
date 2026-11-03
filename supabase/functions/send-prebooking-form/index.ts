@@ -36,8 +36,6 @@ function emailText(first: string, link: string) {
 
 Thank you for your interest in North Star House. When you're ready to reserve your date, the next step is our short pre-booking form. It tells us about you and your event so we can prepare your agreement: ${link}
 
-Our Client Guidebook has everything about the estate, the spaces and how renting works: ${GUIDEBOOK_URL}
-
 You can also see our booking availability here: ${AVAILABILITY_URL}
 (Note: if you have asked a venue coordinator to put a date on hold, that date may appear unavailable.)
 
@@ -54,8 +52,7 @@ function emailHtml(first: string, link: string) {
 <p style="${p}">Hi ${esc(first)},</p>
 <p style="${p}">Thank you for your interest in North Star House. When you're ready to reserve your date, the next step is our short pre-booking form. It tells us about you and your event so we can prepare your agreement.</p>
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 20px;"><tr>
-<td style="padding:0 8px 0 0;"><a href="${GUIDEBOOK_URL}" style="display:inline-block;background:${GOLD};color:#ffffff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;">View Guidebook</a></td>
-<td style="padding:0 0 0 8px;"><a href="${link}" style="display:inline-block;background:transparent;color:${GOLD};text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;border:1.5px solid ${GOLD};">Pre-Booking Form</a></td>
+<td><a href="${link}" style="display:inline-block;background:${GOLD};color:#ffffff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px;">Fill Out the Pre-Booking Form</a></td>
 </tr></table>
 <p style="${p}">If you have any questions or need further details, just reply to this email. We're here to support you every step of the way.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f7f3ec;border-radius:10px;"><tr><td style="padding:16px 20px;text-align:center;">

@@ -19408,7 +19408,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setSendFormOpen(true); }}
                     style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
                     <div style={{ fontWeight: 700 }}>Send out a pre-booking form</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Email the form and client guide to someone</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Email the form to someone</div>
                   </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVendorToolOpen(true); }}
                     style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
@@ -21125,7 +21125,7 @@ function SendPreBookingModal({ onClose }) {
           <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Send out a pre-booking form</div>
           <a onClick={onClose} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Close ×</a>
         </div>
-        <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Emails them the client guide and the right pre-booking form for their event. It is copied to media@.</div>
+        <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Emails them the right pre-booking form for their event. It is copied to media@.</div>
         <label style={label}>Email address<input type="email" value={f.email} onChange={function(e) { set('email', e.target.value); }} placeholder="name@example.org" style={field} /></label>
         <label style={label}>First name (optional)<input value={f.name} onChange={function(e) { set('name', e.target.value); }} style={field} /></label>
         <label style={label}>Event type
