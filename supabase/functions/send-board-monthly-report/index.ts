@@ -14,6 +14,8 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const LA = 'America/Los_Angeles'
 const GOLD = '#886c44'
 const TEST_TO = 'media@thenorthstarhouse.org'
+// Also receive the board update (Jen, Derek, Kaelen, Haley), on top of the active board members.
+const ALSO_SEND_TO = ['jen@thenorthstarhouse.org', 'derekcheeseman@comcast.net', 'development@thenorthstarhouse.org', 'media@thenorthstarhouse.org']
 const AREAS = ['Construction', 'Grounds', 'Interiors', 'Docents', 'Fundraising', 'Events', 'Marketing', 'Venue']
 const RENTAL_INQUIRY_FORMS: Record<string, string> = {
   '1eea2137-f94d-414b-a977-4ed622214580': 'Wedding',
@@ -302,7 +304,7 @@ Deno.serve(async (req) => {
     const live = !action && mode === 'live' && !body.to
     const { html, text } = build(b.label, { h, f, t, don, sp, qs, up, ev, rs }, !live)
 
-    const boardEmails =Array.from(new Set(h.boardRows.filter((p) => p.Email && (p.Status || 'Active') === 'Active').map((p) => String(p.Email).trim().toLowerCase()))).filter((e) => /.+@.+\..+/.test(e))
+    const boardEmails = Array.from(new Set([...ALSO_SEND_TO, ...h.boardRows.filter((p) => p.Email && (p.Status || 'Active') === 'Active').map((p) => String(p.Email))].map((e) => e.trim().toLowerCase()))).filter((e) => /.+@.+\..+/.test(e))
     if (action === 'preview') {
       const full = build(b.label, { h, f, t, don, sp, qs, up, ev, rs }, false)
       const prior = await rest(`activity_log?select=created_at&action=eq.board_report_sent&detail->>month=eq.${ym}&order=created_at.desc&limit=1`).catch(() => [])
