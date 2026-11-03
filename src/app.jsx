@@ -18976,7 +18976,7 @@ function VenueRentalsView({ navigate, initialTab }) {
 
   function markNoShow() {
     if (detailSaving) return;
-    if (!window.confirm('Mark ' + (detailEntry.raw.visitor_name || 'this visitor') + ' as a no-show? This removes them from the upcoming list.')) return;
+    if (!window.confirm('Mark ' + (detailEntry.raw.visitor_name || 'this visitor') + ' as a no-show? They move off the upcoming list and stay on the All inquiries page, marked Didn\'t show up. No pre-booking form is sent.')) return;
     setDetailSaving(true);
     sbPatchById('estate_tours', detailEntry.raw.id, { status: 'no_show' })
       .then(function() {
@@ -20488,6 +20488,24 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
     var todayKey = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
     return t.date && t.date < todayKey ? 'completed' : 'booked';
   }
+  // A visitor who toured (or was booked by staff) without ever filling out an inquiry form has no row here. If they did not show up,
+  // they are listed anyway, marked "Didn't show up", so they are not lost once the tour is over.
+  var displayRows = rows;
+  if (rows !== null && !clientsOnly && tours && tours.length) {
+    var knownEmails = {};
+    rows.forEach(function(sub) { var e = (inquiryPreviewFields(sub).email || '').trim().toLowerCase(); if (e) knownEmails[e] = true; });
+    var todayKeyNs = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    var extra = [];
+    tours.forEach(function(t) {
+      var e = (t.visitor_email || '').trim().toLowerCase();
+      if (t.status !== 'no_show' || !e || knownEmails[e] || (t.date && t.date > todayKeyNs)) return;
+      knownEmails[e] = true;
+      extra.push({ id: 'tour-' + t.id, tourOnly: true, form_id: 'tour-visitor', form_name: 'Tour visitor', created_at: t.date ? t.date + 'T12:00:00' : t.created_at,
+        fields: [{ id: 'name', label: 'Name' }, { id: 'email', label: 'Email' }, { id: 'phone', label: 'Phone' }],
+        answers: { name: t.visitor_name || '', email: t.visitor_email || '', phone: t.visitor_phone || '' } });
+    });
+    if (extra.length) displayRows = rows.concat(extra).sort(function(a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); });
+  }
   function fmtPreferredDate(dateStr) {
     try { return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); }
     catch (e) { return dateStr; }
@@ -20766,26 +20784,26 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
 
       {rows === null ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
-      ) : rows.length === 0 ? (
+      ) : displayRows.length === 0 ? (
         <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 40, textAlign: 'center', color: '#bbb', fontSize: 13 }}>
           No submissions yet.
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           <div style={{ flex: 1, minWidth: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
-            {(clientsOnly || tourFilter === 'all' ? rows : rows.filter(function(sub) { return tourStateKey(sub) === tourFilter; })).length === 0 && (
+            {(clientsOnly || tourFilter === 'all' ? displayRows : displayRows.filter(function(sub) { return tourStateKey(sub) === tourFilter; })).length === 0 && (
               <div style={{ padding: 30, textAlign: 'center', color: '#aaa', fontSize: 13 }}>No inquiries match this filter.</div>
             )}
-            {(clientsOnly || tourFilter === 'all' ? rows : rows.filter(function(sub) { return tourStateKey(sub) === tourFilter; })).map(function(sub, i, shownRows) {
+            {(clientsOnly || tourFilter === 'all' ? displayRows : displayRows.filter(function(sub) { return tourStateKey(sub) === tourFilter; })).map(function(sub, i, shownRows) {
               var p = inquiryPreviewFields(sub);
               var preview = p.name || p.email || 'Unknown';
               var isHandled = sub.status === 'handled';
               var tour = matchedTour(sub);
               return (
                 <div key={sub.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 18px', borderBottom: i < shownRows.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
-                  <input type="checkbox" title="Mark as handled" checked={isHandled} disabled={handlingId === sub.id}
+                  {sub.tourOnly ? <span style={{ width: 16, flexShrink: 0 }} /> : <input type="checkbox" title="Mark as handled" checked={isHandled} disabled={handlingId === sub.id}
                     onChange={function() { toggleHandled(sub); }}
-                    style={{ marginTop: 4, width: 16, height: 16, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0, opacity: handlingId === sub.id ? 0.5 : 1 }} />
+                    style={{ marginTop: 4, width: 16, height: 16, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0, opacity: handlingId === sub.id ? 0.5 : 1 }} />}
                   <button onClick={function() { setSelected(function(prev) { return prev && prev.id === sub.id ? null : sub; }); }}
                     style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
@@ -20820,10 +20838,10 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                   <div style={{ fontSize: 11, color: '#aaa' }}>{fmtTs(selected.created_at)}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                  <button onClick={function() { deleteResponse(selected); }} disabled={deletingId === selected.id} title="Delete this response"
+                  {!selected.tourOnly && <button onClick={function() { deleteResponse(selected); }} disabled={deletingId === selected.id} title="Delete this response"
                     style={{ background: 'none', border: 'none', color: '#c0392b', cursor: deletingId === selected.id ? 'default' : 'pointer', fontSize: 11, fontWeight: 600, opacity: deletingId === selected.id ? 0.6 : 1 }}>
                     {deletingId === selected.id ? 'Deleting…' : 'Delete'}
-                  </button>
+                  </button>}
                   <button onClick={function() { setSelected(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: 16 }}>✕</button>
                 </div>
               </div>

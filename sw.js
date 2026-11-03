@@ -1,8 +1,8 @@
-var CACHE = 'nsh-v1793732588267';
+var CACHE = 'nsh-v1793733138086';
 var STATIC = [
   '/Portal/',
   '/Portal/index.html',
-  '/Portal/assets/app.js?v=1793732588267',
+  '/Portal/assets/app.js?v=1793733138086',
   '/Portal/assets/logo.png',
   '/Portal/favicon.svg',
   'https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js',
