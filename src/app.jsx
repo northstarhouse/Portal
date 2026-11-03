@@ -21241,7 +21241,9 @@ function TourRequestCalendarRow({ tour, onBooked, accentDark }) {
   var [open, setOpen] = useState(false);
   var [date, setDate] = useState('');
   var [time, setTime] = useState('');
-  var [guide, setGuide] = useState('Jen');
+  // Whoever the request was marked "Handled by" is the one who gives the tour.
+  var [guide, setGuide] = useState(tour.request_handled_by === 'Derek' ? 'Derek' : 'Jen');
+  useEffect(function() { if (tour.request_handled_by === 'Jen' || tour.request_handled_by === 'Derek') setGuide(tour.request_handled_by); }, [tour.request_handled_by]);
   var [saving, setSaving] = useState(false);
   var [error, setError] = useState('');
 
