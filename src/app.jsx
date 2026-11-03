@@ -19023,10 +19023,12 @@ function VenueRentalsView({ navigate, initialTab }) {
   // "Made Contact" starts a 30-day clock after which the request fades into
   // the Archived section below (a UI-only fade -- status stays 'requested').
   // Marking a request handled records whose account did it (Jen, Derek...). Un-marking clears it.
-  function setRequestStatus(id, status) {
+  function setRequestStatus(id, choice) {
+    var parts = String(choice).split(':');
+    var status = parts[0], chosenBy = parts[1] || null;
     setReqSavingId(id);
     var madeContactAt = (status === 'made_contact' || status === 'not_interested') ? new Date().toISOString() : null;
-    var whoPromise = status === 'not_handled' ? Promise.resolve(null) : whoIsSignedIn().then(function(name) {
+    var whoPromise = (status === 'not_handled' || chosenBy) ? Promise.resolve(chosenBy) : whoIsSignedIn().then(function(name) {
       if (name) return name;
       var typed = window.prompt('Who is marking this handled? (Jen, Derek or Haley)');
       return typed && typed.trim() ? typed.trim().charAt(0).toUpperCase() + typed.trim().slice(1).toLowerCase() : null;
@@ -19038,6 +19040,23 @@ function VenueRentalsView({ navigate, initialTab }) {
           setTours(function(prev) { return (prev || []).map(function(t) { return t.id === id ? Object.assign({}, t, { request_status: status, made_contact_at: madeContactAt, request_handled: status !== 'not_handled', request_handled_by: by }) : t; }); });
         }).finally(function() { setReqSavingId(null); });
     });
+  }
+
+  // The tour request dropdown: two "Handled by" choices (Jen, Derek) instead of one "Made Contact". An older request marked by someone
+  // else keeps showing as Made Contact (with their name).
+  function reqChoice(t) {
+    var st = t.request_status || 'not_handled';
+    if (st !== 'made_contact') return st;
+    return t.request_handled_by === 'Jen' || t.request_handled_by === 'Derek' ? 'made_contact:' + t.request_handled_by : 'made_contact';
+  }
+  function reqOptions(t) {
+    return [
+      <option key="nh" value="not_handled">Not Handled</option>,
+      <option key="hj" value="made_contact:Jen">Handled by Jen</option>,
+      <option key="hd" value="made_contact:Derek">Handled by Derek</option>,
+      reqChoice(t) === 'made_contact' ? <option key="mc" value="made_contact">{'Made Contact' + (t.request_handled_by ? ' (' + t.request_handled_by + ')' : '')}</option> : null,
+      <option key="ni" value="not_interested">Not Interested</option>
+    ];
   }
 
   function loadTours() {
@@ -19618,12 +19637,10 @@ function VenueRentalsView({ navigate, initialTab }) {
                         </div>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', flexShrink: 0 }}>
-                      <select value={t.request_status || 'not_handled'} disabled={reqSavingId === t.id}
+                      <select value={reqChoice(t)} disabled={reqSavingId === t.id}
                         onChange={function(e) { setRequestStatus(t.id, e.target.value); }}
                         style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: t.request_status === 'made_contact' ? '#f0f7f2' : '#fff8e8', color: t.request_status === 'made_contact' ? '#2e6b4f' : '#b45309', fontWeight: 600 }}>
-                        <option value="not_handled">Not Handled</option>
-                        <option value="made_contact">Made Contact</option>
-                        <option value="not_interested">Not Interested</option>
+                        {reqOptions(t)}
                       </select>
                       {t.request_status === 'made_contact' && t.request_handled_by && <div style={{ fontSize: 11, fontWeight: 700, color: '#2e6b4f' }}>by {t.request_handled_by}</div>}
                       {t.request_status === 'made_contact' && <div style={{ fontSize: 10, color: '#888' }}>Archives {fmtMadeContactDate(new Date(new Date(t.made_contact_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString())}</div>}
@@ -19651,12 +19668,10 @@ function VenueRentalsView({ navigate, initialTab }) {
                             {t.made_contact_at && (t.request_status === 'not_interested' ? ' · Not interested ' : ' · Made contact ') + fmtMadeContactDate(t.made_contact_at) + (t.request_handled_by ? ' by ' + t.request_handled_by : '')}
                           </div>
                         </div>
-                        <select value={t.request_status || 'not_handled'} disabled={reqSavingId === t.id}
+                        <select value={reqChoice(t)} disabled={reqSavingId === t.id}
                           onChange={function(e) { setRequestStatus(t.id, e.target.value); }}
                           style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: '#fff', color: '#777', fontWeight: 600 }}>
-                          <option value="not_handled">Not Handled</option>
-                          <option value="made_contact">Made Contact</option>
-                        <option value="not_interested">Not Interested</option>
+                          {reqOptions(t)}
                         </select>
                       </div>
                     );
