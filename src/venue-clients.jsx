@@ -554,7 +554,9 @@ export function VenueClientDashboard({ showSite: showSiteProp, setShowSite: setS
   const upcoming = clients.flatMap(client=>client.tasks.filter(t=>t.due && t.due>=today).map(task=>({...task,client}))).sort((a,b)=>a.due.localeCompare(b.due));
   const dueSoon = clients.flatMap(c=>c.duePayments).filter(p=>p.due && p.due<=shiftDate(today,30));
   const matches = clients.filter(c=>(filter!=='attention'||c.urgent.length>0)&&(!query || (c.name+' '+c.email+' '+c.eventDate).toLowerCase().includes(query.toLowerCase())));
-  const shown = filter==='viewall' ? matches : matches.slice(0,4);
+  // "Most recent": every client, newest pre-booking form first.
+  const recent = filter==='recent' ? matches.slice().sort((a,b)=>String(b.sub&&b.sub.created_at||'').localeCompare(String(a.sub&&a.sub.created_at||''))) : matches;
+  const shown = (filter==='viewall'||filter==='recent') ? recent : matches.slice(0,4);
   const open = c => setSelected(c.id);
   // opened from an Activity Log entry
   React.useEffect(() => { const id = window.__nshOpenClient; if (id && submissions && submissions.some(sub => sub.id === id)) { setSelected(id); window.__nshOpenClient = null; } }, [submissions]);

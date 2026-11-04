@@ -19446,6 +19446,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                 <option value="all">All upcoming</option>
                 <option value="attention">Needs attention</option>
                 <option value="viewall">View all events</option>
+                <option value="recent">Most recent</option>
               </select>
               <input aria-label="Search clients" placeholder="Search names or dates…" value={clientQuery} onChange={function(e) { setClientQuery(e.target.value); }}
                 style={{ border: '1px solid #ded7cb', background: '#fff', borderRadius: 7, padding: '9px 11px', fontSize: 12, minWidth: 180 }} />
