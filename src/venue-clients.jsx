@@ -107,7 +107,7 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   const requirementsDue = eventDate ? shiftDate(eventDate, -30) : null;
   const formContacts = [['7fnabd0i','c9u1sxb4','163otrai','ps4addr1'], ['7leui2ic','pt4mail1','pt4phon1','pt4addr1']].filter(k => a[k[0]]).map((k, i) => ({ id:'form-' + i, full_name:a[k[0]], email:a[k[1]] || '', phone_number:a[k[2]] || '', address:a[k[3]] || '', kind:'client' }));
   const contacts = (hb?.contacts || []).filter(c => c.kind === 'client').concat(hb?.contacts?.some(c => c.kind === 'client') ? [] : formContacts);
-  const name = (p.name || live?.name || a['7fnabd0i'] || a.evp_name || 'Client').replace(/\s*\([SJ]\)\s*$/i, '').replace(/\s+Wedding\s*$/i, '').trim();
+  const name = (p.name || live?.name || a.evp_org || a['7fnabd0i'] || a.evp_name || 'Client').replace(/\s*\([SJ]\)\s*$/i, '').replace(/\s+Wedding\s*$/i, '').trim();
   const email = a.c9u1sxb4 || a.evp_email || contacts[0]?.email;
   const tasks = [];
   function task(key, title, due, detail, kind) {
