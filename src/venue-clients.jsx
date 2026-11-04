@@ -119,7 +119,7 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
     formContacts.length = 0; evp.forEach(c => formContacts.push(c));
   }
   const contacts = (hb?.contacts || []).filter(c => c.kind === 'client').concat(hb?.contacts?.some(c => c.kind === 'client') ? [] : formContacts);
-  const name = (p.name || live?.name || a.evp_org || a['7fnabd0i'] || a.evp_name || 'Client').replace(/\s*\([SJ]\)\s*$/i, '').replace(/\s+Wedding\s*$/i, '').trim();
+  const name = (a.__event_name || p.name || live?.name || a.evp_org || a['7fnabd0i'] || a.evp_name || 'Client').replace(/\s*\([SJ]\)\s*$/i, '').replace(/\s+Wedding\s*$/i, '').trim();
   const email = a.c9u1sxb4 || a.evp_email || contacts[0]?.email;
   const tasks = [];
   function task(key, title, due, detail, kind) {
@@ -418,7 +418,19 @@ function RequirementsGroup({ client, onVerify, formOpen, setFormOpen }) {
   </div>;
 }
 
-function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
+async function saveEventName(id, name) {
+  const H = { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY, 'Content-Type': 'application/json' };
+  const cur = await fetch(PB_URL + '/rest/v1/nsh_form_responses?select=answers&id=eq.' + id, { headers: H }).then(r => r.ok ? r.json() : Promise.reject(new Error('Could not load the client.')));
+  if (!cur[0]) throw new Error('Client not found.');
+  const answers = { ...(cur[0].answers || {}) };
+  if (name) answers.__event_name = name; else delete answers.__event_name;
+  const r = await fetch(PB_URL + '/rest/v1/nsh_form_responses?id=eq.' + id, { method: 'PATCH', headers: { ...H, Prefer: 'return=representation' }, body: JSON.stringify({ answers }) });
+  if (!r.ok) throw new Error('Could not save the name.');
+  const rows = await r.json();
+  return rows[0];
+}
+
+function ClientDetail({ client, onClose, onRename, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [agrOpen, setAgrOpen] = React.useState(false);
@@ -473,7 +485,7 @@ function ClientDetail({ client, onClose, onVerify, onSavePayments, agreementApi,
   if (client.eventDate) step('Event day', client.days !== null && client.days <= 0, dateLabel(client.eventDate));
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
   return <dialog ref={ref} className="vc-dialog" aria-labelledby="vc-client-title" onCancel={onClose} onClick={e => { if(e.target === ref.current) onClose(); }}>
-    <div className="vc-modal-head"><div style={{flex:1}}><h2 id="vc-client-title" className="vc-name" style={{fontSize:25,margin:0}}>{client.name} - {client.type}</h2>{client.siteManager&&<div style={{marginTop:4,fontSize:13,color:'#6b5d4a'}}>Site manager: <strong style={{color:'#2a2420'}}>{client.siteManager}</strong></div>}<div style={{fontFamily:'Cardo,Georgia,serif',fontSize:22,fontWeight:700,color:'#886c44',marginTop:6}}>{dateLabel(client.eventDate)}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10,flexShrink:0}}><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button><button type="button" onClick={()=>openSitePacket(client)} style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap'}}>Print Site Manager Packet</button><a href="https://venue.northstarhouse.org/guidebook/" target="_blank" rel="noopener noreferrer" style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap',textDecoration:'none',fontSize:'inherit'}}>Client Guidebook</a></div></div>
+    <div className="vc-modal-head"><div style={{flex:1}}><h2 id="vc-client-title" className="vc-name" style={{fontSize:25,margin:0}}>{client.name} - {client.type}</h2>{onRename&&<a onClick={async()=>{const cur=client.name;const v=window.prompt('Event name (leave empty to go back to the original name):',cur);if(v===null)return;try{await onRename(client.id,v.trim());}catch(e){alert(e.message||'Could not save.');}}} style={{cursor:'pointer',color:'#886c44',fontSize:12,fontWeight:600,textDecoration:'underline'}}>Edit name</a>}{client.siteManager&&<div style={{marginTop:4,fontSize:13,color:'#6b5d4a'}}>Site manager: <strong style={{color:'#2a2420'}}>{client.siteManager}</strong></div>}<div style={{fontFamily:'Cardo,Georgia,serif',fontSize:22,fontWeight:700,color:'#886c44',marginTop:6}}>{dateLabel(client.eventDate)}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10,flexShrink:0}}><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button><button type="button" onClick={()=>openSitePacket(client)} style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap'}}>Print Site Manager Packet</button><a href="https://venue.northstarhouse.org/guidebook/" target="_blank" rel="noopener noreferrer" style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap',textDecoration:'none',fontSize:'inherit'}}>Client Guidebook</a></div></div>
     {client.payments && <div className="vc-hstepper" aria-label="Payment timeline">
       {client.schedule.map((s,i) => {
         const pastDue = s.due && s.due < venueDateKey() && !s.paid;
@@ -578,6 +590,10 @@ export function VenueClientDashboard({ showSite: showSiteProp, setShowSite: setS
     const record = await savePayments(id,list);
     setSavedResponses(prev=>({...prev,[id]:record}));
   }
+  async function renameClient(id,name) {
+    const record = await saveEventName(id,name);
+    setSavedResponses(prev=>({...prev,[id]:record}));
+  }
   async function assignSite(id,name) {
     const record = await saveSiteManager(id,name);
     setSavedResponses(prev=>({...prev,[id]:record}));
@@ -605,6 +621,6 @@ export function VenueClientDashboard({ showSite: showSiteProp, setShowSite: setS
       <section className="vc-side-card priority"><h2 className="vc-side-title">Needs your attention <span className="vc-counter">{submissions===null?'—':urgent.length}</span></h2>{submissions===null?<p className="vc-muted">Loading priorities…</p>:urgent.length===0?<p className="vc-muted">No urgent items recorded.</p>:(allTasks?urgent:urgent.slice(0,6)).map(t=><button className="vc-task" key={t.key} onClick={()=>t.action?t.action():open(t.client)}><div className="vc-task-head">{t.title}</div><div className="vc-task-name">{t.client.name}</div><div className={'vc-task-date '+(t.overdue?'late':'')}>{t.due?(t.overdue?'Past due · ':'Due ')+dateLabel(t.due):t.detail}</div></button>)}{urgent.length>6&&<button className="vc-text-button" onClick={()=>setAllTasks(!allTasks)}>{allTasks?'Show fewer priorities':'See all '+urgent.length+' priorities ↓'}</button>}</section>
     </aside></div>
     </>}
-    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSavePayments={recordPayments} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
+    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSavePayments={recordPayments} onRename={renameClient} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }
