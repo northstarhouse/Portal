@@ -60,6 +60,11 @@ function detailsHtml(kind: Kind): string {
       linkBtn(`${SITE}/weddings`, 'View Pricing &amp; Details') +
       `<h3 style="${H3}">Common Questions</h3>` +
       para('<strong>How do I reserve my date?</strong><br>Sign the venue agreement and pay the $800 retainer, which counts toward your total.') +
+      para('<strong>Are tables and chairs included?</strong><br>Yes. We provide 25 round 60" tables, 200 white folding chairs, three 8-foot and two 6-foot rectangular tables, plus patio tables, chairs and umbrellas. Use any or all of them, or bring in additional rentals.') +
+      para('<strong>How much time do we get?</strong><br>A 10-hour rental period, starting when we open the indoor venue for you. You choose the start time, with an 11 PM latest end. Extra hours are $150 each.') +
+      para('<strong>Can we bring our own caterer?</strong><br>Yes, any professional caterer. We will walk them through our facilities, and we have a list of recommended vendors if you would like ideas.') +
+      para('<strong>What is the lighting like?</strong><br>The estate is already lit with string lights in the courtyard and over the East Lawn, twinkle pillar lights and trim lighting on the House.') +
+      para('<strong>Do you help with planning?</strong><br>Yes. We offer up to two onsite planning meetings to go over your details, and we send a planning questionnaire about 60 days out so everything is ready for your Site Manager.') +
       para('<strong>Is the security deposit refundable?</strong><br>Yes. It is returned after your event if there is no damage and policies are followed.') +
       para('<strong>Do we need insurance?</strong><br>Yes, a $1 million liability policy naming North Star Historic Conservancy as additionally insured. These policies are typically inexpensive for a single event.') +
       linkBtn(`${SITE}/weddings#faq`, 'Read the Full Q&amp;A')
@@ -82,6 +87,11 @@ Pricing & details: ${SITE}/weddings
 COMMON QUESTIONS
 How do I reserve my date? Sign the venue agreement and pay the $800 retainer, which counts toward your total.
 Is the security deposit refundable? Yes. It is returned after your event if there is no damage and policies are followed.
+Are tables and chairs included? Yes. We provide 25 round 60" tables, 200 white folding chairs, three 8-foot and two 6-foot rectangular tables, plus patio tables, chairs and umbrellas. Use any or all of them, or bring in additional rentals.
+How much time do we get? A 10-hour rental period, starting when we open the indoor venue for you. You choose the start time, with an 11 PM latest end. Extra hours are $150 each.
+Can we bring our own caterer? Yes, any professional caterer. We will walk them through our facilities, and we have a list of recommended vendors if you would like ideas.
+What is the lighting like? The estate is already lit with string lights in the courtyard and over the East Lawn, twinkle pillar lights and trim lighting on the House.
+Do you help with planning? Yes. We offer up to two onsite planning meetings to go over your details, and we send a planning questionnaire about 60 days out so everything is ready for your Site Manager.
 Do we need insurance? Yes, a $1 million liability policy naming North Star Historic Conservancy as additionally insured.
 Full Q&A: ${SITE}/weddings#faq`
   }
