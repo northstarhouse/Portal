@@ -18886,6 +18886,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   var [toolsOpen, setToolsOpen] = useState(false);
   var [manualFormOpen, setManualFormOpen] = useState(false);
   var [vendorToolOpen, setVendorToolOpen] = useState(false);
+  var [featureReqOpen, setFeatureReqOpen] = useState(false);
   var [sendFormOpen, setSendFormOpen] = useState(false);
   var [movementOpen, setMovementOpen] = useState(false);
   var colorCoding = venueTab === 'clients' ? true : inquiriesColorCoding;
@@ -19426,6 +19427,11 @@ function VenueRentalsView({ navigate, initialTab }) {
                     <div style={{ fontWeight: 700 }}>Add a vendor recommendation</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Shows up in the client guides right away</div>
                   </button>
+                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setFeatureReqOpen(true); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <div style={{ fontWeight: 700 }}>Make a feature request</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Ask for something new in the Portal</div>
+                  </button>
                 </div>
               </React.Fragment>
             )}
@@ -19467,6 +19473,7 @@ function VenueRentalsView({ navigate, initialTab }) {
       {movementOpen && <PendingMovementModal onClose={function() { setMovementOpen(false); }} />}
       {sendFormOpen && <SendPreBookingModal onClose={function() { setSendFormOpen(false); }} />}
       {vendorToolOpen && <VendorToolModal onClose={function() { setVendorToolOpen(false); }} />}
+      {featureReqOpen && <FeatureRequestModal onClose={function() { setFeatureReqOpen(false); }} />}
       {manualFormOpen && <ManualPreBookingModal onClose={function() { setManualFormOpen(false); }} onSaved={function(id) { window.__nshOpenClient = id; setVenueTab('clients'); loadInquiries(); }} />}
       {inquiriesError && <div role="alert" style={{ padding: 16, border: '1px solid #e7c9be', borderRadius: 10, background: '#fff5ef', marginBottom: 16, color: '#8c4c35', fontSize: 13 }}>{inquiriesError}. <button type="button" onClick={loadInquiries} style={{background:'none',border:0,textDecoration:'underline',color:'inherit',cursor:'pointer'}}>Try again</button></div>}
       {!SHOW_LEGACY_VENUE_DASHBOARD && (
@@ -21255,6 +21262,94 @@ function SendPreBookingModal({ onClose }) {
           <button type="submit" disabled={busy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.7 : 1 }}>{busy ? 'Sending…' : 'Send it'}</button>
         </div>
       </form>
+    </div>
+  );
+}
+
+// Tools > "Make a feature request": staff describe something they want the Portal to do. It is saved to feature_requests and listed below the form.
+function FeatureRequestModal({ onClose }) {
+  var [f, setF] = useState({ title: '', details: '', area: 'Venue Rentals', priority: 'normal' });
+  var [list, setList] = useState(null);
+  var [busy, setBusy] = useState(false);
+  var [msg, setMsg] = useState(null);
+  var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/feature_requests?select=*&order=created_at.desc&limit=50', { headers: H })
+      .then(function(r) { return r.ok ? r.json() : []; }).then(function(rows) { setList(Array.isArray(rows) ? rows : []); }).catch(function() { setList([]); });
+  }
+  useEffect(load, []);
+  function set(k, v) { setF(function(o) { var n = Object.assign({}, o); n[k] = v; return n; }); }
+  function submit(e) {
+    e.preventDefault();
+    if (busy) return;
+    if (!f.title.trim()) { setMsg({ bad: true, text: 'Say what you would like in a few words.' }); return; }
+    setBusy(true); setMsg(null);
+    whoIsSignedIn().then(function(name) {
+      return fetch(SUPABASE_URL + '/rest/v1/feature_requests', { method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=minimal' }),
+        body: JSON.stringify({ title: f.title.trim(), details: f.details.trim() || null, area: f.area, priority: f.priority, requested_by: name || null }) });
+    }).then(function(r) {
+      if (!r.ok) throw new Error('Could not save. Please try again.');
+      logActivity('Feature request: ' + f.title.trim(), 'feature_request');
+      setMsg({ bad: false, text: 'Your request was saved.' });
+      setF({ title: '', details: '', area: f.area, priority: 'normal' });
+      load();
+    }).catch(function(err) { setMsg({ bad: true, text: err.message || 'Could not save.' }); }).finally(function() { setBusy(false); });
+  }
+  function setStatus(r, status) {
+    fetch(SUPABASE_URL + '/rest/v1/feature_requests?id=eq.' + r.id, { method: 'PATCH', headers: Object.assign({}, H, { Prefer: 'return=minimal' }), body: JSON.stringify({ status: status }) })
+      .then(function(x) { if (x.ok) load(); });
+  }
+  var field = { padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff', width: '100%', boxSizing: 'border-box' };
+  var label = { fontSize: 12, color: '#888', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 };
+  return (
+    <div onClick={function(e) { if (e.target === e.currentTarget && !busy) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div role="dialog" aria-label="Make a feature request" style={{ background: '#fff', borderRadius: 14, maxWidth: 560, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Make a feature request</div>
+          <a onClick={onClose} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Close ×</a>
+        </div>
+        <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Tell us what you wish the Portal could do.</div>
+        <form onSubmit={submit}>
+          <label style={label}>What would you like?<input value={f.title} onChange={function(e) { set('title', e.target.value); }} placeholder="For example: a way to text clients from here" style={field} /></label>
+          <label style={label}>More detail (optional)<textarea value={f.details} onChange={function(e) { set('details', e.target.value); }} rows={4} placeholder="How would you use it? What problem does it solve?" style={Object.assign({}, field, { resize: 'vertical' })} /></label>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <label style={Object.assign({}, label, { flex: 1 })}>Where in the Portal
+              <select value={f.area} onChange={function(e) { set('area', e.target.value); }} style={field}>
+                {['Venue Rentals', 'Donors', 'Volunteers', 'Events', 'Board', 'Email', 'Reports', 'Something else'].map(function(a) { return <option key={a} value={a}>{a}</option>; })}
+              </select>
+            </label>
+            <label style={Object.assign({}, label, { flex: 1 })}>How important
+              <select value={f.priority} onChange={function(e) { set('priority', e.target.value); }} style={field}>
+                <option value="low">Nice to have</option>
+                <option value="normal">Would help</option>
+                <option value="high">Needed soon</option>
+              </select>
+            </label>
+          </div>
+          {msg && <div style={{ fontSize: 13, marginBottom: 12, color: msg.bad ? '#b3402a' : '#2e7d32' }}>{msg.text}</div>}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="submit" disabled={busy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.7 : 1 }}>{busy ? 'Saving…' : 'Submit request'}</button>
+          </div>
+        </form>
+        <div style={{ borderTop: '0.5px solid #e8e0d5', marginTop: 20, paddingTop: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: gold, marginBottom: 8 }}>Requests so far{list ? ' (' + list.length + ')' : ''}</div>
+          {list === null && <div style={{ color: '#999', fontSize: 13 }}>Loading…</div>}
+          {list && list.length === 0 && <div style={{ color: '#999', fontSize: 13 }}>Nothing yet.</div>}
+          {(list || []).map(function(r) {
+            var done = r.status === 'done';
+            return (
+              <div key={r.id} style={{ padding: '8px 0', borderTop: '0.5px solid #f3eee6' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, color: '#2a2a2a' }}>
+                  <span style={{ fontWeight: 600, textDecoration: done ? 'line-through' : 'none', opacity: done ? 0.55 : 1 }}>{r.title}</span>
+                  <a onClick={function() { setStatus(r, done ? 'open' : 'done'); }} style={{ cursor: 'pointer', color: gold, fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{done ? 'Reopen' : 'Mark done'}</a>
+                </div>
+                {r.details && <div style={{ fontSize: 12, color: '#666', marginTop: 2, whiteSpace: 'pre-wrap' }}>{r.details}</div>}
+                <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{[r.area, r.priority === 'high' ? 'Needed soon' : r.priority === 'low' ? 'Nice to have' : null, r.requested_by, new Date(r.created_at).toLocaleDateString()].filter(Boolean).join(' · ')}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
