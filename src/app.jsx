@@ -23729,8 +23729,10 @@ function TreasurerView({ navigate }) {
     }
     return true;
   });
+  function netOf(p) { return p.net != null && p.net !== '' ? Number(p.net) : Number(p.amount || 0) - Number(p.fee || 0); }
   var total = list.reduce(function(s, p) { return s + Number(p.amount || 0); }, 0);
   var fees = list.reduce(function(s, p) { return s + Number(p.fee || 0); }, 0);
+  var netTotal = list.reduce(function(s, p) { return s + netOf(p); }, 0);
   var bySource = {};
   list.forEach(function(p) { bySource[p.source] = (bySource[p.source] || 0) + Number(p.amount || 0); });
 
@@ -23761,9 +23763,9 @@ function TreasurerView({ navigate }) {
   }
 
   function exportCsv() {
-    var cols = [['Date', 'paid_on'], ['Source', 'source'], ['Category', 'category'], ['From', 'payer'], ['Details', 'detail'], ['Amount', 'amount'], ['PayPal fee', 'fee'], ['Net', 'net'], ['Method', 'method'], ['Reference', 'reference']];
+    var cols = [['Date', 'paid_on'], ['Source', 'source'], ['Category', 'category'], ['From', 'payer'], ['Details', 'detail'], ['Gross', 'amount'], ['Fees', 'fee'], ['Net', 'net'], ['Method', 'method'], ['Reference', 'reference']];
     function cell(v) { var s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
-    var lines = [cols.map(function(c) { return c[0]; }).join(',')].concat(list.map(function(p) { return cols.map(function(c) { return cell(p[c[1]]); }).join(','); }));
+    var lines = [cols.map(function(c) { return c[0]; }).join(',')].concat(list.map(function(p) { return cols.map(function(c) { return cell(c[1] === 'net' ? netOf(p).toFixed(2) : c[1] === 'fee' ? Number(p.fee || 0).toFixed(2) : p[c[1]]); }).join(','); }));
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
     a.download = 'nsh-payments-' + year + (month !== 'all' ? '-' + month : '') + '.csv';
@@ -23803,7 +23805,15 @@ function TreasurerView({ navigate }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
         <div style={Object.assign({}, card, { marginBottom: 0, flex: '1 1 160px' })}>
           <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{money(total)}</div>
-          <div style={{ fontSize: 12, color: '#888' }}>{list.length} payment{list.length === 1 ? '' : 's'}{fees > 0 ? ' · ' + money(fees) + ' PayPal fees' : ''}</div>
+          <div style={{ fontSize: 12, color: '#888' }}>Gross · {list.length} payment{list.length === 1 ? '' : 's'}</div>
+        </div>
+        <div style={Object.assign({}, card, { marginBottom: 0, flex: '1 1 160px' })}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#b3402a' }}>{money(fees)}</div>
+          <div style={{ fontSize: 12, color: '#888' }}>Fees</div>
+        </div>
+        <div style={Object.assign({}, card, { marginBottom: 0, flex: '1 1 160px' })}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#2e7d32' }}>{money(netTotal)}</div>
+          <div style={{ fontSize: 12, color: '#888' }}>Net (after fees)</div>
         </div>
         {Object.keys(bySource).map(function(s) {
           return <div key={s} style={Object.assign({}, card, { marginBottom: 0, flex: '1 1 160px' })}>
@@ -23861,7 +23871,7 @@ function TreasurerView({ navigate }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                {['Date', 'From', 'For', 'Source', 'Method', 'Amount', ''].map(function(h, i) { return <th key={i} style={{ padding: '10px 12px', borderBottom: '0.5px solid #e0d8cc', textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</th>; })}
+                {['Date', 'From', 'For', 'Source', 'Method', 'Gross', 'Fees', 'Net', ''].map(function(h, i) { return <th key={i} style={{ padding: '10px 12px', borderBottom: '0.5px solid #e0d8cc', textAlign: (h === 'Gross' || h === 'Fees' || h === 'Net') ? 'right' : 'left' }}>{h}</th>; })}
               </tr>
             </thead>
             <tbody>
@@ -23872,7 +23882,9 @@ function TreasurerView({ navigate }) {
                   <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{p.category}{p.detail ? <div style={{ fontSize: 12, color: '#999' }}>{p.detail}</div> : null}</td>
                   <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{p.source}</td>
                   <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{p.method}{p.reference ? <div style={{ fontSize: 11, color: '#aaa' }}>{p.reference}</div> : null}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(p.amount)}{Number(p.fee) > 0 ? <div style={{ fontSize: 11, color: '#aaa', fontWeight: 400 }}>fee {money(p.fee)}{p.fee_estimated ? ' (est.)' : ''}</div> : null}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(p.amount)}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap', color: Number(p.fee) > 0 ? '#b3402a' : '#bbb' }}>{Number(p.fee) > 0 ? money(p.fee) : '—'}{Number(p.fee) > 0 && p.fee_estimated ? <div style={{ fontSize: 11, color: '#aaa' }}>(est.)</div> : null}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(netOf(p))}</td>
                   <td style={{ padding: '9px 12px' }}>{p.payment_key.indexOf('man:') === 0 ? <a onClick={function() { removeEntry(p); }} style={{ fontSize: 12, color: '#b3402a', cursor: 'pointer' }}>Delete</a> : null}</td>
                 </tr>;
               })}
