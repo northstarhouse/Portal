@@ -590,13 +590,14 @@ function ClientStats({ clients, onClose }) {
   rows.forEach(r => { let t = types.find(x => x.name === r.c.type); if (!t) { t = { name: r.c.type, n: 0, total: 0, noDeposit: 0 }; types.push(t); } t.n++; t.total += r.i.total; t.noDeposit += r.i.noDeposit; });
   types.sort((a, b) => b.n - a.n);
   const missing = rows.filter(r => !r.i.total).length;
-  const box = { border: '1px solid #e6dfd3', borderRadius: 10, padding: '12px 14px', background: '#fff' };
-  const big = { fontFamily: 'Cardo,Georgia,serif', fontSize: 24, color: '#2a2a2a' };
-  const lab = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#886c44', marginBottom: 2 };
+  const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  const box = { border: '1px solid #e6d9bd', borderRadius: 12, padding: '14px 16px', background: '#f6efe1', fontFamily: SANS };
+  const big = { fontFamily: SANS, fontSize: 26, fontWeight: 700, color: '#4a3b24', letterSpacing: '-0.5px', lineHeight: 1.2 };
+  const lab = { fontFamily: SANS, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#886c44', marginBottom: 4 };
   const th = { textAlign: 'right', fontSize: 11, color: '#888', fontWeight: 600, padding: '4px 0' };
   const td = { textAlign: 'right', padding: '8px 0', borderTop: '1px solid #f0ebe0' };
   return <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-    <div role="dialog" aria-label="Current stats" style={{ background: '#fff', borderRadius: 14, maxWidth: 620, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
+    <div role="dialog" aria-label="Current stats" style={{ fontFamily: SANS, background: '#fff', borderRadius: 14, maxWidth: 620, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: 'Cardo,serif' }}>Current stats</div>
         <a onClick={onClose} style={{ cursor: 'pointer', color: '#886c44', fontSize: 13, fontWeight: 600 }}>Close ×</a>

@@ -18984,7 +18984,8 @@ function VenueRentalsView({ navigate, initialTab }) {
     if (!window.confirm('Mark ' + (detailEntry.raw.visitor_name || 'this visitor') + ' as a no-show? They move off the upcoming list and stay on the All inquiries page, marked Didn\'t show up. No pre-booking form is sent.')) return;
     setDetailSaving(true);
     sbPatchById('estate_tours', detailEntry.raw.id, { status: 'no_show' })
-      .then(function() {
+      .then(function(res) {
+        if (!Array.isArray(res) || !res.length) { alert('Could not mark them as a no-show. Please try again.'); return; }
         loadTours();
         setDetailEntry(null);
       }).finally(function() { setDetailSaving(false); });
