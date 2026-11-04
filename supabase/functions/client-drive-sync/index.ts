@@ -4,7 +4,8 @@
 //     Insurance (copied from the client's insurance upload), Signed Contract (PDF).
 // `sync` is safe to run any number of times: it only adds what is missing (the questionnaire is refreshed if the client changed it).
 // It is called by database triggers whenever one of those things is submitted, and can be run for every client with `backfill`.
-import { agreementPdf } from "./pdf.ts";
+import { contractPdf } from "./contract-pdf.ts";
+import { formPdf, type FormItem } from "./form-pdf.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -102,10 +103,13 @@ async function uploadFile(name: string, parentId: string, mimeType: string, byte
     method: "POST", headers: { "Content-Type": `multipart/related; boundary=${boundary}` }, body,
   });
 }
-async function replaceDocContent(fileId: string, html: string) {
+async function replaceFileContent(fileId: string, mimeType: string, bytes: Uint8Array) {
   await gjson(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&supportsAllDrives=true&fields=id`, {
-    method: "PATCH", headers: { "Content-Type": "text/html; charset=UTF-8" }, body: new TextEncoder().encode(html),
+    method: "PATCH", headers: { "Content-Type": mimeType }, body: bytes,
   });
+}
+async function trashFile(fileId: string) {
+  await gjson(`${D}/${fileId}?supportsAllDrives=true&fields=id`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ trashed: true }) });
 }
 
 // ---------- Rendering a form response as a readable document ----------
@@ -116,25 +120,23 @@ function show(v: unknown): string {
   if (typeof v === "object") return Object.entries(v as Record<string, unknown>).map(([, x]) => show(x)).filter(Boolean).join(", ");
   return String(v);
 }
-function renderDoc(title: string, sub: string, fields: any[], answers: Record<string, any>): string {
-  const rows: string[] = [];
-  const addRow = (label: string, val: unknown, note?: unknown) => {
-    const text = show(val);
-    if (!text && !note) return;
-    rows.push(`<p><b>${esc(label)}</b><br>${esc(text || "(no answer)").replace(/\n/g, "<br>")}${note ? `<br><i>Note: ${esc(note)}</i>` : ""}</p>`);
-  };
+function buildItems(fields: any[], answers: Record<string, any>): FormItem[] {
+  const items: FormItem[] = [];
   for (const f of fields || []) {
-    if (f.type === "heading") { rows.push(`<h2>${esc(f.label)}</h2>`); continue; }
+    if (f.type === "heading") { items.push({ kind: "heading", text: String(f.label || "") }); continue; }
     if (f.type === "divider") continue;
     if (f.type === "group") {
       const v = answers[f.id] || {};
       const parts = (f.parts || []).map((p: any) => `${p.label}: ${show(v[p.id])}`).filter((x: string) => !x.endsWith(": "));
-      if (parts.length) rows.push(`<p><b>${esc(f.label)}</b><br>${parts.map(esc).join("<br>")}</p>`);
+      if (parts.length) items.push({ kind: "qa", label: String(f.label || ""), text: parts.join("\n") });
       continue;
     }
-    addRow(f.label || f.id, answers[f.id], answers[f.id + "__note"]);
+    const text = show(answers[f.id]);
+    const note = answers[f.id + "__note"];
+    if (!text && !note) continue;
+    items.push({ kind: "qa", label: String(f.label || f.id), text, note: note ? String(note) : undefined });
   }
-  return `<html><body><h1>${esc(title)}</h1><p>${esc(sub)}</p>${rows.join("")}</body></html>`;
+  return items;
 }
 
 // ---------- The client ----------
@@ -192,10 +194,15 @@ async function syncClient(pbId: string) {
   const formDoc = async (label: string, formId: string, answers: Record<string, any> | null, when: string | null, refresh = false) => {
     if (!answers || !Object.keys(answers).length) return;
     const form = (await rest(`nsh_forms?select=title,fields&id=eq.${formId}`))?.[0];
-    const html = renderDoc(`${label} - ${name}`, `${form?.title || label}${when ? " - submitted " + String(when).slice(0, 10) : ""}${date ? " - event " + writtenDate(date) : ""}`, form?.fields || [], answers);
-    const existing = has(label);
-    if (!existing) { await uploadFile(label, folderId, "text/html", new TextEncoder().encode(html), true); done.push(label); }
-    else if (refresh) { try { await replaceDocContent(existing.id, html); done.push(label + " (updated)"); } catch (_e) { /* keep the existing copy */ } }
+    const pdfBytes = await formPdf(`${label} - ${name}`, `${form?.title || label}${when ? " - submitted " + String(when).slice(0, 10) : ""}${date ? " - event " + writtenDate(date) : ""}`, buildItems(form?.fields || [], answers));
+    const fileName = `${label}.pdf`;
+    // an earlier version of this filing saved Google Docs: swap those for the PDF
+    for (const old of have.filter((f) => f.mimeType === "application/vnd.google-apps.document" && f.name.toLowerCase().startsWith(label.toLowerCase()))) {
+      try { await trashFile(old.id); } catch (_e) { /* leave it if it cannot be removed */ }
+    }
+    const existing = have.find((f) => f.name.toLowerCase() === fileName.toLowerCase());
+    if (!existing) { await uploadFile(fileName, folderId, "application/pdf", pdfBytes); done.push(fileName); }
+    else if (refresh) { try { await replaceFileContent(existing.id, "application/pdf", pdfBytes); done.push(fileName + " (updated)"); } catch (_e) { /* keep the existing copy */ } }
   };
 
   // 1. pre-booking form
@@ -238,13 +245,19 @@ async function syncClient(pbId: string) {
   }
 
   // 5. signed contract
-  if (!has("Signed Contract")) {
+  {
     const ver = (await rest(`venue_agreement_versions?select=id,version&response_id=eq.${pbId}&status=eq.completed&order=version.desc&limit=1`))?.[0];
-    if (ver) {
+    const existingContract = has("Signed Contract");
+    // a signed contract never changes, so it is written once; copies made with the first (plain) layout were named "Signed Contract (v1).pdf" and are replaced
+    if (ver && (!existingContract || existingContract.name !== "Signed Contract.pdf")) {
       const rec2 = await rest("rpc/venue_agreement_record", { method: "POST", body: JSON.stringify({ p_id: ver.id }) });
       if (rec2) {
-        const pdf = await agreementPdf({ ...rec2, body: tidyBody(rec2.body) });
-        await uploadFile(`Signed Contract (v${ver.version}).pdf`, folderId, "application/pdf", pdf instanceof Uint8Array ? pdf : new Uint8Array(pdf));
+        const pdf = await contractPdf({ ...rec2, body: tidyBody(rec2.body) });
+        const bytes = pdf instanceof Uint8Array ? pdf : new Uint8Array(pdf);
+        if (existingContract) {
+          await replaceFileContent(existingContract.id, "application/pdf", bytes);
+          await gjson(`${D}/${existingContract.id}?supportsAllDrives=true&fields=id`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Signed Contract.pdf" }) });
+        } else await uploadFile("Signed Contract.pdf", folderId, "application/pdf", bytes);
         done.push("Signed Contract");
       }
     }

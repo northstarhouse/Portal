@@ -819,6 +819,13 @@ var NAV_ICONS = {
   announcements: '<path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
   'maintenance-request': '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
   'site-media': '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+  'tool-tour': '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="13" x2="12" y2="19"/><line x1="9" y1="16" x2="15" y2="16"/>',
+  'tool-fill': '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><path d="M9 17l1-3 5-5 2 2-5 5z"/>',
+  'tool-send': '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+  'tool-movement': '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+  'tool-vendor': '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+  'tool-stats': '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+  'tool-request': '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z"/>',
   'treasurer': '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
   'nsh-updates': '<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.3 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>',
   'voicemail-log': '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>',
@@ -836,9 +843,9 @@ var NAV_ICONS = {
   'venue-clients': '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
 };
 
-function NavIcon({ id, active }) {
+function NavIcon({ id, active, size }) {
   return React.createElement('svg', {
-    width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none',
+    width: size || 15, height: size || 15, viewBox: '0 0 24 24', fill: 'none',
     stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round',
     style: { flexShrink: 0, opacity: active ? 1 : 0.7 },
     dangerouslySetInnerHTML: { __html: NAV_ICONS[id] || '' }
@@ -19405,39 +19412,53 @@ function VenueRentalsView({ navigate, initialTab }) {
                 <div onClick={function() { setToolsOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
                 <div role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 41, background: '#fff', border: '1px solid #ded7cb', borderRadius: 10, boxShadow: '0 8px 24px rgba(42,36,32,.14)', minWidth: 270, padding: 6 }}>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setAddTourOpen(true); }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <div style={{ fontWeight: 700 }}>Add a tour to the calendar</div>
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-tour" active size={18} /></span>
+                    <div><div style={{ fontWeight: 700 }}>Add a tour to the calendar</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Pick the date and time; they get a confirmation email</div>
+                    </div>
                   </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setManualFormOpen(true); }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <div style={{ fontWeight: 700 }}>Fill out a pre-booking form</div>
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-fill" active size={18} /></span>
+                    <div><div style={{ fontWeight: 700 }}>Fill out a pre-booking form</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>For a client who skipped the form</div>
+                    </div>
                   </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setSendFormOpen(true); }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <div style={{ fontWeight: 700 }}>Send out a pre-booking form</div>
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-send" active size={18} /></span>
+                    <div><div style={{ fontWeight: 700 }}>Send out a pre-booking form</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Email the form to someone</div>
+                    </div>
                   </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setMovementOpen(true); }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <div style={{ fontWeight: 700 }}>Pending movement</div>
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-movement" active size={18} /></span>
+                    <div><div style={{ fontWeight: 700 }}>Pending movement</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>What was sent, and what is waiting to go out</div>
+                    </div>
                   </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVendorToolOpen(true); }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <div style={{ fontWeight: 700 }}>Add a vendor recommendation</div>
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-vendor" active size={18} /></span>
+                    <div><div style={{ fontWeight: 700 }}>Add a vendor recommendation</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Shows up in the client guides right away</div>
+                    </div>
                   </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVenueTab('clients'); setStatsOpen(true); }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <div style={{ fontWeight: 700 }}>Current stats</div>
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-stats" active size={18} /></span>
+                    <div><div style={{ fontWeight: 700 }}>Current stats</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Bookings, earnings and events by type</div>
+                    </div>
                   </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setFeatureReqOpen(true); }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <div style={{ fontWeight: 700 }}>Make a feature request</div>
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-request" active size={18} /></span>
+                    <div><div style={{ fontWeight: 700 }}>Make a feature request</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Ask for something new in the Portal</div>
+                    </div>
                   </button>
                 </div>
               </React.Fragment>
