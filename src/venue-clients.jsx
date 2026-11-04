@@ -556,6 +556,26 @@ function ClientDetail({ client, onClose, onRename, onVerify, onSavePayments, agr
 function ClientStats({ clients, onClose }) {
   const sum = (arr, f) => arr.reduce((t, x) => t + (f(x) || 0), 0);
   const money = c => amount(c, 'USD');
+  const [extra, setExtra] = React.useState(null);
+  React.useEffect(() => {
+    let off = false;
+    const H = { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY };
+    const get = path => fetch(PB_URL + '/rest/v1/' + path, { headers: H }).then(r => r.ok ? r.json() : []).catch(() => []);
+    (async () => {
+      const forms = (await get('nsh_forms?select=id,title')).filter(f => /inquiry/i.test(f.title || ''));
+      const byId = {}; forms.forEach(f => { byId[f.id] = f.title; });
+      const inq = forms.length ? await get('nsh_form_responses?select=form_id,created_at&order=created_at.desc&limit=5000&form_id=in.(' + forms.map(f => f.id).join(',') + ')') : [];
+      const tours = await get('estate_tours?select=status,date&limit=5000');
+      if (!off) setExtra({ byId, inq: Array.isArray(inq) ? inq : [], tours: Array.isArray(tours) ? tours : [] });
+    })();
+    return () => { off = true; };
+  }, []);
+  const todayKey = venueDateKey();
+  const monthAgo = shiftDate(todayKey, -30);
+  const tourCount = f => extra ? extra.tours.filter(f).length : null;
+  const inqTypes = [];
+  if (extra) extra.inq.forEach(r => { const name = String(extra.byId[r.form_id] || 'Inquiry').replace(/\s*(Inquiry|Inquiries)\s*(Form)?\s*$/i, '').trim() || 'Inquiry'; let t = inqTypes.find(x => x.name === name); if (!t) { t = { name, n: 0, recent: 0 }; inqTypes.push(t); } t.n++; if (String(r.created_at).slice(0, 10) >= monthAgo) t.recent++; });
+  inqTypes.sort((a, b) => b.n - a.n);
   const info = c => {
     const sched = c.schedule || [];
     const total = c.total != null ? c.total : sum(sched, s => s.cents);
@@ -581,7 +601,7 @@ function ClientStats({ clients, onClose }) {
         <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: 'Cardo,serif' }}>Current stats</div>
         <a onClick={onClose} style={{ cursor: 'pointer', color: '#886c44', fontSize: 13, fontWeight: 600 }}>Close ×</a>
       </div>
-      <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Every client whose event has not finished yet. Past events are not counted.</div>
+      <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Bookings and money: every client whose event has not finished yet. Tours and inquiries: all time.</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <div style={box}><div style={lab}>Bookings</div><div style={big}>{all.n}</div></div>
         <div style={box}><div style={lab}>Total booked</div><div style={big}>{money(all.total)}</div><div className="vc-muted">with deposits</div></div>
@@ -593,6 +613,25 @@ function ClientStats({ clients, onClose }) {
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>Bookings</th><th style={th}>Without deposits</th><th style={th}>With deposits</th></tr></thead>
         <tbody>{types.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={td}>{t.n}</td><td style={td}>{money(t.noDeposit)}</td><td style={td}>{money(t.total)}</td></tr>)}</tbody>
       </table>
+      <div style={{ ...lab, marginTop: 22 }}>Tours</div>
+      {!extra ? <div className="vc-muted">Loading…</div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10 }}>
+        <div style={box}><div style={big}>{tourCount(t => t.status === 'booked' && t.date >= todayKey)}</div><div className="vc-muted">Upcoming booked</div></div>
+        <div style={box}><div style={big}>{tourCount(t => t.status === 'booked' && t.date < todayKey)}</div><div className="vc-muted">Completed</div></div>
+        <div style={box}><div style={big}>{tourCount(t => t.status === 'no_show')}</div><div className="vc-muted">Didn't show up</div></div>
+        <div style={box}><div style={big}>{tourCount(t => t.status === 'cancelled')}</div><div className="vc-muted">Cancelled</div></div>
+        <div style={box}><div style={big}>{tourCount(t => t.status === 'requested')}</div><div className="vc-muted">Requests waiting</div></div>
+      </div>}
+      <div style={{ ...lab, marginTop: 22 }}>Inquiries</div>
+      {!extra ? <div className="vc-muted">Loading…</div> : <>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 6 }}>
+          <div style={box}><div style={big}>{extra.inq.length}</div><div className="vc-muted">All time</div></div>
+          <div style={box}><div style={big}>{extra.inq.filter(r => String(r.created_at).slice(0, 10) >= monthAgo).length}</div><div className="vc-muted">Last 30 days</div></div>
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>All time</th><th style={th}>Last 30 days</th></tr></thead>
+          <tbody>{inqTypes.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={td}>{t.n}</td><td style={td}>{t.recent}</td></tr>)}</tbody>
+        </table>
+      </>}
       {missing > 0 && <div className="vc-muted" style={{ marginTop: 14 }}>{missing} {missing === 1 ? 'booking has' : 'bookings have'} no payment schedule on file yet, so {missing === 1 ? 'it is' : 'they are'} counted as $0.</div>}
     </div>
   </div>;
