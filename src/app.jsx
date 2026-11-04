@@ -18887,6 +18887,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   var [manualFormOpen, setManualFormOpen] = useState(false);
   var [vendorToolOpen, setVendorToolOpen] = useState(false);
   var [featureReqOpen, setFeatureReqOpen] = useState(false);
+  var [statsOpen, setStatsOpen] = useState(false);
   var [sendFormOpen, setSendFormOpen] = useState(false);
   var [movementOpen, setMovementOpen] = useState(false);
   var colorCoding = venueTab === 'clients' ? true : inquiriesColorCoding;
@@ -19427,6 +19428,11 @@ function VenueRentalsView({ navigate, initialTab }) {
                     <div style={{ fontWeight: 700 }}>Add a vendor recommendation</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Shows up in the client guides right away</div>
                   </button>
+                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVenueTab('clients'); setStatsOpen(true); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <div style={{ fontWeight: 700 }}>Current stats</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Bookings, earnings and events by type</div>
+                  </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setFeatureReqOpen(true); }}
                     style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
                     <div style={{ fontWeight: 700 }}>Make a feature request</div>
@@ -19529,7 +19535,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
 
           {venueTab === 'clients' && (
-            !inquiriesError && <VenueClientDashboard showSite={siteView} setShowSite={setSiteView} messages={clientMsgs} currentMessages={currentUnhandledMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} savePayments={savePayments} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
+            !inquiriesError && <VenueClientDashboard statsOpen={statsOpen} onCloseStats={function() { setStatsOpen(false); }} showSite={siteView} setShowSite={setSiteView} messages={clientMsgs} currentMessages={currentUnhandledMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} savePayments={savePayments} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
           )}
 
           {venueTab === 'messages' && (

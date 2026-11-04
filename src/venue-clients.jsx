@@ -549,7 +549,53 @@ function ClientDetail({ client, onClose, onRename, onVerify, onSavePayments, agr
   </dialog>;
 }
 
-export function VenueClientDashboard({ showSite: showSiteProp, setShowSite: setShowSiteProp, submissions, loadEvents, saveInsurance, savePayments, agreementApi, filter, setFilter, query, setQuery, messages, currentMessages, onHandleMessage, onOpenMessages }) {
+// Tools > "Current stats": a snapshot of the current (not yet finished) bookings, from the same client records the cards use.
+function ClientStats({ clients, onClose }) {
+  const sum = (arr, f) => arr.reduce((t, x) => t + (f(x) || 0), 0);
+  const money = c => amount(c, 'USD');
+  const info = c => {
+    const sched = c.schedule || [];
+    const total = c.total != null ? c.total : sum(sched, s => s.cents);
+    const deposit = sum(sched.filter(s => s.deposit), s => s.cents);
+    const depositPaid = sum(sched.filter(s => s.deposit && s.paid), s => s.cents);
+    const paid = c.paid || 0;
+    return { total, deposit, paid, noDeposit: Math.max(0, total - deposit), paidNoDeposit: Math.max(0, paid - depositPaid), depositPaid };
+  };
+  const rows = clients.map(c => ({ c, i: info(c) }));
+  const all = { n: rows.length, total: sum(rows, r => r.i.total), deposit: sum(rows, r => r.i.deposit), paid: sum(rows, r => r.i.paid), noDeposit: sum(rows, r => r.i.noDeposit), paidNoDeposit: sum(rows, r => r.i.paidNoDeposit), depositPaid: sum(rows, r => r.i.depositPaid) };
+  const types = [];
+  rows.forEach(r => { let t = types.find(x => x.name === r.c.type); if (!t) { t = { name: r.c.type, n: 0, total: 0, noDeposit: 0 }; types.push(t); } t.n++; t.total += r.i.total; t.noDeposit += r.i.noDeposit; });
+  types.sort((a, b) => b.n - a.n);
+  const missing = rows.filter(r => !r.i.total).length;
+  const box = { border: '1px solid #e6dfd3', borderRadius: 10, padding: '12px 14px', background: '#fff' };
+  const big = { fontFamily: 'Cardo,Georgia,serif', fontSize: 24, color: '#2a2a2a' };
+  const lab = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#886c44', marginBottom: 2 };
+  const th = { textAlign: 'right', fontSize: 11, color: '#888', fontWeight: 600, padding: '4px 0' };
+  const td = { textAlign: 'right', padding: '8px 0', borderTop: '1px solid #f0ebe0' };
+  return <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+    <div role="dialog" aria-label="Current stats" style={{ background: '#fff', borderRadius: 14, maxWidth: 620, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: 'Cardo,serif' }}>Current stats</div>
+        <a onClick={onClose} style={{ cursor: 'pointer', color: '#886c44', fontSize: 13, fontWeight: 600 }}>Close ×</a>
+      </div>
+      <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Every client whose event has not finished yet. Past events are not counted.</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <div style={box}><div style={lab}>Bookings</div><div style={big}>{all.n}</div></div>
+        <div style={box}><div style={lab}>Total booked</div><div style={big}>{money(all.total)}</div><div className="vc-muted">with deposits</div></div>
+        <div style={box}><div style={lab}>Earnings without deposits</div><div style={big}>{money(all.noDeposit)}</div><div className="vc-muted">{money(all.deposit)} in refundable deposits removed</div></div>
+        <div style={box}><div style={lab}>Collected so far</div><div style={big}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
+      </div>
+      <div style={{ ...lab, marginTop: 18 }}>By type of event</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>Bookings</th><th style={th}>Without deposits</th><th style={th}>With deposits</th></tr></thead>
+        <tbody>{types.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={td}>{t.n}</td><td style={td}>{money(t.noDeposit)}</td><td style={td}>{money(t.total)}</td></tr>)}</tbody>
+      </table>
+      {missing > 0 && <div className="vc-muted" style={{ marginTop: 14 }}>{missing} {missing === 1 ? 'booking has' : 'bookings have'} no payment schedule on file yet, so {missing === 1 ? 'it is' : 'they are'} counted as $0.</div>}
+    </div>
+  </div>;
+}
+
+export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSiteProp, setShowSite: setShowSiteProp, submissions, loadEvents, saveInsurance, savePayments, agreementApi, filter, setFilter, query, setQuery, messages, currentMessages, onHandleMessage, onOpenMessages }) {
   const [events,setEvents] = React.useState([]), [error,setError] = React.useState('');
   const [localSite,setLocalSite] = React.useState(false);
   const showSite = showSiteProp !== undefined ? showSiteProp : localSite;
@@ -621,6 +667,7 @@ export function VenueClientDashboard({ showSite: showSiteProp, setShowSite: setS
       <section className="vc-side-card priority"><h2 className="vc-side-title">Needs your attention <span className="vc-counter">{submissions===null?'—':urgent.length}</span></h2>{submissions===null?<p className="vc-muted">Loading priorities…</p>:urgent.length===0?<p className="vc-muted">No urgent items recorded.</p>:(allTasks?urgent:urgent.slice(0,6)).map(t=><button className="vc-task" key={t.key} onClick={()=>t.action?t.action():open(t.client)}><div className="vc-task-head">{t.title}</div><div className="vc-task-name">{t.client.name}</div><div className={'vc-task-date '+(t.overdue?'late':'')}>{t.due?(t.overdue?'Past due · ':'Due ')+dateLabel(t.due):t.detail}</div></button>)}{urgent.length>6&&<button className="vc-text-button" onClick={()=>setAllTasks(!allTasks)}>{allTasks?'Show fewer priorities':'See all '+urgent.length+' priorities ↓'}</button>}</section>
     </aside></div>
     </>}
+    {statsOpen&&<ClientStats clients={clients} onClose={onCloseStats}/>}
     {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSavePayments={recordPayments} onRename={renameClient} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }
