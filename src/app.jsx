@@ -21293,15 +21293,7 @@ function FeatureRequestModal({ onClose }) {
       if (!r.ok) throw new Error('Could not save. Please try again.');
       logActivity('Feature request: ' + f.title.trim(), 'feature_request');
       var pr = f.priority === 'high' ? 'Needed soon' : f.priority === 'low' ? 'Nice to have' : 'Would help';
-      var txt = 'New Portal feature request
-
-' + f.title.trim() + '
-
-' + (f.details.trim() || '(no more detail)') + '
-
-Where: ' + f.area + '
-Importance: ' + pr + '
-From: ' + (reqName || 'someone on the team');
+      var txt = ['New Portal feature request', '', f.title.trim(), '', f.details.trim() || '(no more detail)', '', 'Where: ' + f.area, 'Importance: ' + pr, 'From: ' + (reqName || 'someone on the team')].join(String.fromCharCode(10));
       fetch(SUPABASE_URL + '/functions/v1/send-email', { method: 'POST', headers: H, body: JSON.stringify({ to: ['media@thenorthstarhouse.org'], subject: 'Feature request: ' + f.title.trim(), body: txt }) }).catch(function() {});
       setMsg({ bad: false, text: 'Your request was saved.' });
       setF({ title: '', details: '', area: f.area, priority: 'normal' });
