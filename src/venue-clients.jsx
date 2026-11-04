@@ -106,6 +106,18 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   const hbQa = responses.filter(r => r.responses?.questionnaire).flatMap(r => (r.responses.questionnaire.questions || []).map(q => ({ label: text(q.question), answer: q.answer })));
   const requirementsDue = eventDate ? shiftDate(eventDate, -30) : null;
   const formContacts = [['7fnabd0i','c9u1sxb4','163otrai','ps4addr1'], ['7leui2ic','pt4mail1','pt4phon1','pt4addr1']].filter(k => a[k[0]]).map((k, i) => ({ id:'form-' + i, full_name:a[k[0]], email:a[k[1]] || '', phone_number:a[k[2]] || '', address:a[k[3]] || '', kind:'client' }));
+  // Events pre-booking form: the signer, plus anyone else they listed for portal access or payments (free text: name, address, email, phone).
+  if (a.evp_name) {
+    const evp = [{ id:'form-0', full_name:a.evp_name, email:a.evp_email || '', phone_number:a.evp_phone || '', address:'', kind:'client' }];
+    const extra = String(a.evp_portal || '').trim();
+    if (extra) {
+      const lines = extra.split(/\n+/).map(x => x.trim()).filter(Boolean);
+      const em = (extra.match(/[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+/) || [])[0] || '';
+      const ph = (extra.match(/\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/) || [])[0] || '';
+      evp.push({ id:'form-1', full_name: lines[0], email: em, phone_number: ph, address: lines.filter(l => l !== lines[0] && l.indexOf(em || '\u0000') === -1 && l.indexOf(ph || '\u0000') === -1).join(', '), kind:'client' });
+    }
+    formContacts.length = 0; evp.forEach(c => formContacts.push(c));
+  }
   const contacts = (hb?.contacts || []).filter(c => c.kind === 'client').concat(hb?.contacts?.some(c => c.kind === 'client') ? [] : formContacts);
   const name = (p.name || live?.name || a.evp_org || a['7fnabd0i'] || a.evp_name || 'Client').replace(/\s*\([SJ]\)\s*$/i, '').replace(/\s+Wedding\s*$/i, '').trim();
   const email = a.c9u1sxb4 || a.evp_email || contacts[0]?.email;
