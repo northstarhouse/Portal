@@ -20353,10 +20353,25 @@ function VoicemailCard({ v, onHandle }) {
 }
 
 // One unhandled message from a couple: who handled it, and (if they asked for email) a reply box that sends from venue@.
+// Notes on a message are saved as soon as you click away from the box, so they stay even if the message is never marked handled.
+function saveMessageNote(m, text, setStatus) {
+  var clean = text && String(text).trim() ? String(text).trim() : null;
+  if (clean === (m.handled_note || null)) return;
+  if (setStatus) setStatus('Saving…');
+  fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + m.id, {
+    method: 'PATCH',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ handled_note: clean })
+  }).then(function(r) {
+    if (r.ok) { m.handled_note = clean; if (setStatus) setStatus('Note saved'); } else if (setStatus) setStatus('Could not save the note');
+  }).catch(function() { if (setStatus) setStatus('Could not save the note'); });
+}
+
 function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
   var [by, setBy] = useState('');
   var [reply, setReply] = useState('');
-  var [note, setNote] = useState('');
+  var [note, setNote] = useState(m.handled_note || '');
+  var [noteStatus, setNoteStatus] = useState('');
   var [busy, setBusy] = useState(false);
   var [err, setErr] = useState('');
   var wantsEmail = /wants an email/i.test(m.subject || '');
@@ -20394,8 +20409,9 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
             style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'system-ui, sans-serif', resize: 'vertical' }} />
         </div>
       )}
-      <textarea value={note} onChange={function(e) { setNote(e.target.value); }} rows={2} placeholder="Notes (optional): what you did, what was said, next steps"
+      <textarea value={note} onChange={function(e) { setNote(e.target.value); setNoteStatus(''); }} onBlur={function() { saveMessageNote(m, note, setNoteStatus); }} rows={2} placeholder="Notes (optional): what you did, what was said, next steps"
         style={{ width: '100%', boxSizing: 'border-box', marginTop: 10, padding: '7px 10px', border: '0.5px dashed #d8d0c4', borderRadius: 8, fontSize: 12, fontFamily: 'system-ui, sans-serif', resize: 'vertical', background: '#fffdf9' }} />
+      {noteStatus && <div style={{ fontSize: 11, color: noteStatus.indexOf('Could not') === 0 ? '#b3261e' : '#888', marginTop: 3 }}>{noteStatus}</div>}
       {err && <div style={{ color: '#b3261e', fontSize: 12, marginTop: 6 }}>{err}</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={by} onChange={function(e) { setBy(e.target.value); setErr(''); }} aria-label="Who is handling this"
@@ -24168,7 +24184,8 @@ function VoicemailLogView({ navigate }) {
 
 function VoicemailLogCard({ m, onHandle, day }) {
   var [by, setBy] = useState('');
-  var [note, setNote] = useState('');
+  var [note, setNote] = useState(m.handled_note || '');
+  var [noteStatus, setNoteStatus] = useState('');
   var [busy, setBusy] = useState(false);
   return (
     <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid ' + (m.handled_at ? '#65965a' : '#b5457a'), borderRadius: 10, padding: '12px 16px' }}>
@@ -24184,7 +24201,7 @@ function VoicemailLogCard({ m, onHandle, day }) {
         </div>
       ) : (
         <div style={{ marginTop: 10 }}>
-          <textarea value={note} onChange={function(e) { setNote(e.target.value); }} rows={2} placeholder="Notes (optional): who you called back, what was said, next steps" style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', border: '0.5px dashed #d8d0c4', borderRadius: 8, fontSize: 12, fontFamily: 'system-ui, sans-serif', resize: 'vertical', background: '#fffdf9' }} />
+          <textarea value={note} onChange={function(e) { setNote(e.target.value); setNoteStatus(''); }} onBlur={function() { saveMessageNote(m, note, setNoteStatus); }} rows={2} placeholder="Notes (optional): who you called back, what was said, next steps" style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', border: '0.5px dashed #d8d0c4', borderRadius: 8, fontSize: 12, fontFamily: 'system-ui, sans-serif', resize: 'vertical', background: '#fffdf9' }} />
           <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
             <select value={by} onChange={function(e) { setBy(e.target.value); }} aria-label="Who is handling this" style={{ fontSize: 12, fontWeight: 600, color: gold, background: '#fff', border: '0.5px solid ' + gold, borderRadius: 8, padding: '6px 8px' }}>
               <option value="">Handled by…</option>
