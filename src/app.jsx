@@ -21284,12 +21284,25 @@ function FeatureRequestModal({ onClose }) {
     if (busy) return;
     if (!f.title.trim()) { setMsg({ bad: true, text: 'Say what you would like in a few words.' }); return; }
     setBusy(true); setMsg(null);
+    var reqName = '';
     whoIsSignedIn().then(function(name) {
+      reqName = name;
       return fetch(SUPABASE_URL + '/rest/v1/feature_requests', { method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=minimal' }),
         body: JSON.stringify({ title: f.title.trim(), details: f.details.trim() || null, area: f.area, priority: f.priority, requested_by: name || null }) });
     }).then(function(r) {
       if (!r.ok) throw new Error('Could not save. Please try again.');
       logActivity('Feature request: ' + f.title.trim(), 'feature_request');
+      var pr = f.priority === 'high' ? 'Needed soon' : f.priority === 'low' ? 'Nice to have' : 'Would help';
+      var txt = 'New Portal feature request
+
+' + f.title.trim() + '
+
+' + (f.details.trim() || '(no more detail)') + '
+
+Where: ' + f.area + '
+Importance: ' + pr + '
+From: ' + (reqName || 'someone on the team');
+      fetch(SUPABASE_URL + '/functions/v1/send-email', { method: 'POST', headers: H, body: JSON.stringify({ to: ['media@thenorthstarhouse.org'], subject: 'Feature request: ' + f.title.trim(), body: txt }) }).catch(function() {});
       setMsg({ bad: false, text: 'Your request was saved.' });
       setF({ title: '', details: '', area: f.area, priority: 'normal' });
       load();
