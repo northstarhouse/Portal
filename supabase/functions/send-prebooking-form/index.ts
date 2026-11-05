@@ -31,11 +31,11 @@ async function sb(path: string, init: RequestInit = {}) {
 
 const AVAILABILITY_URL = 'https://northstarhouse.github.io/venue/?availability=1'
 
-type Kind = 'wedding' | 'memorial' | 'nonprofit' | 'event'
+type Kind = 'wedding' | 'memorial' | 'nonprofit' | 'event' | 'public'
 const SITE = 'https://www.northstarhouse.org'
 const kindFromForm = (formId: string): Kind =>
   formId === WEDDING_INQUIRY_FORM_ID ? 'wedding' : formId === '952bc156-e89d-4790-814d-d2c2e9738a8b' ? 'memorial' : formId === 'e8cc69a1-1693-4fb4-8518-b8bb486dd055' ? 'nonprofit' : 'event'
-const kindFromType = (t: string): Kind => (t === 'Wedding' ? 'wedding' : t === 'Memorial' ? 'memorial' : t === 'Nonprofit Event' ? 'nonprofit' : 'event')
+const kindFromType = (t: string): Kind => (t === 'Wedding' ? 'wedding' : t === 'Memorial' ? 'memorial' : t === 'Nonprofit Event' ? 'nonprofit' : t === 'Public Event' ? 'public' : 'event')
 
 type Row = { a: string; b: string; c?: string }
 const PRIVATE_RATES: Row[] = [{ a: 'Saturday', b: '$1,200' }, { a: 'Sunday', b: '$1,000' }, { a: 'Weekdays', b: '$800' }]
@@ -77,6 +77,7 @@ function detailsHtml(kind: Kind): string {
   if (kind === 'nonprofit') {
     return `<h3 style="${H3}">Nonprofit Pricing</h3>` + para('Saturday and Sunday rates:') + rateTable(NONPROFIT_RATES) + linkBtn(`${SITE}/nonprofit`, 'Nonprofit Rentals')
   }
+  if (kind === 'public') return `<h3 style="${H3}">Pricing</h3>` + para("Public event rates depend on the size and type of your event. We're happy to go over them with you by reply.")
   return `<h3 style="${H3}">Private Event Pricing</h3>` + rateTable(PRIVATE_RATES) + para(PRIVATE_NOTE) + para("Rates for other kinds of events depend on size and type. We're happy to go over them with you by reply.") + linkBtn(`${SITE}/private-events`, 'Learn About Events')
 }
 
@@ -104,6 +105,8 @@ ${SITE}/memorials`
   if (kind === 'nonprofit') return `NONPROFIT PRICING (Saturday and Sunday)
 ${rateText(NONPROFIT_RATES)}
 ${SITE}/nonprofit`
+  if (kind === 'public') return `PRICING
+Public event rates depend on the size and type of your event. We're happy to go over them with you by reply.`
   return `PRIVATE EVENT PRICING
 ${rateText(PRIVATE_RATES)}
 ${PRIVATE_NOTE}
@@ -146,8 +149,8 @@ ${detailsHtml(kind)}
 </div></div></div>`
 }
 
-const MANUAL_EVENT_TYPES = ['Wedding', 'Private Event', 'Memorial', 'Nonprofit Event', 'Other']
-const ARRANGEMENTS: Record<string, string> = { standard: 'Standard', bylt: 'BYLT special rate' }
+const MANUAL_EVENT_TYPES = ['Wedding', 'Private Event', 'Public Event', 'Memorial', 'Nonprofit Event', 'Other']
+const ARRANGEMENTS: Record<string, string> = { standard: 'Standard', bylt: 'BYLT special rate', custom: 'Custom price' }
 
 // Sent by hand: just an email and an event type (plus the arrangement). Needs a signed-in Portal session so it cannot be
 // used to send mail to arbitrary addresses.
@@ -163,13 +166,16 @@ async function manualSend(req: Request, body: Record<string, unknown>) {
   if (!MANUAL_EVENT_TYPES.includes(eventType)) return json({ error: 'Choose the event type.' }, 400)
   // Optional set price and security deposit for this client (in cents). They become the client's payment schedule, and so show on their agreement.
   const cents = (v: unknown) => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > 0 && n <= 5_000_000 ? n : null }
-  const customPrice = eventType === 'Wedding' ? null : cents(body.custom_price_cents)
-  const customDeposit = eventType === 'Wedding' ? null : cents(body.custom_deposit_cents)
+  const customPrice = eventType === 'Wedding' || arrangement !== 'custom' ? null : cents(body.custom_price_cents)
+  const customDeposit = eventType === 'Wedding' || arrangement !== 'custom' ? null : cents(body.custom_deposit_cents)
 
   const recent = await sb(`/rest/v1/prebooking_manual_sends?email=ilike.${encodeURIComponent(email)}&select=sent_at&order=sent_at.desc&limit=1`).then((r) => r.json()).catch(() => [])
   if (Array.isArray(recent) && recent.length && !body.resend) return json({ error: 'already sent', already_sent_at: recent[0].sent_at }, 409)
 
-  const link = eventType === 'Wedding' ? PREBOOKING_FORM_URL_WEDDING : PREBOOKING_FORM_URL_EVENT
+  // A client with a set price gets a form link that carries this send's id, so the form can show their price and deposit.
+  const sendId = crypto.randomUUID()
+  const baseLink = eventType === 'Wedding' ? PREBOOKING_FORM_URL_WEDDING : PREBOOKING_FORM_URL_EVENT
+  const link = customPrice || customDeposit ? `${baseLink}&send=${sendId}` : baseLink
   const first = name.split(/\s+/)[0] || 'there'
   const text = emailText(first, link, kindFromType(eventType))
   const mail = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
@@ -180,7 +186,7 @@ async function manualSend(req: Request, body: Record<string, unknown>) {
   if (!mail.ok) return json({ error: 'The email could not be sent. Please try again.' }, 502)
 
   const sentAt = new Date().toISOString()
-  await sb('/rest/v1/prebooking_manual_sends', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ email, name: name || null, event_type: eventType, arrangement, form_url: link, custom_price_cents: customPrice, custom_deposit_cents: customDeposit, sent_by: String(body.sent_by || '').slice(0, 80) || null, sent_at: sentAt }) })
+  await sb('/rest/v1/prebooking_manual_sends', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ id: sendId, email, name: name || null, event_type: eventType, arrangement, form_url: link, custom_price_cents: customPrice, custom_deposit_cents: customDeposit, sent_by: String(body.sent_by || '').slice(0, 80) || null, sent_at: sentAt }) })
   await sb('/rest/v1/activity_log', {
     method: 'POST', headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ description: `Pre-booking form sent to ${name || email} (${eventType}${arrangement !== 'standard' ? ', ' + ARRANGEMENTS[arrangement] : ''}${customPrice ? ', price $' + (customPrice / 100).toFixed(2) : ''}${customDeposit ? ', deposit $' + (customDeposit / 100).toFixed(2) : ''})`, volunteer_name: String(body.sent_by || '') || null, action: 'prebooking_form_sent', tag: 'Venue', detail: { email, event_type: eventType, arrangement, form_url: link, manual: true, custom_price_cents: customPrice, custom_deposit_cents: customDeposit } }),

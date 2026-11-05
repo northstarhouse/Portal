@@ -20848,6 +20848,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                   <option value="">Choose…</option>
                   <option>Wedding</option>
                   <option>Private Event</option>
+                  <option>Public Event</option>
                   <option>Memorial</option>
                   <option>Nonprofit Event</option>
                   <option>Other</option>
@@ -20858,14 +20859,15 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                   style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
                   <option value="standard">None (standard rates)</option>
                   <option value="bylt">BYLT: special rate</option>
+                  <option value="custom">Custom price</option>
                 </select>
               </label>
-              {manualForm.event_type && manualForm.event_type !== 'Wedding' && (
+              {manualForm.arrangement === 'custom' && manualForm.event_type && manualForm.event_type !== 'Wedding' && (
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#888', flex: '1 1 140px' }}>Event price ($)
                   <input inputMode="decimal" value={manualForm.price} onChange={function(e) { var v = e.target.value; setManualForm(function(f) { return Object.assign({}, f, { price: v }); }); }} placeholder="optional" style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff' }} />
                 </label>
               )}
-              {manualForm.event_type && manualForm.event_type !== 'Wedding' && (
+              {manualForm.arrangement === 'custom' && manualForm.event_type && manualForm.event_type !== 'Wedding' && (
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#888', flex: '1 1 140px' }}>Security deposit ($)
                   <input inputMode="decimal" value={manualForm.deposit} onChange={function(e) { var v = e.target.value; setManualForm(function(f) { return Object.assign({}, f, { deposit: v }); }); }} placeholder="optional" style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff' }} />
                 </label>
@@ -21311,6 +21313,7 @@ function SendPreBookingModal({ onClose }) {
             <option value="">Choose…</option>
             <option>Wedding</option>
             <option>Private Event</option>
+                  <option>Public Event</option>
             <option>Memorial</option>
             <option>Nonprofit Event</option>
             <option>Other</option>
@@ -21320,15 +21323,17 @@ function SendPreBookingModal({ onClose }) {
           <select value={f.arrangement} onChange={function(e) { set('arrangement', e.target.value); }} style={field}>
             <option value="standard">None (standard rates)</option>
             <option value="bylt">BYLT: special rate</option>
+            <option value="custom">Custom price</option>
           </select>
         </label>
-        {f.event_type && f.event_type !== 'Wedding' && (
+        {f.arrangement === 'custom' && f.event_type && f.event_type !== 'Wedding' && (
           <div style={{ display: 'flex', gap: 10 }}>
             <label style={Object.assign({}, label, { flex: 1 })}>Event price ($, optional)<input inputMode="decimal" value={f.price} onChange={function(e) { set('price', e.target.value); }} placeholder="e.g. 1200" style={field} /></label>
             <label style={Object.assign({}, label, { flex: 1 })}>Security deposit ($, optional)<input inputMode="decimal" value={f.deposit} onChange={function(e) { set('deposit', e.target.value); }} placeholder="e.g. 800" style={field} /></label>
           </div>
         )}
-        {f.event_type && f.event_type !== 'Wedding' && <div style={{ fontSize: 12, color: '#888', marginTop: -4, marginBottom: 12 }}>Leave blank for no set price. When they submit the form, these become their payment schedule and show on their agreement.</div>}
+        {f.arrangement === 'custom' && f.event_type && f.event_type !== 'Wedding' && <div style={{ fontSize: 12, color: '#888', marginTop: -4, marginBottom: 12 }}>These show on their pre-booking form, and become their payment schedule and agreement pricing once they submit it.</div>}
+        {f.arrangement === 'custom' && f.event_type === 'Wedding' && <div style={{ fontSize: 12, color: '#b3402a', marginTop: -4, marginBottom: 12 }}>Custom prices are not available for weddings yet. Weddings use the standard $5,000 plan.</div>}
         {msg && <div style={{ fontSize: 13, marginBottom: 12, color: msg.bad ? '#b3402a' : '#2e7d32' }}>{msg.text}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           <button type="button" onClick={onClose} disabled={busy} style={{ background: '#fff', color: '#888', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Close</button>
