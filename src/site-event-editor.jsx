@@ -10,7 +10,7 @@ const card = { background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 
 const heading = { fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 12 };
 
 const blank = () => ({
-  id: '', title: '', short_description: '', description: '', image_url: '', image_alt: '',
+  id: '', slug: '', title: '', short_description: '', description: '', image_url: '', image_alt: '',
   date: '', start_time: '18:00', end_time: '', date_tbd: false,
   location_name: 'North Star House', location_address: '12075 Auburn Rd, Grass Valley, CA 95949, USA',
   registration_type: 'NONE', ticket_tiers: [{ name: 'General Admission', price: '', limit: '' }], ticket_limit_per_order: '20',
@@ -21,6 +21,9 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
   const [picker, setPicker] = React.useState(false);
+  // The web address follows the title until the team types their own.
+  const [slugTouched, setSlugTouched] = React.useState(false);
+  const slugify = (v) => String(v || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
   const [events, setEvents] = React.useState(null);
   const set = (k, v) => setF((o) => ({ ...o, [k]: v }));
   const setTier = (i, k, v) => setF((o) => ({ ...o, ticket_tiers: o.ticket_tiers.map((t, j) => (j === i ? { ...t, [k]: v } : t)) }));
@@ -52,7 +55,8 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
 
       <div style={card}>
         <div style={heading}>The event</div>
-        <label style={label}>Title *<input style={input} value={f.title} onChange={(e) => set('title', e.target.value)} placeholder="e.g. Holiday Open House" /></label>
+        <label style={label}>Title *<input style={input} value={f.title} onChange={(e) => { const v = e.target.value; setF((o) => ({ ...o, title: v, slug: slugTouched ? o.slug : slugify(v) })); }} placeholder="e.g. Holiday Open House" /></label>
+        <label style={label}>Web address (the last part of the event's link)<input style={input} value={f.slug} onChange={(e) => { setSlugTouched(true); set('slug', slugify(e.target.value)); }} placeholder="holiday-open-house" /><span style={{ fontSize: 11, color: '#aaa' }}>Letters, numbers and dashes only. It fills in from the title unless you type your own.{f.id ? ' Changing it after the event is published breaks links people already have.' : ''}</span></label>
         <label style={label}>Short description (shown in lists and when shared)<input style={input} maxLength={300} value={f.short_description} onChange={(e) => set('short_description', e.target.value)} placeholder="One or two sentences" /></label>
         <label style={label}>Full description<textarea style={{ ...input, minHeight: 130, resize: 'vertical' }} value={f.description} onChange={(e) => set('description', e.target.value)} placeholder={'Write it like an email. A blank line starts a new paragraph.\nStart a line with "- " to make a bullet list.'} /></label>
         <div style={{ ...label, marginBottom: 0 }}>Photo
@@ -111,7 +115,7 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 28 }}>
         <button type="button" disabled={busy} onClick={() => save('draft')} style={{ background: '#fff', color: GOLD, border: '1px solid ' + GOLD, borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Saving…' : 'Save as draft'}</button>
         <button type="button" disabled={busy} onClick={() => save('published')} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>Publish to website</button>
-        {f.id && <button type="button" onClick={() => { setF(blank()); setMsg(null); }} style={{ background: 'none', color: '#888', border: 'none', fontSize: 14, cursor: 'pointer' }}>Start another event</button>}
+        {f.id && <button type="button" onClick={() => { setF(blank()); setSlugTouched(false); setMsg(null); }} style={{ background: 'none', color: '#888', border: 'none', fontSize: 14, cursor: 'pointer' }}>Start another event</button>}
       </div>
 
       <div style={heading}>Events on the website</div>

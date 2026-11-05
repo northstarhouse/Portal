@@ -137,6 +137,9 @@ Deno.serve(async (req) => {
       const tierList = regType === 'TICKETING' ? tiers(e.ticket_tiers) : []
       if (regType === 'TICKETING' && !tierList.length) return json({ error: 'Add at least one ticket type with a name and price.' }, 400)
 
+      // The web address (last part of the event's link): chosen by the team, or made from the title.
+      const wantedSlug = slugify(String(e.slug || ''))
+      if (String(e.slug || '').trim() && !wantedSlug) return json({ error: 'The web address can only use letters, numbers and dashes.' }, 400)
       const startAt = dateTbd ? null : pacificToUtc(e.date, e.start_time || '18:00')
       const endAt = dateTbd || !e.end_time ? null : pacificToUtc(e.date, e.end_time)
       if (!dateTbd && !startAt) return json({ error: 'The date or start time is not valid.' }, 400)
@@ -161,6 +164,11 @@ Deno.serve(async (req) => {
       const id = String(e.id || '')
       if (id) {
         if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'Event not found.' }, 404)
+        if (wantedSlug) {
+          const clash = await rest(`site_events?select=id&slug=eq.${encodeURIComponent(wantedSlug)}&id=neq.${id}&limit=1`)
+          if (clash.length) return json({ error: 'That web address is already used by another event. Choose a different one.' }, 409)
+          row.slug = wantedSlug
+        }
         const saved = await rest(`site_events?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(row) })
         if (!saved?.[0]) return json({ error: 'Event not found.' }, 404)
         return json({ event: saved[0], refreshed: await refreshSite() })
@@ -168,9 +176,13 @@ Deno.serve(async (req) => {
 
       // New event: a web address from the title (and year), made unique.
       const year = startAt ? new Date(startAt).getUTCFullYear() : ''
-      const base = slugify(title + (year ? ' ' + year : '')) || 'event'
+      const base = wantedSlug || slugify(title + (year ? ' ' + year : '')) || 'event'
       let slug = base
-      for (let n = 2; n < 50; n++) {
+      if (wantedSlug) {
+        const clash = await rest(`site_events?select=id&slug=eq.${encodeURIComponent(wantedSlug)}&limit=1`)
+        if (clash.length) return json({ error: 'That web address is already used by another event. Choose a different one.' }, 409)
+      }
+      for (let n = 2; !wantedSlug && n < 50; n++) {
         const clash = await rest(`site_events?select=id&slug=eq.${encodeURIComponent(slug)}&limit=1`)
         if (!clash.length) break
         slug = `${base}-${n}`
