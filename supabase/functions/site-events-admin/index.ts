@@ -19,6 +19,8 @@ const CORS = {
 }
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
 const TZ = 'America/Los_Angeles'
+// Shown on the website when an event has no photo (served from the Portal's own site).
+const PLACEHOLDER_IMAGE = 'https://northstarhouse.github.io/Portal/assets/event-placeholder.png'
 
 async function rest(path: string, init: RequestInit = {}) {
   const res = await fetch(`${URL_}/rest/v1/${path}`, {
@@ -143,8 +145,8 @@ Deno.serve(async (req) => {
         title, status,
         short_description: String(e.short_description || '').trim().slice(0, 300),
         description: toDocument(String(e.description || '')),
-        image_url: String(e.image_url || '').trim(),
-        image_alt: String(e.image_alt || title).trim().slice(0, 200),
+        image_url: String(e.image_url || '').trim() || PLACEHOLDER_IMAGE,
+        image_alt: String(e.image_url || '').trim() ? String(e.image_alt || title).trim().slice(0, 200) : 'More information to come',
         start_at: startAt, end_at: endAt, hide_end: !endAt, date_tbd: dateTbd, time_zone: TZ,
         location_name: String(e.location_name || 'North Star House').trim().slice(0, 120),
         location_address: String(e.location_address || '12075 Auburn Rd, Grass Valley, CA 95949, USA').trim().slice(0, 200),

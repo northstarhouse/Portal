@@ -48,7 +48,7 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
   const ticketed = f.registration_type === 'TICKETING';
   return (
     <div style={{ maxWidth: 760 }}>
-      <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Add an event to the website. It saves as a draft first, so nothing is public until you press Publish.</div>
+      <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Add an event to the website. It saves as a draft first, so nothing is public until you press Publish. When an event ends it comes off the website by itself.</div>
 
       <div style={card}>
         <div style={heading}>The event</div>
@@ -57,10 +57,11 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
         <label style={label}>Full description<textarea style={{ ...input, minHeight: 130, resize: 'vertical' }} value={f.description} onChange={(e) => set('description', e.target.value)} placeholder={'Write it like an email. A blank line starts a new paragraph.\nStart a line with "- " to make a bullet list.'} /></label>
         <div style={{ ...label, marginBottom: 0 }}>Photo
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {f.image_url ? <img src={f.image_url} alt="" style={{ width: 110, height: 74, objectFit: 'cover', borderRadius: 8, border: '0.5px solid #e0d8cc' }} /> : <div style={{ width: 110, height: 74, borderRadius: 8, background: '#f5f0e8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#aaa' }}>No photo</div>}
+            {f.image_url ? <img src={f.image_url} alt="" style={{ width: 110, height: 74, objectFit: 'cover', borderRadius: 8, border: '0.5px solid #e0d8cc' }} /> : <img src="assets/event-placeholder.png" alt="" style={{ width: 110, height: 74, objectFit: 'cover', borderRadius: 8, border: '0.5px solid #e0d8cc', opacity: 0.85 }} />}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="button" onClick={() => setPicker(true)} style={{ background: '#fff', color: GOLD, border: '1px solid ' + GOLD, borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{f.image_url ? 'Change photo' : 'Choose a photo'}</button>
+                {!f.image_url && <span style={{ alignSelf: 'center', fontSize: 12, color: '#888' }}>No photo? The website shows "More information to come".</span>}
                 {f.image_url && <button type="button" onClick={() => { set('image_url', ''); set('image_alt', ''); }} style={{ background: 'none', color: '#888', border: 'none', fontSize: 13, cursor: 'pointer' }}>Remove</button>}
               </div>
               <input style={input} value={f.image_alt} onChange={(e) => set('image_alt', e.target.value)} placeholder="Describe the photo (for screen readers)" />
@@ -123,7 +124,7 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
               <div style={{ fontWeight: 600, color: '#2a2a2a' }}>{ev.title}</div>
               <div style={{ fontSize: 12, color: '#888' }}>{ev.date_tbd ? 'Date to be announced' : ev.start_at ? new Date(ev.start_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) : 'No date'}</div>
             </div>
-            <span style={{ alignSelf: 'center', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 9px', borderRadius: 20, color: ev.status === 'published' ? '#2e7d32' : '#6b7280', background: ev.status === 'published' ? '#e8f5e9' : '#f3f4f6' }}>{ev.status === 'published' ? 'Published' : 'Draft'}</span>
+            <span style={{ alignSelf: 'center', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 9px', borderRadius: 20, color: ev.status === 'published' ? '#2e7d32' : '#6b7280', background: ev.status === 'published' ? '#e8f5e9' : '#f3f4f6' }}>{ev.status === 'published' ? 'Published' : ev.status === 'archived' ? 'Ended' : 'Draft'}</span>
           </div>
         ))}
       </div>
