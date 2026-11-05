@@ -631,7 +631,7 @@ function AssigneeMentionInput({ assignee, assigneeId, onChange, volunteers }) {
 // can embed the exact same vendor list/add-form Pre-Planning uses, instead
 // of duplicating it.
 function VendorsPanel({ ev, onUpdate }) {
-  const [vendorForm, setVendorForm] = useState({ name: '', role: '', contact: '' });
+  const [vendorForm, setVendorForm] = useState({ name: '', role: '', contact: '', notes: '' });
 
   function toggleVendor(id) {
     onUpdate(e => ({ ...e, vendors: e.vendors.map(v => v.id === id ? { ...v, confirmed: !v.confirmed } : v) }));
@@ -641,8 +641,8 @@ function VendorsPanel({ ev, onUpdate }) {
   }
   function addVendor() {
     if (!vendorForm.name.trim()) return;
-    onUpdate(e => ({ ...e, vendors: [...e.vendors, { id: cryptoId(), name: vendorForm.name.trim(), role: vendorForm.role.trim(), contact: vendorForm.contact.trim(), confirmed: false }] }));
-    setVendorForm({ name: '', role: '', contact: '' });
+    onUpdate(e => ({ ...e, vendors: [...e.vendors, { id: cryptoId(), name: vendorForm.name.trim(), role: vendorForm.role.trim(), contact: vendorForm.contact.trim(), notes: vendorForm.notes.trim(), confirmed: false }] }));
+    setVendorForm({ name: '', role: '', contact: '', notes: '' });
   }
 
   return (
@@ -650,7 +650,9 @@ function VendorsPanel({ ev, onUpdate }) {
       {ev.vendors.map(v => (
         <ItemRow key={v.id} onDelete={() => deleteVendor(v.id)}>
           <input type="checkbox" checked={v.confirmed} onChange={() => toggleVendor(v.id)} title="Confirmed" style={{ accentColor: 'var(--gold)', width: 15, height: 15 }} />
-          <span style={{ flex: 1, fontSize: 13 }}>{v.name} <span style={{ color: 'var(--muted)' }}>— {v.role}</span></span>
+          <span style={{ flex: 1, fontSize: 13 }}>{v.name} <span style={{ color: 'var(--muted)' }}>— {v.role}</span>
+            {v.notes && <div style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'pre-wrap', marginTop: 2 }}>{v.notes}</div>}
+          </span>
           <span style={{ fontSize: 11, color: 'var(--muted)' }}>{v.contact}</span>
         </ItemRow>
       ))}
@@ -658,6 +660,7 @@ function VendorsPanel({ ev, onUpdate }) {
         <input className="input" style={{ width: 140 }} placeholder="Vendor name" value={vendorForm.name} onChange={e => setVendorForm(f => ({ ...f, name: e.target.value }))} />
         <input className="input" style={{ width: 110 }} placeholder="Role" value={vendorForm.role} onChange={e => setVendorForm(f => ({ ...f, role: e.target.value }))} />
         <input className="input" style={{ flex: 1, minWidth: 140 }} placeholder="Contact info" value={vendorForm.contact} onChange={e => setVendorForm(f => ({ ...f, contact: e.target.value }))} />
+        <textarea className="input" style={{ flexBasis: '100%', minHeight: 56, resize: 'vertical' }} placeholder="Internal notes (staff only, optional)" value={vendorForm.notes} onChange={e => setVendorForm(f => ({ ...f, notes: e.target.value }))} />
         <button className="btn-gold" style={{ padding: '9px 14px' }} onClick={addVendor}>Add</button>
       </div>
     </div>

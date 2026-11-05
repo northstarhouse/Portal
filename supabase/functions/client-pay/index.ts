@@ -129,11 +129,16 @@ async function legacySchedule(inq: any) {
   } catch (_e) { return []; }
 }
 
+// Payments are applied to the installments first, in order; the refundable Security Deposit (due last) is filled only once
+// everything else is paid. (Plain sequence order would put it second, ahead of the big installments.)
+const isDeposit = (r: any) => /security deposit/i.test(r?.label || '') || r?.kind === 'security_deposit';
+const payOrder = (rows: any[]) => rows.slice().sort((a: any, b: any) => (isDeposit(a) ? 1 : 0) - (isDeposit(b) ? 1 : 0) || a.sequence - b.sequence);
+
 function view(date: string, inq: any) {
   const sched = (inq.venue_payment_schedule || []).slice().sort((a: any, b: any) => a.sequence - b.sequence);
   const total = sched.reduce((s: number, r: any) => s + (r.amount_cents || 0), 0);
   const paid = sched.reduce((s: number, r: any) => s + (r.amount_paid_cents || 0), 0);
-  const next = sched.find((r: any) => (r.amount_paid_cents || 0) < r.amount_cents);
+  const next = payOrder(sched).find((r: any) => (r.amount_paid_cents || 0) < r.amount_cents);
   return {
     name: inq.name, event_type: inq.event_type, event_date: date,
     has_schedule: sched.length > 0, total_cents: total, paid_cents: paid, balance_cents: Math.max(0, total - paid),
@@ -254,7 +259,7 @@ async function uploadInsuranceToDrive(folderName: string, filename: string, byte
 // Apply a payment to the unpaid schedule rows in order.
 // Which installment(s) a payment pays, e.g. "Payment 2 of 4 - Booking payment". Worked out from what is already paid.
 function installmentNote(sched: any[], cents: number) {
-  const rows = sched.slice().sort((a: any, b: any) => a.sequence - b.sequence);
+  const rows = payOrder(sched);
   let left = cents; const hit: any[] = []; let partial = false;
   for (const r of rows) {
     if (left <= 0) break;
@@ -270,7 +275,7 @@ function installmentNote(sched: any[], cents: number) {
 
 async function applyToSchedule(inq: any, cents: number) {
   let left = cents;
-  const sched = (inq.venue_payment_schedule || []).slice().sort((a: any, b: any) => a.sequence - b.sequence);
+  const sched = payOrder(inq.venue_payment_schedule || []);
   for (const r of sched) {
     if (left <= 0) break;
     const room = r.amount_cents - (r.amount_paid_cents || 0);
@@ -316,19 +321,36 @@ Deno.serve(async req => {
       const cap = order?.purchase_units?.[0]?.payments?.captures?.[0];
       if (!r.ok && order?.details?.[0]?.issue !== 'ORDER_ALREADY_CAPTURED') throw new Fail('The payment was not completed. You have not been charged.', 402);
       if (!cap) throw new Fail('We could not confirm the payment. Please contact us before paying again.', 502);
-      // The order must have been created for THIS booking.
-      if (order.purchase_units[0].custom_id !== 'inq:' + inq.id) throw new Fail('This payment does not match the venue code entered.', 409);
+      // The money is already taken by now, so a mismatch must never throw the payment away. Record it against the booking
+      // the PayPal order was made for; if that cannot be told, against the booking whose code was entered, and log it.
+      let target = inq;
+      const orderFor = String(order.purchase_units[0].custom_id || '');
+      if (orderFor !== 'inq:' + inq.id) {
+        console.error('client-pay: order custom_id', orderFor, 'does not match booking', inq.id, 'for capture', cap.id);
+        const mm = orderFor.match(/^inq:(\d+)$/);
+        if (mm) { const other = await rest(`venue_inquiries?select=${INQUIRY_SELECT}&id=eq.${mm[1]}`).catch(() => []); if (other?.length) target = other[0]; }
+      }
       if (cap.status !== 'COMPLETED') throw new Fail('Your payment is pending with PayPal. We will record it once it clears.', 202);
       const cents = Math.round(parseFloat(cap.amount.value) * 100);
       const exists = await rest(`venue_payments?select=id&paypal_capture_id=eq.${cap.id}`);
-      const schedNow = (inq.venue_payment_schedule || []).length ? inq.venue_payment_schedule : await legacySchedule(inq);
+      const schedNow = (target.venue_payment_schedule || []).length ? target.venue_payment_schedule : await legacySchedule(target);
       const installment_note = installmentNote(schedNow, cents);
       if (!exists.length) {
-        await rest('venue_payments', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ inquiry_id: inq.id, venue_code: code, amount_cents: cents, currency: cap.amount.currency_code, paypal_order_id: orderId, paypal_capture_id: cap.id, installment_note, payer_name: [order.payer?.name?.given_name, order.payer?.name?.surname].filter(Boolean).join(' ') || null, payer_email: order.payer?.email_address || null, paypal_fee: cap.seller_receivable_breakdown?.paypal_fee?.value != null ? Number(cap.seller_receivable_breakdown.paypal_fee.value) : null, net_amount: cap.seller_receivable_breakdown?.net_amount?.value != null ? Number(cap.seller_receivable_breakdown.net_amount.value) : null }) });
-        if ((inq.venue_payment_schedule || []).length) await applyToSchedule(inq, cents);
-        else await recordLegacyPayment(inq, cap.id, cents);
+        const core = { inquiry_id: target.id, venue_code: code, amount_cents: cents, currency: cap.amount.currency_code, paypal_order_id: orderId, paypal_capture_id: cap.id, payer_name: [order.payer?.name?.given_name, order.payer?.name?.surname].filter(Boolean).join(' ') || null, payer_email: order.payer?.email_address || null };
+        const extra = { installment_note, paypal_fee: cap.seller_receivable_breakdown?.paypal_fee?.value != null ? Number(cap.seller_receivable_breakdown.paypal_fee.value) : null, net_amount: cap.seller_receivable_breakdown?.net_amount?.value != null ? Number(cap.seller_receivable_breakdown.net_amount.value) : null };
+        // The money is already taken, so never lose the payment over the optional columns (note, fee, net):
+        // if the full insert fails (for example a column is missing), save the core record and then try the extras.
+        try {
+          await rest('venue_payments', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ...core, ...extra }) });
+        } catch (e) {
+          console.error('client-pay: full venue_payments insert failed, saving core record', (e as Error).message);
+          await rest('venue_payments', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(core) });
+          await rest(`venue_payments?paypal_capture_id=eq.${cap.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(extra) }).catch(() => {});
+        }
+        if ((target.venue_payment_schedule || []).length) await applyToSchedule(target, cents);
+        else await recordLegacyPayment(target, cap.id, cents);
       }
-      const fresh = await rest(`venue_inquiries?select=${INQUIRY_SELECT}&id=eq.${inq.id}`);
+      const fresh = await rest(`venue_inquiries?select=${INQUIRY_SELECT}&id=eq.${target.id}`);
       let shown = fresh[0];
       if (!(shown.venue_payment_schedule || []).length) { const old = await legacySchedule(shown); if (old.length) shown = { ...shown, venue_payment_schedule: old }; }
       return json({ recorded: true, receipt_id: cap.id, paid_cents: cents, ...view(date, shown) });

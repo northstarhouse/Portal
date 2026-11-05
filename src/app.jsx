@@ -20391,7 +20391,15 @@ function saveMessageNote(m, text, setStatus) {
 
 function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
   var [by, setBy] = useState('');
-  var [reply, setReply] = useState('');
+  var draftKey = 'nsh-reply-draft-' + m.id;
+  var [reply, setReply] = useState(function() { try { return localStorage.getItem(draftKey) || ''; } catch (e) { return ''; } });
+  var [draftStatus, setDraftStatus] = useState(function() { try { return localStorage.getItem(draftKey) ? 'Draft saved' : ''; } catch (e) { return ''; } });
+  function saveDraft(text) {
+    try {
+      if (text && text.trim()) { localStorage.setItem(draftKey, text); setDraftStatus('Draft saved'); }
+      else { localStorage.removeItem(draftKey); setDraftStatus(''); }
+    } catch (e) { setDraftStatus('Could not save draft'); }
+  }
   var [note, setNote] = useState(m.handled_note || '');
   var [noteStatus, setNoteStatus] = useState('');
   var [busy, setBusy] = useState(false);
@@ -20407,14 +20415,14 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
     if (!by) { setErr('Choose who is replying (Jen, Derek or Haley).'); return; }
     if (!reply.trim()) { setErr('Type your reply first.'); return; }
     setBusy(true); setErr('');
-    onReply(m, by, reply.trim(), note).catch(function(e) { setErr(e.message || 'Could not send.'); setBusy(false); });
+    onReply(m, by, reply.trim(), note).then(function() { try { localStorage.removeItem(draftKey); } catch (e) {} }).catch(function(e) { setErr(e.message || 'Could not send.'); setBusy(false); });
   }
   var pill = { fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '2px 9px' };
   return (
     <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderLeft: '3px solid #c79535', borderRadius: 10, padding: '12px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a' }}>{isVoicemail ? cleanVoicemail(m).caller : (m.from_name || 'Client')}{m.event_title ? <span style={{ fontWeight: 500, color: gold }}> · {m.event_title}</span> : null}{m.from_phone ? <span style={{ fontWeight: 500, color: '#6b5d4a' }}> · <a href={'tel:' + String(m.from_phone).replace(/[^0-9+]/g, '')} style={{ color: gold, textDecoration: 'none' }}>{m.from_phone}</a></span> : null}{m.from_email && String(m.event_uid || '').indexOf('voicemail:') !== 0 ? <span style={{ fontWeight: 500, color: '#6b5d4a' }}> · <a href={'mailto:' + m.from_email} style={{ color: gold, textDecoration: 'none' }}>{m.from_email}</a></span> : null}</div>
-        <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{new Date(m.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+        <div style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>{new Date(m.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}{isVoicemail ? ' · ' + new Date(m.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) : ''}</div>
       </div>
       {fromInbox && <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 4 }}>{String(m.subject || '').replace(/^Email: /, '')}</div>}
       <div style={{ marginBottom: 6 }}>
@@ -20427,8 +20435,9 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
 
       {canReply && (
         <div style={{ marginTop: 10 }}>
-          <textarea value={reply} onChange={function(e) { setReply(e.target.value); }} rows={4} placeholder={'Reply to ' + (m.from_name || 'them') + ' (sent from venue@northstarhouse.org to ' + m.from_email + ')'}
+          <textarea value={reply} onChange={function(e) { setReply(e.target.value); setDraftStatus(''); }} onBlur={function() { saveDraft(reply); }} rows={4} placeholder={'Reply to ' + (m.from_name || 'them') + ' (sent from venue@northstarhouse.org to ' + m.from_email + ')'}
             style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'system-ui, sans-serif', resize: 'vertical' }} />
+          {draftStatus && <div style={{ fontSize: 11, color: draftStatus.indexOf('Could not') === 0 ? '#b3261e' : '#888', marginTop: 3 }}>{draftStatus}</div>}
         </div>
       )}
       <textarea value={note} onChange={function(e) { setNote(e.target.value); setNoteStatus(''); }} onBlur={function() { saveMessageNote(m, note, setNoteStatus); }} rows={2} placeholder="Notes (optional): what you did, what was said, next steps"
@@ -20443,6 +20452,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
           <option value="Derek">Derek</option>
           <option value="Haley">Haley</option>
         </select>
+        <button disabled={busy} onClick={function() { if (canReply) saveDraft(reply); saveMessageNote(m, note, setNoteStatus); if (!canReply && String(note || '').trim() === String(m.handled_note || '').trim()) setNoteStatus('Note saved'); }} style={{ background: '#fff', color: '#6b5d4a', border: '1px solid #d8d0c4', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Save draft</button>
         {canReply && <button disabled={busy} onClick={sendReply} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Sending…' : 'Send reply & mark handled'}</button>}
         <button disabled={busy} onClick={function() { if (!by) { setErr('Choose who handled it (Jen, Derek or Haley).'); return; } onHandle(m.id, by, note); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{canReply ? 'Mark handled without replying' : 'Mark handled'}</button>
         {knownClient && <button onClick={onOpenClient} style={{ background: 'none', color: gold, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Open client file</button>}
@@ -20491,7 +20501,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
   const [prebookSending, setPrebookSending] = useState(null);
   // Send the pre-booking form by hand: for groups that never went through an inquiry (nonprofits, special arrangements).
   const [manualOpen, setManualOpen] = useState(false);
-  const [manualForm, setManualForm] = useState({ email: '', name: '', event_type: '', arrangement: 'standard' });
+  const [manualForm, setManualForm] = useState({ email: '', name: '', event_type: '', arrangement: 'standard', price: '', deposit: '' });
   const [manualBusy, setManualBusy] = useState(false);
   const [manualMsg, setManualMsg] = useState(null);
   function sendManual(e, resend) {
@@ -20503,7 +20513,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
       return fetch(SUPABASE_URL + '/functions/v1/send-prebooking-form', {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ manual: true, email: manualForm.email.trim(), name: manualForm.name.trim(), event_type: manualForm.event_type, arrangement: manualForm.arrangement, sent_by: who || '', resend: !!resend })
+        body: JSON.stringify({ manual: true, email: manualForm.email.trim(), name: manualForm.name.trim(), event_type: manualForm.event_type, arrangement: manualForm.arrangement, custom_price_cents: centsFromDollars(manualForm.price), custom_deposit_cents: centsFromDollars(manualForm.deposit), sent_by: who || '', resend: !!resend })
       });
     }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok, status: r.status, j: j }; }); })
       .then(function(res) {
@@ -20513,7 +20523,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
         }
         if (!res.ok || !res.j.ok) { setManualMsg({ bad: true, text: res.j && res.j.error ? res.j.error : 'Could not send the pre-booking form.' }); return; }
         setManualMsg({ bad: false, text: 'Sent to ' + res.j.email + '. It is in the activity log.' });
-        setManualForm({ email: '', name: '', event_type: '', arrangement: 'standard' });
+        setManualForm({ email: '', name: '', event_type: '', arrangement: 'standard', price: '', deposit: '' });
       }).catch(function() { setManualMsg({ bad: true, text: 'Could not send the pre-booking form. Please try again.' }); })
       .finally(function() { setManualBusy(false); });
   }
@@ -20850,6 +20860,16 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                   <option value="bylt">BYLT: special rate</option>
                 </select>
               </label>
+              {manualForm.event_type && manualForm.event_type !== 'Wedding' && (
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#888', flex: '1 1 140px' }}>Event price ($)
+                  <input inputMode="decimal" value={manualForm.price} onChange={function(e) { var v = e.target.value; setManualForm(function(f) { return Object.assign({}, f, { price: v }); }); }} placeholder="optional" style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff' }} />
+                </label>
+              )}
+              {manualForm.event_type && manualForm.event_type !== 'Wedding' && (
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#888', flex: '1 1 140px' }}>Security deposit ($)
+                  <input inputMode="decimal" value={manualForm.deposit} onChange={function(e) { var v = e.target.value; setManualForm(function(f) { return Object.assign({}, f, { deposit: v }); }); }} placeholder="optional" style={{ padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff' }} />
+                </label>
+              )}
               <button type="submit" disabled={manualBusy}
                 style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: manualBusy ? 0.7 : 1 }}>{manualBusy ? 'Sending…' : 'Send'}</button>
               {manualMsg && <div style={{ width: '100%', fontSize: 13, color: manualMsg.bad ? '#b3402a' : '#2e7d32' }}>{manualMsg.text}</div>}
@@ -21242,8 +21262,9 @@ function PendingMovementModal({ onClose }) {
 
 // Tools > "Send out a pre-booking form": emails the pre-booking form (with the client guide) to someone who never went through an
 // inquiry, such as a nonprofit or a group with a special arrangement. Same sending as the form on the Inquiries tab.
+function centsFromDollars(v) { var n = parseFloat(String(v || '').replace(/[$,\s]/g, '')); return isFinite(n) && n > 0 ? Math.round(n * 100) : null; }
 function SendPreBookingModal({ onClose }) {
-  var blank = { email: '', name: '', event_type: '', arrangement: 'standard' };
+  var blank = { email: '', name: '', event_type: '', arrangement: 'standard', price: '', deposit: '' };
   var [f, setF] = useState(blank);
   var [busy, setBusy] = useState(false);
   var [msg, setMsg] = useState(null);
@@ -21257,7 +21278,7 @@ function SendPreBookingModal({ onClose }) {
       return fetch(SUPABASE_URL + '/functions/v1/send-prebooking-form', {
         method: 'POST',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ manual: true, email: f.email.trim(), name: f.name.trim(), event_type: f.event_type, arrangement: f.arrangement, sent_by: who || '', resend: !!resend })
+        body: JSON.stringify({ manual: true, email: f.email.trim(), name: f.name.trim(), event_type: f.event_type, arrangement: f.arrangement, custom_price_cents: centsFromDollars(f.price), custom_deposit_cents: centsFromDollars(f.deposit), sent_by: who || '', resend: !!resend })
       });
     }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok, status: r.status, j: j }; }); })
       .then(function(res) {
@@ -21301,6 +21322,13 @@ function SendPreBookingModal({ onClose }) {
             <option value="bylt">BYLT: special rate</option>
           </select>
         </label>
+        {f.event_type && f.event_type !== 'Wedding' && (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <label style={Object.assign({}, label, { flex: 1 })}>Event price ($, optional)<input inputMode="decimal" value={f.price} onChange={function(e) { set('price', e.target.value); }} placeholder="e.g. 1200" style={field} /></label>
+            <label style={Object.assign({}, label, { flex: 1 })}>Security deposit ($, optional)<input inputMode="decimal" value={f.deposit} onChange={function(e) { set('deposit', e.target.value); }} placeholder="e.g. 800" style={field} /></label>
+          </div>
+        )}
+        {f.event_type && f.event_type !== 'Wedding' && <div style={{ fontSize: 12, color: '#888', marginTop: -4, marginBottom: 12 }}>Leave blank for no set price. When they submit the form, these become their payment schedule and show on their agreement.</div>}
         {msg && <div style={{ fontSize: 13, marginBottom: 12, color: msg.bad ? '#b3402a' : '#2e7d32' }}>{msg.text}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           <button type="button" onClick={onClose} disabled={busy} style={{ background: '#fff', color: '#888', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Close</button>

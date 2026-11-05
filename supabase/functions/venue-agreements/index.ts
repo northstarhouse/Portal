@@ -46,20 +46,22 @@ async function signedUpdateEmail(version:any,names:string[],venueCode:string,url
  const code=venueCode||'your wedding date, written like DEC-28-2026';
  const who=joinNames(names.map(n=>esc(n)));
  const whoText=joinNames(names);
- const subject='Your agreement is fully signed! One step left to book your date';
+ const paid=!!(pay&&pay.state==='paid');
+ const subject=paid?'You are officially booked at North Star House!':'Your agreement is fully signed! One step left to book your date';
  const stepHtml=pay&&pay.state==='paid'
   ?'Your first payment has been received, so your date is <strong>officially booked</strong>. We could not be happier!'
   :'There is just one step left to officially book your date: your first payment'+(amt?' of <strong>'+amt+'</strong>':'')+'. You can make it any time on your client portal. Open it and enter your venue code, <strong style="font-size:17px;letter-spacing:2px;">'+esc(code)+'</strong>. As soon as your payment comes in, your date is officially booked.';
- const items:string[][]=[['Make your payments','securely online, and see your full payment schedule.'],['Review and download your signed agreement','and signature record whenever you need them.'],['Upload your certificate of insurance.',''],['Fill out your '+(wedding?'Wedding Day':'Event Day')+' Questionnaire','with your timeline, tables and chairs, vendors and day-of contacts.']];
+ const items:string[][]=[...(paid?[]:[['Make your payments','securely online, and see your full payment schedule.']]),['Review and download your signed agreement','and signature record whenever you need them.'],['Upload your certificate of insurance.',''],['Fill out your '+(wedding?'Wedding Day':'Event Day')+' Questionnaire','with your timeline, tables and chairs, vendors and day-of contacts.']];
  if(wedding)items.push(['Choose the wording for your engraved legacy brick.','']);
  items.push(['Message our team','any time, and see your walk-through details.']);
  const list='<ul style="margin:6px 0 0;padding-left:20px;text-align:left;">'+items.map(i=>'<li style="margin:0 0 8px;text-align:left;"><strong>'+i[0]+'</strong>'+(i[1]?' '+i[1]:'')+'</li>').join('')+'</ul>';
- const text='Hello '+whoText+',\n\nWe are so excited that you have chosen North Star House for your special day! Your rental agreement now has every signature it needs, and we could not be happier to welcome you.\n\n'
-  +(pay&&pay.state==='paid'?'Your first payment has been received, so your date is officially booked.':'There is just one step left to officially book your date: your first payment'+(amt?' of '+amt:'')+'. You can make it any time on your client portal. Open it and enter your venue code: '+code+'. As soon as your payment comes in, your date is officially booked.')
+ const text='Hello '+whoText+',\n\n'+(paid?'Congratulations, you are officially booked! Your rental agreement now has every signature it needs, and your date at North Star House is reserved for you. We could not be happier to welcome you.':'We are so excited that you have chosen North Star House for your special day! Your rental agreement now has every signature it needs, and we could not be happier to welcome you.')+'\n\n'
+  +(paid?'':'There is just one step left to officially book your date: your first payment'+(amt?' of '+amt:'')+'. You can make it any time on your client portal. Open it and enter your venue code: '+code+'. As soon as your payment comes in, your date is officially booked.')
   +'\n\nTip: bookmark your client portal page so it is always one click away. Your venue code is all you need to get back in.'+'\n\nYour client portal: '+url+'\n\nHere is everything you can do there:\n'+items.map(i=>'- '+i[0]+(i[1]?' '+i[1]:'')).join('\n')
   +'\n\nWe are so excited to celebrate with you. If you have any questions at all, just reply to this email or send us a message from your portal.\n\nNorth Star House';
  const tip='<strong>Tip:</strong> bookmark your client portal page so it is always one click away. Your venue code is all you need to get back in.';
- const html=brandedHtml('Your Agreement Is Fully Signed',['Hello '+who+', we are so excited that you have chosen North Star House for your special day! Your rental agreement now has every signature it needs, and we could not be happier to welcome you.',stepHtml,tip,'Here is everything you can do on your client portal:'+list,'We are so excited to celebrate with you. If you have any questions at all, just reply to this email or send us a message from your portal.'],'Open My Client Portal',url);
+ const intro=paid?'Hello '+who+', congratulations, you are officially booked! Your rental agreement now has every signature it needs, and your date at North Star House is reserved for you. We could not be happier to welcome you.':'Hello '+who+', we are so excited that you have chosen North Star House for your special day! Your rental agreement now has every signature it needs, and we could not be happier to welcome you.';
+ const html=brandedHtml(paid?'You Are Officially Booked':'Your Agreement Is Fully Signed',[intro,...(paid?[]:[stepHtml]),tip,'Here is everything you can do on your client portal:'+list,'We are so excited to celebrate with you. If you have any questions at all, just reply to this email or send us a message from your portal.'],'Open My Client Portal',url);
  return {subject,text,html};
 }
 // Emails both clients, in one message, that the agreement is fully signed. auto: sent by the system when the venue countersigns;
@@ -69,8 +71,7 @@ async function sendSignedUpdate(versionId:string,auto:boolean):Promise<any>{
  if(!rec)return {error:'Agreement not found.',status:404};
  if(rec.status!=='completed')return {error:'Everyone has to sign first.',status:400};
  if(auto){
-  const pay=await depositFor(rec.response_id);
-  if(pay&&pay.state==='paid')return {skipped:'paid'};
+  // Already paid at countersigning: the same email goes out as the official "you are booked" one (no payment wording).
   const prior=await rest('activity_log?select=id&action=eq.contract_signed_update_sent&detail->>version_id=eq.'+rec.id+'&limit=1');
   if(prior&&prior.length)return {skipped:'already_sent'};
  }

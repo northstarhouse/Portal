@@ -119,6 +119,8 @@ const EVENT_TYPES: [string, string][] = [
   ['Private Dinners', 'Host an unforgettable dinner surrounded by historic architecture, gardens, and the character of a century-old estate. Ideal for birthdays, anniversaries, rehearsal dinners, and intimate celebrations.'],
   ['Showers & Celebrations', 'Baby showers, bridal showers, engagement parties, birthdays, and milestone moments all feel a little more special here. Choose from indoor and outdoor spaces to create a gathering that feels entirely your own.'],
 ]
+const PRIVATE_RATES: Row[] = [{ a: 'Saturday', b: '$1,200' }, { a: 'Sunday', b: '$1,000' }, { a: 'Weekdays', b: '$800' }]
+const PRIVATE_NOTE = 'Each rental is 6 hours on site, between 10 AM and 10 PM. Extra hours are $150 each. Private event dates can be booked up to 8 months in advance.'
 const MEMORIAL_RATES: Row[] = [{ a: 'Friday', b: '$400' }, { a: 'Saturday', b: '$800' }, { a: 'Sunday', b: '$600' }]
 const NONPROFIT_RATES: Row[] = [
   { a: 'Large Private Event', b: '$800', c: 'Up to 200 guests, 4 hours. Each extra hour $150.' },
@@ -142,11 +144,11 @@ const KIND_COPY: Record<Exclude<Kind, 'wedding'>, { greeting: string; intro: str
     sectionsHtml:
       `<h3 style="${H3}">What You Can Host Here</h3>` +
       EVENT_TYPES.map(([t, d]) => `<p style="${P}margin:0 0 12px;"><strong style="color:#2a2420;">${esc(t)}.</strong> ${esc(d)}</p>`).join('') +
-      `<h3 style="${H3}">Pricing</h3>` + para("Rates depend on the size and type of your event. We're happy to go over them with you on your tour or by reply.") +
+      `<h3 style="${H3}">Private Event Pricing</h3>` + rateTable(PRIVATE_RATES) + para(PRIVATE_NOTE) + para("Rates for other kinds of events depend on size and type. We're happy to go over them with you on your tour or by reply.") +
       `<h3 style="${H3}">Every Event Preserves the House</h3>` + para('Revenue from weddings, private gatherings, programs, and community events supports the ongoing preservation, restoration, and care of the property. When you host something here, you are helping protect a piece of local history.'),
     sectionsText:
       'WHAT YOU CAN HOST HERE\n' + EVENT_TYPES.map(([t, d]) => `- ${t}: ${d}`).join('\n') +
-      "\n\nPRICING\nRates depend on the size and type of your event. We're happy to go over them with you on your tour or by reply." +
+      '\n\nPRIVATE EVENT PRICING\n' + rateText(PRIVATE_RATES) + '\n' + PRIVATE_NOTE + "\nRates for other kinds of events depend on size and type. We're happy to go over them with you on your tour or by reply." +
       '\n\nEVERY EVENT PRESERVES THE HOUSE\nRevenue from weddings, private gatherings, programs, and community events supports the ongoing preservation, restoration, and care of the property.',
   },
   memorial: {

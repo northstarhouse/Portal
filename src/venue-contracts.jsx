@@ -34,7 +34,7 @@ export function prepareAgreementDraft(client,extras={}){
   const formSigners=client.contacts.filter(c=>String(c.id).startsWith('form-')).map(c=>({name:c.full_name,email:c.email,role:'client'}));
   const clientSigners=originalSigners.length?originalSigners.map(s=>({name:s.signee_name,email:client.contacts.find(c=>normalized(c.full_name)===normalized(s.signee_name))?.email || '',role:'client'})):formSigners;
   const people=clientSigners.filter(c=>c.name);
-  const guests=extras.guestCount||client.hb?.project?.guest_count||'[TO COMPLETE]';
+  const guests=extras.guestCount||client.maxGuests||client.hb?.project?.guest_count||'[TO COMPLETE]';
   const schedule=(client.schedule||[]);
   const lines=[
     'North Star House — Venue Rental Agreement',

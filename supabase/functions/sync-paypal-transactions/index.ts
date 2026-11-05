@@ -71,6 +71,54 @@ function toRow(t: any) {
   }
 }
 
+// Safety net: a client can pay through the Portal's checkout and PayPal take the money, yet the Portal fail to record it
+// (closed tab, a database error, a payment that was pending). PayPal's own list is the truth, so any venue payment in it
+// that the Portal has not recorded is recorded here, against the booking named in PayPal's label
+// ("... Wedding - Oct 3, 2027 (OCT-03-2027) - North Star House venue payment").
+const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+async function reconcileVenuePayments() {
+  const out = { venue_recorded: 0, venue_needs_review: [] as string[] }
+  // Only payments from this moment on are checked. Earlier venue payments were recorded by hand (e.g. Molly Burton's
+  // $2,900), so looking back would record them a second time.
+  const GO_LIVE = '2026-11-05T21:30:00Z'
+  const txs = await rest(`paypal_transactions?select=transaction_id,gross,fee,net,payer_name,payer_email,subject,note,items&occurred_at=gte.${GO_LIVE}`) || []
+  const have = new Set(((await rest('venue_payments?select=paypal_capture_id')) || []).map((r: { paypal_capture_id: string }) => r.paypal_capture_id))
+  for (const t of txs) {
+    if (have.has(t.transaction_id)) continue
+    const text = [t.subject, t.note, t.items].filter(Boolean).join(' | ')
+    if (!/venue payment/i.test(text)) continue
+    const m = text.match(/\(([A-Z]{3})-(\d{2})-(\d{4})\)/i)
+    const mi = m ? MON.indexOf(m[1].toUpperCase()) : -1
+    if (!m || mi < 0) { out.venue_needs_review.push(`${t.transaction_id}: no booking code in PayPal's label`); continue }
+    const date = `${m[3]}-${String(mi + 1).padStart(2, '0')}-${m[2]}`
+    let rows = await rest(`venue_inquiries?select=id,name,venue_payment_schedule(id,sequence,label,amount_cents,amount_paid_cents,status)&event_date=eq.${date}&prebooking_form_response_id=not.is.null`) || []
+    if (rows.length > 1) { const nm = text.split(' - ')[0].trim().toLowerCase(); rows = rows.filter((r: { name?: string }) => nm && (r.name || '').toLowerCase().includes(nm)) }
+    if (rows.length !== 1) { out.venue_needs_review.push(`${t.transaction_id}: ${rows.length ? 'more than one' : 'no'} booking for ${date}`); continue }
+    const inq = rows[0]
+    // installments first in order; the Security Deposit (due last) only once the rest are paid
+    const dep = (r: { label?: string }) => /security deposit/i.test(r.label || '') ? 1 : 0
+    const sched = (inq.venue_payment_schedule || []).slice().sort((a: { sequence: number; label?: string }, b: { sequence: number; label?: string }) => dep(a) - dep(b) || a.sequence - b.sequence)
+    if (!sched.length) { out.venue_needs_review.push(`${t.transaction_id}: ${inq.name} has no payment schedule (record by hand)`); continue }
+    const cents = Math.round(Number(t.gross) * 100)
+    const ins = await rest('venue_payments?on_conflict=paypal_capture_id', {
+      method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify({ inquiry_id: inq.id, venue_code: `${m[1].toUpperCase()}-${m[2]}-${m[3]}`, amount_cents: cents, currency: 'USD', paypal_order_id: t.transaction_id, paypal_capture_id: t.transaction_id, payer_name: t.payer_name || null, payer_email: t.payer_email || null, paypal_fee: t.fee, net_amount: t.net }),
+    })
+    if (!ins || !ins.length) continue // recorded by someone else in the meantime
+    let left = cents
+    for (const r of sched) {
+      if (left <= 0) break
+      const room = r.amount_cents - (r.amount_paid_cents || 0)
+      if (room <= 0) continue
+      const add = Math.min(room, left); left -= add
+      const paid = (r.amount_paid_cents || 0) + add
+      await rest(`venue_payment_schedule?id=eq.${r.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ amount_paid_cents: paid, status: paid >= r.amount_cents ? 'paid' : r.status }) })
+    }
+    out.venue_recorded++
+  }
+  return out
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   try {
@@ -101,8 +149,9 @@ Deno.serve(async (req) => {
       }
     }
     // Save PayPal's real fee and net on the Portal's own records (orders, venue payments, matched gifts).
+    const venue = await reconcileVenuePayments().catch((e) => ({ venue_recorded: 0, venue_needs_review: [], venue_error: (e as Error).message }))
     const applied = await rest('rpc/apply_paypal_fees', { method: 'POST', body: '{}' })
-    return json({ looked_at: seen, payments_saved: saved, ...applied })
+    return json({ looked_at: seen, payments_saved: saved, ...venue, ...applied })
   } catch (e) {
     return json({ error: (e as Error).message || 'Sync failed' }, 500)
   }
