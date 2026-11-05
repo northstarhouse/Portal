@@ -139,8 +139,10 @@ async function dueFor(kind: '24h' | '1h', only?: string): Promise<Tour[]> {
   return sb(`/rest/v1/rpc/tours_due_for_${kind}_reminder`, { method: 'POST', body: '{}' }).then((r) => r.json())
 }
 
-async function run24h(only?: string): Promise<number> {
-  const rows: Tour[] = await dueFor('24h', only)
+// testTo: send one sample 24h reminder (made-up tour, placeholder confirm link) to that address only. Nothing is marked sent.
+async function run24h(only?: string, testTo?: string): Promise<number> {
+  const sample: Tour = { id: 'test', visitor_name: 'Test Visitor', visitor_email: testTo || '', date: new Date(Date.now() + 86400000).toISOString().slice(0, 10), start_time: '10:00', guide_name: 'Jen', confirm_token: 'TEST-TOKEN' }
+  const rows: Tour[] = testTo ? [sample] : await dueFor('24h', only)
   let sent = 0
   for (const t of rows || []) {
     const when = fmtWhen(t.date, t.start_time)
@@ -161,6 +163,7 @@ async function run24h(only?: string): Promise<number> {
           TOUR_DIRECTIONS_HTML_INLINE,
       })
     )
+    if (ok && testTo) { sent++; continue }
     if (ok) {
       await sb(`/rest/v1/estate_tours?id=eq.${t.id}`, {
         method: 'PATCH',
@@ -211,6 +214,12 @@ Deno.serve(async (req) => {
     // { tour_id, kind } sends one tour's reminder (called at the scheduled time); no body scans for anything due.
     const body = await req.json().catch(() => ({}))
     const only = body && body.tour_id ? String(body.tour_id) : undefined
+    // Test: { test_to: 'you@thenorthstarhouse.org' } sends one sample 24h reminder to that address. Only our own addresses are allowed.
+    if (body && body.test_to) {
+      const to = String(body.test_to).trim().toLowerCase()
+      if (!/^[^\s@<>,;]+@(the)?northstarhouse\.org$/.test(to)) return new Response(JSON.stringify({ error: 'Test emails can only go to a North Star House address.' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ ok: true, test_sent: await run24h(undefined, to) }), { headers: { 'Content-Type': 'application/json' } })
+    }
     const kind = body && body.kind
     const [sent24, sent1] = await Promise.all([only && kind !== '24h' ? 0 : run24h(only), only && kind !== '1h' ? 0 : run1h(only)])
     return new Response(JSON.stringify({ ok: true, sent24, sent1 }), { headers: { 'Content-Type': 'application/json' } })

@@ -5,6 +5,7 @@ import { createAgreementApi, AgreementSigningPage } from './venue-contracts.jsx'
 import HubEventsCommittee from './hub/entry.jsx';
 import RsvpPanel from './hub/pages/RsvpPanel.jsx';
 import { BlogEditorView as JournalEditor } from './blog-editor.jsx';
+import { NewSiteEventPage } from './site-event-editor.jsx';
 import { MediaLibraryView as SiteMediaLibrary } from './media-library.jsx';
 import { installDateFormatter } from './date-format.js';
 installDateFormatter();
@@ -829,6 +830,7 @@ var NAV_ICONS = {
   'treasurer': '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
   'nsh-updates': '<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.3 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>',
   'voicemail-log': '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  'new-site-event': '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/>',
   'blog-editor': '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   'website-payments': '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/>',
   'venue-inquiries': '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
@@ -16249,6 +16251,15 @@ function AdminView({ navigate }) {
           Website Payments
         </div>
         <div
+          onClick={function() { navigate('new-site-event'); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#2a2a2a', fontSize: 13, fontWeight: 500 }}
+          onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
+          onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          <span style={{ color: '#b5a185', flexShrink: 0 }}>{suClipboardIcon}</span>
+          New Event
+        </div>
+        <div
           onClick={function() { navigate('blog-editor'); }}
           style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500 }}
           onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
@@ -20470,6 +20481,13 @@ function VenueClientsView({ navigate }) {
   return <VenueRentalsView navigate={navigate} initialTab="clients" />;
 }
 
+// When the visitor pressed Confirm My Tour in their 24-hour reminder email, e.g. "Nov 5, 7:50 AM" (Pacific time); '' if they have not.
+function tourConfirmedText(t) {
+  if (!t || !t.confirmed_at) return '';
+  var d = new Date(t.confirmed_at);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
+}
+
 function VenueInquiriesView({ navigate, clientsOnly }) {
   const [rows, setRows] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -20927,6 +20945,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                           {tour && (function() { var st = TOUR_STATES[tourStateKey(sub)]; return (
                             <span title={st.label + ': ' + fmtTourWhen(tour)} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: st.color, background: st.bg }}>{st.label}</span>
                           ); })()}
+                          {tour && tour.confirmed_at && <span title={'Confirmed from the reminder email: ' + tourConfirmedText(tour)} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: '#1b5e20', background: '#e3f4e3' }}>✓ Confirmed</span>}
                           {false && tour && (
                             <span title={(tour.status === 'booked' ? 'Tour booked: ' : 'Tour requested: ') + fmtTourWhen(tour)}
                               style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: tour.status === 'booked' ? '#2e7d32' : '#a15c00', background: tour.status === 'booked' ? '#eafaf0' : '#fdf3e3' }}>
@@ -20967,6 +20986,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                 return (
                   <div style={{ fontSize: 12, fontWeight: 600, color: booked ? '#2e7d32' : '#a15c00', background: booked ? '#eafaf0' : '#fdf3e3', border: '1px solid ' + (booked ? '#bfe0bf' : '#f0d9a8'), borderRadius: 7, padding: '6px 10px', marginBottom: 12 }}>
                     🗓 {st.label} — {fmtTourWhen(tour)}
+                    {tour.confirmed_at && <span style={{ marginLeft: 8, color: '#1b5e20' }}>✓ Confirmed by email {tourConfirmedText(tour)}</span>}
                   </div>
                 );
               })()}
@@ -23725,6 +23745,10 @@ function EventPlanLinkView({ navigate }) {
   );
 }
 
+function NewSiteEventRoute({ navigate }) {
+  return <NewSiteEventPage navigate={navigate} supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} />;
+}
+
 function BlogEditorPage({ navigate }) {
   return <JournalEditor navigate={navigate} supabaseUrl={SUPABASE_URL} supabaseKey={SUPABASE_KEY} />;
 }
@@ -24547,6 +24571,7 @@ const views = {
   'nsh-updates': NshUpdatesView,
   'treasurer': TreasurerView,
   'blog-editor': BlogEditorPage,
+  'new-site-event': NewSiteEventRoute,
   'site-media': SiteMediaPage,
   quarterly: QuarterlyView,
   volunteers: VolunteersView,
@@ -25305,7 +25330,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
