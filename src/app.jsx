@@ -20645,7 +20645,25 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
       .finally(function() { setPrebookSending(null); });
   }
 
-  function load() { fetchVenueInquiries().then(function(r) { setRows(r.filter(function(sub) { return isVenueClientSubmission(sub) === !!clientsOnly && !(clientsOnly && isTestVenueBooking(sub)); })); }); }
+  // Everyone who has filled out a pre-booking form (wedding or events), by email address: their inquiry stays in the list and
+  // gets a "Booked" tag. The form's own email, and the second signer's if there is one, both count.
+  var [bookedEmails, setBookedEmails] = useState({});
+  function isBookedInquiry(sub) {
+    var e = (inquiryPreviewFields(sub).email || '').trim().toLowerCase();
+    return !!e && !!bookedEmails[e];
+  }
+  function load() {
+    fetchVenueInquiries().then(function(r) {
+      setRows(r.filter(function(sub) { return isVenueClientSubmission(sub) === !!clientsOnly && !(clientsOnly && isTestVenueBooking(sub)); }));
+      var booked = {};
+      r.forEach(function(sub) {
+        if (!isVenueClientSubmission(sub) || isTestVenueBooking(sub)) return;
+        var a = sub.answers || {};
+        ['c9u1sxb4', 'pt4mail1', 'evp_email'].forEach(function(k) { var v = String(a[k] || '').trim().toLowerCase(); if (v) booked[v] = true; });
+      });
+      setBookedEmails(booked);
+    });
+  }
   useEffect(function() { load(); }, []);
   useEffect(function() { fetchToursThisMonth().then(setToursMonth); }, []);
   useEffect(function() {
@@ -21023,6 +21041,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                           {tour && (function() { var st = TOUR_STATES[tourStateKey(sub)]; return (
                             <span title={st.label + ': ' + fmtTourWhen(tour)} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: st.color, background: st.bg }}>{st.label}</span>
                           ); })()}
+                          {!sub.tourOnly && isBookedInquiry(sub) && <span title="They have filled out the pre-booking form" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: '#fff', background: '#886c44' }}>Booked</span>}
                           {tour && tour.confirmed_at && <span title={'Confirmed from the reminder email: ' + tourConfirmedText(tour)} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: '#1b5e20', background: '#e3f4e3' }}>✓ Confirmed</span>}
                           {false && tour && (
                             <span title={(tour.status === 'booked' ? 'Tour booked: ' : 'Tour requested: ') + fmtTourWhen(tour)}
