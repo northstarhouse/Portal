@@ -19467,8 +19467,8 @@ function VenueRentalsView({ navigate, initialTab }) {
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setFeatureReqOpen(true); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
                     <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-request" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Make a feature request</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Ask for something new in the Portal</div>
+                    <div><div style={{ fontWeight: 700 }}>Feature request or report a bug</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Ask for something new, or flag something broken</div>
                     </div>
                   </button>
                 </div>
@@ -21366,7 +21366,8 @@ function SendPreBookingModal({ onClose }) {
 
 // Tools > "Make a feature request": staff describe something they want the Portal to do. It is saved to feature_requests and listed below the form.
 function FeatureRequestModal({ onClose }) {
-  var [f, setF] = useState({ title: '', details: '', area: 'Venue Rentals', priority: 'normal' });
+  var [f, setF] = useState({ kind: 'feature', title: '', details: '', area: 'Venue Rentals', priority: 'normal' });
+  var [files, setFiles] = useState([]);
   var [list, setList] = useState(null);
   var [busy, setBusy] = useState(false);
   var [msg, setMsg] = useState(null);
@@ -21377,24 +21378,53 @@ function FeatureRequestModal({ onClose }) {
   }
   useEffect(load, []);
   function set(k, v) { setF(function(o) { var n = Object.assign({}, o); n[k] = v; return n; }); }
+  var MAX_FILES = 5, MAX_BYTES = 10 * 1024 * 1024;
+  function addFiles(picked) {
+    var arr = Array.prototype.slice.call(picked || []);
+    if (!arr.length) return;
+    var problem = null;
+    var next = files.slice();
+    arr.forEach(function(file) {
+      if (file.size > MAX_BYTES) { problem = file.name + ' is over 10 MB.'; return; }
+      if (next.length >= MAX_FILES) { problem = 'You can attach up to ' + MAX_FILES + ' files.'; return; }
+      next.push(file);
+    });
+    setFiles(next);
+    setMsg(problem ? { bad: true, text: problem } : null);
+  }
+  function onPaste(e) {
+    var items = (e.clipboardData && e.clipboardData.files) || [];
+    if (items.length) {
+      e.preventDefault();
+      addFiles(Array.prototype.map.call(items, function(file, i) { return file.name && file.name !== 'image.png' ? file : new File([file], 'screenshot-' + Date.now() + '-' + i + '.png', { type: file.type }); }));
+    }
+  }
+  function uploadFiles() {
+    return Promise.all(files.map(function(file) {
+      var path = 'feature-requests/' + crypto.randomUUID() + '/' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      return fetch(SUPABASE_URL + '/storage/v1/object/board-attachments/' + path, { method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream' }, body: file })
+        .then(function(r) { if (!r.ok) throw new Error('Could not upload ' + file.name + '. Please try again.'); return { name: file.name, url: SUPABASE_URL + '/storage/v1/object/public/board-attachments/' + path }; });
+    }));
+  }
   function submit(e) {
     e.preventDefault();
     if (busy) return;
-    if (!f.title.trim()) { setMsg({ bad: true, text: 'Say what you would like in a few words.' }); return; }
+    if (!f.title.trim()) { setMsg({ bad: true, text: f.kind === 'bug' ? 'Say what went wrong in a few words.' : 'Say what you would like in a few words.' }); return; }
     setBusy(true); setMsg(null);
-    var reqName = '';
-    whoIsSignedIn().then(function(name) {
+    var reqName = '', uploaded = [];
+    uploadFiles().then(function(u) { uploaded = u; return whoIsSignedIn(); }).then(function(name) {
       reqName = name;
       return fetch(SUPABASE_URL + '/rest/v1/feature_requests', { method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=minimal' }),
-        body: JSON.stringify({ title: f.title.trim(), details: f.details.trim() || null, area: f.area, priority: f.priority, requested_by: name || null }) });
+        body: JSON.stringify({ kind: f.kind, title: f.title.trim(), details: f.details.trim() || null, area: f.area, priority: f.priority, requested_by: name || null, attachments: uploaded }) });
     }).then(function(r) {
       if (!r.ok) throw new Error('Could not save. Please try again.');
-      logActivity('Feature request: ' + f.title.trim(), 'feature_request');
+      logActivity((f.kind === 'bug' ? 'Bug report: ' : 'Feature request: ') + f.title.trim(), 'feature_request');
       var pr = f.priority === 'high' ? 'Needed soon' : f.priority === 'low' ? 'Nice to have' : 'Would help';
-      var txt = ['New Portal feature request', '', f.title.trim(), '', f.details.trim() || '(no more detail)', '', 'Where: ' + f.area, 'Importance: ' + pr, 'From: ' + (reqName || 'someone on the team')].join(String.fromCharCode(10));
-      fetch(SUPABASE_URL + '/functions/v1/send-email', { method: 'POST', headers: H, body: JSON.stringify({ to: ['media@thenorthstarhouse.org'], subject: 'Feature request: ' + f.title.trim(), body: txt }) }).catch(function() {});
+      var txt = [f.kind === 'bug' ? 'New Portal bug report' : 'New Portal feature request', '', f.title.trim(), '', f.details.trim() || '(no more detail)', '', 'Where: ' + f.area, 'Importance: ' + pr, 'From: ' + (reqName || 'someone on the team')].concat(uploaded.length ? ['', 'Attachments:'].concat(uploaded.map(function(a) { return a.name + ': ' + a.url; })) : []).join(String.fromCharCode(10));
+      fetch(SUPABASE_URL + '/functions/v1/send-email', { method: 'POST', headers: H, body: JSON.stringify({ to: ['media@thenorthstarhouse.org'], subject: (f.kind === 'bug' ? 'Bug report: ' : 'Feature request: ') + f.title.trim(), body: txt }) }).catch(function() {});
       setMsg({ bad: false, text: 'Your request was saved.' });
-      setF({ title: '', details: '', area: f.area, priority: 'normal' });
+      setF({ kind: f.kind, title: '', details: '', area: f.area, priority: 'normal' }); setFiles([]);
       load();
     }).catch(function(err) { setMsg({ bad: true, text: err.message || 'Could not save.' }); }).finally(function() { setBusy(false); });
   }
@@ -21406,15 +21436,32 @@ function FeatureRequestModal({ onClose }) {
   var label = { fontSize: 12, color: '#888', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 };
   return (
     <div onClick={function(e) { if (e.target === e.currentTarget && !busy) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div role="dialog" aria-label="Make a feature request" style={{ background: '#fff', borderRadius: 14, maxWidth: 560, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
+      <div role="dialog" aria-label="Feature request or bug report" onPaste={onPaste} style={{ background: '#fff', borderRadius: 14, maxWidth: 560, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Make a feature request</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{f.kind === 'bug' ? 'Report a bug' : 'Make a feature request'}</div>
           <a onClick={onClose} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Close ×</a>
         </div>
-        <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Tell us what you wish the Portal could do.</div>
+        <div style={{ fontSize: 13, color: '#888', marginBottom: 12 }}>{f.kind === 'bug' ? 'Something not working right? Tell us what happened.' : 'Tell us what you wish the Portal could do.'}</div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          {[['feature', 'An idea'], ['bug', 'Something is broken']].map(function(k) {
+            var on = f.kind === k[0];
+            return <button key={k[0]} type="button" onClick={function() { set('kind', k[0]); }} style={{ flex: 1, padding: '8px 10px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: '1px solid ' + (on ? gold : '#e0d8cc'), background: on ? gold : '#fff', color: on ? '#fff' : '#555' }}>{k[1]}</button>;
+          })}
+        </div>
         <form onSubmit={submit}>
-          <label style={label}>What would you like?<input value={f.title} onChange={function(e) { set('title', e.target.value); }} placeholder="For example: a way to text clients from here" style={field} /></label>
-          <label style={label}>More detail (optional)<textarea value={f.details} onChange={function(e) { set('details', e.target.value); }} rows={4} placeholder="How would you use it? What problem does it solve?" style={Object.assign({}, field, { resize: 'vertical' })} /></label>
+          <label style={label}>{f.kind === 'bug' ? 'What went wrong?' : 'What would you like?'}<input value={f.title} onChange={function(e) { set('title', e.target.value); }} placeholder={f.kind === 'bug' ? 'For example: the Send button does nothing on a message' : 'For example: a way to text clients from here'} style={field} /></label>
+          <label style={label}>More detail (optional)<textarea value={f.details} onChange={function(e) { set('details', e.target.value); }} rows={4} placeholder={f.kind === 'bug' ? 'What did you click? What did you expect to happen? Which client or page?' : 'How would you use it? What problem does it solve?'} style={Object.assign({}, field, { resize: 'vertical' })} /></label>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>Screenshot or file (optional)</div>
+            <label style={{ display: 'inline-block', padding: '7px 12px', border: '1px dashed #c9b99a', borderRadius: 8, fontSize: 12, color: '#886c44', cursor: 'pointer', fontWeight: 600 }}>
+              Choose files
+              <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" onChange={function(e) { addFiles(e.target.files); e.target.value = ''; }} style={{ display: 'none' }} />
+            </label>
+            <span style={{ fontSize: 11, color: '#999', marginLeft: 8 }}>or paste a screenshot here (Ctrl+V). Up to {MAX_FILES} files, 10 MB each.</span>
+            {files.map(function(file, i) {
+              return <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555', marginTop: 4 }}><span>{file.name}</span><a onClick={function() { setFiles(files.filter(function(_, j) { return j !== i; })); }} style={{ cursor: 'pointer', color: '#b3402a' }}>Remove</a></div>;
+            })}
+          </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <label style={Object.assign({}, label, { flex: 1 })}>Where in the Portal
               <select value={f.area} onChange={function(e) { set('area', e.target.value); }} style={field}>
@@ -21431,7 +21478,7 @@ function FeatureRequestModal({ onClose }) {
           </div>
           {msg && <div style={{ fontSize: 13, marginBottom: 12, color: msg.bad ? '#b3402a' : '#2e7d32' }}>{msg.text}</div>}
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="submit" disabled={busy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.7 : 1 }}>{busy ? 'Saving…' : 'Submit request'}</button>
+            <button type="submit" disabled={busy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.7 : 1 }}>{busy ? (files.length ? 'Uploading…' : 'Saving…') : (f.kind === 'bug' ? 'Send bug report' : 'Submit request')}</button>
           </div>
         </form>
         <div style={{ borderTop: '0.5px solid #e8e0d5', marginTop: 20, paddingTop: 14 }}>
@@ -21443,10 +21490,11 @@ function FeatureRequestModal({ onClose }) {
             return (
               <div key={r.id} style={{ padding: '8px 0', borderTop: '0.5px solid #f3eee6' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, color: '#2a2a2a' }}>
-                  <span style={{ fontWeight: 600, textDecoration: done ? 'line-through' : 'none', opacity: done ? 0.55 : 1 }}>{r.title}</span>
+                  <span style={{ fontWeight: 600, textDecoration: done ? 'line-through' : 'none', opacity: done ? 0.55 : 1 }}>{r.kind === 'bug' && <span style={{ fontSize: 10, fontWeight: 700, color: '#b3402a', border: '1px solid #e3b4a9', borderRadius: 4, padding: '1px 5px', marginRight: 6 }}>BUG</span>}{r.title}</span>
                   <a onClick={function() { setStatus(r, done ? 'open' : 'done'); }} style={{ cursor: 'pointer', color: gold, fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{done ? 'Reopen' : 'Mark done'}</a>
                 </div>
                 {r.details && <div style={{ fontSize: 12, color: '#666', marginTop: 2, whiteSpace: 'pre-wrap' }}>{r.details}</div>}
+                {Array.isArray(r.attachments) && r.attachments.length > 0 && <div style={{ fontSize: 12, marginTop: 3 }}>{r.attachments.map(function(a, i) { return <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" style={{ color: gold, marginRight: 10 }}>📎 {a.name}</a>; })}</div>}
                 <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{[r.area, r.priority === 'high' ? 'Needed soon' : r.priority === 'low' ? 'Nice to have' : null, r.requested_by, new Date(r.created_at).toLocaleDateString()].filter(Boolean).join(' · ')}</div>
               </div>
             );
