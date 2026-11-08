@@ -121,6 +121,7 @@ By signing, you acknowledge that you have read the above Terms and Conditions an
   <div class="hint">(i.e extra hours added, maintenance needs, event mishaps)</div>
   <div class="gap"></div>
   <div class="inline3"><span>Time In -</span><span>Time Out -</span><span>Total Hours =</span></div>
+  <div class="inline3 guestout"><span>Guests' Actual Out Time -</span><small>(when the last guest left; used for billing if different from Time Out)</small></div>
   <div class="inline2"><span>Site Manager - <b>${mn(e.siteManager||"")}</b></span><span>Signature -</span></div>
   <div class="smallcap mid">Bottom Half of Page to Be Completed by Management</div>
   <h1 class="sd">Security Deposit Accounting Form:</h1>
@@ -169,6 +170,9 @@ By signing, you acknowledge that you have read the above Terms and Conditions an
   .hint { font-family: Cardo, Georgia, serif; font-size: 12px; color: #555; margin-top: 4px; }
   .gap { height: 60px; border-bottom: 1.5px solid #888; }
   .inline3 { display: flex; justify-content: space-between; padding: 12px 8px 4px; font-family: Cardo, Georgia, serif; font-weight: 700; font-size: 18px; }
+  .guestout { justify-content: flex-start; gap: 14px; align-items: flex-end; padding-top: 22px; padding-bottom: 14px; }
+  .guestout span { min-width: 3.2in; border-bottom: 1.5px solid #888; }
+  .guestout small { font-weight: 400; font-size: 11px; color: #555; }
   .inline2 { display: flex; justify-content: space-around; padding: 8px 8px 14px; font-family: Cardo, Georgia, serif; font-weight: 700; font-size: 18px; border-bottom: 1.5px solid #888; }
   h1.sd { font-size: 30px; margin: 10px 0 6px; border-top: 1.5px solid #888; border-bottom: 1.5px solid #888; padding: 10px 0; }
   .serif { font-family: Cardo, Georgia, serif; font-size: 17px; }
