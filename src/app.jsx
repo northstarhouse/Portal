@@ -18806,7 +18806,7 @@ function VenueRentalsView({ navigate, initialTab }) {
       body: JSON.stringify({
         to: m.from_email,
         subject: 'Re: Your message to North Star House',
-        body: 'Hi ' + String(m.from_name || 'there').split(' ')[0] + ',\n\n' + text + '\n\n' + by + '\nNorth Star House',
+        body: text + '\n\n' + by + '\nNorth Star House',
         html: buildClientReplyHtml(m.from_name, text, by),
         sender: by,
         fromEmail: 'venue@northstarhouse.org'
@@ -19590,6 +19590,54 @@ function VenueRentalsView({ navigate, initialTab }) {
             </div>
           )}
 
+          {venueTab === 'tour-archive' && (function() {
+            var THIRTY = 30 * 24 * 60 * 60 * 1000;
+            var fmtPhone = function(raw) {
+              if (!raw) return '';
+              var digits = String(raw).replace(/\D/g, '');
+              if (digits.length === 11 && digits[0] === '1') digits = digits.slice(1);
+              if (digits.length !== 10) return raw;
+              return '(' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6);
+            };
+            var fmtMadeContactDate = function(iso) { try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return ''; } };
+            var archivedRequests = (tours || []).filter(function(t) { return t.status === 'requested' && (t.request_status === 'not_interested' || (t.request_status === 'made_contact' && t.made_contact_at && (Date.now() - new Date(t.made_contact_at).getTime()) > THIRTY)); })
+              .sort(function(x, y) { return (y.made_contact_at || '').localeCompare(x.made_contact_at || ''); });
+            return (
+              <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '18px 20px', maxWidth: 760 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Archived Tour Requests</div>
+                  <button type="button" onClick={function() { setVenueTab('inquiries'); window.scrollTo(0, 0); }} style={{ background: '#fff', color: gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>&larr; Back to tour requests</button>
+                </div>
+                <div style={{ fontSize: 12, color: '#999', marginBottom: 10 }}>Not interested, or contacted more than 30 days ago. Change the dropdown to bring one back.</div>
+                {tours === null && <div style={{ fontSize: 13, color: '#777', padding: '16px 0' }}>Loading&hellip;</div>}
+                {tours !== null && archivedRequests.length === 0 && <div style={{ fontSize: 13, color: '#777', padding: '16px 0' }}>Nothing archived.</div>}
+                <div style={{ display: 'flex', flexDirection: 'column', marginTop: 0 }}>
+                  {archivedRequests.map(function(t) {
+                    return (
+                      <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0', borderBottom: '0.5px solid #f6f3ec' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>{(t.visitor_name || 'Unknown') + ' - ' + tourCategoryLabel({ kind: 'Tour', raw: t })}</div>
+                          <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                            {t.visitor_email && <a href={'mailto:' + t.visitor_email} style={{ color: gold, textDecoration: 'none' }}>{t.visitor_email}</a>}
+                            {t.visitor_email && t.visitor_phone && ' · '}
+                            {fmtPhone(t.visitor_phone)}
+                            {t.made_contact_at && (t.request_status === 'not_interested' ? ' · Not interested ' : ' · Made contact ') + fmtMadeContactDate(t.made_contact_at) + (t.request_handled_by ? ' by ' + t.request_handled_by : '')}
+                          </div>
+                        </div>
+                        <select value={reqChoice(t)} disabled={reqSavingId === t.id}
+                          onChange={function(e) { setRequestStatus(t.id, e.target.value); }}
+                          style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: '#fff', color: '#777', fontWeight: 600 }}>
+                          {reqOptions(t)}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+
+              </div>
+            );
+          })()}
+
           {venueTab === 'inquiries' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Tour Requests -- first in this column, above New Messages. */}
@@ -19725,31 +19773,9 @@ function VenueRentalsView({ navigate, initialTab }) {
               </div>
             )}
             {archivedRequests.length > 0 && (
-              <details style={{ marginTop: 14, borderTop: '0.5px solid #f0ece2', paddingTop: 10 }}>
-                <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#999' }}>Archived &mdash; not interested, or made contact 30+ days ago ({archivedRequests.length})</summary>
-                <div style={{ display: 'flex', flexDirection: 'column', marginTop: 6 }}>
-                  {archivedRequests.map(function(t) {
-                    return (
-                      <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0', borderBottom: '0.5px solid #f6f3ec' }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>{(t.visitor_name || 'Unknown') + ' - ' + tourCategoryLabel({ kind: 'Tour', raw: t })}</div>
-                          <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
-                            {t.visitor_email && <a href={'mailto:' + t.visitor_email} style={{ color: gold, textDecoration: 'none' }}>{t.visitor_email}</a>}
-                            {t.visitor_email && t.visitor_phone && ' · '}
-                            {fmtPhone(t.visitor_phone)}
-                            {t.made_contact_at && (t.request_status === 'not_interested' ? ' · Not interested ' : ' · Made contact ') + fmtMadeContactDate(t.made_contact_at) + (t.request_handled_by ? ' by ' + t.request_handled_by : '')}
-                          </div>
-                        </div>
-                        <select value={reqChoice(t)} disabled={reqSavingId === t.id}
-                          onChange={function(e) { setRequestStatus(t.id, e.target.value); }}
-                          style={{ flexShrink: 0, fontSize: 12, padding: '6px 10px', borderRadius: 7, border: '0.5px solid #e0d8cc', background: '#fff', color: '#777', fontWeight: 600 }}>
-                          {reqOptions(t)}
-                        </select>
-                      </div>
-                    );
-                  })}
-                </div>
-              </details>
+              <div style={{ marginTop: 14, borderTop: '0.5px solid #f0ece2', paddingTop: 10 }}>
+                <button type="button" onClick={function() { setVenueTab('tour-archive'); window.scrollTo(0, 0); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#999', textAlign: 'left' }}>Archived &mdash; not interested, or made contact 30+ days ago ({archivedRequests.length}) &rarr;</button>
+              </div>
             )}
             </div>
           </div>
@@ -20287,7 +20313,7 @@ function buildClientReplyHtml(name, text, by) {
     '<div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:3px;color:#886c44;font-weight:bold;margin-bottom:14px;">NORTH STAR HOUSE</div>' +
     '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">A Reply From North Star House</h1>' +
     '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>' +
-    '<p style="margin:0 0 18px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;text-align:left;">Hi ' + esc(first) + ',</p>' + paras +
+    paras +
     '<p style="margin:8px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;text-align:left;">' + esc(by) + '<br>North Star House</p>' +
     '<p style="margin:26px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Just reply to this email to write back to us.</i></p>' +
     '</div></div></div>';
@@ -20469,7 +20495,7 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
 
       {canReply && (
         <div style={{ marginTop: 10 }}>
-          <textarea value={reply} onChange={function(e) { setReply(e.target.value); setDraftStatus(''); }} onBlur={function() { saveDraft(reply); }} rows={4} placeholder={'Reply to ' + (m.from_name || 'them') + ' (sent from venue@northstarhouse.org to ' + m.from_email + ')'}
+          <textarea value={reply} onChange={function(e) { setReply(e.target.value); setDraftStatus(''); }} onBlur={function() { saveDraft(reply); }} rows={4} placeholder={'Reply to ' + (m.from_name || 'them') + ' (sent from venue@northstarhouse.org to ' + m.from_email + '). Write your own greeting; none is added.'}
             style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'system-ui, sans-serif', resize: 'vertical' }} />
           {draftStatus && <div style={{ fontSize: 11, color: draftStatus.indexOf('Could not') === 0 ? '#b3261e' : '#888', marginTop: 3 }}>{draftStatus}</div>}
         </div>
@@ -22097,10 +22123,16 @@ function EstateToursView() {
     if (busyId) return;
     if (!window.confirm('Remove this ' + fmtTime(slot.start_time) + ' slot on ' + fmtDate(slot.date) + '?')) return;
     setBusyId(slot.id);
-    fetch(SUPABASE_URL + '/rest/v1/estate_tours?id=eq.' + slot.id, {
-      method: 'DELETE',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-    }).then(function() { load(); }).finally(function() { setBusyId(null); });
+    // The table does not let the browser key delete rows (it answers "ok" and leaves the row), so this goes through the
+    // delete-estate-tour function like Delete on a booking does, and says so if the slot could not be removed.
+    fetch(SUPABASE_URL + '/functions/v1/delete-estate-tour', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: slot.id })
+    }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok, json: j }; }); }).then(function(res) {
+      if (!res.ok) alert('Could not remove that slot: ' + (res.json && res.json.error ? (typeof res.json.error === 'string' ? res.json.error : JSON.stringify(res.json.error)) : 'unknown error'));
+      load();
+    }).catch(function() { alert('Could not remove that slot. Please check your connection and try again.'); load(); }).finally(function() { setBusyId(null); });
   }
 
   // A range ("available 10 to 3") becomes hourly slots, each one a 45-minute tour on the hour with the 15 minutes before the next
