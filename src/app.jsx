@@ -367,6 +367,17 @@ const SHOW_ESTATE_TOURS_UPCOMING_LIST = false;
 // time being. The forms still exist and still collect responses; remove a
 // category from this list to show it again.
 var HIDDEN_RESPONSE_CATEGORIES = ['Wedding'];
+// Individual forms hidden from Form Responses (and its unread badge) because they are handled in Venue Rentals instead:
+// Memorial, Private Event, Non-Profit Event and Public Event inquiries, and both pre-booking forms. Their responses still arrive and show under
+// Venue Rentals > Inquiries; remove an id here to list that form on Form Responses again.
+var HIDDEN_RESPONSE_FORM_IDS = [
+  '952bc156-e89d-4790-814d-d2c2e9738a8b', // Memorial Inquiry
+  '5b886667-5230-4866-9874-7bc0dcdb3320', // Private Event Inquiry
+  'e8cc69a1-1693-4fb4-8518-b8bb486dd055', // Non-Profit Event Inquiry
+  'cd8f1e9f-06c5-4369-8b66-3498aff31465', // Public Event Inquiry
+  'a3a383f7-e1db-4344-9dec-ea879ad3406d', // Pre-Booking Information Form (weddings)
+  '668f27d4-7e2d-4ce6-ba0c-bac5ddf9d8f8'  // Pre Booking Information Form (Events)
+];
 
 // Shared by the Venue Rentals dashboard and its Messages/Inquiries sub-pages
 // so every part of that feature agrees on which calendar entries count as
@@ -15607,7 +15618,7 @@ function FormResponsesView({ navigate }) {
               return <SuListRow key={pl.id} title={pl.question} meta={meta} onClick={function() { setSelected({ type: 'polls', id: pl.id }); }} />;
             }))}
             {tab === 'forms' && (function() {
-              var shown = forms.filter(function(fm) { return HIDDEN_RESPONSE_CATEGORIES.indexOf(fm.category) === -1; });
+              var shown = forms.filter(function(fm) { return HIDDEN_RESPONSE_CATEGORIES.indexOf(fm.category) === -1 && HIDDEN_RESPONSE_FORM_IDS.indexOf(fm.id) === -1; });
               var visible = formCategory === 'All' ? shown : shown.filter(function(fm) { return fm.category === formCategory; });
               if (visible.length === 0) return <SuEmpty text={formCategory === 'All' ? 'No forms yet.' : 'No ' + formCategory + ' forms yet.'} />;
               return visible.map(function(fm) {
@@ -16032,6 +16043,7 @@ function AdminView({ navigate }) {
       // Leave out forms in hidden categories -- their responses are not shown on Form Responses.
       var hiddenIds = {};
       (Array.isArray(res[2]) ? res[2] : []).forEach(function(f) { if (HIDDEN_RESPONSE_CATEGORIES.indexOf(f.category) !== -1) hiddenIds[f.id] = true; });
+      HIDDEN_RESPONSE_FORM_IDS.forEach(function(id) { hiddenIds[id] = true; });
       var count = rows.filter(function(r) {
         if (hiddenIds[r.form_id]) return false;
         var s = seen[r.form_id];
@@ -20899,8 +20911,10 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
 
   return (
     <div>
-      <button onClick={function() { navigate('venue'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 14 }}>← Venue Rentals</button>
-      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 4 }}>{clientsOnly ? 'Clients' : 'Inquiries'}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div style={{ padding: '7px 0', fontSize: 20, fontFamily: "'Cardo', serif", fontWeight: 700, color: '#2a2a2a', textDecoration: 'underline', textDecorationColor: gold, textDecorationThickness: 2, textUnderlineOffset: 8 }}>{clientsOnly ? 'Clients' : 'Inquiries'}</div>
+        <button type="button" onClick={function() { navigate('venue'); }} style={{ padding: '9px 16px', background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>← Venue Rentals</button>
+      </div>
       <div style={{ fontSize: 12, color: '#aaa', marginBottom: clientsOnly ? 20 : 6 }}>{clientsOnly ? 'Official pre-booking form submissions — check off once handled.' : 'Wedding and Event Inquiry submissions — tours remain inquiries until an official pre-booking form is submitted.'}</div>
       {!clientsOnly && toursMonth !== null && (
         <div style={{ fontSize: 12, color: '#666', marginBottom: 20 }}>
@@ -20911,7 +20925,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
       {!clientsOnly && (
         <div style={{ marginBottom: 14 }}>
           <button type="button" onClick={function() { setManualOpen(!manualOpen); setManualMsg(null); }}
-            style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{manualOpen ? 'Close' : 'Send Pre-Booking Form'}</button>
+            style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '9px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{manualOpen ? 'Close' : 'Send Pre-Booking Form'}</button>
           {manualOpen && (
             <form onSubmit={function(e) { sendManual(e, false); }} style={{ marginTop: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#888', flex: '2 1 220px' }}>Email address
@@ -20960,22 +20974,6 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
         </div>
       )}
 
-      {!clientsOnly && rows !== null && rows.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <label style={{ fontSize: 12, color: '#888' }}>Show</label>
-          <select value={tourFilter} onChange={function(e) { setTourFilter(e.target.value); }} aria-label="Filter inquiries by tour status"
-            style={{ fontSize: 12, fontWeight: 600, color: gold, background: '#fff', border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 8px', cursor: 'pointer' }}>
-            <option value="all">All inquiries</option>
-            <option value="booked">Tour booked</option>
-            <option value="completed">Toured</option>
-            <option value="requested">Tour requested</option>
-            <option value="cancelled">Tour cancelled</option>
-            <option value="no_show">Didn't show up</option>
-            <option value="none">No tour</option>
-          </select>
-        </div>
-      )}
-
       {rows === null ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#aaa', fontSize: 13 }}>Loading…</div>
       ) : displayRows.length === 0 ? (
@@ -20984,7 +20982,25 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
         </div>
       ) : (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-          <div style={{ flex: 1, minWidth: 0, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ flex: 1, minWidth: 0, background: '#fff', border: '1px solid ' + gold + '40', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', padding: '14px 18px', background: gold }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', fontFamily: "'Cardo', serif" }}>{clientsOnly ? 'Clients' : 'Inquiries'} <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.9, fontFamily: 'system-ui, sans-serif' }}>({clientsOnly || tourFilter === 'all' ? displayRows.length : displayRows.filter(function(sub) { return tourStateKey(sub) === tourFilter; }).length})</span></div>
+              {!clientsOnly && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)' }}>Show</label>
+                  <select value={tourFilter} onChange={function(e) { setTourFilter(e.target.value); }} aria-label="Filter inquiries by tour status"
+                    style={{ fontSize: 12, fontWeight: 600, color: gold, background: '#fff', border: 'none', borderRadius: 7, padding: '5px 8px', cursor: 'pointer' }}>
+                    <option value="all">All inquiries</option>
+                    <option value="booked">Tour booked</option>
+                    <option value="completed">Toured</option>
+                    <option value="requested">Tour requested</option>
+                    <option value="cancelled">Tour cancelled</option>
+                    <option value="no_show">Didn't show up</option>
+                    <option value="none">No tour</option>
+                  </select>
+                </div>
+              )}
+            </div>
             {(clientsOnly || tourFilter === 'all' ? displayRows : displayRows.filter(function(sub) { return tourStateKey(sub) === tourFilter; })).length === 0 && (
               <div style={{ padding: 30, textAlign: 'center', color: '#aaa', fontSize: 13 }}>No inquiries match this filter.</div>
             )}
