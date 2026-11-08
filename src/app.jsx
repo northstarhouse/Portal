@@ -22007,6 +22007,8 @@ function EstateToursView() {
   const [addTime, setAddTime] = useState('');
   const [addGuide, setAddGuide] = useState('Jen');
   const [addRecurring, setAddRecurring] = useState(false);
+  const [addRange, setAddRange] = useState(false);
+  const [addEndTime, setAddEndTime] = useState('');
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState('');
   const [busyId, setBusyId] = useState(null);
@@ -22101,9 +22103,22 @@ function EstateToursView() {
     }).then(function() { load(); }).finally(function() { setBusyId(null); });
   }
 
+  // A range ("available 10 to 3") becomes hourly slots, each one a 45-minute tour on the hour with the 15 minutes before the next
+  // one as a break: 10:00, 11:00, 12:00, 1:00, 2:00, 3:00. The end time is the last tour's start.
+  function rangeTimes() {
+    if (!addRange) return addTime ? [addTime] : [];
+    var a = /^(\d\d):(\d\d)/.exec(addTime || ''), b = /^(\d\d):(\d\d)/.exec(addEndTime || '');
+    if (!a || !b) return [];
+    var from = +a[1] * 60 + +a[2], to = +b[1] * 60 + +b[2], out = [];
+    for (var t = from; t <= to && out.length < 14; t += 60) out.push(String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'));
+    return out;
+  }
+  function slotLabel(hhmm) { var h = +hhmm.slice(0, 2); return ((h % 12) || 12) + ':' + hhmm.slice(3, 5) + (h >= 12 ? ' PM' : ' AM'); }
   function addSlot(e) {
     e.preventDefault();
+    var times = rangeTimes();
     if (!addDate || !addTime) { setAddError('Date and time are required.'); return; }
+    if (addRange && !times.length) { setAddError('Choose a start time, and an end time that is the same or later.'); return; }
     if (addSaving) return;
     setAddSaving(true);
     setAddError('');
@@ -22117,20 +22132,22 @@ function EstateToursView() {
       }
     }
     // Skip dates that already have a slot for this guide at this time (Jen's slots are unique per date + time).
-    fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=date&guide_name=eq.' + encodeURIComponent(addGuide) + '&start_time=eq.' + encodeURIComponent(addTime) + '&date=in.(' + dates.join(',') + ')', {
+    fetch(SUPABASE_URL + '/rest/v1/estate_tours?select=date,start_time&guide_name=eq.' + encodeURIComponent(addGuide) + '&start_time=in.(' + times.join(',') + ')&date=in.(' + dates.join(',') + ')', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(existing) {
       var have = {};
-      (Array.isArray(existing) ? existing : []).forEach(function(x) { have[x.date] = true; });
-      var fresh = dates.filter(function(dt) { return !have[dt]; });
-      if (!fresh.length) {
-        setAddError(dates.length > 1 ? addGuide + ' already has a slot at that time on all of those dates.' : 'That slot already exists.');
+      (Array.isArray(existing) ? existing : []).forEach(function(x) { have[x.date + '|' + String(x.start_time).slice(0, 5)] = true; });
+      var wanted = [];
+      dates.forEach(function(dt) { times.forEach(function(tm) { if (!have[dt + '|' + tm]) wanted.push({ date: dt, start_time: tm, guide_name: addGuide, status: 'open' }); }); });
+      if (!wanted.length) {
+        setAddError(dates.length > 1 || times.length > 1 ? addGuide + ' already has all of those slots.' : 'That slot already exists.');
         return;
       }
-      return sbInsert('estate_tours', fresh.map(function(dt) { return { date: dt, start_time: addTime, guide_name: addGuide, status: 'open' }; })).then(function(r) {
+      return sbInsert('estate_tours', wanted).then(function(r) {
         if (Array.isArray(r) && r.length) {
-          setAddDate(''); setAddTime(''); setAddOpen(false); setAddRecurring(false);
-          if (r.length < dates.length) alert('Added ' + r.length + ' slot' + (r.length === 1 ? '' : 's') + '. ' + (dates.length - r.length) + ' already existed and were skipped.');
+          setAddDate(''); setAddTime(''); setAddEndTime(''); setAddOpen(false); setAddRecurring(false); setAddRange(false);
+          var total = dates.length * times.length;
+          if (r.length < total) alert('Added ' + r.length + ' slot' + (r.length === 1 ? '' : 's') + '. ' + (total - r.length) + ' already existed and were skipped.');
           load();
         } else {
           setAddError((r && (r.message || r.error || (r.hint))) || 'Could not add that slot — it may already exist.');
@@ -22531,9 +22548,13 @@ function EstateToursView() {
             <input type="date" value={addDate} onChange={function(e) { setAddDate(e.target.value); }} style={inputStyle} />
           </div>
           <div>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>Time</label>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>{addRange ? 'From' : 'Time'}</label>
             <QuarterHourSelect ariaLabel="Slot time" value={addTime} onChange={setAddTime} style={inputStyle} />
           </div>
+          {addRange && <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>Last tour starts</label>
+            <QuarterHourSelect ariaLabel="Last tour start" value={addEndTime} onChange={setAddEndTime} style={inputStyle} />
+          </div>}
           <div>
             <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 4 }}>Guide</label>
             <select value={addGuide} onChange={function(e) { setAddGuide(e.target.value); }} aria-label="Tour guide" style={inputStyle}>
@@ -22543,12 +22564,17 @@ function EstateToursView() {
             </select>
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#555', padding: '0 4px 10px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={addRange} onChange={function(e) { setAddRange(e.target.checked); }} />
+            A range of hours
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#555', padding: '0 4px 10px', cursor: 'pointer' }}>
             <input type="checkbox" checked={addRecurring} onChange={function(e) { setAddRecurring(e.target.checked); }} />
             Repeat weekly (next 8 weeks)
           </label>
           <button type="submit" disabled={addSaving} style={{ padding: '9px 16px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', opacity: addSaving ? 0.6 : 1 }}>
-            {addSaving ? 'Adding…' : 'Add'}
+            {addSaving ? 'Adding…' : (addRange && rangeTimes().length > 1 ? 'Add ' + rangeTimes().length + ' slots' : 'Add')}
           </button>
+          {addRange && rangeTimes().length > 0 && <div style={{ width: '100%', fontSize: 12, color: '#6b5d4a' }}>Adds {rangeTimes().length} tour slot{rangeTimes().length === 1 ? '' : 's'} on the hour (45 minutes each, 15 minute break): {rangeTimes().map(slotLabel).join(', ')}.</div>}
           {addError && <div style={{ width: '100%', fontSize: 12, color: '#c0392b' }}>{addError}</div>}
         </form>
       )}

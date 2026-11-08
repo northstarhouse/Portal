@@ -143,8 +143,9 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   if (!eventDate) task('date', 'Confirm event date', null, 'No date recorded', 'booking');
   tasks.sort((x, y) => x.rank - y.rank || (x.due || eventDate || '9999').localeCompare(y.due || eventDate || '9999'));
   const siteManager = a.__venue_checklist?.site_manager?.name || '';
+  const eventDay = a.__venue_checklist?.event_day || null;
   const feedbackSentAt = live?.feedback_sent_at || null;
-  return { id:sub.id, sub, maxGuests:String(a.max_guests||'').trim()||null, name, email, contacts, siteManager, questionnaire, hbQa, feedbackSentAt, hb, eventDate, eventEnd, nativeAgreement, legacy, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : evType(live?.event_type), days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
+  return { id:sub.id, sub, maxGuests:String(a.max_guests||'').trim()||null, name, email, contacts, siteManager, questionnaire, hbQa, feedbackSentAt, eventDay, hb, eventDate, eventEnd, nativeAgreement, legacy, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : evType(live?.event_type), days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
 }
 
 const css = `
@@ -167,6 +168,26 @@ async function saveSiteManager(responseId, name) {
   const res = await fetch(resource + '&form_id=eq.' + encodeURIComponent(rows[0].form_id), { method: 'PATCH', headers: { ...headers, Prefer: 'return=representation' }, body: JSON.stringify({ answers }) });
   const saved = res.ok ? await res.json() : null;
   if (!Array.isArray(saved) || saved.length !== 1) throw new Error('The site manager could not be saved. Please try again.');
+  return saved[0];
+}
+
+// Event-day times for billing: when the last guest actually left, and when the site manager left (they are often different).
+// Saved on the client's own record beside the other checklist items. Times are 'HH:MM' (24 hour); empty clears one.
+async function saveEventDay(responseId, times) {
+  if (!responseId) throw new Error('Choose a client.');
+  const headers = { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY, 'Content-Type': 'application/json' };
+  const resource = PB_URL + '/rest/v1/nsh_form_responses?id=eq.' + encodeURIComponent(responseId);
+  const cur = await fetch(resource + '&select=id,form_id,answers', { headers });
+  const rows = cur.ok ? await cur.json() : null;
+  if (!Array.isArray(rows) || rows.length !== 1) throw new Error('Client record is unavailable or you do not have permission to update it.');
+  const ok = (t) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(t || '')) ? String(t) : '');
+  const day = { guests_out: ok(times.guests_out), sm_out: ok(times.sm_out), saved_at: new Date().toISOString() };
+  const checklist = { ...(rows[0].answers?.__venue_checklist || {}) };
+  if (day.guests_out || day.sm_out) checklist.event_day = day; else delete checklist.event_day;
+  const answers = { ...rows[0].answers, __venue_checklist: checklist };
+  const res = await fetch(resource + '&form_id=eq.' + encodeURIComponent(rows[0].form_id), { method: 'PATCH', headers: { ...headers, Prefer: 'return=representation' }, body: JSON.stringify({ answers }) });
+  const saved = res.ok ? await res.json() : null;
+  if (!Array.isArray(saved) || saved.length !== 1) throw new Error('The times could not be saved. Please try again.');
   return saved[0];
 }
 
@@ -433,10 +454,13 @@ async function saveEventName(id, name) {
   return rows[0];
 }
 
-function ClientDetail({ client, onClose, onRename, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
+function ClientDetail({ client, onClose, onRename, onSaveEventDay, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [agrOpen, setAgrOpen] = React.useState(false);
+  const [dayTimes, setDayTimes] = React.useState({ guests_out: client.eventDay?.guests_out || '', sm_out: client.eventDay?.sm_out || '' });
+  const [dayBusy, setDayBusy] = React.useState(false);
+  const [dayMsg, setDayMsg] = React.useState(null);
   const [tl, setTl] = React.useState({ tour: null, sentAt: null, loaded: false });
   // The tour and the "client guide + pre-booking form" email, found by the couple's email addresses.
   React.useEffect(() => {
@@ -516,6 +540,26 @@ function ClientDetail({ client, onClose, onRename, onVerify, onSavePayments, agr
         <div className="vc-modal-section-title">Contacts</div>
         <div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div>{c.address && <div className="vc-muted">{c.address}</div>}</div>)}</div>
       </div>
+      {onSaveEventDay && <div className="vc-modal-section">
+        <div className="vc-modal-section-title">Event-day times (for billing)</div>
+        <p className="vc-muted" style={{margin:'0 0 10px'}}>From the site manager's sheet. Guests' out time and the site manager's out time are often different; bill extra hours from the guests' out time.</p>
+        {(() => {
+          const mins = (t) => { const m = /^(\d\d):(\d\d)$/.exec(t || ''); return m ? +m[1] * 60 + +m[2] : null; };
+          const g = mins(dayTimes.guests_out), sm = mins(dayTimes.sm_out);
+          const pretty = (t) => { const m = mins(t); if (m === null) return ''; const h = Math.floor(m / 60); return (h % 12 || 12) + ':' + String(m % 60).padStart(2, '0') + ' ' + (h < 12 ? 'AM' : 'PM'); };
+          const inp = { border: '1px solid #ded7cb', background: '#fff', borderRadius: 7, padding: '8px 10px', font: 'inherit' };
+          const dirty = dayTimes.guests_out !== (client.eventDay?.guests_out || '') || dayTimes.sm_out !== (client.eventDay?.sm_out || '');
+          return <>
+            <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'flex-end'}}>
+              <label style={{fontSize:12,color:'#666',display:'flex',flexDirection:'column',gap:4}}>Guests' actual out time<input type="time" value={dayTimes.guests_out} onChange={e => { setDayTimes({...dayTimes, guests_out: e.target.value}); setDayMsg(null); }} style={inp}/></label>
+              <label style={{fontSize:12,color:'#666',display:'flex',flexDirection:'column',gap:4}}>Site manager out time<input type="time" value={dayTimes.sm_out} onChange={e => { setDayTimes({...dayTimes, sm_out: e.target.value}); setDayMsg(null); }} style={inp}/></label>
+              <button type="button" disabled={dayBusy || !dirty} onClick={async () => { setDayBusy(true); setDayMsg(null); try { await onSaveEventDay(client.id, dayTimes); setDayMsg({ bad: false, text: 'Saved.' }); } catch (e) { setDayMsg({ bad: true, text: e.message || 'Could not save.' }); } finally { setDayBusy(false); } }} style={{background:'#886c44',color:'#fff',border:0,borderRadius:8,padding:'9px 16px',fontWeight:600,opacity:dayBusy||!dirty?0.6:1}}>{dayBusy ? 'Saving…' : 'Save times'}</button>
+              {dayMsg && <span style={{fontSize:12,color:dayMsg.bad?'#b3261e':'#2e7d32'}}>{dayMsg.text}</span>}
+            </div>
+            {g !== null && sm !== null && g !== sm && <p className="vc-muted" style={{margin:'10px 0 0'}}>Guests left at {pretty(dayTimes.guests_out)}; the site manager left at {pretty(dayTimes.sm_out)} ({Math.abs(sm - g)} min {sm > g ? 'later' : 'earlier'}). Use the guests' time for billing.</p>}
+          </>;
+        })()}
+      </div>}
       <div className="vc-modal-section">
         <div className="vc-modal-section-title">Timeline of Steps</div>
         {steps.map((st, i) => <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i?'1px solid #f0ebe2':'none'}}>
@@ -687,6 +731,10 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     const record = await saveSiteManager(id,name);
     setSavedResponses(prev=>({...prev,[id]:record}));
   }
+  async function recordEventDay(id,times) {
+    const record = await saveEventDay(id,times);
+    setSavedResponses(prev=>({...prev,[id]:record}));
+  }
   async function verifyInsurance(id,verified,note) {
     if (!saveInsurance) throw new Error('Insurance verification is unavailable. Please reload and try again.');
     const record = await saveInsurance(id,verified,note);
@@ -711,6 +759,6 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     </aside></div>
     </>}
     {statsOpen&&<ClientStats clients={clients} onClose={onCloseStats}/>}
-    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSavePayments={recordPayments} onRename={renameClient} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
+    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onSavePayments={recordPayments} onRename={renameClient} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }
