@@ -20421,12 +20421,35 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
   var fromInbox = /^Email: /.test(m.subject || '');
   var isVoicemail = String(m.event_uid || '') === 'voicemail:';
   var knownClient = String(m.event_uid || '').indexOf('client:') === 0;
-  var canReply = (wantsEmail || fromInbox) && !!m.from_email;
+  var canReply = (wantsEmail || fromInbox || fromHb) && !!m.from_email;
   function sendReply() {
     if (!by) { setErr('Choose who is replying (Jen, Derek or Haley).'); return; }
     if (!reply.trim()) { setErr('Type your reply first.'); return; }
     setBusy(true); setErr('');
     onReply(m, by, reply.trim(), note).then(function() { try { localStorage.removeItem(draftKey); } catch (e) {} }).catch(function(e) { setErr(e.message || 'Could not send.'); setBusy(false); });
+  }
+  // Voicemails can be forwarded to a short list of people (the server looks up the addresses).
+  var [fwdTo, setFwdTo] = useState('');
+  var [fwdBusy, setFwdBusy] = useState(false);
+  var [fwdMsg, setFwdMsg] = useState(null);
+  function forwardVoicemail() {
+    if (!fwdTo) { setFwdMsg({ bad: true, text: 'Choose who to forward it to.' }); return; }
+    var label = { docents: 'the Docents', kaelen: 'Kaelen Jennings', ken: 'Ken Underwood' }[fwdTo];
+    if (!window.confirm('Email this voicemail to ' + label + '?')) return;
+    setFwdBusy(true); setFwdMsg(null);
+    var vm = cleanVoicemail(m);
+    var when = new Date(m.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' ' + new Date(m.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' });
+    whoIsSignedIn().then(function(who) {
+      return fetch(SUPABASE_URL + '/functions/v1/forward-message', { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: fwdTo, by: by || who || '', note: note, message: { from: vm.caller, phone: m.from_phone || '', when: when, text: vm.text } }) });
+    }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok, j: j }; }); })
+      .then(function(res) {
+        if (!res.ok || !res.j.ok) { setFwdMsg({ bad: true, text: (res.j && res.j.error) || 'Could not forward it.' }); return; }
+        setFwdMsg({ bad: false, text: 'Forwarded to ' + res.j.label + '.' });
+        logActivity('Voicemail from ' + vm.caller + ' forwarded to ' + res.j.label, 'voicemail_forwarded');
+        setFwdTo('');
+      }).catch(function() { setFwdMsg({ bad: true, text: 'Could not forward it.' }); })
+      .finally(function() { setFwdBusy(false); });
   }
   var pill = { fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '2px 9px' };
   return (
@@ -20468,6 +20491,19 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
         <button disabled={busy} onClick={function() { if (!by) { setErr('Choose who handled it (Jen, Derek or Haley).'); return; } onHandle(m.id, by, note); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{canReply ? 'Mark handled without replying' : 'Mark handled'}</button>
         {knownClient && <button onClick={onOpenClient} style={{ background: 'none', color: gold, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Open client file</button>}
       </div>
+      {isVoicemail && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select value={fwdTo} onChange={function(e) { setFwdTo(e.target.value); setFwdMsg(null); }} aria-label="Forward this voicemail to"
+            style={{ fontSize: 12, fontWeight: 600, color: '#6b5d4a', background: '#fff', border: '0.5px solid #d8d0c4', borderRadius: 8, padding: '6px 8px' }}>
+            <option value="">Forward to…</option>
+            <option value="docents">Docents</option>
+            <option value="kaelen">Kaelen Jennings</option>
+            <option value="ken">Ken Underwood</option>
+          </select>
+          <button disabled={fwdBusy || !fwdTo} onClick={forwardVoicemail} style={{ background: '#fff', color: '#6b5d4a', border: '1px solid #d8d0c4', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: fwdBusy || !fwdTo ? 0.6 : 1 }}>{fwdBusy ? 'Forwarding…' : 'Forward'}</button>
+          {fwdMsg && <span style={{ fontSize: 12, color: fwdMsg.bad ? '#b3261e' : '#2e7d32' }}>{fwdMsg.text}</span>}
+        </div>
+      )}
     </div>
   );
 }
