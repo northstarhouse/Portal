@@ -14007,6 +14007,16 @@ function EventEmailModal({ ev, onClose }) {
   var [letter, setLetter] = useState('');
   // How the letter addresses them ("As a valued ___"): follows who it is going to, unless you pick one.
   var [roleChoice, setRoleChoice] = useState('auto');
+  // What has already gone out for this event (from the activity log), and who received it.
+  var [history, setHistory] = useState(null);
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?select=created_at,volunteer_name,detail&action=eq.event_email_sent&' + encodeURIComponent('detail->>event_id') + '=eq.' + encodeURIComponent(ev.id) + '&order=created_at.desc&limit=30', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.ok ? r.json() : []; }).then(function(rows) { setHistory(Array.isArray(rows) ? rows : []); }).catch(function() { setHistory([]); });
+  }, []);
+  var sentMap = {};
+  (history || []).slice().reverse().forEach(function(h) { ((h.detail && h.detail.emails) || []).forEach(function(e) { sentMap[String(e).toLowerCase()] = h.created_at; }); });
+  function sentDay(email) { var t = sentMap[String(email || '').trim().toLowerCase()]; return t ? new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''; }
+  function audienceName(a) { return ({ 'letter-sponsors': 'Current sponsors', 'letter-custom': 'Pasted list or donors', volunteers: 'Active volunteers', custom: 'Pasted list' })[a] || String(a || ''); }
   var [busy, setBusy] = useState(false);
   var [msg, setMsg] = useState(null);
   var isShift = ev.event_type === 'shift';
@@ -14083,6 +14093,15 @@ function EventEmailModal({ ev, onClose }) {
           <a onClick={onClose} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Close ×</a>
         </div>
         <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>{ev.title}. {style === 'letter' ? 'A formal invitation letter with three RSVP buttons. Each person gets their own email, addressed by name.' : 'Looks like the ' + (isShift ? 'sign-up' : 'RSVP') + ' page, with a button that says "' + (isShift ? 'Click here to sign up' : 'Click here to RSVP') + '".'}</div>
+        {history && history.length > 0 && (
+          <div style={{ background: '#f5f9f5', border: '1px solid #cfe6d4', borderRadius: 8, padding: '10px 12px', marginBottom: 14, fontSize: 12, color: '#2e6b4f' }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Already sent</div>
+            {history.map(function(h, i) {
+              return <div key={i}>{new Date(h.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {audienceName(h.detail && h.detail.audience)}{h.detail && h.detail.count ? ' (' + h.detail.count + ')' : ''}{h.volunteer_name ? ' · by ' + h.volunteer_name : ''}</div>;
+            })}
+            <div style={{ color: '#6b8f7a', marginTop: 4 }}>Real sends only. Tests to the office are not listed.</div>
+          </div>
+        )}
         {!isShift && <label style={label}>Style
           <select value={style} onChange={function(e) { var v = e.target.value; setStyle(v); setMsg(null); if (v === 'letter' && audience === 'volunteers') setAudience('test'); }} style={field}>
             <option value="page">Event page (button: Click here to RSVP)</option>
@@ -14111,7 +14130,7 @@ function EventEmailModal({ ev, onClose }) {
             <option value="custom">Email addresses I paste</option>
           </select>
         </label>
-        {audience === 'custom' && <label style={label}>{style === 'letter' ? 'One person per line: email, first name (the name is optional)' : 'Email addresses (commas, spaces or new lines)'}<textarea rows={4} value={emails} onChange={function(e) { setEmails(e.target.value); }} placeholder={style === 'letter' ? 'jane@example.com, Jane\nbob@example.com, Bob\nsomeone@example.com' : 'jane@example.com, bob@example.com'} style={Object.assign({}, field, { resize: 'vertical' })} /><span>{customCount} valid address{customCount === 1 ? '' : 'es'}</span></label>}
+        {audience === 'custom' && <label style={label}>{style === 'letter' ? 'One person per line: email, first name (the name is optional)' : 'Email addresses (commas, spaces or new lines)'}<textarea rows={4} value={emails} onChange={function(e) { setEmails(e.target.value); }} placeholder={style === 'letter' ? 'jane@example.com, Jane\nbob@example.com, Bob\nsomeone@example.com' : 'jane@example.com, bob@example.com'} style={Object.assign({}, field, { resize: 'vertical' })} /><span>{customCount} valid address{customCount === 1 ? '' : 'es'}{(function() { var already = (emails.match(/[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+/g) || []).filter(function(x) { return sentDay(x); }).length; return already ? ' · ' + already + ' already received this' : ''; })()}</span></label>}
         {audience === 'donors' && (
           <div style={{ marginBottom: 12 }}>
             <input value={donorQuery} onChange={function(e) { setDonorQuery(e.target.value); }} placeholder={donorRows === null ? 'Loading donors…' : 'Search donors by name or email'} style={field} />
@@ -14120,7 +14139,7 @@ function EventEmailModal({ ev, onClose }) {
               return (
                 <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 2px', borderBottom: '0.5px solid #f3eee6', fontSize: 13 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, color: '#2a2a2a' }}>{d.formal_name}</div>
+                    <div style={{ fontWeight: 600, color: '#2a2a2a' }}>{d.formal_name}{has && sentDay(d.email) && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: '#2e6b4f', background: '#e3f4e3', borderRadius: 10, padding: '1px 7px' }}>✓ Sent {sentDay(d.email)}</span>}</div>
                     <div style={{ fontSize: 11, color: has ? '#888' : '#b45309' }}>{has ? d.email : 'No email on file'}</div>
                   </div>
                   {has
@@ -14137,7 +14156,7 @@ function EventEmailModal({ ev, onClose }) {
               <div style={{ marginTop: 10 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Sending to ({pickedList.length})</div>
                 {pickedList.map(function(d) {
-                  return <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: '#555', padding: '3px 0' }}><span>{d.formal_name} <span style={{ color: '#999' }}>· “Dear {donorGreeting(d) || 'Friend'},”</span></span><a onClick={function() { setPickedDonors(function(prev) { var n = Object.assign({}, prev); delete n[d.id]; return n; }); }} style={{ cursor: 'pointer', color: '#b3402a' }}>Remove</a></div>;
+                  return <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: '#555', padding: '3px 0' }}><span>{d.formal_name} <span style={{ color: '#999' }}>· “Dear {donorGreeting(d) || 'Friend'},”</span>{sentDay(d.email) && <span style={{ color: '#b45309', fontWeight: 600 }}> · already sent {sentDay(d.email)}</span>}</span><a onClick={function() { setPickedDonors(function(prev) { var n = Object.assign({}, prev); delete n[d.id]; return n; }); }} style={{ cursor: 'pointer', color: '#b3402a' }}>Remove</a></div>;
                 })}
               </div>
             )}

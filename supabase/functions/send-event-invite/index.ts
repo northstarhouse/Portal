@@ -217,7 +217,7 @@ async function handleLetter(ev: any, body: any, action: string) {
   if (audience !== 'test') {
     await sb('/rest/v1/activity_log', {
       method: 'POST', headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ description: `Invitation letter sent: ${ev.title} (${audience === 'sponsors' ? 'current sponsors' : 'custom list'}, ${people.length} ${people.length === 1 ? 'person' : 'people'})`, volunteer_name: String(body.sent_by || '') || null, action: 'event_email_sent', tag: 'Events', detail: { event_id: ev.id, audience: `letter-${audience}`, count: people.length, subject } }),
+      body: JSON.stringify({ description: `Invitation letter sent: ${ev.title} (${audience === 'sponsors' ? 'current sponsors' : 'custom list'}, ${people.length} ${people.length === 1 ? 'person' : 'people'})`, volunteer_name: String(body.sent_by || '') || null, action: 'event_email_sent', tag: 'Events', detail: { event_id: ev.id, audience: `letter-${audience}`, count: people.length, subject, emails: people.map((p) => p.email) } }),
     }).catch(() => {})
   }
   return json({ ok: true, sent, recipients: audience === 'test' ? 1 : people.length })
