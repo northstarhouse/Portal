@@ -93,7 +93,7 @@ function smallCapsTitle(title: string) {
   }).join('<span style="font-size:36px;">&nbsp;</span>')
 }
 
-const ROLES = ['member', 'sponsor', 'donor', 'member or sponsor']
+const ROLES = ['member', 'sponsor', 'donor', 'supporter']
 const letterBodyAfterIntro = (role: string) => [
   `Your continued generosity, encouragement, and support are vital to preserving and revitalizing North Star House. As a valued ${role}, you are an important part of this work, and we are sincerely grateful for your commitment.`,
   'This gathering is an opportunity to reflect on recent accomplishments, share updates on ongoing preservation efforts, and offer a look at our vision for the future. We look forward to celebrating the progress made possible by the people who care so deeply about North Star House.',
@@ -109,7 +109,7 @@ function buildLetterHtml(ev: any, o: { name?: string; text?: string; org?: strin
   const day = friendlyDay(ev.date)
   const intro = `On behalf of the North Star Historic Conservancy, we warmly invite you to join us for our ${ev.title} gathering${day ? ' on ' + day : ''}.`
   const custom = String(o.text || '').trim()
-  const body = custom ? custom.split(/\n{2,}/).map(p).join('') : [intro, ...letterBodyAfterIntro(ROLES.includes(String(o.role)) ? String(o.role) : 'member or sponsor')].map(p).join('')
+  const body = custom ? custom.split(/\n{2,}/).map(p).join('') : [intro, ...letterBodyAfterIntro(ROLES.includes(String(o.role)) ? String(o.role) : 'supporter')].map(p).join('')
   const rule = '<div style="border-top:1px solid #c9b27c;line-height:1px;font-size:1px;margin:26px 0;">&nbsp;</div>'
   const btn = (label: string) => `<tr><td align="center" style="padding:0 0 10px;"><a href="${esc(link)}" style="display:block;width:260px;max-width:100%;box-sizing:border-box;background:${GOLD};color:#ffffff;border:1.5px solid ${GOLD};text-decoration:none;font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:bold;padding:13px 16px;text-align:center;">${label}</a></td></tr>`
   return `<div style="background:#ffffff;padding:28px 12px;">
@@ -183,7 +183,7 @@ function customPeople(text: string): { email: string; name: string }[] {
 // deno-lint-ignore no-explicit-any
 async function handleLetter(ev: any, body: any, action: string) {
   const text = String(body.letter || '').trim().slice(0, 4000)
-  const role = ROLES.includes(String(body.role)) ? String(body.role) : (String(body.audience) === 'sponsors' ? 'sponsor' : 'member or sponsor')
+  const role = ROLES.includes(String(body.role)) ? String(body.role) : (String(body.audience) === 'sponsors' ? 'sponsor' : 'supporter')
   if (action === 'preview') return json({ html: buildLetterHtml(ev, { name: String(body.preview_name || '').slice(0, 60), text, role }) })
   const audience = String(body.audience || 'test')
   let people: { email: string; name: string; org?: string }[]

@@ -14023,13 +14023,13 @@ function EventEmailModal({ ev, onClose }) {
   var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
   function call(payload) {
     return whoIsSignedIn().then(function(who) {
-      return fetch(SUPABASE_URL + '/functions/v1/send-event-invite', { method: 'POST', headers: H, body: JSON.stringify(Object.assign({ event_id: ev.id, subject: subject, note: note, audience: audience === 'donors' ? 'custom' : audience, emails: audience === 'donors' ? donorLines : emails, sent_by: who || '', template: style === 'letter' ? 'letter' : undefined, letter: letter, role: roleChoice === 'auto' ? (audience === 'sponsors' ? 'sponsor' : audience === 'donors' ? 'donor' : 'member or sponsor') : roleChoice }, payload)) });
+      return fetch(SUPABASE_URL + '/functions/v1/send-event-invite', { method: 'POST', headers: H, body: JSON.stringify(Object.assign({ event_id: ev.id, subject: subject, note: note, audience: (audience === 'donors' || audience === 'members') ? 'custom' : audience, emails: (audience === 'donors' || audience === 'members') ? donorLines : emails, sent_by: who || '', template: style === 'letter' ? 'letter' : undefined, letter: letter, role: roleChoice === 'auto' ? (audience === 'sponsors' ? 'sponsor' : audience === 'members' ? 'member' : audience === 'donors' ? 'donor' : 'supporter') : roleChoice }, payload)) });
     }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok, status: r.status, j: j }; }); });
   }
   useEffect(function() { call({ action: 'count' }).then(function(res) { if (res.ok) { setVolCount(res.j.volunteers); setSponsorCount(res.j.sponsors); } }).catch(function() {}); }, []);
   var customCount = emails.split(/[\s,;]+/).filter(function(x) { return /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(x); }).length;
   useEffect(function() {
-    if (audience !== 'donors' || donorRows !== null) return;
+    if ((audience !== 'donors' && audience !== 'members') || donorRows !== null) return;
     fetch(SUPABASE_URL + '/rest/v1/donors?select=id,formal_name,informal_first_name,preferred_letter_greeting,joint_donor_name,email,deceased&order=formal_name', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
       .then(function(r) { return r.json(); }).then(function(rows) { setDonorRows(Array.isArray(rows) ? rows.filter(function(d) { return !d.deceased; }) : []); }).catch(function() { setDonorRows([]); });
   }, [audience]);
@@ -14057,7 +14057,7 @@ function EventEmailModal({ ev, onClose }) {
   var pickedList = Object.keys(pickedDonors).map(function(id) { return pickedDonors[id]; });
   // Under the hood a donor send is the pasted-list send: one "email, greeting" line per person.
   var donorLines = pickedList.filter(function(d) { return emailOk(d.email); }).map(function(d) { return d.email.trim() + ', ' + donorGreeting(d); }).join('\n');
-  var people = audience === 'volunteers' ? volCount : audience === 'sponsors' ? sponsorCount : audience === 'donors' ? pickedList.filter(function(d) { return emailOk(d.email); }).length : audience === 'custom' ? customCount : 1;
+  var people = audience === 'volunteers' ? volCount : audience === 'sponsors' ? sponsorCount : (audience === 'donors' || audience === 'members') ? pickedList.filter(function(d) { return emailOk(d.email); }).length : audience === 'custom' ? customCount : 1;
   function preview() {
     setBusy(true); setMsg(null);
     call({ action: 'preview' }).then(function(res) {
@@ -14070,7 +14070,7 @@ function EventEmailModal({ ev, onClose }) {
   function send(resend) {
     if (busy) return;
     if (audience === 'custom' && !customCount) { setMsg({ bad: true, text: 'Paste at least one email address.' }); return; }
-    if (audience === 'donors' && !people) { setMsg({ bad: true, text: 'Pick at least one donor who has an email address.' }); return; }
+    if ((audience === 'donors' || audience === 'members') && !people) { setMsg({ bad: true, text: 'Pick at least one person who has an email address.' }); return; }
     if (audience !== 'test' && !resend && !window.confirm('Send "' + ev.title + '" to ' + people + (people === 1 ? ' person' : ' people') + '? Recipients cannot see each other.')) return;
     setBusy(true); setMsg(null);
     call({ action: 'send', confirm: audience !== 'test', resend: !!resend }).then(function(res) {
@@ -14111,11 +14111,11 @@ function EventEmailModal({ ev, onClose }) {
         <label style={label}>Subject<input value={subject} onChange={function(e) { setSubject(e.target.value); }} placeholder={isShift ? 'Volunteer sign-up: ' + ev.title : "You're invited: " + ev.title} style={field} /></label>
         {style === 'letter' && <label style={label}>Address them as a valued…
           <select value={roleChoice} onChange={function(e) { setRoleChoice(e.target.value); }} style={field}>
-            <option value="auto">Automatic (sponsor, donor, or member or sponsor, based on who it goes to)</option>
+            <option value="auto">Automatic (matches who you send to; a pasted list says supporter)</option>
             <option value="member">member</option>
             <option value="sponsor">sponsor</option>
             <option value="donor">donor</option>
-            <option value="member or sponsor">member or sponsor</option>
+            <option value="supporter">supporter</option>
           </select>
         </label>}
         {style === 'letter'
@@ -14126,12 +14126,13 @@ function EventEmailModal({ ev, onClose }) {
             <option value="test">Send me a test (office inbox only)</option>
             {style !== 'letter' && <option value="volunteers">Active volunteers{volCount != null ? ' (' + volCount + ')' : ''}</option>}
             {style === 'letter' && <option value="sponsors">Current sponsors{sponsorCount != null ? ' (' + sponsorCount + ')' : ''}</option>}
+            {style === 'letter' && <option value="members">Members I search for and pick</option>}
             {style === 'letter' && <option value="donors">Donors I search for and pick</option>}
             <option value="custom">Email addresses I paste</option>
           </select>
         </label>
         {audience === 'custom' && <label style={label}>{style === 'letter' ? 'One person per line: email, first name (the name is optional)' : 'Email addresses (commas, spaces or new lines)'}<textarea rows={4} value={emails} onChange={function(e) { setEmails(e.target.value); }} placeholder={style === 'letter' ? 'jane@example.com, Jane\nbob@example.com, Bob\nsomeone@example.com' : 'jane@example.com, bob@example.com'} style={Object.assign({}, field, { resize: 'vertical' })} /><span>{customCount} valid address{customCount === 1 ? '' : 'es'}{(function() { var already = (emails.match(/[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+/g) || []).filter(function(x) { return sentDay(x); }).length; return already ? ' · ' + already + ' already received this' : ''; })()}</span></label>}
-        {audience === 'donors' && (
+        {(audience === 'donors' || audience === 'members') && (
           <div style={{ marginBottom: 12 }}>
             <input value={donorQuery} onChange={function(e) { setDonorQuery(e.target.value); }} placeholder={donorRows === null ? 'Loading donors…' : 'Search donors by name or email'} style={field} />
             {donorMatches.map(function(d) {
