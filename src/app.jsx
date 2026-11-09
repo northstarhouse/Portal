@@ -366,18 +366,7 @@ const SHOW_ESTATE_TOURS_UPCOMING_LIST = false;
 // Form categories hidden from Form Responses (and its unread badge) for the
 // time being. The forms still exist and still collect responses; remove a
 // category from this list to show it again.
-var HIDDEN_RESPONSE_CATEGORIES = ['Wedding'];
-// Individual forms hidden from Form Responses (and its unread badge) because they are handled in Venue Rentals instead:
-// Memorial, Private Event, Non-Profit Event and Public Event inquiries, and both pre-booking forms. Their responses still arrive and show under
-// Venue Rentals > Inquiries; remove an id here to list that form on Form Responses again.
-var HIDDEN_RESPONSE_FORM_IDS = [
-  '952bc156-e89d-4790-814d-d2c2e9738a8b', // Memorial Inquiry
-  '5b886667-5230-4866-9874-7bc0dcdb3320', // Private Event Inquiry
-  'e8cc69a1-1693-4fb4-8518-b8bb486dd055', // Non-Profit Event Inquiry
-  'cd8f1e9f-06c5-4369-8b66-3498aff31465', // Public Event Inquiry
-  'a3a383f7-e1db-4344-9dec-ea879ad3406d', // Pre-Booking Information Form (weddings)
-  '668f27d4-7e2d-4ce6-ba0c-bac5ddf9d8f8'  // Pre Booking Information Form (Events)
-];
+// (Which forms are hidden is now a per-form setting, nsh_forms.portal_hidden, changed from Form Responses with Hide / Show again.)
 
 // Shared by the Venue Rentals dashboard and its Messages/Inquiries sub-pages
 // so every part of that feature agrees on which calendar entries count as
@@ -14070,7 +14059,7 @@ function EventEmailModal({ ev, onClose }) {
   );
 }
 
-function SuListRow({ title, subtitle, meta, unread, onClick, onViewResponses, onCopyLink, copied, onDelete, onSendEmail }) {
+function SuListRow({ title, subtitle, meta, unread, onClick, onViewResponses, onCopyLink, copied, onDelete, onSendEmail, bucketControl, onToggleHidden, hiddenNow }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '0.5px solid #f0ece6' }}>
       <div onClick={onClick} style={{ flex: 1, minWidth: 0, cursor: onClick ? 'pointer' : 'default' }}>
@@ -14081,6 +14070,8 @@ function SuListRow({ title, subtitle, meta, unread, onClick, onViewResponses, on
         {subtitle && <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{subtitle}</div>}
         {meta && <div style={{ fontSize: 11, color: gold, marginTop: 2, fontWeight: 600 }}>{meta}</div>}
       </div>
+      {bucketControl}
+      {onToggleHidden && <button onClick={onToggleHidden} title={hiddenNow ? 'Put this form back on the main list' : 'Move this form out of the main list into the Hidden bucket'} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: hiddenNow ? gold : '#888', flexShrink: 0 }}>{hiddenNow ? 'Show again' : 'Hide'}</button>}
       {onViewResponses && <button onClick={onViewResponses} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#888', flexShrink: 0 }}>Responses</button>}
       {onCopyLink && <button onClick={onCopyLink} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: copied ? '#2e7d32' : '#888', flexShrink: 0 }}>{copied ? '✓ Copied' : 'Copy link'}</button>}
       {onSendEmail && <button onClick={onSendEmail} style={{ background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: gold, flexShrink: 0 }}>Send email</button>}
@@ -15578,6 +15569,41 @@ function FormResponsesView({ navigate }) {
     setSelected({ type: 'forms', id: fm.id });
   }
 
+  // Buckets are the forms' categories; any category in use gets its own tab, and a form can be moved to another (or a new) one.
+  // "Hidden" is a separate switch (portal_hidden) so a hidden form keeps its bucket for when it is shown again.
+  var visibleForms = forms.filter(function(f) { return !f.portal_hidden; });
+  var hiddenForms = forms.filter(function(f) { return !!f.portal_hidden; });
+  var bucketNames = (function() {
+    var seen = {}, out = [];
+    FORM_CATEGORIES.concat(forms.map(function(f) { return f.category; }).filter(Boolean)).forEach(function(c) { if (!seen[c]) { seen[c] = true; out.push(c); } });
+    return out;
+  })();
+  var formTabs = ['All'].concat(bucketNames.filter(function(c) { return visibleForms.some(function(f) { return f.category === c; }); }));
+  function patchForm(fm, patch) {
+    setForms(function(prev) { return prev.map(function(f) { return f.id === fm.id ? Object.assign({}, f, patch) : f; }); });
+    return fetch(SUPABASE_URL + '/rest/v1/nsh_forms?id=eq.' + encodeURIComponent(fm.id), {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(patch)
+    }).then(function(r) {
+      if (!r.ok) throw new Error('save failed');
+    }).catch(function() {
+      alert('Could not save that change. Please try again.');
+      fetchAll();
+    });
+  }
+  function toggleHidden(fm) { patchForm(fm, { portal_hidden: !fm.portal_hidden }); }
+  function moveBucket(fm, value) {
+    var target = value;
+    if (value === '__new__') {
+      var name = window.prompt('Name for the new bucket:', '');
+      if (name === null) return;
+      target = name.trim().slice(0, 40);
+      if (!target) return;
+    }
+    patchForm(fm, { category: target || null });
+  }
+
   if (selected) {
     return (
       <div style={{ maxWidth: 640 }}>
@@ -15601,10 +15627,11 @@ function FormResponsesView({ navigate }) {
       <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden' }}>
         {tab === 'forms' && (
           <div style={{ display: 'flex', gap: 4, padding: '14px 16px 14px', borderBottom: '0.5px solid #f0ece6', flexWrap: 'wrap' }}>
-            {SU_FORM_CATEGORY_TABS.filter(function(c) { return HIDDEN_RESPONSE_CATEGORIES.indexOf(c) === -1; }).map(function(c) {
+            {formTabs.map(function(c) {
               var active = formCategory === c;
               return <button key={c} onClick={function() { setFormCategory(c); }} style={{ padding: '4px 11px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: active ? '#f0ece6' : 'transparent', color: active ? '#2a2a2a' : '#999', border: 'none' }}>{c}</button>;
             })}
+            {hiddenForms.length > 0 && <button onClick={function() { setFormCategory('__hidden__'); }} style={{ marginLeft: 'auto', padding: '4px 11px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: formCategory === '__hidden__' ? '#f0ece6' : 'transparent', color: formCategory === '__hidden__' ? '#2a2a2a' : '#999', border: '0.5px dashed #d8d0c4' }}>Hidden ({hiddenForms.length})</button>}
           </div>
         )}
         {loading ? <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div> : (
@@ -15618,14 +15645,22 @@ function FormResponsesView({ navigate }) {
               return <SuListRow key={pl.id} title={pl.question} meta={meta} onClick={function() { setSelected({ type: 'polls', id: pl.id }); }} />;
             }))}
             {tab === 'forms' && (function() {
-              var shown = forms.filter(function(fm) { return HIDDEN_RESPONSE_CATEGORIES.indexOf(fm.category) === -1 && HIDDEN_RESPONSE_FORM_IDS.indexOf(fm.id) === -1; });
-              var visible = formCategory === 'All' ? shown : shown.filter(function(fm) { return fm.category === formCategory; });
-              if (visible.length === 0) return <SuEmpty text={formCategory === 'All' ? 'No forms yet.' : 'No ' + formCategory + ' forms yet.'} />;
+              var inHidden = formCategory === '__hidden__';
+              var visible = inHidden ? hiddenForms : (formCategory === 'All' ? visibleForms : visibleForms.filter(function(fm) { return fm.category === formCategory; }));
+              if (visible.length === 0) return <SuEmpty text={inHidden ? 'Nothing hidden.' : (formCategory === 'All' ? 'No forms yet.' : 'No ' + formCategory + ' forms yet.')} />;
               return visible.map(function(fm) {
                 var responses = fm.nsh_form_responses || [];
-                var meta = responses.length + ' responses';
+                var meta = responses.length + ' responses' + (fm.category ? ' · ' + fm.category : '');
                 var unread = countUnreadResponses(responses, fm.id, seenMap);
-                return <SuListRow key={fm.id} title={fm.title} meta={meta} unread={unread} onClick={function() { openForm(fm); }} />;
+                var bucket = (
+                  <select value={fm.category || ''} onChange={function(e) { moveBucket(fm, e.target.value); }} aria-label={'Bucket for ' + (fm.title || 'form')}
+                    style={{ fontSize: 11, color: '#888', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '4px 6px', maxWidth: 110, flexShrink: 0 }}>
+                    <option value="">No bucket</option>
+                    {bucketNames.map(function(c) { return <option key={c} value={c}>{c}</option>; })}
+                    <option value="__new__">New bucket…</option>
+                  </select>
+                );
+                return <SuListRow key={fm.id} title={fm.title} meta={meta} unread={unread} onClick={function() { openForm(fm); }} bucketControl={bucket} onToggleHidden={function() { toggleHidden(fm); }} hiddenNow={!!fm.portal_hidden} />;
               });
             })()}
           </div>
@@ -16034,7 +16069,7 @@ function AdminView({ navigate }) {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
       }).then(function(r) { return r.json(); }),
       fetchFormSeenMap(),
-      fetch(SUPABASE_URL + '/rest/v1/nsh_forms?select=id,category', {
+      fetch(SUPABASE_URL + '/rest/v1/nsh_forms?select=id,category,portal_hidden', {
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
       }).then(function(r) { return r.json(); }).catch(function() { return []; }),
     ]).then(function(res) {
@@ -16042,8 +16077,7 @@ function AdminView({ navigate }) {
       if (!Array.isArray(rows)) return;
       // Leave out forms in hidden categories -- their responses are not shown on Form Responses.
       var hiddenIds = {};
-      (Array.isArray(res[2]) ? res[2] : []).forEach(function(f) { if (HIDDEN_RESPONSE_CATEGORIES.indexOf(f.category) !== -1) hiddenIds[f.id] = true; });
-      HIDDEN_RESPONSE_FORM_IDS.forEach(function(id) { hiddenIds[id] = true; });
+      (Array.isArray(res[2]) ? res[2] : []).forEach(function(f) { if (f.portal_hidden) hiddenIds[f.id] = true; });
       var count = rows.filter(function(r) {
         if (hiddenIds[r.form_id]) return false;
         var s = seen[r.form_id];
