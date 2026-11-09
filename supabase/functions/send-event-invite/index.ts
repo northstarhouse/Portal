@@ -162,7 +162,7 @@ async function sponsorPeople(): Promise<{ email: string; name: string; org?: str
     if (!(gave.has(s.id) || !s.sponsor_status || s.sponsor_status === 'current')) continue
     for (const e of String(s['Email Address'] || '').split(/[\s,;]+/)) {
       const em = e.trim().toLowerCase()
-      if (EMAIL_RE.test(em) && !seen.has(em)) { seen.add(em); out.push({ email: em, name: firstNameOf(s['Main Contact']), org: String(s['Business Name'] || '').trim() }) }
+      if (EMAIL_RE.test(em) && !seen.has(em)) { seen.add(em); out.push({ email: em, name: String(s['Business Name'] || '').trim().slice(0, 80), org: String(s['Business Name'] || '').trim() }) }
     }
   }
   return out
