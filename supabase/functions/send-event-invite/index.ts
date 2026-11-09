@@ -132,8 +132,7 @@ ${ev.time ? `<div style="font-size:18px;color:#2c2418;margin:0 0 8px;">${esc(pre
 </div>
 ${rule}
 <div style="text-align:center;margin:0 0 6px;">
-<div style="font-size:22px;font-weight:bold;color:#1e1a14;margin:0 0 4px;">Will you join us?</div>
-<div style="font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#8a7a5c;margin:0 0 18px;">Let us know if you can make it.</div>
+<div style="font-size:22px;font-weight:bold;color:#1e1a14;margin:0 0 18px;">Will you join us?</div>
 <table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;border-collapse:collapse;">
 ${btn('Click here to RSVP')}
 </table></div>
