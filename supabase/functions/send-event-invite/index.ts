@@ -93,22 +93,23 @@ function smallCapsTitle(title: string) {
   }).join('<span style="font-size:36px;">&nbsp;</span>')
 }
 
-const LETTER_BODY_AFTER_INTRO = [
-  'Your continued generosity, encouragement, and support are vital to preserving and revitalizing North Star House. As a valued member or sponsor, you are an important part of this work, and we are sincerely grateful for your commitment.',
+const ROLES = ['member', 'sponsor', 'donor', 'member or sponsor']
+const letterBodyAfterIntro = (role: string) => [
+  `Your continued generosity, encouragement, and support are vital to preserving and revitalizing North Star House. As a valued ${role}, you are an important part of this work, and we are sincerely grateful for your commitment.`,
   'This gathering is an opportunity to reflect on recent accomplishments, share updates on ongoing preservation efforts, and offer a look at our vision for the future. We look forward to celebrating the progress made possible by the people who care so deeply about North Star House.',
 ]
 const LETTER_CLOSING = 'We hope you will join us for this special occasion. Thank you for being part of the North Star House story.'
 
 // deno-lint-ignore no-explicit-any
-function buildLetterHtml(ev: any, o: { name?: string; text?: string; org?: string }) {
+function buildLetterHtml(ev: any, o: { name?: string; text?: string; org?: string; role?: string }) {
   const name = String(o.name || '').trim()
   const org = String(o.org || '').trim()
-  const link = `${SITE}${encodeURIComponent(ev.slug || '')}${name ? '&n=' + encodeURIComponent(name) : ''}${org ? '&g=sponsor&o=' + encodeURIComponent(org) : ''}`
+  const link = `${SITE}${encodeURIComponent(ev.slug || '')}${org ? '&g=sponsor&o=' + encodeURIComponent(org) : o.role === 'member' ? '&g=member' : o.role === 'sponsor' ? '&g=sponsor' : ''}`
   const p = (t: string) => `<p style="margin:0 0 16px;font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:1.65;color:#2c2418;">${esc(t).replace(/\n/g, '<br>')}</p>`
   const day = friendlyDay(ev.date)
   const intro = `On behalf of the North Star Historic Conservancy, we warmly invite you to join us for our ${ev.title} gathering${day ? ' on ' + day : ''}.`
   const custom = String(o.text || '').trim()
-  const body = custom ? custom.split(/\n{2,}/).map(p).join('') : [intro, ...LETTER_BODY_AFTER_INTRO].map(p).join('')
+  const body = custom ? custom.split(/\n{2,}/).map(p).join('') : [intro, ...letterBodyAfterIntro(ROLES.includes(String(o.role)) ? String(o.role) : 'member or sponsor')].map(p).join('')
   const rule = '<div style="border-top:1px solid #c9b27c;line-height:1px;font-size:1px;margin:26px 0;">&nbsp;</div>'
   const btn = (label: string) => `<tr><td align="center" style="padding:0 0 10px;"><a href="${esc(link)}" style="display:block;width:260px;max-width:100%;box-sizing:border-box;background:${GOLD};color:#ffffff;border:1.5px solid ${GOLD};text-decoration:none;font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:bold;padding:13px 16px;text-align:center;">${label}</a></td></tr>`
   return `<div style="background:#ffffff;padding:28px 12px;">
@@ -182,7 +183,8 @@ function customPeople(text: string): { email: string; name: string }[] {
 // deno-lint-ignore no-explicit-any
 async function handleLetter(ev: any, body: any, action: string) {
   const text = String(body.letter || '').trim().slice(0, 4000)
-  if (action === 'preview') return json({ html: buildLetterHtml(ev, { name: String(body.preview_name || '').slice(0, 60), text }) })
+  const role = ROLES.includes(String(body.role)) ? String(body.role) : (String(body.audience) === 'sponsors' ? 'sponsor' : 'member or sponsor')
+  if (action === 'preview') return json({ html: buildLetterHtml(ev, { name: String(body.preview_name || '').slice(0, 60), text, role }) })
   const audience = String(body.audience || 'test')
   let people: { email: string; name: string; org?: string }[]
   if (audience === 'test') people = [{ email: ADMIN, name: '' }]
@@ -205,8 +207,8 @@ async function handleLetter(ev: any, body: any, action: string) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
       body: JSON.stringify({
         to: p.email, subject: audience === 'test' ? `[Test] ${subject}` : subject,
-        body: `${p.name ? 'Dear ' + p.name : 'Dear Friend'},\n\nYou are invited to ${ev.title}: ${[longDate(ev.date), prettyTime(ev.time)].filter(Boolean).join(', ')}, ${ADDRESS}.\n\nRSVP: ${SITE}${ev.slug}${p.name ? '&n=' + encodeURIComponent(p.name) : ''}${p.org ? '&g=sponsor&o=' + encodeURIComponent(p.org) : ''}\n\nThe Board of Directors\nNorth Star Historic Conservancy`,
-        html: buildLetterHtml(ev, { name: p.name, text, org: p.org }), sender: 'North Star House',
+        body: `${p.name ? 'Dear ' + p.name : 'Dear Friend'},\n\nYou are invited to ${ev.title}: ${[longDate(ev.date), prettyTime(ev.time)].filter(Boolean).join(', ')}, ${ADDRESS}.\n\nRSVP: ${SITE}${ev.slug}${p.org ? '&g=sponsor&o=' + encodeURIComponent(p.org) : ''}\n\nThe Board of Directors\nNorth Star Historic Conservancy`,
+        html: buildLetterHtml(ev, { name: p.name, text, org: p.org, role }), sender: 'North Star House',
       }),
     })
     if (!r.ok) return json({ error: `The email could not be sent (sent ${sent} so far). Please try again.`, sent }, 502)
