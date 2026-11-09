@@ -14006,6 +14006,7 @@ function EventEmailModal({ ev, onClose }) {
   // 'page' = looks like the event's RSVP page; 'letter' = the formal invitation letter with RSVP buttons (RSVP events only).
   var [style, setStyle] = useState('page');
   var [letter, setLetter] = useState('');
+  var [subheadline, setSubheadline] = useState('');
   // How the letter addresses them ("As a valued ___"): follows who it is going to, unless you pick one.
   var [roleChoice, setRoleChoice] = useState('auto');
   // What has already gone out for this event (from the activity log), and who received it.
@@ -14024,7 +14025,7 @@ function EventEmailModal({ ev, onClose }) {
   var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
   function call(payload) {
     return whoIsSignedIn().then(function(who) {
-      return fetch(SUPABASE_URL + '/functions/v1/send-event-invite', { method: 'POST', headers: H, body: JSON.stringify(Object.assign({ event_id: ev.id, subject: subject, note: note, audience: (audience === 'donors' || audience === 'members') ? 'custom' : audience, emails: (audience === 'donors' || audience === 'members') ? donorLines : emails, sent_by: who || '', template: style === 'letter' ? 'letter' : undefined, letter: letter, role: roleChoice === 'auto' ? (audience === 'sponsors' ? 'sponsor' : audience === 'members' ? 'member' : audience === 'donors' ? 'donor' : 'supporter') : roleChoice }, payload)) });
+      return fetch(SUPABASE_URL + '/functions/v1/send-event-invite', { method: 'POST', headers: H, body: JSON.stringify(Object.assign({ event_id: ev.id, subject: subject, note: note, audience: (audience === 'donors' || audience === 'members') ? 'custom' : audience, emails: (audience === 'donors' || audience === 'members') ? donorLines : emails, sent_by: who || '', template: style === 'letter' ? 'letter' : undefined, letter: letter, subheadline: subheadline, role: roleChoice === 'auto' ? (audience === 'sponsors' ? 'sponsor' : audience === 'members' ? 'member' : audience === 'donors' ? 'donor' : 'supporter') : roleChoice }, payload)) });
     }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok, status: r.status, j: j }; }); });
   }
   useEffect(function() { call({ action: 'count' }).then(function(res) { if (res.ok) { setVolCount(res.j.volunteers); setSponsorCount(res.j.sponsors); } }).catch(function() {}); }, []);
@@ -14114,6 +14115,7 @@ function EventEmailModal({ ev, onClose }) {
           </select>
         </label>}
         <label style={label}>Subject<input value={subject} onChange={function(e) { setSubject(e.target.value); }} placeholder={isShift ? 'Volunteer sign-up: ' + ev.title : "You're invited: " + ev.title} style={field} /></label>
+        {style === 'letter' && <label style={label}>Sub headline (optional)<input value={subheadline} onChange={function(e) { setSubheadline(e.target.value); }} maxLength={140} placeholder="A line under the title, for example: An evening to celebrate our members and sponsors" style={field} /></label>}
         {style === 'letter' && <label style={label}>Address them as a valued…
           <select value={roleChoice} onChange={function(e) { setRoleChoice(e.target.value); }} style={field}>
             <option value="auto">Automatic (matches who you send to; a pasted list says supporter)</option>
