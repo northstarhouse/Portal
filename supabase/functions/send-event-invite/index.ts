@@ -63,7 +63,7 @@ ${img ? `<td class="ev-img" valign="top" width="230" style="vertical-align:top;w
 
 // ── Invitation letter style ──────────────────────────────────────────────────────────────────────────────────────────────
 // A formal letter look (house sketch, small-caps title, "Dear name,", details between gold rules, signed by the Board) with an
-// interactive RSVP: three buttons that open the RSVP page with that answer already chosen and the guest's name filled in, so
+// RSVP: a "Click here to RSVP" button that opens the RSVP page with the guest's name already filled in (?n=).
 // replying is one tap and a confirm. (The page asks them to confirm instead of saving on the first tap, so mail scanners that
 // open links cannot create RSVPs by themselves.) Used with template: 'letter'. Sent one email per person so each has their own name.
 const HOUSE_IMG = 'https://northstarhouse.github.io/Portal/assets/state-of-the-star-house.png'
@@ -100,16 +100,17 @@ const LETTER_BODY_AFTER_INTRO = [
 const LETTER_CLOSING = 'We hope you will join us for this special occasion. Thank you for being part of the North Star House story.'
 
 // deno-lint-ignore no-explicit-any
-function buildLetterHtml(ev: any, o: { name?: string; text?: string }) {
+function buildLetterHtml(ev: any, o: { name?: string; text?: string; org?: string }) {
   const name = String(o.name || '').trim()
-  const link = (r: number) => `${SITE}${encodeURIComponent(ev.slug || '')}&r=${r}${name ? '&n=' + encodeURIComponent(name) : ''}`
+  const org = String(o.org || '').trim()
+  const link = `${SITE}${encodeURIComponent(ev.slug || '')}${name ? '&n=' + encodeURIComponent(name) : ''}${org ? '&g=sponsor&o=' + encodeURIComponent(org) : ''}`
   const p = (t: string) => `<p style="margin:0 0 16px;font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:1.65;color:#2c2418;">${esc(t).replace(/\n/g, '<br>')}</p>`
   const day = friendlyDay(ev.date)
   const intro = `On behalf of the North Star Historic Conservancy, we warmly invite you to join us for our ${ev.title} gathering${day ? ' on ' + day : ''}.`
   const custom = String(o.text || '').trim()
   const body = custom ? custom.split(/\n{2,}/).map(p).join('') : [intro, ...LETTER_BODY_AFTER_INTRO].map(p).join('')
   const rule = '<div style="border-top:1px solid #c9b27c;line-height:1px;font-size:1px;margin:26px 0;">&nbsp;</div>'
-  const btn = (r: number, label: string, primary: boolean) => `<tr><td align="center" style="padding:0 0 10px;"><a href="${esc(link(r))}" style="display:block;width:290px;max-width:100%;box-sizing:border-box;background:${primary ? GOLD : '#ffffff'};color:${primary ? '#ffffff' : GOLD};border:1.5px solid ${GOLD};text-decoration:none;font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:bold;padding:13px 16px;text-align:center;">${label}</a></td></tr>`
+  const btn = (label: string) => `<tr><td align="center" style="padding:0 0 10px;"><a href="${esc(link)}" style="display:block;width:260px;max-width:100%;box-sizing:border-box;background:${GOLD};color:#ffffff;border:1.5px solid ${GOLD};text-decoration:none;font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:bold;padding:13px 16px;text-align:center;">${label}</a></td></tr>`
   return `<div style="background:#ffffff;padding:28px 12px;">
 <div style="max-width:640px;margin:0 auto;background:#ffffff;font-family:Georgia,'Times New Roman',serif;">
 <div style="text-align:center;padding:8px 0 0;"><img src="${HOUSE_IMG}" alt="North Star House" width="330" style="display:block;margin:0 auto;width:330px;max-width:80%;height:auto;border:0;"></div>
@@ -127,9 +128,9 @@ ${ev.time ? `<div style="font-size:18px;color:#2c2418;margin:0 0 8px;">${esc(pre
 ${rule}
 <div style="text-align:center;margin:0 0 6px;">
 <div style="font-size:22px;font-weight:bold;color:#1e1a14;margin:0 0 4px;">Will you join us?</div>
-<div style="font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#8a7a5c;margin:0 0 18px;">Tap your answer. You will confirm it on the next page.</div>
+<div style="font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#8a7a5c;margin:0 0 18px;">Let us know if you can make it.</div>
 <table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;border-collapse:collapse;">
-${btn(0, "Yes, I'll be there", true)}${btn(1, "Yes, and I'll bring a guest", false)}${btn(2, "Sorry, I can't make it", false)}
+${btn('Click here to RSVP')}
 </table></div>
 ${rule}
 ${p(LETTER_CLOSING)}
@@ -144,20 +145,23 @@ ${p('With sincere appreciation,')}
 const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/
 const firstNameOf = (v: unknown) => { const w = String(v ?? '').trim().split(/\s+/)[0] || ''; return /^[A-Za-z][A-Za-z'’.-]*$/.test(w) ? w : '' }
 
+// A greeting typed after the email, up to a few words ("Bob and Sue", "Dr. Lee"); anything odd falls back to "Dear Friend".
+const greetingOf = (v: unknown) => { const g = String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, 60); return /^[A-Za-z][A-Za-z'’.\- &]*$/.test(g) ? g : '' }
+
 // Current sponsors, the same rule the Portal uses: gave this year, or their status is blank or "current".
-async function sponsorPeople(): Promise<{ email: string; name: string }[]> {
+async function sponsorPeople(): Promise<{ email: string; name: string; org?: string }[]> {
   const yr = new Date().getFullYear()
   // deno-lint-ignore no-explicit-any
   const kind: any[] = await sb(`/rest/v1/${encodeURIComponent('Sponsor In-Kind')}?select=sponsor_id&date=gte.${yr}-01-01`).then((r) => r.json()).catch(() => [])
   const gave = new Set((Array.isArray(kind) ? kind : []).map((k) => k.sponsor_id))
   // deno-lint-ignore no-explicit-any
-  const rows: any[] = await sb(`/rest/v1/Sponsors?select=${encodeURIComponent('id,"Main Contact","Email Address",sponsor_status')}`).then((r) => r.json()).catch(() => [])
-  const seen = new Set<string>(), out: { email: string; name: string }[] = []
+  const rows: any[] = await sb(`/rest/v1/Sponsors?select=${encodeURIComponent('id,"Business Name","Main Contact","Email Address",sponsor_status')}`).then((r) => r.json()).catch(() => [])
+  const seen = new Set<string>(), out: { email: string; name: string; org?: string }[] = []
   for (const s of Array.isArray(rows) ? rows : []) {
     if (!(gave.has(s.id) || !s.sponsor_status || s.sponsor_status === 'current')) continue
     for (const e of String(s['Email Address'] || '').split(/[\s,;]+/)) {
       const em = e.trim().toLowerCase()
-      if (EMAIL_RE.test(em) && !seen.has(em)) { seen.add(em); out.push({ email: em, name: firstNameOf(s['Main Contact']) }) }
+      if (EMAIL_RE.test(em) && !seen.has(em)) { seen.add(em); out.push({ email: em, name: firstNameOf(s['Main Contact']), org: String(s['Business Name'] || '').trim() }) }
     }
   }
   return out
@@ -170,7 +174,7 @@ function customPeople(text: string): { email: string; name: string }[] {
     const em = (line.match(/[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+/) || [])[0]?.toLowerCase()
     if (!em || seen.has(em)) continue
     seen.add(em)
-    out.push({ email: em, name: firstNameOf(line.replace(em, '').replace(/[<>,]/g, ' ')) })
+    out.push({ email: em, name: greetingOf(line.replace(em, '').replace(/[<>,]/g, ' ')) })
   }
   return out
 }
@@ -180,7 +184,7 @@ async function handleLetter(ev: any, body: any, action: string) {
   const text = String(body.letter || '').trim().slice(0, 4000)
   if (action === 'preview') return json({ html: buildLetterHtml(ev, { name: String(body.preview_name || '').slice(0, 60), text }) })
   const audience = String(body.audience || 'test')
-  let people: { email: string; name: string }[]
+  let people: { email: string; name: string; org?: string }[]
   if (audience === 'test') people = [{ email: ADMIN, name: '' }]
   else if (audience === 'sponsors') people = await sponsorPeople()
   else if (audience === 'custom') people = customPeople(String(body.emails || ''))
@@ -201,8 +205,8 @@ async function handleLetter(ev: any, body: any, action: string) {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
       body: JSON.stringify({
         to: p.email, subject: audience === 'test' ? `[Test] ${subject}` : subject,
-        body: `${p.name ? 'Dear ' + p.name : 'Dear Friend'},\n\nYou are invited to ${ev.title}: ${[longDate(ev.date), prettyTime(ev.time)].filter(Boolean).join(', ')}, ${ADDRESS}.\n\nRSVP: ${SITE}${ev.slug}${p.name ? '&n=' + encodeURIComponent(p.name) : ''}\n\nThe Board of Directors\nNorth Star Historic Conservancy`,
-        html: buildLetterHtml(ev, { name: p.name, text }), sender: 'North Star House',
+        body: `${p.name ? 'Dear ' + p.name : 'Dear Friend'},\n\nYou are invited to ${ev.title}: ${[longDate(ev.date), prettyTime(ev.time)].filter(Boolean).join(', ')}, ${ADDRESS}.\n\nRSVP: ${SITE}${ev.slug}${p.name ? '&n=' + encodeURIComponent(p.name) : ''}${p.org ? '&g=sponsor&o=' + encodeURIComponent(p.org) : ''}\n\nThe Board of Directors\nNorth Star Historic Conservancy`,
+        html: buildLetterHtml(ev, { name: p.name, text, org: p.org }), sender: 'North Star House',
       }),
     })
     if (!r.ok) return json({ error: `The email could not be sent (sent ${sent} so far). Please try again.`, sent }, 502)

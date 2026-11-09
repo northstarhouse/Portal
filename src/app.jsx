@@ -5015,7 +5015,9 @@ function DonorsView({ navigate }) {
 
   function saveProfileFields(e){
     e.preventDefault();setSavingProfile(true);
-    var patch={background:profileForm.background||null,first_connected:profileForm.first_connected||null,nsh_contact:profileForm.nsh_contact||null,donor_notes:profileForm.donor_notes||null,also_supports:profileForm.also_supports||null};
+    var emailVal=String(profileForm.email||'').trim();
+    if(emailVal&&!/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(emailVal)){setSavingProfile(false);alert('That email address does not look right.');return;}
+    var patch={background:profileForm.background||null,first_connected:profileForm.first_connected||null,nsh_contact:profileForm.nsh_contact||null,donor_notes:profileForm.donor_notes||null,also_supports:profileForm.also_supports||null,email:emailVal||null};
     fetch(SUPABASE_URL+'/rest/v1/donors?id=eq.'+selected.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(patch)})
       .then(function(r){return r.json();}).then(function(rows){
         setSavingProfile(false);
@@ -5761,10 +5763,11 @@ function DonorsView({ navigate }) {
 
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={sec}>Profile</span>
-              {!profileForm && <button onClick={function(){setProfileForm({background:selected.background||'',first_connected:selected.first_connected||'',nsh_contact:selected.nsh_contact||'',donor_notes:selected.donor_notes||'',also_supports:selected.also_supports||''});}} style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'2px 10px',cursor:'pointer'}}>Edit</button>}
+              {!profileForm && <button onClick={function(){setProfileForm({background:selected.background||'',first_connected:selected.first_connected||'',nsh_contact:selected.nsh_contact||'',donor_notes:selected.donor_notes||'',also_supports:selected.also_supports||'',email:selected.email||''});}} style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'2px 10px',cursor:'pointer'}}>Edit</button>}
             </div>
             {profileForm ? (
               <form onSubmit={saveProfileFields} style={{background:'#faf8f4',borderRadius:8,padding:'12px 14px',border:'0.5px solid #e0d8cc',marginBottom:10}}>
+                <div style={{marginBottom:8}}><label style={lStyle}>Email</label><input type="email" value={profileForm.email} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{email:e.target.value});});}} placeholder="name@example.com" style={iStyle} /></div>
                 <div style={{marginBottom:8}}><label style={lStyle}>Background</label><textarea value={profileForm.background} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{background:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
                 <div style={{marginBottom:8}}><label style={lStyle}>What Ties Them to North Star House</label><textarea value={profileForm.first_connected} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{first_connected:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
                 <div style={{marginBottom:8}}><label style={lStyle}>Main NSH Contact</label><input value={profileForm.nsh_contact} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{nsh_contact:e.target.value});});}} style={iStyle} /></div>
@@ -13994,6 +13997,11 @@ function EventEmailModal({ ev, onClose }) {
   var [emails, setEmails] = useState('');
   var [volCount, setVolCount] = useState(null);
   var [sponsorCount, setSponsorCount] = useState(null);
+  // Donors I pick: search the donor list, tick the people to send to. A donor without an email can have one added right here.
+  var [donorRows, setDonorRows] = useState(null);
+  var [donorQuery, setDonorQuery] = useState('');
+  var [pickedDonors, setPickedDonors] = useState({});
+  var [emailDrafts, setEmailDrafts] = useState({});
   // 'page' = looks like the event's RSVP page; 'letter' = the formal invitation letter with RSVP buttons (RSVP events only).
   var [style, setStyle] = useState('page');
   var [letter, setLetter] = useState('');
@@ -14003,12 +14011,41 @@ function EventEmailModal({ ev, onClose }) {
   var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
   function call(payload) {
     return whoIsSignedIn().then(function(who) {
-      return fetch(SUPABASE_URL + '/functions/v1/send-event-invite', { method: 'POST', headers: H, body: JSON.stringify(Object.assign({ event_id: ev.id, subject: subject, note: note, audience: audience, emails: emails, sent_by: who || '', template: style === 'letter' ? 'letter' : undefined, letter: letter }, payload)) });
+      return fetch(SUPABASE_URL + '/functions/v1/send-event-invite', { method: 'POST', headers: H, body: JSON.stringify(Object.assign({ event_id: ev.id, subject: subject, note: note, audience: audience === 'donors' ? 'custom' : audience, emails: audience === 'donors' ? donorLines : emails, sent_by: who || '', template: style === 'letter' ? 'letter' : undefined, letter: letter }, payload)) });
     }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok, status: r.status, j: j }; }); });
   }
   useEffect(function() { call({ action: 'count' }).then(function(res) { if (res.ok) { setVolCount(res.j.volunteers); setSponsorCount(res.j.sponsors); } }).catch(function() {}); }, []);
   var customCount = emails.split(/[\s,;]+/).filter(function(x) { return /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(x); }).length;
-  var people = audience === 'volunteers' ? volCount : audience === 'sponsors' ? sponsorCount : audience === 'custom' ? customCount : 1;
+  useEffect(function() {
+    if (audience !== 'donors' || donorRows !== null) return;
+    fetch(SUPABASE_URL + '/rest/v1/donors?select=id,formal_name,informal_first_name,preferred_letter_greeting,joint_donor_name,email,deceased&order=formal_name', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); }).then(function(rows) { setDonorRows(Array.isArray(rows) ? rows.filter(function(d) { return !d.deceased; }) : []); }).catch(function() { setDonorRows([]); });
+  }, [audience]);
+  var emailOk = function(x) { return /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(String(x || '').trim()); };
+  // How the letter greets them: their preferred greeting, else first name (with a joint donor: "Bob and Sue"), else the first word of their name.
+  function donorGreeting(d) {
+    var g = String(d.preferred_letter_greeting || '').trim().replace(/^dear\s+/i, '').replace(/[,:]\s*$/, '');
+    if (g) return g;
+    var first = String(d.informal_first_name || '').trim() || String(d.formal_name || '').trim().split(/\s+/)[0] || '';
+    var joint = String(d.joint_donor_name || '').trim().split(/\s+/)[0] || '';
+    return joint && first ? first + ' and ' + joint : first;
+  }
+  function saveDonorEmail(d) {
+    var v = String(emailDrafts[d.id] || '').trim();
+    if (!emailOk(v)) { setMsg({ bad: true, text: 'That email address does not look right.' }); return; }
+    fetch(SUPABASE_URL + '/rest/v1/donors?id=eq.' + encodeURIComponent(d.id), { method: 'PATCH', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ email: v }) })
+      .then(function(r) { if (!r.ok) throw new Error('x'); setDonorRows(function(prev) { return prev.map(function(x) { return x.id === d.id ? Object.assign({}, x, { email: v }) : x; }); }); setMsg(null); })
+      .catch(function() { setMsg({ bad: true, text: 'Could not save that email address.' }); });
+  }
+  var donorMatches = (donorRows || []).filter(function(d) {
+    var q = donorQuery.trim().toLowerCase();
+    if (!q) return false;
+    return (String(d.formal_name || '') + ' ' + String(d.informal_first_name || '') + ' ' + String(d.joint_donor_name || '') + ' ' + String(d.email || '')).toLowerCase().indexOf(q) !== -1;
+  }).slice(0, 12);
+  var pickedList = Object.keys(pickedDonors).map(function(id) { return pickedDonors[id]; });
+  // Under the hood a donor send is the pasted-list send: one "email, greeting" line per person.
+  var donorLines = pickedList.filter(function(d) { return emailOk(d.email); }).map(function(d) { return d.email.trim() + ', ' + donorGreeting(d); }).join('\n');
+  var people = audience === 'volunteers' ? volCount : audience === 'sponsors' ? sponsorCount : audience === 'donors' ? pickedList.filter(function(d) { return emailOk(d.email); }).length : audience === 'custom' ? customCount : 1;
   function preview() {
     setBusy(true); setMsg(null);
     call({ action: 'preview' }).then(function(res) {
@@ -14021,6 +14058,7 @@ function EventEmailModal({ ev, onClose }) {
   function send(resend) {
     if (busy) return;
     if (audience === 'custom' && !customCount) { setMsg({ bad: true, text: 'Paste at least one email address.' }); return; }
+    if (audience === 'donors' && !people) { setMsg({ bad: true, text: 'Pick at least one donor who has an email address.' }); return; }
     if (audience !== 'test' && !resend && !window.confirm('Send "' + ev.title + '" to ' + people + (people === 1 ? ' person' : ' people') + '? Recipients cannot see each other.')) return;
     setBusy(true); setMsg(null);
     call({ action: 'send', confirm: audience !== 'test', resend: !!resend }).then(function(res) {
@@ -14058,10 +14096,42 @@ function EventEmailModal({ ev, onClose }) {
             <option value="test">Send me a test (office inbox only)</option>
             {style !== 'letter' && <option value="volunteers">Active volunteers{volCount != null ? ' (' + volCount + ')' : ''}</option>}
             {style === 'letter' && <option value="sponsors">Current sponsors{sponsorCount != null ? ' (' + sponsorCount + ')' : ''}</option>}
+            {style === 'letter' && <option value="donors">Donors I search for and pick</option>}
             <option value="custom">Email addresses I paste</option>
           </select>
         </label>
         {audience === 'custom' && <label style={label}>{style === 'letter' ? 'One person per line: email, first name (the name is optional)' : 'Email addresses (commas, spaces or new lines)'}<textarea rows={4} value={emails} onChange={function(e) { setEmails(e.target.value); }} placeholder={style === 'letter' ? 'jane@example.com, Jane\nbob@example.com, Bob\nsomeone@example.com' : 'jane@example.com, bob@example.com'} style={Object.assign({}, field, { resize: 'vertical' })} /><span>{customCount} valid address{customCount === 1 ? '' : 'es'}</span></label>}
+        {audience === 'donors' && (
+          <div style={{ marginBottom: 12 }}>
+            <input value={donorQuery} onChange={function(e) { setDonorQuery(e.target.value); }} placeholder={donorRows === null ? 'Loading donors…' : 'Search donors by name or email'} style={field} />
+            {donorMatches.map(function(d) {
+              var has = emailOk(d.email), on = !!pickedDonors[d.id];
+              return (
+                <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 2px', borderBottom: '0.5px solid #f3eee6', fontSize: 13 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, color: '#2a2a2a' }}>{d.formal_name}</div>
+                    <div style={{ fontSize: 11, color: has ? '#888' : '#b45309' }}>{has ? d.email : 'No email on file'}</div>
+                  </div>
+                  {has
+                    ? <button type="button" onClick={function() { setPickedDonors(function(prev) { var n = Object.assign({}, prev); if (n[d.id]) delete n[d.id]; else n[d.id] = d; return n; }); }} style={{ background: on ? '#eef7ee' : gold, color: on ? '#2e7d32' : '#fff', border: on ? '1px solid #bfe0bf' : 'none', borderRadius: 7, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{on ? '✓ Added' : 'Add'}</button>
+                    : <span style={{ display: 'inline-flex', gap: 4 }}>
+                        <input value={emailDrafts[d.id] || ''} onChange={function(e) { var v = e.target.value; setEmailDrafts(function(prev) { var n = Object.assign({}, prev); n[d.id] = v; return n; }); }} placeholder="Add email" style={Object.assign({}, field, { width: 150, padding: '5px 8px', fontSize: 12 })} />
+                        <button type="button" onClick={function() { saveDonorEmail(d); }} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Save</button>
+                      </span>}
+                </div>
+              );
+            })}
+            {donorQuery.trim() && donorRows !== null && donorMatches.length === 0 && <div style={{ fontSize: 12, color: '#999', padding: '8px 2px' }}>No donors match.</div>}
+            {pickedList.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Sending to ({pickedList.length})</div>
+                {pickedList.map(function(d) {
+                  return <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: '#555', padding: '3px 0' }}><span>{d.formal_name} <span style={{ color: '#999' }}>· “Dear {donorGreeting(d) || 'Friend'},”</span></span><a onClick={function() { setPickedDonors(function(prev) { var n = Object.assign({}, prev); delete n[d.id]; return n; }); }} style={{ cursor: 'pointer', color: '#b3402a' }}>Remove</a></div>;
+                })}
+              </div>
+            )}
+          </div>
+        )}
         {msg && <div style={{ fontSize: 13, marginBottom: 12, color: msg.bad ? '#b3402a' : '#2e7d32' }}>{msg.text}</div>}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button type="button" onClick={preview} disabled={busy} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Preview</button>
@@ -14251,6 +14321,7 @@ function SuEventPanel({ event, onSaved, onCancel }) {
   var [eventType, setEventType] = useState(event ? event.event_type : 'rsvp');
   var [form, setForm] = useState({ title: event ? event.title || '' : '', date: event ? event.date || '' : '', time: event ? event.time || '' : '', description: event ? event.description || '' : '' });
   var [options, setOptions] = useState(event && event.options && event.options.length ? event.options : ['Attending', 'Attending +1', "Can't Make It"]);
+  var [askAffiliation, setAskAffiliation] = useState(!!(event && event.ask_affiliation));
   var [slots, setSlots] = useState([]);
   var [origSlotIds, setOrigSlotIds] = useState([]);
   var [loadingSlots, setLoadingSlots] = useState(isEdit && event.event_type === 'shift');
@@ -14332,6 +14403,8 @@ function SuEventPanel({ event, onSaved, onCancel }) {
     if (!form.title.trim() || saving) return;
     setSaving(true);
     var payload = { title: form.title.trim(), date: form.date || null, time: form.time || null, description: form.description.trim() || null, options: eventType === 'rsvp' ? options.filter(function(o) { return o.trim(); }) : [] };
+    // Only send the member/sponsor switch when it is on (or was on), so events still save before the column exists.
+    if (eventType === 'rsvp' && (askAffiliation || (event && event.ask_affiliation))) payload.ask_affiliation = askAffiliation;
     // Only touch image_url when there is one to set or clear (so events still save before the column exists).
     if (imageUrl || (event && event.image_url)) payload.image_url = imageUrl || null;
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
@@ -14396,6 +14469,10 @@ function SuEventPanel({ event, onSaved, onCancel }) {
             );
           })}
           <button onClick={addOption} style={{ background: 'none', border: 'none', color: gold, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>+ Add option</button>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#555', marginTop: 14, cursor: 'pointer' }}>
+            <input type="checkbox" checked={askAffiliation} onChange={function(e) { setAskAffiliation(e.target.checked); }} />
+            Ask whether they are a member or a sponsor, and the organization name
+          </label>
         </div>
       ) : (
         <div style={{ marginBottom: 16 }}>
@@ -14762,6 +14839,32 @@ function SuEventResponses({ event }) {
             );
           })}
         </div>
+        {(function() {
+          var sponsors = responses.filter(function(r) { return r.affiliation === 'sponsor'; }).sort(function(a, b) { return String(a.organization || a.name || '').toLowerCase().localeCompare(String(b.organization || b.name || '').toLowerCase()); });
+          var members = responses.filter(function(r) { return r.affiliation === 'member'; });
+          if (!sponsors.length && !members.length) return null;
+          var head = { fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 };
+          return (
+            <div style={{ marginBottom: 20 }}>
+              {sponsors.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={head}>Sponsor RSVPs ({sponsors.length})</div>
+                  {sponsors.map(function(r) {
+                    return <div key={r.id} style={{ fontSize: 13, color: '#2a2a2a', padding: '6px 0', borderBottom: '0.5px solid #f5f0e8' }}><strong>{r.organization || r.name}</strong> <span style={{ color: '#888' }}>{r.organization && r.name ? '(' + r.name + ')' : ''}</span> <span style={{ color: gold, fontWeight: 600 }}>— {r.response}</span></div>;
+                  })}
+                </div>
+              )}
+              {members.length > 0 && (
+                <div>
+                  <div style={head}>Member RSVPs ({members.length})</div>
+                  {members.map(function(r) {
+                    return <div key={r.id} style={{ fontSize: 13, color: '#2a2a2a', padding: '6px 0', borderBottom: '0.5px solid #f5f0e8' }}>{r.name} <span style={{ color: gold, fontWeight: 600 }}>— {r.response}</span></div>;
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
         <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>All Responses ({responses.length})</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {responses.map(function(r) { return <div key={r.id} style={{ fontSize: 13, color: '#2a2a2a', padding: '6px 0', borderBottom: '0.5px solid #f5f0e8' }}>{r.name} <span style={{ color: gold, fontWeight: 600 }}>— {r.response}</span></div>; })}
