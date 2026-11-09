@@ -112,7 +112,10 @@ function buildLetterHtml(ev: any, o: { name?: string; text?: string; org?: strin
   const body = custom ? custom.split(/\n{2,}/).map(p).join('') : [intro, ...letterBodyAfterIntro(ROLES.includes(String(o.role)) ? String(o.role) : 'supporter')].map(p).join('')
   const rule = '<div style="border-top:1px solid #c9b27c;line-height:1px;font-size:1px;margin:26px 0;">&nbsp;</div>'
   const btn = (label: string) => `<tr><td align="center" style="padding:0 0 10px;"><a href="${esc(link)}" style="display:block;width:260px;max-width:100%;box-sizing:border-box;background:${GOLD};color:#ffffff;border:1.5px solid ${GOLD};text-decoration:none;font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:bold;padding:13px 16px;text-align:center;">${label}</a></td></tr>`
-  return `<div style="background:#ffffff;padding:28px 12px;">
+  const preview = String(o.sub || '').trim().slice(0, 140) || `You are warmly invited to ${ev.title}${day ? ' on ' + day : ''}`
+  const pad = '&#8204;&nbsp;'.repeat(120)
+  return `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#ffffff;opacity:0;">${esc(preview)}${pad}</div>
+<div style="background:#ffffff;padding:28px 12px;">
 <div style="max-width:640px;margin:0 auto;background:#ffffff;font-family:Georgia,'Times New Roman',serif;">
 <div style="text-align:center;padding:8px 0 0;"><img src="${HOUSE_IMG}" alt="North Star House" width="330" style="display:block;margin:0 auto;width:330px;max-width:80%;height:auto;border:0;"></div>
 <div style="text-align:center;margin:18px 0 6px;font-family:'Cormorant SC',Cardo,Georgia,serif;font-weight:700;color:${GOLD};letter-spacing:1px;line-height:1.15;">${smallCapsTitle(ev.title)}</div>
