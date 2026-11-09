@@ -14000,6 +14000,7 @@ function EventEmailModal({ ev, onClose }) {
   // Donors I pick: search the donor list, tick the people to send to. A donor without an email can have one added right here.
   var [donorRows, setDonorRows] = useState(null);
   var [donorQuery, setDonorQuery] = useState('');
+  var [onlyWithEmail, setOnlyWithEmail] = useState(true);
   var [pickedDonors, setPickedDonors] = useState({});
   var [emailDrafts, setEmailDrafts] = useState({});
   // 'page' = looks like the event's RSVP page; 'letter' = the formal invitation letter with RSVP buttons (RSVP events only).
@@ -14049,11 +14050,15 @@ function EventEmailModal({ ev, onClose }) {
       .then(function(r) { if (!r.ok) throw new Error('x'); setDonorRows(function(prev) { return prev.map(function(x) { return x.id === d.id ? Object.assign({}, x, { email: v }) : x; }); }); setMsg(null); })
       .catch(function() { setMsg({ bad: true, text: 'Could not save that email address.' }); });
   }
+  // With "only donors with an email" on (the default), everyone who can be emailed is listed right away; typing narrows the list.
+  // With it off, nothing is listed until you type, so donors without an email can have one added.
+  var withEmailCount = (donorRows || []).filter(function(d) { return emailOk(d.email); }).length;
   var donorMatches = (donorRows || []).filter(function(d) {
     var q = donorQuery.trim().toLowerCase();
-    if (!q) return false;
+    if (onlyWithEmail && !emailOk(d.email)) return false;
+    if (!q) return onlyWithEmail;
     return (String(d.formal_name || '') + ' ' + String(d.informal_first_name || '') + ' ' + String(d.joint_donor_name || '') + ' ' + String(d.email || '')).toLowerCase().indexOf(q) !== -1;
-  }).slice(0, 12);
+  }).slice(0, 150);
   var pickedList = Object.keys(pickedDonors).map(function(id) { return pickedDonors[id]; });
   // Under the hood a donor send is the pasted-list send: one "email, greeting" line per person.
   var donorLines = pickedList.filter(function(d) { return emailOk(d.email); }).map(function(d) { return d.email.trim() + ', ' + donorGreeting(d); }).join('\n');
@@ -14135,6 +14140,13 @@ function EventEmailModal({ ev, onClose }) {
         {(audience === 'donors' || audience === 'members') && (
           <div style={{ marginBottom: 12 }}>
             <input value={donorQuery} onChange={function(e) { setDonorQuery(e.target.value); }} placeholder={donorRows === null ? 'Loading donors…' : 'Search donors by name or email'} style={field} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', margin: '8px 0 2px', fontSize: 12, color: '#666' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={onlyWithEmail} onChange={function(e) { setOnlyWithEmail(e.target.checked); }} />
+                Only donors with an email on file{donorRows !== null ? ' (' + withEmailCount + ')' : ''}
+              </label>
+              {donorMatches.some(function(d) { return emailOk(d.email) && !pickedDonors[d.id]; }) && <a onClick={function() { setPickedDonors(function(prev) { var n = Object.assign({}, prev); donorMatches.forEach(function(d) { if (emailOk(d.email)) n[d.id] = d; }); return n; }); }} style={{ cursor: 'pointer', color: gold, fontWeight: 600 }}>Add everyone shown</a>}
+            </div>
             {donorMatches.map(function(d) {
               var has = emailOk(d.email), on = !!pickedDonors[d.id];
               return (
@@ -14152,7 +14164,8 @@ function EventEmailModal({ ev, onClose }) {
                 </div>
               );
             })}
-            {donorQuery.trim() && donorRows !== null && donorMatches.length === 0 && <div style={{ fontSize: 12, color: '#999', padding: '8px 2px' }}>No donors match.</div>}
+            {(donorQuery.trim() || onlyWithEmail) && donorRows !== null && donorMatches.length === 0 && <div style={{ fontSize: 12, color: '#999', padding: '8px 2px' }}>{onlyWithEmail ? 'No donors with an email match. Untick the box above to find donors without one and add their email.' : 'No donors match.'}</div>}
+            {!onlyWithEmail && !donorQuery.trim() && donorRows !== null && <div style={{ fontSize: 12, color: '#999', padding: '8px 2px' }}>Type a name to search all donors.</div>}
             {pickedList.length > 0 && (
               <div style={{ marginTop: 10 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Sending to ({pickedList.length})</div>
