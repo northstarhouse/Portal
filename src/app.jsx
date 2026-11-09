@@ -13993,18 +13993,22 @@ function EventEmailModal({ ev, onClose }) {
   var [audience, setAudience] = useState('test');
   var [emails, setEmails] = useState('');
   var [volCount, setVolCount] = useState(null);
+  var [sponsorCount, setSponsorCount] = useState(null);
+  // 'page' = looks like the event's RSVP page; 'letter' = the formal invitation letter with RSVP buttons (RSVP events only).
+  var [style, setStyle] = useState('page');
+  var [letter, setLetter] = useState('');
   var [busy, setBusy] = useState(false);
   var [msg, setMsg] = useState(null);
   var isShift = ev.event_type === 'shift';
   var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
   function call(payload) {
     return whoIsSignedIn().then(function(who) {
-      return fetch(SUPABASE_URL + '/functions/v1/send-event-invite', { method: 'POST', headers: H, body: JSON.stringify(Object.assign({ event_id: ev.id, subject: subject, note: note, audience: audience, emails: emails, sent_by: who || '' }, payload)) });
+      return fetch(SUPABASE_URL + '/functions/v1/send-event-invite', { method: 'POST', headers: H, body: JSON.stringify(Object.assign({ event_id: ev.id, subject: subject, note: note, audience: audience, emails: emails, sent_by: who || '', template: style === 'letter' ? 'letter' : undefined, letter: letter }, payload)) });
     }).then(function(r) { return r.json().catch(function() { return {}; }).then(function(j) { return { ok: r.ok, status: r.status, j: j }; }); });
   }
-  useEffect(function() { call({ action: 'count' }).then(function(res) { if (res.ok) setVolCount(res.j.volunteers); }).catch(function() {}); }, []);
+  useEffect(function() { call({ action: 'count' }).then(function(res) { if (res.ok) { setVolCount(res.j.volunteers); setSponsorCount(res.j.sponsors); } }).catch(function() {}); }, []);
   var customCount = emails.split(/[\s,;]+/).filter(function(x) { return /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(x); }).length;
-  var people = audience === 'volunteers' ? volCount : audience === 'custom' ? customCount : 1;
+  var people = audience === 'volunteers' ? volCount : audience === 'sponsors' ? sponsorCount : audience === 'custom' ? customCount : 1;
   function preview() {
     setBusy(true); setMsg(null);
     call({ action: 'preview' }).then(function(res) {
@@ -14038,17 +14042,26 @@ function EventEmailModal({ ev, onClose }) {
           <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Send email</div>
           <a onClick={onClose} style={{ cursor: 'pointer', color: gold, fontSize: 13, fontWeight: 600 }}>Close ×</a>
         </div>
-        <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>{ev.title}. Looks like the {isShift ? 'sign-up' : 'RSVP'} page, with a button that says "{isShift ? 'Click here to sign up' : 'Click here to RSVP'}".</div>
+        <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>{ev.title}. {style === 'letter' ? 'A formal invitation letter with three RSVP buttons. Each person gets their own email, addressed by name.' : 'Looks like the ' + (isShift ? 'sign-up' : 'RSVP') + ' page, with a button that says "' + (isShift ? 'Click here to sign up' : 'Click here to RSVP') + '".'}</div>
+        {!isShift && <label style={label}>Style
+          <select value={style} onChange={function(e) { var v = e.target.value; setStyle(v); setMsg(null); if (v === 'letter' && audience === 'volunteers') setAudience('test'); }} style={field}>
+            <option value="page">Event page (button: Click here to RSVP)</option>
+            <option value="letter">Invitation letter (with RSVP buttons)</option>
+          </select>
+        </label>}
         <label style={label}>Subject<input value={subject} onChange={function(e) { setSubject(e.target.value); }} placeholder={isShift ? 'Volunteer sign-up: ' + ev.title : "You're invited: " + ev.title} style={field} /></label>
-        <label style={label}>A note at the top (optional)<textarea rows={3} value={note} onChange={function(e) { setNote(e.target.value); }} placeholder="Add a personal message before the event details" style={Object.assign({}, field, { resize: 'vertical' })} /></label>
+        {style === 'letter'
+          ? <label style={label}>Letter wording (optional)<textarea rows={4} value={letter} onChange={function(e) { setLetter(e.target.value); }} placeholder={'Leave blank for the standard State of the Star letter. Or type your own paragraphs (blank line between them); "Dear name," and the date, RSVP buttons and signature are added for you.'} style={Object.assign({}, field, { resize: 'vertical' })} /></label>
+          : <label style={label}>A note at the top (optional)<textarea rows={3} value={note} onChange={function(e) { setNote(e.target.value); }} placeholder="Add a personal message before the event details" style={Object.assign({}, field, { resize: 'vertical' })} /></label>}
         <label style={label}>Send to
           <select value={audience} onChange={function(e) { setAudience(e.target.value); setMsg(null); }} style={field}>
             <option value="test">Send me a test (office inbox only)</option>
-            <option value="volunteers">Active volunteers{volCount != null ? ' (' + volCount + ')' : ''}</option>
+            {style !== 'letter' && <option value="volunteers">Active volunteers{volCount != null ? ' (' + volCount + ')' : ''}</option>}
+            {style === 'letter' && <option value="sponsors">Current sponsors{sponsorCount != null ? ' (' + sponsorCount + ')' : ''}</option>}
             <option value="custom">Email addresses I paste</option>
           </select>
         </label>
-        {audience === 'custom' && <label style={label}>Email addresses (commas, spaces or new lines)<textarea rows={4} value={emails} onChange={function(e) { setEmails(e.target.value); }} style={Object.assign({}, field, { resize: 'vertical' })} /><span>{customCount} valid address{customCount === 1 ? '' : 'es'}</span></label>}
+        {audience === 'custom' && <label style={label}>{style === 'letter' ? 'One person per line: email, first name (the name is optional)' : 'Email addresses (commas, spaces or new lines)'}<textarea rows={4} value={emails} onChange={function(e) { setEmails(e.target.value); }} placeholder={style === 'letter' ? 'jane@example.com, Jane\nbob@example.com, Bob\nsomeone@example.com' : 'jane@example.com, bob@example.com'} style={Object.assign({}, field, { resize: 'vertical' })} /><span>{customCount} valid address{customCount === 1 ? '' : 'es'}</span></label>}
         {msg && <div style={{ fontSize: 13, marginBottom: 12, color: msg.bad ? '#b3402a' : '#2e7d32' }}>{msg.text}</div>}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button type="button" onClick={preview} disabled={busy} style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Preview</button>
