@@ -74,8 +74,8 @@ function buildEmail(first: string, day: string, status: 'open' | 'held' | 'unkno
   let availHtml = ''
   let availText = ''
   if (status === 'open' && day) {
-    availHtml = `<p style="${text}">Good news: <strong>${esc(prettyDay(day))}</strong> is currently open on our calendar. Dates are held only once a contract is signed, so we'd love to show you the property before someone else does.</p>`
-    availText = `Good news: ${prettyDay(day)} is currently open on our calendar. Dates are held only once a contract is signed, so we'd love to show you the property before someone else does.`
+    availHtml = `<p style="${text}">Good news: <strong>${esc(prettyDay(day))}</strong> is still available. We can't hold a date until a contract is signed, so we'd recommend coming to see the estate soon.</p>`
+    availText = `Good news: ${prettyDay(day)} is still available. We can't hold a date until a contract is signed, so we'd recommend coming to see the estate soon.`
   } else if (status === 'held' && day) {
     availHtml = `<p style="${text}">The date you asked about, <strong>${esc(prettyDay(day))}</strong>, looks like it may already be reserved. We'd still love to help you find a date that works. Book a tour or reply to this email and we'll go over what's open around your dates.</p>`
     availText = `The date you asked about, ${prettyDay(day)}, looks like it may already be reserved. We'd still love to help you find a date that works. Book a tour or reply to this email and we'll go over what's open around your dates.`
