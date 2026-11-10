@@ -15881,7 +15881,7 @@ function PersonActivityView() {
     var first = person.split(' ')[0];
     var like = encodeURIComponent(first + '*');
     var out = [];
-    function add(kind, at, text, note) { if (at) out.push({ kind: kind, at: at, text: text, note: note || '' }); }
+    function add(kind, at, text, note, pill) { if (at) out.push({ kind: kind, at: at, text: text, note: note || '', pill: pill || '' }); }
     var tourWhen = function(t) { return t.date ? t.date + 'T' + (t.start_time || '12:00') : t.created_at; };
     Promise.all([
       get('portal_activity?select=*&actor_name=eq.' + encodeURIComponent(person) + '&order=created_at.desc&limit=2000').then(function(rows) {
@@ -15918,7 +15918,12 @@ function PersonActivityView() {
         rows.forEach(function(a) { add('tours', a.created_at, String(a.description || 'Tour booked').replace(/^Booked a venue tour for (.+?) with \S+.*$/, 'Tour booked: $1')); });
       }),
       get('estate_tours?select=id,visitor_name,category,made_contact_at,created_at,request_status&request_handled_by=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
-        rows.forEach(function(t) { add('tours', t.made_contact_at || t.created_at, 'Handled tour request: ' + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), t.request_status ? 'Status: ' + t.request_status : ''); });
+        // the request's outcome is the pill (Contacted / Not interested) instead of a status line
+        var outcome = { made_contact: 'Contacted', not_interested: 'Not interested' };
+        rows.forEach(function(t) {
+          var pill = outcome[t.request_status] || (t.request_status ? String(t.request_status).replace(/_/g, ' ').replace(/^\w/, function(c) { return c.toUpperCase(); }) : '');
+          add('tours', t.made_contact_at || t.created_at, 'Handled tour request: ' + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), '', pill);
+        });
       }),
       get('activity_log?select=id,description,created_at,resolved_at&handled_by=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
         rows.forEach(function(a) { add('other', a.resolved_at || a.created_at, 'Handled: ' + (a.description || 'an Activity Log item')); });
@@ -15978,7 +15983,7 @@ function PersonActivityView() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', padding: '10px 16px', borderTop: head ? 'none' : '1px solid #f2ece2', alignItems: 'baseline' }}>
                 <div style={{ flex: '0 0 150px', fontSize: 12, color: '#888' }}>{when(it.at)}</div>
                 <div style={{ flex: '1 1 260px', minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: '#2a2420' }}><span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, color: '#fff', background: pillColor[it.kind], borderRadius: 4, padding: '1px 6px', marginRight: 8, verticalAlign: 1 }}>{PA_KINDS[it.kind]}</span>{it.text}</div>
+                  <div style={{ fontSize: 13, color: '#2a2420' }}><span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, color: '#fff', background: pillColor[it.kind], borderRadius: 4, padding: '1px 6px', marginRight: 8, verticalAlign: 1 }}>{it.pill || PA_KINDS[it.kind]}</span>{it.text}</div>
                   {it.note && <div style={{ fontSize: 12, color: '#888', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{it.note}</div>}
                 </div>
               </div>
