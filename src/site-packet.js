@@ -236,10 +236,32 @@ export function buildSitePacketHtml(client) {
   .wl li { line-height: 1.55; }
   .boxes { width: 48%; display: grid; grid-template-columns: 1fr 1fr; border: 1.5px solid #222; }
   .boxes div:first-child { border-right: 1.5px solid #222; }
-  @media print { body { background: #fff; } .bar { display: none; } .page { margin: 0; box-shadow: none; width: auto; min-height: 9.95in; padding: 0.1in 0.1in; } }
+  @media print { body { background: #fff; } .bar { display: none; } .page { margin: 0; box-shadow: none; width: auto; min-height: 0; padding: 0.1in 0.1in; } }
 </style></head><body>
 <div class="bar"><button onclick="window.print()">Print packet</button><span>${esc(eventName)}${date ? ' &middot; ' + esc(date) : ''}. 4 pages. In the print window you can also choose Save as PDF.</span></div>
 ${page1}${page2}${walkPage(WALK[0], 0)}${walkPage(WALK[1], 1)}
+<script>
+// Each section must print on exactly one sheet. A section that runs long (a long itinerary, many notes) would spill onto an
+// extra, nearly blank sheet and throw the rest of the packet off, so it is scaled down just enough to fit when printed.
+(function () {
+  var FIT = 9.75 * 96; // printable height of a letter page with the margins above, in CSS pixels, less a little room
+  function fit() {
+    var css = '';
+    Array.prototype.forEach.call(document.querySelectorAll('.page'), function (p, i) {
+      p.id = 'pg' + i;
+      var first = p.firstElementChild, last = p.lastElementChild;
+      if (!first || !last) return;
+      var h = last.getBoundingClientRect().bottom - first.getBoundingClientRect().top + 24;
+      if (h > FIT) css += '#pg' + i + '{zoom:' + (FIT / h).toFixed(3) + '}';
+    });
+    var s = document.getElementById('fit-pages') || document.head.appendChild(Object.assign(document.createElement('style'), { id: 'fit-pages' }));
+    s.textContent = '@media print{' + css + '}';
+  }
+  fit();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+  window.addEventListener('beforeprint', fit);
+})();
+</script>
 </body></html>`;
 }
 
