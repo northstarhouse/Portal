@@ -15856,6 +15856,44 @@ var PA_TABLE_LABELS = {
 function paTableLabel(t) { return PA_TABLE_LABELS[t] || String(t || '').replace(/_/g, ' ').replace(/^\w/, function(c) { return c.toUpperCase(); }); }
 var PA_KINDS = { portal: 'Portal changes', messages: 'Messages', tours: 'Tours', other: 'Other' };
 
+// One recorded Portal change as a plain sentence, or null when the page already lists it another way
+// (messages handled/replied, pre-booking sends, Portal requests, vendors and client access come from their own tables).
+var PA_SKIP_TABLES = ['venue_messages', 'prebooking_manual_sends', 'feature_requests', 'venue_vendors', 'venue_portal_access'];
+function paDescribe(r) {
+  if (PA_SKIP_TABLES.indexOf(r.table_name) !== -1) return null;
+  var label = r.label || '';
+  var changed = r.changed || [];
+  var fields = changed.filter(function(c) { return c.indexOf('checklist.') !== 0; }).map(function(c) { return c.replace(/^answers\./, '').replace(/_/g, ' '); });
+  var fieldNote = fields.length ? 'Changed: ' + fields.slice(0, 8).join(', ') + (fields.length > 8 ? ' and ' + (fields.length - 8) + ' more' : '') : '';
+  // Activity Log lines written by the Portal (contracts, tours, forms, ...): the line itself says what happened.
+  if (r.table_name === 'activity_log') {
+    if (r.op !== 'insert') return null; // marking items handled is listed separately
+    if (/^(Feature request|Bug report): |to the vendor list/.test(label)) return null;
+    if (/^(Sent|Signed) contract/.test(label)) return { text: label, pill: 'Contract' };
+    if (/tour/i.test(label)) return { kind: 'tours', text: label };
+    return { kind: 'other', text: label || 'Activity Log entry' };
+  }
+  if (r.table_name === 'nsh_form_responses' && r.op === 'update') {
+    var who = label || 'a client';
+    var out = [];
+    changed.filter(function(c) { return c.indexOf('checklist.') === 0; }).forEach(function(c) {
+      var key = c.slice(10), v = (r.detail || {})[key];
+      if (key === 'site_manager') out.push({ text: v && v.name ? 'Scheduled ' + v.name + ' as site manager for ' + who : 'Removed the site manager for ' + who, pill: 'Site manager' });
+      else if (key === 'insurance') out.push({ text: (v && v.verified ? 'Verified insurance for ' : 'Updated insurance for ') + who, pill: 'Insurance' });
+      else if (key === 'event_day') out.push({ text: 'Recorded event-day times for ' + who });
+      else out.push({ text: 'Updated ' + key.replace(/_/g, ' ') + ' for ' + who });
+    });
+    if (fields.length) out.push({ text: 'Edited client details for ' + who, note: fieldNote });
+    if (!out.length) return null;
+    return out.length === 1 ? out[0] : { text: out.map(function(o) { return o.text; }).join(' · '), pill: out[0].pill, note: fieldNote };
+  }
+  if (r.table_name === 'estate_tours') {
+    return { kind: 'tours', text: (r.op === 'insert' ? 'Added tour' : r.op === 'delete' ? 'Deleted tour' : 'Updated tour') + (label ? ': ' + label : ''), note: r.op === 'update' ? fieldNote : '' };
+  }
+  var verb = r.op === 'insert' ? 'Added' : r.op === 'delete' ? 'Deleted' : 'Updated';
+  return { text: verb + ' ' + paTableLabel(r.table_name) + (label ? ': ' + label : ''), note: r.op === 'update' ? fieldNote : '' };
+}
+
 function PersonActivityView() {
   var [people, setPeople] = useState([]);
   var [person, setPerson] = useState('');
@@ -15889,10 +15927,8 @@ function PersonActivityView() {
     Promise.all([
       get('portal_activity?select=*&actor_name=eq.' + encodeURIComponent(person) + '&order=created_at.desc&limit=2000').then(function(rows) {
         rows.forEach(function(r) {
-          var verb = r.op === 'insert' ? 'Added' : r.op === 'delete' ? 'Deleted' : 'Updated';
-          var what = paTableLabel(r.table_name) + (r.label ? ': ' + r.label : '');
-          var fields = (r.changed || []).map(function(c) { return c.replace(/^answers\.__venue_checklist$/, 'client checklist').replace(/^answers\./, '').replace(/_/g, ' '); });
-          add('portal', r.created_at, verb + ' ' + what, fields.length ? 'Changed: ' + fields.slice(0, 8).join(', ') + (fields.length > 8 ? ' and ' + (fields.length - 8) + ' more' : '') : '');
+          var d = paDescribe(r);
+          if (d) add(d.kind || 'portal', r.created_at, d.text, d.note || '', d.pill || '');
         });
       }),
       get('venue_messages?select=id,event_uid,subject,from_name,body,handled_at,handled_note&handled_by=ilike.' + like + '&order=handled_at.desc&limit=1000').then(function(rows) {
@@ -15951,7 +15987,7 @@ function PersonActivityView() {
         rows.forEach(function(a) { add('other', a.created_at, 'Gave client page access: ' + (a.person_name || a.person_email)); });
       }),
       get('feature_requests?select=title,created_at&requested_by=ilike.' + like + '&order=created_at.desc&limit=500').then(function(rows) {
-        rows.forEach(function(f) { add('other', f.created_at, 'Feature request: ' + f.title); });
+        rows.forEach(function(f) { add('other', f.created_at, 'Made a Portal request: ' + f.title, '', 'Portal request'); });
       })
     ]).then(function() {
       out.sort(function(a, b) { return String(b.at).localeCompare(String(a.at)); });

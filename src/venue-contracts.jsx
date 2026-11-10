@@ -6,7 +6,12 @@ export function createAgreementApi({baseUrl,apiKey,staffToken}) {
     const token=staffToken?.();
     const response=await fetch(baseUrl+'/functions/v1/venue-agreements',{method:'POST',headers:{apikey:apiKey,Authorization:'Bearer '+apiKey,'Content-Type':'application/json',...(token?{'x-app-token':token}:{})},body:JSON.stringify({action,...data})});
     if(pdf&&response.ok)return response.blob();
-    const result=await response.json();if(!response.ok||result?.error)throw new Error(result.error||'Contract request failed.');return result;
+    const result=await response.json();if(!response.ok||result?.error)throw new Error(result.error||'Contract request failed.');
+    // Sending and countersigning go in the Activity Log; the database ties each line to whoever is signed in
+    // (Tools > Activity log). Best effort: a logging failure never affects the contract.
+    const what=action==='issue'?'Sent contract':action==='countersign'?'Signed contract (venue countersignature)':null;
+    if(what)fetch(baseUrl+'/rest/v1/activity_log',{method:'POST',headers:{apikey:apiKey,Authorization:'Bearer '+apiKey,'Content-Type':'application/json',Prefer:'return=minimal',...(token?{'x-app-token':token}:{})},body:JSON.stringify({action:action==='issue'?'contract_issued':'contract_countersigned',tag:'Venue',description:what+': '+String(result?.version?.title||'agreement').replace(/ — Rental Agreement$/,'')})}).catch(()=>{});
+    return result;
   };
 }
 function readable(html){return String(html||'').replace(/<br\s*\/?\s*>|<\/p>|<\/li>/gi,'\n').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/\n\s*\n\s*\n/g,'\n\n').trim();}
