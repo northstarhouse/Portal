@@ -136,3 +136,6 @@ begin
     execute format('create trigger zz_portal_activity after insert or update or delete on public.%I for each row execute function public.log_portal_change()', t.relname);
   end loop;
 end $$;
+
+-- sign everyone out once: sessions from before this change do not know who signed in
+update public.app_sessions set expires_at = now() where actor_name is null and expires_at > now();
