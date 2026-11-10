@@ -275,9 +275,23 @@ async function syncClient(pbId: string) {
 // the Portal's client page: filed in the client's Drive folder and listed on the client's record.
 const PAPERWORK_TYPES = /^(application\/pdf|image\/(jpeg|png|heic|heif|webp|gif)|application\/msword|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet)|application\/vnd\.ms-excel|text\/plain)$/;
 const PAPERWORK_MAX = 10 * 1024 * 1024;
+// Same branded look as the Portal's other venue emails (send-email's brandPlain), with a Drive button.
+const LOGO_URL = "https://northstarhouse.github.io/venue/assets/logo.png";
+function paperworkEmailHtml(client: string, when: string, siteManager: string, fileName: string, fileUrl: string) {
+  const row = (k: string, v: string) => `<tr><td style="padding:6px 0;font-size:13px;color:#888;width:120px;vertical-align:top;">${esc(k)}</td><td style="padding:6px 0;font-size:15px;color:#2a2420;">${esc(v)}</td></tr>`;
+  return `<div style="background:#f7f3ec;padding:32px 16px;font-family:Helvetica,Arial,sans-serif;"><div style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e8e0d5;overflow:hidden;">
+<div style="background:#6b5232;padding:22px;text-align:center;"><img src="${LOGO_URL}" alt="North Star House" width="170" style="display:block;margin:0 auto;max-width:170px;height:auto;"></div>
+<div style="height:4px;background:#886c44;"></div>
+<div style="padding:30px 36px;"><h1 style="margin:0 0 16px;font-family:Georgia,serif;font-size:22px;font-weight:400;color:#2a2420;">Final Site Manager Paperwork</h1>
+<p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#444;">The site manager's final paperwork was uploaded in the Portal. The file is attached and saved in the client's Drive folder.</p>
+<table role="presentation" style="border-collapse:collapse;width:100%;margin:0 0 24px;">${row("Client", client)}${row("Event date", when)}${row("Site manager", siteManager || "Not assigned in the Portal")}${row("File", fileName)}</table>
+<div style="text-align:center;"><a href="${esc(fileUrl)}" style="display:inline-block;background:#886c44;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:6px;">Open in Google Drive</a></div></div>
+<div style="background:#f7f3ec;padding:16px 36px;border-top:1px solid #e8e0d5;text-align:center;font-size:11px;color:#999;">North Star House</div></div></div>`;
+}
+
 // Each upload is also emailed, with the file attached, to these addresses.
 const PAPERWORK_EMAIL_TO = ["media@thenorthstarhouse.org", "wyn.spiller@gmail.com"];
-async function emailPaperwork(fileName: string, data: string, client: string, date: string, siteManager: string, fileUrl: string) {
+async function emailPaperwork(fileName: string, data: string, client: string, date: string, siteManager: string, fileUrl: string, isTest = false) {
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) return false;
   const when = /^\d{4}-\d{2}-\d{2}$/.test(date) ? writtenDate(date) : "date to confirm";
@@ -292,10 +306,11 @@ async function emailPaperwork(fileName: string, data: string, client: string, da
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       from: "Venue Portal · North Star House <info@northstarhouse.org>",
-      to: PAPERWORK_EMAIL_TO,
+      // test bookings (+test@ addresses) only go to media@
+      to: isTest ? PAPERWORK_EMAIL_TO.slice(0, 1) : PAPERWORK_EMAIL_TO,
       subject: `FINAL site manager paperwork: ${client} (${when})`,
       text: lines.join("\n\n"),
-      html: lines.map((l) => `<p style="font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#333;margin:0 0 12px">${esc(l)}</p>`).join(""),
+      html: paperworkEmailHtml(client, when, siteManager, fileName, fileUrl),
       attachments: [{ filename: fileName, content: data }],
     }),
   });
@@ -321,7 +336,8 @@ async function uploadSiteManagerPaperwork(pbId: string, filename: string, mimeTy
   checklist.site_manager_paperwork = [...(Array.isArray(checklist.site_manager_paperwork) ? checklist.site_manager_paperwork : []), entry];
   const saved = await rest(`nsh_form_responses?id=eq.${pbId}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ answers: { ...cur, __venue_checklist: checklist } }) });
   // the file is saved either way; the email is a copy, so a failure there is only reported
-  const emailed = await emailPaperwork(fileName, data, name, date, String(checklist.site_manager?.name || ""), entry.url).catch(() => false);
+  const isTest = Object.values(pb.answers || {}).some((v) => typeof v === "string" && /\+test@thenorthstarhouse\.org/i.test(v));
+  const emailed = await emailPaperwork(fileName, data, name, date, String(checklist.site_manager?.name || ""), entry.url, isTest).catch(() => false);
   return { file: entry, record: saved?.[0] || null, emailed };
 }
 
