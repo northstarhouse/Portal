@@ -173,7 +173,8 @@ async function saveSiteManager(responseId, name) {
 }
 
 // The site manager's final paperwork from the event: the file goes to the client's Google Drive folder
-// (Closing Events Paperwork) and is listed on the client's record. Returns the updated record.
+// (Closing Events Paperwork), is listed on the client's record and is emailed (attached) to media@ and Wyn.
+// Returns { record, emailed }.
 async function uploadSiteManagerPaperwork(responseId, file) {
   if (!responseId) throw new Error('Choose a client.');
   if (file.size > 10 * 1024 * 1024) throw new Error(file.name + ' is over 10 MB. Please upload a smaller copy.');
@@ -181,7 +182,7 @@ async function uploadSiteManagerPaperwork(responseId, file) {
   const res = await fetch(PB_URL + '/functions/v1/client-drive-sync', { method: 'POST', headers: { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'upload_site_manager', response_id: responseId, filename: file.name, mime_type: file.type || 'application/octet-stream', data }) });
   const out = await res.json().catch(() => ({}));
   if (!res.ok || !out.ok || !out.record) throw new Error(out.error || 'The upload did not go through. Please try again.');
-  return out.record;
+  return { record: out.record, emailed: !!out.emailed };
 }
 
 // Event-day times for billing: when the last guest actually left, and when the site manager left (they are often different).
@@ -578,7 +579,7 @@ function ClientDetail({ client, onClose, onRename, onSaveEventDay, onUploadPaper
       </div>}
       {onUploadPaperwork && <div className="vc-modal-section">
         <div className="vc-modal-section-title"><span>Site manager paperwork</span>{client.smPaperwork.length > 0 && <span className="vc-pill good">{client.smPaperwork.length} on file</span>}</div>
-        <p className="vc-muted" style={{margin:'0 0 10px'}}>Upload the site manager's final paperwork after the event (checklist, notes, any incident report). Scans and phone photos are fine. Files are saved to this client's folder in Google Drive.</p>
+        <p className="vc-muted" style={{margin:'0 0 10px'}}>Upload the site manager's final paperwork after the event (checklist, notes, any incident report). Scans and phone photos are fine. Files are saved to this client's folder in Google Drive and emailed to media@thenorthstarhouse.org and wyn.spiller@gmail.com.</p>
         {client.smPaperwork.map((f, i) => <div key={f.file_id || i} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 0',borderTop:i?'1px solid #f0ebe2':'none',fontSize:13}}>
           <a href={f.url} target="_blank" rel="noopener noreferrer" style={{color:'#886c44',fontWeight:600,wordBreak:'break-word'}}>{String(f.name || '').replace(/^(FINAL - )?Site Manager Paperwork - /, '')} ↗</a>
           <span className="vc-muted" style={{whiteSpace:'nowrap'}}>{f.uploaded_at ? dateLabel(f.uploaded_at) : ''}</span>
@@ -590,8 +591,8 @@ function ClientDetail({ client, onClose, onRename, onSaveEventDay, onUploadPaper
               const files = [...(e.target.files || [])]; e.target.value = '';
               if (!files.length) return;
               setSmBusy(true); setSmMsg(null);
-              let done = 0;
-              try { for (const f of files) { await onUploadPaperwork(client.id, f); done++; } setSmMsg({ bad: false, text: done === 1 ? 'Uploaded.' : done + ' files uploaded.' }); }
+              let done = 0, unsent = 0;
+              try { for (const f of files) { if (!(await onUploadPaperwork(client.id, f))) unsent++; done++; } setSmMsg({ bad: unsent > 0, text: (done === 1 ? 'Uploaded' : done + ' files uploaded') + (unsent ? ', but ' + (unsent === done ? 'the email' : unsent + ' email' + (unsent > 1 ? 's' : '')) + ' to media@ and Wyn did not send. The file is saved in Drive.' : ' and emailed to media@ and Wyn.') }); }
               catch (err) { setSmMsg({ bad: true, text: (done ? done + ' uploaded, then: ' : '') + (err.message || 'Upload failed.') }); }
               finally { setSmBusy(false); }
             }}/>
@@ -776,8 +777,9 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     setSavedResponses(prev=>({...prev,[id]:record}));
   }
   async function uploadPaperwork(id,file) {
-    const record = await uploadSiteManagerPaperwork(id,file);
+    const { record, emailed } = await uploadSiteManagerPaperwork(id,file);
     setSavedResponses(prev=>({...prev,[id]:record}));
+    return emailed;
   }
   async function verifyInsurance(id,verified,note) {
     if (!saveInsurance) throw new Error('Insurance verification is unavailable. Please reload and try again.');

@@ -275,6 +275,33 @@ async function syncClient(pbId: string) {
 // the Portal's client page: filed in the client's Drive folder and listed on the client's record.
 const PAPERWORK_TYPES = /^(application\/pdf|image\/(jpeg|png|heic|heif|webp|gif)|application\/msword|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet)|application\/vnd\.ms-excel|text\/plain)$/;
 const PAPERWORK_MAX = 10 * 1024 * 1024;
+// Each upload is also emailed, with the file attached, to these addresses.
+const PAPERWORK_EMAIL_TO = ["media@thenorthstarhouse.org", "wyn.spiller@gmail.com"];
+async function emailPaperwork(fileName: string, data: string, client: string, date: string, siteManager: string, fileUrl: string) {
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) return false;
+  const when = /^\d{4}-\d{2}-\d{2}$/.test(date) ? writtenDate(date) : "date to confirm";
+  const lines = [
+    `Final site manager paperwork was uploaded in the Portal for ${client} (event ${when}).`,
+    `Site manager: ${siteManager || "not assigned in the Portal"}`,
+    `File: ${fileName} (attached)`,
+    `Saved in the client's Drive folder: ${fileUrl}`,
+  ];
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: "Venue Portal · North Star House <info@northstarhouse.org>",
+      to: PAPERWORK_EMAIL_TO,
+      subject: `FINAL site manager paperwork: ${client} (${when})`,
+      text: lines.join("\n\n"),
+      html: lines.map((l) => `<p style="font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#333;margin:0 0 12px">${esc(l)}</p>`).join(""),
+      attachments: [{ filename: fileName, content: data }],
+    }),
+  });
+  if (!r.ok) console.error("paperwork email failed", r.status, await r.text());
+  return r.ok;
+}
 async function uploadSiteManagerPaperwork(pbId: string, filename: string, mimeType: string, data: string) {
   if (!PAPERWORK_TYPES.test(mimeType)) throw new Error("Upload a PDF, photo, Word or Excel file.");
   const raw = atob(data);
@@ -284,7 +311,7 @@ async function uploadSiteManagerPaperwork(pbId: string, filename: string, mimeTy
   const pb = (await rest(`nsh_form_responses?select=id,form_id,answers&id=eq.${pbId}`))?.[0];
   if (!pb) throw new Error("Client not found.");
   const inq = (await rest(`venue_inquiries?select=*&prebooking_form_response_id=eq.${pbId}&limit=1`))?.[0] || null;
-  const { folderId, folderUrl } = await clientFolder(pbId, pb.answers || {}, inq);
+  const { folderId, folderUrl, name, date } = await clientFolder(pbId, pb.answers || {}, inq);
   const fileName = `FINAL - Site Manager Paperwork - ${clean(filename) || "upload"}`;
   const up = await uploadFile(fileName, folderId, mimeType, bytes);
   const entry = { name: fileName, file_id: up.id, url: `https://drive.google.com/file/d/${up.id}/view`, folder_url: folderUrl, uploaded_at: new Date().toISOString() };
@@ -293,7 +320,9 @@ async function uploadSiteManagerPaperwork(pbId: string, filename: string, mimeTy
   const checklist = { ...(cur.__venue_checklist || {}) };
   checklist.site_manager_paperwork = [...(Array.isArray(checklist.site_manager_paperwork) ? checklist.site_manager_paperwork : []), entry];
   const saved = await rest(`nsh_form_responses?id=eq.${pbId}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ answers: { ...cur, __venue_checklist: checklist } }) });
-  return { file: entry, record: saved?.[0] || null };
+  // the file is saved either way; the email is a copy, so a failure there is only reported
+  const emailed = await emailPaperwork(fileName, data, name, date, String(checklist.site_manager?.name || ""), entry.url).catch(() => false);
+  return { file: entry, record: saved?.[0] || null, emailed };
 }
 
 // One sync per client at a time: a second submission arriving together waits its turn (and then finds the first one's work already done).
