@@ -15187,13 +15187,33 @@ function SuFormResponses({ form }) {
       fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?id=eq.' + r.id, {
         method: 'PATCH',
         headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ status: 'handled', internal_notes: note })
+        // tour_status is what docents see in the Volunteer Hub
+        body: JSON.stringify({ status: 'handled', internal_notes: note, tour_status: 'Handled by Venue Team' })
       }).then(function(x) {
         if (!x.ok) return;
-        setResponses(function(prev) { return prev.map(function(y) { return y.id === r.id ? Object.assign({}, y, { status: 'handled', internal_notes: note }) : y; }); });
+        setResponses(function(prev) { return prev.map(function(y) { return y.id === r.id ? Object.assign({}, y, { status: 'handled', internal_notes: note, tour_status: 'Handled by Venue Team' }) : y; }); });
         setNotesDraft(function(prev) { var n = Object.assign({}, prev); n[r.id] = note; return n; });
       }).catch(function() {});
+      emailDocentsHandledByVenue(r);
     }).catch(function() { setVenueReply(Object.assign({}, v, { busy: false, err: 'The email could not be sent. Please try again.' })); });
+  }
+  // Lets the docents know a request was a wedding/event inquiry the venue team has answered, so no docent tour is needed.
+  function emailDocentsHandledByVenue(r) {
+    var a = r.answers || {};
+    var name = ((a.dt_first || '') + ' ' + (a.dt_last || '')).trim() || 'A visitor';
+    cachedSbFetch('2026 Volunteers', ['Email', 'Team', 'Event Tags', 'Status']).then(function(rows) {
+      var emails = (Array.isArray(rows) ? rows : []).filter(function(p) {
+        return String(p['Status'] || '').trim().toLowerCase() === 'active' && p['Email'] && (/docent/i.test(p['Team'] || '') || /docent/i.test(p['Event Tags'] || ''));
+      }).map(function(p) { return p['Email'].trim(); });
+      if (!emails.length) return;
+      var text = 'Tour request handled by the venue team\n\n' + name + "'s tour request was about a wedding or event, so the venue team has replied and invited them to a venue tour. No docent tour is needed.\n\nIt is marked \"Handled by Venue Team\" in the Volunteer Hub.";
+      var html = buildBoardNotificationEmailHtml({ headline: 'Handled by the venue team', subtext: name.replace(/&/g, '&amp;').replace(/</g, '&lt;') + "'s tour request was about a wedding or event, so the venue team has replied and invited them to a venue tour. <b>No docent tour is needed.</b><br/><br/>It is marked &ldquo;Handled by Venue Team&rdquo; in the Volunteer Hub.", footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS });
+      return fetch(SUPABASE_URL + '/functions/v1/send-email', {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: emails, bcc: [ADMIN_NOTIFY_BCC], subject: 'Tour request handled by venue team: ' + name, body: text, html: html })
+      });
+    }).catch(function() {});
   }
 
   function notifyDocents(r) {
