@@ -71,39 +71,35 @@ const btn = (href: string, label: string, primary: boolean) =>
 function buildEmail(first: string, day: string, status: 'open' | 'held' | 'unknown') {
   const text = 'font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#555;'
   const h3 = `margin:26px 0 8px;font-family:Georgia,serif;font-size:19px;font-weight:400;color:#2a2420;`
+  // The date sentence in the opening paragraph: open, maybe reserved, or left out when there is no date to check.
   let availHtml = ''
   let availText = ''
   if (status === 'open' && day) {
-    availHtml = `<p style="${text}">Good news: <strong>${esc(prettyDay(day))}</strong> is still available. We can't hold a date until a contract is signed, so we'd recommend coming to see the estate soon.</p>`
-    availText = `Good news: ${prettyDay(day)} is still available. We can't hold a date until a contract is signed, so we'd recommend coming to see the estate soon.`
+    availHtml = ` <strong>${esc(prettyDay(day))}</strong>, is currently available.`
+    availText = ` ${prettyDay(day)}, is currently available.`
   } else if (status === 'held' && day) {
-    availHtml = `<p style="${text}">The date you asked about, <strong>${esc(prettyDay(day))}</strong>, looks like it may already be reserved. We'd still love to help you find a date that works. Book a tour or reply to this email and we'll go over what's open around your dates.</p>`
-    availText = `The date you asked about, ${prettyDay(day)}, looks like it may already be reserved. We'd still love to help you find a date that works. Book a tour or reply to this email and we'll go over what's open around your dates.`
+    availHtml = ` <strong>${esc(prettyDay(day))}</strong> may already be reserved, but we’d love to help you find a date that works.`
+    availText = ` ${prettyDay(day)} may already be reserved, but we’d love to help you find a date that works.`
   }
+  const opening = 'Thanks for considering North Star House for your wedding!'
+  const below = 'Below you’ll find pricing, what’s included in the rental, and a link to book a tour if you’d like to come explore the estate with us.'
+  const paras = [
+    'The wedding rental is $5,000 and gives you exclusive use of the estate for 10 hours. If you decide North Star House is the right fit, reserving your date is as simple as signing the venue agreement and paying an $800 retainer that goes toward the rental fee.',
+    'Tables and chairs are included, and the courtyard and East Lawn are already strung with lights. You can host cocktails in the courtyard and dinner on the lawn, or use the spaces in whatever way feels right for your day.',
+    'You’re welcome to bring your own vendors, whether you already have a favorite caterer in mind or are still figuring out what you’d like. We’re happy to share recommendations if you’d like a few ideas.',
+    'We’d love to show you around and hear what you’re envisioning!',
+  ]
   const html = `<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:${GOLD};"></div><div style="padding:44px 40px 36px;">
 <div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:1px;color:${GOLD};font-weight:bold;margin-bottom:14px;">North Star House</div>
 <h1 style="margin:0 0 22px;text-align:center;font-size:29px;font-weight:400;color:#2a2420;">Thank You for Your Inquiry</h1>
 <div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>
 <p style="${text}">Hi ${esc(first)},</p>
-<p style="${text}">Thank you for reaching out about a wedding at North Star House. We're so glad you found us. Here is a quick look at what you asked about.</p>
-${availHtml}
+<p style="${text}">${esc(opening)}${availHtml} ${esc(below)}</p>
+${paras.map((t) => `<p style="${text}">${esc(t)}</p>`).join('\n')}
 <div style="margin:24px 0 8px;">${btn(TOUR_PAGE('wedding'), 'Book a Tour', true)}</div>
-<h3 style="${h3}">Pricing</h3>
-<p style="${text}"><strong>$5,000</strong>, one price. It makes the estate yours for the day. A non-refundable <strong>$800 retainer</strong> reserves your date and counts toward the total, and an <strong>$800 refundable security deposit</strong> is due one month before your wedding.</p>
-${btn(`${SITE}/weddings`, 'View Pricing &amp; Details', false)}
-<h3 style="${h3}">Common Questions</h3>
-<p style="${text}"><strong>How do I reserve my date?</strong><br>Sign the venue agreement and pay the $800 retainer, which counts toward your total.</p>
-<p style="${text}"><strong>Are tables and chairs included?</strong><br>Yes. We provide 25 round 60" tables, 200 white folding chairs, three 8-foot and two 6-foot rectangular tables, plus patio tables, chairs and umbrellas. Use any or all of them, or bring in additional rentals.</p>
-<p style="${text}"><strong>How much time do we get?</strong><br>A 10-hour rental period, starting when we open the indoor venue for you. You choose the start time, with an 11 PM latest end. Extra hours are $150 each.</p>
-<p style="${text}"><strong>Can we bring our own caterer?</strong><br>Yes, any professional caterer. We will walk them through our facilities, and we have a list of recommended vendors if you would like ideas.</p>
-<p style="${text}"><strong>What is the lighting like?</strong><br>The estate is already lit with string lights in the courtyard and over the East Lawn, twinkle pillar lights and trim lighting on the House.</p>
-<p style="${text}"><strong>Do you help with planning?</strong><br>Yes. We offer up to two onsite planning meetings to go over your details, and we send a planning questionnaire about 60 days out so everything is ready for your Site Manager.</p>
-<p style="${text}"><strong>Is the security deposit refundable?</strong><br>Yes. It is returned after your event if there is no damage and policies are followed.</p>
-<p style="${text}"><strong>Do we need insurance?</strong><br>Yes, a $1 million liability policy naming North Star Historic Conservancy as additionally insured. These policies are typically inexpensive for a single event.</p>
-${btn(`${SITE}/weddings#faq`, 'Read the Full Q&amp;A', false)}
 <p style="margin:26px 0 0;text-align:center;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Questions? Just reply to this email. We're happy to help.</i></p>
 </div></div></div>`
-  const body = `Hi ${first},\n\nThank you for reaching out about a wedding at North Star House. We're so glad you found us.\n\n${availText ? availText + '\n\n' : ''}Book a tour: ${TOUR_PAGE('wedding')}\n\nPRICING\n$5,000, one price. A non-refundable $800 retainer reserves your date and counts toward the total, and an $800 refundable security deposit is due one month before your wedding.\nPricing & details: ${SITE}/weddings\n\nCOMMON QUESTIONS\nHow do I reserve my date? Sign the venue agreement and pay the $800 retainer.\nIs the security deposit refundable? Yes, if there is no damage and policies are followed.\nAre tables and chairs included? Yes. We provide 25 round 60" tables, 200 white folding chairs, three 8-foot and two 6-foot rectangular tables, plus patio tables, chairs and umbrellas. Use any or all of them, or bring in additional rentals.\nHow much time do we get? A 10-hour rental period, starting when we open the indoor venue for you. You choose the start time, with an 11 PM latest end. Extra hours are $150 each.\nCan we bring our own caterer? Yes, any professional caterer. We will walk them through our facilities, and we have a list of recommended vendors if you would like ideas.\nWhat is the lighting like? The estate is already lit with string lights in the courtyard and over the East Lawn, twinkle pillar lights and trim lighting on the House.\nDo you help with planning? Yes. We offer up to two onsite planning meetings to go over your details, and we send a planning questionnaire about 60 days out so everything is ready for your Site Manager.\nDo we need insurance? Yes, a $1 million liability policy naming North Star Historic Conservancy as additionally insured.\nFull Q&A: ${SITE}/weddings#faq\n\nQuestions? Just reply to this email.\n\nNorth Star House`
+  const body = `Hi ${first},\n\n${opening}${availText} ${below}\n\n${paras.join('\n\n')}\n\nBook a tour: ${TOUR_PAGE('wedding')}\n\nQuestions? Just reply to this email. We're happy to help.\n\nNorth Star House`
   return { html, body }
 }
 
@@ -112,12 +108,11 @@ ${btn(`${SITE}/weddings#faq`, 'Read the Full Q&amp;A', false)}
 // update these if the site's copy or rates change). Same Book a Tour button on all of them.
 type Row = { a: string; b: string; c?: string }
 const EVENT_TYPES: [string, string][] = [
-  ['Concerts & Performances', 'The courtyard and surrounding grounds create a natural backdrop for live music, performances, and cultural events, with flexible space for audiences, staging, and production needs.'],
-  ['Fundraisers & Galas', 'Bring people together for a cause in a setting that already feels special. North Star House can accommodate up to 400 guests for fundraisers, galas, auctions, and benefit events.'],
   ['Holiday Parties', 'Celebrate the season somewhere with a little more character. From intimate company dinners to larger community gatherings, North Star House offers a warm, distinctive setting year-round.'],
   ['Corporate Events', 'Step outside the conference room. North Star House offers a refreshing setting for company retreats, team gatherings, networking events, presentations, and client celebrations.'],
   ['Private Dinners', 'Host an unforgettable dinner surrounded by historic architecture, gardens, and the character of a century-old estate. Ideal for birthdays, anniversaries, rehearsal dinners, and intimate celebrations.'],
   ['Showers & Celebrations', 'Baby showers, bridal showers, engagement parties, birthdays, and milestone moments all feel a little more special here. Choose from indoor and outdoor spaces to create a gathering that feels entirely your own.'],
+  ['Something Else in Mind?', "Family reunions, workshops, retreats, or a gathering that doesn't fit neatly into a category. Tell us what you're imagining, and we'll help you find the right space and plan at North Star House."],
 ]
 const PRIVATE_RATES: Row[] = [{ a: 'Saturday', b: '$1,200' }, { a: 'Sunday', b: '$1,000' }, { a: 'Weekdays', b: '$800' }]
 const PRIVATE_NOTE = 'Each rental is 6 hours on site, between 10 AM and 10 PM. Extra hours are $150 each. Private event dates can be booked up to 8 months in advance.'
