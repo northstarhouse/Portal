@@ -21,7 +21,7 @@ const Q = {
 // Older (HoneyBook) questionnaires have no field ids, so their answers are found by the wording of the question.
 const HB = {
   houseAccess: /start time|access|begin/i, outdoorSetup: /outside only|outdoor set/i, guests: /guest count|number of guests|how many guests/i, chairs: /chairs/i,
-  round: /round/i, rect8: /8['’]?\s*rect|8 ?foot rect/i, rect6: /6['’]?\s*rect|6 ?foot rect/i, dining: /dining/i, ceremony: /ceremony/i,
+  round: /round/i, rect8: /8['’]?\s*rect|8 ?foot rect/i, rect6: /6['’]?\s*rect|6 ?foot rect/i, dining: /dining (area|location|space)|where.*(din|eat)/i, ceremony: /ceremony (area|location|site|space)|where.*ceremony/i,
   coordinator: /day.?of coordinator/i, itinerary: /itinerary|timeline/i, refundTo: /refund check to|deposit refund/i, mailTo: /mail the security|mail.*refund/i,
 };
 
