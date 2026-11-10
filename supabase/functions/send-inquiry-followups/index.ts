@@ -70,6 +70,9 @@ const btn = (href: string, label: string, primary: boolean) =>
 
 function buildEmail(first: string, day: string, status: 'open' | 'held' | 'unknown') {
   const text = 'font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#555;'
+  // airier paragraphs and a small gold star divider between the opening, the details and the closing
+  const roomy = 'margin:0 0 22px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.75;color:#555;'
+  const stars = `<div style="margin:30px 0;text-align:center;font-size:12px;letter-spacing:10px;color:${GOLD};">&#10022;&#10022;&#10022;</div>`
   const h3 = `margin:26px 0 8px;font-family:Georgia,serif;font-size:19px;font-weight:400;color:#2a2420;`
   // The date sentence in the opening paragraph: open, maybe reserved, or left out when there is no date to check.
   let availHtml = ''
@@ -93,13 +96,17 @@ function buildEmail(first: string, day: string, status: 'open' | 'held' | 'unkno
 <div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:1px;color:${GOLD};font-weight:bold;margin-bottom:14px;">North Star House</div>
 <h1 style="margin:0 0 22px;text-align:center;font-size:29px;font-weight:400;color:#2a2420;">Thank You for Your Inquiry</h1>
 <div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>
-<p style="${text}">Hi ${esc(first)},</p>
-<p style="${text}">${esc(opening)}${availHtml} ${esc(below)}</p>
-${paras.map((t) => `<p style="${text}">${esc(t)}</p>`).join('\n')}
-<div style="margin:24px 0 8px;">${btn(TOUR_PAGE('wedding'), 'Book a Tour', true)}</div>
-<p style="margin:26px 0 0;text-align:center;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Questions? Just reply to this email. We're happy to help.</i></p>
+<p style="${roomy}">Hi ${esc(first)},</p>
+<p style="${roomy}">${esc(opening)}${availHtml} ${esc(below)}</p>
+${stars}
+${paras.slice(0, 3).map((t) => `<p style="${roomy}">${esc(t)}</p>`).join('\n')}
+${stars}
+<p style="margin:0 0 30px;text-align:center;font-family:Georgia,serif;font-size:19px;line-height:1.5;color:#2a2420;"><i>${esc(paras[3])}</i></p>
+<div style="margin:0 0 12px;">${btn(TOUR_PAGE('wedding'), 'Book a Tour', true)}</div>
+<div style="border-top:1px solid #e5ddcf;width:60%;margin:30px auto 22px;"></div>
+<p style="margin:0;text-align:center;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Questions? Just reply to this email. We're happy to help.</i></p>
 </div></div></div>`
-  const body = `Hi ${first},\n\n${opening}${availText} ${below}\n\n${paras.join('\n\n')}\n\nBook a tour: ${TOUR_PAGE('wedding')}\n\nQuestions? Just reply to this email. We're happy to help.\n\nNorth Star House`
+  const body = `Hi ${first},\n\n${opening}${availText} ${below}\n\n* * *\n\n${paras.slice(0, 3).join('\n\n')}\n\n* * *\n\n${paras[3]}\n\nBook a tour: ${TOUR_PAGE('wedding')}\n\n\nQuestions? Just reply to this email. We're happy to help.\n\nNorth Star House`
   return { html, body }
 }
 
