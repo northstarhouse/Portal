@@ -472,7 +472,26 @@ async function saveEventName(id, name) {
   return rows[0];
 }
 
-function ClientDetail({ client, onClose, onRename, onSaveEventDay, onUploadPaperwork, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
+// In a client's View details: choose the site manager (same list and saved the same way as the Assign Site Managers page).
+function SiteManagerPicker({ client, onAssign }) {
+  const [managers, setManagers] = React.useState(null), [busy, setBusy] = React.useState(false), [msg, setMsg] = React.useState(null);
+  React.useEffect(() => { fetch(PB_URL + '/rest/v1/venue_site_managers?select=name&order=name', { headers: { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY } }).then(r => r.ok ? r.json() : []).then(rows => setManagers((rows || []).map(x => x.name))).catch(() => setManagers([])); }, []);
+  const names = (managers || []).slice(); if (client.siteManager && names.indexOf(client.siteManager) === -1) names.unshift(client.siteManager);
+  return <div className="vc-modal-section">
+    <div className="vc-modal-section-title"><span>Site manager</span>{client.siteManager ? <span className="vc-pill good">{client.siteManager}</span> : <span className="vc-pill alert">Unassigned</span>}</div>
+    <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+      <select value={client.siteManager || ''} disabled={busy || managers === null} aria-label={'Site manager for ' + client.name} onChange={async e => { setBusy(true); setMsg(null); try { await onAssign(client.id, e.target.value); setMsg({ bad: false, text: e.target.value ? 'Saved.' : 'Site manager removed.' }); } catch (err) { setMsg({ bad: true, text: err.message || 'Could not save.' }); } finally { setBusy(false); } }}
+        style={{border:'1px solid #ded7cb',background:'#fff',borderRadius:7,padding:'8px 10px',fontSize:13,minWidth:200}}>
+        <option value="">{managers === null ? 'Loading…' : 'Unassigned'}</option>
+        {names.map(n => <option key={n} value={n}>{n}</option>)}
+      </select>
+      {busy && <span className="vc-muted">Saving…</span>}
+      {msg && <span role="status" style={{fontSize:12,color:msg.bad?'#b3261e':'#2e7d32'}}>{msg.text}</span>}
+    </div>
+  </div>;
+}
+
+function ClientDetail({ client, onClose, onRename, onAssignSite, onSaveEventDay, onUploadPaperwork, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [agrOpen, setAgrOpen] = React.useState(false);
@@ -561,6 +580,7 @@ function ClientDetail({ client, onClose, onRename, onSaveEventDay, onUploadPaper
         <div className="vc-modal-section-title">Contacts</div>
         <div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div>{c.address && <div className="vc-muted">{c.address}</div>}</div>)}</div>
       </div>
+      {onAssignSite && <SiteManagerPicker client={client} onAssign={onAssignSite}/>}
       {onSaveEventDay && <div className="vc-modal-section">
         <div className="vc-modal-section-title">Event-day times (for billing)</div>
         <p className="vc-muted" style={{margin:'0 0 10px'}}>From the site manager's sheet. Guests' out time and the site manager's out time are often different; bill extra hours from the guests' out time.</p>
@@ -833,6 +853,6 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     </aside></div>
     </>}
     {statsOpen&&<ClientStats clients={upcomingClients} onClose={onCloseStats}/>}
-    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onUploadPaperwork={uploadPaperwork} onSavePayments={recordPayments} onRename={renameClient} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
+    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onUploadPaperwork={uploadPaperwork} onAssignSite={assignSite} onSavePayments={recordPayments} onRename={renameClient} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }
