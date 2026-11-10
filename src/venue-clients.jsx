@@ -135,13 +135,13 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
     // pre-booking submission, or the questionnaire once the event is within 60 days. A payment that is simply coming up is not.
     const daysOut = eventDate ? dayCount(today, eventDate) : null;
     const needsAction = overdue || kind === 'signature' || kind === 'booking' || kind === 'paperwork' || (kind === 'survey' && daysOut !== null && daysOut <= 60);
-    tasks.push({ key: sub.id + '-' + key, title, due, detail, kind, overdue, urgent: needsAction, rank: overdue ? 0 : kind === 'signature' || kind === 'booking' || kind === 'paperwork' ? 1 : soon ? 2 : 3 });
+    tasks.push({ key: sub.id + '-' + key, title, due, detail, kind, overdue, urgent: needsAction, rank: kind === 'paperwork' ? -1 : overdue ? 0 : kind === 'signature' || kind === 'booking' || kind === 'paperwork' ? 1 : soon ? 2 : 3 });
   }
   for (const payment of duePayments) task('payment-' + schedule.indexOf(payment), 'Collect ' + amount(payment.cents, payment.currency), payment.due, payment.label, 'payment');
   if (nativeAgreement && ['declined','expired'].includes(nativeAgreement.status)) task('contract-revision','Prepare revised agreement',null,'Previous request '+nativeAgreement.status,'booking');
   else for (const [index, s] of unsigned.entries()) task('signature-' + index, s.signee_type === 'vendor' ? 'Venue countersignature' : 'Client signature', null, s.signee_name || 'Required signer', 'signature');
   if (!hb && !nativeAgreement && !legacy) task('booking', 'New pre-booking submission', null, (eventDate ? 'Event ' + longDay(eventDate) + ' · ' : '') + 'Review it and prepare the agreement', 'booking');
-  if (needsPaperwork) task('sm-paperwork', 'Upload final site manager paperwork', null, 'Event was ' + longDay(eventDate) + ' · needs attention', 'paperwork');
+  if (needsPaperwork) task('sm-paperwork', 'Site manager paperwork needed', null, 'Event was ' + longDay(eventDate) + ' · upload the FINAL paperwork', 'paperwork');
   if (!isPast && !surveyComplete) task('survey', surveySent ? 'Complete event questionnaire' : 'Event questionnaire', requirementsDue, surveySent ? 'Sent; awaiting required answers' : 'Not yet on file', 'survey');
   if (!isPast && !insuranceVerified) task('insurance', 'Confirm insurance on file', requirementsDue, 'Coverage not verified in the portal', 'insurance');
   if (!eventDate) task('date', 'Confirm event date', null, 'No date recorded', 'booking');
