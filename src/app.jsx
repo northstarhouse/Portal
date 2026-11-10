@@ -16525,6 +16525,116 @@ function AdminToolCard(props) {
   return <a href={tool.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>{card}</a>;
 }
 
+// Tools > Mail & Checks: upload scans of the mail or of checks. Each upload is filed in Google Drive (Mail folder or the
+// shared Checks folder) and Wyn is emailed a link (copy to media@); the list below shows every past upload, who did it,
+// and whether the email went out. Failed uploads are listed too, so "did that go through?" always has an answer.
+var MAIL_KINDS = {
+  mail: { label: 'Mail', ok: 'mail_uploaded', bad: 'mail_upload_failed', fileWord: 'Mail' },
+  check: { label: 'Checks', ok: 'check_uploaded', bad: 'check_upload_failed', fileWord: 'Check' },
+};
+function MailChecksView() {
+  var [kind, setKind] = useState('mail');
+  var [rows, setRows] = useState(null);
+  var [busy, setBusy] = useState('');
+  var [msg, setMsg] = useState(null);
+  var inputRef = React.useRef(null);
+  var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+  var K = MAIL_KINDS[kind];
+
+  function load() {
+    var actions = [MAIL_KINDS.mail.ok, MAIL_KINDS.mail.bad, MAIL_KINDS.check.ok, MAIL_KINDS.check.bad].join(',');
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?select=id,action,description,created_at,detail,volunteer_name&action=in.(' + actions + ')&order=created_at.desc&limit=500', { headers: H })
+      .then(function(r) { return r.ok ? r.json() : []; }).then(function(d) { setRows(Array.isArray(d) ? d : []); }).catch(function() { setRows([]); });
+  }
+  useEffect(load, []);
+
+  function readFile(file) {
+    return new Promise(function(resolve, reject) {
+      var r = new FileReader();
+      r.onload = function() { resolve(String(r.result).split(',')[1]); };
+      r.onerror = function() { reject(new Error('Could not read ' + file.name)); };
+      r.readAsDataURL(file);
+    });
+  }
+  async function upload(files) {
+    if (!files.length) return;
+    setBusy('Uploading…'); setMsg(null);
+    var now = new Date();
+    var mdY = (now.getMonth() + 1) + '.' + now.getDate() + '.' + now.getFullYear();
+    // number same-day uploads so each file has its own name
+    var sameDay = (rows || []).filter(function(r) { return r.action === K.ok && String((r.detail && r.detail.filename) || r.description || '').indexOf(mdY + ' - ' + K.fileWord) !== -1; }).length;
+    var done = 0, unsent = 0, errors = [];
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i];
+      setBusy('Uploading ' + (i + 1) + ' of ' + files.length + '…');
+      var n = sameDay + i;
+      var ext = (file.name.match(/\.[a-zA-Z0-9]+$/) || [''])[0];
+      var filename = mdY + ' - ' + K.fileWord + (n ? ' ' + (n + 1) : '') + ext;
+      try {
+        var base64 = await readFile(file);
+        var res = await fetch(SUPABASE_URL + '/functions/v1/upload-mail', {
+          method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, H),
+          body: JSON.stringify({ kind: kind, filename: filename, mimeType: file.type || 'application/octet-stream', base64: base64 })
+        }).then(function(r) { return r.json(); });
+        if (!res.success) throw new Error(res.error || 'Upload failed.');
+        done++; if (!res.emailed) unsent++;
+      } catch (e) { errors.push(file.name + ': ' + (e.message || 'Upload failed.')); }
+    }
+    setBusy('');
+    setMsg(errors.length
+      ? { bad: true, text: (done ? done + ' uploaded. ' : '') + 'Not uploaded: ' + errors.join('; ') }
+      : { bad: unsent > 0, text: (done === 1 ? 'Uploaded' : done + ' files uploaded') + (unsent ? ', but the email to Wyn did not send. The file is saved in Drive.' : ' and Wyn was emailed.') });
+    load();
+  }
+
+  var shown = (rows || []).filter(function(r) { return r.action === K.ok || r.action === K.bad; });
+  var when = function(iso) { var d = new Date(iso); return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+  var pill = function(text, bg, color) { return <span style={{ fontSize: 10, fontWeight: 700, background: bg, color: color, borderRadius: 10, padding: '2px 8px', whiteSpace: 'nowrap' }}>{text}</span>; };
+  var tab = function(k) {
+    var on = kind === k;
+    return <button key={k} type="button" onClick={function() { setKind(k); setMsg(null); }} style={{ background: on ? gold : '#fff', color: on ? '#fff' : gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{MAIL_KINDS[k].label}</button>;
+  };
+  return (
+    <div style={{ maxWidth: 760 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>{tab('mail')}{tab('check')}</div>
+      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '16px 18px', marginBottom: 18 }}>
+        <div style={{ fontSize: 13, color: '#555', marginBottom: 12, lineHeight: 1.5 }}>
+          {kind === 'check' ? 'Upload scans or photos of checks. They are saved to the shared Checks folder in Google Drive' : 'Upload scans or photos of the mail. They are saved to the Mail folder in Google Drive'}, and Wyn is emailed a link (copy to media@).
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <button type="button" disabled={!!busy} onClick={function() { if (inputRef.current) inputRef.current.click(); }}
+            style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{busy || ('Upload ' + (kind === 'check' ? 'checks' : 'mail'))}</button>
+          <input ref={inputRef} type="file" multiple accept="image/*,.pdf" style={{ display: 'none' }} onChange={function(e) { var f = Array.prototype.slice.call(e.target.files || []); e.target.value = ''; upload(f); }} />
+          {msg && <span role="status" style={{ fontSize: 12, color: msg.bad ? '#a04545' : '#2e6b4f' }}>{msg.text}</span>}
+        </div>
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8 }}>Past {kind === 'check' ? 'check' : 'mail'} uploads{rows ? ' (' + shown.length + ')' : ''}</div>
+      {rows === null ? <div style={{ color: '#aaa', fontSize: 13 }}>Loading…</div> : shown.length === 0 ? <div style={{ color: '#aaa', fontSize: 13, padding: '16px 0' }}>Nothing uploaded yet.</div> :
+        <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, overflow: 'hidden' }}>
+          {shown.map(function(r, i) {
+            var d = r.detail || {};
+            var failed = r.action === K.bad;
+            var name = d.filename || String(r.description || '').replace(/^(New )?(Mail|Check) (upload FAILED|uploaded): /i, '');
+            var who = d.by || r.volunteer_name || '';
+            var status = failed ? pill('Upload failed', '#fdecea', '#a04545')
+              : d.emailed === true ? pill('Sent to Wyn', '#e8f5e9', '#2e7d32')
+              : d.emailed === false ? pill('Email not sent', '#fff3e0', '#a15c00')
+              : null; // older uploads did not record the email
+            return <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '11px 16px', borderTop: i ? '1px solid #f2ece2' : 'none' }}>
+              <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2420', wordBreak: 'break-word' }}>{d.url ? <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ color: '#2a2420' }}>{name} ↗</a> : name}</div>
+                <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{when(r.created_at)}{who ? ' · ' + who : ''}</div>
+                {failed && d.error && <div style={{ fontSize: 11, color: '#a04545', marginTop: 2 }}>{d.error}</div>}
+                {!failed && d.email_error && <div style={{ fontSize: 11, color: '#a15c00', marginTop: 2 }}>{d.email_error}</div>}
+              </div>
+              {status}
+            </div>;
+          })}
+        </div>}
+    </div>
+  );
+}
+
 function AdminView({ navigate }) {
   var [uploadingMail, setUploadingMail] = useState(false);
   var [mailUploadResult, setMailUploadResult] = useState(null);
@@ -16606,7 +16716,7 @@ function AdminView({ navigate }) {
           return <AdminToolCard key={tool.label} tool={tool} icon={tool.icon} navigate={navigate} />;
         })}
         <div
-          onClick={function() { if (!uploadingMail && mailFileInputRef.current) mailFileInputRef.current.click(); }}
+          onClick={function() { navigate('mail-checks'); }}
           style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '13px 16px', cursor: uploadingMail ? 'default' : 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s', color: '#3a3226', fontSize: 13, fontWeight: 500, opacity: uploadingMail ? 0.7 : 1 }}
           onMouseEnter={function(e) { e.currentTarget.style.borderColor = '#b5a185'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(136,108,68,0.1)'; }}
           onMouseLeave={function(e) { e.currentTarget.style.borderColor = '#e0d8cc'; e.currentTarget.style.boxShadow = 'none'; }}
@@ -16614,7 +16724,7 @@ function AdminView({ navigate }) {
           <span style={{ color: '#b5a185', flexShrink: 0 }}>
             <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/><polyline points="2,18 8,13"/><polyline points="22,18 16,13"/></svg>
           </span>
-          {uploadingMail ? 'Uploading…' : 'Upload Mail'}
+          Mail &amp; Checks
         </div>
         <div
           onClick={function() { navigate('vol-email-lists'); }}
@@ -25371,6 +25481,7 @@ const views = {
   'maintenance-request': MaintenanceRequestView,
   'activity-log': ActivityLogView,
   'person-activity': PersonActivityView,
+  'mail-checks': MailChecksView,
   'acknowledgment-templates': AcknowledgmentTemplatesView,
   'acknowledgments-queue': AcknowledgmentsQueueView,
   announcements: AnnouncementsView,
@@ -26092,7 +26203,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "person-activity" ? "Activity by Person" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "person-activity" ? "Activity by Person" : active === "mail-checks" ? "Mail & Checks" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}

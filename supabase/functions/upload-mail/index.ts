@@ -3,7 +3,10 @@
 // (acknowledgment_settings.output_folder_id), using the same service account
 // already configured for the Donor Acknowledgment system.
 //
-// POST body: { filename: string, mimeType: string, base64: string }
+// POST body: { filename: string, mimeType: string, base64: string, kind?: "mail" | "check" }
+// kind "check" files the scan in the shared Checks folder instead. Either way Wyn is emailed a link (copy to media@),
+// and the upload is written to the Activity Log with its Drive link, who uploaded it and whether the email went out;
+// failed uploads are logged too. Tools > Mail & Checks lists them.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -151,33 +154,94 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
+// ---------- Checks folder, notifications, log ----------
+
+// The shared "Checks" folder (same one upload-check files donation checks into).
+const CHECKS_FOLDER_ID = "1H_XL4zTyR8la-QB5pty8pRiGzXJ9lvNT";
+const WYN_EMAIL = "wyn.spiller@gmail.com";
+const LOGO_URL = "https://northstarhouse.github.io/venue/assets/logo.png";
+
+function noticeHtml(headline: string, line: string, url: string) {
+  return `<div style="background:#f7f3ec;padding:32px 16px;font-family:Helvetica,Arial,sans-serif;"><div style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e8e0d5;overflow:hidden;">
+<div style="background:#6b5232;padding:22px;text-align:center;"><img src="${LOGO_URL}" alt="North Star House" width="170" style="display:block;margin:0 auto;max-width:170px;height:auto;"></div>
+<div style="height:4px;background:#886c44;"></div>
+<div style="padding:30px 36px;text-align:center;"><h1 style="margin:0 0 12px;font-family:Georgia,serif;font-size:24px;font-weight:400;color:#2a2420;">${headline}</h1>
+<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#555;">${line}</p>
+<a href="${url}" style="display:inline-block;background:#886c44;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 26px;border-radius:6px;">View in Google Drive</a></div>
+<div style="background:#f7f3ec;padding:16px 36px;border-top:1px solid #e8e0d5;text-align:center;font-size:11px;color:#999;">North Star House</div></div></div>`;
+}
+
+async function signedInName(token: string) {
+  if (!token) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_sessions?select=actor_name&token=eq.${encodeURIComponent(token)}&expires_at=gt.${new Date().toISOString()}`, { headers: sbHeaders() });
+    const rows = r.ok ? await r.json() : [];
+    return rows?.[0]?.actor_name || null;
+  } catch { return null; }
+}
+
+const logRow = (row: Record<string, unknown>) => fetch(`${SUPABASE_URL}/rest/v1/activity_log`, {
+  method: "POST", headers: sbHeaders({ Prefer: "return=minimal" }), body: JSON.stringify(row),
+}).catch(() => {});
+
 // ---------- HTTP entrypoint ----------
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ error: "Unsupported method" }, 405);
 
+  let kind: "mail" | "check" = "mail";
+  let filename = "";
+  let by: string | null = null;
   try {
     const body = await req.json();
-    const { filename, mimeType, base64 } = body;
+    kind = body.kind === "check" ? "check" : "mail";
+    filename = String(body.filename || "");
+    const { mimeType, base64 } = body;
+    by = await signedInName(req.headers.get("x-app-token") || "");
     if (!filename || !mimeType || !base64) return json({ error: "filename, mimeType, and base64 are required" }, 400);
 
     const bytes = base64ToBytes(base64);
     const token = await getDriveAccessToken();
-    const folderId = await resolveMailFolder(token);
+    const folderId = kind === "check" ? CHECKS_FOLDER_ID : await resolveMailFolder(token);
     const uploaded = await driveUploadFile(filename, bytes, mimeType, folderId, token);
 
-    await fetch(`${SUPABASE_URL}/rest/v1/activity_log`, {
-      method: "POST",
-      headers: sbHeaders({ Prefer: "return=minimal" }),
-      body: JSON.stringify({
-        description: "Mail uploaded: " + filename,
-        action: "mail_uploaded",
-      }),
-    }).catch(() => {});
+    // Tell Wyn (copy to media@ is added by send-email).
+    const label = kind === "check" ? "Check" : "Mail";
+    let emailed = false, emailError: string | null = null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+        method: "POST",
+        headers: sbHeaders(),
+        body: JSON.stringify({
+          to: [WYN_EMAIL],
+          subject: `New ${label} Uploaded`,
+          body: `New ${label} Uploaded\n\n${kind === "check" ? "A new check" : "New mail"} has been uploaded for your review.\n\nView in Google Drive: ${uploaded.webViewLink}`,
+          html: noticeHtml(`New ${label} Uploaded`, `${kind === "check" ? "A new check has" : "New mail has"} been uploaded for your review.`, uploaded.webViewLink),
+        }),
+      });
+      emailed = r.ok;
+      if (!r.ok) emailError = `email service ${r.status}: ${(await r.text()).slice(0, 200)}`;
+    } catch (e) { emailError = (e as Error).message; }
 
-    return json({ success: true, url: uploaded.webViewLink, fileId: uploaded.id });
+    await logRow({
+      action: kind === "check" ? "check_uploaded" : "mail_uploaded",
+      tag: kind === "check" ? "Check" : "Mail",
+      description: `${label} uploaded: ${filename}`,
+      volunteer_name: by,
+      detail: { url: uploaded.webViewLink, file_id: uploaded.id, filename, by, emailed, emailed_to: emailed ? [WYN_EMAIL] : [], email_error: emailError },
+    });
+
+    return json({ success: true, url: uploaded.webViewLink, fileId: uploaded.id, emailed });
   } catch (err: any) {
-    return json({ success: false, error: err.message || String(err) }, 500);
+    const msg = err?.message || String(err);
+    await logRow({
+      action: kind === "check" ? "check_upload_failed" : "mail_upload_failed",
+      tag: kind === "check" ? "Check" : "Mail",
+      description: `${kind === "check" ? "Check" : "Mail"} upload FAILED: ${filename || "(no file)"}`,
+      volunteer_name: by,
+      detail: { filename, by, error: msg.slice(0, 300) },
+    });
+    return json({ success: false, error: msg }, 500);
   }
 });
