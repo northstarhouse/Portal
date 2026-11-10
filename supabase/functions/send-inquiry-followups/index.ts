@@ -70,19 +70,23 @@ const btn = (href: string, label: string, primary: boolean) =>
 
 function buildEmail(first: string, day: string, status: 'open' | 'held' | 'unknown') {
   const text = 'font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#555;'
-  // airier paragraphs and a small gold star divider between the opening, the details and the closing
+  // Airy paragraphs, a "your date" card and hairline rules (no ornaments).
   const roomy = 'margin:0 0 22px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.75;color:#555;'
-  const stars = `<div style="margin:30px 0;text-align:center;font-size:12px;letter-spacing:10px;color:${GOLD};">&#10022;&#10022;&#10022;</div>`
-  const h3 = `margin:26px 0 8px;font-family:Georgia,serif;font-size:19px;font-weight:400;color:#2a2420;`
+  const rule = `<div style="border-top:1px solid #e5ddcf;margin:30px 0;"></div>`
+  const label = 'font-family:Helvetica,Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:#8a7a62;'
   // The date sentence in the opening paragraph: open, maybe reserved, or left out when there is no date to check.
   let availHtml = ''
   let availText = ''
-  if (status === 'open' && day) {
-    availHtml = ` <strong>${esc(prettyDay(day))}</strong>, is currently available.`
-    availText = ` ${prettyDay(day)}, is currently available.`
-  } else if (status === 'held' && day) {
-    availHtml = ` <strong>${esc(prettyDay(day))}</strong> may already be reserved, but we’d love to help you find a date that works.`
-    availText = ` ${prettyDay(day)} may already be reserved, but we’d love to help you find a date that works.`
+  let dateCard = ''
+  if ((status === 'open' || status === 'held') && day) {
+    const open = status === 'open'
+    availHtml = open ? ` ${esc(prettyDay(day))}, is currently available.` : ` ${esc(prettyDay(day))} may already be reserved, but we’d love to help you find a date that works.`
+    availText = open ? ` ${prettyDay(day)}, is currently available.` : ` ${prettyDay(day)} may already be reserved, but we’d love to help you find a date that works.`
+    dateCard = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:0 0 30px;"><tr><td style="background:#f4ede1;border-left:3px solid ${GOLD};padding:16px 20px;">
+<div style="${label}">Your date</div>
+<div style="margin-top:4px;font-family:Georgia,serif;font-size:21px;color:#2a2420;">${esc(prettyDay(day))}</div>
+<div style="margin-top:6px;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:bold;color:${open ? GOLD : '#b45309'};">${open ? '&#10003; Currently Available' : 'May already be reserved'}</div>
+</td></tr></table>`
   }
   const opening = 'Thanks for considering North Star House for your wedding!'
   const below = 'Below you’ll find pricing, what’s included in the rental, and a link to book a tour if you’d like to come explore the estate with us.'
@@ -98,15 +102,15 @@ function buildEmail(first: string, day: string, status: 'open' | 'held' | 'unkno
 <div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>
 <p style="${roomy}">Hi ${esc(first)},</p>
 <p style="${roomy}">${esc(opening)}${availHtml} ${esc(below)}</p>
-${stars}
+${dateCard}
 ${paras.slice(0, 3).map((t) => `<p style="${roomy}">${esc(t)}</p>`).join('\n')}
-${stars}
+${rule}
 <p style="margin:0 0 30px;text-align:center;font-family:Georgia,serif;font-size:19px;line-height:1.5;color:#2a2420;"><i>${esc(paras[3])}</i></p>
 <div style="margin:0 0 12px;">${btn(TOUR_PAGE('wedding'), 'Book a Tour', true)}</div>
 <div style="border-top:1px solid #e5ddcf;width:60%;margin:30px auto 22px;"></div>
 <p style="margin:0;text-align:center;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Questions? Just reply to this email. We're happy to help.</i></p>
 </div></div></div>`
-  const body = `Hi ${first},\n\n${opening}${availText} ${below}\n\n* * *\n\n${paras.slice(0, 3).join('\n\n')}\n\n* * *\n\n${paras[3]}\n\nBook a tour: ${TOUR_PAGE('wedding')}\n\n\nQuestions? Just reply to this email. We're happy to help.\n\nNorth Star House`
+  const body = `Hi ${first},\n\n${opening}${availText} ${below}\n\n${paras.slice(0, 3).join('\n\n')}\n\n${paras[3]}\n\nBook a tour: ${TOUR_PAGE('wedding')}\n\n\nQuestions? Just reply to this email. We're happy to help.\n\nNorth Star House`
   return { html, body }
 }
 
