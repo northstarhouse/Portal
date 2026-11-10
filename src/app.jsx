@@ -15017,6 +15017,9 @@ function SuFormResponses({ form }) {
   var [loading, setLoading] = useState(true);
   var [notifying, setNotifying] = useState({});
   var [notified, setNotified] = useState({});
+  // Docent tour requests that are really about a wedding or event: a ready-made reply pointing them to the venue tour.
+  var [venueReply, setVenueReply] = useState(null); // { id, to, subject, text, busy, err }
+  var [venueReplied, setVenueReplied] = useState({});
   var [sendingLead, setSendingLead] = useState({});
   var [sentLead, setSentLead] = useState({});
   var [sendingVol, setSendingVol] = useState({});
@@ -15146,6 +15149,51 @@ function SuFormResponses({ form }) {
     if (!w) return;
     w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Email Preview — New Docent Tour Request</title></head><body style="margin:0">' + email.html + '</body></html>');
     w.document.close();
+  }
+
+  function docentLooksLikeVenue(r) {
+    var a = r.answers || {};
+    return /wedding|marr|bride|groom|reception|elope|venue|rehearsal|engag|quincea|celebration of life|memorial|private event|host (my|our|an?)\b/i.test(String(a.dt_notes || '') + ' ' + String(a.dt_dates || ''));
+  }
+  function startVenueReply(r) {
+    if (venueReply && venueReply.id === r.id) { setVenueReply(null); return; }
+    var a = r.answers || {};
+    var first = String(a.dt_first || '').trim();
+    var isWedding = /wedding|marr|bride|groom|elope|engag/i.test(String(a.dt_notes || ''));
+    var text = 'Hi' + (first ? ' ' + first : '') + ',\n\n' +
+      'Thank you for your interest in North Star House! The form you filled out is for our historic docent tours, which focus on the history and architecture of the house.\n\n' +
+      'To see North Star House as a ' + (isWedding ? 'wedding' : 'event') + ' venue, please book a free venue tour with our venue team instead. You\'ll see the spaces, talk through your plans, and we can check date availability for you. You can choose a time that works for you here:\n\n' +
+      'https://www.northstarhouse.org/book-a-tour\n\n' +
+      'We\'d love to show you around!\n\n' +
+      'Warmly,\nThe North Star House Venue Team';
+    setVenueReply({ id: r.id, to: String(a.dt_email || '').trim(), subject: 'Your North Star House tour request', text: text, busy: false, err: '' });
+  }
+  function sendVenueReply(r) {
+    var v = venueReply;
+    if (!v || v.busy) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.to)) { setVenueReply(Object.assign({}, v, { err: 'Add a valid email address.' })); return; }
+    setVenueReply(Object.assign({}, v, { busy: true, err: '' }));
+    fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: [v.to], subject: v.subject, body: v.text, fromEmail: 'venue@northstarhouse.org' })
+    }).then(function(res) {
+      if (!res.ok) throw new Error('send failed');
+      setVenueReplied(function(p) { var n = Object.assign({}, p); n[r.id] = true; return n; });
+      setVenueReply(null);
+      // record it on the request and mark it handled
+      var stamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      var note = [r.internal_notes, 'Sent venue tour reply (' + stamp + ').'].filter(Boolean).join('\n');
+      fetch(SUPABASE_URL + '/rest/v1/nsh_form_responses?id=eq.' + r.id, {
+        method: 'PATCH',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ status: 'handled', internal_notes: note })
+      }).then(function(x) {
+        if (!x.ok) return;
+        setResponses(function(prev) { return prev.map(function(y) { return y.id === r.id ? Object.assign({}, y, { status: 'handled', internal_notes: note }) : y; }); });
+        setNotesDraft(function(prev) { var n = Object.assign({}, prev); n[r.id] = note; return n; });
+      }).catch(function() {});
+    }).catch(function() { setVenueReply(Object.assign({}, v, { busy: false, err: 'The email could not be sent. Please try again.' })); });
   }
 
   function notifyDocents(r) {
@@ -15519,6 +15567,11 @@ function SuFormResponses({ form }) {
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
                   {form.id === DOCENT_TOUR_FORM_ID && (
                     <React.Fragment>
+                      <button onClick={function() { startVenueReply(r); }} disabled={venueReplied[r.id]}
+                        title="Send a ready-made reply pointing them to a free venue tour (for weddings and events)"
+                        style={{ background: venueReplied[r.id] ? '#eef7ee' : docentLooksLikeVenue(r) ? '#c0392b' : '#fff', color: venueReplied[r.id] ? '#2e7d32' : docentLooksLikeVenue(r) ? '#fff' : '#b5457a', border: '1px solid ' + (venueReplied[r.id] ? '#bfe0bf' : docentLooksLikeVenue(r) ? '#c0392b' : '#b5457a'), borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: venueReplied[r.id] ? 'default' : 'pointer' }}>
+                        {venueReplied[r.id] ? '✓ Venue reply sent' : (venueReply && venueReply.id === r.id) ? 'Close reply' : docentLooksLikeVenue(r) ? 'Wedding/event? Send venue reply' : 'Venue tour reply'}
+                      </button>
                       <button onClick={function() { previewDocentEmail(r); }}
                         style={{ background: '#fff', color: '#888', border: '1px solid #e0d8cc', borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                         Preview Email
@@ -15576,6 +15629,23 @@ function SuFormResponses({ form }) {
                 </div>
               </div>
 
+              {form.id === DOCENT_TOUR_FORM_ID && venueReply && venueReply.id === r.id && (
+                <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 14, marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Reply from venue@ · edit before sending</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                    <input value={venueReply.to} onChange={function(e) { var t = e.target.value; setVenueReply(function(v) { return Object.assign({}, v, { to: t, err: '' }); }); }} placeholder="Email" style={{ flex: '1 1 200px', padding: '7px 10px', border: '1px solid #e0d8cc', borderRadius: 8, fontSize: 13 }} />
+                    <input value={venueReply.subject} onChange={function(e) { var t = e.target.value; setVenueReply(function(v) { return Object.assign({}, v, { subject: t }); }); }} style={{ flex: '2 1 260px', padding: '7px 10px', border: '1px solid #e0d8cc', borderRadius: 8, fontSize: 13 }} />
+                  </div>
+                  <textarea rows={11} value={venueReply.text} onChange={function(e) { var t = e.target.value; setVenueReply(function(v) { return Object.assign({}, v, { text: t }); }); }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 11px', border: '1px solid #e0d8cc', borderRadius: 8, fontSize: 13, lineHeight: 1.5, fontFamily: 'system-ui, sans-serif', resize: 'vertical' }} />
+                  {venueReply.err && <div style={{ color: '#b3261e', fontSize: 12, marginTop: 6 }}>{venueReply.err}</div>}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                    <button onClick={function() { sendVenueReply(r); }} disabled={venueReply.busy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 18px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: venueReply.busy ? 0.6 : 1 }}>{venueReply.busy ? 'Sending…' : 'Send reply'}</button>
+                    <button onClick={function() { setVenueReply(null); }} style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+                    <span style={{ fontSize: 11, color: '#999' }}>Sending marks the request handled and adds a note.</span>
+                  </div>
+                </div>
+              )}
               {form.id === WEDDING_INQUIRY_FORM_ID && inquiryFollowUpAllowed(r, pendingTourEmails) && composingId === r.id && (
                 <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 14, marginBottom: 10 }}>
                   {composeStep === 'paste' ? (
