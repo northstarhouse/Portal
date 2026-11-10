@@ -846,6 +846,7 @@ var NAV_ICONS = {
   'email-notices': '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/>',
   'dev-log': '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
   'activity-log': '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+  'mail-checks': '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/><polyline points="15 17 17 19 21 15"/>',
   'person-activity': '<circle cx="9" cy="7" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2"/><polyline points="22 15 19 15 17.5 20 15 11 13.5 15 12 15"/>',
   planning: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
   'venue-clients': '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
@@ -16646,8 +16647,11 @@ function MailChecksView() {
       r.readAsDataURL(file);
     });
   }
-  async function upload(files) {
+  var pendingKind = React.useRef('mail');
+  async function upload(files, upKind) {
     if (!files.length) return;
+    var K = MAIL_KINDS[upKind];
+    if (upKind !== kind) setKind(upKind);
     setBusy('Uploading…'); setMsg(null);
     var now = new Date();
     var mdY = (now.getMonth() + 1) + '.' + now.getDate() + '.' + now.getFullYear();
@@ -16664,7 +16668,7 @@ function MailChecksView() {
         var base64 = await readFile(file);
         var res = await fetch(SUPABASE_URL + '/functions/v1/upload-mail', {
           method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, H),
-          body: JSON.stringify({ kind: kind, filename: filename, mimeType: file.type || 'application/octet-stream', base64: base64 })
+          body: JSON.stringify({ kind: upKind, filename: filename, mimeType: file.type || 'application/octet-stream', base64: base64 })
         }).then(function(r) { return r.json(); });
         if (!res.success) throw new Error(res.error || 'Upload failed.');
         done++; if (!res.emailed) unsent++;
@@ -16688,13 +16692,13 @@ function MailChecksView() {
     <div style={{ maxWidth: 760 }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>{tab('mail')}{tab('check')}</div>
       <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '16px 18px', marginBottom: 18 }}>
-        <div style={{ fontSize: 13, color: '#555', marginBottom: 12, lineHeight: 1.5 }}>
-          {kind === 'check' ? 'Upload scans or photos of checks. They are saved to the shared Checks folder in Google Drive' : 'Upload scans or photos of the mail. They are saved to the Mail folder in Google Drive'}, and Wyn is emailed a link (copy to media@).
-        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <button type="button" disabled={!!busy} onClick={function() { if (inputRef.current) inputRef.current.click(); }}
-            style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{busy || ('Upload ' + (kind === 'check' ? 'checks' : 'mail'))}</button>
-          <input ref={inputRef} type="file" multiple accept="image/*,.pdf" style={{ display: 'none' }} onChange={function(e) { var f = Array.prototype.slice.call(e.target.files || []); e.target.value = ''; upload(f); }} />
+          {['mail', 'check'].map(function(k) {
+            return <button key={k} type="button" disabled={!!busy} onClick={function() { pendingKind.current = k; if (inputRef.current) inputRef.current.click(); }}
+              style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{k === 'mail' ? 'Upload mail' : 'Upload checks'}</button>;
+          })}
+          {busy && <span style={{ fontSize: 12, color: '#777' }}>{busy}</span>}
+          <input ref={inputRef} type="file" multiple accept="image/*,.pdf" style={{ display: 'none' }} onChange={function(e) { var f = Array.prototype.slice.call(e.target.files || []); e.target.value = ''; upload(f, pendingKind.current); }} />
           {msg && <span role="status" style={{ fontSize: 12, color: msg.bad ? '#a04545' : '#2e6b4f' }}>{msg.text}</span>}
         </div>
       </div>
