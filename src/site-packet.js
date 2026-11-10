@@ -218,7 +218,8 @@ export function buildSitePacketHtml(client) {
   .guestout { justify-content: flex-start; gap: 14px; align-items: flex-end; border: 2px solid #555; border-radius: 4px; margin: 14px 0 12px; padding: 18px 12px 12px; }
   .guestout span { min-width: 3.2in; border-bottom: 1.5px solid #888; }
   .guestout small { font-weight: 400; font-size: 11px; color: #555; }
-  .inline2 { display: flex; justify-content: space-around; padding: 8px 8px 14px; font-family: Cardo, Georgia, serif; font-weight: 700; font-size: 18px; border-bottom: 1.5px solid #888; }
+  .inline2 > span { flex: 0 0 50%; }
+  .inline2 { display: flex; justify-content: flex-start; padding: 8px 8px 14px; font-family: Cardo, Georgia, serif; font-weight: 700; font-size: 18px; border-bottom: 1.5px solid #888; }
   h1.sd { font-size: 30px; margin: 10px 0 6px; border-top: 1.5px solid #888; border-bottom: 1.5px solid #888; padding: 10px 0; }
   .serif { font-family: Cardo, Georgia, serif; font-size: 17px; }
   .serif.tall { min-height: 86px; }
