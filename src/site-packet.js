@@ -146,9 +146,9 @@ export function buildSitePacketHtml(client) {
   </tr></table>
   <h2>Schedule of Event Activities:</h2>
   <table class="sched"><tr>${schedule.map((s) => `<th>${esc(s[0])}</th>`).join('')}</tr><tr>${schedule.map((s) => `<td>${esc(s[1])}</td>`).join('')}</tr></table>
+  ${itinerary ? `<div class="notes"><b>${isWedding ? "Couple's" : "Client's"} itinerary:</b><div class="itin">${esc(itinerary)}</div></div>` : ''}
   <h2>Site Manager Notes:</h2>
   ${notes.length ? `<div class="notes">${notes.map((n) => `<div><b>${esc(n[0])}:</b> ${esc(n[1])}</div>`).join('')}</div>` : ''}
-  ${itinerary ? `<div class="notes"><b>${isWedding ? "Couple's" : "Client's"} itinerary:</b><div class="itin">${esc(itinerary)}</div></div>` : ''}
   ${rule(notes.length || itinerary ? 4 : 7)}
 </section>`;
 

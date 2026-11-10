@@ -108,9 +108,9 @@ By signing, you acknowledge that you have read the above Terms and Conditions an
   </tr></table>
   <h2>Schedule of Event Activities:</h2>
   <table class="sched"><tr>${s.map(p=>`<th>${mn(p[0])}</th>`).join("")}</tr><tr>${s.map(p=>`<td>${mn(p[1])}</td>`).join("")}</tr></table>
+  ${v?`<div class="notes"><b>${c?"Couple's":"Client's"} itinerary:</b><div class="itin">${mn(v)}</div></div>`:""}
   <h2>Site Manager Notes:</h2>
   ${d.length?`<div class="notes">${d.map(p=>`<div><b>${mn(p[0])}:</b> ${mn(p[1])}</div>`).join("")}</div>`:""}
-  ${v?`<div class="notes"><b>${c?"Couple's":"Client's"} itinerary:</b><div class="itin">${mn(v)}</div></div>`:""}
   ${u(d.length||v?4:7)}
 </section>`,k=`
 <section class="page">
