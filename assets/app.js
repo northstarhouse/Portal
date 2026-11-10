@@ -170,7 +170,8 @@ By signing, you acknowledge that you have read the above Terms and Conditions an
   .hint { font-family: Cardo, Georgia, serif; font-size: 12px; color: #555; margin-top: 4px; }
   .gap { height: 60px; border-bottom: 1.5px solid #888; }
   .inline3 { display: flex; justify-content: space-between; padding: 12px 8px 4px; font-family: Cardo, Georgia, serif; font-weight: 700; font-size: 18px; }
-  .guestout { justify-content: flex-start; gap: 14px; align-items: flex-end; padding-top: 22px; padding-bottom: 14px; }
+  .inline3:not(.guestout) > span { flex: 0 0 33.33%; }
+  .guestout { justify-content: flex-start; gap: 14px; align-items: flex-end; border: 2px solid #555; border-radius: 4px; margin: 14px 0 12px; padding: 18px 12px 12px; }
   .guestout span { min-width: 3.2in; border-bottom: 1.5px solid #888; }
   .guestout small { font-weight: 400; font-size: 11px; color: #555; }
   .inline2 { display: flex; justify-content: space-around; padding: 8px 8px 14px; font-family: Cardo, Georgia, serif; font-weight: 700; font-size: 18px; border-bottom: 1.5px solid #888; }
