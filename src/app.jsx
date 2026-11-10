@@ -19240,9 +19240,12 @@ var TOUR_CATEGORY_COLORS = {
   Memorials: { bg: '#e8f5e9', color: '#2e7d32', dark: '#6a3fa0' },
   Tour: { bg: '#f0ece6', color: '#888', dark: '#d35400' },
 };
-// Tour calendar: each guide's tours in their own color (Jen light pink, Derek dark blue; a tour on the default slot is Jen's).
+// Tour calendar: each guide's tours in their own color (Event tours red; otherwise Jen light pink, Derek dark blue; a tour on the default slot is Jen's).
+var TOUR_EVENT_COLOR = { bg: '#c62828', color: '#fff', ring: '#8e1b1b' };
 var TOUR_GUIDE_COLORS = { Jen: { bg: '#fde4ee', color: '#b0456f' }, Derek: { bg: '#1f3f73', color: '#fff', ring: '#14294d' } };
 function tourGuideColor(t) {
+  // tours for an Event booking are red, whoever guides them
+  if (tourCategoryLabel({ kind: 'Tour', raw: t || {} }) === 'Event') return TOUR_EVENT_COLOR;
   var g = guideLabel(t && t.guide_name).split(' ')[0];
   return TOUR_GUIDE_COLORS[g] || tourCategoryColor(tourCategoryLabel({ kind: 'Tour', raw: t || {} }));
 }
