@@ -19240,6 +19240,12 @@ var TOUR_CATEGORY_COLORS = {
   Memorials: { bg: '#e8f5e9', color: '#2e7d32', dark: '#6a3fa0' },
   Tour: { bg: '#f0ece6', color: '#888', dark: '#d35400' },
 };
+// Tour calendar: each guide's tours in their own color (Jen light pink, Derek dark green; a tour on the default slot is Jen's).
+var TOUR_GUIDE_COLORS = { Jen: { bg: '#fde4ee', color: '#b0456f' }, Derek: { bg: '#2e6b3a', color: '#fff', ring: '#1b4524' } };
+function tourGuideColor(t) {
+  var g = guideLabel(t && t.guide_name).split(' ')[0];
+  return TOUR_GUIDE_COLORS[g] || tourCategoryColor(tourCategoryLabel({ kind: 'Tour', raw: t || {} }));
+}
 function tourCategoryColor(label) {
   return TOUR_CATEGORY_COLORS[label] || (label === 'Second Walk-Through' ? TOUR_CATEGORY_COLORS.Wedding : null) || TOUR_CATEGORY_COLORS.Tour;
 }
@@ -22991,11 +22997,11 @@ function EstateToursView() {
                       <div style={{ fontSize: 11, fontWeight: 700, color: isToday ? '#fff' : (inMonth ? '#888' : '#ccc'), background: isToday ? gold : 'transparent', width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>{d.getDate()}</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {shown.map(function(t) {
-                          var colors = tourCategoryColor(tourCategoryLabel({ kind: 'Tour', raw: t }));
+                          var colors = tourGuideColor(t);
                           var isSelected = t.id === selectedId;
                           return (
                             <div key={t.id} onClick={function() { selectTour(t); }}
-                              style={{ fontSize: 10, fontWeight: 600, padding: '2px 4px', borderRadius: 4, background: colors.bg, color: colors.color, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', boxShadow: isSelected ? '0 0 0 1.5px ' + colors.color : 'none' }}>
+                              style={{ fontSize: 10, fontWeight: 600, padding: '2px 4px', borderRadius: 4, background: colors.bg, color: colors.color, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', boxShadow: isSelected ? '0 0 0 1.5px ' + (colors.ring || colors.color) : 'none' }}>
                               {fmtTime(t.start_time)} {t.visitor_name || 'Visitor'}
                             </div>
                           );
@@ -23041,11 +23047,11 @@ function EstateToursView() {
                           if (startDec === null || startDec < CAL_START_HOUR || startDec >= CAL_END_HOUR + 1) return null;
                           var top = (startDec - CAL_START_HOUR) * CAL_ROW_H;
                           var heightPx = Math.max(((t.duration_min || 45) / 60) * CAL_ROW_H, 26);
-                          var colors = tourCategoryColor(tourCategoryLabel({ kind: 'Tour', raw: t }));
+                          var colors = tourGuideColor(t);
                           var isSelected = t.id === selectedId;
                           return (
                             <div key={t.id} onClick={function() { selectTour(t); }}
-                              style={{ position: 'absolute', top: top, left: 2, right: 2, height: heightPx, background: colors.bg, borderLeft: '3px solid ' + colors.color, borderRadius: 5, padding: '3px 6px', fontSize: 10, color: colors.color, cursor: 'pointer', overflow: 'hidden', boxShadow: isSelected ? '0 0 0 2px ' + colors.color : 'none' }}>
+                              style={{ position: 'absolute', top: top, left: 2, right: 2, height: heightPx, background: colors.bg, borderLeft: '3px solid ' + (colors.ring || colors.color), borderRadius: 5, padding: '3px 6px', fontSize: 10, color: colors.color, cursor: 'pointer', overflow: 'hidden', boxShadow: isSelected ? '0 0 0 2px ' + (colors.ring || colors.color) : 'none' }}>
                               <div style={{ fontWeight: 700 }}>{fmtTime(t.start_time)}</div>
                               <div style={{ fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{tourTitleFor(t)}</div>
                             </div>
