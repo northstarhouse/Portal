@@ -16681,33 +16681,39 @@ function MailChecksView() {
     load();
   }
 
-  var shown = (rows || []).filter(function(r) { return r.action === K.ok || r.action === K.bad; });
+  // one log for both mail and checks, newest first
+  var shown = rows || [];
+  // Drive folders. The Mail folder's exact link is recorded with each new upload; until then its parent shared folder is opened.
+  var mailFolder = ((rows || []).find(function(r) { return r.action === MAIL_KINDS.mail.ok && r.detail && r.detail.folder_url; }) || {}).detail;
+  var folders = [
+    ['Mail folder', mailFolder ? mailFolder.folder_url : 'https://drive.google.com/drive/folders/1M4p35h-L_V0Ikgz2YNJh5eklp62Dp0wx'],
+    ['Checks folder', 'https://drive.google.com/drive/folders/1H_XL4zTyR8la-QB5pty8pRiGzXJ9lvNT'],
+  ];
   var when = function(iso) { var d = new Date(iso); return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
   var pill = function(text, bg, color) { return <span style={{ fontSize: 10, fontWeight: 700, background: bg, color: color, borderRadius: 10, padding: '2px 8px', whiteSpace: 'nowrap' }}>{text}</span>; };
-  var tab = function(k) {
-    var on = kind === k;
-    return <button key={k} type="button" onClick={function() { setKind(k); setMsg(null); }} style={{ background: on ? gold : '#fff', color: on ? '#fff' : gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{MAIL_KINDS[k].label}</button>;
-  };
   return (
     <div style={{ maxWidth: 760 }}>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>{tab('mail')}{tab('check')}</div>
       <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '16px 18px', marginBottom: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {['mail', 'check'].map(function(k) {
             return <button key={k} type="button" disabled={!!busy} onClick={function() { pendingKind.current = k; if (inputRef.current) inputRef.current.click(); }}
               style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{k === 'mail' ? 'Upload mail' : 'Upload checks'}</button>;
           })}
+          {folders.map(function(fl) {
+            return <a key={fl[0]} href={fl[1]} target="_blank" rel="noopener noreferrer" style={{ background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>{fl[0]} ↗</a>;
+          })}
           {busy && <span style={{ fontSize: 12, color: '#777' }}>{busy}</span>}
           <input ref={inputRef} type="file" multiple accept="image/*,.pdf" style={{ display: 'none' }} onChange={function(e) { var f = Array.prototype.slice.call(e.target.files || []); e.target.value = ''; upload(f, pendingKind.current); }} />
           {msg && <span role="status" style={{ fontSize: 12, color: msg.bad ? '#a04545' : '#2e6b4f' }}>{msg.text}</span>}
         </div>
       </div>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8 }}>Past {kind === 'check' ? 'check' : 'mail'} uploads{rows ? ' (' + shown.length + ')' : ''}</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8 }}>Past uploads{rows ? ' (' + shown.length + ')' : ''}</div>
       {rows === null ? <div style={{ color: '#aaa', fontSize: 13 }}>Loading…</div> : shown.length === 0 ? <div style={{ color: '#aaa', fontSize: 13, padding: '16px 0' }}>Nothing uploaded yet.</div> :
         <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, overflow: 'hidden' }}>
           {shown.map(function(r, i) {
             var d = r.detail || {};
-            var failed = r.action === K.bad;
+            var isCheck = r.action === MAIL_KINDS.check.ok || r.action === MAIL_KINDS.check.bad;
+            var failed = r.action === MAIL_KINDS.mail.bad || r.action === MAIL_KINDS.check.bad;
             var name = d.filename || String(r.description || '').replace(/^(New )?(Mail|Check) (upload FAILED|uploaded): /i, '');
             var who = d.by || r.volunteer_name || '';
             var status = failed ? pill('Upload failed', '#fdecea', '#a04545')
@@ -16716,7 +16722,7 @@ function MailChecksView() {
               : null; // older uploads did not record the email
             return <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '11px 16px', borderTop: i ? '1px solid #f2ece2' : 'none' }}>
               <div style={{ flex: '1 1 260px', minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2420', wordBreak: 'break-word' }}>{d.url ? <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ color: '#2a2420' }}>{name} ↗</a> : name}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2420', wordBreak: 'break-word' }}><span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: isCheck ? '#2e6f8e' : gold, borderRadius: 4, padding: '1px 6px', marginRight: 8, verticalAlign: 1 }}>{isCheck ? 'Check' : 'Mail'}</span>{d.url ? <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ color: '#2a2420' }}>{name} ↗</a> : name}</div>
                 <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{when(r.created_at)}{who ? ' · ' + who : ''}</div>
                 {failed && d.error && <div style={{ fontSize: 11, color: '#a04545', marginTop: 2 }}>{d.error}</div>}
                 {!failed && d.email_error && <div style={{ fontSize: 11, color: '#a15c00', marginTop: 2 }}>{d.email_error}</div>}
@@ -26294,8 +26300,8 @@ function Dashboard() {
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
               </button>
             )}
-            <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <NavIcon id={active} active={true} />
+            <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: gold }}>
+              <NavIcon id={active} active={true} size={20} />
             </div>
             <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "person-activity" ? "Activity by Person" : active === "mail-checks" ? "Mail & Checks" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (

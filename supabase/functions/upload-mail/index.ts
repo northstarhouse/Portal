@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
       tag: kind === "check" ? "Check" : "Mail",
       description: `${label} uploaded: ${filename}`,
       volunteer_name: by,
-      detail: { url: uploaded.webViewLink, file_id: uploaded.id, filename, by, emailed, emailed_to: emailed ? [WYN_EMAIL] : [], email_error: emailError },
+      detail: { url: uploaded.webViewLink, file_id: uploaded.id, folder_url: `https://drive.google.com/drive/folders/${folderId}`, filename, by, emailed, emailed_to: emailed ? [WYN_EMAIL] : [], email_error: emailError },
     });
 
     return json({ success: true, url: uploaded.webViewLink, fileId: uploaded.id, emailed });
