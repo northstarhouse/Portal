@@ -15844,7 +15844,7 @@ function FormResponsesView({ navigate }) {
 //  - older records that already carry a first name: messages marked handled, replies sent, tours guided,
 //    tour requests handled, Activity Log items handled, pre-booking forms sent, vendors added, client access
 //    links made and feature requests.
-// Opens on Derek (he asked for it); the dropdown lists everyone who can sign in to the Portal.
+// Opens on Derek (he asked for it); the dropdown lists the venue team: Derek, Jen and Haley.
 var PA_TABLE_LABELS = {
   venue_inquiries: 'Venue booking', nsh_form_responses: 'Client record / form', estate_tours: 'Tour', venue_messages: 'Message',
   venue_payment_schedule: 'Payment schedule', venue_payments: 'Venue payment', venue_agreement_versions: 'Agreement', venue_agreement_signers: 'Agreement signer',
@@ -15867,9 +15867,12 @@ function PersonActivityView() {
 
   useEffect(function() {
     get(encodeURIComponent('2026 Volunteers') + '?select=' + encodeURIComponent('First Name,Last Name,Team,Status') + '&Status=eq.Active').then(function(rows) {
-      var names = rows.filter(function(v) { return /(^|[|,])\s*(staff|board member|team lead)\s*([|,]|$)/i.test(v.Team || ''); })
+      // Only the venue team: Derek, Jen and Haley, in that order.
+      var team = ['derek', 'jen', 'haley'];
+      var names = rows.filter(function(v) { return /(^|[|,])\s*(staff|board member|team lead)\s*([|,]|$)/i.test(v.Team || '') && team.indexOf(String(v['First Name'] || '').trim().toLowerCase()) !== -1; })
         .map(function(v) { return (String(v['First Name'] || '').trim() + ' ' + String(v['Last Name'] || '').trim()).trim(); })
-        .filter(Boolean).sort();
+        .filter(Boolean)
+        .sort(function(a, b) { return team.indexOf(a.split(' ')[0].toLowerCase()) - team.indexOf(b.split(' ')[0].toLowerCase()); });
       setPeople(names);
       setPerson(function(cur) { return cur || names.find(function(n) { return /^derek\b/i.test(n); }) || names[0] || ''; });
     });
