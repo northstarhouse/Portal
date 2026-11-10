@@ -158,13 +158,8 @@ async function resolvePrebookingId(responseId: string): Promise<string | null> {
   return hit ? hit.id : null;
 }
 
-async function syncClient(pbId: string) {
-  const pb = (await rest(`nsh_form_responses?select=id,form_id,answers,created_at&id=eq.${pbId}`))?.[0];
-  if (!pb) return { skipped: "no such response" };
-  const a = pb.answers || {};
-  if (Object.values(a).some((v) => typeof v === "string" && /\+test@thenorthstarhouse\.org/i.test(v))) return { skipped: "test booking" };
-  const inq = (await rest(`venue_inquiries?select=*&prebooking_form_response_id=eq.${pbId}&limit=1`))?.[0] || null;
-
+// The client's Drive folder: "<event date> - <client name>" under its year, made on first use.
+async function clientFolder(pbId: string, a: Record<string, any>, inq: any) {
   const two = a["7fnabd0i"] && a["7leui2ic"] ? `${a["7fnabd0i"]} + ${a["7leui2ic"]}` : a["7fnabd0i"];
   const name = clean(String(a.__event_name || inq?.name || a.evp_org || two || a.evp_name || "Client")).replace(/(?<!&)\s+Wedding$/i, "") || "Client";
   const date = String(inq?.event_date || a.sn9urgfr || a.evp_date || "").slice(0, 10);
@@ -187,6 +182,16 @@ async function syncClient(pbId: string) {
       await rest(`venue_drive_folders?response_id=eq.${pbId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ folder_name: folderName }) });
     } catch (_e) { /* keep the old name */ }
   }
+  return { folderId, folderUrl: rec.folder_url as string, folderName, name, date };
+}
+
+async function syncClient(pbId: string) {
+  const pb = (await rest(`nsh_form_responses?select=id,form_id,answers,created_at&id=eq.${pbId}`))?.[0];
+  if (!pb) return { skipped: "no such response" };
+  const a = pb.answers || {};
+  if (Object.values(a).some((v) => typeof v === "string" && /\+test@thenorthstarhouse\.org/i.test(v))) return { skipped: "test booking" };
+  const inq = (await rest(`venue_inquiries?select=*&prebooking_form_response_id=eq.${pbId}&limit=1`))?.[0] || null;
+  const { folderId, folderUrl, folderName, name, date } = await clientFolder(pbId, a, inq);
   const have = await listChildren(folderId);
   const has = (prefix: string) => have.find((f) => f.name.toLowerCase().startsWith(prefix.toLowerCase()));
   const done: string[] = [];
@@ -263,7 +268,32 @@ async function syncClient(pbId: string) {
     }
   }
 
-  return { folder: folderName, url: rec.folder_url, added: done };
+  return { folder: folderName, url: folderUrl, added: done };
+}
+
+// The site manager's final paperwork from the event (checklists, notes, incident forms), uploaded from
+// the Portal's client page: filed in the client's Drive folder and listed on the client's record.
+const PAPERWORK_TYPES = /^(application\/pdf|image\/(jpeg|png|heic|heif|webp|gif)|application\/msword|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet)|application\/vnd\.ms-excel|text\/plain)$/;
+const PAPERWORK_MAX = 10 * 1024 * 1024;
+async function uploadSiteManagerPaperwork(pbId: string, filename: string, mimeType: string, data: string) {
+  if (!PAPERWORK_TYPES.test(mimeType)) throw new Error("Upload a PDF, photo, Word or Excel file.");
+  const raw = atob(data);
+  if (raw.length > PAPERWORK_MAX) throw new Error("That file is over 10 MB. Please upload a smaller copy.");
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  const pb = (await rest(`nsh_form_responses?select=id,form_id,answers&id=eq.${pbId}`))?.[0];
+  if (!pb) throw new Error("Client not found.");
+  const inq = (await rest(`venue_inquiries?select=*&prebooking_form_response_id=eq.${pbId}&limit=1`))?.[0] || null;
+  const { folderId, folderUrl } = await clientFolder(pbId, pb.answers || {}, inq);
+  const fileName = `Site Manager Paperwork - ${clean(filename) || "upload"}`;
+  const up = await uploadFile(fileName, folderId, mimeType, bytes);
+  const entry = { name: fileName, file_id: up.id, url: `https://drive.google.com/file/d/${up.id}/view`, folder_url: folderUrl, uploaded_at: new Date().toISOString() };
+  // read again just before saving, so a checklist change made meanwhile is kept
+  const cur = (await rest(`nsh_form_responses?select=answers&id=eq.${pbId}`))?.[0]?.answers || {};
+  const checklist = { ...(cur.__venue_checklist || {}) };
+  checklist.site_manager_paperwork = [...(Array.isArray(checklist.site_manager_paperwork) ? checklist.site_manager_paperwork : []), entry];
+  const saved = await rest(`nsh_form_responses?id=eq.${pbId}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ answers: { ...cur, __venue_checklist: checklist } }) });
+  return { file: entry, record: saved?.[0] || null };
 }
 
 // One sync per client at a time: a second submission arriving together waits its turn (and then finds the first one's work already done).
@@ -293,6 +323,17 @@ Deno.serve(async (req) => {
       const pbId = await resolvePrebookingId(id);
       if (!pbId) return json({ ok: true, skipped: "not tied to a client" });
       return json({ ok: true, ...(await syncLocked(pbId)) });
+    }
+    if (body.action === "upload_site_manager") {
+      const id = String(body.response_id || "");
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "response_id required" }, 400);
+      const pbId = await resolvePrebookingId(id);
+      if (!pbId) return json({ error: "Client not found." }, 404);
+      try {
+        return json({ ok: true, ...(await uploadSiteManagerPaperwork(pbId, String(body.filename || ""), String(body.mime_type || ""), String(body.data || ""))) });
+      } catch (e: any) {
+        return json({ ok: false, error: e.message || String(e) }, 400);
+      }
     }
     if (body.action === "backfill") {
       // heavy, so only callable with the service key (it was run once for the existing clients)

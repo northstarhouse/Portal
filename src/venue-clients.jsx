@@ -144,8 +144,9 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   tasks.sort((x, y) => x.rank - y.rank || (x.due || eventDate || '9999').localeCompare(y.due || eventDate || '9999'));
   const siteManager = a.__venue_checklist?.site_manager?.name || '';
   const eventDay = a.__venue_checklist?.event_day || null;
+  const smPaperwork = Array.isArray(a.__venue_checklist?.site_manager_paperwork) ? a.__venue_checklist.site_manager_paperwork : [];
   const feedbackSentAt = live?.feedback_sent_at || null;
-  return { id:sub.id, sub, maxGuests:String(a.max_guests||'').trim()||null, name, email, contacts, siteManager, questionnaire, hbQa, feedbackSentAt, eventDay, hb, eventDate, eventEnd, nativeAgreement, legacy, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : evType(live?.event_type), days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
+  return { id:sub.id, sub, maxGuests:String(a.max_guests||'').trim()||null, name, email, contacts, siteManager, questionnaire, hbQa, feedbackSentAt, eventDay, smPaperwork, hb, eventDate, eventEnd, nativeAgreement, legacy, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : evType(live?.event_type), days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount ?? null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
 }
 
 const css = `
@@ -169,6 +170,18 @@ async function saveSiteManager(responseId, name) {
   const saved = res.ok ? await res.json() : null;
   if (!Array.isArray(saved) || saved.length !== 1) throw new Error('The site manager could not be saved. Please try again.');
   return saved[0];
+}
+
+// The site manager's final paperwork from the event: the file goes to the client's Google Drive folder
+// (Closing Events Paperwork) and is listed on the client's record. Returns the updated record.
+async function uploadSiteManagerPaperwork(responseId, file) {
+  if (!responseId) throw new Error('Choose a client.');
+  if (file.size > 10 * 1024 * 1024) throw new Error(file.name + ' is over 10 MB. Please upload a smaller copy.');
+  const data = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1] || ''); r.onerror = () => reject(new Error('Could not read ' + file.name + '.')); r.readAsDataURL(file); });
+  const res = await fetch(PB_URL + '/functions/v1/client-drive-sync', { method: 'POST', headers: { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'upload_site_manager', response_id: responseId, filename: file.name, mime_type: file.type || 'application/octet-stream', data }) });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok || !out.ok || !out.record) throw new Error(out.error || 'The upload did not go through. Please try again.');
+  return out.record;
 }
 
 // Event-day times for billing: when the last guest actually left, and when the site manager left (they are often different).
@@ -454,10 +467,12 @@ async function saveEventName(id, name) {
   return rows[0];
 }
 
-function ClientDetail({ client, onClose, onRename, onSaveEventDay, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
+function ClientDetail({ client, onClose, onRename, onSaveEventDay, onUploadPaperwork, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [agrOpen, setAgrOpen] = React.useState(false);
+  const [smBusy, setSmBusy] = React.useState(false);
+  const [smMsg, setSmMsg] = React.useState(null);
   const [dayTimes, setDayTimes] = React.useState({ guests_out: client.eventDay?.guests_out || '', sm_out: client.eventDay?.sm_out || '' });
   const [dayBusy, setDayBusy] = React.useState(false);
   const [dayMsg, setDayMsg] = React.useState(null);
@@ -510,6 +525,7 @@ function ClientDetail({ client, onClose, onRename, onSaveEventDay, onVerify, onS
   // Only weddings include an engraved brick (not private events, nonprofits or memorials).
   if (client.type === 'Wedding') step('Wedding brick',!!client.brickSubmittedAt || (client.brickLines || []).length > 0, client.brickSubmittedAt ? dateLabel(client.brickSubmittedAt) : 'Not submitted yet');
   if (client.eventDate) step('Event day', client.days !== null && client.days <= 0, dateLabel(client.eventDate));
+  if (client.eventDate) step('Site manager paperwork', client.smPaperwork.length > 0, client.smPaperwork.length ? client.smPaperwork.length + ' file' + (client.smPaperwork.length > 1 ? 's' : '') + ' uploaded' : client.days !== null && client.days <= 0 ? 'Not uploaded yet' : 'After the event');
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
   return <dialog ref={ref} className="vc-dialog" aria-labelledby="vc-client-title" onCancel={onClose} onClick={e => { if(e.target === ref.current) onClose(); }}>
     <div className="vc-modal-head"><div style={{flex:1}}><h2 id="vc-client-title" className="vc-name" style={{fontSize:25,margin:0}}>{client.name} - {client.type}</h2>{onRename&&<a onClick={async()=>{const cur=client.name;const v=window.prompt('Event name (leave empty to go back to the original name):',cur);if(v===null)return;try{await onRename(client.id,v.trim());}catch(e){alert(e.message||'Could not save.');}}} style={{cursor:'pointer',color:'#886c44',fontSize:12,fontWeight:600,textDecoration:'underline'}}>Edit name</a>}{client.siteManager&&<div style={{marginTop:4,fontSize:13,color:'#6b5d4a'}}>Site manager: <strong style={{color:'#2a2420'}}>{client.siteManager}</strong></div>}<div style={{fontFamily:'Cardo,Georgia,serif',fontSize:22,fontWeight:700,color:'#886c44',marginTop:6}}>{dateLabel(client.eventDate)}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10,flexShrink:0}}><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button><button type="button" onClick={()=>openSitePacket(client)} style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap'}}>Print Site Manager Packet</button><a href="https://venue.northstarhouse.org/guidebook/" target="_blank" rel="noopener noreferrer" style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap',textDecoration:'none',fontSize:'inherit'}}>Client Guidebook</a></div></div>
@@ -559,6 +575,30 @@ function ClientDetail({ client, onClose, onRename, onSaveEventDay, onVerify, onS
             {g !== null && sm !== null && g !== sm && <p className="vc-muted" style={{margin:'10px 0 0'}}>Guests left at {pretty(dayTimes.guests_out)}; the site manager left at {pretty(dayTimes.sm_out)} ({Math.abs(sm - g)} min {sm > g ? 'later' : 'earlier'}). Use the guests' time for billing.</p>}
           </>;
         })()}
+      </div>}
+      {onUploadPaperwork && <div className="vc-modal-section">
+        <div className="vc-modal-section-title"><span>Site manager paperwork</span>{client.smPaperwork.length > 0 && <span className="vc-pill good">{client.smPaperwork.length} on file</span>}</div>
+        <p className="vc-muted" style={{margin:'0 0 10px'}}>Upload the site manager's final paperwork after the event (checklist, notes, any incident report). Scans and phone photos are fine. Files are saved to this client's folder in Google Drive.</p>
+        {client.smPaperwork.map((f, i) => <div key={f.file_id || i} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 0',borderTop:i?'1px solid #f0ebe2':'none',fontSize:13}}>
+          <a href={f.url} target="_blank" rel="noopener noreferrer" style={{color:'#886c44',fontWeight:600,wordBreak:'break-word'}}>{String(f.name || '').replace(/^Site Manager Paperwork - /, '')} ↗</a>
+          <span className="vc-muted" style={{whiteSpace:'nowrap'}}>{f.uploaded_at ? dateLabel(f.uploaded_at) : ''}</span>
+        </div>)}
+        <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',marginTop:10}}>
+          <label style={{background:'#886c44',color:'#fff',borderRadius:8,padding:'9px 16px',fontWeight:600,cursor:smBusy?'default':'pointer',opacity:smBusy?0.6:1}}>
+            {smBusy ? 'Uploading…' : 'Upload paperwork'}
+            <input type="file" multiple accept=".pdf,image/*,.doc,.docx,.xls,.xlsx,.txt" disabled={smBusy} style={{display:'none'}} onChange={async e => {
+              const files = [...(e.target.files || [])]; e.target.value = '';
+              if (!files.length) return;
+              setSmBusy(true); setSmMsg(null);
+              let done = 0;
+              try { for (const f of files) { await onUploadPaperwork(client.id, f); done++; } setSmMsg({ bad: false, text: done === 1 ? 'Uploaded.' : done + ' files uploaded.' }); }
+              catch (err) { setSmMsg({ bad: true, text: (done ? done + ' uploaded, then: ' : '') + (err.message || 'Upload failed.') }); }
+              finally { setSmBusy(false); }
+            }}/>
+          </label>
+          {client.smPaperwork[0]?.folder_url && <a href={client.smPaperwork[0].folder_url} target="_blank" rel="noopener noreferrer" style={{color:'#886c44',fontSize:13}}>Open client folder in Drive ↗</a>}
+          {smMsg && <span role="status" style={{fontSize:12,color:smMsg.bad?'#b3261e':'#2e7d32'}}>{smMsg.text}</span>}
+        </div>
       </div>}
       <div className="vc-modal-section">
         <div className="vc-modal-section-title">Timeline of Steps</div>
@@ -735,6 +775,10 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     const record = await saveEventDay(id,times);
     setSavedResponses(prev=>({...prev,[id]:record}));
   }
+  async function uploadPaperwork(id,file) {
+    const record = await uploadSiteManagerPaperwork(id,file);
+    setSavedResponses(prev=>({...prev,[id]:record}));
+  }
   async function verifyInsurance(id,verified,note) {
     if (!saveInsurance) throw new Error('Insurance verification is unavailable. Please reload and try again.');
     const record = await saveInsurance(id,verified,note);
@@ -759,6 +803,6 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     </aside></div>
     </>}
     {statsOpen&&<ClientStats clients={clients} onClose={onCloseStats}/>}
-    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onSavePayments={recordPayments} onRename={renameClient} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
+    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onUploadPaperwork={uploadPaperwork} onSavePayments={recordPayments} onRename={renameClient} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }
