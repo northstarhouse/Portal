@@ -58,6 +58,7 @@ function scheduleFromItinerary(text) {
     ['cocktail', /cocktail/i],
     ['dining', /dinner|dining|meal|toast/i],
     ['leave', /guest(s)?\s*leave|send.?off|exit|last dance|reception (ends?|over)|end of (the )?(reception|event|night)/i],
+    ['out', /out time|load.?out|out by|off (the )?(property|site)|vacate|venue (closes|empty)/i],
   ];
   for (const line of String(text || '').split(/\n|;/)) {
     const mins = clock(line);
@@ -89,12 +90,11 @@ export function buildSitePacketHtml(client) {
   const date = longDate(client.eventDate);
   const sched = scheduleFromItinerary(a('itinerary'));
   const access = a('houseAccess');
-  const accessMins = clock(access);
   const times = {
     setup: a('outdoorSetup'), house: access, ceremony: sched.ceremony || '', cocktail: sched.cocktail || '',
     dining: sched.dining || '', leave: sched.leave || '',
-    // the rental is 10 hours from the time inside access begins
-    out: accessMins != null ? showClock(accessMins + 600) : '',
+    // only an out time the client actually gave in their itinerary; otherwise blank for the site manager to fill in
+    out: sched.out || '',
   };
   const schedule = [['Outdoor Setup', times.setup], ['House Access', times.house], ['Ceremony', times.ceremony], ['Cocktail Hour', times.cocktail], ['Dining', times.dining], ['Guests Leave', times.leave], ['Out Time', times.out]];
 
