@@ -113,7 +113,16 @@ export function buildSitePacketHtml(client) {
   const deposit = (() => {
     const rows = client.schedule || [];
     const hit = rows.find((p) => /security deposit/i.test(p.label || '')) || (rows.length > 1 && rows[rows.length - 1].cents === 80000 ? rows[rows.length - 1] : null);
-    return hit ? hit.cents : null;
+    if (hit) return hit.cents;
+    // HoneyBook invoices often carry the deposit as a "Security Deposit" line item (sometimes inside a package) instead of its own payment.
+    let found = null;
+    const walk = (items) => (items || []).forEach((li) => {
+      const cents = (li.price?.amount || 0) * (li.quantity == null ? 1 : li.quantity);
+      if (found == null && /security deposit/i.test(li.title || li.name || '') && cents > 0) found = cents;
+      walk(li.children);
+    });
+    walk(client.payments?.line_items);
+    return found;
   })();
   const notes = [
     ['Ceremony', a('ceremony')], ['Dining', a('dining')], ['Other areas', a('areas')], ['Caterer', a('caterer')], ['DJ', a('dj')], ['Photographer', a('photographer')],
@@ -212,7 +221,8 @@ export function buildSitePacketHtml(client) {
   h1.sd { font-size: 30px; margin: 10px 0 6px; border-top: 1.5px solid #888; border-bottom: 1.5px solid #888; padding: 10px 0; }
   .serif { font-family: Cardo, Georgia, serif; font-size: 17px; }
   .serif.tall { min-height: 86px; }
-  .serif.split { justify-content: space-between; }
+  .serif.split { justify-content: flex-start; gap: 0; }
+  .serif.split > span { flex: 0 0 50%; }
   .serif.refund { min-height: 64px; }
   .lab.big { font-size: 22px; }
   .serif.why { border-bottom: none; }
