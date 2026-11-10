@@ -15983,7 +15983,6 @@ function PersonActivityView() {
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
         {chip('all', 'All')}{chip('portal', PA_KINDS.portal)}{chip('messages', PA_KINDS.messages)}{chip('tours', PA_KINDS.tours)}{chip('other', PA_KINDS.other)}
       </div>
-      <p style={{ fontSize: 12, color: '#888', margin: '0 0 14px' }}>Portal changes are recorded from November 2026 onward, for people signed in with their own account. Messages, tours and the other items go back further, wherever their name was chosen.</p>
       {!items ? <p style={{ color: '#888' }}>Loading…</p> : shown.length === 0 ? <p style={{ color: '#888' }}>Nothing recorded{kind !== 'all' ? ' here' : ''} for {person} yet.</p> :
         <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, overflow: 'hidden' }}>
           {shown.map(function(it, i) {
