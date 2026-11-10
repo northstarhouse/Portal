@@ -15883,7 +15883,6 @@ function PersonActivityView() {
     var out = [];
     function add(kind, at, text, note) { if (at) out.push({ kind: kind, at: at, text: text, note: note || '' }); }
     var tourWhen = function(t) { return t.date ? t.date + 'T' + (t.start_time || '12:00') : t.created_at; };
-    var today = new Date().toISOString().slice(0, 10);
     Promise.all([
       get('portal_activity?select=*&actor_name=eq.' + encodeURIComponent(person) + '&order=created_at.desc&limit=2000').then(function(rows) {
         rows.forEach(function(r) {
@@ -15899,10 +15898,14 @@ function PersonActivityView() {
       get('venue_messages?select=id,subject,event_title,created_at,body&direction=eq.outgoing&from_name=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
         rows.forEach(function(m) { add('messages', m.created_at, 'Replied: ' + (m.subject || m.event_title || 'a client message'), String(m.body || '').slice(0, 160)); });
       }),
-      get('estate_tours?select=id,date,start_time,visitor_name,category,status,created_at&guide_name=ilike.' + like + '&order=date.desc&limit=2000').then(function(rows) {
+      // Only tours that happened (booked, time passed), were cancelled, or were no-shows; not open
+      // schedule slots, blocked time or booked tours still to come.
+      get('estate_tours?select=id,date,start_time,visitor_name,category,status,created_at&guide_name=ilike.' + like + '&status=in.(booked,cancelled,no_show)&order=date.desc&limit=2000').then(function(rows) {
+        var now = new Date();
         rows.forEach(function(t) {
-          var upcoming = t.date && t.date >= today;
-          add('tours', tourWhen(t), (upcoming ? 'Tour scheduled: ' : 'Guided tour: ') + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), t.status && t.status !== 'booked' ? 'Status: ' + t.status : '');
+          if (t.status === 'booked' && !(t.date && new Date(tourWhen(t)) < now)) return;
+          var label = t.status === 'cancelled' ? 'Cancelled tour: ' : t.status === 'no_show' ? 'No-show: ' : 'Guided tour: ';
+          add('tours', tourWhen(t), label + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''));
         });
       }),
       get('estate_tours?select=id,visitor_name,category,made_contact_at,created_at,request_status&request_handled_by=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
