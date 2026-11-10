@@ -40,6 +40,15 @@ function answers(client) {
 // "4:30 PM", "4pm", "16:00", "noon" -> minutes after midnight
 function clock(text) {
   const t = String(text || '').toLowerCase();
+  // a range ("5:15-6:00 p.m.", "6-8 pm", "6 to 8pm"): the START time, taking am/pm from the end if the start has none
+  const r = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(?:([ap])\.?\s*m?\.?)?\s*(?:-|–|—|to)\s*(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s*m?\.?/);
+  if (r) {
+    let h = Number(r[1]); const min = Number(r[2] || 0); const ap = r[3] || r[6];
+    const endH = Number(r[4]) % 12 + (r[6] === 'p' ? 12 : 0);
+    if (ap === 'p' && h < 12) h += 12; if (ap === 'a' && h === 12) h = 0;
+    if (!r[3] && h > endH && h >= 12) h -= 12; // "11-1 pm" starts at 11 am
+    return h * 60 + min;
+  }
   if (/\bnoon\b/.test(t)) return 12 * 60;
   const m = t.match(/(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s*m?\.?/) || t.match(/\b([01]?\d|2[0-3]):(\d{2})\b/);
   if (!m) return null;
@@ -57,7 +66,7 @@ function scheduleFromItinerary(text) {
     ['ceremony', /ceremony/i],
     ['cocktail', /cocktail/i],
     ['dining', /dinner|dining|meal|toast/i],
-    ['leave', /guest(s)?\s*leave|send.?off|exit|last dance|reception (ends?|over)|end of (the )?(reception|event|night)/i],
+    ['leave', /guest(s)?\s*(leave|depart)|send.?off|exit|last dance|reception (ends?|over)|end of (the )?(reception|event|night|party)|clean.?up|tear.?down/i],
     ['out', /out time|load.?out|out by|off (the )?(property|site)|vacate|venue (closes|empty)/i],
   ];
   for (const line of String(text || '').split(/\n|;/)) {
@@ -96,7 +105,10 @@ export function buildSitePacketHtml(client) {
     // only an out time the client actually gave in their itinerary; otherwise blank for the site manager to fill in
     out: sched.out || '',
   };
-  const schedule = [['Outdoor Setup', times.setup], ['House Access', times.house], ['Ceremony', times.ceremony], ['Cocktail Hour', times.cocktail], ['Dining', times.dining], ['Guests Leave', times.leave], ['Out Time', times.out]];
+  // Weddings always list a cocktail hour; other events only when their itinerary has one.
+  const isWedding = client.type === 'Wedding';
+  const schedule = [['Outdoor Setup', times.setup], ['House Access', times.house], ['Guests Arrive', sched.arrive || ''], ['Ceremony', times.ceremony],
+    ...(isWedding || times.cocktail ? [['Cocktail Hour', times.cocktail]] : []), ['Dining', times.dining], ['Guests Leave', times.leave], ['Out Time', times.out]];
 
   const deposit = (() => {
     const rows = client.schedule || [];
@@ -127,7 +139,7 @@ export function buildSitePacketHtml(client) {
   <table class="sched"><tr>${schedule.map((s) => `<th>${esc(s[0])}</th>`).join('')}</tr><tr>${schedule.map((s) => `<td>${esc(s[1])}</td>`).join('')}</tr></table>
   <h2>Site Manager Notes:</h2>
   ${notes.length ? `<div class="notes">${notes.map((n) => `<div><b>${esc(n[0])}:</b> ${esc(n[1])}</div>`).join('')}</div>` : ''}
-  ${itinerary ? `<div class="notes"><b>Couple's itinerary:</b><div class="itin">${esc(itinerary)}</div></div>` : ''}
+  ${itinerary ? `<div class="notes"><b>${isWedding ? "Couple's" : "Client's"} itinerary:</b><div class="itin">${esc(itinerary)}</div></div>` : ''}
   ${rule(notes.length || itinerary ? 4 : 7)}
   <div class="version">Version 2.26</div>
 </section>`;
