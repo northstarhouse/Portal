@@ -98,7 +98,7 @@ function buildEmail(first: string, day: string, status: 'open' | 'held' | 'unkno
   ]
   const html = `<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:${GOLD};"></div><div style="padding:44px 40px 36px;">
 <div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:1px;color:${GOLD};font-weight:bold;margin-bottom:14px;">North Star House</div>
-<h1 style="margin:0 0 22px;text-align:center;font-size:29px;font-weight:400;color:#2a2420;">Thank You for Your Inquiry</h1>
+<h1 style="margin:0 0 22px;text-align:center;font-size:29px;font-weight:400;color:#2a2420;">Thank You for Inquiring</h1>
 <div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>
 <p style="${roomy}">Hi ${esc(first)},</p>
 <p style="${roomy}">${esc(opening)}${availHtml} ${esc(below)}</p>
@@ -185,7 +185,7 @@ function buildKindEmail(first: string, kind: Exclude<Kind, 'wedding'>) {
   const c = KIND_COPY[kind]
   const html = `<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,'Times New Roman',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:${GOLD};"></div><div style="padding:40px 36px 34px;">
 <div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:1px;color:${GOLD};font-weight:bold;margin-bottom:14px;">North Star House</div>
-<h1 style="margin:0 0 22px;text-align:center;font-size:29px;font-weight:400;color:#2a2420;">Thank You for Your Inquiry</h1>
+<h1 style="margin:0 0 22px;text-align:center;font-size:29px;font-weight:400;color:#2a2420;">Thank You for Inquiring</h1>
 <div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>
 <p style="${P}">Hi ${esc(first)},</p>
 ${para(c.greeting)}
