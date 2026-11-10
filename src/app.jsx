@@ -15892,8 +15892,13 @@ function PersonActivityView() {
           add('portal', r.created_at, verb + ' ' + what, fields.length ? 'Changed: ' + fields.slice(0, 8).join(', ') + (fields.length > 8 ? ' and ' + (fields.length - 8) + ' more' : '') : '');
         });
       }),
-      get('venue_messages?select=id,subject,from_name,handled_at,handled_note&handled_by=ilike.' + like + '&order=handled_at.desc&limit=1000').then(function(rows) {
-        rows.forEach(function(m) { add('messages', m.handled_at, 'Marked handled: ' + (m.subject || m.from_name || 'a message'), m.handled_note); });
+      get('venue_messages?select=id,event_uid,subject,from_name,body,handled_at,handled_note&handled_by=ilike.' + like + '&order=handled_at.desc&limit=1000').then(function(rows) {
+        rows.forEach(function(m) {
+          // voicemails: a snippet of what the caller said, then any note left when handling it
+          var said = /^voicemail:/.test(m.event_uid || '') ? String(m.body || '').replace(/\s+/g, ' ').trim() : '';
+          var snippet = said ? '“' + (said.length > 180 ? said.slice(0, 180).replace(/\s+\S*$/, '') + '…' : said) + '”' : '';
+          add('messages', m.handled_at, 'Marked handled: ' + (m.subject || m.from_name || 'a message'), [snippet, m.handled_note ? 'Note: ' + m.handled_note : ''].filter(Boolean).join('\n'));
+        });
       }),
       get('venue_messages?select=id,subject,event_title,created_at,body&direction=eq.outgoing&from_name=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
         rows.forEach(function(m) { add('messages', m.created_at, 'Replied: ' + (m.subject || m.event_title || 'a client message'), String(m.body || '').slice(0, 160)); });
