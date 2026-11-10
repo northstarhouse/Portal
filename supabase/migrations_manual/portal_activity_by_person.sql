@@ -7,6 +7,8 @@
 -- 3. The trigger is attached to every public table except logs, caches and session tables.
 -- The Portal's Tools > Activity log page reads this plus the older name-tagged records
 -- (messages handled, tours guided, tour requests handled, replies sent, ...).
+-- 4. Staying signed in: a session lasts a year and every Portal visit pushes it another year out
+--    (touch_app_session, called when the Portal opens), so people only sign in again after a year away.
 -- Apply one statement at a time (the CLI's db query runs a single statement).
 
 alter table public.app_sessions add column if not exists volunteer_id bigint;
@@ -52,10 +54,30 @@ begin
   select u.email into v_email from auth.users u where u.id = v_uid;
   v_token := encode(extensions.gen_random_bytes(32), 'hex');
   insert into public.app_sessions (token, expires_at, user_agent, volunteer_id, actor_name, email)
-  values (v_token, now() + interval '30 days', p_user_agent, v_vol, v_name, v_email);
+  values (v_token, now() + interval '365 days', p_user_agent, v_vol, v_name, v_email);
   return v_token;
 end
 $function$;
+
+-- The Portal calls this when it opens: true if the session is good, and the session is pushed a year out.
+CREATE OR REPLACE FUNCTION public.touch_app_session()
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare v_token text; v_ok boolean;
+begin
+  v_token := current_setting('request.headers', true)::json->>'x-app-token';
+  if v_token is null or v_token = '' then return false; end if;
+  update public.app_sessions set last_seen = now(), expires_at = greatest(expires_at, now() + interval '365 days')
+    where token = v_token and expires_at > now()
+    returning true into v_ok;
+  return coalesce(v_ok, false);
+end
+$function$;
+
+grant execute on function public.touch_app_session() to anon, authenticated;
 
 create table if not exists public.portal_activity (
   id bigint generated always as identity primary key,

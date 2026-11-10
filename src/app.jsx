@@ -109,14 +109,19 @@ function AppGate({ children }) {
 
   // Validate token on mount — RLS returns [] on bad token (not 401), so the
   // global fetch wrapper's 401 handler doesn't catch expiry. Probe explicitly.
+  // touch_app_session also pushes the session a year out, so people stay signed in;
+  // has_valid_app_session is the plain check if touch is unavailable.
   useEffect(function() {
     if (!hasToken) return;
     var cancelled = false;
-    fetch(SUPABASE_URL + '/rest/v1/rpc/has_valid_app_session', {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: '{}'
-    }).then(function(r) { return r.json(); }).then(function(valid) {
+    var probe = function(fn) {
+      return fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+    };
+    probe('touch_app_session').then(function(r) { return r.status === 404 ? probe('has_valid_app_session') : r; }).then(function(r) { return r.json(); }).then(function(valid) {
       if (cancelled) return;
       if (valid !== true) {
         try { localStorage.removeItem(APP_TOKEN_KEY); } catch (e) {}
