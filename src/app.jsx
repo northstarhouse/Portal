@@ -841,6 +841,7 @@ var NAV_ICONS = {
   'email-notices': '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/>',
   'dev-log': '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
   'activity-log': '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+  'person-activity': '<circle cx="9" cy="7" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2"/><polyline points="22 15 19 15 17.5 20 15 11 13.5 15 12 15"/>',
   planning: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
   'venue-clients': '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
 };
@@ -15832,6 +15833,145 @@ function FormResponsesView({ navigate }) {
   );
 }
 
+// Tools > "Activity log": everything one person has done in the Portal. Two kinds of records:
+//  - portal_activity: every change made while signed in to the Portal, logged by a database trigger
+//    under the signed-in person's name (started Nov 2026; see migrations_manual/portal_activity_by_person.sql);
+//  - older records that already carry a first name: messages marked handled, replies sent, tours guided,
+//    tour requests handled, Activity Log items handled, pre-booking forms sent, vendors added, client access
+//    links made and feature requests.
+// Opens on Derek (he asked for it); the dropdown lists everyone who can sign in to the Portal.
+var PA_TABLE_LABELS = {
+  venue_inquiries: 'Venue booking', nsh_form_responses: 'Client record / form', estate_tours: 'Tour', venue_messages: 'Message',
+  venue_payment_schedule: 'Payment schedule', venue_payments: 'Venue payment', venue_agreement_versions: 'Agreement', venue_agreement_signers: 'Agreement signer',
+  venue_vendors: 'Vendor', venue_site_managers: 'Site manager list', venue_tour_availability: 'Tour availability', venue_portal_access: 'Client page access',
+  '2026 Volunteers': 'Volunteer', donors: 'Donor', donations: 'Donation', '2026 Donations': 'Donation', activity_log: 'Activity Log item',
+  tasks: 'Task', task_comments: 'Task comment', site_events: 'Website event', site_posts: 'Journal post', site_content: 'Website page',
+  'Op Budget': 'Budget entry', feature_requests: 'Feature request', prebooking_manual_sends: 'Pre-booking form send', ticket_orders: 'Ticket order'
+};
+function paTableLabel(t) { return PA_TABLE_LABELS[t] || String(t || '').replace(/_/g, ' ').replace(/^\w/, function(c) { return c.toUpperCase(); }); }
+var PA_KINDS = { portal: 'Portal changes', messages: 'Messages', tours: 'Tours', other: 'Other' };
+
+function PersonActivityView() {
+  var [people, setPeople] = useState([]);
+  var [person, setPerson] = useState('');
+  var [items, setItems] = useState(null);
+  var [kind, setKind] = useState('all');
+  var [q, setQ] = useState('');
+  var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+  function get(path) { return fetch(SUPABASE_URL + '/rest/v1/' + path, { headers: H }).then(function(r) { return r.ok ? r.json() : []; }).then(function(d) { return Array.isArray(d) ? d : []; }).catch(function() { return []; }); }
+
+  useEffect(function() {
+    get(encodeURIComponent('2026 Volunteers') + '?select=' + encodeURIComponent('First Name,Last Name,Team,Status') + '&Status=eq.Active').then(function(rows) {
+      var names = rows.filter(function(v) { return /(^|[|,])\s*(staff|board member|team lead)\s*([|,]|$)/i.test(v.Team || ''); })
+        .map(function(v) { return (String(v['First Name'] || '').trim() + ' ' + String(v['Last Name'] || '').trim()).trim(); })
+        .filter(Boolean).sort();
+      setPeople(names);
+      setPerson(function(cur) { return cur || names.find(function(n) { return /^derek\b/i.test(n); }) || names[0] || ''; });
+    });
+  }, []);
+
+  useEffect(function() {
+    if (!person) return;
+    setItems(null);
+    var first = person.split(' ')[0];
+    var like = encodeURIComponent(first + '*');
+    var out = [];
+    function add(kind, at, text, note) { if (at) out.push({ kind: kind, at: at, text: text, note: note || '' }); }
+    var tourWhen = function(t) { return t.date ? t.date + 'T' + (t.start_time || '12:00') : t.created_at; };
+    var today = new Date().toISOString().slice(0, 10);
+    Promise.all([
+      get('portal_activity?select=*&actor_name=eq.' + encodeURIComponent(person) + '&order=created_at.desc&limit=2000').then(function(rows) {
+        rows.forEach(function(r) {
+          var verb = r.op === 'insert' ? 'Added' : r.op === 'delete' ? 'Deleted' : 'Updated';
+          var what = paTableLabel(r.table_name) + (r.label ? ': ' + r.label : '');
+          var fields = (r.changed || []).map(function(c) { return c.replace(/^answers\.__venue_checklist$/, 'client checklist').replace(/^answers\./, '').replace(/_/g, ' '); });
+          add('portal', r.created_at, verb + ' ' + what, fields.length ? 'Changed: ' + fields.slice(0, 8).join(', ') + (fields.length > 8 ? ' and ' + (fields.length - 8) + ' more' : '') : '');
+        });
+      }),
+      get('venue_messages?select=id,subject,from_name,handled_at,handled_note&handled_by=ilike.' + like + '&order=handled_at.desc&limit=1000').then(function(rows) {
+        rows.forEach(function(m) { add('messages', m.handled_at, 'Marked handled: ' + (m.subject || m.from_name || 'a message'), m.handled_note); });
+      }),
+      get('venue_messages?select=id,subject,event_title,created_at,body&direction=eq.outgoing&from_name=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
+        rows.forEach(function(m) { add('messages', m.created_at, 'Replied: ' + (m.subject || m.event_title || 'a client message'), String(m.body || '').slice(0, 160)); });
+      }),
+      get('estate_tours?select=id,date,start_time,visitor_name,category,status,created_at&guide_name=ilike.' + like + '&order=date.desc&limit=2000').then(function(rows) {
+        rows.forEach(function(t) {
+          var upcoming = t.date && t.date >= today;
+          add('tours', tourWhen(t), (upcoming ? 'Tour scheduled: ' : 'Guided tour: ') + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), t.status && t.status !== 'booked' ? 'Status: ' + t.status : '');
+        });
+      }),
+      get('estate_tours?select=id,visitor_name,category,made_contact_at,created_at,request_status&request_handled_by=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
+        rows.forEach(function(t) { add('tours', t.made_contact_at || t.created_at, 'Handled tour request: ' + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), t.request_status ? 'Status: ' + t.request_status : ''); });
+      }),
+      get('activity_log?select=id,description,created_at,resolved_at&handled_by=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
+        rows.forEach(function(a) { add('other', a.resolved_at || a.created_at, 'Handled: ' + (a.description || 'an Activity Log item')); });
+      }),
+      get('activity_log?select=id,description,created_at&volunteer_name=ilike.' + encodeURIComponent(person + '*') + '&order=created_at.desc&limit=1000').then(function(rows) {
+        rows.forEach(function(a) { add('other', a.created_at, a.description || 'Activity'); });
+      }),
+      get('prebooking_manual_sends?select=name,email,event_type,sent_at&sent_by=ilike.' + like + '&order=sent_at.desc&limit=500').then(function(rows) {
+        rows.forEach(function(s) { add('other', s.sent_at, 'Sent a pre-booking form: ' + (s.name || s.email) + (s.event_type ? ' (' + s.event_type + ')' : '')); });
+      }),
+      get('venue_vendors?select=name,category,created_at&added_by=ilike.' + like + '&order=created_at.desc&limit=500').then(function(rows) {
+        rows.forEach(function(v) { add('other', v.created_at, 'Added vendor: ' + v.name + (v.category ? ' (' + v.category + ')' : '')); });
+      }),
+      get('venue_portal_access?select=person_name,person_email,created_at&created_by=ilike.' + like + '&order=created_at.desc&limit=500').then(function(rows) {
+        rows.forEach(function(a) { add('other', a.created_at, 'Gave client page access: ' + (a.person_name || a.person_email)); });
+      }),
+      get('feature_requests?select=title,created_at&requested_by=ilike.' + like + '&order=created_at.desc&limit=500').then(function(rows) {
+        rows.forEach(function(f) { add('other', f.created_at, 'Feature request: ' + f.title); });
+      })
+    ]).then(function() {
+      out.sort(function(a, b) { return String(b.at).localeCompare(String(a.at)); });
+      setItems(out);
+    });
+  }, [person]);
+
+  var needle = q.trim().toLowerCase();
+  var shown = (items || []).filter(function(it) { return (kind === 'all' || it.kind === kind) && (!needle || (it.text + ' ' + it.note).toLowerCase().indexOf(needle) !== -1); });
+  var count = function(k) { return (items || []).filter(function(it) { return k === 'all' || it.kind === k; }).length; };
+  var monthOf = function(iso) { return new Date(iso).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); };
+  var when = function(iso) { var d = new Date(iso); return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+  var pillColor = { portal: '#886c44', messages: '#2e6f8e', tours: '#4f7a3a', other: '#777' };
+  var chip = function(k, label) {
+    var on = kind === k;
+    return <button key={k} type="button" onClick={function() { setKind(k); }} style={{ background: on ? gold : '#fff', color: on ? '#fff' : gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}{items ? ' (' + count(k) + ')' : ''}</button>;
+  };
+  var lastMonth = '';
+  return (
+    <div style={{ maxWidth: 860 }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: '#555', display: 'flex', alignItems: 'center', gap: 8 }}>Person
+          <select value={person} onChange={function(e) { setPerson(e.target.value); setKind('all'); }} style={{ padding: '7px 10px', border: '1px solid #e0d8cc', borderRadius: 8, fontSize: 14, minWidth: 200, background: '#fff' }}>
+            {people.map(function(n) { return <option key={n} value={n}>{n}</option>; })}
+          </select>
+        </label>
+        <input value={q} onChange={function(e) { setQ(e.target.value); }} placeholder="Search" style={{ flex: 1, minWidth: 140, padding: '7px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13 }} />
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+        {chip('all', 'All')}{chip('portal', PA_KINDS.portal)}{chip('messages', PA_KINDS.messages)}{chip('tours', PA_KINDS.tours)}{chip('other', PA_KINDS.other)}
+      </div>
+      <p style={{ fontSize: 12, color: '#888', margin: '0 0 14px' }}>Portal changes are recorded from November 2026 onward, for people signed in with their own account. Messages, tours and the other items go back further, wherever their name was chosen.</p>
+      {!items ? <p style={{ color: '#888' }}>Loading…</p> : shown.length === 0 ? <p style={{ color: '#888' }}>Nothing recorded{kind !== 'all' ? ' here' : ''} for {person} yet.</p> :
+        <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, overflow: 'hidden' }}>
+          {shown.map(function(it, i) {
+            var m = monthOf(it.at), head = m !== lastMonth; lastMonth = m;
+            return <React.Fragment key={i}>
+              {head && <div style={{ padding: '8px 16px', background: '#f7f3ec', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#8a7a62' }}>{m}</div>}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', padding: '10px 16px', borderTop: head ? 'none' : '1px solid #f2ece2', alignItems: 'baseline' }}>
+                <div style={{ flex: '0 0 150px', fontSize: 12, color: '#888' }}>{when(it.at)}</div>
+                <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: '#2a2420' }}><span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, color: '#fff', background: pillColor[it.kind], borderRadius: 4, padding: '1px 6px', marginRight: 8, verticalAlign: 1 }}>{PA_KINDS[it.kind]}</span>{it.text}</div>
+                  {it.note && <div style={{ fontSize: 12, color: '#888', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{it.note}</div>}
+                </div>
+              </div>
+            </React.Fragment>;
+          })}
+        </div>}
+    </div>
+  );
+}
+
 function ActivityLogView({ navigate }) {
   var [activity, setActivity] = useState(null);
   var [editingTagId, setEditingTagId] = useState(null);
@@ -19670,6 +19810,13 @@ function VenueRentalsView({ navigate, initialTab }) {
                     <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-stats" active size={18} /></span>
                     <div><div style={{ fontWeight: 700 }}>Current stats</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Bookings, earnings and events by type</div>
+                    </div>
+                  </button>
+                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); navigate('person-activity'); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="person-activity" active size={18} /></span>
+                    <div><div style={{ fontWeight: 700 }}>Activity log</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Everything one person has done: Portal changes, messages, tours</div>
                     </div>
                   </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setFeatureReqOpen(true); }}
@@ -24982,6 +25129,7 @@ const views = {
   'dev-log': DevLogView,
   'maintenance-request': MaintenanceRequestView,
   'activity-log': ActivityLogView,
+  'person-activity': PersonActivityView,
   'acknowledgment-templates': AcknowledgmentTemplatesView,
   'acknowledgments-queue': AcknowledgmentsQueueView,
   announcements: AnnouncementsView,
@@ -25703,7 +25851,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <NavIcon id={active} active={true} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "person-activity" ? "Activity by Person" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
