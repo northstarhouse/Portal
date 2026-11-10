@@ -112,7 +112,6 @@ By signing, you acknowledge that you have read the above Terms and Conditions an
   ${d.length?`<div class="notes">${d.map(p=>`<div><b>${mn(p[0])}:</b> ${mn(p[1])}</div>`).join("")}</div>`:""}
   ${v?`<div class="notes"><b>${c?"Couple's":"Client's"} itinerary:</b><div class="itin">${mn(v)}</div></div>`:""}
   ${u(d.length||v?4:7)}
-  <div class="version">Version 2.26</div>
 </section>`,k=`
 <section class="page">
   <div class="smallcap">Top Half to Be Completed by Site Manager</div>

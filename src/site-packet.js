@@ -150,7 +150,6 @@ export function buildSitePacketHtml(client) {
   ${notes.length ? `<div class="notes">${notes.map((n) => `<div><b>${esc(n[0])}:</b> ${esc(n[1])}</div>`).join('')}</div>` : ''}
   ${itinerary ? `<div class="notes"><b>${isWedding ? "Couple's" : "Client's"} itinerary:</b><div class="itin">${esc(itinerary)}</div></div>` : ''}
   ${rule(notes.length || itinerary ? 4 : 7)}
-  <div class="version">Version 2.26</div>
 </section>`;
 
   const page2 = `
