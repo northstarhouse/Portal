@@ -15902,7 +15902,14 @@ function PersonActivityView() {
   var [items, setItems] = useState(null);
   var [kind, setKind] = useState('all');
   var [q, setQ] = useState('');
+  // Notes about the person. The author is stamped by the database from whoever is signed in (portal_notes_stamp).
+  var [me, setMe] = useState('');
+  var [notes, setNotes] = useState(null);
+  var [draft, setDraft] = useState('');
+  var [noteBusy, setNoteBusy] = useState(false);
+  var [editing, setEditing] = useState(null); // { key: 'note:12' | 'msg:34', text }
   var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+  var HJ = Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=representation' }, H);
   function get(path) { return fetch(SUPABASE_URL + '/rest/v1/' + path, { headers: H }).then(function(r) { return r.ok ? r.json() : []; }).then(function(d) { return Array.isArray(d) ? d : []; }).catch(function() { return []; }); }
 
   useEffect(function() {
@@ -15916,7 +15923,51 @@ function PersonActivityView() {
       setPeople(names);
       setPerson(function(cur) { return cur || names.find(function(n) { return /^derek\b/i.test(n); }) || names[0] || ''; });
     });
+    fetch(SUPABASE_URL + '/rest/v1/rpc/app_session_name', { method: 'POST', headers: HJ, body: '{}' })
+      .then(function(r) { return r.ok ? r.json() : ''; }).then(function(n) { setMe(typeof n === 'string' ? n : ''); }).catch(function() {});
   }, []);
+
+  useEffect(function() {
+    if (!person) return;
+    setNotes(null); setDraft(''); setEditing(null);
+    get('portal_notes?select=*&about_person=eq.' + encodeURIComponent(person) + '&order=created_at.desc').then(setNotes);
+  }, [person]);
+
+  function addNote() {
+    var body = draft.trim();
+    if (!body || noteBusy) return;
+    setNoteBusy(true);
+    fetch(SUPABASE_URL + '/rest/v1/portal_notes', { method: 'POST', headers: HJ, body: JSON.stringify({ about_person: person, body: body }) })
+      .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function(rows) { setNotes(function(p) { return [rows[0]].concat(p || []); }); setDraft(''); })
+      .catch(function() { window.alert('The note could not be saved. Please try again.'); })
+      .then(function() { setNoteBusy(false); });
+  }
+  function saveEdit() {
+    if (!editing || noteBusy) return;
+    var parts = editing.key.split(':'), id = parts[1], text = editing.text.trim();
+    if (parts[0] === 'note' && !text) return;
+    setNoteBusy(true);
+    var req = parts[0] === 'note'
+      ? fetch(SUPABASE_URL + '/rest/v1/portal_notes?id=eq.' + id, { method: 'PATCH', headers: HJ, body: JSON.stringify({ body: text }) })
+      // a note left when a message was marked handled
+      : fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + id, { method: 'PATCH', headers: HJ, body: JSON.stringify({ handled_note: text || null }) });
+    req.then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function(rows) {
+        if (!rows || !rows.length) return Promise.reject();
+        if (parts[0] === 'note') setNotes(function(p) { return (p || []).map(function(n) { return String(n.id) === id ? rows[0] : n; }); });
+        else setItems(function(p) { return (p || []).map(function(it) { return it.msgId && String(it.msgId) === id ? Object.assign({}, it, { hNote: text }) : it; }); });
+        setEditing(null);
+      })
+      .catch(function() { window.alert('The note could not be saved. Please try again.'); })
+      .then(function() { setNoteBusy(false); });
+  }
+  function deleteNote(n) {
+    if (!window.confirm('Delete this note?')) return;
+    fetch(SUPABASE_URL + '/rest/v1/portal_notes?id=eq.' + n.id, { method: 'DELETE', headers: H })
+      .then(function(r) { if (!r.ok) throw new Error(); setNotes(function(p) { return (p || []).filter(function(x) { return x.id !== n.id; }); }); })
+      .catch(function() { window.alert('The note could not be deleted.'); });
+  }
 
   useEffect(function() {
     if (!person) return;
@@ -15924,7 +15975,7 @@ function PersonActivityView() {
     var first = person.split(' ')[0];
     var like = encodeURIComponent(first + '*');
     var out = [];
-    function add(kind, at, text, note, pill) { if (at) out.push({ kind: kind, at: at, text: text, note: note || '', pill: pill || '' }); }
+    function add(kind, at, text, note, pill, extra) { if (at) out.push(Object.assign({ kind: kind, at: at, text: text, note: note || '', pill: pill || '' }, extra || {})); }
     var tourWhen = function(t) { return t.date ? t.date + 'T' + (t.start_time || '12:00') : t.created_at; };
     Promise.all([
       get('portal_activity?select=*&actor_name=eq.' + encodeURIComponent(person) + '&order=created_at.desc&limit=2000').then(function(rows) {
@@ -15938,7 +15989,7 @@ function PersonActivityView() {
           // voicemails: a snippet of what the caller said, then any note left when handling it
           var said = /^voicemail:/.test(m.event_uid || '') ? String(m.body || '').replace(/\s+/g, ' ').trim() : '';
           var snippet = said ? '“' + (said.length > 180 ? said.slice(0, 180).replace(/\s+\S*$/, '') + '…' : said) + '”' : '';
-          add('messages', m.handled_at, 'Marked handled: ' + (m.subject || m.from_name || 'a message'), [snippet, m.handled_note ? 'Note: ' + m.handled_note : ''].filter(Boolean).join('\n'));
+          add('messages', m.handled_at, 'Marked handled: ' + (m.subject || m.from_name || 'a message'), snippet, '', { msgId: m.id, hNote: m.handled_note || '' });
         });
       }),
       // Voicemail forwards (the forward-message function logs every attempt, sent or not).
@@ -16000,7 +16051,7 @@ function PersonActivityView() {
   }, [person]);
 
   var needle = q.trim().toLowerCase();
-  var shown = (items || []).filter(function(it) { return (kind === 'all' || it.kind === kind) && (!needle || (it.text + ' ' + it.note).toLowerCase().indexOf(needle) !== -1); });
+  var shown = (items || []).filter(function(it) { return (kind === 'all' || it.kind === kind) && (!needle || (it.text + ' ' + it.note + ' ' + (it.hNote || '')).toLowerCase().indexOf(needle) !== -1); });
   var count = function(k) { return (items || []).filter(function(it) { return k === 'all' || it.kind === k; }).length; };
   var monthOf = function(iso) { return new Date(iso).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); };
   var when = function(iso) { var d = new Date(iso); return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
@@ -16010,6 +16061,19 @@ function PersonActivityView() {
     return <button key={k} type="button" onClick={function() { setKind(k); }} style={{ background: on ? gold : '#fff', color: on ? '#fff' : gold, border: '0.5px solid ' + gold, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}{items ? ' (' + count(k) + ')' : ''}</button>;
   };
   var lastMonth = '';
+  var linkBtn = { background: 'none', border: 'none', padding: 0, color: gold, fontSize: 11, fontWeight: 600, cursor: 'pointer' };
+  var editBox = function() {
+    return <div style={{ marginTop: 6 }}>
+      <textarea autoFocus value={editing.text} onChange={function(e) { var v = e.target.value; setEditing(function(x) { return Object.assign({}, x, { text: v }); }); }}
+        onKeyDown={function(e) { if (e.key === 'Escape') setEditing(null); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveEdit(); }}
+        rows={3} style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', border: '1px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }} />
+      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+        <button type="button" onClick={saveEdit} disabled={noteBusy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{noteBusy ? 'Saving…' : 'Save'}</button>
+        <button type="button" onClick={function() { setEditing(null); }} style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 7, padding: '5px 14px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+      </div>
+    </div>;
+  };
+  var firstName = (person || '').split(' ')[0];
   return (
     <div style={{ maxWidth: 860 }}>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
@@ -16023,6 +16087,32 @@ function PersonActivityView() {
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
         {chip('all', 'All')}{chip('portal', PA_KINDS.portal)}{chip('messages', PA_KINDS.messages)}{chip('tours', PA_KINDS.tours)}{chip('other', PA_KINDS.other)}
       </div>
+      {person && <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#8a7a62' }}>Notes{notes && notes.length ? ' (' + notes.length + ')' : ''}</div>
+          {me && <div style={{ fontSize: 11, color: '#999' }}>Signed in as {me}</div>}
+        </div>
+        <textarea value={draft} onChange={function(e) { setDraft(e.target.value); }} onKeyDown={function(e) { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) addNote(); }}
+          placeholder={'Add a note about ' + firstName + '…'} rows={2}
+          style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }} />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+          <button type="button" onClick={addNote} disabled={!draft.trim() || noteBusy} style={{ background: draft.trim() ? gold : '#d8cfc2', color: '#fff', border: 'none', borderRadius: 7, padding: '6px 16px', fontSize: 12, fontWeight: 600, cursor: draft.trim() ? 'pointer' : 'default' }}>{noteBusy && !editing ? 'Saving…' : 'Add note'}</button>
+        </div>
+        {notes === null ? <div style={{ fontSize: 12, color: '#aaa', marginTop: 6 }}>Loading…</div> : notes.map(function(n) {
+          var key = 'note:' + n.id, open = editing && editing.key === key;
+          return <div key={n.id} style={{ borderTop: '1px solid #f2ece2', marginTop: 10, paddingTop: 10 }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#2a2420' }}>{n.author_name || 'Unknown'}</span>
+              <span style={{ fontSize: 11, color: '#999' }}>{when(n.created_at)}{n.updated_at ? ' · edited' + (n.updated_by && n.updated_by !== n.author_name ? ' by ' + n.updated_by : '') + ' ' + when(n.updated_at) : ''}</span>
+              {!open && <span style={{ marginLeft: 'auto', display: 'flex', gap: 12 }}>
+                <button type="button" style={linkBtn} onClick={function() { setEditing({ key: key, text: n.body }); }}>Edit</button>
+                <button type="button" style={Object.assign({}, linkBtn, { color: '#a04545' })} onClick={function() { deleteNote(n); }}>Delete</button>
+              </span>}
+            </div>
+            {open ? editBox() : <div style={{ fontSize: 13, color: '#444', marginTop: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{n.body}</div>}
+          </div>;
+        })}
+      </div>}
       {!items ? <p style={{ color: '#888' }}>Loading…</p> : shown.length === 0 ? <p style={{ color: '#888' }}>Nothing recorded{kind !== 'all' ? ' here' : ''} for {person} yet.</p> :
         <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, overflow: 'hidden' }}>
           {shown.map(function(it, i) {
@@ -16034,6 +16124,11 @@ function PersonActivityView() {
                 <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                   <div style={{ fontSize: 13, color: '#2a2420' }}><span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, color: '#fff', background: pillColor[it.kind], borderRadius: 4, padding: '1px 6px', marginRight: 8, verticalAlign: 1 }}>{it.pill || PA_KINDS[it.kind]}</span>{it.text}</div>
                   {it.note && <div style={{ fontSize: 12, color: '#888', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{it.note}</div>}
+                  {it.msgId && (it.hNote || (editing && editing.key === 'msg:' + it.msgId)) && (editing && editing.key === 'msg:' + it.msgId ? editBox() :
+                    <div style={{ fontSize: 12, color: '#888', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {it.hNote ? 'Note: ' + it.hNote + ' ' : ''}
+                      <button type="button" style={linkBtn} onClick={function() { setEditing({ key: 'msg:' + it.msgId, text: it.hNote || '' }); }}>Edit note</button>
+                    </div>)}
                 </div>
               </div>
             </React.Fragment>;
