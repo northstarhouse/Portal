@@ -20850,6 +20850,58 @@ function buildClientReplyHtml(name, text, by) {
     '</div></div></div>';
 }
 
+// The notes on a past message: shown with who wrote them (stamped by the database from whoever is signed in),
+// and they can be added or edited any time.
+function PastMessageNote({ m }) {
+  var [note, setNote] = useState(m.handled_note || '');
+  var [by, setBy] = useState(m.handled_note_by || '');
+  var [at, setAt] = useState(m.handled_note_at || '');
+  var [editing, setEditing] = useState(false);
+  var [draft, setDraft] = useState('');
+  var [busy, setBusy] = useState(false);
+  var [err, setErr] = useState('');
+  function day(iso) { return iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''; }
+  function save() {
+    var clean = draft.trim() ? draft.trim() : null;
+    if (clean === (note || null)) { setEditing(false); return; }
+    setBusy(true); setErr('');
+    fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + m.id, {
+      method: 'PATCH',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ handled_note: clean })
+    }).then(function(r) { return r.ok ? r.json() : Promise.reject(); }).then(function(rows) {
+      var row = rows && rows[0];
+      if (!row) return Promise.reject();
+      m.handled_note = row.handled_note; m.handled_note_by = row.handled_note_by; m.handled_note_at = row.handled_note_at;
+      setNote(row.handled_note || ''); setBy(row.handled_note_by || ''); setAt(row.handled_note_at || '');
+      setEditing(false);
+    }).catch(function() { setErr('The note could not be saved. Please try again.'); }).then(function() { setBusy(false); });
+  }
+  var link = { background: 'none', border: 'none', padding: 0, color: gold, fontSize: 11, fontWeight: 600, cursor: 'pointer' };
+  if (editing) return (
+    <div style={{ marginTop: 8 }}>
+      <textarea autoFocus value={draft} onChange={function(e) { setDraft(e.target.value); }} onKeyDown={function(e) { if (e.key === 'Escape') setEditing(false); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save(); }}
+        rows={3} placeholder="Notes: who you called back, what was said, next steps"
+        style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', border: '1px solid #d8d0c4', borderRadius: 8, fontSize: 12, fontFamily: 'system-ui, sans-serif', resize: 'vertical', background: '#fffdf9' }} />
+      {err && <div style={{ color: '#b3261e', fontSize: 12, marginTop: 4 }}>{err}</div>}
+      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+        <button type="button" disabled={busy} onClick={save} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{busy ? 'Saving…' : 'Save note'}</button>
+        <button type="button" onClick={function() { setEditing(false); setErr(''); }} style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 7, padding: '5px 14px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+      </div>
+    </div>
+  );
+  if (!note) return <div style={{ marginTop: 8 }}><button type="button" style={link} onClick={function() { setDraft(''); setEditing(true); }}>+ Add note</button></div>;
+  return (
+    <div style={{ marginTop: 8, fontSize: 12, color: '#555', background: '#faf8f3', border: '0.5px solid #ece6da', borderRadius: 8, padding: '6px 10px' }}>
+      <div style={{ whiteSpace: 'pre-wrap' }}><strong style={{ color: gold }}>Notes:</strong> {note}</div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', marginTop: 4 }}>
+        {(by || at) && <span style={{ fontSize: 11, color: '#999' }}>{by ? '— ' + by : ''}{at ? (by ? ' · ' : '') + day(at) : ''}</span>}
+        <button type="button" style={Object.assign({}, link, { marginLeft: 'auto' })} onClick={function() { setDraft(note); setEditing(true); }}>Edit note</button>
+      </div>
+    </div>
+  );
+}
+
 // Past messages: what has been handled (and who handled it), the reply we sent, and older messages from before the new list began.
 function PastMessages({ msgs, voicemails }) {
   var [q, setQ] = useState('');
@@ -20906,7 +20958,7 @@ function PastMessages({ msgs, voicemails }) {
                 </div>
               );
             })}
-            {m.handled_note && <div style={{ marginTop: 8, fontSize: 12, color: '#555', background: '#faf8f3', border: '0.5px solid #ece6da', borderRadius: 8, padding: '6px 10px', whiteSpace: 'pre-wrap' }}><strong style={{ color: gold }}>Notes:</strong> {m.handled_note}</div>}
+            <PastMessageNote key={'n' + m.id} m={m} />
             <div style={{ fontSize: 11, fontWeight: 700, color: m.handled_at ? '#2e6b4f' : '#b45309', marginTop: 8 }}>{m.handled_at ? 'Handled' + (m.handled_by ? ' by ' + m.handled_by : '') + ' · ' + day(m.handled_at) + (reps.length ? '' : ' · no email reply sent from here') : 'Older, not marked handled'}</div>
           </div>
         );
@@ -24984,7 +25036,7 @@ function VoicemailLogCard({ m, onHandle, day }) {
       <div style={{ fontSize: 13, color: '#444', lineHeight: 1.5 }}>{cleanVoicemail(m).text}</div>
       {m.handled_at ? (
         <div style={{ marginTop: 8 }}>
-          {m.handled_note && <div style={{ fontSize: 12, color: '#555', background: '#faf8f3', border: '0.5px solid #ece6da', borderRadius: 8, padding: '6px 10px', whiteSpace: 'pre-wrap', marginBottom: 6 }}><strong style={{ color: gold }}>Notes:</strong> {m.handled_note}</div>}
+          <div style={{ marginBottom: 6 }}><PastMessageNote m={m} /></div>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#2e6b4f' }}>Handled{m.handled_by ? ' by ' + m.handled_by : ''} · {day(m.handled_at)}</div>
         </div>
       ) : (
