@@ -19707,10 +19707,10 @@ function VenueRentalsView({ navigate, initialTab }) {
                 Edit Tour Schedule
               </button>
               <button type="button" aria-pressed={inquiriesColorCoding} onClick={toggleColorCoding}
-                title="Color-code this dashboard. Saved only in this browser."
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0, padding: '9px 12px', background: inquiriesColorCoding ? '#f5f0ff' : 'none', border: '1px solid ' + (inquiriesColorCoding ? '#c8b5de' : '#e0d8cc'), borderRadius: 8, color: inquiriesColorCoding ? '#745295' : '#777', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                aria-label="Color coding"
+                title={'Color coding: ' + (inquiriesColorCoding ? 'on' : 'off') + '. Color-codes this dashboard; saved only in this browser.'}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: '9px 10px', background: inquiriesColorCoding ? '#f5f0ff' : 'none', border: '1px solid ' + (inquiriesColorCoding ? '#c8b5de' : '#e0d8cc'), borderRadius: 8, color: inquiriesColorCoding ? '#745295' : '#777', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3 1.5 1.5 0 0 1 1.1-2.5H18a3 3 0 0 0 3-3A9 9 0 0 0 12 3Z"/><circle cx="7.5" cy="11" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="7.5" r="1" fill="currentColor" stroke="none"/></svg>
-                Color coding <span style={{ fontSize: 10, fontWeight: 500 }}>{inquiriesColorCoding ? 'On' : 'Off'}</span>
               </button>
             </React.Fragment>
           )}
