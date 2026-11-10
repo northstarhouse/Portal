@@ -15855,6 +15855,8 @@ var PA_TABLE_LABELS = {
 };
 function paTableLabel(t) { return PA_TABLE_LABELS[t] || String(t || '').replace(/_/g, ' ').replace(/^\w/, function(c) { return c.toUpperCase(); }); }
 var PA_KINDS = { portal: 'Portal changes', messages: 'Messages', tours: 'Tours', other: 'Other' };
+// Where a person's list starts (by first name). Jen's starts the day Derek's first record does (Jul 24, 2026).
+var PA_START_FROM = { jen: '2026-07-24T00:00:00-07:00' };
 
 // One recorded Portal change as a plain sentence, or null when the page already lists it another way
 // (messages handled/replied, pre-booking sends, Portal requests, vendors and client access come from their own tables).
@@ -15990,6 +15992,8 @@ function PersonActivityView() {
         rows.forEach(function(f) { add('other', f.created_at, 'Made a Portal request: ' + f.title, '', 'Portal request'); });
       })
     ]).then(function() {
+      var startFrom = PA_START_FROM[first.toLowerCase()];
+      if (startFrom) out = out.filter(function(it) { return new Date(it.at) >= new Date(startFrom); });
       out.sort(function(a, b) { return String(b.at).localeCompare(String(a.at)); });
       setItems(out);
     });
