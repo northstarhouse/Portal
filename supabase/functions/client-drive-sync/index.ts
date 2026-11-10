@@ -285,7 +285,7 @@ async function uploadSiteManagerPaperwork(pbId: string, filename: string, mimeTy
   if (!pb) throw new Error("Client not found.");
   const inq = (await rest(`venue_inquiries?select=*&prebooking_form_response_id=eq.${pbId}&limit=1`))?.[0] || null;
   const { folderId, folderUrl } = await clientFolder(pbId, pb.answers || {}, inq);
-  const fileName = `Site Manager Paperwork - ${clean(filename) || "upload"}`;
+  const fileName = `FINAL - Site Manager Paperwork - ${clean(filename) || "upload"}`;
   const up = await uploadFile(fileName, folderId, mimeType, bytes);
   const entry = { name: fileName, file_id: up.id, url: `https://drive.google.com/file/d/${up.id}/view`, folder_url: folderUrl, uploaded_at: new Date().toISOString() };
   // read again just before saving, so a checklist change made meanwhile is kept

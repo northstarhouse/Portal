@@ -580,7 +580,7 @@ function ClientDetail({ client, onClose, onRename, onSaveEventDay, onUploadPaper
         <div className="vc-modal-section-title"><span>Site manager paperwork</span>{client.smPaperwork.length > 0 && <span className="vc-pill good">{client.smPaperwork.length} on file</span>}</div>
         <p className="vc-muted" style={{margin:'0 0 10px'}}>Upload the site manager's final paperwork after the event (checklist, notes, any incident report). Scans and phone photos are fine. Files are saved to this client's folder in Google Drive.</p>
         {client.smPaperwork.map((f, i) => <div key={f.file_id || i} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 0',borderTop:i?'1px solid #f0ebe2':'none',fontSize:13}}>
-          <a href={f.url} target="_blank" rel="noopener noreferrer" style={{color:'#886c44',fontWeight:600,wordBreak:'break-word'}}>{String(f.name || '').replace(/^Site Manager Paperwork - /, '')} ↗</a>
+          <a href={f.url} target="_blank" rel="noopener noreferrer" style={{color:'#886c44',fontWeight:600,wordBreak:'break-word'}}>{String(f.name || '').replace(/^(FINAL - )?Site Manager Paperwork - /, '')} ↗</a>
           <span className="vc-muted" style={{whiteSpace:'nowrap'}}>{f.uploaded_at ? dateLabel(f.uploaded_at) : ''}</span>
         </div>)}
         <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',marginTop:10}}>
