@@ -15908,6 +15908,10 @@ function PersonActivityView() {
           add('tours', tourWhen(t), label + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''));
         });
       }),
+      // When each of their tours was booked (the booking is logged with the guide's name).
+      get('activity_log?select=id,description,created_at&action=eq.tour_booked&or=' + encodeURIComponent('(detail->>guide_name.ilike.' + first + '*,description.ilike.*with ' + first + ' *)') + '&order=created_at.desc&limit=1000').then(function(rows) {
+        rows.forEach(function(a) { add('tours', a.created_at, String(a.description || 'Tour booked').replace(/^Booked a venue tour for (.+?) with \S+.*$/, 'Tour booked: $1')); });
+      }),
       get('estate_tours?select=id,visitor_name,category,made_contact_at,created_at,request_status&request_handled_by=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
         rows.forEach(function(t) { add('tours', t.made_contact_at || t.created_at, 'Handled tour request: ' + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), t.request_status ? 'Status: ' + t.request_status : ''); });
       }),
