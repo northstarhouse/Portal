@@ -16193,7 +16193,7 @@ function PersonActivityView() {
                   {notes.filter(function(n) { return n.item_ref === it.ref; }).map(function(n) {
                     var key = 'note:' + n.id, open = editing && editing.key === key;
                     return <div key={n.id} style={{ marginTop: 6, background: '#faf6ef', borderLeft: '3px solid ' + gold, borderRadius: 6, padding: '6px 10px' }}>
-                      {open ? editBox() : <div style={{ fontSize: 12, color: '#444', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{n.body}</div>}
+                      {open ? editBox() : <div style={{ fontSize: 12, color: gold, fontWeight: 500, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{n.body}</div>}
                       {!open && <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', marginTop: 3 }}>
                         <span style={{ fontSize: 11, color: '#999' }}>— {n.author_name || 'Unknown'} · {when(n.created_at)}{n.updated_at ? ' · edited' + (n.updated_by && n.updated_by !== n.author_name ? ' by ' + n.updated_by : '') : ''}</span>
                         <span style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
