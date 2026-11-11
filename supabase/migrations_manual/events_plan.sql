@@ -56,3 +56,6 @@ alter table public.events_plan add column if not exists final_decision text;
 alter table public.events_plan add column if not exists multi_day boolean not null default false;
 
 alter table public.events_plan add column if not exists end_date date;
+
+-- Multi-day events can be months apart: each day (date, start_time, end_time) is kept in days.
+alter table public.events_plan add column if not exists days jsonb;
