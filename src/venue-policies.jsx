@@ -259,6 +259,28 @@ function ChangesList({ history, compact }) {
   );
 }
 
+// Dashboard tiles: one per section.
+const TILE_ICONS = {
+  pricing: <><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .9-3 2.1 0 2.9 6 1.6 6 4.6 0 1.2-1.3 2.3-3 2.3-1.5 0-2.7-.6-3.2-1.7"/><line x1="12" y1="6" x2="12" y2="8"/><line x1="12" y1="17" x2="12" y2="18.5"/></>,
+  templates: <><rect x="5" y="3" width="14" height="18" rx="2"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></>,
+  faq: <><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.1-2.4 3.6"/><line x1="12" y1="17" x2="12" y2="17.01"/></>,
+  sm: <><rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2.5" width="6" height="3" rx="1"/><polyline points="9 13 11 15 15 11"/></>,
+  vc: <><circle cx="9" cy="8" r="3.2"/><circle cx="16.5" cy="8.5" r="2.6"/><path d="M3 20v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1"/><path d="M16 14h1a4 4 0 0 1 4 4v1"/></>,
+  info: <><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></>,
+};
+const TILES = [['pricing', 'Pricing & Packages', 'Annual rental rates'], ['templates', 'Contract Templates', 'Official documents'], ['faq', 'Policies & FAQs', 'Rules and answers'], ['sm', 'Site Manager', 'Event-day procedures'], ['vc', 'Venue Coordinator', 'Booking workflows'], ['info', 'Venue Information', 'Spaces and amenities']];
+function SectionTile({ id, title, sub, count, onClick }) {
+  const [hover, setHover] = React.useState(false);
+  return (
+    <button type="button" onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ textAlign: 'left', background: hover ? '#fdfaf4' : '#fff', border: '1px solid ' + (hover ? '#c9b48f' : '#e8e0d5'), borderRadius: 14, padding: '18px 20px', cursor: 'pointer', boxShadow: hover ? '0 4px 14px rgba(136,108,68,.12)' : 'none', transition: 'all .15s' }}>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{TILE_ICONS[id]}</svg>
+      <div style={{ fontFamily: "'Cardo', Georgia, serif", fontSize: 19, fontWeight: 700, color: '#2a2420', marginTop: 10 }}>{title}</div>
+      <div style={{ fontSize: 13, color: '#8a7a62', marginTop: 4 }}>{sub}{count ? ' · ' + count : ''}</div>
+    </button>
+  );
+}
+
 export function VenuePoliciesView() {
   const [rows, setRows] = React.useState(null);
   const [history, setHistory] = React.useState([]);
@@ -348,6 +370,9 @@ export function VenuePoliciesView() {
         </div>
       ) : tab === 'home' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+            {TILES.map(([id, title, sub]) => <SectionTile key={id} id={id} title={title} sub={sub} count={live.filter(r => r.kind === TAB_KIND[id] && r.status !== 'archived').length} onClick={() => setTab(id)} />)}
+          </div>
           <div style={{ ...card, borderTop: '3px solid ' + GOLD, padding: 0, overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '14px 16px 6px' }}>
               <div style={{ ...h2, margin: 0 }}>Pricing {quickYear ? <span style={{ fontSize: 13, color: '#888', fontFamily: 'inherit', fontWeight: 400 }}>· {quickYear} rates</span> : null}</div>
