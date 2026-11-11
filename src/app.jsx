@@ -16187,7 +16187,7 @@ function PersonActivityView() {
                   {it.note && <div style={{ fontSize: 12, color: '#888', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{it.note}</div>}
                   {it.msgId && (it.hNote || (editing && editing.key === 'msg:' + it.msgId)) && (editing && editing.key === 'msg:' + it.msgId ? editBox() :
                     <div style={{ fontSize: 12, color: '#888', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                      {it.hNote ? 'Note: ' + it.hNote + ' ' : ''}
+                      {it.hNote ? <span style={{ color: gold, fontWeight: 700 }}>{'Note: ' + it.hNote + ' '}</span> : ''}
                       <button type="button" style={linkBtn} onClick={function() { setEditing({ key: 'msg:' + it.msgId, text: it.hNote || '' }); }}>Edit note</button>
                     </div>)}
                   {notes.filter(function(n) { return n.item_ref === it.ref; }).map(function(n) {
