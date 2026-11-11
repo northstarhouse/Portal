@@ -53,6 +53,9 @@ const kindPill = (k) => KINDS[k] ? pill(KINDS[k].label, '#fff', KINDS[k].color) 
 const btn = { background: '#fff', color: GOLD, border: '1px solid ' + GOLD, borderRadius: 7, padding: '5px 11px', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', display: 'inline-block' };
 const btnGold = { ...btn, background: GOLD, color: '#fff' };
 const card = { background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '14px 16px' };
+// Section card: gold top edge, serif heading, rows that drop open (same look as the dashboard's Pricing).
+const sectionCard = { background: '#fff', border: '0.5px solid #e8e0d5', borderTop: '3px solid ' + GOLD, borderRadius: 10, overflow: 'hidden' };
+const sectionHead = { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '14px 16px 10px' };
 const h2 = { fontFamily: "'Cardo', Georgia, serif", fontSize: 19, fontWeight: 700, color: '#2a2420', margin: '0 0 10px' };
 
 function CopyButton({ text, label }) {
@@ -65,11 +68,16 @@ function ResourceCard({ r, onEdit, onArchive, onReviewed, onNewVersion, open, on
   const d = r.data || {};
   const isTemplate = r.kind === 'template';
   return (
-    <div id={'res-' + r.id} style={{ ...card, padding: '12px 14px', boxShadow: highlight ? '0 0 0 2px ' + GOLD : 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap', cursor: 'pointer' }} onClick={onToggle}>
-        <div style={{ flex: '1 1 260px', minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2420' }}>{open ? '▾ ' : '▸ '}{r.title}</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 5, alignItems: 'center' }}>
+    <div id={'res-' + r.id} style={{ borderTop: '1px solid #f2ece2', background: open ? '#faf6ef' : '#fff', boxShadow: highlight ? 'inset 3px 0 0 ' + GOLD : 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '11px 16px', cursor: 'pointer' }} onClick={onToggle}>
+        <span style={{ fontSize: 10, color: '#2a2420', width: 10, flexShrink: 0 }}>{open ? '▾' : '▸'}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#2a2420', flex: 1, minWidth: 0 }}>{r.title}</span>
+        {r.needs_review && pill('Review needed', '#ffebee', '#c62828')}
+        {r.status !== 'approved' && statusPill(r.status)}
+      </div>
+      {open && (
+        <div style={{ padding: '0 16px 14px 36px' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
             {audiencePill(r.audience)}{statusPill(r.status)}
             {r.needs_review && pill('Review needed', '#ffebee', '#c62828')}
             {isTemplate && d.version && pill('v' + d.version, '#e3f2fd', '#1565c0')}
@@ -77,10 +85,6 @@ function ResourceCard({ r, onEdit, onArchive, onReviewed, onNewVersion, open, on
             {r.quick_ref && pill('Quick reference', '#fff3e0', '#e65100')}
             <span style={{ fontSize: 11, color: '#999' }}>{r.kind === 'faq' ? 'Approved ' : 'Updated '}{fmtDate(r.approved_at || r.updated_at)}{r.updated_by && r.updated_by !== 'Setup' ? ' · ' + r.updated_by : ''}</span>
           </div>
-        </div>
-      </div>
-      {open && (
-        <div style={{ marginTop: 10 }}>
           {r.body && <div style={{ fontSize: 13, color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{r.body}</div>}
           {r.detail && <details style={{ marginTop: 8 }}><summary style={{ cursor: 'pointer', color: GOLD, fontSize: 12, fontWeight: 600 }}>More detail</summary><div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap', marginTop: 6, lineHeight: 1.55 }}>{r.detail}</div></details>}
           {Array.isArray(d.related) && d.related.length > 0 && <div style={{ fontSize: 12, color: '#666', marginTop: 8 }}><b>Related documents:</b> {d.related.join(', ')}</div>}
@@ -338,9 +342,10 @@ export function VenuePoliciesView() {
   const grouped = (kind) => {
     const list = live.filter(r => r.kind === kind);
     const cats = Array.from(new Set((CATEGORIES[kind] || []).filter(c => list.some(r => r.category === c)).concat(list.map(r => r.category || 'Other'))));
-    return cats.map(c => <div key={c} style={{ marginBottom: 18 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#8a7a62', marginBottom: 6 }}>{c}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{list.filter(r => (r.category || 'Other') === c).map(cardFor)}</div>
+    // one card per category, like the dashboard's Pricing: a heading, then a row per entry that drops open
+    return cats.map(c => <div key={c} style={{ ...sectionCard, marginBottom: 16 }}>
+      <div style={sectionHead}><div style={{ ...h2, margin: 0 }}>{c}</div><span style={{ fontSize: 12, color: '#999' }}>{list.filter(r => (r.category || 'Other') === c).length}</span></div>
+      {list.filter(r => (r.category || 'Other') === c).map(cardFor)}
     </div>);
   };
   const addBtn = (kind, extra) => <button type="button" style={btnGold} onClick={() => setEditing({ kind, ...(extra || {}) })}>+ Add {KINDS[kind].label.toLowerCase()}</button>;
@@ -420,9 +425,20 @@ export function VenuePoliciesView() {
             <span style={{ marginLeft: 'auto' }}>{addBtn('pricing', { year: curYear })}</span>
           </div>
           {curYear === quickYear && <div style={{ fontSize: 12, color: '#2e7d32', marginBottom: 10 }}>These are the current rates shown in Quick Reference.</div>}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12 }}>
-            {live.filter(r => r.kind === 'pricing' && r.year === curYear).map(r => <div key={r.id} id={'res-' + r.id}><PricingCard r={r} onEdit={() => setEditing(r)} onArchive={() => archive(r)} /></div>)}
-          </div>
+          {live.some(r => r.kind === 'pricing' && r.year === curYear) && <div style={sectionCard}>
+            <div style={sectionHead}><div style={{ ...h2, margin: 0 }}>Pricing <span style={{ fontSize: 13, color: '#888', fontFamily: 'inherit', fontWeight: 400 }}>· {curYear} rates</span></div></div>
+            {live.filter(r => r.kind === 'pricing' && r.year === curYear).sort((a, b) => a.sort_order - b.sort_order).map(r => {
+              const isOpen = openId === r.id;
+              return <div key={r.id} id={'res-' + r.id} style={{ borderTop: '1px solid #f2ece2' }}>
+                <button type="button" onClick={() => setOpenId(isOpen ? null : r.id)} style={{ width: '100%', display: 'flex', alignItems: 'baseline', gap: 10, padding: '11px 16px', background: isOpen ? '#faf6ef' : '#fff', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ fontSize: 10, color: '#2a2420', width: 10 }}>{isOpen ? '▾' : '▸'}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#2a2420', flex: 1 }}>{r.category || r.title}</span>
+                  {r.status !== 'approved' && statusPill(r.status)}
+                </button>
+                {isOpen && <div style={{ padding: '0 16px 14px', background: '#faf6ef' }}><PricingCard r={r} onEdit={() => setEditing(r)} onArchive={() => archive(r)} /></div>}
+              </div>;
+            })}
+          </div>}
           {!live.some(r => r.kind === 'pricing' && r.year === curYear) && <div style={{ ...card, color: '#888', fontSize: 13 }}>No pricing for {curYear} yet. Use “+ Add pricing” to enter it.</div>}
         </div>
       ) : tab === 'changes' ? (
