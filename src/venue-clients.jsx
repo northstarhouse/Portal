@@ -491,6 +491,31 @@ function SiteManagerPicker({ client, onAssign }) {
   </div>;
 }
 
+// Event-day out times: an hour (10 AM through 2 AM, since events can run past midnight) and minutes limited to
+// 00 / 15 / 30 / 45. Value is "HH:MM" (24h); an existing off-grid value stays listed.
+const OUT_HOURS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1, 2];
+const OUT_MINUTES = ['00', '15', '30', '45'];
+const outHourLabel = h => ((h % 12) || 12) + ' ' + (h >= 12 ? 'PM' : 'AM');
+function OutTimeSelect({ value, onChange, style, label }) {
+  const [hh, mm] = (value || '').slice(0, 5).split(':');
+  const hour = hh ? parseInt(hh, 10) : '';
+  const minute = mm || '00';
+  const hours = hour !== '' && !OUT_HOURS.includes(hour) ? [hour, ...OUT_HOURS] : OUT_HOURS;
+  const minutes = OUT_MINUTES.includes(minute) ? OUT_MINUTES : [minute, ...OUT_MINUTES];
+  const set = (h, m) => onChange(h === '' ? '' : String(h).padStart(2, '0') + ':' + m);
+  const sel = { ...style, width: 'auto', minWidth: 0 };
+  return <span style={{display:'inline-flex',alignItems:'center',gap:4}}>
+    <select aria-label={label + ' hour'} value={hour} onChange={e => set(e.target.value === '' ? '' : parseInt(e.target.value, 10), minute)} style={sel}>
+      <option value="">Hour</option>
+      {hours.map(h => <option key={h} value={h}>{outHourLabel(h)}</option>)}
+    </select>
+    <span aria-hidden="true" style={{color:'#999'}}>:</span>
+    <select aria-label={label + ' minutes'} value={minute} onChange={e => set(hour === '' ? 22 : hour, e.target.value)} style={sel}>
+      {minutes.map(m => <option key={m} value={m}>{m}</option>)}
+    </select>
+  </span>;
+}
+
 function ClientDetail({ client, onClose, onRename, onAssignSite, onSaveEventDay, onUploadPaperwork, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
   const [formOpen, setFormOpen] = React.useState(false);
@@ -592,8 +617,8 @@ function ClientDetail({ client, onClose, onRename, onAssignSite, onSaveEventDay,
           const dirty = dayTimes.guests_out !== (client.eventDay?.guests_out || '') || dayTimes.sm_out !== (client.eventDay?.sm_out || '');
           return <>
             <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'flex-end'}}>
-              <label style={{fontSize:12,color:'#666',display:'flex',flexDirection:'column',gap:4}}>Guests' actual out time<input type="time" value={dayTimes.guests_out} onChange={e => { setDayTimes({...dayTimes, guests_out: e.target.value}); setDayMsg(null); }} style={inp}/></label>
-              <label style={{fontSize:12,color:'#666',display:'flex',flexDirection:'column',gap:4}}>Site manager out time<input type="time" value={dayTimes.sm_out} onChange={e => { setDayTimes({...dayTimes, sm_out: e.target.value}); setDayMsg(null); }} style={inp}/></label>
+              <label style={{fontSize:12,color:'#666',display:'flex',flexDirection:'column',gap:4}}>Guests' actual out time<OutTimeSelect label="Guests' actual out time" value={dayTimes.guests_out} onChange={v => { setDayTimes({...dayTimes, guests_out: v}); setDayMsg(null); }} style={inp}/></label>
+              <label style={{fontSize:12,color:'#666',display:'flex',flexDirection:'column',gap:4}}>Site manager out time<OutTimeSelect label="Site manager out time" value={dayTimes.sm_out} onChange={v => { setDayTimes({...dayTimes, sm_out: v}); setDayMsg(null); }} style={inp}/></label>
               <button type="button" disabled={dayBusy || !dirty} onClick={async () => { setDayBusy(true); setDayMsg(null); try { await onSaveEventDay(client.id, dayTimes); setDayMsg({ bad: false, text: 'Saved.' }); } catch (e) { setDayMsg({ bad: true, text: e.message || 'Could not save.' }); } finally { setDayBusy(false); } }} style={{background:'#886c44',color:'#fff',border:0,borderRadius:8,padding:'9px 16px',fontWeight:600,opacity:dayBusy||!dirty?0.6:1}}>{dayBusy ? 'Saving…' : 'Save times'}</button>
               {dayMsg && <span style={{fontSize:12,color:dayMsg.bad?'#b3261e':'#2e7d32'}}>{dayMsg.text}</span>}
             </div>

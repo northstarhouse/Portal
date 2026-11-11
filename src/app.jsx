@@ -16043,7 +16043,7 @@ function PersonActivityView() {
       .then(function(rows) {
         if (!rows || !rows.length) return Promise.reject();
         if (parts[0] === 'note') setNotes(function(p) { return (p || []).map(function(n) { return String(n.id) === id ? rows[0] : n; }); });
-        else setItems(function(p) { return (p || []).map(function(it) { return it.msgId && String(it.msgId) === id ? Object.assign({}, it, { hNote: text }) : it; }); });
+        else setItems(function(p) { return (p || []).map(function(it) { return it.msgId && String(it.msgId) === id ? Object.assign({}, it, { hNote: text, hNoteBy: rows[0].handled_note_by || '', hNoteAt: rows[0].handled_note_at || '' }) : it; }); });
         setEditing(null);
       })
       .catch(function() { window.alert('The note could not be saved. Please try again.'); })
@@ -16072,12 +16072,12 @@ function PersonActivityView() {
           if (d) add(d.kind || 'portal', r.created_at, d.text, d.note || '', d.pill || '');
         });
       }),
-      get('venue_messages?select=id,event_uid,subject,from_name,body,handled_at,handled_note&handled_by=ilike.' + like + '&order=handled_at.desc&limit=1000').then(function(rows) {
+      get('venue_messages?select=id,event_uid,subject,from_name,body,handled_at,handled_note,handled_note_by,handled_note_at&handled_by=ilike.' + like + '&order=handled_at.desc&limit=1000').then(function(rows) {
         rows.forEach(function(m) {
           // voicemails: a snippet of what the caller said, then any note left when handling it
           var said = /^voicemail:/.test(m.event_uid || '') ? String(m.body || '').replace(/\s+/g, ' ').trim() : '';
           var snippet = said ? '“' + (said.length > 180 ? said.slice(0, 180).replace(/\s+\S*$/, '') + '…' : said) + '”' : '';
-          add('messages', m.handled_at, 'Marked handled: ' + (m.subject || m.from_name || 'a message'), snippet, '', { msgId: m.id, hNote: m.handled_note || '' });
+          add('messages', m.handled_at, 'Marked handled: ' + (m.subject || m.from_name || 'a message'), snippet, '', { msgId: m.id, hNote: m.handled_note || '', hNoteBy: m.handled_note_by || '', hNoteAt: m.handled_note_at || '' });
         });
       }),
       // Voicemail forwards (the forward-message function logs every attempt, sent or not).
@@ -16186,25 +16186,23 @@ function PersonActivityView() {
                   <div style={{ fontSize: 13, color: '#2a2420' }}><span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, color: '#fff', background: pillColor[it.kind], borderRadius: 4, padding: '1px 6px', marginRight: 8, verticalAlign: 1 }}>{it.pill || PA_KINDS[it.kind]}</span>{it.text}</div>
                   {it.note && <div style={{ fontSize: 12, color: '#888', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{it.note}</div>}
                   {it.msgId && (it.hNote || (editing && editing.key === 'msg:' + it.msgId)) && (editing && editing.key === 'msg:' + it.msgId ? editBox() :
-                    <div style={{ fontSize: 12, color: '#888', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                      {it.hNote ? <span style={{ color: gold, fontWeight: 700 }}>{'Note: ' + it.hNote + ' '}</span> : ''}
-                      <button type="button" style={linkBtn} onClick={function() { setEditing({ key: 'msg:' + it.msgId, text: it.hNote || '' }); }}>Edit note</button>
-                    </div>)}
+                    <NoteCard body={it.hNote} author={it.hNoteBy} at={it.hNoteAt}
+                      onEdit={function() { setEditing({ key: 'msg:' + it.msgId, text: it.hNote || '' }); }}
+                      onDelete={function() {
+                        if (!window.confirm('Delete this note?')) return;
+                        fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + it.msgId, { method: 'PATCH', headers: HJ, body: JSON.stringify({ handled_note: null }) })
+                          .then(function(r) { if (!r.ok) throw new Error(); setItems(function(p) { return (p || []).map(function(x) { return x.msgId === it.msgId ? Object.assign({}, x, { hNote: '' }) : x; }); }); })
+                          .catch(function() { window.alert('The note could not be deleted.'); });
+                      }} />)}
                   {notes.filter(function(n) { return n.item_ref === it.ref; }).map(function(n) {
-                    var key = 'note:' + n.id, open = editing && editing.key === key;
-                    return <div key={n.id} style={{ marginTop: 6, background: '#faf6ef', borderLeft: '3px solid ' + gold, borderRadius: 6, padding: '6px 10px' }}>
-                      {open ? editBox() : <div style={{ fontSize: 12, color: gold, fontWeight: 700, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{n.body}</div>}
-                      {!open && <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', marginTop: 3 }}>
-                        <span style={{ fontSize: 11, color: '#999' }}>— {n.author_name || 'Unknown'} · {when(n.created_at)}{n.updated_at ? ' · edited' + (n.updated_by && n.updated_by !== n.author_name ? ' by ' + n.updated_by : '') : ''}</span>
-                        <span style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
-                          <button type="button" style={linkBtn} onClick={function() { setEditing({ key: key, text: n.body }); }}>Edit</button>
-                          <button type="button" style={Object.assign({}, linkBtn, { color: '#a04545' })} onClick={function() { deleteNote(n); }}>Delete</button>
-                        </span>
-                      </div>}
-                    </div>;
+                    var key = 'note:' + n.id;
+                    return editing && editing.key === key ? <React.Fragment key={n.id}>{editBox()}</React.Fragment>
+                      : <NoteCard key={n.id} body={n.body} author={n.author_name || 'Unknown'} at={n.created_at}
+                        edited={n.updated_at ? 'edited' + (n.updated_by && n.updated_by !== n.author_name ? ' by ' + n.updated_by : '') : ''}
+                        onEdit={function() { setEditing({ key: key, text: n.body }); }} onDelete={function() { deleteNote(n); }} />;
                   })}
                   {editing && editing.key === 'new:' + it.ref ? editBox()
-                    : <button type="button" style={Object.assign({}, linkBtn, { marginTop: 4, fontWeight: 500, color: '#b5a185' })} onClick={function() { setEditing({ key: 'new:' + it.ref, text: '' }); }}>+ Note</button>}
+                    : <button type="button" style={addNoteLink} onClick={function() { setEditing({ key: 'new:' + it.ref, text: '' }); }}>+ Note</button>}
                 </div>
               </div>
             </React.Fragment>;
@@ -21045,6 +21043,26 @@ function buildClientReplyHtml(name, text, by) {
     '</div></div></div>';
 }
 
+// The look shared by notes across the Portal: a cream card with a gold edge, the note in bold gold, then
+// "— Name · date" with Edit and Delete on the right.
+function noteWhen(iso) { var d = new Date(iso); return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+function NoteCard({ body, author, at, edited, onEdit, onDelete }) {
+  var link = { background: 'none', border: 'none', padding: 0, color: gold, fontSize: 12, fontWeight: 600, cursor: 'pointer' };
+  return (
+    <div style={{ marginTop: 6, background: '#faf6ef', borderLeft: '3px solid ' + gold, borderRadius: 6, padding: '8px 12px' }}>
+      <div style={{ fontSize: 13, color: gold, fontWeight: 700, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{body}</div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', marginTop: 3 }}>
+        <span style={{ fontSize: 12, color: '#999' }}>{[author ? '— ' + author : '', at ? noteWhen(at) : ''].filter(Boolean).join(' · ')}{edited ? ' · ' + edited : ''}</span>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 12 }}>
+          {onEdit && <button type="button" style={link} onClick={onEdit}>Edit</button>}
+          {onDelete && <button type="button" style={Object.assign({}, link, { color: '#a04545' })} onClick={onDelete}>Delete</button>}
+        </span>
+      </div>
+    </div>
+  );
+}
+var addNoteLink = { background: 'none', border: 'none', padding: 0, marginTop: 6, color: '#b5a185', fontSize: 12, fontWeight: 500, cursor: 'pointer' };
+
 // The notes on a past message: shown with who wrote them (stamped by the database from whoever is signed in),
 // and they can be added or edited any time.
 function PastMessageNote({ m }) {
@@ -21056,8 +21074,9 @@ function PastMessageNote({ m }) {
   var [busy, setBusy] = useState(false);
   var [err, setErr] = useState('');
   function day(iso) { return iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''; }
-  function save() {
-    var clean = draft.trim() ? draft.trim() : null;
+  function save(value) {
+    var text = typeof value === 'string' ? value : draft;
+    var clean = text.trim() ? text.trim() : null;
     if (clean === (note || null)) { setEditing(false); return; }
     setBusy(true); setErr('');
     fetch(SUPABASE_URL + '/rest/v1/venue_messages?id=eq.' + m.id, {
@@ -21085,14 +21104,13 @@ function PastMessageNote({ m }) {
       </div>
     </div>
   );
-  if (!note) return <div style={{ marginTop: 8 }}><button type="button" style={link} onClick={function() { setDraft(''); setEditing(true); }}>+ Add note</button></div>;
+  if (!note) return <div><button type="button" style={addNoteLink} onClick={function() { setDraft(''); setEditing(true); }}>+ Note</button></div>;
   return (
-    <div style={{ marginTop: 8, fontSize: 12, color: '#555', background: '#faf8f3', border: '0.5px solid #ece6da', borderRadius: 8, padding: '6px 10px' }}>
-      <div style={{ whiteSpace: 'pre-wrap' }}><strong style={{ color: gold }}>Notes:</strong> {note}</div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', marginTop: 4 }}>
-        {(by || at) && <span style={{ fontSize: 11, color: '#999' }}>{by ? '— ' + by : ''}{at ? (by ? ' · ' : '') + day(at) : ''}</span>}
-        <button type="button" style={Object.assign({}, link, { marginLeft: 'auto' })} onClick={function() { setDraft(note); setEditing(true); }}>Edit note</button>
-      </div>
+    <div>
+      <NoteCard body={note} author={by} at={at}
+        onEdit={function() { setDraft(note); setEditing(true); }}
+        onDelete={function() { if (window.confirm('Delete this note?')) save(''); }} />
+      {err && <div style={{ color: '#b3261e', fontSize: 12, marginTop: 4 }}>{err}</div>}
     </div>
   );
 }
