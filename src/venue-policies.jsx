@@ -58,9 +58,11 @@ const sectionCard = { background: '#fff', border: '0.5px solid #e8e0d5', borderT
 const sectionHead = { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '14px 16px 10px' };
 const h2 = { fontFamily: "'Cardo', Georgia, serif", fontSize: 19, fontWeight: 700, color: '#2a2420', margin: '0 0 10px' };
 
-function CopyButton({ text, label }) {
+// Quiet text actions in the top-right corner of an opened entry.
+const act = { background: 'none', border: 'none', padding: 0, color: '#8a7a62', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'none' };
+function CopyButton({ text, label, style }) {
   const [done, setDone] = React.useState(false);
-  return <button type="button" style={btn} onClick={() => { navigator.clipboard.writeText(text || '').then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }); }}>{done ? '✓ Copied' : label}</button>;
+  return <button type="button" style={style || btn} onClick={() => { navigator.clipboard.writeText(text || '').then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }); }}>{done ? '✓ Copied' : label}</button>;
 }
 
 // One entry (FAQ, reference, info, template): title, badges, the text, and its actions.
@@ -84,24 +86,24 @@ function ResourceCard({ r, onEdit, onArchive, onReviewed, onNewVersion, open, on
             {isTemplate && r.year && pill(String(r.year), '#f3e5f5', '#6a1b9a')}
             {r.quick_ref && pill('Quick reference', '#fff3e0', '#e65100')}
             <span style={{ fontSize: 11, color: '#999' }}>{r.kind === 'faq' ? 'Approved ' : 'Updated '}{fmtDate(r.approved_at || r.updated_at)}{r.updated_by && r.updated_by !== 'Setup' ? ' · ' + r.updated_by : ''}</span>
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+              {r.body && !isTemplate && <CopyButton text={r.body} label="Copy answer" style={act} />}
+              {r.body && isTemplate && r.category === 'Client Communication' && <CopyButton text={r.body} label="Copy template" style={act} />}
+              {isTemplate && d.url && <>
+                <a href={d.url} target="_blank" rel="noopener noreferrer" style={act}>Open ↗</a>
+                <a href={previewUrl(d.url)} target="_blank" rel="noopener noreferrer" style={act}>Preview</a>
+                <a href={driveDownload(d.url)} target="_blank" rel="noopener noreferrer" style={act}>Download</a>
+              </>}
+              {r.needs_review && onReviewed && <button type="button" style={act} onClick={onReviewed}>Mark reviewed</button>}
+              {isTemplate && r.status !== 'archived' && onNewVersion && <button type="button" style={act} onClick={onNewVersion}>New version</button>}
+              {onEdit && <button type="button" style={act} onClick={onEdit}>Edit</button>}
+              {onArchive && r.status !== 'archived' && <button type="button" style={{ ...act, color: '#b07a7a' }} onClick={onArchive}>Archive</button>}
+            </span>
           </div>
           {r.body && <div style={{ fontSize: 13, color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{r.body}</div>}
           {r.detail && <details style={{ marginTop: 8 }}><summary style={{ cursor: 'pointer', color: GOLD, fontSize: 12, fontWeight: 600 }}>More detail</summary><div style={{ fontSize: 13, color: '#444', whiteSpace: 'pre-wrap', marginTop: 6, lineHeight: 1.55 }}>{r.detail}</div></details>}
           {Array.isArray(d.related) && d.related.length > 0 && <div style={{ fontSize: 12, color: '#666', marginTop: 8 }}><b>Related documents:</b> {d.related.join(', ')}</div>}
           {isTemplate && d.format && <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>Format: {d.format}</div>}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-            {r.body && !isTemplate && <CopyButton text={r.body} label="Copy answer" />}
-            {r.body && isTemplate && r.category === 'Client Communication' && <CopyButton text={r.body} label="Copy template" />}
-            {isTemplate && d.url && <>
-              <a href={d.url} target="_blank" rel="noopener noreferrer" style={btn}>Open ↗</a>
-              <a href={previewUrl(d.url)} target="_blank" rel="noopener noreferrer" style={btn}>Preview</a>
-              <a href={driveDownload(d.url)} target="_blank" rel="noopener noreferrer" style={btn}>Download</a>
-            </>}
-            {r.needs_review && onReviewed && <button type="button" style={btn} onClick={onReviewed}>Mark reviewed</button>}
-            {isTemplate && r.status !== 'archived' && onNewVersion && <button type="button" style={btn} onClick={onNewVersion}>New version</button>}
-            {onEdit && <button type="button" style={btn} onClick={onEdit}>Edit</button>}
-            {onArchive && r.status !== 'archived' && <button type="button" style={{ ...btn, color: '#a04545', borderColor: '#e0b4b4' }} onClick={onArchive}>Archive</button>}
-          </div>
         </div>
       )}
     </div>
