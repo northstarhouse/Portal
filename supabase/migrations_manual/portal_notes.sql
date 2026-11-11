@@ -72,3 +72,6 @@ $function$;
 drop trigger if exists portal_notes_stamp on public.portal_notes;
 
 create trigger portal_notes_stamp before insert or update on public.portal_notes for each row execute function public.portal_notes_stamp();
+
+-- Notes now attach to one Activity log entry (item_ref) instead of the person as a whole.
+alter table public.portal_notes add column if not exists item_ref text;
