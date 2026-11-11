@@ -19,7 +19,7 @@ const KINDS = {
 const TABS = [['home', 'Dashboard'], ['pricing', 'Pricing'], ['templates', 'Templates'], ['faq', 'Policies & FAQs'], ['sm', 'Site Manager'], ['vc', 'Venue Coordinator'], ['info', 'Venue Info'], ['changes', 'Changes']];
 const TAB_KIND = { pricing: 'pricing', templates: 'template', faq: 'faq', sm: 'sm_ref', vc: 'vc_ref', info: 'info' };
 const CATEGORIES = {
-  pricing: ['Wedding', 'Private Event', 'Corporate Event', 'Nonprofit', 'Memorial', 'Other'],
+  pricing: ['Wedding', 'Rehearsal', 'Private Event', 'Corporate Event', 'Nonprofit', 'Memorial', 'Other'],
   template: ['Rental Agreements', 'Booking Documents', 'Event Management', 'Client Communication'],
   faq: ['Bookings and reservations', 'Soft holds', 'Retainers and payments', 'Cancellations and rescheduling', 'Rental access and hours', 'Vendors and catering', 'Alcohol', 'Dogs and pets', 'Decorations', 'Music and noise', 'Parking', 'Building and grounds access', 'Setup and breakdown', 'Cleaning and damage', 'Site Manager requirements', 'Exceptions and special requests'],
   sm_ref: ['Site Manager responsibilities', 'Pre-event procedures', 'Arrival and property opening', 'Client and vendor access', 'Event monitoring', 'Closing procedures', 'Property security', 'Incident reporting', 'Emergency contacts', 'Escalation procedures'],

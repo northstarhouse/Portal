@@ -9,6 +9,8 @@
 // holds the PayPal credentials; the key for that is the service-role-only
 // private_config row 'venue_paypal_proxy_key'.
 
+import { longDate, money, isConfirmedWedding, rehearsalDateAvailable, addRehearsalCharge, coupleOf, brandedEmail } from '../_shared/rehearsal.ts';
+
 const URL_ = Deno.env.get('SUPABASE_URL')!, KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const PP_ID = Deno.env.get('PAYPAL_CLIENT_ID') || '', PP_SECRET = Deno.env.get('PAYPAL_SECRET') || '';
 const PP_BASE = Deno.env.get('PAYPAL_ENV') === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
@@ -120,11 +122,14 @@ async function legacySchedule(inq: any) {
     if (!items.length) return [];
     const base = items.map((p: any) => ({ cents: Number(p.amount?.amount) || 0, due: String(p.due_date || '').slice(0, 10) || null, paid: !!p.paid }))
       .sort((x, y) => (x.due || '9999').localeCompare(y.due || '9999'));
+    // charges added later (e.g. a wedding rehearsal) come after the HoneyBook invoice's own payments
+    const extras: any[] = (Array.isArray(a.__venue_checklist?.extra_charges) ? a.__venue_checklist.extra_charges : [])
+      .filter((c: any) => Number(c?.cents) > 0).map((c: any) => ({ cents: Number(c.cents), due: c.due || null, paid: false, label: c.label }));
     let manual = (Array.isArray(a.__venue_checklist?.manual_payments) ? a.__venue_checklist.manual_payments : []).reduce((s: number, p: any) => s + (Number(p?.cents) || 0), 0);
-    return base.map((p, i) => {
+    return base.concat(extras).map((p: any, i: number) => {
       let paid = p.paid;
       if (!paid && p.cents > 0 && manual >= p.cents) { manual -= p.cents; paid = true; }
-      return { sequence: i + 1, label: i === 0 ? 'Booking payment' : `Scheduled payment ${i + 1}`, amount_cents: p.cents, amount_paid_cents: paid ? p.cents : 0, due_date: p.due, status: paid ? 'paid' : 'due' };
+      return { sequence: i + 1, label: p.label || (i === 0 ? 'Booking payment' : `Scheduled payment ${i + 1}`), amount_cents: p.cents, amount_paid_cents: paid ? p.cents : 0, due_date: p.due, status: paid ? 'paid' : 'due' };
     });
   } catch (_e) { return []; }
 }
@@ -153,6 +158,13 @@ function view(date: string, inq: any) {
 
 // The couple's second walk-through, if they've booked one (estate_tours row
 // linked by venue_inquiry_id when booked from this page).
+// The wedding rehearsal offered to this couple (see rehearsal-offers), if any.
+async function rehearsalFor(inq: any) {
+  const r = (await rest(`venue_rehearsals?select=*&inquiry_id=eq.${inq.id}&status=in.(offered,confirmed)`).catch(() => []))?.[0];
+  if (!r) return null;
+  return { status: r.status, date: r.rehearsal_date, date_label: longDate(r.rehearsal_date), duration: r.duration, price_cents: r.price_cents, terms: r.terms || '' };
+}
+
 async function walkthroughFor(inq: any) {
   const rows = await rest(`estate_tours?select=date,start_time&venue_inquiry_id=eq.${inq.id}&status=eq.booked&order=date.desc,start_time.desc&limit=1`).catch(() => []);
   return rows?.[0] || null;
@@ -297,12 +309,60 @@ Deno.serve(async req => {
     const code = String(body.code).trim();
 
     if (action === 'lookup') {
-      const [paypal_client_id, walkthrough] = await Promise.all([ppClientId(), walkthroughFor(inq)]);
+      const [paypal_client_id, walkthrough, rehearsal] = await Promise.all([ppClientId(), walkthroughFor(inq), rehearsalFor(inq)]);
       if (!(inq.venue_payment_schedule || []).length) {
         const old = await legacySchedule(inq);
-        if (old.length) return json({ ...view(date, { ...inq, venue_payment_schedule: old }), walkthrough, paypal_client_id });
+        if (old.length) return json({ ...view(date, { ...inq, venue_payment_schedule: old }), walkthrough, rehearsal, paypal_client_id });
       }
-      return json({ ...view(date, inq), walkthrough, paypal_client_id });
+      return json({ ...view(date, inq), walkthrough, rehearsal, paypal_client_id });
+    }
+
+    // "Add Rehearsal to My Wedding". rehearsal_check rechecks the date and shows the details; rehearsal_confirm (only with
+    // the client's explicit agreement to the charge) rechecks again, claims the date (a unique index allows one confirmed
+    // rehearsal per date, so two couples can't both get it), then adds the charge to their invoice.
+    if (action === 'rehearsal_check' || action === 'rehearsal_confirm') {
+      const unavailable = 'Unfortunately, this rehearsal date is no longer available. Please contact our venue team if you\'d like to discuss other options.';
+      const offer = (await rest(`venue_rehearsals?select=*&inquiry_id=eq.${inq.id}`))?.[0];
+      if (!offer || !isConfirmedWedding(inq)) throw new Fail('There is no rehearsal offer for this booking.', 404);
+      if (offer.status === 'confirmed') return json({ added: true, rehearsal: await rehearsalFor(inq) });
+      if (offer.status !== 'offered') throw new Fail(unavailable, 409, { unavailable: true });
+      const avail = await rehearsalDateAvailable(rest, offer.rehearsal_date, { ignoreRehearsalId: offer.id });
+      if (!avail.ok) throw new Fail(unavailable, 409, { unavailable: true });
+      const details = { date: offer.rehearsal_date, date_label: longDate(offer.rehearsal_date), duration: offer.duration, price_cents: offer.price_cents, terms: offer.terms || '' };
+      if (action === 'rehearsal_check') return json({ available: true, rehearsal: details });
+
+      if (body.agree !== true) throw new Fail('Please confirm the additional charge to add the rehearsal.');
+      // claim the date: only an offer still "offered" moves to "confirmed"; the unique index rejects a second couple
+      let claimed: any[] = [];
+      try {
+        claimed = await rest(`venue_rehearsals?id=eq.${offer.id}&status=eq.offered`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'confirmed', confirmed_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
+      } catch (_e) { throw new Fail(unavailable, 409, { unavailable: true }); }
+      if (!claimed?.length) { const now = (await rest(`venue_rehearsals?select=status&id=eq.${offer.id}`))?.[0]; if (now?.status === 'confirmed') return json({ added: true, rehearsal: await rehearsalFor(inq) }); throw new Fail(unavailable, 409, { unavailable: true }); }
+      let charge_ref = '';
+      try {
+        charge_ref = await addRehearsalCharge(rest, inq, { date: offer.rehearsal_date, cents: offer.price_cents, id: offer.id });
+      } catch (e) {
+        // never leave a claimed date without its charge: release it and report
+        await rest(`venue_rehearsals?id=eq.${offer.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'offered', confirmed_at: null }) }).catch(() => {});
+        console.error('client-pay: rehearsal charge failed', (e as Error).message);
+        throw new Fail('Something went wrong adding the rehearsal. Nothing was charged. Please try again or contact the venue team.', 500);
+      }
+      await rest(`venue_rehearsals?id=eq.${offer.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ charge_ref }) }).catch(() => {});
+      // tell the couple and the venue team
+      const couple = await coupleOf(rest, inq);
+      const what = `<b>${esc(details.date_label)}</b> · ${esc(details.duration || '')} · ${esc(money(details.price_cents))}`;
+      const mailTo = (to: string[], subject: string, title: string, html: string, text: string) => fetch(`${URL_}/functions/v1/send-email`, { method: 'POST', headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ to, subject, body: text, html: brandedEmail(title, html, { text: 'View My Client Portal', url: PAGE_URL }), fromEmail: 'venue@northstarhouse.org' }) }).catch(() => null);
+      if (couple.emails.length) await mailTo(couple.emails, 'Your Wedding Rehearsal Is Added', 'Your Rehearsal Is Added',
+        `<p style="margin:0 0 16px;">Hi ${esc(couple.firsts.join(' & ') || 'there')}!</p><p style="margin:0 0 16px;">Your rehearsal at North Star House is confirmed for ${what}.</p><p style="margin:0;">It has been added to your wedding invoice as its own payment. You can see your updated balance and payment schedule in your client portal.</p>`,
+        `Your rehearsal at North Star House is confirmed: ${details.date_label}, ${details.duration}, ${money(details.price_cents)}. It has been added to your wedding invoice; see your client portal for the updated balance.`);
+      await mailTo(['venue@thenorthstarhouse.org'], `Rehearsal added: ${inq.name} (${details.date_label})`, 'Rehearsal Added',
+        `<p style="margin:0 0 16px;"><b>${esc(inq.name)}</b> added a rehearsal to their wedding from the client portal: ${what}.</p><p style="margin:0;">It was added to their invoice and payment schedule. Add it to the venue calendar and arrange a site manager.</p>`,
+        `${inq.name} added a rehearsal: ${details.date_label}, ${details.duration}, ${money(details.price_cents)}. Added to their invoice. Add it to the venue calendar and arrange a site manager.`);
+      await rest('activity_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ action: 'rehearsal_added', tag: 'Venue', description: `Rehearsal added by ${inq.name} for ${details.date_label} (${money(details.price_cents)})`, detail: { inquiry_id: inq.id, rehearsal_id: offer.id, charge_ref } }) }).catch(() => {});
+      const fresh = (await rest(`venue_inquiries?select=${INQUIRY_SELECT}&id=eq.${inq.id}`))[0];
+      let shown = fresh;
+      if (!(shown.venue_payment_schedule || []).length) { const old = await legacySchedule(shown); if (old.length) shown = { ...shown, venue_payment_schedule: old }; }
+      return json({ added: true, rehearsal: await rehearsalFor(inq), ...view(date, shown) });
     }
 
     if (action === 'create_order') {
