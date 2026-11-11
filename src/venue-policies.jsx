@@ -266,6 +266,7 @@ export function VenuePoliciesView() {
   const [q, setQ] = React.useState('');
   const [year, setYear] = React.useState(null);
   const [openId, setOpenId] = React.useState(null);
+  const [openPrice, setOpenPrice] = React.useState(null); // dashboard pricing row that is open
   const [editing, setEditing] = React.useState(null);
   const [showArchived, setShowArchived] = React.useState(false);
   const [err, setErr] = React.useState('');
@@ -347,16 +348,25 @@ export function VenuePoliciesView() {
         </div>
       ) : tab === 'home' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <div style={{ ...card, borderTop: '3px solid ' + GOLD }}>
-            <div style={h2}>Quick Reference {quickYear ? <span style={{ fontSize: 13, color: '#888', fontFamily: 'inherit', fontWeight: 400 }}>· {quickYear} rates</span> : null}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10, marginBottom: 14 }}>
-              {currentPricing.map(r => <button key={r.id} type="button" onClick={() => goTo(r)} style={{ background: '#faf6ef', border: '1px solid #ece3d3', borderRadius: 8, padding: '10px 12px', textAlign: 'left', cursor: 'pointer' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#8a7a62', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.category}</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: GOLD, marginTop: 2 }}>{priceSummary(r.data || {}) || '—'}</div>
-                {(r.data || {}).retainer && <div style={{ fontSize: 12, color: '#555', marginTop: 3 }}>Retainer: {r.data.retainer}</div>}
-                {(r.data || {}).included_hours && <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>{r.data.included_hours}</div>}
-              </button>)}
+          <div style={{ ...card, borderTop: '3px solid ' + GOLD, padding: 0, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '14px 16px 6px' }}>
+              <div style={{ ...h2, margin: 0 }}>Pricing {quickYear ? <span style={{ fontSize: 13, color: '#888', fontFamily: 'inherit', fontWeight: 400 }}>· {quickYear} rates</span> : null}</div>
+              <button type="button" style={btn} onClick={() => setTab('pricing')}>All years</button>
             </div>
+            {currentPricing.length === 0 && <div style={{ padding: '6px 16px 14px', fontSize: 13, color: '#888' }}>No approved pricing for this year yet.</div>}
+            {currentPricing.map(r => {
+              const d = r.data || {}, isOpen = openPrice === r.id;
+              return <div key={r.id} style={{ borderTop: '1px solid #f2ece2' }}>
+                <button type="button" onClick={() => setOpenPrice(isOpen ? null : r.id)} style={{ width: '100%', display: 'flex', alignItems: 'baseline', gap: 10, padding: '11px 16px', background: isOpen ? '#faf6ef' : '#fff', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#2a2420', flex: 1 }}>{isOpen ? '▾ ' : '▸ '}{r.category || r.title}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: GOLD }}>{priceSummary(d)}</span>
+                </button>
+                {isOpen && <div style={{ padding: '0 16px 14px', background: '#faf6ef' }}><PricingCard r={r} onEdit={() => setEditing(r)} onArchive={() => archive(r)} /></div>}
+              </div>;
+            })}
+          </div>
+          <div style={{ ...card, borderTop: '3px solid ' + GOLD }}>
+            <div style={h2}>Quick Reference</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {live.filter(r => r.quick_ref && r.status === 'approved').map(r => <div key={r.id} style={{ display: 'flex', gap: 10, alignItems: 'baseline', borderTop: '1px solid #f2ece2', paddingTop: 6 }}>
                 <button type="button" onClick={() => goTo(r)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', flex: 1, minWidth: 0 }}>
