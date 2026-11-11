@@ -51,3 +51,8 @@ insert into public.events_plan (year, name, sort_order) values
 
 -- The committee's final call on each event (Moving Forward / Not Moving Forward / Merging with Another Event / Needs Further Discussion), set from the dropdown.
 alter table public.events_plan add column if not exists final_decision text;
+
+-- Multi-day events: a checkbox, plus the end date (date is then the start date).
+alter table public.events_plan add column if not exists multi_day boolean not null default false;
+
+alter table public.events_plan add column if not exists end_date date;
