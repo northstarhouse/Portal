@@ -491,9 +491,9 @@ function SiteManagerPicker({ client, onAssign }) {
   </div>;
 }
 
-// Event-day out times: an hour (10 AM through 2 AM, since events can run past midnight) and minutes limited to
+// Event-day out times: an hour (10 AM through 11 PM; events end by 11 PM) and minutes limited to
 // 00 / 15 / 30 / 45. Value is "HH:MM" (24h); an existing off-grid value stays listed.
-const OUT_HOURS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1, 2];
+const OUT_HOURS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
 const OUT_MINUTES = ['00', '15', '30', '45'];
 const outHourLabel = h => ((h % 12) || 12) + ' ' + (h >= 12 ? 'PM' : 'AM');
 function OutTimeSelect({ value, onChange, style, label }) {
