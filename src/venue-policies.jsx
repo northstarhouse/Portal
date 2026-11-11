@@ -288,7 +288,7 @@ export function VenuePoliciesView() {
   const curYear = year || (years.includes(thisYear) ? thisYear : years[years.length - 1]) || thisYear;
   // Quick Reference reads the approved pricing for the current rental year
   const quickYear = years.includes(thisYear) ? thisYear : years.filter(y => y <= thisYear).pop() || years[0];
-  const currentPricing = all.filter(r => r.kind === 'pricing' && r.status === 'approved' && r.year === quickYear);
+  const currentPricing = all.filter(r => r.kind === 'pricing' && r.status === 'approved' && r.year === quickYear).sort((a, b) => a.sort_order - b.sort_order);
 
   async function patch(r, body, summary) {
     try { await api('venue_resources?id=eq.' + r.id, { method: 'PATCH', body: JSON.stringify({ ...body, change_summary: summary }) }); load(); }
@@ -359,7 +359,7 @@ export function VenuePoliciesView() {
               return <div key={r.id} style={{ borderTop: '1px solid #f2ece2' }}>
                 <button type="button" onClick={() => setOpenPrice(isOpen ? null : r.id)} style={{ width: '100%', display: 'flex', alignItems: 'baseline', gap: 10, padding: '11px 16px', background: isOpen ? '#faf6ef' : '#fff', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: '#2a2420', flex: 1 }}>{isOpen ? '▾ ' : '▸ '}{r.category || r.title}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: GOLD }}>{priceSummary(d)}</span>
+
                 </button>
                 {isOpen && <div style={{ padding: '0 16px 14px', background: '#faf6ef' }}><PricingCard r={r} onEdit={() => setEditing(r)} onArchive={() => archive(r)} /></div>}
               </div>;
