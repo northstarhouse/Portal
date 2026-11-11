@@ -48,3 +48,6 @@ insert into public.events_plan (year, name, sort_order) values
   (2027, '1920s Speakeasy Event', 13),
   (2027, 'Signature Fundraising Event', 14),
   (2027, 'Chamber Mixer', 15);
+
+-- The committee's final call on each event (Confirmed / Tentative / On hold / Canceled), set from the dropdown.
+alter table public.events_plan add column if not exists final_decision text;
