@@ -3,6 +3,7 @@
 import { VenueClientDashboard, saveVenueInsuranceVerification, saveVenueManualPayments } from './venue-clients.jsx';
 import { createAgreementApi, AgreementSigningPage } from './venue-contracts.jsx';
 import { VenuePoliciesView } from './venue-policies.jsx';
+import { AuctionItemsPanel } from './auction-items.jsx';
 import HubEventsCommittee from './hub/entry.jsx';
 import RsvpPanel from './hub/pages/RsvpPanel.jsx';
 import { BlogEditorView as JournalEditor } from './blog-editor.jsx';
@@ -10533,7 +10534,7 @@ function SponsorsView() {
       </div>
 
       <div style={{ display: 'flex', gap: 2, marginBottom: 16, background: '#f5f0ea', borderRadius: 10, padding: 4 }}>
-        {[['current','Current'],['past','Past'],['potential','Potential']].map(function(pair) {
+        {[['current','Current'],['past','Past'],['potential','Potential'],['auction','Auction Items']].map(function(pair) {
           var active = tab === pair[0];
           return (
             <button key={pair[0]} onClick={function() { setTab(pair[0]); setSelected(null); }}
@@ -10544,6 +10545,8 @@ function SponsorsView() {
         })}
       </div>
 
+      {/* Auction Items: in-kind items donated for auctions (src/auction-items.jsx) */}
+      {tab === 'auction' ? <AuctionItemsPanel sponsors={sponsors || []} /> : <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div style={{ fontSize: 13, color: '#aaa' }}>{sponsors !== null ? visibleSponsors.length + ' sponsor' + (visibleSponsors.length !== 1 ? 's' : '') : ''}</div>
         <button onClick={function() { setAddForm(Object.assign({}, emptyAddForm, { sponsor_status: tab === 'current' ? null : tab })); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add New Sponsor</button>
@@ -10876,6 +10879,7 @@ function SponsorsView() {
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 }
