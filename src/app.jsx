@@ -4,6 +4,7 @@ import { VenueClientDashboard, saveVenueInsuranceVerification, saveVenueManualPa
 import { createAgreementApi, AgreementSigningPage } from './venue-contracts.jsx';
 import { VenuePoliciesView } from './venue-policies.jsx';
 import { EventListView } from './event-list.jsx';
+import { VenueFollowingView } from './venue-following.jsx';
 import { AuctionItemsPanel } from './auction-items.jsx';
 import HubEventsCommittee from './hub/entry.jsx';
 import RsvpPanel from './hub/pages/RsvpPanel.jsx';
@@ -851,6 +852,7 @@ var NAV_ICONS = {
   'activity-log': '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
   'venue-policies': '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="7" x2="16" y2="7"/><line x1="9" y1="11" x2="14" y2="11"/>',
   'mail-checks': '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/><polyline points="15 17 17 19 21 15"/>',
+  'venue-following': '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   'office-cash-flow': '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><line x1="6" y1="10" x2="6" y2="10.01"/><line x1="18" y1="14" x2="18" y2="14.01"/>',
   'person-activity': '<circle cx="9" cy="7" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2"/><polyline points="22 15 19 15 17.5 20 15 11 13.5 15 12 15"/>',
   planning: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
@@ -20333,6 +20335,13 @@ function VenueRentalsView({ navigate, initialTab }) {
               <React.Fragment>
                 <div onClick={function() { setToolsOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
                 <div role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 41, background: '#fff', border: '1px solid #ded7cb', borderRadius: 10, boxShadow: '0 8px 24px rgba(42,36,32,.14)', minWidth: 270, padding: 6 }}>
+                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); navigate('venue-following'); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="venue-following" active size={18} /></span>
+                    <div><div style={{ fontWeight: 700 }}>Following</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Watch couples go from their tour to their wedding</div>
+                    </div>
+                  </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); navigate('venue-policies'); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
                     <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="venue-policies" active size={18} /></span>
@@ -25853,6 +25862,7 @@ const views = {
   'mail-checks': MailChecksView,
   'venue-policies': VenuePoliciesView,
   'event-list': EventListView,
+  'venue-following': VenueFollowingView,
   'acknowledgment-templates': AcknowledgmentTemplatesView,
   'acknowledgments-queue': AcknowledgmentsQueueView,
   announcements: AnnouncementsView,
@@ -26574,7 +26584,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: gold }}>
               <NavIcon id={active} active={true} size={20} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "person-activity" ? "Activity by Person" : active === "mail-checks" ? "Mail & Checks" : active === "venue-policies" ? "Venue Policies & Resources" : active === "event-list" ? "2027 Event List" : active === "office-cash-flow" ? "Office Cash" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "person-activity" ? "Activity by Person" : active === "mail-checks" ? "Mail & Checks" : active === "venue-policies" ? "Venue Policies & Resources" : active === "event-list" ? "2027 Event List" : active === "venue-following" ? "Following" : active === "office-cash-flow" ? "Office Cash" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
