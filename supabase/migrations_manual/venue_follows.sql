@@ -75,9 +75,12 @@ begin
       select max(completed_at) into signed_at from venue_agreement_versions where response_id = r.id and status = 'completed';
       booked_hb := r.answers ? '__honeybook';
       ev_date := coalesce(r.answers->>'sn9urgfr', r.answers->>'evp_date', r.answers->'__honeybook'->'project'->>'project_date');
+      select min((m->>'date')::timestamptz) into paid_at from jsonb_array_elements(coalesce(r.answers->'__venue_checklist'->'manual_payments', '[]'::jsonb)) m where (m->>'cents')::int > 0 and m->>'date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}';
     end if;
+    paid_at := least(paid_at, (select min(p.created_at) from venue_payments p where lower(trim(p.payer_email)) = f.email));
     if i.id is not null then
-      select min(s.paid_at) into paid_at from venue_payment_schedule s where s.inquiry_id = i.id and s.status = 'paid';
+      paid_at := least(paid_at, (select min(s.paid_at) from venue_payment_schedule s where s.inquiry_id = i.id and s.status = 'paid'));
+      paid_at := least(paid_at, (select min(p.created_at) from venue_payments p where p.inquiry_id = i.id));
       ev_date := coalesce(i.event_date::text, ev_date);
     end if;
     out := out || jsonb_build_object(
