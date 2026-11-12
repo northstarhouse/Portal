@@ -10007,6 +10007,53 @@ function SponsorsView() {
     });
   }, [selected]);
 
+  // Other listings with the same business name (case/spacing ignored).
+  function sponsorDuplicates(s) {
+    var key = String((s && s['Business Name']) || '').trim().toLowerCase();
+    if (!key) return [];
+    return (sponsors || []).filter(function(o) { return o.id !== s.id && String(o['Business Name'] || '').trim().toLowerCase() === key; });
+  }
+
+  // Delete a sponsor listing. If it's a duplicate, its in-kind entries, acknowledgments and auction items move to the
+  // listing that stays, so nothing is lost. Otherwise they are deleted along with it (after a clear warning).
+  // The website Sponsors page is matched by name, so it is left alone.
+  function deleteSponsor(s) {
+    var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+    var name = s['Business Name'] || 'this sponsor';
+    var keep = sponsorDuplicates(s)[0] || null;
+    function count(table, col) {
+      return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent(table) + '?' + col + '=eq.' + s.id + '&select=id', { headers: H })
+        .then(function(r) { return r.json(); }).then(function(rows) { return Array.isArray(rows) ? rows.length : 0; }).catch(function() { return 0; });
+    }
+    Promise.all([count('Sponsor In-Kind', 'sponsor_id'), count('Sponsor Acknowledgments', 'sponsor_id'), count('auction_items', 'sponsor_id')]).then(function(n) {
+      var linked = n[0] + n[1] + n[2];
+      var parts = [];
+      if (n[0]) parts.push(n[0] + ' in-kind entr' + (n[0] === 1 ? 'y' : 'ies'));
+      if (n[1]) parts.push(n[1] + ' acknowledgment' + (n[1] === 1 ? '' : 's'));
+      if (n[2]) parts.push(n[2] + ' auction item' + (n[2] === 1 ? '' : 's'));
+      var msg = 'Delete this listing for ' + name + '?';
+      if (keep) msg += linked ? '\n\nIts ' + parts.join(', ') + ' will be moved to the other ' + name + ' listing, which stays.' : '\n\nThe other ' + name + ' listing stays.';
+      else msg += linked ? '\n\nThis is the only listing for ' + name + '. Its ' + parts.join(', ') + ' will be deleted too.' : '';
+      msg += '\n\nThis can\'t be undone.';
+      if (!window.confirm(msg)) return;
+      var moves = keep && linked ? ['Sponsor In-Kind', 'Sponsor Acknowledgments', 'auction_items'].map(function(t) {
+        return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent(t) + '?sponsor_id=eq.' + s.id, { method: 'PATCH', headers: H, body: JSON.stringify({ sponsor_id: keep.id }) })
+          .then(function(r) { if (!r.ok) throw new Error('Could not move ' + t + ' (' + r.status + ')'); });
+      }) : (!keep && n[2] ? [fetch(SUPABASE_URL + '/rest/v1/auction_items?sponsor_id=eq.' + s.id, { method: 'PATCH', headers: H, body: JSON.stringify({ sponsor_id: null }) })] : []);
+      Promise.all(moves).then(function() {
+        return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?id=eq.' + s.id, { method: 'DELETE', headers: Object.assign({}, H, { Prefer: 'return=representation' }) });
+      }).then(function(r) { return r.json().catch(function() { return null; }).then(function(rows) { return { ok: r.ok, rows: rows }; }); })
+        .then(function(res) {
+          if (!res.ok || !Array.isArray(res.rows) || !res.rows.length) { alert('Could not delete ' + name + '. Try signing out and back in.'); return; }
+          setSponsors(function(prev) { return (prev || []).filter(function(o) { return o.id !== s.id; }); });
+          setSelected(keep || null);
+          setEditing(false);
+          try { if (typeof logActivity === 'function') logActivity('Deleted sponsor listing: ' + name + (keep ? ' (duplicate)' : ''), 'sponsor_deleted'); } catch (e) {}
+        })
+        .catch(function(err) { alert('Could not delete ' + name + ': ' + err.message); });
+    });
+  }
+
   function selectSponsor(s) {
     setSelected(s);
     setAckForm({ date: new Date().toISOString().slice(0,10), method: '', notes: '' });
@@ -10569,7 +10616,7 @@ function SponsorsView() {
                   : null}
                 <div style={{ width: 40, height: 40, borderRadius: 6, background: '#f0ece6', display: s.logo_url ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, color: gold, flexShrink: 0 }}>{(s['Business Name'] || '?')[0]}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s['Business Name']}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#2a2a2a', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s['Business Name']}{sponsorDuplicates(s).length > 0 && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#b26a00', background: '#fff4e5', border: '0.5px solid #f0d2a8', borderRadius: 10, padding: '1px 7px', verticalAlign: 'middle' }}>Duplicate</span>}</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                     {s['Main Contact'] && <span style={{ fontSize: 12, color: '#666' }}>{s['Main Contact']}</span>}
                     {s['Area Supported'] && <span style={{ fontSize: 12, color: '#aaa' }}>{s['Area Supported']}</span>}
@@ -10611,9 +10658,15 @@ function SponsorsView() {
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <button onClick={function() { setEditSponsorForm({ 'Business Name': selected['Business Name'] || '', 'Main Contact': selected['Main Contact'] || '', 'Area Supported': selected['Area Supported'] || '', 'NSH Contact': selected['NSH Contact'] || '', 'Phone Number': selected['Phone Number'] || '', 'Email Address': selected['Email Address'] || '', 'Mailing Address': selected['Mailing Address'] || '', 'Date Recieved': selected['Date Recieved'] || '', 'website': selected['website'] || '', 'overview': selected['overview'] || '', 'Notes': selected['Notes'] || '' }); setEditing(true); }} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#888', cursor: 'pointer' }}>Edit</button>
+                <button onClick={function() { deleteSponsor(selected); }} title="Delete this sponsor listing" style={{ background: 'none', border: '0.5px solid #f0cfcf', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#c0392b', cursor: 'pointer' }}>Delete</button>
                 <button onClick={function() { setSelected(null); setEditing(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb', lineHeight: 1 }}>×</button>
               </div>
             </div>
+            {sponsorDuplicates(selected).length > 0 && (
+              <div style={{ background: '#fff4e5', border: '0.5px solid #f0d2a8', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#8a5a12', marginBottom: 14 }}>
+                There {sponsorDuplicates(selected).length === 1 ? 'is another listing' : 'are ' + sponsorDuplicates(selected).length + ' other listings'} named {selected['Business Name']}. Delete the extra one; its in-kind entries and acknowledgments move to the one that stays.
+              </div>
+            )}
             {editing && (
               <div style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 16, border: '0.5px solid #e8e0d5' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a', marginBottom: 12 }}>Edit Sponsor</div>
