@@ -33,6 +33,20 @@ function estateTourCategory(tour: { category?: string | null; inquiry_form_id?: 
 // Public, no-login Client Guidebook, published from the venue-portal repo at venue.northstarhouse.org.
 const GUIDEBOOK_URL = 'https://venue.northstarhouse.org/guidebook/';
 const AVAILABILITY_CALENDAR_URL = 'https://northstarhouse.github.io/venue/?availability=1';
+// The after-tour email (toured_docs) includes the Client Guidebook for weddings only: a line with the link above the
+// pre-booking form, and a "View Guidebook" button next to the form button. Other event types get the template as is.
+function touredDocsFor(tpl: { subject: string; body: string; html_body: string }, eventType?: string | null) {
+  if (eventType !== 'Wedding') return tpl;
+  const formLine = "If you'd like to move forward with booking, please complete our pre-booking form";
+  const body = tpl.body.includes(formLine)
+    ? tpl.body.replace(formLine, 'Here is our Client Guidebook, which your Venue Coordinator reviewed with you: {{guidebook_link}}\n\n' + formLine)
+    : tpl.body + '\n\nClient Guidebook: {{guidebook_link}}';
+  let html = tpl.html_body || '';
+  html = html.replace(formLine + '.', "Here is our Client Guidebook, which your Venue Coordinator reviewed with you, along with our pre-booking form if you'd like to move forward with booking.");
+  html = html.replace('<td style="padding:0 0 0 8px;"><a href="{{prebooking_link}}"',
+    '<td style="padding:0 8px 0 0;"><a href="{{guidebook_link}}" style="display:inline-block;background:#886c44;color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;">View Guidebook</a></td>\n    <td style="padding:0 0 0 8px;"><a href="{{prebooking_link}}"');
+  return { ...tpl, body, html_body: html };
+}
 // Clients' event page (payments, insurance, questionnaire, brick wording), unlocked by their venue code.
 const CLIENT_PAGE_URL = 'https://venue.northstarhouse.org/';
 // Venue code = wedding date written like DEC-28-2026.
@@ -369,7 +383,7 @@ Deno.serve(async (req) => {
         if (inq?.email) {
           const hostName = tour.venue_tour_hosts?.name || '';
           const prebookingLink = prebookingFormUrlFor(inq.event_type);
-          await sendTemplated(templates.toured_docs, inq.email,
+          await sendTemplated(touredDocsFor(templates.toured_docs, inq.event_type), inq.email,
             { name: inq.name, host_name: hostName, guidebook_link: GUIDEBOOK_URL, prebooking_link: prebookingLink, availability_calendar_link: AVAILABILITY_CALENDAR_URL },
             { name: escapeHtml(inq.name), host_name: escapeHtml(hostName), guidebook_link: GUIDEBOOK_URL, prebooking_link: prebookingLink, availability_calendar_link: AVAILABILITY_CALENDAR_URL });
         }
@@ -392,7 +406,7 @@ Deno.serve(async (req) => {
         if (tour.visitor_email) {
           const category = estateTourCategory(tour);
           const prebookingLink = prebookingFormUrlFor(category);
-          await sendTemplated(templates.toured_docs, tour.visitor_email,
+          await sendTemplated(touredDocsFor(templates.toured_docs, category), tour.visitor_email,
             { name: tour.visitor_name || 'there', host_name: tour.guide_name || '', guidebook_link: GUIDEBOOK_URL, prebooking_link: prebookingLink, availability_calendar_link: AVAILABILITY_CALENDAR_URL },
             { name: escapeHtml(tour.visitor_name || 'there'), host_name: escapeHtml(tour.guide_name || ''), guidebook_link: GUIDEBOOK_URL, prebooking_link: prebookingLink, availability_calendar_link: AVAILABILITY_CALENDAR_URL });
         }
