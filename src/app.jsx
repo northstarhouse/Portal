@@ -2900,6 +2900,7 @@ function normalizeTeamLabel(text) {
   var raw = String(text || '').trim();
   if (!raw) return '';
   var lower = raw.toLowerCase();
+  if (lower === 'restoration') return 'Construction'; // Restoration = Construction team (kiosk area)
   var exact = TEAM_OPTIONS.find(function(t) { return t.toLowerCase() === lower; });
   if (exact) return exact;
   var partial = TEAM_OPTIONS.find(function(t) { return lower.indexOf(t.toLowerCase()) !== -1 || t.toLowerCase().indexOf(lower) !== -1; });
