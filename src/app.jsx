@@ -12662,7 +12662,7 @@ function OfficeCashFlowView({ navigate }) {
         <div style={{ fontSize: 13, color: '#888' }}>Office earnings (Creative Rentals) and cash log — the day-to-day office cash flow ledger.</div>
         <button onClick={function() { navigate('financial-overview'); }} style={{ background: gold, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#fff', cursor: 'pointer', flexShrink: 0 }}>View All Financials</button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, alignItems: 'start' }}>
         <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
           <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fdfcfb' }}>
             <div>
@@ -12786,6 +12786,33 @@ function OfficeCashFlowView({ navigate }) {
                   </div>
                 );
               })}
+            </div>
+          );
+        })()}
+
+        {/* Cash in the box: cash earnings + cash log in - cash log out (earnings were logged under Earnings through
+            August 2026 and as Cash Log "In" entries from September on, so both count). */}
+        {(function() {
+          var num = function(x) { return parseFloat(x) || 0; };
+          var earnCash = rentals.filter(function(r) { return !r.payment_type || r.payment_type === 'Cash'; }).reduce(function(s, r) { return s + num(r.amount); }, 0);
+          var logIn = cashLog.filter(function(c) { return c.direction === 'In'; }).reduce(function(s, c) { return s + num(c.amount); }, 0);
+          var logOut = cashLog.filter(function(c) { return c.direction === 'Out'; }).reduce(function(s, c) { return s + num(c.amount); }, 0);
+          var total = earnCash + logIn - logOut;
+          var loading = rentalsLoading || cashLoading;
+          var row = function(label, value, color) { return <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, padding: '6px 0', borderTop: '0.5px solid #f3eee6' }}><span style={{ color: '#888' }}>{label}</span><span style={{ fontWeight: 600, color: color }}>{value}</span></div>; };
+          return (
+            <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Cash in the Box</div>
+                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>What should be in the office cash box now</div>
+              </div>
+              <div style={{ padding: '16px 18px' }}>
+                <div style={{ fontSize: 30, fontWeight: 700, color: loading ? '#ccc' : total < 0 ? '#c0392b' : gold, fontFamily: "'Cardo', serif", lineHeight: 1.1, marginBottom: 12 }}>{loading ? '…' : fmt(total)}</div>
+                {!loading && row('Cash earnings', '+ ' + fmt(earnCash), '#059669')}
+                {!loading && row('Cash log in', '+ ' + fmt(logIn), '#059669')}
+                {!loading && row('Cash log out', '− ' + fmt(logOut), '#c0392b')}
+                {!loading && total < 0 && <div style={{ fontSize: 11, color: '#c0392b', marginTop: 8 }}>Below zero: an entry may be missing or logged twice.</div>}
+              </div>
             </div>
           );
         })()}
