@@ -12794,9 +12794,12 @@ function OfficeCashFlowView({ navigate }) {
             August 2026 and as Cash Log "In" entries from September on, so both count). */}
         {(function() {
           var num = function(x) { return parseFloat(x) || 0; };
-          var earnCash = rentals.filter(function(r) { return !r.payment_type || r.payment_type === 'Cash'; }).reduce(function(s, r) { return s + num(r.amount); }, 0);
-          var logIn = cashLog.filter(function(c) { return c.direction === 'In'; }).reduce(function(s, c) { return s + num(c.amount); }, 0);
-          var logOut = cashLog.filter(function(c) { return c.direction === 'Out'; }).reduce(function(s, c) { return s + num(c.amount); }, 0);
+          // 2026 only (matches the Financials page totals).
+          var BOX_YEAR = '2026';
+          var inYear = function(d) { return String(d || '').slice(0, 4) === BOX_YEAR; };
+          var earnCash = rentals.filter(function(r) { return inYear(r.date) && (!r.payment_type || r.payment_type === 'Cash'); }).reduce(function(s, r) { return s + num(r.amount); }, 0);
+          var logIn = cashLog.filter(function(c) { return inYear(c.date) && c.direction === 'In'; }).reduce(function(s, c) { return s + num(c.amount); }, 0);
+          var logOut = cashLog.filter(function(c) { return inYear(c.date) && c.direction === 'Out'; }).reduce(function(s, c) { return s + num(c.amount); }, 0);
           var total = earnCash + logIn - logOut;
           var loading = rentalsLoading || cashLoading;
           var row = function(label, value, color) { return <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, padding: '6px 0', borderTop: '0.5px solid #f3eee6' }}><span style={{ color: '#888' }}>{label}</span><span style={{ fontWeight: 600, color: color }}>{value}</span></div>; };
@@ -12804,7 +12807,7 @@ function OfficeCashFlowView({ navigate }) {
             <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
               <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Cash in the Box</div>
-                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>What should be in the office cash box now</div>
+                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>What should be in the office cash box now · 2026</div>
               </div>
               <div style={{ padding: '16px 18px' }}>
                 <div style={{ fontSize: 30, fontWeight: 700, color: loading ? '#ccc' : total < 0 ? '#c0392b' : gold, fontFamily: "'Cardo', serif", lineHeight: 1.1, marginBottom: 12 }}>{loading ? '…' : fmt(total)}</div>
