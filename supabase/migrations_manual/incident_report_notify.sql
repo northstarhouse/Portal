@@ -1,5 +1,5 @@
 -- Incident Report form: every new submission is emailed (branded, with every question and answer, grouped by section)
--- to the board members (board_members table), media@ and info@. The questions are read from the form itself, so edits
+-- to media@ and info@. The questions are read from the form itself, so edits
 -- to the form in Form Builder show up in the email automatically.
 -- Apply one statement at a time.
 
@@ -63,12 +63,7 @@ begin
   who := coalesce(nullif(trim(new.answers->>'ir_name'), ''), 'Someone');
   when_txt := coalesce(nullif(new.answers->>'ir_date', ''), 'an unknown date');
 
-  select array_agg(distinct lower(trim(email))) into recipients
-  from (
-    select email from board_members where email is not null and trim(email) <> ''
-    union all select 'media@thenorthstarhouse.org'
-    union all select 'info@thenorthstarhouse.org'
-  ) r;
+  recipients := array['media@thenorthstarhouse.org', 'info@thenorthstarhouse.org'];
 
   text_body := 'New Incident Report' || E'\n\n' || who || ' reported an incident on ' || when_txt || '.' || text_body
     || E'\n\nView all responses in the Portal: https://northstarhouse.github.io/Portal/#form-responses';
