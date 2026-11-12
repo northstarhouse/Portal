@@ -12577,6 +12577,91 @@ function TreasuryReportsView() {
   );
 }
 
+// Box counts (office_cash_counts): what was actually in the cash box on a day, kept apart from the Cash Log so a count never
+// changes the ledger. Shows the latest count against the expected total, the history, and a form to record a new count.
+function OfficeCashCounts({ expected, fmt }) {
+  var [counts, setCounts] = useState(null);
+  var [showForm, setShowForm] = useState(false);
+  var [showAll, setShowAll] = useState(false);
+  var [form, setForm] = useState({ count_date: new Date().toISOString().slice(0, 10), counted: '', note: '' });
+  var [busy, setBusy] = useState(false);
+  var [err, setErr] = useState('');
+  var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' };
+  function load() {
+    fetch(SUPABASE_URL + '/rest/v1/office_cash_counts?select=*&order=count_date.desc,created_at.desc', { headers: H })
+      .then(function(r) { return r.ok ? r.json() : []; }).then(function(rows) { setCounts(Array.isArray(rows) ? rows : []); }).catch(function() { setCounts([]); });
+  }
+  useEffect(load, []);
+  function save(e) {
+    e.preventDefault();
+    var amt = parseFloat(form.counted);
+    if (isNaN(amt) || !form.count_date) { setErr('Enter the date and the amount counted.'); return; }
+    setBusy(true); setErr('');
+    whoIsSignedIn().then(function(name) {
+      return fetch(SUPABASE_URL + '/rest/v1/office_cash_counts', { method: 'POST', headers: H, body: JSON.stringify({ count_date: form.count_date, counted: amt, expected: expected, note: form.note.trim() || null, counted_by: name || null }) });
+    }).then(function(r) { if (!r.ok) throw new Error('Could not save the count.'); setShowForm(false); setForm({ count_date: new Date().toISOString().slice(0, 10), counted: '', note: '' }); load(); })
+      .catch(function(x) { setErr(x.message); }).finally(function() { setBusy(false); });
+  }
+  function del(c) {
+    if (!window.confirm('Delete the ' + c.count_date + ' count of ' + fmt(parseFloat(c.counted) || 0) + '?')) return;
+    fetch(SUPABASE_URL + '/rest/v1/office_cash_counts?id=eq.' + c.id, { method: 'DELETE', headers: H }).then(function(r) { if (r.ok) load(); });
+  }
+  var day = function(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''; };
+  var diffLine = function(c) {
+    if (c.expected === null || c.expected === undefined) return null;
+    var d = Math.round(((parseFloat(c.counted) || 0) - (parseFloat(c.expected) || 0)) * 100) / 100;
+    if (d === 0) return <span style={{ color: '#059669', fontWeight: 600 }}>Matches</span>;
+    return <span style={{ color: d < 0 ? '#c0392b' : '#b26a00', fontWeight: 600 }}>{fmt(Math.abs(d))} {d < 0 ? 'short' : 'over'}</span>;
+  };
+  var inp = { width: '100%', padding: '6px 8px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 12, boxSizing: 'border-box', fontFamily: 'inherit' };
+  var latest = counts && counts[0];
+  return (
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #ece4d8' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: '#888' }}>Box Count</div>
+        <button type="button" onClick={function() { setShowForm(!showForm); setErr(''); }} style={{ background: 'none', border: 'none', color: gold, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>{showForm ? 'Cancel' : '+ Record a count'}</button>
+      </div>
+      {counts === null && <div style={{ fontSize: 12, color: '#ccc' }}>Loading…</div>}
+      {counts && !counts.length && !showForm && <div style={{ fontSize: 12, color: '#aaa' }}>No counts recorded yet.</div>}
+      {latest && (
+        <div style={{ background: '#faf6ef', borderLeft: '3px solid ' + gold, borderRadius: 6, padding: '8px 12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif" }}>{fmt(parseFloat(latest.counted) || 0)}</span>
+            <span style={{ fontSize: 12 }}>{diffLine(latest)}</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>Counted {day(latest.count_date)}{latest.counted_by ? ' by ' + latest.counted_by : ''}{latest.expected !== null && latest.expected !== undefined ? ' · expected ' + fmt(parseFloat(latest.expected) || 0) : ''}</div>
+          {latest.note && <div style={{ fontSize: 12, color: '#6b5d4a', marginTop: 4, whiteSpace: 'pre-wrap' }}>{latest.note}</div>}
+        </div>
+      )}
+      {counts && counts.length > 1 && (
+        <div style={{ marginTop: 6 }}>
+          <button type="button" onClick={function() { setShowAll(!showAll); }} style={{ background: 'none', border: 'none', color: '#b5a185', fontSize: 12, cursor: 'pointer', padding: 0 }}>{showAll ? 'Hide earlier counts' : 'Earlier counts (' + (counts.length - 1) + ')'}</button>
+          {showAll && counts.slice(1).map(function(c) {
+            return <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, padding: '5px 0', borderTop: '0.5px solid #f3eee6' }}>
+              <span style={{ color: '#888' }}>{day(c.count_date)}</span><span style={{ fontWeight: 600 }}>{fmt(parseFloat(c.counted) || 0)}</span><span>{diffLine(c)}</span>
+              <a onClick={function() { del(c); }} style={{ color: '#c0392b', cursor: 'pointer', fontSize: 11 }}>Delete</a>
+            </div>;
+          })}
+        </div>
+      )}
+      {showForm && (
+        <form onSubmit={save} style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input type="date" value={form.count_date} onChange={function(e) { setForm(Object.assign({}, form, { count_date: e.target.value })); }} style={inp} />
+            <input type="number" step="0.01" min="0" placeholder="Amount counted" value={form.counted} onChange={function(e) { setForm(Object.assign({}, form, { counted: e.target.value })); }} style={inp} />
+          </div>
+          <input placeholder="Note (optional)" value={form.note} onChange={function(e) { setForm(Object.assign({}, form, { note: e.target.value })); }} style={inp} />
+          <div style={{ fontSize: 11, color: '#999' }}>Saved with today's expected total of {fmt(expected)}.</div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button type="submit" disabled={busy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{busy ? 'Saving…' : 'Save count'}</button>
+            {err && <span style={{ fontSize: 12, color: '#c0392b' }}>{err}</span>}
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function OfficeCashFlowView({ navigate }) {
   var { useState, useEffect } = React;
 
@@ -12815,6 +12900,7 @@ function OfficeCashFlowView({ navigate }) {
                 {!loading && row('Cash log in', '+ ' + fmt(logIn), '#059669')}
                 {!loading && row('Cash log out', '− ' + fmt(logOut), '#c0392b')}
                 {!loading && total < 0 && <div style={{ fontSize: 11, color: '#c0392b', marginTop: 8 }}>Below zero: an entry may be missing or logged twice.</div>}
+                {!loading && <OfficeCashCounts expected={Math.round(total * 100) / 100} fmt={fmt} />}
               </div>
             </div>
           );
