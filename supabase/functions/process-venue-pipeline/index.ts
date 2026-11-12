@@ -129,7 +129,7 @@ function renderShell(innerHtml: string) {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f3ec;padding:32px 16px;">
       <tr><td align="center">
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e8e0d5;">
-          <tr><td style="background:#2a2a2e;padding:24px;text-align:center;">
+          <tr><td bgcolor="#886c44" style="background-color:#886c44;background-image:linear-gradient(135deg,#a3845a 0%,#886c44 55%,#6f5534 100%);padding:24px;text-align:center;border-bottom:3px solid #c9ad7a;">
             <img src="${LOGO_URL}" alt="North Star House" width="180" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
           </td></tr>
           <tr><td style="padding:32px 36px;font-family:Helvetica,Arial,sans-serif;">
