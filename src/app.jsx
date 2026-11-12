@@ -12456,7 +12456,12 @@ function FinancialOverviewView({ navigate }) {
           </div>
 
           {(function() {
-            var yearCashRows = cashLog.filter(function(c) { return inYear(c.date); }).sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+            // Office cash in and out together: money in is logged under Earnings (Creative Rentals), money out in the Cash Log.
+            var yearCashRows = cashLog.filter(function(c) { return inYear(c.date); })
+              .concat(rentals.filter(function(r) { return inYear(r.date); }).map(function(r) { return { date: r.date, direction: 'In', description: r.name, amount: r.amount }; }))
+              .sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+            var yearIn = yearCashRows.filter(function(c) { return c.direction === 'In'; }).reduce(function(s, c) { return s + (parseFloat(c.amount) || 0); }, 0);
+            var yearOut = yearCashRows.filter(function(c) { return c.direction === 'Out'; }).reduce(function(s, c) { return s + (parseFloat(c.amount) || 0); }, 0);
             var newRows = reconciledAt ? yearCashRows.filter(function(c) { return isSinceReconciliation(c.date); }) : [];
             function cashLogRow(c, i, total) {
               var isIn = c.direction === 'In';
@@ -12481,7 +12486,14 @@ function FinancialOverviewView({ navigate }) {
                   </div>
                 )}
                 <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
-                  <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>Cash Log — {year} (everything)</div>
+                  <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                    <span>Cash Log — {year} (everything, in &amp; out)</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, display: 'flex', gap: 12 }}>
+                      <span style={{ color: '#2e7d32' }}>In {money(yearIn)}</span>
+                      <span style={{ color: '#c07040' }}>Out {money(yearOut)}</span>
+                      <span style={{ color: '#888' }}>Net {money(yearIn - yearOut)}</span>
+                    </span>
+                  </div>
                   {yearCashRows.length === 0 ? (
                     <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>No cash log entries for {year}.</div>
                   ) : yearCashRows.map(function(c, i) { return cashLogRow(c, i, yearCashRows.length); })}
