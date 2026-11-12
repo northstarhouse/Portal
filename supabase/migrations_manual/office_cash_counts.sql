@@ -18,4 +18,4 @@ create policy "portal session all office_cash_counts" on public.office_cash_coun
 
 grant select, insert, update, delete on public.office_cash_counts to anon;
 
-insert into public.office_cash_counts (count_date, counted, expected, note, counted_by) values ('2026-11-12', 634.41, 745.44, 'Box count; expected per Cash in the Box (2026)', 'Haley Wright');
+insert into public.office_cash_counts (count_date, counted, expected, note, counted_by) values ('2026-11-12', 634.41, 745.44, 'Box count. Expected per Cash in the Box (2026).', 'Haley Wright');
