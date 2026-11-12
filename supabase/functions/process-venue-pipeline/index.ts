@@ -34,17 +34,25 @@ function estateTourCategory(tour: { category?: string | null; inquiry_form_id?: 
 const GUIDEBOOK_URL = 'https://venue.northstarhouse.org/guidebook/';
 const AVAILABILITY_CALENDAR_URL = 'https://northstarhouse.github.io/venue/?availability=1';
 // The after-tour email (toured_docs) includes the Client Guidebook for weddings only: a line with the link above the
-// pre-booking form, and a "View Guidebook" button next to the form button. Other event types get the template as is.
+// pre-booking form, and a "View Guidebook" button next to the form button. Other event types get just the form button.
 function touredDocsFor(tpl: { subject: string; body: string; html_body: string }, eventType?: string | null) {
-  if (eventType !== 'Wedding') return tpl;
+  const wedding = eventType === 'Wedding';
   const formLine = "If you'd like to move forward with booking, please complete our pre-booking form";
-  const body = tpl.body.includes(formLine)
+  const body = !wedding ? tpl.body : tpl.body.includes(formLine)
     ? tpl.body.replace(formLine, 'Here is our Client Guidebook, which your Venue Coordinator reviewed with you: {{guidebook_link}}\n\n' + formLine)
     : tpl.body + '\n\nClient Guidebook: {{guidebook_link}}';
   let html = tpl.html_body || '';
-  html = html.replace(formLine + '.', "Here is our Client Guidebook, which your Venue Coordinator reviewed with you, along with our pre-booking form if you'd like to move forward with booking.");
-  html = html.replace('<td style="padding:0 0 0 8px;"><a href="{{prebooking_link}}"',
-    '<td style="padding:0 8px 0 0;"><a href="{{guidebook_link}}" style="display:inline-block;background:#886c44;color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;">View Guidebook</a></td>\n    <td style="padding:0 0 0 8px;"><a href="{{prebooking_link}}"');
+  if (wedding) html = html.replace(formLine + '.', "Here is our Client Guidebook, which your Venue Coordinator reviewed with you, along with our pre-booking form if you'd like to move forward with booking.");
+  // The button row spans the full width of the email: two half-width buttons for weddings, one full-width otherwise.
+  const btn = 'display:block;text-align:center;text-decoration:none;font-size:15px;font-weight:600;padding:14px 12px;border-radius:8px;';
+  const guideBtn = `<td width="50%" style="padding:0 6px 0 0;"><a href="{{guidebook_link}}" style="${btn}background:#886c44;color:#ffffff;border:1.5px solid #886c44;">View Guidebook</a></td>`;
+  const formBtn = `<td width="${wedding ? '50%' : '100%'}" style="padding:0 0 0 ${wedding ? '6px' : '0'};"><a href="{{prebooking_link}}" style="${btn}background:${wedding ? 'transparent' : '#886c44'};color:${wedding ? '#886c44' : '#ffffff'};border:1.5px solid #886c44;">Pre-Booking Form</a></td>`;
+  const row = /<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 20px;">[\s\S]*?Pre-Booking Form<\/a><\/td>\s*<\/tr>\s*<\/table>/;
+  if (row.test(html)) {
+    html = html.replace(row, `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;"><tr>${wedding ? guideBtn : ''}${formBtn}</tr></table>`);
+  } else if (wedding) {
+    html = html.replace('<td style="padding:0 0 0 8px;"><a href="{{prebooking_link}}"', guideBtn + '\n    <td style="padding:0 0 0 8px;"><a href="{{prebooking_link}}"');
+  }
   return { ...tpl, body, html_body: html };
 }
 // Clients' event page (payments, insurance, questionnaire, brick wording), unlocked by their venue code.
