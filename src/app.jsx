@@ -22472,6 +22472,58 @@ function FeatureRequestModal({ onClose }) {
   );
 }
 
+// Internal notes on one preferred vendor (venue_vendor_notes, staff only; the database stamps who wrote/edited each).
+function VendorNotes({ vendor, notes, onChange }) {
+  var list = (notes && notes[vendor.id]) || [];
+  var [editing, setEditing] = useState(null); // note id, or 'new'
+  var [draft, setDraft] = useState('');
+  var [busy, setBusy] = useState(false);
+  var [err, setErr] = useState('');
+  var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' };
+  function start(n) { setEditing(n ? n.id : 'new'); setDraft(n ? n.body : ''); setErr(''); }
+  function save() {
+    var text = draft.trim();
+    if (!text) { setErr('Write a note first.'); return; }
+    setBusy(true); setErr('');
+    var req = editing === 'new'
+      ? fetch(SUPABASE_URL + '/rest/v1/venue_vendor_notes', { method: 'POST', headers: H, body: JSON.stringify({ vendor_id: vendor.id, body: text }) })
+      : fetch(SUPABASE_URL + '/rest/v1/venue_vendor_notes?id=eq.' + editing, { method: 'PATCH', headers: H, body: JSON.stringify({ body: text }) });
+    req.then(function(r) { return r.json().catch(function() { return null; }).then(function(j) { return { ok: r.ok, j: j }; }); })
+      .then(function(res) {
+        if (!res.ok || !Array.isArray(res.j) || !res.j.length) throw new Error('Could not save the note. Try signing out and back in.');
+        setEditing(null); setDraft(''); onChange();
+      })
+      .catch(function(e) { setErr(e.message); })
+      .finally(function() { setBusy(false); });
+  }
+  function del(n) {
+    if (!window.confirm('Delete this note about ' + vendor.name + '?')) return;
+    fetch(SUPABASE_URL + '/rest/v1/venue_vendor_notes?id=eq.' + n.id, { method: 'DELETE', headers: H })
+      .then(function(r) { if (r.ok) onChange(); else setErr('Could not delete the note.'); });
+  }
+  var box = { width: '100%', boxSizing: 'border-box', padding: '7px 9px', border: '0.5px solid #e0d8cc', borderRadius: 6, fontSize: 13, fontFamily: 'inherit', resize: 'vertical' };
+  var editor = (
+    <div style={{ marginTop: 6 }}>
+      <textarea autoFocus rows={3} value={draft} onChange={function(e) { setDraft(e.target.value); }} placeholder={'Internal note about ' + vendor.name + ' (staff only, not in the client guides)'} style={box} />
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 4 }}>
+        <button type="button" disabled={busy} onClick={save} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{busy ? 'Saving…' : 'Save note'}</button>
+        <button type="button" onClick={function() { setEditing(null); setErr(''); }} style={{ background: 'none', border: 'none', color: '#999', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+        {err && <span style={{ fontSize: 12, color: '#b3402a' }}>{err}</span>}
+      </div>
+    </div>
+  );
+  return (
+    <div>
+      {list.map(function(n) {
+        if (editing === n.id) return <div key={n.id}>{editor}</div>;
+        return <NoteCard key={n.id} body={n.body} author={n.created_by} at={n.created_at} edited={n.updated_at ? 'edited' + (n.updated_by ? ' by ' + n.updated_by : '') : ''} onEdit={function() { start(n); }} onDelete={function() { del(n); }} />;
+      })}
+      {editing === 'new' ? editor : <button type="button" style={addNoteLink} onClick={function() { start(null); }}>+ Internal note</button>}
+      {err && editing === null && <div style={{ fontSize: 12, color: '#b3402a' }}>{err}</div>}
+    </div>
+  );
+}
+
 // Tools > "Add a vendor recommendation": the vendor list in every client guide (venue.northstarhouse.org/guidebook) comes from the
 // venue_vendors table, so a vendor added here appears in the guides right away. Removing one hides it from the guides.
 function VendorToolModal({ onClose }) {
@@ -22486,6 +22538,15 @@ function VendorToolModal({ onClose }) {
       .then(function(r) { return r.ok ? r.json() : []; }).then(function(rows) { setVendors(Array.isArray(rows) ? rows : []); }).catch(function() { setVendors([]); });
   }
   useEffect(load, []);
+  // Internal notes (staff only, never in the client guides), keyed by vendor id.
+  var [vendorNotes, setVendorNotes] = useState({});
+  function loadNotes() {
+    fetch(SUPABASE_URL + '/rest/v1/venue_vendor_notes?select=*&order=created_at.asc&limit=5000', { headers: H })
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(rows) { var m = {}; (Array.isArray(rows) ? rows : []).forEach(function(n) { (m[n.vendor_id] = m[n.vendor_id] || []).push(n); }); setVendorNotes(m); })
+      .catch(function() {});
+  }
+  useEffect(loadNotes, []);
   function set(k, v) { setF(function(o) { var n = Object.assign({}, o); n[k] = v; return n; }); }
   var categories = [];
   (vendors || []).forEach(function(v) { if (categories.indexOf(v.category) === -1) categories.push(v.category); });
@@ -22560,9 +22621,12 @@ function VendorToolModal({ onClose }) {
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#2a2a2a', marginBottom: 2 }}>{c}</div>
                 {vendors.filter(function(v) { return v.category === c; }).map(function(v) {
                   return (
-                    <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, color: '#555', padding: '3px 0', borderTop: '0.5px solid #f3eee6' }}>
-                      <span>{v.name}</span>
-                      <a onClick={function() { remove(v); }} style={{ cursor: 'pointer', color: '#c0392b', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>Remove</a>
+                    <div key={v.id} style={{ fontSize: 12, color: '#555', padding: '4px 0', borderTop: '0.5px solid #f3eee6' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                        <span>{v.name}</span>
+                        <a onClick={function() { remove(v); }} style={{ cursor: 'pointer', color: '#c0392b', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>Remove</a>
+                      </div>
+                      <VendorNotes vendor={v} notes={vendorNotes} onChange={loadNotes} />
                     </div>
                   );
                 })}
