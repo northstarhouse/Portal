@@ -16283,13 +16283,14 @@ function PersonActivityView() {
       get('venue_messages?select=id,subject,event_title,created_at,body&direction=eq.outgoing&from_name=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
         rows.forEach(function(m) { add('messages', m.created_at, 'Replied: ' + (m.subject || m.event_title || 'a client message'), String(m.body || '').slice(0, 160)); });
       }),
-      // Only what the person actually did: tours they guided, on the day they guided them. Not when a visitor booked a
-      // tour, cancelled, or didn't show up (things outside their control), and not tours still to come.
-      get('estate_tours?select=id,date,start_time,visitor_name,category,status,created_at&guide_name=ilike.' + like + '&status=eq.booked&order=date.desc&limit=2000').then(function(rows) {
+      // What happened on the day of each of their tours: guided it, it was cancelled, or the visitor didn't show. Shown on
+      // the tour's own date and time, once that has passed. When a visitor booked the tour is not shown.
+      get('estate_tours?select=id,date,start_time,visitor_name,category,status,created_at&guide_name=ilike.' + like + '&status=in.(booked,cancelled,no_show)&order=date.desc&limit=2000').then(function(rows) {
         var now = new Date();
         rows.forEach(function(t) {
           if (!(t.date && new Date(tourWhen(t)) < now)) return;
-          add('tours', tourWhen(t), 'Guided a tour: ' + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''));
+          var label = t.status === 'cancelled' ? 'Cancelled tour: ' : t.status === 'no_show' ? 'No-show: ' : 'Guided a tour: ';
+          add('tours', tourWhen(t), label + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''));
         });
       }),
       get('estate_tours?select=id,visitor_name,category,made_contact_at,created_at,request_status&request_handled_by=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
