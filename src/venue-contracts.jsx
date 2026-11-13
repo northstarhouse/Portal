@@ -74,7 +74,9 @@ export function prepareAgreementDraft(client,extras={}){
   const schedRental=schedule.filter(p=>!p.deposit&&!/security deposit/i.test(p.label||'')).reduce((s,p)=>s+(p.cents||0),0);
   const schedDeposit=schedule.filter(p=>p.deposit||/security deposit/i.test(p.label||'')).reduce((s,p)=>s+(p.cents||0),0);
   const rentalCents=schedRental||extras.rentalCents||0;
-  const depositCents=schedDeposit||extras.depositCents||0;
+  // No deposit on file: use the refundable amount the contract terms themselves state ("Security Deposit (refundable $800.00)").
+  const termsDeposit=(()=>{const m=String(agreementTerms||'').match(/Security Deposit \(refundable \$([\d,]+(?:\.\d{2})?)\)/i);return m?Math.round(parseFloat(m[1].replace(/,/g,''))*100):0;})();
+  const depositCents=schedDeposit||extras.depositCents||termsDeposit||0;
   const lines=[
     'North Star House — Venue Rental Agreement',
     'Agreement between North Star Historic Conservancy (NSHC) and Client (Renter)',
@@ -84,7 +86,7 @@ export function prepareAgreementDraft(client,extras={}){
     ...(people.length?people.map(c=>c.name+' — '+(c.email||'[EMAIL TO COMPLETE]')):[client.name+' — [EMAIL TO COMPLETE]']),
     'Max Estimated Guest Count: '+guests,
     'Rental Fee: '+(rentalCents?money(rentalCents,client.currency||'USD'):'[TO COMPLETE]'),
-    ...(depositCents?['Refundable Security Deposit: '+money(depositCents,client.currency||'USD')]:[]),
+    'Refundable Security Deposit: '+(depositCents?money(depositCents,client.currency||'USD'):'[TO COMPLETE]'),
     ...(client.total!==null&&client.total!==undefined?['Venue rental invoice total, including any security deposit: '+money(client.total,client.currency)]:[]),
     ...(schedule.length?['Payment schedule:',...schedule.map((p,i)=>'- '+p.label+': '+money(p.cents,p.currency)+' due '+(i===0?'when both clients have signed this agreement':p.due?writtenDate(p.due):'[TO COMPLETE]')+(p.paid?' (already paid)':''))]:[]),
     '',
