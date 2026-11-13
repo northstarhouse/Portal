@@ -3,6 +3,7 @@
 // Data: venue_follows (each follow is stamped with whoever is signed in) and the venue_follow_progress() database
 // function, which ties the couple's tour, inquiry, pre-booking form, agreement and payments together by email.
 // See supabase/migrations_manual/venue_follows.sql.
+import { ClientNotes } from './client-notes.jsx';
 const VF_URL = 'https://uvzwhhwzelaelfhfkvdb.supabase.co', VF_KEY = 'sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do';
 const vfApi = (path, init = {}) => fetch(VF_URL + '/rest/v1/' + path, { ...init, headers: { apikey: VF_KEY, Authorization: 'Bearer ' + VF_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation', ...(init.headers || {}) } })
   .then(async r => { const t = await r.text(); const d = t ? JSON.parse(t) : null; if (!r.ok) throw new Error((d && (d.message || d.hint)) || 'Request failed'); return d; });
@@ -69,8 +70,6 @@ export function VenueFollowingView({ navigate }) {
   const [busy, setBusy] = React.useState('');
   const [query, setQuery] = React.useState('');
   const [manual, setManual] = React.useState({ name: '', email: '' });
-  const [noteEdit, setNoteEdit] = React.useState(null);
-  const [noteDraft, setNoteDraft] = React.useState('');
 
   function load() {
     vfApi('rpc/venue_follow_progress', { method: 'POST', body: '{}' }).then(d => setRows(Array.isArray(d) ? d : [])).catch(e => { setErr('Could not load: ' + e.message); setRows([]); });
@@ -100,10 +99,6 @@ export function VenueFollowingView({ navigate }) {
     if (!window.confirm('Stop following ' + (r.name || r.email) + '?')) return;
     try { await vfApi('venue_follows?id=eq.' + r.id, { method: 'DELETE' }); setRows(prev => prev.filter(x => x.id !== r.id)); }
     catch (e) { setErr('Could not unfollow: ' + e.message); }
-  }
-  async function saveNote(r) {
-    try { await vfApi('venue_follows?id=eq.' + r.id, { method: 'PATCH', body: JSON.stringify({ note: noteDraft.trim() || null }) }); setNoteEdit(null); load(); }
-    catch (e) { setErr('Could not save the note: ' + e.message); }
   }
 
   // Couples the signed-in person toured (or is about to): one click to follow.
@@ -150,16 +145,10 @@ export function VenueFollowingView({ navigate }) {
                 </div>
                 <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{r.email}{r.event_date ? ' · ' + (shortDate(r.event_date)) : ''}{scope === 'all' ? ' · followed by ' + r.follower : ''}</div>
               </div>
-              {noteEdit !== r.id && <button onClick={() => { setNoteEdit(r.id); setNoteDraft(r.note || ''); }} style={ghost}>{r.note ? 'Edit note' : 'Add note'}</button>}
               {r.follower === me && <button onClick={() => unfollow(r)} style={{ ...ghost, color: '#c0392b', borderColor: '#f0cfcf' }}>Unfollow</button>}
             </div>
             <Pipeline p={r} />
-            {noteEdit === r.id ? (
-              <div style={{ marginTop: 8 }}>
-                <textarea rows={2} value={noteDraft} onChange={e => setNoteDraft(e.target.value)} placeholder="Your note about this couple" style={{ ...input, resize: 'vertical' }} />
-                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}><button onClick={() => saveNote(r)} style={btn}>Save note</button><button onClick={() => setNoteEdit(null)} style={ghost}>Cancel</button></div>
-              </div>
-            ) : r.note ? <div style={{ marginTop: 8, background: '#faf6ef', borderLeft: '3px solid ' + GOLD, borderRadius: 6, padding: '7px 11px', fontSize: 13, color: GOLD, fontWeight: 700, whiteSpace: 'pre-wrap' }}>{r.note}</div> : null}
+            <div style={{ marginTop: 6 }}><ClientNotes emails={[r.email]} compact /></div>
           </div>
         );
       })}

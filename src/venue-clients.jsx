@@ -1,4 +1,5 @@
 import { ContractManager } from './venue-contracts.jsx';
+import { ClientNotes } from './client-notes.jsx';
 import { openSitePacket, openSamplePacket } from './site-packet.js';
 // Client dashboard: reads the imported source snapshot without changing signed
 // agreements, invoice schedules, or sending any client communications.
@@ -606,6 +607,10 @@ function ClientDetail({ client, onClose, onRename, onAssignSite, onSaveEventDay,
         <div className="vc-modal-section-title">BYLT special arrangement</div>
         <p className="vc-muted" style={{margin:0}}>This group has a different agreement and payment plan. Those aren't set up in the Portal yet, so prepare them separately rather than sending the standard agreement.</p>
       </div>}
+      <div className="vc-modal-section" style={{background:'#fdfaf4'}}>
+        <div className="vc-modal-section-title">Internal Notes <span className="vc-muted" style={{fontFamily:'system-ui',fontWeight:400,fontSize:11}}>Staff only · also shown on Following</span></div>
+        <ClientNotes emails={[client.email, ...(client.contacts || []).map(c => c.email)]} />
+      </div>
       <div className="vc-modal-section">
         <div className="vc-modal-section-title">Contacts</div>
         <div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div>{c.address && <div className="vc-muted">{c.address}</div>}</div>)}</div>
