@@ -2,6 +2,7 @@
 // policies & FAQs, Site Manager and Venue Coordinator references, and venue information, all searchable in one place.
 // Data: venue_resources (one row per entry) and venue_resource_history (written by a database trigger on every change,
 // with the signed-in person). See supabase/migrations_manual/venue_resources.sql.
+import { sampleKindFor, openTemplateSample, TemplateSampleModal } from './template-samples.jsx';
 const RV_URL = 'https://uvzwhhwzelaelfhfkvdb.supabase.co', RV_KEY = 'sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do';
 const GOLD = '#886c44';
 const H = { apikey: RV_KEY, Authorization: 'Bearer ' + RV_KEY, 'Content-Type': 'application/json' };
@@ -66,7 +67,7 @@ function CopyButton({ text, label, style }) {
 }
 
 // One entry (FAQ, reference, info, template): title, badges, the text, and its actions.
-function ResourceCard({ r, onEdit, onArchive, onReviewed, onNewVersion, open, onToggle, highlight }) {
+function ResourceCard({ r, onEdit, onArchive, onReviewed, onNewVersion, onSample, open, onToggle, highlight }) {
   const d = r.data || {};
   const isTemplate = r.kind === 'template';
   return (
@@ -94,6 +95,7 @@ function ResourceCard({ r, onEdit, onArchive, onReviewed, onNewVersion, open, on
                 <a href={previewUrl(d.url)} target="_blank" rel="noopener noreferrer" style={act}>Preview</a>
                 <a href={driveDownload(d.url)} target="_blank" rel="noopener noreferrer" style={act}>Download</a>
               </>}
+              {isTemplate && onSample && sampleKindFor(r) && <button type="button" style={{ ...act, fontWeight: 700 }} onClick={() => onSample(sampleKindFor(r))}>View sample</button>}
               {r.needs_review && onReviewed && <button type="button" style={act} onClick={onReviewed}>Mark reviewed</button>}
               {isTemplate && r.status !== 'archived' && onNewVersion && <button type="button" style={act} onClick={onNewVersion}>New version</button>}
               {onEdit && <button type="button" style={act} onClick={onEdit}>Edit</button>}
@@ -296,6 +298,7 @@ export function VenuePoliciesView() {
   const [openId, setOpenId] = React.useState(null);
   const [openPrice, setOpenPrice] = React.useState(null); // dashboard pricing row that is open
   const [editing, setEditing] = React.useState(null);
+  const [sample, setSample] = React.useState(null); // template sample shown in a modal
   const [showArchived, setShowArchived] = React.useState(false);
   const [err, setErr] = React.useState('');
   const [hf, setHf] = React.useState({ from: '', to: '', category: '', kind: '', person: '' });
@@ -340,7 +343,7 @@ export function VenuePoliciesView() {
   const needle = q.trim().toLowerCase();
   const results = needle ? live.filter(r => JSON.stringify([r.title, r.category, r.body, r.detail, r.data]).toLowerCase().includes(needle)) : [];
   const cardFor = (r) => <ResourceCard key={r.id} r={r} open={openId === r.id} highlight={openId === r.id} onToggle={() => setOpenId(openId === r.id ? null : r.id)}
-    onEdit={() => setEditing(r)} onArchive={() => archive(r)} onReviewed={() => reviewed(r)} onNewVersion={() => newVersion(r)} />;
+    onEdit={() => setEditing(r)} onArchive={() => archive(r)} onReviewed={() => reviewed(r)} onNewVersion={() => newVersion(r)} onSample={(k) => openTemplateSample(k, setSample)} />;
   const grouped = (kind) => {
     const list = live.filter(r => r.kind === kind);
     const cats = Array.from(new Set((CATEGORIES[kind] || []).filter(c => list.some(r => r.category === c)).concat(list.map(r => r.category || 'Other'))));
@@ -461,6 +464,7 @@ export function VenuePoliciesView() {
           {live.some(r => r.kind === TAB_KIND[tab]) ? grouped(TAB_KIND[tab]) : <div style={{ ...card, color: '#888', fontSize: 13 }}>Nothing here yet.</div>}
         </div>
       )}
+      {sample && <TemplateSampleModal kind={sample} onClose={() => setSample(null)} />}
       {editing && <EditModal entry={editing} onClose={() => setEditing(null)} onSaved={(r) => { setEditing(null); if (r) setOpenId(r.id); load(); }} />}
     </div>
   );

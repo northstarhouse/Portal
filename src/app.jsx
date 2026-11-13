@@ -5,6 +5,7 @@ import { createAgreementApi, AgreementSigningPage } from './venue-contracts.jsx'
 import { VenuePoliciesView } from './venue-policies.jsx';
 import { EventListView } from './event-list.jsx';
 import { VenueFollowingView } from './venue-following.jsx';
+import { docentVenueReplyText } from './template-samples.jsx';
 import { AuctionItemsPanel } from './auction-items.jsx';
 import HubEventsCommittee from './hub/entry.jsx';
 import RsvpPanel from './hub/pages/RsvpPanel.jsx';
@@ -15358,12 +15359,7 @@ function SuFormResponses({ form }) {
     var a = r.answers || {};
     var first = String(a.dt_first || '').trim();
     var isWedding = /wedding|marr|bride|groom|elope|engag/i.test(String(a.dt_notes || ''));
-    var text = 'Hi' + (first ? ' ' + first : '') + ',\n\n' +
-      'Thank you for your interest in North Star House! The form you filled out is for our historic docent tours, which focus on the history and architecture of the house.\n\n' +
-      'To see North Star House as a ' + (isWedding ? 'wedding' : 'event') + ' venue, please book a free venue tour with our venue team instead. You\'ll see the spaces, talk through your plans, and we can check date availability for you. You can choose a time that works for you here:\n\n' +
-      'https://www.northstarhouse.org/book-a-tour\n\n' +
-      'We\'d love to show you around!\n\n' +
-      'Warmly,\nThe North Star House Venue Team';
+    var text = docentVenueReplyText(first, isWedding);
     setVenueReply({ id: r.id, to: String(a.dt_email || '').trim(), subject: 'Your North Star House tour request', text: text, busy: false, err: '' });
   }
   function sendVenueReply(r) {
