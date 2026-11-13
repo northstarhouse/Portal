@@ -156,7 +156,7 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   const eventDay = a.__venue_checklist?.event_day || null;
   const smPaperwork = Array.isArray(a.__venue_checklist?.site_manager_paperwork) ? a.__venue_checklist.site_manager_paperwork : [];
   const feedbackSentAt = live?.feedback_sent_at || null;
-  return { id:sub.id, sub, isPast, needsPaperwork, maxGuests:String(a.max_guests||'').trim()||null, name, email, contacts, siteManager, questionnaire, hbQa, feedbackSentAt, eventDay, smPaperwork, hb, eventDate, eventEnd, nativeAgreement, legacy, type: sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : evType(live?.event_type), days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount != null ? payments.total.amount + extraTotal : null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount + extraTotal - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
+  return { id:sub.id, sub, isPast, needsPaperwork, maxGuests:String(a.max_guests||'').trim()||null, name, email, contacts, siteManager, questionnaire, hbQa, feedbackSentAt, eventDay, smPaperwork, hb, eventDate, eventEnd, nativeAgreement, legacy, type: a.__event_type ? String(a.__event_type) : sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : evType(live?.event_type), days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount != null ? payments.total.amount + extraTotal : null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount + extraTotal - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
 }
 
 const css = `
@@ -467,6 +467,21 @@ function RequirementsGroup({ client, onVerify, formOpen, setFormOpen }) {
   </div>;
 }
 
+export const EVENT_TYPE_OPTIONS = ['Wedding', 'Private Event', 'Public Event', 'Non-Profit Event', 'Memorial', 'Corporate Event', 'Other'];
+// Staff can set the event type by hand (answers.__event_type); empty goes back to the type worked out from the form.
+async function saveEventType(id, type) {
+  const H = { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY, 'Content-Type': 'application/json' };
+  const cur = await fetch(PB_URL + '/rest/v1/nsh_form_responses?select=answers&id=eq.' + id, { headers: H }).then(r => r.ok ? r.json() : Promise.reject(new Error('Could not load the client.')));
+  if (!cur[0]) throw new Error('Client not found.');
+  const answers = { ...(cur[0].answers || {}) };
+  if (type) answers.__event_type = type; else delete answers.__event_type;
+  const r = await fetch(PB_URL + '/rest/v1/nsh_form_responses?id=eq.' + id, { method: 'PATCH', headers: { ...H, Prefer: 'return=representation' }, body: JSON.stringify({ answers }) });
+  if (!r.ok) throw new Error('Could not save the event type.');
+  const rows = await r.json();
+  if (!rows[0]) throw new Error('Could not save the event type. Try signing out and back in.');
+  return rows[0];
+}
+
 async function saveEventName(id, name) {
   const H = { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY, 'Content-Type': 'application/json' };
   const cur = await fetch(PB_URL + '/rest/v1/nsh_form_responses?select=answers&id=eq.' + id, { headers: H }).then(r => r.ok ? r.json() : Promise.reject(new Error('Could not load the client.')));
@@ -523,9 +538,10 @@ function OutTimeSelect({ value, onChange, style, label }) {
   </span>;
 }
 
-function ClientDetail({ client, onClose, onRename, onAssignSite, onSaveEventDay, onUploadPaperwork, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
+function ClientDetail({ client, onClose, onRename, onRetype, onAssignSite, onSaveEventDay, onUploadPaperwork, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
   const [formOpen, setFormOpen] = React.useState(false);
+  const [typeEdit, setTypeEdit] = React.useState(false);
   const [agrOpen, setAgrOpen] = React.useState(false);
   const [smBusy, setSmBusy] = React.useState(false);
   const [smMsg, setSmMsg] = React.useState(null);
@@ -584,7 +600,7 @@ function ClientDetail({ client, onClose, onRename, onAssignSite, onSaveEventDay,
   if (client.eventDate) step('Site manager paperwork', client.smPaperwork.length > 0, client.smPaperwork.length ? client.smPaperwork.length + ' file' + (client.smPaperwork.length > 1 ? 's' : '') + ' uploaded' : client.days !== null && client.days <= 0 ? 'Not uploaded yet' : 'After the event');
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
   return <dialog ref={ref} className="vc-dialog" aria-labelledby="vc-client-title" onCancel={onClose} onClick={e => { if(e.target === ref.current) onClose(); }}>
-    <div className="vc-modal-head"><div style={{flex:1}}><h2 id="vc-client-title" className="vc-name" style={{fontSize:25,margin:0}}>{client.name} - {client.type}</h2>{onRename&&<a onClick={async()=>{const cur=client.name;const v=window.prompt('Event name (leave empty to go back to the original name):',cur);if(v===null)return;try{await onRename(client.id,v.trim());}catch(e){alert(e.message||'Could not save.');}}} style={{cursor:'pointer',color:'#886c44',fontSize:12,fontWeight:600,textDecoration:'underline'}}>Edit name</a>}{client.siteManager&&<div style={{marginTop:4,fontSize:13,color:'#6b5d4a'}}>Site manager: <strong style={{color:'#2a2420'}}>{client.siteManager}</strong></div>}<div style={{fontFamily:'Cardo,Georgia,serif',fontSize:22,fontWeight:700,color:'#886c44',marginTop:6}}>{dateLabel(client.eventDate)}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10,flexShrink:0}}><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button><button type="button" onClick={()=>openSitePacket(client)} style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap'}}>Print Site Manager Packet</button><a href="https://venue.northstarhouse.org/guidebook/" target="_blank" rel="noopener noreferrer" style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap',textDecoration:'none',fontSize:'inherit'}}>Client Guidebook</a></div></div>
+    <div className="vc-modal-head"><div style={{flex:1}}><h2 id="vc-client-title" className="vc-name" style={{fontSize:25,margin:0}}>{client.name} - {client.type}</h2>{onRename&&<a onClick={async()=>{const cur=client.name;const v=window.prompt('Event name (leave empty to go back to the original name):',cur);if(v===null)return;try{await onRename(client.id,v.trim());}catch(e){alert(e.message||'Could not save.');}}} style={{cursor:'pointer',color:'#886c44',fontSize:12,fontWeight:600,textDecoration:'underline'}}>Edit name</a>}{onRetype&&<span style={{marginLeft:12,fontSize:12}}>{typeEdit?<select autoFocus value={client.sub?.answers?.__event_type||''} onBlur={()=>setTypeEdit(false)} onChange={async e=>{const v=e.target.value;try{await onRetype(client.id,v);setTypeEdit(false);}catch(err){alert(err.message||'Could not save.');}}} style={{fontSize:12,padding:'3px 6px',border:'1px solid #886c44',borderRadius:6,color:'#886c44',background:'#fff'}}><option value=''>Automatic (from the form)</option>{EVENT_TYPE_OPTIONS.map(t=><option key={t} value={t}>{t}</option>)}</select>:<a onClick={()=>setTypeEdit(true)} style={{cursor:'pointer',color:'#886c44',fontWeight:600,textDecoration:'underline'}}>Edit type</a>}</span>}{client.siteManager&&<div style={{marginTop:4,fontSize:13,color:'#6b5d4a'}}>Site manager: <strong style={{color:'#2a2420'}}>{client.siteManager}</strong></div>}<div style={{fontFamily:'Cardo,Georgia,serif',fontSize:22,fontWeight:700,color:'#886c44',marginTop:6}}>{dateLabel(client.eventDate)}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10,flexShrink:0}}><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button><button type="button" onClick={()=>openSitePacket(client)} style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap'}}>Print Site Manager Packet</button><a href="https://venue.northstarhouse.org/guidebook/" target="_blank" rel="noopener noreferrer" style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap',textDecoration:'none',fontSize:'inherit'}}>Client Guidebook</a></div></div>
     {client.payments && <div className="vc-hstepper" aria-label="Payment timeline">
       {client.schedule.map((s,i) => {
         const pastDue = s.due && s.due < venueDateKey() && !s.paid;
@@ -848,6 +864,10 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     const record = await savePayments(id,list);
     setSavedResponses(prev=>({...prev,[id]:record}));
   }
+  async function retypeClient(id,type) {
+    const record = await saveEventType(id,type);
+    setSavedResponses(prev=>({...prev,[id]:record}));
+  }
   async function renameClient(id,name) {
     const record = await saveEventName(id,name);
     setSavedResponses(prev=>({...prev,[id]:record}));
@@ -889,6 +909,6 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     </aside></div>
     </>}
     {statsOpen&&<ClientStats clients={upcomingClients} onClose={onCloseStats}/>}
-    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onUploadPaperwork={uploadPaperwork} onAssignSite={assignSite} onSavePayments={recordPayments} onRename={renameClient} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
+    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onUploadPaperwork={uploadPaperwork} onAssignSite={assignSite} onSavePayments={recordPayments} onRename={renameClient} onRetype={retypeClient} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }
