@@ -21433,6 +21433,35 @@ function saveMessageNote(m, text, setStatus) {
   }).catch(function() { if (setStatus) setStatus('Could not save the note'); });
 }
 
+// Reply templates on Messages. [First Name] comes from the message, the wedding price from the newest approved
+// "Wedding" entry in Venue Policies & Resources, and the reply's sign-off (name + North Star House) is added when sent.
+var WEDDING_INFO_URL = 'https://www.northstarhouse.org/weddings';
+var _weddingPricePromise = null;
+function currentWeddingPrice() {
+  if (!_weddingPricePromise) {
+    _weddingPricePromise = fetch(SUPABASE_URL + '/rest/v1/venue_resources?kind=eq.pricing&status=eq.approved&category=ilike.wedding&select=year,data&order=year.desc&limit=1', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(rows) { return (rows && rows[0] && rows[0].data && String(rows[0].data.base_price || '').trim()) || ''; })
+      .catch(function() { _weddingPricePromise = null; return ''; });
+  }
+  return _weddingPricePromise;
+}
+var REPLY_TEMPLATES = [
+  {
+    id: 'wedding-info',
+    name: 'Basic Wedding Info Routing',
+    build: function(ctx) {
+      return currentWeddingPrice().then(function(price) {
+        return 'Hi ' + (ctx.first || 'there') + ',\n\n' +
+          'Thank you for considering North Star House for your wedding! Our historic estate offers a beautiful setting to celebrate, offering exclusive use during your rental, tables and chairs included, and flexible vendor choices so you can create a day that feels like you.\n\n' +
+          'Our wedding rental is ' + (price || '[current rental price]') + '. Visit ' + WEDDING_INFO_URL + ' to explore pricing, what’s included, and available event dates. You can also view available tour times and schedule a personal tour of the estate. We’d love to show you around!\n\n' +
+          'We look forward to hearing more about your celebration!\n\n' +
+          'Warmly,';
+      });
+    }
+  }
+];
+
 function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
   var [by, setBy] = useState('');
   var draftKey = 'nsh-reply-draft-' + m.id;
@@ -21515,6 +21544,18 @@ function ClientMessageCard({ m, onHandle, onReply, onOpenClient }) {
 
       {canReply && (
         <div style={{ marginTop: 10 }}>
+          <select value="" onChange={function(e) {
+              var t = REPLY_TEMPLATES.find(function(x) { return x.id === e.target.value; });
+              if (!t) return;
+              if (reply.trim() && !window.confirm('Replace your reply with the "' + t.name + '" template?')) return;
+              var first = String(m.from_name || '').trim().split(/\s+/)[0] || '';
+              if (first.indexOf('@') !== -1) first = '';
+              t.build({ first: first, m: m }).then(function(text) { setReply(text); saveDraft(text); });
+            }}
+            style={{ marginBottom: 6, padding: '6px 9px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 12, color: gold, fontWeight: 600, background: '#fdfbf7', cursor: 'pointer' }}>
+            <option value="">Use a template…</option>
+            {REPLY_TEMPLATES.map(function(t) { return <option key={t.id} value={t.id}>{t.name}</option>; })}
+          </select>
           <textarea value={reply} onChange={function(e) { setReply(e.target.value); setDraftStatus(''); }} onBlur={function() { saveDraft(reply); }} rows={4} placeholder={'Reply to ' + (m.from_name || 'them') + ' (sent from venue@northstarhouse.org to ' + m.from_email + '). Write your own greeting; none is added.'}
             style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'system-ui, sans-serif', resize: 'vertical' }} />
           {draftStatus && <div style={{ fontSize: 11, color: draftStatus.indexOf('Could not') === 0 ? '#b3261e' : '#888', marginTop: 3 }}>{draftStatus}</div>}
