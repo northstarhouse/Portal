@@ -63,10 +63,36 @@ function ItemModal({ entry, sponsors, events, onClose, onSaved }) {
   );
 }
 
+// The saved item, read-only, shown when its row is clicked. Edit opens the form.
+function ItemDetails({ it, sponsors, onEdit }) {
+  const sponsor = it.sponsor_id ? sponsors.find(s => String(s.id) === String(it.sponsor_id)) : null;
+  const day = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const rows = [
+    ['Donor', it.donor], ['Sponsor', sponsor ? sponsor['Business Name'] : ''], ['Donor contact', it.donor_contact],
+    ['Estimated value', it.est_value != null ? usd(it.est_value) : ''], ['Event / auction', it.event], ['Status', it.status],
+    ['Date received', day(it.received_date)], ['Sold for', it.sold_amount != null ? usd(it.sold_amount) : ''], ['Winning bidder', it.winner],
+    ['Donor thanked', it.acknowledged ? 'Yes' : 'Not yet'],
+  ].filter(([, v]) => v !== '' && v != null);
+  return (
+    <div style={{ padding: '0 16px 14px 30px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
+        <span style={{ fontSize: 11, color: '#999' }}>{it.updated_at ? 'Updated ' + new Date(it.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + (it.updated_by ? ' · ' + it.updated_by : '') : ''}</span>
+        <button type="button" onClick={onEdit} style={{ background: 'none', border: 'none', padding: 0, color: GOLD, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Edit</button>
+      </div>
+      {it.description && <div style={{ fontSize: 13, color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.55, marginBottom: 10 }}>{it.description}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px 18px' }}>
+        {rows.map(([k, v]) => <div key={k}><div style={{ fontSize: 10, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 0.5 }}>{k}</div><div style={{ fontSize: 13, color: '#2a2420', marginTop: 1, overflowWrap: 'anywhere' }}>{v}</div></div>)}
+      </div>
+      {it.notes && <div style={{ marginTop: 10, background: '#fff', borderLeft: '3px solid ' + GOLD, borderRadius: 6, padding: '8px 12px', fontSize: 13, color: '#4a3f30', whiteSpace: 'pre-wrap' }}>{it.notes}</div>}
+    </div>
+  );
+}
+
 export function AuctionItemsPanel({ sponsors }) {
   const [items, setItems] = React.useState(null);
   const [err, setErr] = React.useState('');
   const [editing, setEditing] = React.useState(null);
+  const [openId, setOpenId] = React.useState(null); // item shown as saved (read-only) below its row
   const [event, setEvent] = React.useState('');
   const [status, setStatus] = React.useState('');
   const [q, setQ] = React.useState('');
@@ -102,9 +128,11 @@ export function AuctionItemsPanel({ sponsors }) {
         <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderTop: '3px solid ' + GOLD, borderRadius: 10, overflow: 'hidden' }}>
           {shown.map((it, i) => {
             const t = TONE[it.status] || TONE.Pledged;
-            return <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 16px', borderTop: i ? '1px solid #f2ece2' : 'none' }}>
-              <div style={{ flex: '1 1 240px', minWidth: 0, cursor: 'pointer' }} onClick={() => setEditing(it)}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2420' }}>{it.item}</div>
+            const isOpen = openId === it.id;
+            return <div key={it.id} style={{ borderTop: i ? '1px solid #f2ece2' : 'none', background: isOpen ? '#faf6ef' : '#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 16px' }}>
+              <div style={{ flex: '1 1 240px', minWidth: 0, cursor: 'pointer' }} onClick={() => setOpenId(isOpen ? null : it.id)}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2420' }}><span style={{ fontSize: 10, color: '#2a2420', display: 'inline-block', width: 14 }}>{isOpen ? '▾' : '▸'}</span>{it.item}</div>
                 <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{[it.donor ? 'From ' + it.donor : '', it.event, it.est_value != null ? 'Value ' + usd(it.est_value) : '', it.status === 'Sold' && it.sold_amount != null ? 'Sold ' + usd(it.sold_amount) + (it.winner ? ' to ' + it.winner : '') : ''].filter(Boolean).join(' · ')}</div>
               </div>
               {it.acknowledged ? <span style={{ fontSize: 10, fontWeight: 700, color: '#2e7d32' }}>✓ Thanked</span> : <span style={{ fontSize: 10, fontWeight: 700, color: '#b07a7a' }}>Not thanked</span>}
@@ -112,6 +140,8 @@ export function AuctionItemsPanel({ sponsors }) {
                 style={{ fontSize: 12, fontWeight: 700, padding: '5px 8px', borderRadius: 6, border: '1px solid transparent', background: t[0], color: t[1], cursor: 'pointer' }}>
                 {STATUSES.map(s => <option key={s}>{s}</option>)}
               </select>
+            </div>
+            {isOpen && <ItemDetails it={it} sponsors={sponsors || []} onEdit={() => setEditing(it)} />}
             </div>;
           })}
         </div>}
