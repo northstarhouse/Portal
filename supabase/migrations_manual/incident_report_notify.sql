@@ -72,7 +72,6 @@ begin
     || '<div style="max-width:620px;margin:0 auto;background:#fdfbf7;border-radius:2px;overflow:hidden;">'
     || '<div style="height:14px;background:#886c44;"></div>'
     || '<div style="padding:40px 36px 32px;">'
-    || '<div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#886c44;margin-bottom:10px;">North Star House</div>'
     || '<h1 style="margin:0 0 18px;font-size:30px;font-weight:400;color:#2a2420;text-align:center;">New Incident Report</h1>'
     || '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 18px;"></div>'
     || '<p style="margin:0 0 8px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.5;text-align:center;"><b>'

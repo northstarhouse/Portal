@@ -21237,7 +21237,6 @@ function buildClientReplyHtml(name, text, by) {
   }).join('');
   return '<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,\'Times New Roman\',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;">' +
     '<div style="height:14px;background:#886c44;"></div><div style="padding:44px 40px 36px;text-align:center;">' +
-    '<div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:3px;color:#886c44;font-weight:bold;margin-bottom:14px;">NORTH STAR HOUSE</div>' +
     '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">A Reply From North Star House</h1>' +
     '<div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>' +
     paras +
