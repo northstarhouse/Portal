@@ -22,16 +22,38 @@ const longDate=iso=>{const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);r
 const writtenDate=iso=>{const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?new Date(m[1]+'-'+m[2]+'-'+m[3]+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):String(iso||'');};
 const todayLong=()=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',month:'long',day:'numeric',year:'numeric'}).format(new Date());
 // Extra facts that are not on the pre-booking form: the guest count the couple gave on their original wedding inquiry.
+// The rental price for the contract when the client has no payment schedule yet: a custom price set when their pre-booking
+// form was sent, otherwise the approved price in Venue Policies & Resources for their event type and the event's day of the week.
+async function rentalPriceFor(client){
+  const H={headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}};
+  const get=url=>fetch(SB_URL+url,H).then(r=>r.ok?r.json():[]).catch(()=>[]);
+  const emails=[client.email,...(client.contacts||[]).map(c=>c.email)].map(e=>String(e||'').trim().toLowerCase()).filter(e=>e.includes('@'));
+  for(const email of emails){const rows=await get('/rest/v1/prebooking_manual_sends?select=custom_price_cents,custom_deposit_cents&email=ilike.'+encodeURIComponent(email)+'&custom_price_cents=not.is.null&order=sent_at.desc&limit=1');if(rows[0])return {cents:rows[0].custom_price_cents,depositCents:rows[0].custom_deposit_cents,source:'custom'};}
+  const type=String(client.type||'');
+  const cat=/wedding/i.test(type)?'wedding':/memorial|celebration/i.test(type)?'memorial':/non-?profit/i.test(type)?'nonprofit':'private event';
+  const rows=await get('/rest/v1/venue_resources?kind=eq.pricing&status=eq.approved&category=ilike.'+encodeURIComponent(cat)+'&select=year,data&order=year.desc');
+  const evYear=Number(String(client.eventDate||'').slice(0,4))||0;
+  const row=rows.find(r=>!evYear||Number(r.year)<=evYear)||rows[0];if(!row)return {};
+  const d=row.data||{};const toCents=v=>{const m=String(v||'').replace(/,/g,'').match(/\$?\s*(\d+(?:\.\d{1,2})?)/);return m?Math.round(parseFloat(m[1])*100):null;};
+  let cents=toCents(d.base_price);
+  const tiers=Array.isArray(d.rates)?d.rates:Array.isArray(d.tiers)?d.tiers:[];
+  if(!cents&&tiers.length&&client.eventDate){const wd=new Date(String(client.eventDate).slice(0,10)+'T12:00:00').getDay();const name=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][wd];
+    const t=tiers.find(t=>new RegExp('^'+name,'i').test(String(t.label||'')))||(wd>=1&&wd<=5?tiers.find(t=>/weekday/i.test(String(t.label||''))):null);if(t)cents=toCents(t.price);}
+  const depositCents=/wedding/i.test(type)?toCents((String(d.fees||'').match(/\$[\d,]+(?=[^.]*security deposit)/i)||[])[0]):null;
+  return cents?{cents,depositCents,source:'pricing'}:{};
+}
 export async function contractExtras(client){
+  const price=await rentalPriceFor(client).catch(()=>({}));
+  const out={rentalCents:price.cents||null,depositCents:price.depositCents||null};
   const emails=(client.contacts||[]).map(c=>String(c.email||'').trim()).filter(Boolean);
   for(const email of emails){
     try{
       const r=await fetch(SB_URL+'/rest/v1/nsh_form_responses?form_id=eq.1eea2137-f94d-414b-a977-4ed622214580&answers-%3E%3Ew_email=ilike.'+encodeURIComponent(email)+'&select=answers&order=created_at.desc&limit=1',{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});
       const rows=r.ok?await r.json():[];const g=rows?.[0]?.answers?.w_guests;
-      if(g&&String(g).trim())return {guestCount:String(g).trim()};
+      if(g&&String(g).trim())return {...out,guestCount:String(g).trim()};
     }catch(e){/* fall through to the placeholder */}
   }
-  return {};
+  return out;
 }
 export function prepareAgreementDraft(client,extras={}){
   const normalized=value=>String(value||'').toLowerCase().replace(/\s+/g,' ').trim();
@@ -41,6 +63,11 @@ export function prepareAgreementDraft(client,extras={}){
   const people=clientSigners.filter(c=>c.name);
   const guests=extras.guestCount||client.maxGuests||client.hb?.project?.guest_count||'[TO COMPLETE]';
   const schedule=(client.schedule||[]);
+  // The price always appears on the contract: from the payment schedule when there is one, otherwise the custom or listed price.
+  const schedRental=schedule.filter(p=>!p.deposit&&!/security deposit/i.test(p.label||'')).reduce((s,p)=>s+(p.cents||0),0);
+  const schedDeposit=schedule.filter(p=>p.deposit||/security deposit/i.test(p.label||'')).reduce((s,p)=>s+(p.cents||0),0);
+  const rentalCents=schedRental||extras.rentalCents||0;
+  const depositCents=schedDeposit||extras.depositCents||0;
   const lines=[
     'North Star House — Venue Rental Agreement',
     'Agreement between North Star Historic Conservancy (NSHC) and Client (Renter)',
@@ -49,6 +76,8 @@ export function prepareAgreementDraft(client,extras={}){
     'Event Date: '+(longDate(client.eventDate)||'[TO COMPLETE]'),
     ...(people.length?people.map(c=>c.name+' — '+(c.email||'[EMAIL TO COMPLETE]')):[client.name+' — [EMAIL TO COMPLETE]']),
     'Max Estimated Guest Count: '+guests,
+    'Rental Fee: '+(rentalCents?money(rentalCents,client.currency||'USD'):'[TO COMPLETE]'),
+    ...(depositCents?['Refundable Security Deposit: '+money(depositCents,client.currency||'USD')]:[]),
     ...(client.total!==null&&client.total!==undefined?['Venue rental invoice total, including any security deposit: '+money(client.total,client.currency)]:[]),
     ...(schedule.length?['Payment schedule:',...schedule.map((p,i)=>'- '+p.label+': '+money(p.cents,p.currency)+' due '+(i===0?'when both clients have signed this agreement':p.due?writtenDate(p.due):'[TO COMPLETE]')+(p.paid?' (already paid)':''))]:[]),
     '',
@@ -81,7 +110,7 @@ export function ContractPreview({body,initials}){
     if(/^(Event Details:|Signatures|Payment schedule:)$/.test(line.trim())){out.push(<h3 key={i}>{line.replace(/:$/,'')}</h3>);return;}
     const clause=line.match(/^(\d{1,2}\.\s+[^.]{2,80}\.)(\s.*)?$/);
     if(clause){if(initials&&Number(line.match(/^(\d{1,2})\./)[1])===next){close();open=true;next++;}out.push(<p key={i}><strong>{clause[1]}</strong>{clause[2]||''}</p>);return;}
-    const kv=line.match(/^(Event Date|Max Estimated Guest Count|Contract Date|Client|For North Star Historic Conservancy|Venue rental invoice total[^:]*):\s*(.*)$/);
+    const kv=line.match(/^(Event Date|Max Estimated Guest Count|Rental Fee|Refundable Security Deposit|Contract Date|Client|For North Star Historic Conservancy|Venue rental invoice total[^:]*):\s*(.*)$/);
     if(kv){out.push(<p key={i} className="va-pv-kv"><strong>{kv[1]}:</strong> {/\[.*TO COMPLETE.*\]/.test(kv[2])?<mark>{kv[2]}</mark>:kv[2]}</p>);return;}
     out.push(<p key={i}>{line.split(/(\[[^\]]*TO COMPLETE[^\]]*\])/).map((t,j)=>/TO COMPLETE/.test(t)?<mark key={j}>{t}</mark>:t)}</p>);
   });
