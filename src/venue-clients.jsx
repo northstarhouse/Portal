@@ -1,5 +1,6 @@
 import { ContractManager } from './venue-contracts.jsx';
 import { ClientNotes } from './client-notes.jsx';
+import { RequestDetailsButton, missingPrebookingItems } from './request-details.jsx';
 import { openSitePacket, openSamplePacket } from './site-packet.js';
 // Client dashboard: reads the imported source snapshot without changing signed
 // agreements, invoice schedules, or sending any client communications.
@@ -443,11 +444,13 @@ function RequirementsGroup({ client, onVerify, formOpen, setFormOpen }) {
   const pre = client.surveyComplete ? ['Complete', 'good'] : client.surveySent ? ['Sent', ''] : ['Not sent', client.days !== null && client.days <= 60 ? 'alert' : ''];
   const post = feedback ? ['Received', 'good'] : client.feedbackSentAt ? ['Sent', ''] : (client.days !== null && client.days > 0) ? ['After the event', ''] : ['Not sent', 'alert'];
   const hasForm = !!client.sub?.answers && Object.keys(client.sub.answers).some(k => !k.startsWith('__'));
+  const missingPb = hasForm && !client.nativeAgreement && !client.hb && !client.isPast && missingPrebookingItems(client).some(i => !i.optional);
   const brickDone = !!client.brickLines?.some(l => String(l).trim());
   return <div className="vc-modal-section">
     <div className="vc-modal-section-title">Forms &amp; Requirements</div>
-    {client.sub?.answers && <ExpandRow id="vc-prebooking" title="Pre-booking form" tone={hasForm ? 'good' : ''} pill={hasForm ? 'Filled out' : 'Imported record'} open={formOpen} onToggle={() => setFormOpen(!formOpen)}>
+    {client.sub?.answers && <ExpandRow id="vc-prebooking" title="Pre-booking form" tone={missingPb ? 'alert' : hasForm ? 'good' : ''} pill={missingPb ? 'Missing details' : hasForm ? 'Filled out' : 'Imported record'} open={formOpen} onToggle={() => setFormOpen(!formOpen)}>
       <PreBookingFormView client={client} open={formOpen} setOpen={setFormOpen}/>
+      {!client.nativeAgreement&&!client.hb&&!client.isPast&&<RequestDetailsButton client={client}/>}
     </ExpandRow>}
     <ExpandRow id="vc-insurance" title="Insurance" tone={client.insuranceVerified ? 'good' : 'alert'} pill={client.insuranceVerified ? 'Verified' : 'Not verified'} open={insOpen} onToggle={() => setInsOpen(!insOpen)}>
       <InsuranceVerification client={client} onVerify={onVerify}/>
