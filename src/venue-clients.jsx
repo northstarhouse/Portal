@@ -636,7 +636,8 @@ function ClientDetail({ client, onClose, onRename, onRetype, onAssignSite, onSav
         <div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div>{c.address && <div className="vc-muted">{c.address}</div>}</div>)}</div>
       </div>
       {onAssignSite && <SiteManagerPicker client={client} onAssign={onAssignSite}/>}
-      {onSaveEventDay && <div className="vc-modal-section">
+      {/* Event-day times section removed from the client profile (Nov 2026); saved times stay on the record. */}
+      {false && onSaveEventDay && <div className="vc-modal-section">
         <div className="vc-modal-section-title">Event-day times (for billing)</div>
         <p className="vc-muted" style={{margin:'0 0 10px'}}>From the site manager's sheet. Guests' out time and the site manager's out time are often different; bill extra hours from the guests' out time.</p>
         {(() => {
