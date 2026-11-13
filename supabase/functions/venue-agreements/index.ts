@@ -157,7 +157,7 @@ Deno.serve(async req=>{
    const draft=await rest('rpc/venue_agreement_record',{method:'POST',body:JSON.stringify({p_id:body.version_id})});if(!draft)return json({error:'Draft not found.'},404);
    const values=(draft.signers||[]).map(()=>token());const hashes=await Promise.all(values.map(async(value:string)=>({hash:await tokenHash(value)})));
    const version=await rpc('issue',{version_id:body.version_id,expected_updated_at:body.expected_updated_at,tokens:hashes,expiry_days:body.expiry_days});
-   const links=await Promise.all((draft.signers||[]).map(async(s:any,index:number)=>{const recipient=version.recipients.find((r:any)=>r.email===s.email.trim().toLowerCase());return {signer_id:recipient.id,name:recipient.name,email:recipient.email,url:link(values[index]),...(body.send_email===true?await mailLink(version,recipient,values[index]):{})};}));
+   const links=await Promise.all((draft.signers||[]).map(async(s:any,index:number)=>{const recipient=version.recipients.find((r:any)=>r.email===s.email.trim().toLowerCase());return {signer_id:recipient.id,name:recipient.name,email:recipient.email,url:link(values[index]),...(body.send_email===true&&recipient.role!=='venue'?await mailLink(version,recipient,values[index]):{})};}));
    return json({version,links});
   }
   // The venue countersigner is already signed in to the Portal, so no emailed code: the server runs the same
