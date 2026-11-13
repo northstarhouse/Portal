@@ -21454,7 +21454,7 @@ var REPLY_TEMPLATES = [
       return currentWeddingPrice().then(function(price) {
         return 'Hi ' + (ctx.first || 'there') + ',\n\n' +
           'Thank you for considering North Star House for your wedding! Our historic estate offers a beautiful setting to celebrate, offering exclusive use during your rental, tables and chairs included, and flexible vendor choices so you can create a day that feels like you.\n\n' +
-          'Our wedding rental is ' + (price || '[current rental price]') + '. Visit ' + WEDDING_INFO_URL + ' to explore pricing, what’s included, and available event dates. You can also view available tour times and schedule a personal tour of the estate. We’d love to show you around!\n\n' +
+          'Our wedding rental is ' + (price || '[current rental price]') + '. Visit ' + WEDDING_INFO_URL + ' to explore pricing, what’s included, and available event dates. You can also view upcoming tour times and schedule a personal tour of the estate. We’d love to show you around!\n\n' +
           'We look forward to hearing more about your celebration!\n\n' +
           'Warmly,';
       });

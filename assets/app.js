@@ -701,7 +701,7 @@ North Star House`,html:eg(ne.from_name,_t,He),sender:He,fromEmail:"venue@northst
 
 Thank you for considering North Star House for your wedding! Our historic estate offers a beautiful setting to celebrate, offering exclusive use during your rental, tables and chairs included, and flexible vendor choices so you can create a day that feels like you.
 
-Our wedding rental is `+(t||"[current rental price]")+". Visit "+ig+` to explore pricing, what\u2019s included, and available event dates. You can also view available tour times and schedule a personal tour of the estate. We\u2019d love to show you around!
+Our wedding rental is `+(t||"[current rental price]")+". Visit "+ig+` to explore pricing, what\u2019s included, and available event dates. You can also view upcoming tour times and schedule a personal tour of the estate. We\u2019d love to show you around!
 
 We look forward to hearing more about your celebration!
 
