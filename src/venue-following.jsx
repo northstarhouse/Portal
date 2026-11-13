@@ -81,7 +81,8 @@ export function VenueFollowingView({ navigate }) {
   }, []);
 
   const mine = (rows || []).filter(r => me && r.follower === me);
-  const shown = scope === 'mine' ? mine : (rows || []);
+  const guides = [...new Set((rows || []).map(r => r.follower).filter(Boolean))].sort();
+  const shown = scope === 'mine' ? mine : scope === 'all' ? (rows || []) : (rows || []).filter(r => r.follower === scope);
   const followedByMe = new Set(mine.map(r => r.email));
 
   async function follow(name, email) {
@@ -122,17 +123,18 @@ export function VenueFollowingView({ navigate }) {
       {navigate && <button onClick={() => navigate('venue')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: GOLD, fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 12 }}>← Venue Rentals</button>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 13, color: '#888', maxWidth: 600 }}>Follow a couple to watch them go from their tour all the way to their wedding day. Progress updates on its own as they fill in the pre-booking form, sign, pay, and celebrate.</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {[['mine', 'Mine' + (rows ? ' (' + mine.length + ')' : '')], ['all', 'Everyone' + (rows ? ' (' + rows.length + ')' : '')]].map(([k, l]) => (
-            <button key={k} onClick={() => setScope(k)} style={{ fontSize: 12, padding: '5px 12px', borderRadius: 20, cursor: 'pointer', fontWeight: scope === k ? 700 : 500, border: '1px solid ' + (scope === k ? GOLD : '#e0d8cc'), background: scope === k ? '#faf5ee' : '#fff', color: scope === k ? GOLD : '#888' }}>{l}</button>
-          ))}
-        </div>
+        <select value={scope} onChange={e => setScope(e.target.value)} aria-label="Whose follows to show"
+          style={{ fontSize: 13, fontWeight: 600, padding: '7px 10px', borderRadius: 8, border: '1px solid ' + GOLD, background: '#faf5ee', color: GOLD, cursor: 'pointer' }}>
+          <option value="mine">Mine{rows ? ' (' + mine.length + ')' : ''}</option>
+          {guides.filter(g => g !== me).map(g => <option key={g} value={g}>{g} ({(rows || []).filter(r => r.follower === g).length})</option>)}
+          <option value="all">All tour guides{rows ? ' (' + rows.length + ')' : ''}</option>
+        </select>
       </div>
       {err && <div style={{ color: '#b3261e', fontSize: 12, marginTop: 10 }}>{err}</div>}
 
-      <div style={section}>{scope === 'mine' ? 'Couples you\'re following' : 'Everyone\'s follows'}</div>
+      <div style={section}>{scope === 'mine' ? 'Couples you\'re following' : scope === 'all' ? 'All tour guides\' follows' : 'Couples ' + scope + ' is following'}</div>
       {rows === null && <div style={{ fontSize: 13, color: '#aaa' }}>Loading…</div>}
-      {rows && !shown.length && <div style={{ fontSize: 13, color: '#aaa', background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 18 }}>{scope === 'mine' ? 'You are not following anyone yet. Pick a couple you toured below.' : 'No one is being followed yet.'}</div>}
+      {rows && !shown.length && <div style={{ fontSize: 13, color: '#aaa', background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 18 }}>{scope === 'mine' ? 'You are not following anyone yet. Pick a couple you toured below.' : scope === 'all' ? 'No one is being followed yet.' : scope + ' is not following anyone yet.'}</div>}
       {shown.map(r => {
         const st = currentStage(r), t = tone[st.tone];
         return (
