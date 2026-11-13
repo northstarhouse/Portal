@@ -847,6 +847,7 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     const tasks = c.tasks.map(t => t.kind==='booking' ? {...t, title:'BYLT pre-booking submission', detail:(c.eventDate?'Event '+longDay(c.eventDate)+' · ':'')+'Review it. Their agreement and payments are arranged separately.'} : t);
     return {...c, arrangement, tasks, urgent: tasks.filter(t=>t.urgent), isNewSubmission: tasks.some(t=>/-booking$/.test(t.key))};
   };
+  const [deletedIds,setDeletedIds] = React.useState([]);
   const clients = (submissions || []).filter(sub => !deletedIds.includes(sub.id)).map(sub => withArrangement(buildVenueClient(savedResponses[sub.id] ? {...sub,...savedResponses[sub.id]} : sub,events.find(e=>e.prebooking_form_response_id===sub.id),today,nativeVersions))).sort((a,b)=>(b.isNewSubmission?1:0)-(a.isNewSubmission?1:0) || (a.isNewSubmission&&b.isNewSubmission ? String(b.sub&&b.sub.created_at||'').localeCompare(String(a.sub&&a.sub.created_at||'')) : (a.eventDate || '9999').localeCompare(b.eventDate || '9999')));
   const allClients = clients;
   // Past events (newest first) live under the "Past events" view; everything else is upcoming.
@@ -874,7 +875,6 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     const record = await saveEventType(id,type);
     setSavedResponses(prev=>({...prev,[id]:record}));
   }
-  const [deletedIds,setDeletedIds] = React.useState([]);
   // Delete a pre-booking submission (and any unsent contract drafts). The database refuses once an agreement was sent.
   async function deleteSubmission(id) {
     const r = await fetch(PB_URL+'/rest/v1/rpc/delete_prebooking_submission',{method:'POST',headers:{apikey:PB_KEY,Authorization:'Bearer '+PB_KEY,'Content-Type':'application/json'},body:JSON.stringify({p_id:id})});
