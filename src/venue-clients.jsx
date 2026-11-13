@@ -16,7 +16,7 @@ function evType(t) { const x = String(t || '').replace(/([a-z])([A-Z])/g, '$1 $2
 function amount(cents, currency = 'USD') { return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format((cents || 0) / 100); }
 
 // Payments received outside this system (for clients booked before it existed), kept beside the form response.
-// list: [{ id, cents, date: 'YYYY-MM-DD', note }]
+// list: [{ id, cents, date: 'YYYY-MM-DD', note, by }]  (by = who logged it, from the Portal sign-in)
 export async function saveVenueManualPayments({ baseUrl, apiKey, request = fetch }, responseId, list) {
   if (!responseId || !Array.isArray(list)) throw new Error('Choose a client.');
   const headers = { apikey:apiKey, Authorization:'Bearer '+apiKey, 'Content-Type':'application/json' };
@@ -29,7 +29,7 @@ export async function saveVenueManualPayments({ baseUrl, apiKey, request = fetch
   }
   const current = await readResponse(await request(resource+'&select=id,form_id,answers', {headers}));
   if (!['a3a383f7-e1db-4344-9dec-ea879ad3406d','668f27d4-7e2d-4ce6-ba0c-bac5ddf9d8f8'].includes(current.form_id)) throw new Error('This record is not a venue client.');
-  const clean = list.map(p => ({ id:String(p.id), cents:Math.round(Number(p.cents)), date:String(p.date || '').slice(0,10), note:String(p.note || '').trim().slice(0,200) })).filter(p => p.cents > 0);
+  const clean = list.map(p => ({ id:String(p.id), cents:Math.round(Number(p.cents)), date:String(p.date || '').slice(0,10), note:String(p.note || '').trim().slice(0,200), ...(p.by ? { by:String(p.by).slice(0,80) } : {}) })).filter(p => p.cents > 0);
   const answers = { ...current.answers, __venue_checklist:{ ...current.answers?.__venue_checklist, manual_payments:clean } };
   const saved = await readResponse(await request(resource+'&form_id=eq.'+encodeURIComponent(current.form_id), {method:'PATCH',headers:{...headers,Prefer:'return=representation'},body:JSON.stringify({answers})}));
   if ((saved.answers?.__venue_checklist?.manual_payments || []).length !== clean.length) throw new Error('Payments were not saved. Please try again.');
@@ -365,7 +365,8 @@ function ManualPayments({ client, onSave }) {
     e.preventDefault();
     const cents = Math.round(parseFloat(String(amt).replace(/[^0-9.]/g,'')) * 100);
     if (!(cents > 0)) { setErr('Enter the amount received.'); return; }
-    await save([...list, { id:String(Date.now()), cents, date, note }]);
+    const by = await fetch(PB_URL + '/rest/v1/rpc/app_session_name', { method:'POST', headers:{ apikey:PB_KEY, Authorization:'Bearer '+PB_KEY, 'Content-Type':'application/json' }, body:'{}' }).then(r => r.ok ? r.json() : '').catch(() => '');
+    await save([...list, { id:String(Date.now()), cents, date, note, by: typeof by === 'string' ? by : '' }]);
     setAmt(''); setNote('');
   }
   const inp = {border:'1px solid #ded7cb',borderRadius:7,padding:'8px 10px',font:'inherit',background:'#fff'};

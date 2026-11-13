@@ -25,11 +25,11 @@ function stagesOf(p) {
   const isWedding = (p.prebooking && p.prebooking.kind === 'Wedding') || /wedding/i.test((p.inquiry && p.inquiry.event_type) || '') || /wedding/i.test((p.tour && p.tour.category) || '');
   const tourDone = !!(p.tour && p.tour.date && p.tour.date <= today && !/cancel/i.test(p.tour.status || ''));
   return [
-    { key: 'tour', label: 'Toured', done: tourDone, when: p.tour ? (tourDone ? shortDate(p.tour.date) : 'Tour ' + shortDate(p.tour.date)) + (p.tour.guide ? ' · ' + p.tour.guide : '') : '' },
-    { key: 'pre', label: 'Pre-booking form', done: !!p.prebooking, when: p.prebooking ? shortDate(p.prebooking.at) : '' },
-    { key: 'signed', label: 'Agreement signed', done: !!p.signed, when: p.signed === 'booked' ? 'Booked' : shortDate(p.signed) },
-    { key: 'paid', label: 'First payment', done: !!p.paid, when: p.paid === 'paid' ? 'Paid' : shortDate(p.paid) },
-    { key: 'day', label: isWedding ? 'Wedding day' : 'Event day', done: !!(ev && ev < today && p.signed), when: ev ? shortDate(ev) : '' },
+    { key: 'tour', label: 'Toured', done: tourDone, when: p.tour ? (tourDone ? shortDate(p.tour.date) : 'Tour ' + shortDate(p.tour.date)) : '', by: p.tour && p.tour.guide ? 'Guide: ' + p.tour.guide : '' },
+    { key: 'pre', label: 'Pre-booking form', done: !!p.prebooking, when: p.prebooking ? shortDate(p.prebooking.at) : '', by: p.prebooking_by || '' },
+    { key: 'signed', label: 'Agreement signed', done: !!p.signed, when: p.signed === 'booked' ? 'Booked' : shortDate(p.signed), by: p.signed && p.signed_by ? (p.signed_by === 'HoneyBook' ? 'Via HoneyBook' : 'Countersigned by ' + p.signed_by) : '' },
+    { key: 'paid', label: 'First payment', done: !!p.paid, when: p.paid === 'paid' ? 'Paid' : shortDate(p.paid), by: p.paid ? (p.paid_by && p.paid_by !== 'Paid online' && p.paid_by !== 'Logged by staff' ? 'Logged by ' + p.paid_by : (p.paid_by || '')) : '' },
+    { key: 'day', label: isWedding ? 'Wedding day' : 'Event day', done: !!(ev && ev < today && p.signed), when: ev ? shortDate(ev) : '', by: p.site_manager ? 'Site manager: ' + p.site_manager : '' },
   ];
 }
 function currentStage(p) {
@@ -55,6 +55,7 @@ function Pipeline({ p }) {
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.label}</span>
           </div>
           <div style={{ fontSize: 11, color: x.done ? '#3b6b3d' : '#aaa', marginTop: 3, minHeight: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.when || (x.done ? '' : '—')}</div>
+          {x.by && <div title={x.by} style={{ fontSize: 10.5, color: x.done ? '#5b7f5d' : '#b0a796', marginTop: 2, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.by}</div>}
         </div>
       ))}
     </div>
