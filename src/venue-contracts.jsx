@@ -38,7 +38,14 @@ async function rentalPriceFor(client){
   let cents=toCents(d.base_price);
   const tiers=Array.isArray(d.rates)?d.rates:Array.isArray(d.tiers)?d.tiers:[];
   if(!cents&&tiers.length&&client.eventDate){const wd=new Date(String(client.eventDate).slice(0,10)+'T12:00:00').getDay();const name=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][wd];
-    const t=tiers.find(t=>new RegExp('^'+name,'i').test(String(t.label||'')))||(wd>=1&&wd<=5?tiers.find(t=>/weekday/i.test(String(t.label||''))):null);if(t)cents=toCents(t.price);}
+    let t=tiers.find(t=>new RegExp('^'+name,'i').test(String(t.label||'')))||(wd>=1&&wd<=5?tiers.find(t=>/weekday/i.test(String(t.label||''))):null);
+    // Size-based tiers (non-profit): "Small private event (up to 50 guests, 4 hr), Sat/Sun". Pick the smallest private tier that
+    // fits the guest count, among tiers for that day (Sat/Sun labels cover both weekend days). Public events are priced by hand.
+    if(!t){const guests=Number(String(client.maxGuests||'').match(/\d+/)?.[0])||0;
+      const dayOk=l=>/sat\/sun|weekend/i.test(l)?(wd===0||wd===6):/weekday/i.test(l)?(wd>=1&&wd<=5):true;
+      const sized=tiers.map(x=>({x,l:String(x.label||''),cap:Number((String(x.label||'').match(/up to (\d+)/i)||[])[1])||0})).filter(o=>!/public/i.test(o.l)&&dayOk(o.l)&&o.cap).sort((a,b)=>a.cap-b.cap);
+      const fit=sized.find(o=>!guests||o.cap>=guests)||sized[sized.length-1];if(fit)t=fit.x;}
+    if(t)cents=toCents(t.price);}
   const depositCents=/wedding/i.test(type)?toCents((String(d.fees||'').match(/\$[\d,]+(?=[^.]*security deposit)/i)||[])[0]):null;
   return cents?{cents,depositCents,source:'pricing'}:{};
 }
