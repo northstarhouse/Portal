@@ -141,7 +141,7 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
     // pre-booking submission, or the questionnaire once the event is within 60 days. A payment that is simply coming up is not.
     const daysOut = eventDate ? dayCount(today, eventDate) : null;
     const needsAction = overdue || kind === 'signature' || kind === 'booking' || kind === 'paperwork' || (kind === 'survey' && daysOut !== null && daysOut <= 60);
-    tasks.push({ key: sub.id + '-' + key, title, due, detail, kind, overdue, urgent: needsAction, rank: kind === 'paperwork' ? -1 : overdue ? 0 : kind === 'signature' || kind === 'booking' || kind === 'paperwork' ? 1 : soon ? 2 : 3 });
+    tasks.push({ key: sub.id + '-' + key, title, due, detail, kind, overdue, urgent: needsAction, rank: key === 'booking' ? -2 : kind === 'paperwork' ? -1 : overdue ? 0 : kind === 'signature' || kind === 'booking' || kind === 'paperwork' ? 1 : soon ? 2 : 3 });
   }
   for (const payment of duePayments) task('payment-' + schedule.indexOf(payment), 'Collect ' + amount(payment.cents, payment.currency), payment.due, payment.label, 'payment');
   if (nativeAgreement && ['declined','expired'].includes(nativeAgreement.status)) task('contract-revision','Prepare revised agreement',null,'Previous request '+nativeAgreement.status,'booking');
@@ -853,8 +853,9 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
   const dueSoon = upcomingClients.flatMap(c=>c.duePayments).filter(p=>p.due && p.due<=shiftDate(today,30));
   const matches = (filter==='past' ? pastClients : filter==='attention' ? allClients : upcomingClients).filter(c=>(filter!=='attention'||c.urgent.length>0)&&(!query || (c.name+' '+c.email+' '+c.eventDate).toLowerCase().includes(query.toLowerCase())));
   // "Most recent": every client, newest pre-booking form first.
-  const recent = filter==='recent' ? matches.slice().sort((a,b)=>String(b.sub&&b.sub.created_at||'').localeCompare(String(a.sub&&a.sub.created_at||''))) : matches;
-  const shown = (filter==='viewall'||filter==='recent'||filter==='past') ? recent : matches.slice(0,4);
+  const newFirst = (a,b)=>(b.isNewSubmission?1:0)-(a.isNewSubmission?1:0);
+  const recent = (filter==='recent' ? matches.slice().sort((a,b)=>newFirst(a,b) || String(b.sub&&b.sub.created_at||'').localeCompare(String(a.sub&&a.sub.created_at||''))) : matches.slice().sort(newFirst));
+  const shown = (filter==='viewall'||filter==='recent'||filter==='past') ? recent : recent.slice(0,4);
   const open = c => setSelected(c.id);
   // opened from an Activity Log entry
   React.useEffect(() => { const id = window.__nshOpenClient; if (id && submissions && submissions.some(sub => sub.id === id)) { setSelected(id); window.__nshOpenClient = null; } }, [submissions]);
