@@ -426,7 +426,7 @@ function ExpandRow({ id, title, pill, tone, open, onToggle, children }) {
     {open && <div style={{padding:'0 2px 14px'}}>{children}</div>}
   </div>;
 }
-function RequirementsGroup({ client, onVerify, formOpen, setFormOpen }) {
+function RequirementsGroup({ client, onVerify, formOpen, setFormOpen, onDelete }) {
   const [insOpen, setInsOpen] = React.useState(false), [brickOpen, setBrickOpen] = React.useState(false);
   const [preOpen, setPreOpen] = React.useState(false), [postOpen, setPostOpen] = React.useState(false);
   // The post-event (final feedback) response, matched to the couple by the email they gave on it.
@@ -451,6 +451,7 @@ function RequirementsGroup({ client, onVerify, formOpen, setFormOpen }) {
     {client.sub?.answers && <ExpandRow id="vc-prebooking" title="Pre-booking form" tone={missingPb ? 'alert' : hasForm ? 'good' : ''} pill={missingPb ? 'Missing details' : hasForm ? 'Filled out' : 'Imported record'} open={formOpen} onToggle={() => setFormOpen(!formOpen)}>
       <PreBookingFormView client={client} open={formOpen} setOpen={setFormOpen}/>
       {!client.nativeAgreement&&!client.hb&&!client.isPast&&<RequestDetailsButton client={client}/>}
+      {onDelete&&!client.nativeAgreement&&!client.hb&&<div style={{marginTop:16,paddingTop:12,borderTop:'1px solid #eee7dd',textAlign:'right'}}><button type="button" onClick={async()=>{if(!confirm('Delete the pre-booking form submission from '+client.name+'? This removes the client from the Portal along with any unsent contract drafts. It cannot be undone.'))return;try{await onDelete(client.id);}catch(e){alert(e.message||'Could not delete.');}}} style={{background:'none',border:'1px solid #a64f3c',color:'#a64f3c',borderRadius:7,padding:'6px 12px',fontSize:12,fontWeight:600}}>Delete this submission</button></div>}
     </ExpandRow>}
     <ExpandRow id="vc-insurance" title="Insurance" tone={client.insuranceVerified ? 'good' : 'alert'} pill={client.insuranceVerified ? 'Verified' : 'Not verified'} open={insOpen} onToggle={() => setInsOpen(!insOpen)}>
       <InsuranceVerification client={client} onVerify={onVerify}/>
@@ -541,7 +542,7 @@ function OutTimeSelect({ value, onChange, style, label }) {
   </span>;
 }
 
-function ClientDetail({ client, onClose, onRename, onRetype, onAssignSite, onSaveEventDay, onUploadPaperwork, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
+function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignSite, onSaveEventDay, onUploadPaperwork, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [typeEdit, setTypeEdit] = React.useState(false);
@@ -689,7 +690,7 @@ function ClientDetail({ client, onClose, onRename, onRetype, onAssignSite, onSav
           <div style={{textAlign:'right',fontSize:12,color:st.late?'#c0392b':st.done?'#2e7d32':'#888'}}>{st.when}</div>
         </div>)}
       </div>
-      <RequirementsGroup client={client} onVerify={onVerify} formOpen={formOpen} setFormOpen={setFormOpen}/>
+      <RequirementsGroup client={client} onVerify={onVerify} formOpen={formOpen} setFormOpen={setFormOpen} onDelete={onDelete}/>
       {messages&&messages.length>0&&<div className="vc-modal-section">
         <div className="vc-modal-section-title"><span>Messages from the couple</span><span className={'vc-pill '+(messages.some(m=>m.direction!=='outgoing'&&!m.handled_at)?'alert':'good')}>{messages.some(m=>m.direction!=='outgoing'&&!m.handled_at)?'New':'All handled'}</span></div>
         {messages.map(m=><div key={m.id} className="vc-note-box" style={{marginTop:8}}><div className="vc-muted" style={{marginBottom:4}}>{m.direction==='outgoing'?'Reply from '+(m.from_name||'the team'):(m.from_name||'Client')} · {new Date(m.created_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}{m.direction!=='outgoing'&&m.handled_at?' · handled'+(m.handled_by?' by '+m.handled_by:''):''}</div><div style={{whiteSpace:'pre-wrap'}}>{m.body}</div>{m.handled_note&&<div className="vc-muted" style={{marginTop:6,whiteSpace:'pre-wrap'}}><strong>Notes:</strong> {m.handled_note}</div>}{m.direction!=='outgoing'&&!m.handled_at&&onHandleMessage&&<button type="button" onClick={()=>{const who=window.prompt('Handled by (Jen, Derek or Haley)?');if(who&&/^(jen|derek|haley)$/i.test(who.trim()))onHandleMessage(m.id,who.trim().charAt(0).toUpperCase()+who.trim().slice(1).toLowerCase());else if(who)alert('Please enter Jen, Derek or Haley.');}} style={{marginTop:8,border:'1px solid #e0d8cc',borderRadius:6,padding:'5px 10px',background:'#fff',color:'#886c44',fontSize:11,fontWeight:600}}>Mark handled</button>}</div>)}
@@ -846,7 +847,7 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     const tasks = c.tasks.map(t => t.kind==='booking' ? {...t, title:'BYLT pre-booking submission', detail:(c.eventDate?'Event '+longDay(c.eventDate)+' · ':'')+'Review it. Their agreement and payments are arranged separately.'} : t);
     return {...c, arrangement, tasks, urgent: tasks.filter(t=>t.urgent), isNewSubmission: tasks.some(t=>/-booking$/.test(t.key))};
   };
-  const clients = (submissions || []).map(sub => withArrangement(buildVenueClient(savedResponses[sub.id] ? {...sub,...savedResponses[sub.id]} : sub,events.find(e=>e.prebooking_form_response_id===sub.id),today,nativeVersions))).sort((a,b)=>(b.isNewSubmission?1:0)-(a.isNewSubmission?1:0) || (a.isNewSubmission&&b.isNewSubmission ? String(b.sub&&b.sub.created_at||'').localeCompare(String(a.sub&&a.sub.created_at||'')) : (a.eventDate || '9999').localeCompare(b.eventDate || '9999')));
+  const clients = (submissions || []).filter(sub => !deletedIds.includes(sub.id)).map(sub => withArrangement(buildVenueClient(savedResponses[sub.id] ? {...sub,...savedResponses[sub.id]} : sub,events.find(e=>e.prebooking_form_response_id===sub.id),today,nativeVersions))).sort((a,b)=>(b.isNewSubmission?1:0)-(a.isNewSubmission?1:0) || (a.isNewSubmission&&b.isNewSubmission ? String(b.sub&&b.sub.created_at||'').localeCompare(String(a.sub&&a.sub.created_at||'')) : (a.eventDate || '9999').localeCompare(b.eventDate || '9999')));
   const allClients = clients;
   // Past events (newest first) live under the "Past events" view; everything else is upcoming.
   const pastClients = allClients.filter(c => c.isPast).sort((a,b) => String(b.eventEnd||'').localeCompare(String(a.eventEnd||'')));
@@ -872,6 +873,13 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
   async function retypeClient(id,type) {
     const record = await saveEventType(id,type);
     setSavedResponses(prev=>({...prev,[id]:record}));
+  }
+  const [deletedIds,setDeletedIds] = React.useState([]);
+  // Delete a pre-booking submission (and any unsent contract drafts). The database refuses once an agreement was sent.
+  async function deleteSubmission(id) {
+    const r = await fetch(PB_URL+'/rest/v1/rpc/delete_prebooking_submission',{method:'POST',headers:{apikey:PB_KEY,Authorization:'Bearer '+PB_KEY,'Content-Type':'application/json'},body:JSON.stringify({p_id:id})});
+    if (!r.ok) { let m=''; try { m=(await r.json()).message||''; } catch(e) {} throw new Error(m||'Could not delete the submission.'); }
+    setDeletedIds(prev=>[...prev,id]); setSelected(null);
   }
   async function renameClient(id,name) {
     const record = await saveEventName(id,name);
@@ -914,6 +922,6 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     </aside></div>
     </>}
     {statsOpen&&<ClientStats clients={upcomingClients} onClose={onCloseStats}/>}
-    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onUploadPaperwork={uploadPaperwork} onAssignSite={assignSite} onSavePayments={recordPayments} onRename={renameClient} onRetype={retypeClient} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
+    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onUploadPaperwork={uploadPaperwork} onAssignSite={assignSite} onSavePayments={recordPayments} onRename={renameClient} onRetype={retypeClient} onDelete={deleteSubmission} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }
