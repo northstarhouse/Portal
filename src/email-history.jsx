@@ -36,12 +36,11 @@ export function EmailHistory({ client, api, messages, guideSentAt }) {
   }, [client.id, (messages || []).length, guideSentAt]);
   if (rows === null) return <p className="vc-muted" style={{ margin: 0 }}>Loading…</p>;
   if (!rows.length) return <p className="vc-muted" style={{ margin: 0 }}>No emails recorded yet.</p>;
-  return <div>{rows.map((r, i) => <details key={i} style={{ borderTop: i ? '1px solid #f0ebe2' : 'none', padding: '7px 0' }} open={false}>
+  return <div><div style={{ display: 'flex', gap: 14, fontSize: 11, color: '#777', marginBottom: 8 }}><span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#c9ad7a', marginRight: 5, verticalAlign: 'middle' }}/>From North Star House</span><span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#8fae8f', marginRight: 5, verticalAlign: 'middle' }}/>From the client</span></div>{rows.map((r, i) => <details key={i} style={{ borderLeft: '3px solid ' + (r.incoming ? '#8fae8f' : '#c9ad7a'), background: r.incoming ? '#f3f7f2' : '#faf6ef', borderRadius: 6, padding: '8px 12px', marginTop: i ? 6 : 0 }} open={false}>
     <summary style={{ display: 'flex', gap: 10, alignItems: 'baseline', cursor: r.body ? 'pointer' : 'default', listStyle: 'none', padding: 0, color: 'inherit', fontStyle: 'normal' }}>
-      <span style={{ fontSize: 15, width: 18, flexShrink: 0 }} aria-hidden="true">{r.incoming ? '↘' : '↗'}</span>
-      <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontWeight: 600, color: r.failed ? '#a64f3c' : '#2a2420' }}>{r.what}{r.failed ? ' (not delivered)' : ''}</b>{r.who ? <span className="vc-muted"> · {r.who}</span> : null}</span>
+      <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontWeight: 700, color: r.failed ? '#a64f3c' : r.incoming ? '#4f6b52' : '#886c44' }}>{r.what}{r.failed ? ' (not delivered)' : ''}</b>{r.who ? <span className="vc-muted"> · {r.who}</span> : null}</span>
       <span className="vc-muted" style={{ whiteSpace: 'nowrap', fontSize: 12 }}>{when(r.at)}</span>
     </summary>
-    {r.body && <div className="vc-note-box" style={{ marginLeft: 28 }}>{r.body}</div>}
+    {r.body && <div className="vc-note-box" style={{ background: '#fff' }}>{r.body}</div>}
   </details>)}</div>;
 }
