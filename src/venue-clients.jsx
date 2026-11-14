@@ -662,7 +662,7 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
           </>;
         })()}
       </div>}
-      {onUploadPaperwork && <div className="vc-modal-section">
+      {onUploadPaperwork && (client.smPaperwork.length > 0 || (client.eventDate && client.eventDate <= venueDateKey())) && <div className="vc-modal-section">
         <div className="vc-modal-section-title"><span>Site manager paperwork</span>{client.smPaperwork.length > 0 && <span className="vc-pill good">{client.smPaperwork.length} on file</span>}</div>
         <p className="vc-muted" style={{margin:'0 0 10px'}}>Upload the site manager's final paperwork after the event (checklist, notes, any incident report). Scans and phone photos are fine. Files are saved to this client's folder in Google Drive and emailed to media@thenorthstarhouse.org and wyn.spiller@gmail.com.</p>
         {client.smPaperwork.map((f, i) => <div key={f.file_id || i} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 0',borderTop:i?'1px solid #f0ebe2':'none',fontSize:13}}>
