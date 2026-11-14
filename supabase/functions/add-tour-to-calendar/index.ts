@@ -130,11 +130,11 @@ type Tour = {
 const WEDDING_FORM_ID = "1eea2137-f94d-414b-a977-4ed622214580";
 const EVENT_TYPE_FIELD_ID = "0uj9rtfk";
 
-// Guide colors on the calendar: Derek blue ("Blueberry"), Jen green ("Basil", the closest event color to Avocado,
+// Guide colors on the calendar: Derek orange ("Tangerine", the closest event color to Mango), Jen green ("Basil", the closest event color to Avocado,
 // which Google only offers for whole calendars). Other guides keep the calendar's default color.
 function guideColor(guide: string | null): string | null {
   const g = String(guide || "").trim();
-  if (/^derek\b/i.test(g)) return "9";
+  if (/^derek\b/i.test(g)) return "6";
   if (/^jen(nifer)?\b/i.test(g)) return "10";
   return null;
 }
