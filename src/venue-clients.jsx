@@ -475,7 +475,25 @@ function RequirementsGroup({ client, onVerify, formOpen, setFormOpen, onDelete }
   </div>;
 }
 
-export const EVENT_TYPE_OPTIONS = ['Wedding', 'Private Event', 'Public Event', 'Non-Profit Event', 'Memorial', 'Corporate Event', 'Other'];
+// The post-event (final feedback) response, matched to the couple by the email they gave on it. Reports what it found
+// to the timeline (onFound) so the step can show Received / Sent.
+function PostEventFeedback({ client, onFound }) {
+  const [feedback, setFeedback] = React.useState(undefined);
+  React.useEffect(() => {
+    let off = false;
+    const emails = [...new Set([client.email, ...(client.contacts || []).map(c => c.email)].filter(Boolean).map(e => String(e).trim().toLowerCase().replace(/[,()"]/g, '')))];
+    if (!emails.length) { setFeedback(null); onFound && onFound(null); return; }
+    const or = '(' + emails.map(e => 'answers->>' + FEEDBACK_EMAIL_FIELD + '.ilike.' + e).join(',') + ')';
+    fetch(PB_URL + '/rest/v1/nsh_form_responses?select=answers,created_at&form_id=eq.' + FEEDBACK_FORM + '&order=created_at.desc&limit=1&or=' + encodeURIComponent(or), { headers: { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY } })
+      .then(r => r.ok ? r.json() : []).then(rows => { if (off) return; const f = rows && rows[0] ? rows[0] : null; setFeedback(f); onFound && onFound(f); }).catch(() => { if (!off) { setFeedback(null); onFound && onFound(null); } });
+    return () => { off = true; };
+  }, [client.id]);
+  if (feedback === undefined) return <p className="vc-muted" style={{margin:0}}>Loading…</p>;
+  return feedback ? <><FormAnswers formId={FEEDBACK_FORM} answers={feedback.answers}/><p className="vc-muted" style={{marginBottom:0}}>Received {dateLabel(String(feedback.created_at).slice(0,10))}</p></>
+    : <p className="vc-muted" style={{margin:0}}>{client.feedbackSentAt ? 'The feedback form was sent ' + dateLabel(String(client.feedbackSentAt).slice(0,10)) + '. No response yet.' : 'The feedback form is emailed to the couple after their event.'}</p>;
+}
+
+export const EVENT_TYPE_OPTIONS =['Wedding', 'Private Event', 'Public Event', 'Non-Profit Event', 'Memorial', 'Corporate Event', 'Other'];
 // Staff can set the event type by hand (answers.__event_type); empty goes back to the type worked out from the form.
 async function saveEventType(id, type) {
   const H = { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY, 'Content-Type': 'application/json' };
@@ -503,12 +521,12 @@ async function saveEventName(id, name) {
 }
 
 // In a client's View details: choose the site manager (same list and saved the same way as the Assign Site Managers page).
-function SiteManagerPicker({ client, onAssign }) {
+function SiteManagerPicker({ client, onAssign, bare }) {
   const [managers, setManagers] = React.useState(null), [busy, setBusy] = React.useState(false), [msg, setMsg] = React.useState(null);
   React.useEffect(() => { fetch(PB_URL + '/rest/v1/venue_site_managers?select=name&order=name', { headers: { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY } }).then(r => r.ok ? r.json() : []).then(rows => setManagers((rows || []).map(x => x.name))).catch(() => setManagers([])); }, []);
   const names = (managers || []).slice(); if (client.siteManager && names.indexOf(client.siteManager) === -1) names.unshift(client.siteManager);
-  return <div className="vc-modal-section">
-    <div className="vc-modal-section-title"><span>Site manager</span>{client.siteManager ? <span className="vc-pill good">{client.siteManager}</span> : <span className="vc-pill alert">Unassigned</span>}</div>
+  return <div className={bare ? '' : 'vc-modal-section'}>
+    {bare ? <div style={{fontSize:12,fontWeight:600,color:'#555',marginBottom:6}}>Site manager</div> : <div className="vc-modal-section-title"><span>Site manager</span>{client.siteManager ? <span className="vc-pill good">{client.siteManager}</span> : <span className="vc-pill alert">Unassigned</span>}</div>}
     <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
       <select value={client.siteManager || ''} disabled={busy || managers === null} aria-label={'Site manager for ' + client.name} onChange={async e => { setBusy(true); setMsg(null); try { await onAssign(client.id, e.target.value); setMsg({ bad: false, text: e.target.value ? 'Saved.' : 'Site manager removed.' }); } catch (err) { setMsg({ bad: true, text: err.message || 'Could not save.' }); } finally { setBusy(false); } }}
         style={{border:'1px solid #ded7cb',background:'#fff',borderRadius:7,padding:'8px 10px',fontSize:13,minWidth:200}}>
@@ -568,44 +586,78 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
       get('/rest/v1/estate_tours?select=date,status,prebooking_form_sent_at&status=eq.booked&order=date.desc&limit=5&or=' + encodeURIComponent('(' + emails.map(e => 'visitor_email.ilike.' + e).join(',') + ')')),
       get('/rest/v1/prebooking_form_sends?select=sent_at&order=sent_at.desc&limit=1&or=' + encodeURIComponent('(' + emails.map(e => 'email.ilike.' + e).join(',') + ')')),
       get('/rest/v1/prebooking_manual_sends?select=sent_at&order=sent_at.desc&limit=1&or=' + encodeURIComponent('(' + emails.map(e => 'email.ilike.' + e).join(',') + ')')),
-    ]).then(([tours, sends, manual]) => {
+      get('/rest/v1/nsh_form_responses?select=created_at&form_id=eq.' + FEEDBACK_FORM + '&order=created_at.desc&limit=1&or=' + encodeURIComponent('(' + emails.map(e => 'answers->>' + FEEDBACK_EMAIL_FIELD + '.ilike.' + e).join(',') + ')')),
+    ]).then(([tours, sends, manual, fb]) => {
       if (off) return;
-      setTl({ tour: tours[0] || null, sentAt: sends[0]?.sent_at || manual[0]?.sent_at || (tours.find(t => t.prebooking_form_sent_at) || {}).prebooking_form_sent_at || null, loaded: true });
+      setTl({ feedbackAt: fb[0]?.created_at || null, tour: tours[0] || null, sentAt: sends[0]?.sent_at || manual[0]?.sent_at || (tours.find(t => t.prebooking_form_sent_at) || {}).prebooking_form_sent_at || null, loaded: true });
     });
     return () => { off = true; };
   }, [client.id]);
   const today = venueDateKey();
   const steps = [];
-  const step = (label, done, when, extra, late) => steps.push({ label, done: !!done, when, extra, late: !!late });
+  const step = (label, done, when, extra, late, body) => steps.push({ key: 's' + steps.length + ':' + label, label, done: !!done, when, extra, late: !!late, body: body || null });
+  const [openStep, setOpenStep] = React.useState(null);
+  const contractBody = !agreementApi ? null : client.legacy ? <p className="vc-muted" style={{margin:0}}>Booked before this system. The signed agreement is on file, so nothing is managed here.</p> : <ContractManager client={client} api={agreementApi} onChange={onContractsChange}/>;
+  const nextUnpaid = (client.schedule || []).find(x => !x.paid);
+  const paymentBody = onSavePayments ? <div>{nextUnpaid ? <button type="button" onClick={async()=>{if(!window.confirm('Mark '+nextUnpaid.label+' ('+amount(nextUnpaid.cents,nextUnpaid.currency)+') as paid? Nobody is notified.'))return;try{await onSavePayments(client.id,[...(client.manualPayments||[]),{id:String(Date.now()),cents:nextUnpaid.cents,date:venueDateKey(),note:nextUnpaid.label}]);}catch(e){alert(e.message||'Could not save.');}}} style={{marginBottom:10,border:'1px solid #886c44',borderRadius:6,padding:'6px 14px',background:'#fff',color:'#886c44',fontSize:12,fontWeight:600}}>Mark {nextUnpaid.label} ({amount(nextUnpaid.cents,nextUnpaid.currency)}) as paid</button> : null}<ManualPayments client={client} onSave={onSavePayments}/></div> : null;
+  const hbAnswered = (client.hbQa || []).filter(x => String(x.answer || '').trim());
+  const brickDone = !!client.brickLines?.some(l => String(l).trim());
+  const paperworkBody = onUploadPaperwork ? <div>
+        <p className="vc-muted" style={{margin:'0 0 10px'}}>Upload the site manager's final paperwork after the event (checklist, notes, any incident report). Scans and phone photos are fine. Files are saved to this client's folder in Google Drive and emailed to media@thenorthstarhouse.org and wyn.spiller@gmail.com.</p>
+        {client.smPaperwork.map((f, i) => <div key={f.file_id || i} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 0',borderTop:i?'1px solid #f0ebe2':'none',fontSize:13}}>
+          <a href={f.url} target="_blank" rel="noopener noreferrer" style={{color:'#886c44',fontWeight:600,wordBreak:'break-word'}}>{String(f.name || '').replace(/^(FINAL - )?Site Manager Paperwork - /, '')} ↗</a>
+          <span className="vc-muted" style={{whiteSpace:'nowrap'}}>{f.uploaded_at ? dateLabel(f.uploaded_at) : ''}</span>
+        </div>)}
+        {(client.eventDate && client.eventDate <= venueDateKey()) ? <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',marginTop:10}}>
+          <label style={{background:'#886c44',color:'#fff',borderRadius:8,padding:'9px 16px',fontWeight:600,cursor:smBusy?'default':'pointer',opacity:smBusy?0.6:1}}>
+            {smBusy ? 'Uploading…' : 'Upload paperwork'}
+            <input type="file" multiple accept=".pdf,image/*,.doc,.docx,.xls,.xlsx,.txt" disabled={smBusy} style={{display:'none'}} onChange={async e => {
+              const files = [...(e.target.files || [])]; e.target.value = '';
+              if (!files.length) return;
+              setSmBusy(true); setSmMsg(null);
+              let done = 0, unsent = 0;
+              try { for (const f of files) { if (!(await onUploadPaperwork(client.id, f))) unsent++; done++; } setSmMsg({ bad: unsent > 0, text: (done === 1 ? 'Uploaded' : done + ' files uploaded') + (unsent ? ', but ' + (unsent === done ? 'the email' : unsent + ' email' + (unsent > 1 ? 's' : '')) + ' to media@ and Wyn did not send. The file is saved in Drive.' : ' and emailed to media@ and Wyn.') }); }
+              catch (err) { setSmMsg({ bad: true, text: (done ? done + ' uploaded, then: ' : '') + (err.message || 'Upload failed.') }); }
+              finally { setSmBusy(false); }
+            }}/>
+          </label>
+          {client.smPaperwork[0]?.folder_url && <a href={client.smPaperwork[0].folder_url} target="_blank" rel="noopener noreferrer" style={{color:'#886c44',fontSize:13}}>Open client folder in Drive ↗</a>}
+          {smMsg && <span role="status" style={{fontSize:12,color:smMsg.bad?'#b3261e':'#2e7d32'}}>{smMsg.text}</span>}
+        </div> : <p className="vc-muted" style={{margin:'8px 0 0'}}>Upload opens on the event day.</p>}
+  </div> : null;
   const tourPast = !!tl.tour && tl.tour.date <= today;
   step('Toured venue', tourPast, tl.tour ? (tourPast ? dateLabel(tl.tour.date) : 'Tour booked ' + dateLabel(tl.tour.date)) : (tl.loaded ? 'No tour on file' : ''));
   step('Received Client Guide and Pre-Booking Form', !!tl.sentAt || !!client.sub?.created_at, tl.sentAt ? 'Sent ' + dateLabel(tl.sentAt) : (tl.loaded ? 'Send date not on file' : ''));
   const hasForm = !!client.sub?.answers && Object.keys(client.sub.answers).some(k => !k.startsWith('__'));
-  step('Filled out Pre-Booking Form', !!client.sub?.created_at, client.sub?.created_at ? dateLabel(client.sub.created_at) : '', hasForm ? <a onClick={() => { setFormOpen(true); setTimeout(() => { const el = ref.current && ref.current.querySelector('#vc-prebooking'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60); }} style={{color:'#886c44',fontWeight:700,textDecoration:'underline',cursor:'pointer'}}>View form</a> : null);
+  step('Filled out Pre-Booking Form', !!client.sub?.created_at, client.sub?.created_at ? dateLabel(client.sub.created_at) : '', null, false, hasForm ? <><PreBookingFormView client={client} open={true} setOpen={setFormOpen}/>{!client.nativeAgreement&&!client.hb&&!client.isPast&&<RequestDetailsButton client={client}/>}</> : null);
   const sigs = client.signatures?.signatures || [];
   const clientSigs = sigs.filter(x => x.signee_type !== 'vendor'), venueSigs = sigs.filter(x => x.signee_type === 'vendor');
   const lastSigned = list => list.map(x => x.signed_at).filter(Boolean).sort().pop();
-  step('Agreement sent', client.legacy || !!client.nativeAgreement, client.legacy ? 'Signed before the new system' : client.nativeAgreement?.issued_at ? dateLabel(client.nativeAgreement.issued_at) : 'Not sent yet');
+  step(client.legacy || client.nativeAgreement ? 'Agreement sent' : 'Populate agreement', client.legacy || !!client.nativeAgreement, client.legacy ? 'Signed before the new system' : client.nativeAgreement?.issued_at ? dateLabel(client.nativeAgreement.issued_at) : 'Not sent yet', null, false, contractBody);
   const clientsSigned = client.legacy || (clientSigs.length > 0 && clientSigs.every(x => x.signed));
-  step('Clients signed', clientsSigned, client.legacy ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed before the new system') : clientsSigned ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed') : clientSigs.length ? clientSigs.filter(x => x.signed).length + ' of ' + clientSigs.length + ' signed' : 'Waiting on the agreement');
+  step('Clients signed', clientsSigned, client.legacy ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed before the new system') : clientsSigned ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed') : clientSigs.length ? clientSigs.filter(x => x.signed).length + ' of ' + clientSigs.length + ' signed' : 'Waiting on the agreement', null, false, contractBody);
   const venueSigned = client.legacy || (venueSigs.length > 0 && venueSigs.every(x => x.signed));
-  step('Venue countersigned', venueSigned, client.legacy ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed before the new system') : venueSigned ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed') : 'Waiting on the clients');
+  step('Venue countersigned', venueSigned, client.legacy ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed before the new system') : venueSigned ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed') : 'Waiting on the clients', null, false, contractBody);
   (client.schedule || []).forEach((p, i) => {
     // The first payment is due the moment both clients have signed, not on a calendar date.
     if (i === 0 && !client.legacy) {
-      step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : clientsSigned ? 'Due now' : 'Due when both clients sign', null, !p.paid && clientsSigned);
+      step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : clientsSigned ? 'Due now' : 'Due when both clients sign', null, !p.paid && clientsSigned, paymentBody);
       return;
     }
     const late = !p.paid && p.due && p.due < today && client.clientsSigned;
-    step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : !client.clientsSigned && p.due && p.due < today ? 'Due once the clients sign' : p.due ? (late ? 'Past due · ' : 'Due ') + dateLabel(p.due) : 'Awaiting payment', null, late);
+    step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : !client.clientsSigned && p.due && p.due < today ? 'Due once the clients sign' : p.due ? (late ? 'Past due · ' : 'Due ') + dateLabel(p.due) : 'Awaiting payment', null, late, paymentBody);
   });
-  step('Insurance verified', client.insuranceVerified, client.insuranceVerified ? 'Verified' : client.insuranceUploadedAt ? 'Uploaded ' + dateLabel(client.insuranceUploadedAt) + ', needs checking' : 'Not uploaded yet');
-  step('Event questionnaire', client.surveyComplete, client.surveyComplete ? 'Completed' : client.surveySent ? 'Sent, awaiting answers' : 'Not sent yet', null, !client.surveyComplete && client.requirementsDue && client.requirementsDue < today);
-  step('Site Manager Packet', client.surveyComplete, client.surveyComplete ? (client.siteManager ? 'Ready to print · ' + client.siteManager : 'Ready to print, no site manager assigned yet') : 'Waiting on the questionnaire', client.surveyComplete ? <a onClick={() => openSitePacket(client)} style={{color:'#886c44',fontWeight:700,textDecoration:'underline',cursor:'pointer'}}>Print</a> : null);
+  step('Insurance verified', client.insuranceVerified, client.insuranceVerified ? 'Verified' : client.insuranceUploadedAt ? 'Uploaded ' + dateLabel(client.insuranceUploadedAt) + ', needs checking' : 'Not uploaded yet', null, false, <InsuranceVerification client={client} onVerify={onVerify}/>);
+  step('Event questionnaire', client.surveyComplete, client.surveyComplete ? 'Completed' : client.surveySent ? 'Sent, awaiting answers' : 'Not sent yet', null, !client.surveyComplete && client.requirementsDue && client.requirementsDue < today,
+    client.questionnaire ? <FormAnswers formId={QUESTIONNAIRE_FORM} answers={client.questionnaire}/>
+      : hbAnswered.length ? <div>{hbAnswered.map((x, i) => <div key={i} style={{display:'flex',gap:12,padding:'6px 0',borderTop:'1px solid #f0ebe2'}}><div style={{flex:'0 0 38%',color:'#888'}}>{x.label}</div><div style={{flex:1,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{String(x.answer)}</div></div>)}</div>
+      : <p className="vc-muted" style={{margin:0}}>{client.surveySent ? 'Sent. The couple fills it in on their event page.' : 'Not sent yet. The couple fills it in on their event page.'}</p>);
+  step('Site Manager Packet', client.surveyComplete, client.surveyComplete ? (client.siteManager ? 'Ready to print · ' + client.siteManager : 'Ready to print, no site manager assigned yet') : 'Waiting on the questionnaire', null, false, <div style={{display:'flex',gap:16,alignItems:'flex-end',flexWrap:'wrap'}}>{onAssignSite && <SiteManagerPicker client={client} onAssign={onAssignSite} bare/>}<button type="button" onClick={() => openSitePacket(client)} style={{background:'#886c44',color:'#fff',border:0,borderRadius:8,padding:'9px 16px',fontWeight:600}}>{client.surveyComplete ? 'Print Site Manager Packet' : 'Print packet (questionnaire not complete yet)'}</button></div>);
   // Only weddings include an engraved brick (not private events, nonprofits or memorials).
-  if (client.type === 'Wedding') step('Wedding brick',!!client.brickSubmittedAt || (client.brickLines || []).length > 0, client.brickSubmittedAt ? dateLabel(client.brickSubmittedAt) : 'Not submitted yet');
+  if (client.type === 'Wedding') step('Wedding brick',!!client.brickSubmittedAt || (client.brickLines || []).length > 0, client.brickSubmittedAt ? dateLabel(client.brickSubmittedAt) : 'Not submitted yet', null, false, brickDone ? <><div style={{fontFamily:'Cardo,Georgia,serif',letterSpacing:2,lineHeight:1.9,background:'#faf8f3',border:'1px solid #eee7dd',borderRadius:7,padding:'10px 14px'}}>{client.brickLines.map((l,i) => <div key={i}>{l || ' '}</div>)}</div></> : <p className="vc-muted" style={{margin:0}}>The client chooses 3 lines of up to 20 characters on their event page.</p>);
   if (client.eventDate) step('Event day', client.days !== null && client.days <= 0, dateLabel(client.eventDate));
-  if (client.eventDate) step('Site manager paperwork', client.smPaperwork.length > 0, client.smPaperwork.length ? client.smPaperwork.length + ' file' + (client.smPaperwork.length > 1 ? 's' : '') + ' uploaded' : client.days !== null && client.days <= 0 ? 'Not uploaded yet' : 'After the event');
+  if (client.eventDate) step('Site manager paperwork', client.smPaperwork.length > 0, client.smPaperwork.length ? client.smPaperwork.length + ' file' + (client.smPaperwork.length > 1 ? 's' : '') + ' uploaded' : client.days !== null && client.days <= 0 ? 'Not uploaded yet' : 'After the event', null, false, paperworkBody);
+  step('Post-event feedback', !!tl.feedbackAt, tl.feedbackAt ? 'Received ' + dateLabel(String(tl.feedbackAt).slice(0, 10)) : client.feedbackSentAt ? 'Sent ' + dateLabel(String(client.feedbackSentAt).slice(0, 10)) + ', no response yet' : 'After the event', null, false, <PostEventFeedback client={client}/>);
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
   return <dialog ref={ref} className="vc-dialog" aria-labelledby="vc-client-title" onCancel={onClose} onClick={e => { if(e.target === ref.current) onClose(); }}>
     <div className="vc-modal-head"><div style={{flex:1}}><h2 id="vc-client-title" className="vc-name" style={{fontSize:25,margin:0}}>{client.name} - {client.type}</h2>{onRename&&<a onClick={async()=>{const cur=client.name;const v=window.prompt('Event name (leave empty to go back to the original name):',cur);if(v===null)return;try{await onRename(client.id,v.trim());}catch(e){alert(e.message||'Could not save.');}}} style={{cursor:'pointer',color:'#886c44',fontSize:12,fontWeight:600,textDecoration:'underline'}}>Edit name</a>}{onRetype&&<span style={{marginLeft:12,fontSize:12}}>{typeEdit?<select autoFocus value={client.sub?.answers?.__event_type||''} onBlur={()=>setTypeEdit(false)} onChange={async e=>{const v=e.target.value;try{await onRetype(client.id,v);setTypeEdit(false);}catch(err){alert(err.message||'Could not save.');}}} style={{fontSize:12,padding:'3px 6px',border:'1px solid #886c44',borderRadius:6,color:'#886c44',background:'#fff'}}><option value=''>Automatic (from the form)</option>{EVENT_TYPE_OPTIONS.map(t=><option key={t} value={t}>{t}</option>)}</select>:<a onClick={()=>setTypeEdit(true)} style={{cursor:'pointer',color:'#886c44',fontWeight:600,textDecoration:'underline'}}>Edit type</a>}</span>}{onDelete&&!client.nativeAgreement&&!client.hb&&client.sub?.answers&&<a onClick={async()=>{if(!confirm('Delete the pre-booking form submission from '+client.name+'? This removes the client from the Portal along with any unsent contract drafts. It cannot be undone.'))return;const pw=window.prompt('Enter the delete password:');if(pw===null)return;try{await onDelete(client.id,pw);}catch(e){alert(e.message||'Could not delete.');}}} style={{marginLeft:12,cursor:'pointer',color:'#a64f3c',fontSize:12,fontWeight:600,textDecoration:'underline'}}>Delete submission</a>}{client.siteManager&&<div style={{marginTop:4,fontSize:13,color:'#6b5d4a'}}>Site manager: <strong style={{color:'#2a2420'}}>{client.siteManager}</strong></div>}<div style={{fontFamily:'Cardo,Georgia,serif',fontSize:22,fontWeight:700,color:'#886c44',marginTop:6}}>{dateLabel(client.eventDate)}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10,flexShrink:0}}><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button><button type="button" onClick={()=>openSitePacket(client)} style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap'}}>Print Site Manager Packet</button><a href="https://venue.northstarhouse.org/guidebook/" target="_blank" rel="noopener noreferrer" style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap',textDecoration:'none',fontSize:'inherit'}}>Client Guidebook</a></div></div>
@@ -640,7 +692,6 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
         <div className="vc-modal-section-title">Contacts</div>
         <div className="vc-contact-grid">{(client.contacts.length ? client.contacts : [{full_name:client.name,email:client.email}]).map((c,i) => <div key={c.id || i} className="vc-contact"><strong>{c.full_name}</strong><div className="vc-muted">{c.email && <a href={'mailto:'+c.email}>{c.email}</a>}</div><div className="vc-muted">{c.phone_number || 'Phone not recorded'}</div>{c.address && <div className="vc-muted">{c.address}</div>}</div>)}</div>
       </div>
-      {onAssignSite && <SiteManagerPicker client={client} onAssign={onAssignSite}/>}
       {/* Event-day times section removed from the client profile (Nov 2026); saved times stay on the record. */}
       {false && onSaveEventDay && <div className="vc-modal-section">
         <div className="vc-modal-section-title">Event-day times (for billing)</div>
@@ -662,57 +713,18 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
           </>;
         })()}
       </div>}
-      {onUploadPaperwork && (client.smPaperwork.length > 0 || (client.eventDate && client.eventDate <= venueDateKey())) && <div className="vc-modal-section">
-        <div className="vc-modal-section-title"><span>Site manager paperwork</span>{client.smPaperwork.length > 0 && <span className="vc-pill good">{client.smPaperwork.length} on file</span>}</div>
-        <p className="vc-muted" style={{margin:'0 0 10px'}}>Upload the site manager's final paperwork after the event (checklist, notes, any incident report). Scans and phone photos are fine. Files are saved to this client's folder in Google Drive and emailed to media@thenorthstarhouse.org and wyn.spiller@gmail.com.</p>
-        {client.smPaperwork.map((f, i) => <div key={f.file_id || i} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 0',borderTop:i?'1px solid #f0ebe2':'none',fontSize:13}}>
-          <a href={f.url} target="_blank" rel="noopener noreferrer" style={{color:'#886c44',fontWeight:600,wordBreak:'break-word'}}>{String(f.name || '').replace(/^(FINAL - )?Site Manager Paperwork - /, '')} ↗</a>
-          <span className="vc-muted" style={{whiteSpace:'nowrap'}}>{f.uploaded_at ? dateLabel(f.uploaded_at) : ''}</span>
-        </div>)}
-        <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',marginTop:10}}>
-          <label style={{background:'#886c44',color:'#fff',borderRadius:8,padding:'9px 16px',fontWeight:600,cursor:smBusy?'default':'pointer',opacity:smBusy?0.6:1}}>
-            {smBusy ? 'Uploading…' : 'Upload paperwork'}
-            <input type="file" multiple accept=".pdf,image/*,.doc,.docx,.xls,.xlsx,.txt" disabled={smBusy} style={{display:'none'}} onChange={async e => {
-              const files = [...(e.target.files || [])]; e.target.value = '';
-              if (!files.length) return;
-              setSmBusy(true); setSmMsg(null);
-              let done = 0, unsent = 0;
-              try { for (const f of files) { if (!(await onUploadPaperwork(client.id, f))) unsent++; done++; } setSmMsg({ bad: unsent > 0, text: (done === 1 ? 'Uploaded' : done + ' files uploaded') + (unsent ? ', but ' + (unsent === done ? 'the email' : unsent + ' email' + (unsent > 1 ? 's' : '')) + ' to media@ and Wyn did not send. The file is saved in Drive.' : ' and emailed to media@ and Wyn.') }); }
-              catch (err) { setSmMsg({ bad: true, text: (done ? done + ' uploaded, then: ' : '') + (err.message || 'Upload failed.') }); }
-              finally { setSmBusy(false); }
-            }}/>
-          </label>
-          {client.smPaperwork[0]?.folder_url && <a href={client.smPaperwork[0].folder_url} target="_blank" rel="noopener noreferrer" style={{color:'#886c44',fontSize:13}}>Open client folder in Drive ↗</a>}
-          {smMsg && <span role="status" style={{fontSize:12,color:smMsg.bad?'#b3261e':'#2e7d32'}}>{smMsg.text}</span>}
-        </div>
-      </div>}
       <div className="vc-modal-section">
         <div className="vc-modal-section-title">Timeline of Steps</div>
-        {steps.map((st, i) => <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:i?'1px solid #f0ebe2':'none'}}>
+        {steps.map((st, i) => <div key={st.key} style={{borderTop:i?'1px solid #f0ebe2':'none'}}><div role={st.body?'button':undefined} tabIndex={st.body?0:undefined} aria-expanded={st.body?openStep===st.key:undefined} onClick={st.body?()=>setOpenStep(openStep===st.key?null:st.key):undefined} onKeyDown={st.body?e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setOpenStep(openStep===st.key?null:st.key);}}:undefined} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',cursor:st.body?'pointer':'default'}}>
           <span aria-hidden="true" style={{flex:'0 0 20px',height:20,borderRadius:'50%',display:'grid',placeItems:'center',fontSize:12,fontWeight:700,background:st.done?'#2e7d32':'#fff',color:'#fff',border:st.done?'none':'1.5px solid '+(st.late?'#c0392b':'#cfc6b6')}}>{st.done?'✓':''}</span>
           <div style={{flex:1,fontWeight:600,color:st.done?'#2a2420':'#555'}}>{st.label}{st.extra ? <span style={{fontWeight:400}}> – {st.extra}</span> : null}</div>
           <div style={{textAlign:'right',fontSize:12,color:st.late?'#c0392b':st.done?'#2e7d32':'#888'}}>{st.when}</div>
-        </div>)}
+          <span aria-hidden="true" style={{color:'#886c44',fontSize:13,width:14,textAlign:'center'}}>{st.body ? (openStep===st.key ? '▾' : '▸') : ''}</span>
+        </div>{st.body && openStep===st.key && <div style={{padding:'4px 0 16px 30px'}}>{st.body}</div>}</div>)}
       </div>
-      <RequirementsGroup client={client} onVerify={onVerify} formOpen={formOpen} setFormOpen={setFormOpen} onDelete={onDelete}/>
       {messages&&messages.length>0&&<div className="vc-modal-section">
         <div className="vc-modal-section-title"><span>Messages from the couple</span><span className={'vc-pill '+(messages.some(m=>m.direction!=='outgoing'&&!m.handled_at)?'alert':'good')}>{messages.some(m=>m.direction!=='outgoing'&&!m.handled_at)?'New':'All handled'}</span></div>
         {messages.map(m=><div key={m.id} className="vc-note-box" style={{marginTop:8}}><div className="vc-muted" style={{marginBottom:4}}>{m.direction==='outgoing'?'Reply from '+(m.from_name||'the team'):(m.from_name||'Client')} · {new Date(m.created_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}{m.direction!=='outgoing'&&m.handled_at?' · handled'+(m.handled_by?' by '+m.handled_by:''):''}</div><div style={{whiteSpace:'pre-wrap'}}>{m.body}</div>{m.handled_note&&<div className="vc-muted" style={{marginTop:6,whiteSpace:'pre-wrap'}}><strong>Notes:</strong> {m.handled_note}</div>}{m.direction!=='outgoing'&&!m.handled_at&&onHandleMessage&&<button type="button" onClick={()=>{const who=window.prompt('Handled by (Jen, Derek or Haley)?');if(who&&/^(jen|derek|haley)$/i.test(who.trim()))onHandleMessage(m.id,who.trim().charAt(0).toUpperCase()+who.trim().slice(1).toLowerCase());else if(who)alert('Please enter Jen, Derek or Haley.');}} style={{marginTop:8,border:'1px solid #e0d8cc',borderRadius:6,padding:'5px 10px',background:'#fff',color:'#886c44',fontSize:11,fontWeight:600}}>Mark handled</button>}</div>)}
-      </div>}
-      {agreementApi&&(client.legacy
-        ? <div style={{opacity:.4,pointerEvents:'none',userSelect:'none'}} aria-disabled="true"><div className="vc-modal-section"><div className="vc-modal-section-title"><span>Agreement</span><span className="vc-pill good">Signed</span></div><p className="vc-muted" style={{margin:0}}>Booked before this system. The signed agreement is on file, so nothing is managed here.</p></div></div>
-        : client.nativeAgreement
-          // Once the agreement has been sent it stays closed, showing Sent or Signed, until it is clicked open.
-          ? <div className="vc-modal-section"><div className="vc-modal-section-title">Contract</div><ExpandRow id="vc-agreement" title="Agreement" tone={client.nativeAgreement.status === 'completed' ? 'good' : ['declined','expired'].includes(client.nativeAgreement.status) ? 'alert' : ''} pill={({completed:'Signed',pending:'Sent',declined:'Declined',expired:'Expired'})[client.nativeAgreement.status] || 'Sent'} open={agrOpen} onToggle={() => setAgrOpen(!agrOpen)}><ContractManager client={client} api={agreementApi} onChange={onContractsChange}/></ExpandRow></div>
-          : <ContractManager client={client} api={agreementApi} onChange={onContractsChange}/>)}
-      {client.legacy&&<div className="vc-modal-section">
-        <div className="vc-modal-section-title">Record a payment</div>
-        {(() => { const next = (client.schedule||[]).find(x=>!x.paid); return next && onSavePayments ? <button type="button" onClick={async()=>{if(!window.confirm('Mark '+next.label+' ('+amount(next.cents,next.currency)+') as paid? Nobody is notified.'))return;try{await onSavePayments(client.id,[...(client.manualPayments||[]),{id:String(Date.now()),cents:next.cents,date:venueDateKey(),note:next.label}]);}catch(e){alert(e.message||'Could not save.');}}} style={{marginBottom:10,border:'1px solid #886c44',borderRadius:6,padding:'6px 14px',background:'#fff',color:'#886c44',fontSize:12,fontWeight:600}}>Mark {next.label} ({amount(next.cents,next.currency)}) as paid</button> : null; })()}
-        <ManualPayments client={client} onSave={onSavePayments}/>
-      </div>}
-      {client.signatures && !client.legacy && <div className="vc-modal-section">
-        <div className="vc-modal-section-title">Contract signatures</div>
-        {client.signatures.signatures.map((s,i) => <div className="vc-line" key={i}><span className={'vc-dot '+(s.signed?'good':'')}/><span>{s.signee_name} · {s.signed?'Signed '+dateLabel(s.signed_at):'Awaiting signature'}</span></div>)}
       </div>}
       <div className="vc-modal-section">
         <details><summary>Original forms, documents &amp; email history</summary><p className="vc-muted">The source record is preserved here for reference.</p><div className="vc-history">{client.sub.internal_notes || 'No history recorded.'}</div></details>
