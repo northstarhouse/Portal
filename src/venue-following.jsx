@@ -40,6 +40,10 @@ function currentStage(p) {
   return { label: s[last].label, tone: 'mid' };
 }
 
+// Where a couple is now, for the Stage filter: the furthest step they've completed.
+const STAGE_OPTIONS = [['none', 'Not toured yet'], ['tour', 'Toured'], ['pre', 'Pre-booking form in'], ['signed', 'Agreement signed'], ['paid', 'First payment made'], ['day', 'Event held']];
+function stageKey(p) { const s = stagesOf(p); const last = s.map(x => x.done).lastIndexOf(true); return last === -1 ? 'none' : s[last].key; }
+
 const btn = { background: GOLD, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, padding: '6px 13px', cursor: 'pointer' };
 const ghost = { background: 'none', border: '0.5px solid #e0d8cc', color: '#777', borderRadius: 7, fontSize: 12, padding: '5px 11px', cursor: 'pointer' };
 const input = { width: '100%', boxSizing: 'border-box', padding: '7px 9px', fontSize: 13, border: '0.5px solid #d8cfc2', borderRadius: 6, fontFamily: 'inherit', background: '#fff' };
@@ -70,6 +74,7 @@ export function VenueFollowingView({ navigate }) {
   const [err, setErr] = React.useState('');
   const [busy, setBusy] = React.useState('');
   const [query, setQuery] = React.useState('');
+  const [stage, setStage] = React.useState('all');
 
   function load() {
     vfApi('rpc/venue_follow_progress', { method: 'POST', body: '{}' }).then(d => setRows(Array.isArray(d) ? d : [])).catch(e => { setErr('Could not load: ' + e.message); setRows([]); });
@@ -111,7 +116,8 @@ export function VenueFollowingView({ navigate }) {
     .slice(0, 40);
   // Basic search over the couples in the current view (name or email).
   const q = query.trim().toLowerCase();
-  const visible = q ? shown.filter(r => String(r.name || '').toLowerCase().includes(q) || String(r.email || '').toLowerCase().includes(q)) : shown;
+  const staged = stage === 'all' ? shown : shown.filter(r => stageKey(r) === stage);
+  const visible = q ? staged.filter(r => String(r.name || '').toLowerCase().includes(q) || String(r.email || '').toLowerCase().includes(q)) : staged;
 
   const tone = { early: { bg: '#f3efe8', c: '#8a7a64' }, mid: { bg: '#fff8e1', c: '#8a6200' }, done: { bg: '#e8f5e9', c: '#2e7d32' } };
   const section = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: GOLD, margin: '22px 0 10px' };
@@ -129,6 +135,11 @@ export function VenueFollowingView({ navigate }) {
           {guides.filter(g => g !== me).map(g => <option key={g} value={g}>{g} ({(rows || []).filter(r => r.follower === g).length})</option>)}
           <option value="all">All tour guides{rows ? ' (' + rows.length + ')' : ''}</option>
         </select>
+        <select value={stage} onChange={e => setStage(e.target.value)} aria-label="Stage"
+          style={{ fontSize: 13, fontWeight: 600, padding: '7px 10px', borderRadius: 8, border: '1px solid ' + GOLD, background: '#faf5ee', color: GOLD, cursor: 'pointer' }}>
+          <option value="all">All stages{rows ? ' (' + shown.length + ')' : ''}</option>
+          {STAGE_OPTIONS.map(([k, l]) => <option key={k} value={k}>{l} ({shown.filter(r => stageKey(r) === k).length})</option>)}
+        </select>
         </div>
       </div>
       {err && <div style={{ color: '#b3261e', fontSize: 12, marginTop: 10 }}>{err}</div>}
@@ -136,7 +147,7 @@ export function VenueFollowingView({ navigate }) {
       <div style={section}>{scope === 'mine' ? 'Couples you\'re following' : scope === 'all' ? 'All tour guides\' follows' : 'Couples ' + scope + ' is following'}</div>
       {rows === null && <div style={{ fontSize: 13, color: '#aaa' }}>Loading…</div>}
       {rows && !shown.length && <div style={{ fontSize: 13, color: '#aaa', background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 18 }}>{scope === 'mine' ? 'You are not following anyone yet. Pick a couple you toured below.' : scope === 'all' ? 'No one is being followed yet.' : scope + ' is not following anyone yet.'}</div>}
-      {rows && shown.length > 0 && q && !visible.length && <div style={{ fontSize: 13, color: '#aaa', background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 18 }}>No couples match “{query.trim()}”.</div>}
+      {rows && shown.length > 0 && (q || stage !== 'all') && !visible.length && <div style={{ fontSize: 13, color: '#aaa', background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: 18 }}>{q ? 'No couples match “' + query.trim() + '”' + (stage !== 'all' ? ' at this stage' : '') + '.' : 'No couples at this stage.'}</div>}
       {visible.map(r => {
         const st = currentStage(r), t = tone[st.tone];
         return (
