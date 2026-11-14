@@ -20321,10 +20321,10 @@ function VenueRentalsView({ navigate, initialTab }) {
             })}
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginLeft: 'auto' }}>
-          <div style={{ position: 'relative', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginLeft: 'auto', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'relative', flexShrink: 0, order: 2 }}>
             <button type="button" aria-haspopup="menu" aria-expanded={toolsOpen} onClick={function() { setToolsOpen(!toolsOpen); }}
-              style={{ padding: '9px 16px', background: toolsOpen ? gold : '#fff', color: toolsOpen ? '#fff' : gold, border: '1px solid ' + gold, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Tools ▾</button>
+              style={{ height: 38, boxSizing: 'border-box', padding: '0 16px', background: toolsOpen ? gold : '#fff', color: toolsOpen ? '#fff' : gold, border: '1px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Tools ▾</button>
             {toolsOpen && (
               <React.Fragment>
                 <div onClick={function() { setToolsOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
@@ -20404,12 +20404,9 @@ function VenueRentalsView({ navigate, initialTab }) {
             )}
           </div>
           {venueTab === 'clients' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
-              <button type="button" onClick={function() { setSiteView(!siteView); }}
-                style={{ padding: '9px 16px', background: siteView ? gold : '#fff', color: siteView ? '#fff' : gold, border: '1px solid ' + gold, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>{siteView ? 'Back to clients' : 'Assign Site Managers'}</button>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end', order: 1 }}>
               <select aria-label="Filter clients" value={clientFilter} onChange={function(e) { setClientFilter(e.target.value); }}
-                style={{ border: '1px solid #ded7cb', background: '#fff', borderRadius: 7, padding: '9px 11px', fontSize: 12, color: '#333', cursor: 'pointer' }}>
+                style={{ height: 38, boxSizing: 'border-box', border: '1px solid #ded7cb', background: '#fff', borderRadius: 8, padding: '0 10px', fontSize: 13, color: '#333', cursor: 'pointer' }}>
                 <option value="all">All upcoming</option>
                 <option value="attention">Needs attention</option>
                 <option value="viewall">View all events</option>
@@ -20417,8 +20414,9 @@ function VenueRentalsView({ navigate, initialTab }) {
                 <option value="past">Past events</option>
               </select>
               <input aria-label="Search clients" placeholder="Search names or dates…" value={clientQuery} onChange={function(e) { setClientQuery(e.target.value); }}
-                style={{ border: '1px solid #ded7cb', background: '#fff', borderRadius: 7, padding: '9px 11px', fontSize: 12, minWidth: 180 }} />
-              </div>
+                style={{ height: 38, boxSizing: 'border-box', border: '1px solid #ded7cb', background: '#fff', borderRadius: 8, padding: '0 12px', fontSize: 13, width: 210 }} />
+              <button type="button" onClick={function() { setSiteView(!siteView); }}
+                style={{ height: 38, boxSizing: 'border-box', padding: '0 16px', background: siteView ? gold : '#fff', color: siteView ? '#fff' : gold, border: '1px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>{siteView ? 'Back to clients' : 'Assign Site Managers'}</button>
             </div>
           )}
           {venueTab !== 'clients' && (
