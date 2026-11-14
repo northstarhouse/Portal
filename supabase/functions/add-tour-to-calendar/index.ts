@@ -181,6 +181,8 @@ Deno.serve(async (req) => {
           // you override -- trying it here; the response below reports
           // back what Google actually assigned either way.
           organizer: { displayName: "North Star House" },
+          // Derek's tours show in blue (Google Calendar "Blueberry"); other guides keep the calendar's default color.
+          ...(/^derek\b/i.test(String(tour.guide_name || "").trim()) ? { colorId: "9" } : {}),
         }),
       },
     );
