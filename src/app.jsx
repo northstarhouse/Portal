@@ -20405,16 +20405,6 @@ function VenueRentalsView({ navigate, initialTab }) {
           </div>
           {venueTab === 'clients' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end', order: 1 }}>
-              <select aria-label="Filter clients" value={clientFilter} onChange={function(e) { setClientFilter(e.target.value); }}
-                style={{ height: 38, boxSizing: 'border-box', border: '1px solid #ded7cb', background: '#fff', borderRadius: 8, padding: '0 10px', fontSize: 13, color: '#333', cursor: 'pointer' }}>
-                <option value="all">All upcoming</option>
-                <option value="attention">Needs attention</option>
-                <option value="viewall">View all events</option>
-                <option value="recent">Most recent</option>
-                <option value="past">Past events</option>
-              </select>
-              <input aria-label="Search clients" placeholder="Search names or dates…" value={clientQuery} onChange={function(e) { setClientQuery(e.target.value); }}
-                style={{ height: 38, boxSizing: 'border-box', border: '1px solid #ded7cb', background: '#fff', borderRadius: 8, padding: '0 12px', fontSize: 13, width: 210 }} />
               <button type="button" onClick={function() { setSiteView(!siteView); }}
                 style={{ height: 38, boxSizing: 'border-box', padding: '0 16px', background: siteView ? gold : '#fff', color: siteView ? '#fff' : gold, border: '1px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>{siteView ? 'Back to clients' : 'Assign Site Managers'}</button>
             </div>
@@ -20434,6 +20424,20 @@ function VenueRentalsView({ navigate, initialTab }) {
             </React.Fragment>
           )}
         </div>
+        {venueTab === 'clients' && (
+          <div style={{ flexBasis: '100%', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <select aria-label="Filter clients" value={clientFilter} onChange={function(e) { setClientFilter(e.target.value); }}
+                style={{ height: 38, boxSizing: 'border-box', border: '1px solid #ded7cb', background: '#fff', borderRadius: 8, padding: '0 10px', fontSize: 13, color: '#333', cursor: 'pointer' }}>
+                <option value="all">All upcoming</option>
+                <option value="attention">Needs attention</option>
+                <option value="viewall">View all events</option>
+                <option value="recent">Most recent</option>
+                <option value="past">Past events</option>
+              </select>
+              <input aria-label="Search clients" placeholder="Search names or dates…" value={clientQuery} onChange={function(e) { setClientQuery(e.target.value); }}
+                style={{ height: 38, boxSizing: 'border-box', border: '1px solid #ded7cb', background: '#fff', borderRadius: 8, padding: '0 12px', fontSize: 13, width: 210 }} />
+          </div>
+        )}
       </div>
 
       {addTourOpen && <AddTourModal onClose={function() { setAddTourOpen(false); }} />}
