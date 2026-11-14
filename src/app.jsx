@@ -19625,6 +19625,8 @@ var TOUR_CATEGORY_COLORS = {
 };
 // Tour calendar: each guide's tours in their own color (Event tours red; otherwise Jen light pink, Derek dark blue; a tour on the default slot is Jen's).
 var TOUR_EVENT_COLOR = { bg: '#c62828', color: '#fff', ring: '#8e1b1b' };
+// Venue Rentals Upcoming Tours (color coding on): guide name tags in the same colors as Google Calendar (Jen Peacock, Derek Banana).
+var CAL_GUIDE_TAG = { Jen: { bg: '#039be5', color: '#fff' }, Derek: { bg: '#f6bf26', color: '#3d3000' } };
 var TOUR_GUIDE_COLORS = { Jen: { bg: '#fde4ee', color: '#b0456f' }, Derek: { bg: '#1f3f73', color: '#fff', ring: '#14294d' } };
 function tourGuideColor(t) {
   // tours for an Event booking are red, whoever guides them
@@ -20488,7 +20490,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: e.cancelled ? 'line-through' : 'none' }}>{e.title}</div>
                         <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>{when}</div>
                       </div>
-                      {e.cancelled ? <span style={{ flexShrink: 0, width: 64, textAlign: 'center', boxSizing: 'border-box', background: '#fdecea', color: '#b3261e', fontSize: 11, fontWeight: 700, borderRadius: 12, padding: '3px 0' }}>Cancelled</span> : guideName ? <span style={{ flexShrink: 0, width: 64, textAlign: 'center', boxSizing: 'border-box', background: 'rgba(136,108,68,0.12)', color: gold, fontSize: 11, fontWeight: 700, borderRadius: 12, padding: '3px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{guideName}</span> : null}
+                      {e.cancelled ? <span style={{ flexShrink: 0, width: 64, textAlign: 'center', boxSizing: 'border-box', background: '#fdecea', color: '#b3261e', fontSize: 11, fontWeight: 700, borderRadius: 12, padding: '3px 0' }}>Cancelled</span> : guideName ? <span style={{ flexShrink: 0, width: 64, textAlign: 'center', boxSizing: 'border-box', background: (colorCoding && CAL_GUIDE_TAG[guideName.split(' ')[0]] || {}).bg || 'rgba(136,108,68,0.12)', color: (colorCoding && CAL_GUIDE_TAG[guideName.split(' ')[0]] || {}).color || gold, fontSize: 11, fontWeight: 700, borderRadius: 12, padding: '3px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{guideName}</span> : null}
                       <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                   );
