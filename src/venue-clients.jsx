@@ -730,14 +730,11 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
           <span aria-hidden="true" style={{color:'#886c44',fontSize:13,width:14,textAlign:'center'}}>{st.body ? (openStep===st.key ? '▾' : '▸') : ''}</span>
         </div>{st.body && openStep===st.key && <div style={{padding:'4px 0 16px 30px'}}>{st.body}</div>}</div>)}
       </div>
-      {messages&&messages.length>0&&<div className="vc-modal-section">
-        <div className="vc-modal-section-title"><span>Messages from the couple</span><span className={'vc-pill '+(messages.some(m=>m.direction!=='outgoing'&&!m.handled_at)?'alert':'good')}>{messages.some(m=>m.direction!=='outgoing'&&!m.handled_at)?'New':'All handled'}</span></div>
-        {messages.map(m=><div key={m.id} className="vc-note-box" style={{marginTop:8}}><div className="vc-muted" style={{marginBottom:4}}>{m.direction==='outgoing'?'Reply from '+(m.from_name||'the team'):(m.from_name||'Client')} · {new Date(m.created_at).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}{m.direction!=='outgoing'&&m.handled_at?' · handled'+(m.handled_by?' by '+m.handled_by:''):''}</div><div style={{whiteSpace:'pre-wrap'}}>{m.body}</div>{m.handled_note&&<div className="vc-muted" style={{marginTop:6,whiteSpace:'pre-wrap'}}><strong>Notes:</strong> {m.handled_note}</div>}{m.direction!=='outgoing'&&!m.handled_at&&onHandleMessage&&<button type="button" onClick={()=>{const who=window.prompt('Handled by (Jen, Derek or Haley)?');if(who&&/^(jen|derek|haley)$/i.test(who.trim()))onHandleMessage(m.id,who.trim().charAt(0).toUpperCase()+who.trim().slice(1).toLowerCase());else if(who)alert('Please enter Jen, Derek or Haley.');}} style={{marginTop:8,border:'1px solid #e0d8cc',borderRadius:6,padding:'5px 10px',background:'#fff',color:'#886c44',fontSize:11,fontWeight:600}}>Mark handled</button>}</div>)}
-      </div>}
-      {!(client.sub.internal_notes || client.hb || client.sourceUrl) ? <div className="vc-modal-section">
+      <div className="vc-modal-section">
         <div className="vc-modal-section-title">Email history</div>
-        <EmailHistory client={client} api={agreementApi} messages={messages} guideSentAt={tl.sentAt}/>
-      </div> : <div className="vc-modal-section">
+        <EmailHistory client={client} api={agreementApi} messages={messages} guideSentAt={tl.sentAt} onHandleMessage={onHandleMessage}/>
+      </div>
+      {(client.sub.internal_notes || client.hb || client.sourceUrl) && <div className="vc-modal-section">
         <details><summary>Original forms, documents &amp; email history</summary><p className="vc-muted">The source record is preserved here for reference.</p><div className="vc-history">{client.sub.internal_notes || 'No history recorded.'}</div></details>
         {client.sourceUrl && <p style={{marginBottom:0}}><a href={client.sourceUrl} target="_blank" rel="noopener noreferrer">Open original HoneyBook project ↗</a></p>}
       </div>}
