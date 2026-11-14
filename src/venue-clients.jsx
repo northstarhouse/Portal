@@ -600,7 +600,11 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
   const [openStep, setOpenStep] = React.useState(null);
   const contractBody = !agreementApi ? null : client.legacy ? <p className="vc-muted" style={{margin:0}}>Booked before this system. The signed agreement is on file, so nothing is managed here.</p> : <ContractManager client={client} api={agreementApi} onChange={onContractsChange}/>;
   const nextUnpaid = (client.schedule || []).find(x => !x.paid);
-  const paymentBody = onSavePayments ? <div>{nextUnpaid ? <button type="button" onClick={async()=>{if(!window.confirm('Mark '+nextUnpaid.label+' ('+amount(nextUnpaid.cents,nextUnpaid.currency)+') as paid? Nobody is notified.'))return;try{await onSavePayments(client.id,[...(client.manualPayments||[]),{id:String(Date.now()),cents:nextUnpaid.cents,date:venueDateKey(),note:nextUnpaid.label}]);}catch(e){alert(e.message||'Could not save.');}}} style={{marginBottom:10,border:'1px solid #886c44',borderRadius:6,padding:'6px 14px',background:'#fff',color:'#886c44',fontSize:12,fontWeight:600}}>Mark {nextUnpaid.label} ({amount(nextUnpaid.cents,nextUnpaid.currency)}) as paid</button> : null}<ManualPayments client={client} onSave={onSavePayments}/></div> : null;
+  // Each payment's own step: Paid, or (for the next payment due) mark it paid / log a payment. Payments apply in order.
+  const paymentBody = (p) => p.paid ? <p className="vc-muted" style={{margin:0}}>✓ Paid{p.manual ? ' (logged by hand)' : ''}.</p>
+    : !onSavePayments ? null
+    : nextUnpaid && p !== nextUnpaid ? <p className="vc-muted" style={{margin:0}}>Payments are applied in order. Mark {nextUnpaid.label} paid first.</p>
+    : <div><button type="button" onClick={async()=>{if(!window.confirm('Mark '+p.label+' ('+amount(p.cents,p.currency)+') as paid? Nobody is notified.'))return;try{await onSavePayments(client.id,[...(client.manualPayments||[]),{id:String(Date.now()),cents:p.cents,date:venueDateKey(),note:p.label}]);}catch(e){alert(e.message||'Could not save.');}}} style={{marginBottom:10,border:'1px solid #886c44',borderRadius:6,padding:'6px 14px',background:'#fff',color:'#886c44',fontSize:12,fontWeight:600}}>Mark {p.label} ({amount(p.cents,p.currency)}) as paid</button><ManualPayments client={client} onSave={onSavePayments}/></div>;
   const hbAnswered = (client.hbQa || []).filter(x => String(x.answer || '').trim());
   const brickDone = !!client.brickLines?.some(l => String(l).trim());
   const paperworkBody = onUploadPaperwork ? <div>
@@ -642,11 +646,11 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
   (client.schedule || []).forEach((p, i) => {
     // The first payment is due the moment both clients have signed, not on a calendar date.
     if (i === 0 && !client.legacy) {
-      step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : clientsSigned ? 'Due now' : 'Due when both clients sign', null, !p.paid && clientsSigned, paymentBody);
+      step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : clientsSigned ? 'Due now' : 'Due when both clients sign', null, !p.paid && clientsSigned, paymentBody(p));
       return;
     }
     const late = !p.paid && p.due && p.due < today && client.clientsSigned;
-    step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : !client.clientsSigned && p.due && p.due < today ? 'Due once the clients sign' : p.due ? (late ? 'Past due · ' : 'Due ') + dateLabel(p.due) : 'Awaiting payment', null, late, paymentBody);
+    step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : !client.clientsSigned && p.due && p.due < today ? 'Due once the clients sign' : p.due ? (late ? 'Past due · ' : 'Due ') + dateLabel(p.due) : 'Awaiting payment', null, late, paymentBody(p));
   });
   step('Insurance verified', client.insuranceVerified, client.insuranceVerified ? 'Verified' : client.insuranceUploadedAt ? 'Uploaded ' + dateLabel(client.insuranceUploadedAt) + ', needs checking' : 'Not uploaded yet', null, false, <InsuranceVerification client={client} onVerify={onVerify}/>);
   const qSend = client.eventDate ? shiftDate(client.eventDate, -60) : null;
