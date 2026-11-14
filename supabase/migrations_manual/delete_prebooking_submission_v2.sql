@@ -7,9 +7,14 @@ language plpgsql
 set search_path to 'public', 'extensions', 'pg_temp'
 as $function$
 begin
- if tg_op='DELETE' and current_setting('nsh.delete_unsent_drafts', true)='on'
-    and (tg_table_name<>'venue_agreement_versions' or (old.status in ('draft','void') and old.issued_at is null)) then
-  return old;
+ if tg_op='DELETE' and current_setting('nsh.delete_unsent_drafts', true)='on' then
+  -- Separate IFs: plpgsql can't read old.status on tables that don't have it (history rows).
+  if tg_table_name<>'venue_agreement_versions' then
+   return old;
+  end if;
+  if (to_jsonb(old)->>'status') in ('draft','void') and (to_jsonb(old)->>'issued_at') is null then
+   return old;
+  end if;
  end if;
  if tg_op='DELETE' or tg_table_name='venue_agreement_events' then raise exception 'Agreement history is retained. Withdraw a request or create a revised version.'; end if;
  if tg_table_name='venue_agreement_versions' and old.status<>'draft' then
