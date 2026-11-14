@@ -20128,9 +20128,10 @@ function VenueRentalsView({ navigate, initialTab }) {
   upcoming.forEach(function(w) {
     var t = getTrack(w.uid);
     var missing = [];
+    // The payment clock starts at signing: until the contract is signed (soft holds included) only the contract is outstanding.
     if (!t.contract_signed) missing.push('contract');
-    if (!t.deposit_paid) missing.push('deposit');
-    if (!t.final_payment_received) missing.push('final payment');
+    if (t.contract_signed && !t.deposit_paid) missing.push('deposit');
+    if (t.contract_signed && !t.final_payment_received) missing.push('final payment');
     if (missing.length) {
       attentionItems.push({
         key: 'wed_' + w.uid,
