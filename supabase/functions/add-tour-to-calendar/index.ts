@@ -130,6 +130,15 @@ type Tour = {
 const WEDDING_FORM_ID = "1eea2137-f94d-414b-a977-4ed622214580";
 const EVENT_TYPE_FIELD_ID = "0uj9rtfk";
 
+// Guide colors on the calendar: Derek blue ("Blueberry"), Jen green ("Basil", the closest event color to Avocado,
+// which Google only offers for whole calendars). Other guides keep the calendar's default color.
+function guideColor(guide: string | null): string | null {
+  const g = String(guide || "").trim();
+  if (/^derek\b/i.test(g)) return "9";
+  if (/^jen(nifer)?\b/i.test(g)) return "10";
+  return null;
+}
+
 function tourCategoryLabel(tour: Tour): string {
   if (tour.inquiry_form_id === WEDDING_FORM_ID) return "Wedding";
   const eventType = tour.inquiry_answers?.[EVENT_TYPE_FIELD_ID];
@@ -142,7 +151,24 @@ function tourCategoryLabel(tour: Tour): string {
 Deno.serve(async (req) => {
   try {
     if (req.method !== "POST") return new Response(JSON.stringify({ error: "POST only" }), { status: 405 });
-    const { id } = await req.json();
+    const body = await req.json();
+    const { id } = body;
+    // One-time recolor: set the guide color on every upcoming booked tour already on the calendar.
+    if (body.recolor === true) {
+      const today = new Date().toISOString().slice(0, 10);
+      const tours: Tour[] = await sbGet(`estate_tours?status=eq.booked&date=gte.${today}&gcal_event_id=not.is.null&select=id,guide_name,gcal_event_id`);
+      const token = await getCalendarAccessToken();
+      const out = { updated: 0, skipped: 0, failed: [] as string[] };
+      for (const t of tours) {
+        const colorId = guideColor(t.guide_name);
+        if (!colorId) { out.skipped++; continue; }
+        const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(t.gcal_event_id!)}`, {
+          method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ colorId }),
+        });
+        if (r.ok) out.updated++; else out.failed.push(t.id + ": " + r.status);
+      }
+      return new Response(JSON.stringify({ ok: true, ...out }), { headers: { "Content-Type": "application/json" } });
+    }
     if (!id) return new Response(JSON.stringify({ error: "id required" }), { status: 400 });
 
     const rows: Tour[] = await sbGet(`estate_tours?id=eq.${encodeURIComponent(id)}&select=*`);
@@ -183,7 +209,7 @@ Deno.serve(async (req) => {
           organizer: { displayName: "North Star House" },
           // Guide colors: Derek blue ("Blueberry"), Jen green ("Basil", the closest event color to Avocado, which
           // Google only offers for whole calendars). Other guides keep the calendar's default color.
-          ...(/^derek\b/i.test(String(tour.guide_name || "").trim()) ? { colorId: "9" } : /^jen(nifer)?\b/i.test(String(tour.guide_name || "").trim()) ? { colorId: "10" } : {}),
+          ...(guideColor(tour.guide_name) ? { colorId: guideColor(tour.guide_name) } : {}),
         }),
       },
     );
