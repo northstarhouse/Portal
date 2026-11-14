@@ -91,10 +91,18 @@ async function resolve(body: any, ip: string) {
   const miss = () => { brakeMiss(ip); return new Fail("We couldn't find a booking for that venue code. Check the code in your email.", 404); };
   if (!date) throw miss();
   let rows = await rest(`venue_inquiries?select=${INQUIRY_SELECT}&event_date=eq.${date}&prebooking_form_response_id=not.is.null`);
+  // Two bookings on one date: tell them apart by what the client types -- the event / organization name first (one person
+  // can hold two events that day), then their last name, matched against the booking name and the email on file.
   const nm = String(body.name || '').trim().toLowerCase();
-  if (rows.length > 1 && nm) rows = rows.filter((r: any) => (r.name || '').toLowerCase().includes(nm));
+  if (rows.length > 1 && nm) {
+    const words = nm.split(/\s+/).filter((w) => w.length > 1);
+    const has = (t: string) => words.length > 0 && words.every((w) => t.includes(w));
+    const byEvent = rows.filter((r: any) => has(String(r.name || '').toLowerCase()));
+    rows = byEvent.length ? byEvent : rows.filter((r: any) => has((String(r.name || '') + ' ' + String(r.email || '')).toLowerCase()));
+    if (rows.length > 1) throw new Fail('More than one event on this date is under that name. Please type the event or organization name instead.', 409, { needs_name: true });
+  }
   if (!rows.length) throw miss();
-  if (rows.length > 1) throw new Fail('More than one booking uses this date. Please add your last name.', 409, { needs_name: true });
+  if (rows.length > 1) throw new Fail('More than one booking uses this date. Please add your last name or your event name.', 409, { needs_name: true });
   return { date, inq: rows[0] };
 }
 
