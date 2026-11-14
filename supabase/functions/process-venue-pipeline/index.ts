@@ -428,7 +428,11 @@ Deno.serve(async (req) => {
   try {
     const in60Days = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const todayStr = now.toISOString().slice(0, 10);
-    const rows = await rest(`venue_inquiries?select=*&status=eq.Booked&questionnaire_sent_at=is.null&event_date=lte.${in60Days}&event_date=gte.${todayStr}&email=not.is.null`);
+    // Clients booked in the Portal stay at "Booking"; they count as booked once their agreement is fully signed.
+    const candidates = await rest(`venue_inquiries?select=*&status=in.(Booked,Booking)&questionnaire_sent_at=is.null&event_date=lte.${in60Days}&event_date=gte.${todayStr}&email=not.is.null`);
+    const bookingIds = candidates.filter((r: any) => r.status === 'Booking' && r.prebooking_form_response_id).map((r: any) => r.prebooking_form_response_id);
+    const signed = new Set<string>(bookingIds.length ? (await rest(`venue_agreement_versions?select=response_id&status=eq.completed&response_id=in.(${bookingIds.join(',')})`)).map((v: any) => v.response_id) : []);
+    const rows = candidates.filter((r: any) => r.status === 'Booked' || signed.has(r.prebooking_form_response_id));
     for (const inq of rows) {
       try {
         // One page for everything now; both legacy variables point at it so older template copies still work.
