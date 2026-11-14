@@ -1,4 +1,4 @@
-import { ContractManager } from './venue-contracts.jsx';
+import { ContractManager, SigBlock, contractPreviewStyle } from './venue-contracts.jsx';
 import { ClientNotes } from './client-notes.jsx';
 import { RequestDetailsButton, missingPrebookingItems } from './request-details.jsx';
 import { EmailHistory } from './email-history.jsx';
@@ -636,7 +636,7 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
   const lastSigned = list => list.map(x => x.signed_at).filter(Boolean).sort().pop();
   step(client.legacy || client.nativeAgreement ? 'Agreement sent' : 'Populate agreement', client.legacy || !!client.nativeAgreement, client.legacy ? 'Signed before the new system' : client.nativeAgreement?.issued_at ? dateLabel(client.nativeAgreement.issued_at) : 'Not sent yet', null, false, contractBody);
   const clientsSigned = client.legacy || (clientSigs.length > 0 && clientSigs.every(x => x.signed));
-  step('Clients signed', clientsSigned, client.legacy ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed before the new system') : clientsSigned ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed') : clientSigs.length ? clientSigs.filter(x => x.signed).length + ' of ' + clientSigs.length + ' signed' : 'Waiting on the agreement', null, false, contractBody);
+  step('Clients signed', clientsSigned, client.legacy ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed before the new system') : clientsSigned ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed') : clientSigs.length ? clientSigs.filter(x => x.signed).length + ' of ' + clientSigs.length + ' signed' : 'Waiting on the agreement', null, false, clientSigs.length ? <div><style>{contractPreviewStyle}</style>{clientSigs.map((x, i) => { const r = (client.nativeAgreement?.recipients || []).find(y => y.role !== 'venue' && y.name === x.signee_name) || {}; return <div key={i} style={{marginBottom:10}}><SigBlock s={{ name: x.signee_name, email: r.email, role: 'client', status: x.signed ? 'signed' : 'pending', signed_at: x.signed_at, signed_name: r.signed_name }}/></div>; })}{!clientsSigned && client.nativeAgreement?.expires_at && <p className="vc-muted" style={{margin:0}}>Sign by {new Date(client.nativeAgreement.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. Reminders are sent from the Agreement step.</p>}</div> : null);
   const venueSigned = client.legacy || (venueSigs.length > 0 && venueSigs.every(x => x.signed));
   step('Venue countersigned', venueSigned, client.legacy ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed before the new system') : venueSigned ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed') : 'Waiting on the clients', null, false, contractBody);
   (client.schedule || []).forEach((p, i) => {
