@@ -1860,7 +1860,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                   <option value="">General</option>
                   {CHECKLIST_CATEGORIES.filter(c => c !== 'General').map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-                <AssignVolunteers v={dutyPeople(t)} volunteers={volunteers} compact onPatch={pt => patchDutyPeople(t, pt)} />
+                <span title="Click the line to add or change who is on it" style={{ width: 170, flexShrink: 0, fontSize: 12, lineHeight: 1.4, color: t.assignee ? 'var(--text)' : 'var(--muted)', fontStyle: t.assignee ? 'normal' : 'italic' }}>{t.assignee || 'No one yet'}</span>
                 <select className="input" value={t.timing || (t.due ? 'before' : '')} style={{ width: 132, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}
                   onChange={e => { const v = e.target.value; patchItem(t.id, { timing: v, due: v === 'before' ? (t.timing === 'dayof' ? '' : (t.due || '')) : dueForTiming(v, ev.date) }); }}>
                   <option value="">When?</option>
@@ -1893,6 +1893,8 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                       <input className="input" type="date" style={{ width: 130 }} value={expandForm.due} onChange={e => setExpandForm(f => ({ ...f, due: e.target.value }))} />
                     </div>
                   </div>
+                  <div className="label">Who is on this</div>
+                  <div style={{ marginBottom: 12 }}><AssignVolunteers v={dutyPeople(t)} volunteers={volunteers} onPatch={pt => patchDutyPeople(t, pt)} /></div>
                   <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
                     <div style={{ flex: 1 }}>
                       <div className="label">Estimated $</div>
