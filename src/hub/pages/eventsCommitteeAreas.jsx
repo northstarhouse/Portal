@@ -476,7 +476,7 @@ function AreaFormSection({ fields, data, onFieldChange, volunteers, readOnly }) 
 
 // editing / embedded: when a parent owns the Edit button (Volunteers, Staffing & Vendors share one), it passes editing and
 // this tab hides its own tabs and buttons.
-export default function AreasTab({ event, session, volunteer, initialArea, editing: editingProp, embedded }) {
+export default function AreasTab({ event, session, volunteer, initialArea, editing: editingProp, embedded, alwaysEdit }) {
   const [rows, setRows] = useState(null);
   const [volunteersDir, setVolunteersDir] = useState([]);
   const [activeArea, setActiveArea] = useState(initialArea || 'logistics');
@@ -485,7 +485,7 @@ export default function AreasTab({ event, session, volunteer, initialArea, editi
   const [saved, setSaved] = useState(false);
   const [editingState, setEditingState] = useState(false);
   const controlled = editingProp !== undefined;
-  const editing = controlled ? editingProp : editingState;
+  const editing = alwaysEdit ? true : (controlled ? editingProp : editingState);
   const setEditing = controlled ? () => {} : setEditingState;
   // While editing (say, one person typing during a meeting) changes save by themselves a moment after they stop typing.
   const dirtyRef = useRef(false);
@@ -575,7 +575,7 @@ export default function AreasTab({ event, session, volunteer, initialArea, editi
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {editing && <span style={{ fontSize: 12, color: saved && !saving ? '#2e7d32' : 'var(--muted)' }}>{saving ? 'Saving…' : saved ? 'All changes saved ✓' : 'Changes save automatically'}</span>}
-          {editing ? <button className="btn-gold" disabled={saving} onClick={done}>Done</button> : <button className="btn-ghost" onClick={() => setEditing(true)}>Edit</button>}
+          {alwaysEdit ? null : (editing ? <button className="btn-gold" disabled={saving} onClick={done}>Done</button> : <button className="btn-ghost" onClick={() => setEditing(true)}>Edit</button>)}
         </div>
       </div>
       )}
@@ -583,7 +583,7 @@ export default function AreasTab({ event, session, volunteer, initialArea, editi
       {fields.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)', padding: '10px 0' }}>Nothing to fill in here.</div>}
       <AreaFormSection fields={fields} data={data} onFieldChange={updateField} volunteers={volunteersDir} readOnly={!editing} />
 
-      {editing && !embedded && (
+      {editing && !embedded && !alwaysEdit && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20 }}>
           <button className="btn-gold" disabled={saving} onClick={done}>Done</button>
           <span style={{ fontSize: 12, color: 'var(--muted)' }}>{saving ? 'Saving…' : saved ? 'All changes saved ✓' : ''}</span>

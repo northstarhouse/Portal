@@ -330,12 +330,11 @@ const PLANNING_SECTION_ICONS = {
 };
 
 const PLANNING_SECTIONS = [
-  { key: 'preplanning', title: 'Event Basics', desc: 'Event details, website page, tickets' },
   { key: 'checklist', title: 'Checklist', desc: 'Type the duties in fast, then assign and date them' },
   { key: 'volunteers', title: 'Volunteers, Staffing & Vendors', desc: 'What we need, who we found, contacts and volunteer roles', area: 'volunteers' },
+  { key: 'dayof', title: 'Day-Of Timeline', desc: 'Run of show for the day' },
   { key: 'marketing', title: 'Marketing & Promotion', desc: 'Flyers, newsletters, website, social media', area: 'marketing' },
   { key: 'budget', title: 'Budget & Transactions', desc: 'Income, expenses, reimbursements' },
-  { key: 'dayof', title: 'Day-Of Timeline', desc: 'Run of show for the day' },
   { key: 'after', title: 'After the Event', desc: 'What went well, final numbers, follow-ups, reviews and feedback' },
 ];
 
@@ -368,6 +367,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
   const [ticketStats, setTicketStats] = useState(null);
   // RSVP events have no ticket sales, so that box reads N/A.
   const [rsvpOnly, setRsvpOnly] = useState(false);
+  const [basicsOpen, setBasicsOpen] = useState(false);
   useEffect(() => { let live = true; setRsvpOnly(false); fetchEventCardMeta(ev.name).then(m => { if (live) setRsvpOnly(!!(m && m.rsvp_only)); }).catch(() => {}); return () => { live = false; }; }, [ev.name]);
   const [financials, setFinancials] = useState(null);
   const [flyerUrl, setFlyerUrl] = useState(null);
@@ -441,7 +441,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
-              <button className="btn-ghost" style={{ fontSize: 12 }} onClick={onEdit}>Edit</button>
+              <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setBasicsOpen(v => !v)}>{basicsOpen ? 'Close' : 'Edit'}</button>
               {onDelete && <button className="btn-ghost" style={{ fontSize: 12, color: '#a04545' }} onClick={onDelete}>Delete</button>}
             </div>
           </div>
@@ -469,6 +469,16 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
           </button>
         </div>
       </div>
+
+      {basicsOpen && (
+        <div className="card" style={{ padding: '18px 22px', marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif" }}>Event Basics</div>
+            <button className="btn-ghost" style={{ fontSize: 12, padding: '4px 12px' }} onClick={() => setBasicsOpen(false)}>Close</button>
+          </div>
+          <PreplanningTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} onRsvpChange={setRsvpOnly} autoEdit onClose={() => setBasicsOpen(false)} />
+        </div>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
         <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif" }}>Planning progress</div>
@@ -563,12 +573,6 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{s.title}{s.key === 'marketing' && marketingNA && <span className="badge" style={{ marginLeft: 8, background: 'var(--light)', color: 'var(--muted)' }}>N/A</span>}</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>{s.desc}</div>
                 </div>
-                {s.key === 'marketing' && (
-                  <button className="btn-ghost" onClick={e => { e.stopPropagation(); toggleMarketingNA(!marketingNA); }}
-                    style={{ padding: '3px 12px', fontSize: 11, flexShrink: 0, color: marketingNA ? 'var(--gold)' : '#a04545' }}>
-                    {marketingNA ? 'Turn on' : 'Turn off'}
-                  </button>
-                )}
                 <span style={{ color: 'var(--muted)', flexShrink: 0, transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>&rsaquo;</span>
               </div>
               {isOpen && (
@@ -593,7 +597,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                   {s.key === 'marketing' && marketingNA ? (
                     <div style={{ fontSize: 13, color: 'var(--muted)' }}>Marked not applicable. Untick the box above to plan marketing for this event.</div>
                   ) : (s.key === 'marketing') && (
-                    <AreasTab event={ev} session={session} volunteer={volunteer} initialArea={s.area} />
+                    <AreasTab event={ev} session={session} volunteer={volunteer} initialArea={s.area} alwaysEdit />
                   )}
                   {s.key === 'volunteers' && <NeedsList ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}
                 </div>
@@ -1043,7 +1047,7 @@ function EventBasicsView({ f, ev, rsvp }) {
 
 // "Website event page": everything the website event needs, filled in here, then Push to website sends it to
 // Admin > New Event and goes live (later pushes update the same event).
-function WebsiteEventPanel({ ev, onUpdate, onRsvpChange }) {
+function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
   const w = ev.website || {};
   const slugify = v => String(v || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
   const initial = () => ({
@@ -1057,7 +1061,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange }) {
   });
   const [f, setF] = useState(initial);
   const [picker, setPicker] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(!!autoEdit);
   // RSVP-only events (no ticket sales) are a third choice next to the ticket options; the flag lives on the event's overview card.
   const [rsvpSaved, setRsvpSaved] = useState(false);
   const [rsvp, setRsvp] = useState(false);
@@ -1107,6 +1111,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange }) {
     saveRsvp(f.title.trim());
     setEditing(false);
     setMsg({ ok: true, text: 'Saved.' });
+    if (onClose) onClose();
   }
   async function push(form) {
     if (pushing) return;
@@ -1241,7 +1246,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange }) {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             <button className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => push(f)}>{pushing ? 'Pushing…' : (ev.siteEventId ? 'Save and update website' : 'Save and push to website')}</button>
             <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={save}>Save only</button>
-            <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => { setF(initial()); setRsvp(rsvpSaved); setMsg(null); setEditing(false); }}>Cancel</button>
+            <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => { setF(initial()); setRsvp(rsvpSaved); setMsg(null); setEditing(false); if (onClose) onClose(); }}>Cancel</button>
           </div>
         </div>
       )}
@@ -1483,10 +1488,10 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
           if (it.need) {
             const v = it.v; const handled = needHandled(v);
             return (
-              <ItemRow key={'need-' + v.id} done={handled}>
+              <ItemRow key={'need-' + v.id}>
                 <button type="button" onClick={() => patchNeed(v.id, handled ? { confirmed: false, who: '' } : { confirmed: true })} title={handled ? 'Click to mark as still needed' : 'Click when it is figured out'}
                   style={{ width: 15, height: 15, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: handled ? 'none' : '1.5px dashed var(--border)', background: handled ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: 9, lineHeight: '15px' }}>{handled ? '✓' : ''}</button>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, textDecoration: handled ? 'line-through' : 'none', color: handled ? 'var(--muted)' : 'var(--text)' }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--text)' }}>
                   {handled ? '' : 'Find: '}{v.name}{v.kind ? <span style={{ fontSize: 11, color: 'var(--muted)' }}> · {NEED_TAG[v.kind]}</span> : null}
                 </span>
                 {!['volunteer', 'activity'].includes(v.kind) && <input className="input" placeholder="Who we found" defaultValue={v.who || (v.role ? v.name : '')} key={v.id + (v.who || '')} style={{ width: 150, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
@@ -1604,8 +1609,8 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   );
 }
 
-function PreplanningTab({ ev, onUpdate, onRsvpChange }) {
-  return <WebsiteEventPanel key={ev.id} ev={ev} onUpdate={onUpdate} onRsvpChange={onRsvpChange} />;
+function PreplanningTab({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
+  return <WebsiteEventPanel key={ev.id} ev={ev} onUpdate={onUpdate} onRsvpChange={onRsvpChange} autoEdit={autoEdit} onClose={onClose} />;
 }
 
 function DayOfTab({ ev, onUpdate }) {
