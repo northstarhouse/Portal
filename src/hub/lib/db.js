@@ -1108,9 +1108,11 @@ export async function syncInHouseEvent({ name, date, ihEventId }) {
 // (Admin > New Event) and PUBLISHES it, so it is live on the website right away. Pushing again updates that same website
 // event and keeps its photo (an ended event stays ended). Returns { siteEventId, status }.
 export async function pushCommitteeEventToWebsite(ev) {
+  const { data: sess } = await supabase.auth.getSession();
+  const bearer = (sess && sess.session && sess.session.access_token) || KEY;
   const call = async (body) => {
     const r = await fetch(`${URL}/functions/v1/site-events-admin`, {
-      method: 'POST', headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      method: 'POST', headers: { apikey: KEY, Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || j.error) throw new Error(j.error || 'Something went wrong. Please try again.');

@@ -3,8 +3,8 @@
 const GOLD = '#886c44';
 const MAX_SIDE = 2400;
 
-export function mediaClient(supabaseUrl, supabaseKey) {
-  const headers = { apikey: supabaseKey, Authorization: 'Bearer ' + supabaseKey };
+export function mediaClient(supabaseUrl, supabaseKey, authToken) {
+  const headers = { apikey: supabaseKey, Authorization: 'Bearer ' + (authToken || supabaseKey) };
   async function call(init) {
     const r = await fetch(supabaseUrl + '/functions/v1/site-media', { method: 'POST', ...init });
     const out = await r.json().catch(() => ({}));
@@ -47,8 +47,8 @@ const btn = (primary) => ({ background: primary ? GOLD : '#fff', color: primary 
 
 // Photos with folders (a path kept in each photo's metadata, same as the old console), alt text and upload.
 // With onPick it is a chooser; without it, a library with copy-link, alt text, move and delete.
-function MediaGrid({ supabaseUrl, supabaseKey, onPick }) {
-  const api = React.useMemo(() => mediaClient(supabaseUrl, supabaseKey), [supabaseUrl, supabaseKey]);
+function MediaGrid({ supabaseUrl, supabaseKey, authToken, onPick }) {
+  const api = React.useMemo(() => mediaClient(supabaseUrl, supabaseKey, authToken), [supabaseUrl, supabaseKey, authToken]);
   const [images, setImages] = React.useState(null);
   const [folder, setFolder] = React.useState('');
   const [query, setQuery] = React.useState('');
@@ -191,7 +191,7 @@ export function MediaLibraryView({ navigate, supabaseUrl, supabaseKey }) {
   );
 }
 
-export function MediaPicker({ supabaseUrl, supabaseKey, onPick, onClose }) {
+export function MediaPicker({ supabaseUrl, supabaseKey, authToken, onPick, onClose }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#fdfcfb', borderRadius: 12, width: '100%', maxWidth: 860, maxHeight: '88vh', overflow: 'auto', padding: 18 }}>
@@ -199,7 +199,7 @@ export function MediaPicker({ supabaseUrl, supabaseKey, onPick, onClose }) {
           <div style={{ fontFamily: "'Cardo', serif", fontSize: 18, color: GOLD, fontWeight: 700 }}>Choose a photo</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888' }}>×</button>
         </div>
-        <MediaGrid supabaseUrl={supabaseUrl} supabaseKey={supabaseKey} onPick={onPick} />
+        <MediaGrid supabaseUrl={supabaseUrl} supabaseKey={supabaseKey} authToken={authToken} onPick={onPick} />
       </div>
     </div>
   );

@@ -101,14 +101,27 @@ async function refreshSite() {
   } catch { return false }
 }
 
+
+// Volunteer Hub staff (signed in with their Hub account, Team includes "staff") may also call this, not just a Portal session.
+async function hubStaff(req: Request): Promise<boolean> {
+  const bearer = (req.headers.get('authorization') || '').replace(/^Bearers+/i, '')
+  if (!bearer || bearer === KEY) return false
+  const u = await fetch(`${URL_}/auth/v1/user`, { headers: { apikey: KEY, Authorization: `Bearer ${bearer}` } })
+  if (!u.ok) return false
+  const email = String((await u.json().catch(() => ({}))).email || '').trim()
+  if (!email) return false
+  const r = await fetch(`${URL_}/rest/v1/${encodeURIComponent('2026 Volunteers')}?Email=ilike.${encodeURIComponent(email)}&select=Team&limit=5`, { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } })
+  const rows = await r.json().catch(() => [])
+  return Array.isArray(rows) && rows.some((v) => String(v.Team || '').split(/[|,]/).some((t) => t.trim().toLowerCase() === 'staff'))
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'POST required.' }, 405)
   try {
     const token = req.headers.get('x-app-token') || ''
-    if (!token) return json({ error: 'Staff sign-in required.' }, 403)
-    const ok = await rest('rpc/has_valid_app_session', { method: 'POST', headers: { 'x-app-token': token }, body: '{}' })
-    if (ok !== true) return json({ error: 'Staff session expired. Sign in again.' }, 403)
+    const ok = token ? await rest('rpc/has_valid_app_session', { method: 'POST', headers: { 'x-app-token': token }, body: '{}' }) : false
+    if (ok !== true && !(await hubStaff(req))) return json({ error: token ? 'Staff session expired. Sign in again.' : 'Staff sign-in required.' }, 403)
 
     const body = await req.json()
     const action = String(body.action || '')

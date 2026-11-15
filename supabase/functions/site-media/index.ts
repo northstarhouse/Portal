@@ -23,16 +23,29 @@ const deliver = (id: string, variant = 'public') => `https://imagedelivery.net/$
 // deno-lint-ignore no-explicit-any
 const shape = (i: any) => ({ id: i.id, name: i.meta?.name || i.filename || i.id, folder: i.meta?.folder || '', alt: i.meta?.alt || '', width: i.meta?.width || null, height: i.meta?.height || null, uploaded: i.uploaded, url: deliver(i.id), thumb: deliver(i.id, 'w=480,h=480,fit=scale-down,q=70') })
 
+
+// Volunteer Hub staff (signed in with their Hub account, Team includes "staff") may also call this, not just a Portal session.
+async function hubStaff(req: Request): Promise<boolean> {
+  const bearer = (req.headers.get('authorization') || '').replace(/^Bearers+/i, '')
+  if (!bearer || bearer === KEY) return false
+  const u = await fetch(`${URL_}/auth/v1/user`, { headers: { apikey: KEY, Authorization: `Bearer ${bearer}` } })
+  if (!u.ok) return false
+  const email = String((await u.json().catch(() => ({}))).email || '').trim()
+  if (!email) return false
+  const r = await fetch(`${URL_}/rest/v1/${encodeURIComponent('2026 Volunteers')}?Email=ilike.${encodeURIComponent(email)}&select=Team&limit=5`, { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } })
+  const rows = await r.json().catch(() => [])
+  return Array.isArray(rows) && rows.some((v) => String(v.Team || '').split(/[|,]/).some((t) => t.trim().toLowerCase() === 'staff'))
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'POST required.' }, 405)
   try {
     const token = req.headers.get('x-app-token') || ''
-    if (!token) return json({ error: 'Staff sign-in required.' }, 403)
-    const ok = await fetch(`${URL_}/rest/v1/rpc/has_valid_app_session`, {
+    const ok = token ? await fetch(`${URL_}/rest/v1/rpc/has_valid_app_session`, {
       method: 'POST', headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', 'x-app-token': token }, body: '{}',
-    }).then((r) => r.json())
-    if (ok !== true) return json({ error: 'Staff session expired. Sign in again.' }, 403)
+    }).then((r) => r.json()) : false
+    if (ok !== true && !(await hubStaff(req))) return json({ error: token ? 'Staff session expired. Sign in again.' : 'Staff sign-in required.' }, 403)
     if (!TOKEN) return json({ error: 'Photo storage is not connected yet (CF_IMAGES_TOKEN is not set).' }, 503)
     const auth = { Authorization: `Bearer ${TOKEN}` }
 
