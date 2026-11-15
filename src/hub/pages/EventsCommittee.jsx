@@ -328,10 +328,10 @@ const PLANNING_SECTION_ICONS = {
 };
 
 const PLANNING_SECTIONS = [
-  { key: 'preplanning', title: 'Event Basics', desc: 'Event details, website page, tickets, guest count' },
-  { key: 'checklist', title: 'Checklist', desc: 'Tasks with priority, due dates and assignees' },
+  { key: 'preplanning', title: 'Event Basics', desc: 'Event details, website page, tickets' },
+  { key: 'checklist', title: 'Checklist', desc: 'Type the duties in fast, then assign and date them' },
+  { key: 'volunteers', title: 'Volunteers, Staffing & Vendors', desc: 'Who is needed, who is assigned, vendors and contacts', area: 'volunteers' },
   { key: 'marketing', title: 'Marketing & Promotion', desc: 'Flyers, newsletters, website, social media', area: 'marketing' },
-  { key: 'volunteers', title: 'Volunteers, Staffing & Vendors', desc: 'Assignments, shifts, vendors, contact information', area: 'volunteers' },
   { key: 'areas-other', title: 'Other Planning Areas', desc: 'Logistics, hospitality, finance, sponsorship, interiors' },
   { key: 'budget', title: 'Budget & Transactions', desc: 'Income, expenses, reimbursements' },
   { key: 'dayof', title: 'Day-Of Timeline', desc: 'Run of show for the day' },
@@ -534,7 +534,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               {isOpen && (
                 <div style={{ padding: '4px 16px 18px' }}>
                   {s.key === 'preplanning' && <PreplanningTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}
-                  {s.key === 'checklist' && <SheetToggle view={<ChecklistView ev={ev} onUpdate={onUpdate} />}><ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} /></SheetToggle>}
+                  {s.key === 'checklist' && <ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}
                   {s.key === 'budget' && <FinancialsTab ev={ev} />}
                   {s.key === 'dayof' && <SheetToggle view={<DayOfView ev={ev} />}><DayOfTab ev={ev} onUpdate={onUpdate} /></SheetToggle>}
                   {s.key === 'reviews' && <ReviewsTab ev={ev} />}
@@ -547,15 +547,10 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                   )}
                   {s.key === 'marketing' && marketingNA ? (
                     <div style={{ fontSize: 13, color: 'var(--muted)' }}>Marked not applicable. Untick the box above to plan marketing for this event.</div>
-                  ) : (s.key === 'marketing' || s.key === 'volunteers') && (
+                  ) : (s.key === 'marketing') && (
                     <AreasTab event={ev} session={session} volunteer={volunteer} initialArea={s.area} />
                   )}
-                  {s.key === 'volunteers' && (
-                    <div style={{ marginTop: 24 }}>
-                      <div style={SECTION_HEAD}>Vendors & contacts</div>
-                      <SheetToggle view={<VendorsView ev={ev} />}><VendorsPanel ev={ev} onUpdate={onUpdate} /></SheetToggle>
-                    </div>
-                  )}
+                  {s.key === 'volunteers' && <VolunteersVendorsTab ev={ev} onUpdate={onUpdate} session={session} volunteer={volunteer} />}
                   {s.key === 'areas-other' && <AreasTab event={ev} session={session} volunteer={volunteer} />}
                 </div>
               )}
@@ -674,6 +669,21 @@ function VendorsView({ ev }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Volunteers, Staffing & Vendors: staffing roles (with who is assigned) and vendors together, behind one Edit button.
+function VolunteersVendorsTab({ ev, onUpdate, session, volunteer }) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+        <button className={editing ? 'btn-gold' : 'btn-ghost'} style={{ fontSize: 12, padding: '5px 14px' }} onClick={() => setEditing(v => !v)}>{editing ? 'Done' : 'Edit'}</button>
+      </div>
+      <AreasTab event={ev} session={session} volunteer={volunteer} initialArea="volunteers" embedded editing={editing} />
+      <div style={{ ...SECTION_HEAD, marginTop: 26 }}>Vendors & contacts</div>
+      {editing ? <VendorsPanel ev={ev} onUpdate={onUpdate} /> : <VendorsView ev={ev} />}
     </div>
   );
 }
@@ -1009,6 +1019,21 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   const [expandForm, setExpandForm] = useState({ text: '', due: '', assignee: '', assigneeId: null, priority: '', estimated: '', actual: '', notes: '' });
   const [subtaskInput, setSubtaskInput] = useState('');
   const sectionTitle = SECTION_HEAD;
+  const [quick, setQuick] = useState('');
+
+  // Fast entry: type a duty and press Enter, then the next. Pasting several lines adds one item per line.
+  function addQuick(text) {
+    const lines = String(text || '').split(/\r?\n/).map(l => l.replace(/^\s*(?:[-*\u2022]|\d+[.)])\s*/, '').trim()).filter(Boolean);
+    if (!lines.length) return;
+    onUpdate(e => ({ ...e, checklist: [...e.checklist, ...lines.map(l => ({
+      id: cryptoId(), text: l, done: false, due: '', assignee: '', assigneeId: null, priority: '',
+      estimated: 0, actual: 0, notes: '', subtasks: [],
+    }))] }));
+    setQuick('');
+  }
+  function patchItem(id, patch) {
+    onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, ...patch } : t) }));
+  }
 
   function toggleItem(id) {
     onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, done: !t.done } : t) }));
@@ -1078,8 +1103,12 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: TASK_PRIORITY.medium.color, display: 'inline-block' }} />Medium</span>
           </div>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
-          Click an item to edit it, add subtasks, or attach an estimated/actual $ amount and notes.
+        <input className="input" style={{ marginBottom: 12 }} autoFocus value={quick} placeholder="Type a duty and press Enter…"
+          onChange={e => setQuick(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addQuick(quick); } }}
+          onPaste={e => { const t = e.clipboardData.getData('text'); if (/\r?\n/.test(t.trim())) { e.preventDefault(); addQuick(t); } }} />
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>
+          Add them all first, then set who is doing each one and when it is due right on its line. Click a duty for notes, subtasks or dollar amounts.
         </div>
         {ev.checklist.map(t => {
           const hasMoney = t.estimated > 0 || t.actual > 0;
@@ -1103,7 +1132,14 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
                     </span>
                   )}
                 </button>
-                <span style={{ fontSize: 11, color: t.assigneeId ? 'var(--gold)' : 'var(--muted)', whiteSpace: 'nowrap' }}>{t.assignee ? `${t.assigneeId ? '@' : ''}${t.assignee} · ` : ''}{t.due ? fmtDateShort(t.due) : ''}</span>
+                <input className="input" list={'vols-' + ev.id} placeholder="Who" defaultValue={t.assignee || ''} key={t.id + (t.assignee || '')} style={{ width: 130, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
+                  onBlur={e => {
+                    const name = e.target.value.trim();
+                    if (name === (t.assignee || '')) return;
+                    const match = (volunteers || []).find(v => (v['First Name'] + ' ' + v['Last Name']).trim().toLowerCase() === name.toLowerCase());
+                    patchItem(t.id, { assignee: match ? (match['First Name'] + ' ' + match['Last Name']).trim() : name, assigneeId: match ? match.id : null });
+                  }} />
+                <input className="input" type="date" value={t.due || ''} onChange={e => patchItem(t.id, { due: e.target.value })} style={{ width: 128, flexShrink: 0, fontSize: 12, padding: '5px 8px' }} />
               </ItemRow>
               {isOpen && (
                 <div style={{ padding: '10px 0 14px 33px' }}>
@@ -1165,18 +1201,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
             </div>
           );
         })}
-        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-          <input className="input" style={{ flex: 1, minWidth: 140 }} placeholder="Add an item…" value={itemForm.text} onChange={e => setItemForm(f => ({ ...f, text: e.target.value }))} />
-          <select className="input" style={{ width: 118, appearance: 'auto' }} value={itemForm.priority} onChange={e => setItemForm(f => ({ ...f, priority: e.target.value }))}>
-            <option value="">No priority</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-          <input className="input" type="date" style={{ width: 130 }} value={itemForm.due} onChange={e => setItemForm(f => ({ ...f, due: e.target.value }))} />
-          <AssigneeMentionInput assignee={itemForm.assignee} assigneeId={itemForm.assigneeId} volunteers={volunteers}
-            onChange={(assignee, assigneeId) => setItemForm(f => ({ ...f, assignee, assigneeId }))} />
-          <button className="btn-gold" style={{ padding: '9px 14px' }} onClick={addItem}>Add</button>
-        </div>
+        <datalist id={'vols-' + ev.id}>{(volunteers || []).map(v => <option key={v.id} value={(v['First Name'] + ' ' + v['Last Name']).trim()} />)}</datalist>
       </div>
 
     </div>

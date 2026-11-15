@@ -59,114 +59,8 @@ const SCHEMAS = {
   volunteers: {
     pre: [
       { key: 'roles', label: 'Staffing Needs', type: 'staffing' },
-      { key: 'volunteersAssigned', label: 'Volunteers Assigned', type: 'textarea' },
-      { key: 'boardContacted', label: 'Board Contacted', type: 'yesno', options: ['N/A', 'Yes', 'No'], pairedDateKey: 'boardContactedDate' },
-      { key: 'eventSupportContacted', label: 'Event Support Contacted', type: 'yesno', options: ['N/A', 'Yes', 'No'], pairedDateKey: 'eventSupportDate' },
-      { key: 'volunteerBriefingSent', label: 'Volunteer Briefing Sent', type: 'yesno', options: ['N/A', 'Yes', 'No'], pairedDateKey: 'volunteerBriefingDate' },
-      { key: 'otherNotes', label: 'Other Notes', type: 'textarea' },
     ],
-    post: [
-      { key: 'avgHoursOnSite', label: 'Average Hours On Site', type: 'text' },
-      { key: 'totalVolunteerHours', label: 'Total Volunteer Hours', type: 'text' },
-      { key: 'whatWeLearned', label: 'What We Learned', type: 'textarea' },
-      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
-    ],
-  },
-  logistics: {
-    pre: [
-      { key: 'proposedAttendance', label: 'Proposed Attendance', type: 'text' },
-      { key: 'eventLocations', label: 'Event Locations', type: 'textarea' },
-      { key: 'setupPlan', label: 'Setup Plan', type: 'textarea' },
-      { key: 'volunteersAssisting', label: 'Volunteers Assisting', type: 'text' },
-      { key: 'equipmentNeeded', label: 'Equipment Needed', type: 'textarea' },
-      { key: 'safetyConsiderations', label: 'Safety Considerations', type: 'textarea' },
-      { key: 'couldImpactSuccess', label: 'Could Impact Success?', type: 'radio', options: ['No', 'Yes'] },
-      { key: 'backupPlan', label: 'Backup Plan', type: 'textarea' },
-      { key: 'otherNotes', label: 'Other Notes', type: 'textarea' },
-    ],
-    post: [
-      { key: 'setupVsReality', label: 'Setup vs Reality', type: 'radio', options: ['Matched plan exactly', 'Minor adjustments', 'Significant changes'] },
-      { key: 'adjustmentsMade', label: 'Adjustments Made', type: 'textarea' },
-      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
-    ],
-  },
-  hospitality: {
-    pre: [
-      { key: 'servingStyle', label: 'Serving Style', type: 'checkboxGroup', options: ['Self-serve', 'Served', 'Passed items', 'Combination'] },
-      { key: 'alcoholInvolved', label: 'Alcohol Involved', type: 'radio', options: ['No', 'Yes'] },
-      { key: 'cleanupPlan', label: 'Cleanup Plan', type: 'textarea' },
-      { key: 'volunteersAssisting', label: 'Volunteers Assisting', type: 'text' },
-      { key: 'foodBevPlan', label: 'Food & Beverage Plan', type: 'table', columns: [{ key: 'item', label: 'Item' }, { key: 'volunteer', label: 'Volunteer' }] },
-      { key: 'shoppingList', label: 'Shopping List', type: 'table', columns: [{ key: 'item', label: 'Item' }, { key: 'volunteer', label: 'Volunteer' }] },
-      { key: 'rentalEquipment', label: 'Rental Equipment', type: 'table', columns: [{ key: 'item', label: 'Equipment' }, { key: 'volunteer', label: 'Volunteer' }] },
-      { key: 'otherNotes', label: 'Other Notes', type: 'textarea' },
-    ],
-    post: [
-      { key: 'fbOutcome', label: 'Food & Beverage Outcome', type: 'radio', options: ['More than enough', 'Adequate', 'Ran out'] },
-      { key: 'guestFlow', label: 'Guest Flow', type: 'radio', options: ['Excellent', 'Good', 'Issues noted'] },
-      { key: 'guestComments', label: 'Guest Comments', type: 'textarea' },
-      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
-    ],
-  },
-  finance: {
-    pre: [
-      { key: 'expenses', label: 'Projected Expenses', type: 'moneyTable', rowKey: 'category', rows: EXPENSE_CATEGORIES },
-      { key: 'income', label: 'Projected Income', type: 'moneyTable', rowKey: 'source', rows: INCOME_SOURCES },
-      { key: 'financialNotes', label: 'Financial Notes', type: 'textarea' },
-    ],
-    post: [
-      { key: 'finalExpenses', label: 'Final Expenses', type: 'text' },
-      { key: 'finalIncome', label: 'Final Income', type: 'text' },
-      { key: 'finalNet', label: 'Final Net', type: 'text' },
-      { key: 'reimbursementsNeeded', label: 'Reimbursements Needed?', type: 'radio', options: ['No', 'Yes'] },
-      { key: 'netReportedToBoard', label: 'Net Reported to Board?', type: 'checkbox' },
-      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
-    ],
-  },
-  sponsorship: {
-    pre: [
-      { key: 'recognitionMethods', label: 'Recognition Methods', type: 'checkboxGroup', options: ['Signage on site', 'Verbal recognition', 'Program/printed materials', 'Digital recognition', 'Invitation-only/VIP access', 'Other'] },
-      { key: 'recognitionOther', label: 'Other Recognition', type: 'text' },
-      { key: 'recognitionVolunteer', label: 'Recognition Volunteer', type: 'text' },
-      { key: 'potentialSponsors', label: 'Potential Sponsors', type: 'textarea' },
-      { key: 'outreachActions', label: 'Outreach Actions', type: 'checkboxGroup', options: ['Personal invitation', 'Event-specific pitch', 'Follow-up after event', 'Other'] },
-      { key: 'outreachOther', label: 'Other Outreach', type: 'text' },
-      { key: 'outreachVolunteer', label: 'Outreach Volunteer', type: 'text' },
-      { key: 'intentionalInvites', label: 'Intentional Invites', type: 'textarea' },
-      { key: 'otherNotes', label: 'Other Notes', type: 'textarea' },
-    ],
-    post: [
-      { key: 'sponsorsInvolved', label: 'Sponsors Involved', type: 'textarea' },
-      { key: 'recognitionDelivered', label: 'Recognition Delivered', type: 'textarea' },
-      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
-    ],
-  },
-  interiors: {
-    pre: [
-      { key: 'historicApproach', label: 'Historic Approach', type: 'radio', options: ['All historically accurate items remain in place', 'Some items may be moved/stored', 'Significant rearrangement needed'] },
-      { key: 'moreInfo', label: 'More Info', type: 'textarea' },
-      { key: 'decorAdded', label: 'Decor Added', type: 'textarea' },
-      { key: 'decorCost', label: 'Decor Cost', type: 'text' },
-      { key: 'removalReasons', label: 'Removal Reasons', type: 'checkboxGroup', options: ['Space needs', 'Safety concerns', 'Damage risk', 'Event logistics', 'Other'] },
-      { key: 'removalOther', label: 'Other Removal Reason', type: 'text' },
-      { key: 'otherNotes', label: 'Other Notes', type: 'textarea' },
-    ],
-    post: [
-      { key: 'historicIssues', label: 'Historic Issues', type: 'textarea' },
-      { key: 'wearDamage', label: 'Wear / Damage', type: 'textarea' },
-      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
-    ],
-  },
-  marketing: {
-    pre: [
-      { key: 'channels', label: 'Channels', type: 'channelChecklist' },
-      { key: 'notes', label: 'Notes', type: 'textarea' },
-    ],
-    post: [
-      { key: 'photosTaken', label: 'Photos Taken?', type: 'checkbox' },
-      { key: 'donationsRelatedToEvent', label: 'Donations Related to Event', type: 'text' },
-      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
-    ],
+    post: [],
   },
 };
 
@@ -479,14 +373,19 @@ function AreaFormSection({ fields, data, onFieldChange, volunteers, readOnly }) 
 
 // ---------- Top-level Areas tab ----------
 
-export default function AreasTab({ event, session, volunteer, initialArea }) {
+// editing / embedded: when a parent owns the Edit button (Volunteers, Staffing & Vendors share one), it passes editing and
+// this tab hides its own tabs and buttons.
+export default function AreasTab({ event, session, volunteer, initialArea, editing: editingProp, embedded }) {
   const [rows, setRows] = useState(null);
   const [volunteersDir, setVolunteersDir] = useState([]);
   const [activeArea, setActiveArea] = useState(initialArea || 'programs');
   const [phase, setPhase] = useState('pre');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editingState, setEditingState] = useState(false);
+  const controlled = editingProp !== undefined;
+  const editing = controlled ? editingProp : editingState;
+  const setEditing = controlled ? () => {} : setEditingState;
   // While editing (say, one person typing during a meeting) changes save by themselves a moment after they stop typing.
   const dirtyRef = useRef(false);
   const dirtyAreaRef = useRef(null);
@@ -526,6 +425,8 @@ export default function AreasTab({ event, session, volunteer, initialArea }) {
     const t = setTimeout(() => persistRef.current(true), 1000);
     return () => clearTimeout(t);
   }, [rows, editing]);
+  // Done (or closing the section) saves anything still pending.
+  useEffect(() => { if (!editing && dirtyRef.current && persistRef.current) persistRef.current(true); }, [editing]);
   // Leaving the section with unsaved typing still saves it.
   useEffect(() => () => { if (dirtyRef.current && persistRef.current) persistRef.current(true); }, []);
 
@@ -565,6 +466,7 @@ export default function AreasTab({ event, session, volunteer, initialArea }) {
         </div>
       )}
 
+      {embedded ? (editing && <div style={{ fontSize: 12, color: saved && !saving ? '#2e7d32' : 'var(--muted)', marginBottom: 8 }}>{saving ? 'Saving…' : saved ? 'All changes saved ✓' : 'Changes save automatically'}</div>) : (
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 22, borderBottom: '1px solid var(--border-light)' }}>
           <button onClick={() => setPhase('pre')} style={tab(phase === 'pre')}>Pre-Event</button>
@@ -575,10 +477,11 @@ export default function AreasTab({ event, session, volunteer, initialArea }) {
           {editing ? <button className="btn-gold" disabled={saving} onClick={done}>Done</button> : <button className="btn-ghost" onClick={() => setEditing(true)}>Edit</button>}
         </div>
       </div>
+      )}
 
       <AreaFormSection fields={fields} data={data} onFieldChange={updateField} volunteers={volunteersDir} readOnly={!editing} />
 
-      {editing && (
+      {editing && !embedded && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20 }}>
           <button className="btn-gold" disabled={saving} onClick={done}>Done</button>
           <span style={{ fontSize: 12, color: 'var(--muted)' }}>{saving ? 'Saving…' : saved ? 'All changes saved ✓' : ''}</span>
