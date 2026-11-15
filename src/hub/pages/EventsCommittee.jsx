@@ -512,7 +512,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               }}>
                 {t.done && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
               </span>
-              <span style={{ fontSize: 13, color: t.done ? 'var(--muted)' : 'var(--text)', textDecoration: t.done ? 'line-through' : 'none' }}>{t.text}</span>
+              <span style={{ fontSize: 13, color: t.done ? 'var(--muted)' : 'var(--text)', textDecoration: 'none' }}>{t.text}</span>
             </div>
           ))(row.t))}
         </div>
@@ -622,13 +622,14 @@ function CheckCircle({ checked, onChange, size }) {
   );
 }
 
-function ItemRow({ children, onDelete, done, accent }) {
+function ItemRow({ children, onDelete, done, accent, onAccent, accentTitle }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0 9px 10px',
-      borderBottom: '0.5px solid var(--border-light)', borderLeft: `3px solid ${accent || 'transparent'}`,
+      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0 9px 10px', position: 'relative',
+      borderBottom: '0.5px solid var(--border-light)', borderLeft: `4px solid ${accent || 'transparent'}`,
       opacity: done ? 0.6 : 1,
     }}>
+      {onAccent && <button type="button" onClick={onAccent} title={accentTitle} aria-label={accentTitle} style={{ position: 'absolute', left: -4, top: 0, bottom: 0, width: 12, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }} />}
       {children}
       {onDelete && <button onClick={onDelete} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>×</button>}
     </div>
@@ -990,7 +991,7 @@ function DayOfView({ ev, onUpdate }) {
         <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: '0.5px solid var(--border-light)', fontSize: 13 }}>
           <CheckCircle checked={!!(!!t.done)} onChange={() => toggle(t.id)} />
           <span style={{ width: 70, flexShrink: 0, color: 'var(--muted)' }}>{fmtTime12(t.time)}</span>
-          <span style={{ flex: 1, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--muted)' : 'var(--text)' }}>{t.activity}</span>
+          <span style={{ flex: 1, textDecoration: 'none', color: t.done ? 'var(--muted)' : 'var(--text)' }}>{t.activity}</span>
         </div>
       ))}
     </div>
@@ -1014,14 +1015,14 @@ function ChecklistView({ ev, onUpdate }) {
           <div key={t.id} style={{ display: 'flex', gap: 10, padding: '9px 0', borderBottom: '0.5px solid var(--border-light)' }}>
             <CheckCircle checked={!!(!!t.done)} onChange={() => toggle(t.id)} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--muted)' : 'var(--text)' }}>
+              <div style={{ fontSize: 13, textDecoration: 'none', color: t.done ? 'var(--muted)' : 'var(--text)' }}>
                 {p && <span title={p.label} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.color, marginRight: 7 }} />}{t.text}
               </div>
               {meta && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{meta}</div>}
               {t.notes && t.notes.trim() && <div style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'pre-wrap', marginTop: 3 }}>{t.notes}</div>}
               {subs.length > 0 && (
                 <div style={{ marginTop: 4 }}>
-                  {subs.map(s => <div key={s.id} style={{ fontSize: 12, color: s.done ? 'var(--muted)' : 'var(--text)', textDecoration: s.done ? 'line-through' : 'none' }}>{s.done ? '✓' : '○'} {s.text}</div>)}
+                  {subs.map(s => <div key={s.id} style={{ fontSize: 12, color: s.done ? 'var(--muted)' : 'var(--text)', textDecoration: 'none' }}>{s.done ? '✓' : '○'} {s.text}</div>)}
                 </div>
               )}
             </div>
@@ -1609,7 +1610,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
             return (
               <ItemRow key={'mk-' + it.c} done={done}>
                 <CheckCircle checked={!!(done)} onChange={() => toggleChannel(it.c)} />
-                <span style={{ flex: 1, fontSize: 13, textDecoration: done ? 'line-through' : 'none', color: 'var(--text)' }}>{it.c}</span>
+                <span style={{ flex: 1, fontSize: 13, textDecoration: 'none', color: 'var(--text)' }}>{it.c}</span>
               </ItemRow>
             );
           }
@@ -1619,7 +1620,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
               <ItemRow key={'tl-' + t.id} done={t.done} onDelete={() => onUpdate(e => ({ ...e, timeline: e.timeline.filter(x => x.id !== t.id) }))}>
                 <CheckCircle checked={!!(!!t.done)} onChange={() => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, done: !x.done } : x) }))} />
                 <span style={{ fontSize: 12, color: 'var(--muted)', width: 70, flexShrink: 0 }}>{fmtTime12(t.time)}</span>
-                <span style={{ flex: 1, fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: 'var(--text)' }}>{t.activity}</span>
+                <span style={{ flex: 1, fontSize: 13, textDecoration: 'none', color: 'var(--text)' }}>{t.activity}</span>
               </ItemRow>
             );
           }
@@ -1634,12 +1635,11 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
           const isOpen = expandedId === t.id;
           return (
             <div key={t.id}>
-              <ItemRow done={t.done} onDelete={() => deleteItem(t.id)} accent={t.priority ? TASK_PRIORITY[t.priority].color : null}>
-                <PriorityDot priority={t.priority} onClick={() => cycleItemPriority(t.id)} />
+              <ItemRow done={t.done} onDelete={() => deleteItem(t.id)} accent={t.priority ? TASK_PRIORITY[t.priority].color : null} onAccent={() => cycleItemPriority(t.id)} accentTitle={(t.priority ? TASK_PRIORITY[t.priority].label : 'No priority') + ' — click this left edge to change (none, medium, high)'}>
                 <CheckCircle checked={!!(t.done)} onChange={() => toggleItem(t.id)} />
                 <button onClick={() => startExpand(t)} title="Edit item"
                   style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
-                  <span style={{ fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: 'var(--text)' }}>{t.text}</span>
+                  <span style={{ fontSize: 13, textDecoration: 'none', color: 'var(--text)' }}>{t.text}</span>
                   {(hasMoney || hasNotes || subtasks.length > 0) && (
                     <span style={{ fontSize: 11, color: 'var(--gold)', marginLeft: 8 }}>
                       {subtasks.length > 0 ? `${subDone}/${subtasks.length} subtasks` : ''}
@@ -1707,7 +1707,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                   {subtasks.map(s => (
                     <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' }}>
                       <CheckCircle checked={!!(s.done)} onChange={() => toggleSubtask(t.id, s.id)} size={14} />
-                      <span style={{ flex: 1, fontSize: 12, textDecoration: s.done ? 'line-through' : 'none', color: s.done ? 'var(--muted)' : 'var(--text)' }}>{s.text}</span>
+                      <span style={{ flex: 1, fontSize: 12, textDecoration: 'none', color: s.done ? 'var(--muted)' : 'var(--text)' }}>{s.text}</span>
                       <button onClick={() => deleteSubtask(t.id, s.id)} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 13, cursor: 'pointer', padding: '0 2px' }}>×</button>
                     </div>
                   ))}
@@ -1786,7 +1786,7 @@ function DayOfTab({ ev, onUpdate }) {
             <CheckCircle checked={!!(!!t.done)} onChange={() => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, done: !x.done } : x) }))} />
             <span style={{ fontSize: 12, color: 'var(--muted)', width: 54, flexShrink: 0 }}>{t.time}</span>
             <button onClick={() => startEdit(t)} title="Edit"
-              style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 13, color: 'var(--text)', fontFamily: 'inherit', textDecoration: t.done ? 'line-through' : 'none' }}>
+              style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 13, color: 'var(--text)', fontFamily: 'inherit', textDecoration: 'none' }}>
               {t.activity}
             </button>
           </ItemRow>

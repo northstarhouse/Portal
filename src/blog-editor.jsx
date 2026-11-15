@@ -127,6 +127,8 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
   const tickT = React.useRef(null);
   const [pasteBox, setPasteBox] = React.useState(null);
   const wrapRef = React.useRef(null);
+  const [menu, setMenu] = React.useState(null);   // insert menu (right click or the + button): { x, y }
+  const [plus, setPlus] = React.useState(null);   // the + shown beside an empty line: { top, left }
   const [slides, setSlides] = React.useState([]);
   const [selImg, setSelImg] = React.useState(null);
   const [, setTick] = React.useState(0);
@@ -264,6 +266,20 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
     if (prev && prev !== t) prev.classList.remove('nsh-sel');
     if (t && t.tagName === 'IMG' && !t.closest('.nsh-slideshow')) { t.classList.add('nsh-sel'); setSelImg(t); } else setSelImg(null);
   }
+  function updatePlus() {
+    const body = bodyRef.current; const wrap = wrapRef.current; const sel = window.getSelection();
+    if (!body || !wrap || htmlMode || !sel || !sel.rangeCount || !sel.isCollapsed || !body.contains(sel.anchorNode)) { setPlus(null); return; }
+    let n = sel.anchorNode;
+    if (n === body) n = body.childNodes[sel.anchorOffset] || body.lastChild;
+    while (n && n.parentNode !== body) n = n.parentNode;
+    if (!n || n.nodeType !== 1 || n.textContent.trim() !== '' || n.querySelector('img,iframe')) { setPlus(null); return; }
+    const r = n.getBoundingClientRect(); const w = wrap.getBoundingClientRect();
+    setPlus({ top: r.top - w.top + Math.max(0, (r.height - 26) / 2), left: 6 });
+  }
+  function openMenuAt(clientX, clientY) {
+    const w = wrapRef.current.getBoundingClientRect();
+    setMenu({ x: Math.max(0, Math.min(clientX - w.left, w.width - 210)), y: clientY - w.top });
+  }
   function wrapImg(mode) {
     const el = selImg;
     if (!el || htmlMode || !bodyRef.current || !bodyRef.current.contains(el)) { setMsg({ ok: false, text: 'Click a photo in the post first, then choose how the text wraps.' }); return; }
@@ -388,7 +404,9 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
           <div ref={wrapRef} style={{ position: 'relative' }}>
           <div key={editorKey} ref={bodyRef} className="blog-body" contentEditable suppressContentEditableWarning
             dangerouslySetInnerHTML={{ __html: post.body_html || '<p><br></p>' }}
-            onClick={selectImg} onKeyUp={() => { rememberSelection(); clearTimeout(tickT.current); tickT.current = setTimeout(() => setTick((n) => n + 1), 800); }} onMouseUp={rememberSelection}
+            onClick={(e) => { selectImg(e); setTimeout(updatePlus, 0); }} onInput={updatePlus}
+            onContextMenu={(e) => { if (e.shiftKey) return; e.preventDefault(); rememberSelection(); openMenuAt(e.clientX, e.clientY); }}
+            onKeyUp={() => { rememberSelection(); updatePlus(); clearTimeout(tickT.current); tickT.current = setTimeout(() => setTick((n) => n + 1), 800); }} onMouseUp={() => { rememberSelection(); updatePlus(); }}
             onPaste={(e) => {
               const html = e.clipboardData.getData('text/html');
               const plain = e.clipboardData.getData('text/plain');
@@ -397,6 +415,22 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
               if (html) document.execCommand('insertHTML', false, cleanPasted(html));
               else document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
             }} />
+          {plus && !menu && (
+            <button type="button" title="Insert a picture, slideshow or video" onMouseDown={(e) => { e.preventDefault(); rememberSelection(); const w = wrapRef.current.getBoundingClientRect(); setMenu({ x: plus.left + 34, y: plus.top + w.top + 28 - w.top }); }}
+              style={{ position: 'absolute', top: plus.top, left: plus.left, width: 26, height: 26, borderRadius: '50%', border: '1px solid #b5a185', background: '#fff', color: '#886c44', fontSize: 18, lineHeight: '22px', padding: 0, cursor: 'pointer', zIndex: 15 }}>+</button>
+          )}
+          {menu && (
+            <>
+              <div onMouseDown={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null); }} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+              <div style={{ position: 'absolute', top: menu.y, left: menu.x, zIndex: 41, minWidth: 200, background: '#fff', border: '0.5px solid #d8d0c4', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,0.18)', padding: 4 }}>
+                {[['🖼  Insert picture', () => pickImage('body')], ['🎞  Insert slideshow', () => pickImage('slide')], ['▶  Insert video', addVideo]].map((it) => (
+                  <button key={it[0]} type="button" onMouseDown={(e) => { e.preventDefault(); setMenu(null); it[1](); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 6, padding: '8px 12px', fontSize: 14, cursor: 'pointer', color: '#333', fontFamily: 'inherit' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f5f0e8'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}>{it[0]}</button>
+                ))}
+              </div>
+            </>
+          )}
           {selImg && bodyRef.current && bodyRef.current.contains(selImg) && wrapRef.current && (() => {
             // The same photo controls, right under the picture that is selected.
             const r = selImg.getBoundingClientRect(); const w = wrapRef.current.getBoundingClientRect();
