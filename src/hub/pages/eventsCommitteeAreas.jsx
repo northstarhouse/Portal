@@ -30,7 +30,7 @@ export const PLANNING_PROMPTS = [
 ];
 
 // The spaces at North Star House (from the site manager walk-through) for "Spaces used".
-export const NSH_SPACES = ['Living Room', 'Dining Room', 'Library', 'Julia Morgan Room', 'Mudroom & Study', "Mary Huck's Boat Room", 'Kitchen', 'Restrooms & Foyer', 'Terrace & West Lawn', 'Courtyard & East Lawn', 'Garden', 'Parking Lot'];
+export const NSH_SPACES = ['Living Room', 'Dining Room', 'Library', 'Julia Morgan Room', 'Mudroom & Study', 'Kitchen', 'Restrooms & Foyer', 'Terrace & West Lawn', 'Courtyard & East Lawn', 'Garden', 'Parking Lot'];
 
 const MARKETING_CHANNELS = [
   'Create Press Release', 'Send Email Blast', 'YubaNet (Press Release Only)', 'Go Nevada County Calendar - Community Blast',
