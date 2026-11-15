@@ -159,8 +159,6 @@ const SCHEMAS = {
     ],
     post: [
       { key: 'photosTaken', label: 'Photos Taken?', type: 'checkbox' },
-      { key: 'donationsRelatedToEvent', label: 'Donations Related to Event', type: 'text' },
-      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
     ],
   },
 };
