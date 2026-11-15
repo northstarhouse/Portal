@@ -490,7 +490,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             {ev.eventLead && <div><strong>Event lead:</strong> {ev.eventLead}</div>}
             {ev.location && <div><strong>Location:</strong> {ev.location}</div>}
             {ev.pricing && <div><strong>Pricing:</strong> {ev.pricing}</div>}
-            {(ev.guestCount.invited || ev.expectedAttendance) && <div><strong>Expected guests:</strong> {ev.guestCount.invited || ev.expectedAttendance}</div>}
+            {(ev.expectedAttendance || ev.guestCount.invited) && <div><strong>Expected guests:</strong> {ev.expectedAttendance || ev.guestCount.invited}</div>}
             {ev.volunteersNeeded !== '' && ev.volunteersNeeded != null && <div><strong>Volunteers needed:</strong> {ev.volunteersNeeded}</div>}
             {!ev.eventLead && !ev.location && !ev.pricing && !ev.guestCount.invited && !ev.expectedAttendance && (ev.volunteersNeeded === '' || ev.volunteersNeeded == null) && (
               <div style={{ color: 'var(--muted)' }}>Nothing set yet -- fill these in under Event Basics.</div>
@@ -848,9 +848,8 @@ function WebsiteEventPanel({ ev, onUpdate }) {
   const head = { fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, margin: '22px 0 12px', paddingTop: 16, borderTop: '0.5px solid #f0ebe0' };
 
   return (
-    <div style={{ marginBottom: 24, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '18px 20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <div style={{ ...SECTION_HEAD, marginBottom: 6 }}>Event Basics</div>
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', minHeight: 28 }}>
         {!editing && <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 14px' }} onClick={() => setEditing(true)}>Edit</button>}
       </div>
       <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>
@@ -866,7 +865,7 @@ function WebsiteEventPanel({ ev, onUpdate }) {
           <label style={lab}>Title *<input style={inp} value={f.title} onChange={e => { const v = e.target.value; setF(o => ({ ...o, title: v, slug: o.slugTouched ? o.slug : slugify(v) })); }} placeholder="e.g. Holiday Open House" /></label>
           <label style={lab}>Web address (the last part of the event's link)
             <input style={inp} value={f.slug} onChange={e => setF(o => ({ ...o, slugTouched: true, slug: slugify(e.target.value) }))} placeholder="holiday-open-house" />
-            <span style={note}>Letters, numbers and dashes only. It fills in from the title unless you type your own.{ev.siteEventId ? ' Changing it after the event is published breaks links people already have.' : ''}</span>
+            <span className="edit-only" style={note}>Letters, numbers and dashes only. It fills in from the title unless you type your own.{ev.siteEventId ? ' Changing it after the event is published breaks links people already have.' : ''}</span>
           </label>
           <label style={lab}>Short description (shown in lists and when shared) *<input style={inp} maxLength={300} value={f.short} onChange={e => set('short', e.target.value)} placeholder="One or two sentences" /></label>
           <label style={lab}>Full description *<textarea rows={6} style={{ ...inp, resize: 'vertical' }} value={f.desc} onChange={e => set('desc', e.target.value)} placeholder={'Write it like an email. A blank line starts a new paragraph.\nStart a line with "- " to make a bullet list.'} /></label>
@@ -877,7 +876,7 @@ function WebsiteEventPanel({ ev, onUpdate }) {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <button type="button" className="btn-ghost edit-only" style={{ fontSize: 12 }} onClick={() => setPicker(true)}>{f.imageUrl ? 'Change photo' : 'Choose a photo'}</button>
                   {f.imageUrl && <button type="button" className="btn-ghost edit-only" style={{ fontSize: 12 }} onClick={() => setF(o => ({ ...o, imageUrl: '', imageAlt: '' }))}>Remove</button>}
-                  {!f.imageUrl && <span style={note}>No photo? The website shows "More information to come".</span>}
+                  {!f.imageUrl && <span className="edit-only" style={note}>No photo? The website shows "More information to come".</span>}
                 </div>
                 <input style={inp} value={f.imageAlt} onChange={e => set('imageAlt', e.target.value)} placeholder="Describe the photo (for screen readers)" />
               </div>
@@ -1134,59 +1133,8 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   );
 }
 
-function PreplanningTab({ ev, onUpdate, volunteers }) {
-  const [guests, setGuests] = useState(ev.guestCount);
-  const [guestsEditing, setGuestsEditing] = useState(false);
-
-  function saveGuests() {
-    onUpdate(e => ({ ...e, guestCount: { invited: Number(guests.invited) || 0, confirmed: Number(guests.confirmed) || 0 } }));
-    setGuestsEditing(false);
-  }
-  function cancelGuests() {
-    setGuests(ev.guestCount);
-    setGuestsEditing(false);
-  }
-
-  const sectionTitle = SECTION_HEAD;
-
-  return (
-    <div>
-      <WebsiteEventPanel key={ev.id} ev={ev} onUpdate={onUpdate} />
-
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <div style={sectionTitle}>Guest count</div>
-          {!guestsEditing && <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setGuestsEditing(true)}>Edit</button>}
-        </div>
-        {guestsEditing ? (
-          <>
-            <div style={{ display: 'flex', gap: 10, maxWidth: 320, marginBottom: 8 }}>
-              <div style={{ flex: 1 }}>
-                <div className="label">Invited</div>
-                <input className="input" type="number" value={guests.invited} onChange={e => setGuests(g => ({ ...g, invited: e.target.value }))} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div className="label">Confirmed</div>
-                <input className="input" type="number" value={guests.confirmed} onChange={e => setGuests(g => ({ ...g, confirmed: e.target.value }))} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} onClick={saveGuests}>Save</button>
-              <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} onClick={cancelGuests}>Cancel</button>
-            </div>
-          </>
-        ) : (
-          <div style={{ fontSize: 13 }}>
-            {(ev.guestCount.invited || ev.guestCount.confirmed) ? (
-              <><strong>Invited:</strong> {ev.guestCount.invited || 0} &nbsp;·&nbsp; <strong>Confirmed:</strong> {ev.guestCount.confirmed || 0}</>
-            ) : (
-              <span style={{ color: 'var(--muted)' }}>Nothing set yet -- click Edit to fill these in.</span>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+function PreplanningTab({ ev, onUpdate }) {
+  return <WebsiteEventPanel key={ev.id} ev={ev} onUpdate={onUpdate} />;
 }
 
 function DayOfTab({ ev, onUpdate }) {
