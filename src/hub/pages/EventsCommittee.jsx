@@ -1005,6 +1005,36 @@ function dutyPeople(t) {
     phones: t.phones || {},
   };
 }
+function DutyWho({ t, volunteers, onPatch }) {
+  const roster = volunteers || [];
+  const cur = dutyPeople(t);
+  const total = cur.assignedIds.length + cur.people.length;
+  const primaryId = cur.assignedIds.length ? cur.assignedIds[0] : null;
+  const primaryPerson = primaryId == null && cur.people.length ? cur.people[0] : null;
+  const value = primaryId != null ? String(primaryId) : primaryPerson ? 'p:' + primaryPerson.id : '';
+  const sorted = [...roster].sort((a, b) => volFullName(a).localeCompare(volFullName(b)));
+  const known = primaryId == null || roster.some(x => String(x.id) === String(primaryId));
+  function change(e) {
+    const v = e.target.value;
+    if (!v) { if (primaryId != null) onPatch({ assignedIds: cur.assignedIds.slice(1) }); else if (primaryPerson) onPatch({ people: cur.people.slice(1) }); return; }
+    if (v.startsWith('p:')) return;
+    const vol = roster.find(x => String(x.id) === v);
+    if (!vol) return;
+    const rest = cur.assignedIds.slice(primaryId != null ? 1 : 0).filter(i => String(i) !== v);
+    onPatch({ assignedIds: [vol.id, ...rest], people: primaryPerson ? cur.people.slice(1) : cur.people });
+  }
+  return (
+    <div title="Choose the main person. Click the line to add more." style={{ width: 190, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <select className="input" value={value} onChange={change} style={{ flex: 1, minWidth: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto', color: value ? 'var(--text)' : 'var(--muted)' }}>
+        <option value="">No one yet</option>
+        {primaryPerson && <option value={'p:' + primaryPerson.id}>{primaryPerson.name}</option>}
+        {!known && <option value={String(primaryId)}>Volunteer no longer on the list</option>}
+        {sorted.map(x => <option key={x.id} value={String(x.id)}>{volFullName(x)}</option>)}
+      </select>
+      <span style={{ width: 28, flexShrink: 0, fontSize: 11, color: 'var(--gold)', fontWeight: 600 }}>{total > 1 ? '+' + (total - 1) : ''}</span>
+    </div>
+  );
+}
 function whoOn(t, volunteers) {
   const roster = volunteers || [];
   return [
@@ -1038,7 +1068,7 @@ function TimelineRow({ t, volunteers, onUpdate, isOpen, onToggle }) {
         <button type="button" onClick={onToggle} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{fmtTime12(t.time)}  ·  {t.activity}</div>
         </button>
-        <AssignVolunteers v={t} volunteers={volunteers} compact target={target} onPatch={patch} />
+        <div style={{ width: 300, flexShrink: 0 }}><AssignVolunteers v={t} volunteers={volunteers} compact target={target} onPatch={patch} /></div>
         <span style={{ color: 'var(--muted)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>&rsaquo;</span>
       </div>
       {isOpen && (
@@ -1860,8 +1890,8 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                   <option value="">General</option>
                   {CHECKLIST_CATEGORIES.filter(c => c !== 'General').map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-                <span title="Click the line to add or change who is on it" style={{ width: 170, flexShrink: 0, fontSize: 12, lineHeight: 1.4, color: t.assignee ? 'var(--text)' : 'var(--muted)', fontStyle: t.assignee ? 'normal' : 'italic' }}>{t.assignee || 'No one yet'}</span>
-                <select className="input" value={t.timing || (t.due ? 'before' : '')} style={{ width: 132, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}
+                <DutyWho t={t} volunteers={volunteers} onPatch={pt => patchDutyPeople(t, pt)} />
+                {!((t.timing === 'before' || (!t.timing && t.due)) && t.due) && <select className="input" value={t.timing || (t.due ? 'before' : '')} style={{ width: 152, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}
                   onChange={e => { const v = e.target.value; patchItem(t.id, { timing: v, due: v === 'before' ? (t.timing === 'dayof' ? '' : (t.due || '')) : dueForTiming(v, ev.date) }); }}>
                   <option value="">When?</option>
                   <option value="asap">As soon as possible</option>
@@ -1871,9 +1901,8 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                   <option value="meeting">Meeting before event</option>
                   <option value="dayof">Day of event</option>
                   <option value="before">Pick a date</option>
-                </select>
-                {['month', 'twoweeks', 'week'].includes(t.timing) && <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, width: 70 }}>{t.due ? fmtDateShort(t.due) : 'set the event date'}</span>}
-                {(t.timing || (t.due ? 'before' : '')) === 'before' && <input className="input" type="date" value={t.due || ''} onChange={e => patchItem(t.id, { due: e.target.value })} style={{ width: 128, flexShrink: 0, fontSize: 12, padding: '5px 8px' }} />}
+                </select>}
+                {(t.timing || (t.due ? 'before' : '')) === 'before' && <input className="input" type="date" value={t.due || ''} title="Clear the date to pick a different timing" onChange={e => patchItem(t.id, { due: e.target.value })} style={{ width: 152, flexShrink: 0, fontSize: 12, padding: '5px 8px' }} />}
               </ItemRow>
               {isOpen && (
                 <div style={{ padding: '10px 0 14px 33px' }}>
@@ -1893,8 +1922,16 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                       <input className="input" type="date" style={{ width: 130 }} value={expandForm.due} onChange={e => setExpandForm(f => ({ ...f, due: e.target.value }))} />
                     </div>
                   </div>
-                  <div className="label">Who is on this</div>
-                  <div style={{ marginBottom: 12 }}><AssignVolunteers v={dutyPeople(t)} volunteers={volunteers} onPatch={pt => patchDutyPeople(t, pt)} /></div>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <div style={{ width: 130 }}>
+                      <div className="label">How many volunteers</div>
+                      <input className="input" type="number" min="0" defaultValue={t.target || ''} key={t.id + 'tg' + (t.target || '')} placeholder="1" onBlur={e => { const n = Number(e.target.value) || 0; if (n !== (Number(t.target) || 0)) patchItem(t.id, { target: n }); }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 220 }}>
+                      <div className="label">Who is on this</div>
+                      <AssignVolunteers v={dutyPeople(t)} volunteers={volunteers} target={Number(t.target) || 0} onPatch={pt => patchDutyPeople(t, pt)} />
+                    </div>
+                  </div>
                   <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
                     <div style={{ flex: 1 }}>
                       <div className="label">Estimated $</div>
