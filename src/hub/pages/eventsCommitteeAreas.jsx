@@ -42,14 +42,7 @@ const SCHEMAS = {
     ],
   },
   programs: {
-    pre: [
-      { key: 'vendorFormsSent', label: 'Vendor Forms', type: 'select', options: ['', 'Not Sent', 'Sent', 'Received'] },
-      { key: 'transitions', label: 'Transitions', type: 'textarea' },
-      { key: 'performers', label: 'Performers / Vendors', type: 'table', columns: [{ key: 'name', label: 'Name' }, { key: 'contact', label: 'Contact' }] },
-      { key: 'activities', label: 'Activities', type: 'table', columns: [{ key: 'activity', label: 'Activity' }, { key: 'timeFrame', label: 'Time Frame' }, { key: 'volunteers', label: 'Volunteers' }] },
-      { key: 'actionItems', label: 'Action Items', type: 'table', columns: [{ key: 'item', label: 'Item' }, { key: 'dueDate', label: 'Due Date', type: 'date' }, { key: 'volunteer', label: 'Volunteer' }] },
-      { key: 'otherNotes', label: 'Other Notes', type: 'textarea' },
-    ],
+    pre: [],
     post: [
       { key: 'activityReview', label: 'Activity Review', type: 'table', columns: [{ key: 'activity', label: 'Activity' }, { key: 'whatWorked', label: 'What Worked' }, { key: 'whatDidnt', label: "What Didn't" }, { key: 'notes', label: 'Notes' }] },
       { key: 'flowTiming', label: 'Flow & Timing', type: 'textarea' },
@@ -61,6 +54,102 @@ const SCHEMAS = {
       { key: 'roles', label: 'Staffing Needs', type: 'staffing' },
     ],
     post: [],
+  },
+  logistics: {
+    pre: [
+      { key: 'proposedAttendance', label: 'Proposed Attendance', type: 'text' },
+      { key: 'eventLocations', label: 'Event Locations', type: 'textarea' },
+      { key: 'setupPlan', label: 'Setup Plan', type: 'textarea' },
+      { key: 'volunteersAssisting', label: 'Volunteers Assisting', type: 'text' },
+      { key: 'equipmentNeeded', label: 'Equipment Needed', type: 'textarea' },
+      { key: 'safetyConsiderations', label: 'Safety Considerations', type: 'textarea' },
+      { key: 'couldImpactSuccess', label: 'Could Impact Success?', type: 'radio', options: ['No', 'Yes'] },
+      { key: 'backupPlan', label: 'Backup Plan', type: 'textarea' },
+      { key: 'otherNotes', label: 'Other Notes', type: 'textarea' },
+    ],
+    post: [
+      { key: 'setupVsReality', label: 'Setup vs Reality', type: 'radio', options: ['Matched plan exactly', 'Minor adjustments', 'Significant changes'] },
+      { key: 'adjustmentsMade', label: 'Adjustments Made', type: 'textarea' },
+      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
+    ],
+  },
+  hospitality: {
+    pre: [
+      { key: 'servingStyle', label: 'Serving Style', type: 'checkboxGroup', options: ['Self-serve', 'Served', 'Passed items', 'Combination'] },
+      { key: 'alcoholInvolved', label: 'Alcohol Involved', type: 'radio', options: ['No', 'Yes'] },
+      { key: 'cleanupPlan', label: 'Cleanup Plan', type: 'textarea' },
+      { key: 'volunteersAssisting', label: 'Volunteers Assisting', type: 'text' },
+      { key: 'foodBevPlan', label: 'Food & Beverage Plan', type: 'table', columns: [{ key: 'item', label: 'Item' }, { key: 'volunteer', label: 'Volunteer' }] },
+      { key: 'shoppingList', label: 'Shopping List', type: 'table', columns: [{ key: 'item', label: 'Item' }, { key: 'volunteer', label: 'Volunteer' }] },
+      { key: 'rentalEquipment', label: 'Rental Equipment', type: 'table', columns: [{ key: 'item', label: 'Equipment' }, { key: 'volunteer', label: 'Volunteer' }] },
+      { key: 'otherNotes', label: 'Other Notes', type: 'textarea' },
+    ],
+    post: [
+      { key: 'fbOutcome', label: 'Food & Beverage Outcome', type: 'radio', options: ['More than enough', 'Adequate', 'Ran out'] },
+      { key: 'guestFlow', label: 'Guest Flow', type: 'radio', options: ['Excellent', 'Good', 'Issues noted'] },
+      { key: 'guestComments', label: 'Guest Comments', type: 'textarea' },
+      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
+    ],
+  },
+  finance: {
+    pre: [
+      { key: 'expenses', label: 'Projected Expenses', type: 'moneyTable', rowKey: 'category', rows: EXPENSE_CATEGORIES },
+      { key: 'income', label: 'Projected Income', type: 'moneyTable', rowKey: 'source', rows: INCOME_SOURCES },
+      { key: 'financialNotes', label: 'Financial Notes', type: 'textarea' },
+    ],
+    post: [
+      { key: 'finalExpenses', label: 'Final Expenses', type: 'text' },
+      { key: 'finalIncome', label: 'Final Income', type: 'text' },
+      { key: 'finalNet', label: 'Final Net', type: 'text' },
+      { key: 'reimbursementsNeeded', label: 'Reimbursements Needed?', type: 'radio', options: ['No', 'Yes'] },
+      { key: 'netReportedToBoard', label: 'Net Reported to Board?', type: 'checkbox' },
+      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
+    ],
+  },
+  sponsorship: {
+    pre: [
+      { key: 'recognitionMethods', label: 'Recognition Methods', type: 'checkboxGroup', options: ['Signage on site', 'Verbal recognition', 'Program/printed materials', 'Digital recognition', 'Invitation-only/VIP access', 'Other'] },
+      { key: 'recognitionOther', label: 'Other Recognition', type: 'text' },
+      { key: 'recognitionVolunteer', label: 'Recognition Volunteer', type: 'text' },
+      { key: 'potentialSponsors', label: 'Potential Sponsors', type: 'textarea' },
+      { key: 'outreachActions', label: 'Outreach Actions', type: 'checkboxGroup', options: ['Personal invitation', 'Event-specific pitch', 'Follow-up after event', 'Other'] },
+      { key: 'outreachOther', label: 'Other Outreach', type: 'text' },
+      { key: 'outreachVolunteer', label: 'Outreach Volunteer', type: 'text' },
+      { key: 'intentionalInvites', label: 'Intentional Invites', type: 'textarea' },
+      { key: 'otherNotes', label: 'Other Notes', type: 'textarea' },
+    ],
+    post: [
+      { key: 'sponsorsInvolved', label: 'Sponsors Involved', type: 'textarea' },
+      { key: 'recognitionDelivered', label: 'Recognition Delivered', type: 'textarea' },
+      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
+    ],
+  },
+  interiors: {
+    pre: [
+      { key: 'historicApproach', label: 'Historic Approach', type: 'radio', options: ['All historically accurate items remain in place', 'Some items may be moved/stored', 'Significant rearrangement needed'] },
+      { key: 'moreInfo', label: 'More Info', type: 'textarea' },
+      { key: 'decorAdded', label: 'Decor Added', type: 'textarea' },
+      { key: 'decorCost', label: 'Decor Cost', type: 'text' },
+      { key: 'removalReasons', label: 'Removal Reasons', type: 'checkboxGroup', options: ['Space needs', 'Safety concerns', 'Damage risk', 'Event logistics', 'Other'] },
+      { key: 'removalOther', label: 'Other Removal Reason', type: 'text' },
+      { key: 'otherNotes', label: 'Other Notes', type: 'textarea' },
+    ],
+    post: [
+      { key: 'historicIssues', label: 'Historic Issues', type: 'textarea' },
+      { key: 'wearDamage', label: 'Wear / Damage', type: 'textarea' },
+      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
+    ],
+  },
+  marketing: {
+    pre: [
+      { key: 'channels', label: 'Channels', type: 'channelChecklist' },
+      { key: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+    post: [
+      { key: 'photosTaken', label: 'Photos Taken?', type: 'checkbox' },
+      { key: 'donationsRelatedToEvent', label: 'Donations Related to Event', type: 'text' },
+      { key: 'committeeNotes', label: 'Committee Notes', type: 'textarea' },
+    ],
   },
 };
 
@@ -93,6 +182,42 @@ function migrateStaffing(v) {
 
 // ---------- Generic field renderers ----------
 
+function TableField({ field, v, onChange, readOnly }) {
+    const rows = Array.isArray(v) ? v : [];
+    const [draft, setDraft] = useState({});
+    const [showForm, setShowForm] = useState(false);
+    function addRow() {
+      if (field.columns.every(c => !draft[c.key])) return;
+      onChange([...rows, { id: Math.random().toString(36).slice(2, 8), ...draft }]);
+      setDraft({});
+      setShowForm(false);
+    }
+    function removeRow(id) { onChange(rows.filter(r => r.id !== id)); }
+    if (readOnly && !rows.length) return <div className="sheet-answer"><span className="sheet-empty">Not filled in yet</span></div>;
+    return (
+      <div>
+        {rows.map(r => (
+          <div key={r.id} className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '7px 10px', marginBottom: 5 }}>
+            {field.columns.map(c => <span key={c.key} style={{ flex: 1, fontSize: 12 }}>{r[c.key]}</span>)}
+            <button className="edit-only" onClick={() => removeRow(r.id)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>×</button>
+          </div>
+        ))}
+        {showForm ? (
+          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+            {field.columns.map(c => (
+              <input key={c.key} className="input" type={c.type || 'text'} style={{ flex: 1 }} placeholder={c.label}
+                value={draft[c.key] || ''} onChange={e => setDraft(d => ({ ...d, [c.key]: e.target.value }))} />
+            ))}
+            <button className="btn-gold" style={{ padding: '8px 12px' }} onClick={addRow}>Add</button>
+            <button className="btn-ghost" style={{ padding: '8px 12px' }} onClick={() => { setDraft({}); setShowForm(false); }}>Cancel</button>
+          </div>
+        ) : (
+          <button className="btn-ghost edit-only" style={{ fontSize: 12, marginTop: 4 }} onClick={() => setShowForm(true)}>+ Add {field.label}</button>
+        )}
+      </div>
+    );
+}
+
 function Field({ field, value, onChange, volunteers, readOnly }) {
   const v = value !== undefined ? value : defaultValueFor(field);
 
@@ -100,7 +225,6 @@ function Field({ field, value, onChange, volunteers, readOnly }) {
   if (readOnly && (field.type === 'text' || field.type === 'textarea' || field.type === 'select')) {
     return <div className="sheet-answer">{v ? v : <span className="sheet-empty">Not filled in yet</span>}</div>;
   }
-  if (readOnly && field.type === 'table' && !(Array.isArray(v) && v.length)) return <div className="sheet-answer"><span className="sheet-empty">Not filled in yet</span></div>;
 
   if (field.type === 'text') return <input className="input" value={v} onChange={e => onChange(e.target.value)} />;
   if (field.type === 'textarea') return <textarea className="input" rows={3} style={{ resize: 'vertical' }} value={v} onChange={e => onChange(e.target.value)} />;
@@ -135,40 +259,7 @@ function Field({ field, value, onChange, volunteers, readOnly }) {
       <input type="checkbox" checked={!!v} onChange={e => onChange(e.target.checked)} style={{ accentColor: 'var(--gold)', width: 15, height: 15 }} /> Yes
     </label>
   );
-  if (field.type === 'table') {
-    const rows = Array.isArray(v) ? v : [];
-    const [draft, setDraft] = useState({});
-    const [showForm, setShowForm] = useState(false);
-    function addRow() {
-      if (field.columns.every(c => !draft[c.key])) return;
-      onChange([...rows, { id: Math.random().toString(36).slice(2, 8), ...draft }]);
-      setDraft({});
-      setShowForm(false);
-    }
-    function removeRow(id) { onChange(rows.filter(r => r.id !== id)); }
-    return (
-      <div>
-        {rows.map(r => (
-          <div key={r.id} className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '7px 10px', marginBottom: 5 }}>
-            {field.columns.map(c => <span key={c.key} style={{ flex: 1, fontSize: 12 }}>{r[c.key]}</span>)}
-            <button className="edit-only" onClick={() => removeRow(r.id)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>×</button>
-          </div>
-        ))}
-        {showForm ? (
-          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-            {field.columns.map(c => (
-              <input key={c.key} className="input" type={c.type || 'text'} style={{ flex: 1 }} placeholder={c.label}
-                value={draft[c.key] || ''} onChange={e => setDraft(d => ({ ...d, [c.key]: e.target.value }))} />
-            ))}
-            <button className="btn-gold" style={{ padding: '8px 12px' }} onClick={addRow}>Add</button>
-            <button className="btn-ghost" style={{ padding: '8px 12px' }} onClick={() => { setDraft({}); setShowForm(false); }}>Cancel</button>
-          </div>
-        ) : (
-          <button className="btn-ghost edit-only" style={{ fontSize: 12, marginTop: 4 }} onClick={() => setShowForm(true)}>+ Add {field.label}</button>
-        )}
-      </div>
-    );
-  }
+  if (field.type === 'table') return <TableField field={field} v={v} onChange={onChange} readOnly={readOnly} />;
   if (field.type === 'staffing') return <StaffingField roles={migrateStaffing(v)} onChange={onChange} volunteers={volunteers || []} readOnly={readOnly} />;
   if (field.type === 'channelChecklist') {
     const m = v || {};
@@ -378,7 +469,7 @@ function AreaFormSection({ fields, data, onFieldChange, volunteers, readOnly }) 
 export default function AreasTab({ event, session, volunteer, initialArea, editing: editingProp, embedded }) {
   const [rows, setRows] = useState(null);
   const [volunteersDir, setVolunteersDir] = useState([]);
-  const [activeArea, setActiveArea] = useState(initialArea || 'programs');
+  const [activeArea, setActiveArea] = useState(initialArea || 'logistics');
   const [phase, setPhase] = useState('pre');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -462,7 +553,7 @@ export default function AreasTab({ event, session, volunteer, initialArea, editi
       {/* Only show the area switcher when no specific area was requested (Marketing and Volunteers jump straight to theirs). */}
       {!initialArea && (
         <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', borderBottom: '1px solid var(--border-light)', marginBottom: 16 }}>
-          {AREA_DEFAULTS.map(a => <button key={a.key} onClick={() => setActiveArea(a.key)} style={tab(activeArea === a.key)}>{a.label}</button>)}
+          {AREA_DEFAULTS.filter(a => a.key !== 'volunteers' && a.key !== 'marketing').map(a => <button key={a.key} onClick={() => setActiveArea(a.key)} style={tab(activeArea === a.key)}>{a.label}</button>)}
         </div>
       )}
 
@@ -479,6 +570,7 @@ export default function AreasTab({ event, session, volunteer, initialArea, editi
       </div>
       )}
 
+      {fields.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)', padding: '10px 0' }}>Nothing to fill in here.</div>}
       <AreaFormSection fields={fields} data={data} onFieldChange={updateField} volunteers={volunteersDir} readOnly={!editing} />
 
       {editing && !embedded && (

@@ -42,7 +42,7 @@ export default function RsvpPanel({ eventName, onSaved, hideToggle }) {
     setSaving(false);
   }
 
-  if (!meta) return <div style={{ fontSize: 12, color: 'var(--muted, #888)', margin: '14px 0' }}>Loading RSVP settings…</div>;
+  if (!meta) return hideToggle ? null : <div style={{ fontSize: 12, color: 'var(--muted, #888)', margin: '14px 0' }}>Loading RSVP settings…</div>;
 
   if (hideToggle && !meta.rsvp_only) return null;
   const linked = forms.find(f => f.id === meta.rsvp_event_id) || null;

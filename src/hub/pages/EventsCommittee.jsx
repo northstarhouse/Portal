@@ -70,7 +70,7 @@ function emptyEvent(name) {
   return {
     id: cryptoId(), name, date: '', startTime: '', endTime: '', location: '', description: '', status: 'planning',
     purpose: '', expectedAttendance: '', pricing: '', ticketTiers: [], siteEventId: null, website: {}, eventLead: '', volunteersNeeded: '',
-    checklist: [], vendors: [], guestCount: { invited: 0, confirmed: 0 }, timeline: [],
+    checklist: [], notes: [], vendors: [], guestCount: { invited: 0, confirmed: 0 }, timeline: [],
     afterNotes: { wentWell: '', wentWrong: '', finalAttendance: '', finalBudget: '', followUps: '' },
   };
 }
@@ -97,6 +97,7 @@ function fromDb(row) {
     volunteersNeeded: row.volunteers_needed ?? '',
     guestCount: { invited: row.guest_invited || 0, confirmed: row.guest_confirmed || 0 },
     checklist: row.checklist || [],
+    notes: Array.isArray(row.notes) ? row.notes : [],
     vendors: row.vendors || [],
     timeline: row.timeline || [],
     afterNotes: (row.after_notes && Object.keys(row.after_notes).length)
@@ -124,6 +125,7 @@ function toDb(ev) {
     guest_invited: ev.guestCount.invited || 0,
     guest_confirmed: ev.guestCount.confirmed || 0,
     checklist: ev.checklist,
+    notes: ev.notes || [],
     vendors: ev.vendors,
     timeline: ev.timeline,
     after_notes: ev.afterNotes,
@@ -335,8 +337,7 @@ const PLANNING_SECTIONS = [
   { key: 'areas-other', title: 'Other Planning Areas', desc: 'Logistics, hospitality, finance, sponsorship, interiors' },
   { key: 'budget', title: 'Budget & Transactions', desc: 'Income, expenses, reimbursements' },
   { key: 'dayof', title: 'Day-Of Timeline', desc: 'Run of show for the day' },
-  { key: 'reviews', title: 'Reviews & Feedback', desc: 'Guest and volunteer feedback' },
-  { key: 'after', title: 'After Notes', desc: "What went well, final numbers, follow-ups" },
+  { key: 'after', title: 'After the Event', desc: 'What went well, final numbers, follow-ups, reviews and feedback' },
 ];
 
 function StatBox({ label, value, sub, color }) {
@@ -536,8 +537,13 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                   {s.key === 'checklist' && <ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}
                   {s.key === 'budget' && <FinancialsTab ev={ev} />}
                   {s.key === 'dayof' && <SheetToggle view={<DayOfView ev={ev} />}><DayOfTab ev={ev} onUpdate={onUpdate} /></SheetToggle>}
-                  {s.key === 'reviews' && <ReviewsTab ev={ev} />}
-                  {s.key === 'after' && <AfterTab ev={ev} onUpdate={onUpdate} />}
+                  {s.key === 'after' && (
+                    <div>
+                      <AfterTab ev={ev} onUpdate={onUpdate} />
+                      <div style={{ ...SECTION_HEAD, marginTop: 28 }}>Reviews & feedback</div>
+                      <ReviewsTab ev={ev} />
+                    </div>
+                  )}
                   {s.key === 'marketing' && (
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '8px 0 12px', cursor: 'pointer' }}>
                       <input type="checkbox" checked={marketingNA} onChange={e => toggleMarketingNA(e.target.checked)} style={{ accentColor: 'var(--gold)', width: 16, height: 16 }} />
@@ -664,6 +670,7 @@ function VendorsView({ ev }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 600 }}>{v.name}{v.role && <span style={{ fontWeight: 400, color: 'var(--muted)' }}> — {v.role}</span>}</div>
             {v.contact && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{v.contact}</div>}
+            <div style={{ fontSize: 12, marginTop: 2, color: v.formStatus === 'Received' ? '#2e7d32' : v.formStatus === 'Sent' ? '#886c44' : '#b8863b' }}>Vendor form: {v.formStatus || 'not tracked yet'}</div>
             {v.notes && <div style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'pre-wrap', marginTop: 2 }}>{v.notes}</div>}
           </div>
         </div>
@@ -747,6 +754,9 @@ function VendorsPanel({ ev, onUpdate }) {
   function toggleVendor(id) {
     onUpdate(e => ({ ...e, vendors: e.vendors.map(v => v.id === id ? { ...v, confirmed: !v.confirmed } : v) }));
   }
+  function setFormStatus(id, val) {
+    onUpdate(e => ({ ...e, vendors: e.vendors.map(v => v.id === id ? { ...v, formStatus: val } : v) }));
+  }
   function deleteVendor(id) {
     onUpdate(e => ({ ...e, vendors: e.vendors.filter(v => v.id !== id) }));
   }
@@ -765,6 +775,12 @@ function VendorsPanel({ ev, onUpdate }) {
             {v.notes && <div style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'pre-wrap', marginTop: 2 }}>{v.notes}</div>}
           </span>
           <span style={{ fontSize: 11, color: 'var(--muted)' }}>{v.contact}</span>
+          <select className="input" value={v.formStatus || ''} onChange={e => setFormStatus(v.id, e.target.value)} title="Vendor form" style={{ width: 138, flexShrink: 0, fontSize: 12, padding: '4px 8px', appearance: 'auto' }}>
+            <option value="">Vendor form…</option>
+            <option value="Not sent">Form: not sent</option>
+            <option value="Sent">Form: sent</option>
+            <option value="Received">Form: received</option>
+          </select>
         </ItemRow>
       ))}
       <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
@@ -1034,15 +1050,51 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   const sectionTitle = SECTION_HEAD;
   const [quick, setQuick] = useState('');
 
-  // Fast entry: type a duty and press Enter, then the next. Pasting several lines adds one item per line.
+  // Note taker: type a thought and press Enter, then the next. Pasting several lines adds one note per line.
+  // Later each note is attached to where it belongs (a duty, the day-of timeline, a vendor, the after notes).
+  const [attachedMsg, setAttachedMsg] = useState('');
   function addQuick(text) {
     const lines = String(text || '').split(/\r?\n/).map(l => l.replace(/^\s*(?:[-*\u2022]|\d+[.)])\s*/, '').trim()).filter(Boolean);
     if (!lines.length) return;
-    onUpdate(e => ({ ...e, checklist: [...e.checklist, ...lines.map(l => ({
-      id: cryptoId(), text: l, done: false, due: '', assignee: '', assigneeId: null, priority: '',
-      estimated: 0, actual: 0, notes: '', subtasks: [],
-    }))] }));
+    onUpdate(e => ({ ...e, notes: [...(e.notes || []), ...lines.map(l => ({ id: cryptoId(), text: l }))] }));
     setQuick('');
+  }
+  // "doors open at 4:30" -> 16:30. Without am/pm, 1 to 7 is read as the afternoon.
+  function parseClock(text) {
+    const m = String(text).match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)/i) || String(text).match(/\b(\d{1,2}):(\d{2})\b/);
+    if (!m) return null;
+    let h = parseInt(m[1], 10); const min = m[2] ? parseInt(m[2], 10) : 0; const ap = (m[3] || '').toLowerCase();
+    if (h > 23 || min > 59) return null;
+    if (ap.startsWith('p') && h < 12) h += 12;
+    else if (ap.startsWith('a') && h === 12) h = 0;
+    else if (!ap && h >= 1 && h <= 7) h += 12;
+    return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+  }
+  function attachNote(note, target) {
+    if (!target) return;
+    const drop = e => (e.notes || []).filter(n => n.id !== note.id);
+    if (target === 'task') {
+      onUpdate(e => ({ ...e, notes: drop(e), checklist: [...e.checklist, { id: cryptoId(), text: note.text, done: false, due: '', assignee: '', assigneeId: null, priority: '', estimated: 0, actual: 0, notes: '', subtasks: [] }] }));
+      setAttachedMsg('Added to the checklist below. Set who and when on its line.');
+    } else if (target === 'dayof') {
+      let time = parseClock(note.text);
+      if (!time) { time = parseClock(window.prompt('What time is this? (for example 4:30 PM)') || ''); if (!time) return; }
+      onUpdate(e => ({ ...e, notes: drop(e), timeline: [...e.timeline, { id: cryptoId(), time, activity: note.text }] }));
+      setAttachedMsg('Added to the Day-Of Timeline.');
+    } else if (target === 'vendor') {
+      onUpdate(e => ({ ...e, notes: drop(e), vendors: [...e.vendors, { id: cryptoId(), name: note.text, role: '', contact: '', notes: '', confirmed: false }] }));
+      setAttachedMsg('Added to Vendors & contacts (under Volunteers, Staffing & Vendors).');
+    } else if (target === 'after') {
+      onUpdate(e => ({ ...e, notes: drop(e), afterNotes: { ...e.afterNotes, followUps: e.afterNotes.followUps ? e.afterNotes.followUps + '\n' + note.text : note.text } }));
+      setAttachedMsg('Added to After Notes as a follow-up.');
+    }
+  }
+  function deleteNote(id) { onUpdate(e => ({ ...e, notes: (e.notes || []).filter(n => n.id !== id) })); }
+  function allToDuties() {
+    const list = ev.notes || [];
+    if (!list.length) return;
+    onUpdate(e => ({ ...e, notes: [], checklist: [...e.checklist, ...list.map(n => ({ id: cryptoId(), text: n.text, done: false, due: '', assignee: '', assigneeId: null, priority: '', estimated: 0, actual: 0, notes: '', subtasks: [] }))] }));
+    setAttachedMsg('All notes added to the checklist below.');
   }
   function patchItem(id, patch) {
     onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, ...patch } : t) }));
@@ -1116,13 +1168,35 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: TASK_PRIORITY.medium.color, display: 'inline-block' }} />Medium</span>
           </div>
         </div>
-        <input className="input" style={{ marginBottom: 12 }} autoFocus value={quick} placeholder="Type a duty and press Enter…"
+        <input className="input" style={{ marginBottom: 12 }} autoFocus value={quick} placeholder="Type a note and press Enter…"
           onChange={e => setQuick(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addQuick(quick); } }}
           onPaste={e => { const t = e.clipboardData.getData('text'); if (/\r?\n/.test(t.trim())) { e.preventDefault(); addQuick(t); } }} />
         <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>
-          Add them all first, then set who is doing each one and when it is due right on its line. Click a duty for notes, subtasks or dollar amounts.
+          Just get everything down, one per line. Afterwards, attach each note to where it belongs.
         </div>
+        {(ev.notes || []).length > 0 && (
+          <div style={{ border: '0.5px solid var(--border-light)', borderRadius: 10, padding: '10px 14px', marginBottom: 18, background: '#faf8f4' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 700 }}>Notes to sort ({ev.notes.length})</div>
+              <button className="btn-ghost" style={{ fontSize: 11, padding: '3px 10px' }} onClick={allToDuties}>Make all checklist duties</button>
+            </div>
+            {ev.notes.map(n => (
+              <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '0.5px solid var(--border-light)' }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflowWrap: 'anywhere' }}>{n.text}</span>
+                <select className="input" value="" onChange={e => attachNote(n, e.target.value)} style={{ width: 190, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}>
+                  <option value="">Attach to…</option>
+                  <option value="task">Checklist duty</option>
+                  <option value="dayof">Day-Of Timeline</option>
+                  <option value="vendor">Vendors & contacts</option>
+                  <option value="after">After Notes (follow-up)</option>
+                </select>
+                <button onClick={() => deleteNote(n.id)} title="Delete this note" style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>×</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {attachedMsg && <div style={{ fontSize: 12, color: '#2e7d32', marginBottom: 10 }}>{attachedMsg}</div>}
         {ev.checklist.map(t => {
           const hasMoney = t.estimated > 0 || t.actual > 0;
           const hasNotes = !!(t.notes && t.notes.trim());
