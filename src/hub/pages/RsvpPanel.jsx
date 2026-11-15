@@ -73,7 +73,7 @@ export default function RsvpPanel({ eventName, onSaved }) {
               Link “{suggestion.title}” (same name)
             </button>
           )}
-          {forms.length === 0 && <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>No RSVP forms exist yet. Create one in the Form Builder (Events, RSVP Event).</div>}
+          {forms.length === 0 && <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>No RSVP forms exist yet. Create one in the Portal under Forms (Events, RSVP Event).</div>}
 
           {linked && (
             <div style={{ marginTop: 14 }}>
