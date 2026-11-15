@@ -816,7 +816,7 @@ function NeedsList({ ev, onUpdate, volunteers }) {
                       </div>
                       <div style={{ flex: 1, minWidth: 200 }}>
                         <div style={cap}>Assign a volunteer</div>
-                        <select className="input" value="" onChange={e => { if (e.target.value) patch(v.id, { assignedIds: [...(v.assignedIds || []), e.target.value] }); }} style={{ ...inp, appearance: 'auto' }}>
+                        <select className="input" value="" onChange={e => { const pick = (volunteers || []).find(x => x.id === e.target.value); if (pick) patch(v.id, { assignedIds: [...(v.assignedIds || []), pick.id], contact: v.contact || pick['Phone Number'] || '' }); }} style={{ ...inp, appearance: 'auto' }}>
                           <option value="">Choose a volunteer…</option>
                           {(volunteers || []).filter(x => !(v.assignedIds || []).includes(x.id)).map(x => <option key={x.id} value={x.id}>{volFullName(x)}</option>)}
                         </select>
@@ -824,7 +824,7 @@ function NeedsList({ ev, onUpdate, volunteers }) {
                     </div>
                     {assigned.map(x => (
                       <div key={x.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: 13 }}>
-                        <span>{volFullName(x)}</span>
+                        <span>{volFullName(x)}{x['Phone Number'] ? <span style={{ color: 'var(--muted)' }}> · {x['Phone Number']}</span> : null}</span>
                         <button className="btn-ghost" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => patch(v.id, { assignedIds: (v.assignedIds || []).filter(id => id !== x.id) })}>Remove</button>
                       </div>
                     ))}
@@ -1489,6 +1489,8 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
         {g.items.map(it => {
           if (it.need) {
             const v = it.v; const handled = needHandled(v);
+            const assignedList = (v.assignedIds || []).map(id => (volunteers || []).find(x => x.id === id)).filter(Boolean);
+            const vName = (x) => ((x['First Name'] || '') + ' ' + (x['Last Name'] || '')).trim() || 'Unnamed';
             return (
               <ItemRow key={'need-' + v.id}>
                 <button type="button" onClick={() => patchNeed(v.id, handled ? { confirmed: false, who: '' } : { confirmed: true })} title={handled ? 'Click to mark as still needed' : 'Click when it is figured out'}
@@ -1503,6 +1505,19 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
                   <option value="activity">Activity</option>
                   <option value="sponsor">Sponsor</option>
                 </select>
+                {['volunteer', 'activity'].includes(v.kind) && (
+                  <>
+                    <select className="input" value="" onChange={e => { const pick = (volunteers || []).find(x => x.id === e.target.value); if (pick) patchNeed(v.id, { assignedIds: [...(v.assignedIds || []), pick.id], contact: v.contact || pick['Phone Number'] || '' }); }} style={{ width: 170, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}>
+                      <option value="">Assign a volunteer…</option>
+                      {(volunteers || []).filter(x => !(v.assignedIds || []).includes(x.id)).map(x => <option key={x.id} value={x.id}>{vName(x)}</option>)}
+                    </select>
+                    {assignedList.map(x => (
+                      <span key={x.id} className="badge" style={{ background: 'var(--light)', color: 'var(--text)', flexShrink: 0 }}>{vName(x)}{x['Phone Number'] ? ' · ' + x['Phone Number'] : ''}
+                        <button type="button" onClick={() => patchNeed(v.id, { assignedIds: (v.assignedIds || []).filter(id => id !== x.id) })} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', marginLeft: 4, padding: 0 }}>×</button>
+                      </span>
+                    ))}
+                  </>
+                )}
                 {!['volunteer', 'activity'].includes(v.kind) && <input className="input" placeholder="Who we found" defaultValue={v.who || (v.role ? v.name : '')} key={v.id + 'who' + (v.who || '')} style={{ width: 140, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
                   onBlur={e => { const t = e.target.value.trim(); if (t !== (v.who || (v.role ? v.name : ''))) patchNeed(v.id, v.role && !v.who ? { name: t } : { who: t }); }} />}
                 {!['volunteer', 'activity'].includes(v.kind) && <input className="input" placeholder="Phone or email" defaultValue={v.contact || ''} key={v.id + 'contact' + (v.contact || '')} style={{ width: 140, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
