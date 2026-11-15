@@ -831,6 +831,24 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
 }
 
 // Tools > "Current stats": a snapshot of the current (not yet finished) bookings, from the same client records the cards use.
+// Tools > Upcoming Events List: just every upcoming event, name and date, in date order. Click one to open its profile.
+function UpcomingEventsList({ clients, onOpen, onClose }) {
+  const ref = React.useRef(null);
+  React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
+  const rows = clients.slice().sort((a, b) => (a.eventDate || '9999').localeCompare(b.eventDate || '9999') || String(a.name).localeCompare(String(b.name)));
+  const day = (iso) => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? new Date(m[1] + '-' + m[2] + '-' + m[3] + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : 'Date to confirm'; };
+  return <dialog ref={ref} className="vc-dialog" aria-label="Upcoming events" onCancel={onClose} onClick={e => { if (e.target === ref.current) onClose(); }}>
+    <div className="vc-modal-head"><div style={{flex:1}}><h2 className="vc-name" style={{fontSize:25,margin:0}}>Upcoming Events</h2><div className="vc-muted" style={{marginTop:4}}>{rows.length} {rows.length === 1 ? 'event' : 'events'}, in date order. Click one to open it.</div></div><button className="vc-open" onClick={onClose} aria-label="Close the list">Close ×</button></div>
+    <div className="vc-modal-body" style={{padding:'4px 24px 20px'}}>
+      {rows.length === 0 ? <p className="vc-muted">No upcoming events.</p> : rows.map(c => <button key={c.id} type="button" onClick={() => onOpen(c)} style={{display:'flex',gap:16,alignItems:'baseline',width:'100%',textAlign:'left',background:'none',border:0,borderBottom:'1px solid #eee7dd',padding:'12px 4px',color:'inherit'}}>
+        <span style={{width:158,flexShrink:0,fontWeight:700,color:'#886c44',fontSize:13}}>{day(c.eventDate)}</span>
+        <span style={{flex:1,minWidth:0,overflowWrap:'anywhere',fontFamily:'Cardo,Georgia,serif',fontSize:17,fontWeight:700}}>{c.name}</span>
+        <span className="vc-muted" style={{flexShrink:0}}>{c.type}</span>
+      </button>)}
+    </div>
+  </dialog>;
+}
+
 function ClientStats({ clients, onClose }) {
   const sum = (arr, f) => arr.reduce((t, x) => t + (f(x) || 0), 0);
   const money = c => amount(c, 'USD');
@@ -936,7 +954,7 @@ function CardPaperworkUpload({ client, onUpload }) {
   </div>;
 }
 
-export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSiteProp, setShowSite: setShowSiteProp, submissions, loadEvents, saveInsurance, savePayments, agreementApi, filter, setFilter, query, setQuery, messages, currentMessages, onHandleMessage, onOpenMessages }) {
+export function VenueClientDashboard({ statsOpen, onCloseStats, listOpen, onCloseList, showSite: showSiteProp, setShowSite: setShowSiteProp, submissions, loadEvents, saveInsurance, savePayments, agreementApi, filter, setFilter, query, setQuery, messages, currentMessages, onHandleMessage, onOpenMessages }) {
   const [events,setEvents] = React.useState([]), [error,setError] = React.useState('');
   const [localSite,setLocalSite] = React.useState(false);
   const showSite = showSiteProp !== undefined ? showSiteProp : localSite;
@@ -1038,6 +1056,7 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     </aside></div>
     </>}
     {statsOpen&&<ClientStats clients={upcomingClients} onClose={onCloseStats}/>}
+    {listOpen&&<UpcomingEventsList clients={upcomingClients} onClose={onCloseList} onOpen={c=>{onCloseList();setSelected(c.id);}}/>}
     {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onSavePortalEmail={recordPortalEmail} onUploadPaperwork={uploadPaperwork} onAssignSite={assignSite} onSavePayments={recordPayments} onRename={renameClient} onRetype={retypeClient} onDelete={deleteSubmission} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }

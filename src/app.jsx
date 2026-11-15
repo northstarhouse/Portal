@@ -835,6 +835,7 @@ var NAV_ICONS = {
   'tool-send': '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
   'tool-movement': '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
   'tool-vendor': '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+  'tool-list': '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
   'tool-stats': '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
   'tool-request': '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z"/>',
   'treasurer': '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
@@ -19814,6 +19815,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   var [vendorToolOpen, setVendorToolOpen] = useState(false);
   var [featureReqOpen, setFeatureReqOpen] = useState(false);
   var [statsOpen, setStatsOpen] = useState(false);
+  var [eventsListOpen, setEventsListOpen] = useState(false);
   var [sendFormOpen, setSendFormOpen] = useState(false);
   var [movementOpen, setMovementOpen] = useState(false);
   var colorCoding = venueTab === 'clients' ? true : inquiriesColorCoding;
@@ -20380,6 +20382,12 @@ function VenueRentalsView({ navigate, initialTab }) {
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Shows up in the client guides right away</div>
                     </div>
                   </button>
+                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVenueTab('clients'); setEventsListOpen(true); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-list" active size={18} /></span>
+                    <div><div style={{ fontWeight: 700 }}>Upcoming Events List</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Every event by name and date, in order</div></div>
+                  </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVenueTab('clients'); setStatsOpen(true); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
                     <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-stats" active size={18} /></span>
@@ -20501,7 +20509,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
 
           {venueTab === 'clients' && (
-            !inquiriesError && <VenueClientDashboard statsOpen={statsOpen} onCloseStats={function() { setStatsOpen(false); }} showSite={siteView} setShowSite={setSiteView} messages={clientMsgs} currentMessages={currentUnhandledMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} savePayments={savePayments} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
+            !inquiriesError && <VenueClientDashboard statsOpen={statsOpen} onCloseStats={function() { setStatsOpen(false); }} listOpen={eventsListOpen} onCloseList={function() { setEventsListOpen(false); }} showSite={siteView} setShowSite={setSiteView} messages={clientMsgs} currentMessages={currentUnhandledMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} savePayments={savePayments} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
           )}
 
           {venueTab === 'messages' && (
