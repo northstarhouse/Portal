@@ -998,6 +998,13 @@ function NeedsList({ ev, onUpdate, volunteers }) {
   );
 }
 
+function dutyPeople(t) {
+  return {
+    assignedIds: t.assignedIds || (t.assigneeId ? [t.assigneeId] : []),
+    people: t.people || (t.assignee && !t.assigneeId ? [{ id: 'legacy-' + t.id, name: t.assignee, phone: '' }] : []),
+    phones: t.phones || {},
+  };
+}
 function whoOn(t, volunteers) {
   const roster = volunteers || [];
   return [
@@ -1531,7 +1538,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
   }
   // Marketing is Haley Wright's: marketing lines get her as the person unless someone else is named.
   const haley = (volunteers || []).find(v => ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim().toLowerCase() === 'haley wright');
-  const mkWho = (cat) => (cat === 'Marketing' ? { assignee: 'Haley Wright', assigneeId: haley ? haley.id : null } : {});
+  const mkWho = (cat) => (cat === 'Marketing' ? { assignee: 'Haley Wright', assigneeId: haley ? haley.id : null, assignedIds: haley ? [haley.id] : [], people: haley ? [] : [{ id: 'haley', name: 'Haley Wright', phone: '' }] } : {});
   useEffect(() => {
     if (!volunteers || !volunteers.length) return;
     if (!ev.checklist.some(t => t.category === 'Marketing' && !t.assignee)) return;
@@ -1654,6 +1661,13 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     setEmailBusy(false);
     setEmailMsg({ ok, text: ok ? (who === 'committee' ? 'Sent to ' + list.length + ' committee member' + (list.length > 1 ? 's' : '') + '.' : 'Test sent to ' + list[0] + '.') : 'Could not send. Please try again.' });
   }
+  // Saves the people on a duty, and keeps assignee/assigneeId (the names, and the first volunteer) in step for the other screens.
+  function patchDutyPeople(t, pt) {
+    const next = { ...dutyPeople(t), ...pt };
+    const roster = volunteers || [];
+    const names = [...next.assignedIds.map(id => roster.find(x => x.id === id)).filter(Boolean).map(volFullName), ...next.people.map(pp => pp.name)];
+    patchItem(t.id, { assignedIds: next.assignedIds, people: next.people, phones: next.phones, assignee: names.join(', '), assigneeId: next.assignedIds.length ? next.assignedIds[0] : null });
+  }
   function patchItem(id, patch) {
     onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, ...patch } : t) }));
   }
@@ -1690,8 +1704,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     if (!expandForm.text.trim()) return;
     onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id
       ? {
-          ...t, text: expandForm.text.trim(), due: expandForm.due, assignee: expandForm.assignee.trim(),
-          assigneeId: expandForm.assigneeId, priority: expandForm.priority,
+          ...t, text: expandForm.text.trim(), due: expandForm.due, priority: expandForm.priority,
           estimated: Number(expandForm.estimated) || 0, actual: Number(expandForm.actual) || 0, notes: expandForm.notes.trim(),
         }
       : t) }));
@@ -1847,13 +1860,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                   <option value="">General</option>
                   {CHECKLIST_CATEGORIES.filter(c => c !== 'General').map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-                <input className="input" list={'vols-' + ev.id} placeholder="Who" defaultValue={t.assignee || ''} key={t.id + (t.assignee || '')} style={{ width: 130, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
-                  onBlur={e => {
-                    const name = e.target.value.trim();
-                    if (name === (t.assignee || '')) return;
-                    const match = (volunteers || []).find(v => (v['First Name'] + ' ' + v['Last Name']).trim().toLowerCase() === name.toLowerCase());
-                    patchItem(t.id, { assignee: match ? (match['First Name'] + ' ' + match['Last Name']).trim() : name, assigneeId: match ? match.id : null });
-                  }} />
+                <AssignVolunteers v={dutyPeople(t)} volunteers={volunteers} compact onPatch={pt => patchDutyPeople(t, pt)} />
                 <select className="input" value={t.timing || (t.due ? 'before' : '')} style={{ width: 132, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}
                   onChange={e => { const v = e.target.value; patchItem(t.id, { timing: v, due: v === 'before' ? (t.timing === 'dayof' ? '' : (t.due || '')) : dueForTiming(v, ev.date) }); }}>
                   <option value="">When?</option>
@@ -1884,11 +1891,6 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                     <div>
                       <div className="label">Due</div>
                       <input className="input" type="date" style={{ width: 130 }} value={expandForm.due} onChange={e => setExpandForm(f => ({ ...f, due: e.target.value }))} />
-                    </div>
-                    <div>
-                      <div className="label">Assignee</div>
-                      <AssigneeMentionInput key={t.id} assignee={expandForm.assignee} assigneeId={expandForm.assigneeId} volunteers={volunteers}
-                        onChange={(assignee, assigneeId) => setExpandForm(f => ({ ...f, assignee, assigneeId }))} />
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
