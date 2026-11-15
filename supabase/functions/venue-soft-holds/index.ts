@@ -78,14 +78,17 @@ const phoneFmt = (p: unknown) => { const d = String(p || "").replace(/[^0-9]/g, 
 const clean = (x: unknown) => String(x ?? "").trim();
 
 // The calendar entry's notes: who the clients are and where the booking stands, rebuilt whenever any of it changes.
-function describe(inq: any, form: any, v: any, signers: any[]): string {
+// Booked = the first payment has come in (online, or recorded by hand). Until then the date is a soft hold, signed or not.
+function describe(inq: any, form: any, v: any, signers: any[], paid: { cents: number; first: string | null }): string {
   const a = form?.answers || {};
   const status = v?.status || null;
   const lines: string[] = [];
-  if (status === "completed") lines.push(`BOOKED · agreement fully signed ${laDay(v.completed_at)}`);
+  const money = (c: number) => (c / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+  if (paid.cents > 0) lines.push(`BOOKED · first payment received${paid.first ? " " + laDay(paid.first) : ""} (${money(paid.cents)} paid so far)`);
   else {
     lines.push(`SOFT HOLD · pre-booking form received ${laDay(form?.created_at || inq.created_at)}`);
-    lines.push(status === "pending" ? `Agreement sent ${laDay(v.issued_at)}, waiting for signatures${v.expires_at ? ` (sign by ${laDay(v.expires_at)} or the hold is released)` : ""}`
+    lines.push(status === "completed" ? `Agreement fully signed ${laDay(v.completed_at)}, waiting for the first payment`
+      : status === "pending" ? `Agreement sent ${laDay(v.issued_at)}, waiting for signatures${v.expires_at ? ` (sign by ${laDay(v.expires_at)} or the hold is released)` : ""}`
       : status === "draft" ? "Agreement drafted, not sent yet" : status === "void" || status === "superseded" ? "Agreement being revised" : "Agreement not created yet");
   }
   const guests = clean(a.max_guests || inq.guest_count);
@@ -139,6 +142,9 @@ Deno.serve(async (req) => {
     const versions: any[] = respIds.length ? await rest(`venue_agreement_versions?select=id,response_id,version,status,issued_at,expires_at,completed_at&response_id=in.(${respIds.join(",")})&order=version.desc`) : [];
     const latestIds = respIds.map((r) => versions.find((v) => v.response_id === r)?.id).filter(Boolean);
     const signers: any[] = latestIds.length ? await rest(`venue_agreement_signers?select=version_id,name,email,role,status,signed_at&version_id=in.(${latestIds.join(",")})`) : [];
+    const inqIds = inqs.map((i) => i.id);
+    const payments: any[] = inqIds.length ? await rest(`venue_payments?select=inquiry_id,amount_cents,created_at&inquiry_id=in.(${inqIds.join(",")})`) : [];
+    const schedules: any[] = inqIds.length ? await rest(`venue_payment_schedule?select=inquiry_id,amount_paid_cents&inquiry_id=in.(${inqIds.join(",")})`) : [];
     const holds: any[] = await rest(`venue_soft_holds?select=*`);
     const cacheRow = (await rest(`calendar_events_cache?select=events&id=eq.1`))?.[0];
     const cache: any[] = Array.isArray(cacheRow?.events) ? cacheRow.events : [];
@@ -153,8 +159,16 @@ Deno.serve(async (req) => {
       const v = versions.find((x) => x.response_id === rid) || null;
       const ag = v?.status || null;
       const name = String(i.name || "Venue booking").trim();
-      const details = describe(i, forms.find((f) => f.id === rid), v, signers.filter((x) => x.version_id === v?.id));
-      want.set(rid, ag === "expired" || ag === "declined" ? null : { date: i.event_date, name, details, summary: ag === "completed" ? name : `Soft hold: ${name}` });
+      const form = forms.find((f) => f.id === rid);
+      const online = payments.filter((p) => p.inquiry_id === i.id);
+      const manual: any[] = Array.isArray(form?.answers?.__venue_checklist?.manual_payments) ? form.answers.__venue_checklist.manual_payments : [];
+      const scheduled = schedules.filter((x) => x.inquiry_id === i.id).reduce((n, x) => n + (Number(x.amount_paid_cents) || 0), 0);
+      const paidCents = Math.max(scheduled, online.reduce((n, p) => n + (Number(p.amount_cents) || 0), 0) + manual.reduce((n, p) => n + (Number(p?.cents) || 0), 0));
+      const firstPaid = [...online.map((p) => p.created_at), ...manual.map((p) => p?.date)].filter(Boolean).sort()[0] || null;
+      const booked = paidCents > 0;
+      const details = describe(i, form, v, signers.filter((x) => x.version_id === v?.id), { cents: paidCents, first: firstPaid });
+      // A paid booking stays on the calendar even if a later agreement version lapses; an unpaid one is released.
+      want.set(rid, !booked && (ag === "expired" || ag === "declined") ? null : { date: i.event_date, name, details, summary: booked ? name : `Soft hold: ${name}` });
     }
 
     for (const [rid, w] of want) {
