@@ -315,7 +315,8 @@ function HiddenEvents({ onChanged }) {
 // ── Detail tabs ─────────────────────────────────────────────────────────────
 
 const PLANNING_SECTION_ICONS = {
-  preplanning: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+  preplanning: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  checklist: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
   marketing: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>,
   volunteers: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
   vendors: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg>,
@@ -327,11 +328,11 @@ const PLANNING_SECTION_ICONS = {
 };
 
 const PLANNING_SECTIONS = [
-  { key: 'preplanning', title: 'Event Basics & Checklist', desc: 'Purpose, attendance, event lead, detailed checklist' },
+  { key: 'preplanning', title: 'Event Basics', desc: 'Event details, website page, tickets, guest count' },
+  { key: 'checklist', title: 'Checklist', desc: 'Tasks with priority, due dates and assignees' },
   { key: 'marketing', title: 'Marketing & Promotion', desc: 'Flyers, newsletters, website, social media', area: 'marketing' },
-  { key: 'volunteers', title: 'Volunteers & Staffing', desc: 'Assignments, shifts, contact information', area: 'volunteers' },
+  { key: 'volunteers', title: 'Volunteers, Staffing & Vendors', desc: 'Assignments, shifts, vendors, contact information', area: 'volunteers' },
   { key: 'areas-other', title: 'Other Planning Areas', desc: 'Logistics, hospitality, finance, sponsorship, interiors' },
-  { key: 'vendors', title: 'Vendors & Supplies', desc: 'Catering, rentals, orders, deliveries' },
   { key: 'budget', title: 'Budget & Transactions', desc: 'Income, expenses, reimbursements' },
   { key: 'dayof', title: 'Day-Of Timeline', desc: 'Run of show for the day' },
   { key: 'reviews', title: 'Reviews & Feedback', desc: 'Guest and volunteer feedback' },
@@ -466,7 +467,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           </div>
           {ev.checklist.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>No checklist items yet -- add some in Pre-Planning.</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>No checklist items yet -- add some in Checklist.</div>
           ) : ev.checklist.slice(0, 6).map(t => (
             <div key={t.id} onClick={() => toggleChecklistItem(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer' }}>
               <span style={{
@@ -492,7 +493,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             {(ev.guestCount.invited || ev.expectedAttendance) && <div><strong>Expected guests:</strong> {ev.guestCount.invited || ev.expectedAttendance}</div>}
             {ev.volunteersNeeded !== '' && ev.volunteersNeeded != null && <div><strong>Volunteers needed:</strong> {ev.volunteersNeeded}</div>}
             {!ev.eventLead && !ev.location && !ev.pricing && !ev.guestCount.invited && !ev.expectedAttendance && (ev.volunteersNeeded === '' || ev.volunteersNeeded == null) && (
-              <div style={{ color: 'var(--muted)' }}>Nothing set yet -- fill these in under Pre-Planning.</div>
+              <div style={{ color: 'var(--muted)' }}>Nothing set yet -- fill these in under Event Basics.</div>
             )}
           </div>
           {upcomingDeadlines.length > 0 && (
@@ -533,9 +534,9 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               {isOpen && (
                 <div style={{ padding: '4px 16px 18px' }}>
                   {s.key === 'preplanning' && <PreplanningTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}
-                  {s.key === 'vendors' && <VendorsPanel ev={ev} onUpdate={onUpdate} />}
+                  {s.key === 'checklist' && <SheetToggle view={<ChecklistView ev={ev} onUpdate={onUpdate} />}><ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} /></SheetToggle>}
                   {s.key === 'budget' && <FinancialsTab ev={ev} />}
-                  {s.key === 'dayof' && <DayOfTab ev={ev} onUpdate={onUpdate} />}
+                  {s.key === 'dayof' && <SheetToggle view={<DayOfView ev={ev} />}><DayOfTab ev={ev} onUpdate={onUpdate} /></SheetToggle>}
                   {s.key === 'reviews' && <ReviewsTab ev={ev} />}
                   {s.key === 'after' && <AfterTab ev={ev} onUpdate={onUpdate} />}
                   {s.key === 'marketing' && (
@@ -548,6 +549,12 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                     <div style={{ fontSize: 13, color: 'var(--muted)' }}>Marked not applicable. Untick the box above to plan marketing for this event.</div>
                   ) : (s.key === 'marketing' || s.key === 'volunteers') && (
                     <AreasTab event={ev} session={session} volunteer={volunteer} initialArea={s.area} />
+                  )}
+                  {s.key === 'volunteers' && (
+                    <div style={{ marginTop: 24 }}>
+                      <div style={SECTION_HEAD}>Vendors & contacts</div>
+                      <SheetToggle view={<VendorsView ev={ev} />}><VendorsPanel ev={ev} onUpdate={onUpdate} /></SheetToggle>
+                    </div>
                   )}
                   {s.key === 'areas-other' && <AreasTab event={ev} session={session} volunteer={volunteer} />}
                 </div>
@@ -640,6 +647,88 @@ function AssigneeMentionInput({ assignee, assigneeId, onChange, volunteers }) {
   );
 }
 
+// A section as a ready sheet: the read-only view with an Edit button. Edit swaps in the editor, Done goes back.
+function SheetToggle({ view, children }) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <button className={editing ? 'btn-gold' : 'btn-ghost'} style={{ fontSize: 12, padding: '5px 14px' }} onClick={() => setEditing(v => !v)}>{editing ? 'Done' : 'Edit'}</button>
+      </div>
+      {editing ? children : view}
+    </div>
+  );
+}
+
+function VendorsView({ ev }) {
+  if (!ev.vendors.length) return <div style={{ fontSize: 13, color: 'var(--muted)' }}>No vendors or contacts yet. Click Edit to add some.</div>;
+  return (
+    <div>
+      {ev.vendors.map(v => (
+        <div key={v.id} style={{ display: 'flex', gap: 10, padding: '9px 0', borderBottom: '0.5px solid var(--border-light)' }}>
+          <span style={{ width: 15, flexShrink: 0, color: v.confirmed ? 'var(--gold)' : 'var(--muted)' }} title={v.confirmed ? 'Confirmed' : 'Not confirmed yet'}>{v.confirmed ? '✓' : '○'}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>{v.name}{v.role && <span style={{ fontWeight: 400, color: 'var(--muted)' }}> — {v.role}</span>}</div>
+            {v.contact && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{v.contact}</div>}
+            {v.notes && <div style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'pre-wrap', marginTop: 2 }}>{v.notes}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DayOfView({ ev }) {
+  const sorted = [...ev.timeline].sort((a, b) => a.time.localeCompare(b.time));
+  if (!sorted.length) return <div style={{ fontSize: 13, color: 'var(--muted)' }}>No timeline items yet. Click Edit to add some.</div>;
+  return (
+    <div>
+      <div style={SECTION_HEAD}>Run of Show</div>
+      {sorted.map(t => (
+        <div key={t.id} style={{ display: 'flex', gap: 14, padding: '9px 0', borderBottom: '0.5px solid var(--border-light)', fontSize: 13 }}>
+          <span style={{ width: 70, flexShrink: 0, color: 'var(--muted)' }}>{fmtTime12(t.time)}</span>
+          <span style={{ flex: 1 }}>{t.activity}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChecklistView({ ev, onUpdate }) {
+  const items = ev.checklist;
+  if (!items.length) return <div style={{ fontSize: 13, color: 'var(--muted)' }}>No checklist items yet. Click Edit to add some.</div>;
+  const doneCount = items.filter(t => t.done).length;
+  function toggle(id) { onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, done: !t.done } : t) })); }
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>{doneCount} of {items.length} done</div>
+      {items.map(t => {
+        const subs = t.subtasks || [];
+        const p = TASK_PRIORITY[t.priority];
+        const hasMoney = t.estimated > 0 || t.actual > 0;
+        const meta = [t.assignee ? (t.assigneeId ? '@' : '') + t.assignee : '', t.due ? 'Due ' + fmtDateShort(t.due) : '', subs.length ? subs.filter(s => s.done).length + '/' + subs.length + ' subtasks' : '', hasMoney ? 'Est. ' + money(t.estimated) + ' · Act. ' + money(t.actual) : ''].filter(Boolean).join(' · ');
+        return (
+          <div key={t.id} style={{ display: 'flex', gap: 10, padding: '9px 0', borderBottom: '0.5px solid var(--border-light)' }}>
+            <input type="checkbox" checked={!!t.done} onChange={() => toggle(t.id)} style={{ accentColor: 'var(--gold)', width: 15, height: 15, marginTop: 2, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--muted)' : 'var(--text)' }}>
+                {p && <span title={p.label} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.color, marginRight: 7 }} />}{t.text}
+              </div>
+              {meta && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{meta}</div>}
+              {t.notes && t.notes.trim() && <div style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'pre-wrap', marginTop: 3 }}>{t.notes}</div>}
+              {subs.length > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  {subs.map(s => <div key={s.id} style={{ fontSize: 12, color: s.done ? 'var(--muted)' : 'var(--text)', textDecoration: s.done ? 'line-through' : 'none' }}>{s.done ? '✓' : '○'} {s.text}</div>)}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // Extracted so Overview's "Vendors & Supplies" planning-section dropdown
 // can embed the exact same vendor list/add-form Pre-Planning uses, instead
 // of duplicating it.
@@ -695,10 +784,15 @@ function WebsiteEventPanel({ ev, onUpdate }) {
   });
   const [f, setF] = useState(initial);
   const [picker, setPicker] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [msg, setMsg] = useState(null);
   const set = (k, v) => setF(o => ({ ...o, [k]: v }));
   const setTier = (i, k, v) => setF(o => ({ ...o, tiers: o.tiers.map((t, j) => j === i ? { ...t, [k]: v } : t) }));
+
+  // The sheet shows what is saved; follow changes made elsewhere while not editing.
+  const savedKey = JSON.stringify([ev.name, ev.date, ev.startTime, ev.endTime, ev.description, ev.purpose, ev.eventLead, ev.expectedAttendance, ev.pricing, ev.ticketTiers, ev.website]);
+  useEffect(() => { if (!editing) setF(initial()); }, [savedKey, editing]);
 
   // Turn the form into the committee event's fields.
   const toEvent = (form, base) => ({
@@ -727,6 +821,7 @@ function WebsiteEventPanel({ ev, onUpdate }) {
   function save() {
     if (!f.title.trim()) { setMsg({ ok: false, text: 'Give the event a title first.' }); return; }
     onUpdate(e => toEvent(f, e));
+    setEditing(false);
     setMsg({ ok: true, text: 'Saved.' });
   }
   async function push(form) {
@@ -739,6 +834,7 @@ function WebsiteEventPanel({ ev, onUpdate }) {
       const merged = toEvent(form, ev);
       const r = await pushCommitteeEventToWebsite(merged);
       onUpdate(e => ({ ...toEvent(form, e), siteEventId: r.siteEventId }));
+      setEditing(false);
       setMsg({ ok: true, text: r.status === 'archived' ? 'Updated. This event has ended, so it is not shown on the website.' : 'Done. The event is live on the website (it also shows in Admin > New Event).' });
     } catch (err) {
       setMsg({ ok: false, text: err.message || 'Could not push. Please try again.' });
@@ -753,7 +849,10 @@ function WebsiteEventPanel({ ev, onUpdate }) {
 
   return (
     <div style={{ marginBottom: 24, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '18px 20px' }}>
-      <div style={{ ...SECTION_HEAD, marginBottom: 6 }}>Event Basics</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <div style={{ ...SECTION_HEAD, marginBottom: 6 }}>Event Basics</div>
+        {!editing && <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 14px' }} onClick={() => setEditing(true)}>Edit</button>}
+      </div>
       <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>
         {ev.siteEventId
           ? 'This is the event and its website page. Fill it in here; this event is on the website, so Save and update website sends your changes live.'
@@ -762,6 +861,7 @@ function WebsiteEventPanel({ ev, onUpdate }) {
 
       {true ? (
         <div>
+          <fieldset disabled={!editing} className={'sheet-fieldset' + (editing ? '' : ' sheet-readonly')}>
           <div style={{ ...head, marginTop: 8, borderTop: 'none', paddingTop: 0 }}>The event</div>
           <label style={lab}>Title *<input style={inp} value={f.title} onChange={e => { const v = e.target.value; setF(o => ({ ...o, title: v, slug: o.slugTouched ? o.slug : slugify(v) })); }} placeholder="e.g. Holiday Open House" /></label>
           <label style={lab}>Web address (the last part of the event's link)
@@ -775,8 +875,8 @@ function WebsiteEventPanel({ ev, onUpdate }) {
               {f.imageUrl ? <img src={f.imageUrl} alt="" style={{ width: 110, height: 74, objectFit: 'cover', borderRadius: 8, border: '0.5px solid var(--border-light)' }} /> : <div style={{ width: 110, height: 74, borderRadius: 8, background: 'var(--light)', border: '0.5px solid var(--border-light)' }} />}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button type="button" className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setPicker(true)}>{f.imageUrl ? 'Change photo' : 'Choose a photo'}</button>
-                  {f.imageUrl && <button type="button" className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setF(o => ({ ...o, imageUrl: '', imageAlt: '' }))}>Remove</button>}
+                  <button type="button" className="btn-ghost edit-only" style={{ fontSize: 12 }} onClick={() => setPicker(true)}>{f.imageUrl ? 'Change photo' : 'Choose a photo'}</button>
+                  {f.imageUrl && <button type="button" className="btn-ghost edit-only" style={{ fontSize: 12 }} onClick={() => setF(o => ({ ...o, imageUrl: '', imageAlt: '' }))}>Remove</button>}
                   {!f.imageUrl && <span style={note}>No photo? The website shows "More information to come".</span>}
                 </div>
                 <input style={inp} value={f.imageAlt} onChange={e => set('imageAlt', e.target.value)} placeholder="Describe the photo (for screen readers)" />
@@ -810,10 +910,10 @@ function WebsiteEventPanel({ ev, onUpdate }) {
                   <label style={{ ...lab, flex: '2 1 160px', marginBottom: 0 }}>Ticket name<input style={inp} value={t.name || ''} onChange={e => setTier(i, 'name', e.target.value)} /></label>
                   <label style={{ ...lab, flex: '1 1 90px', marginBottom: 0 }}>Price ($)<input style={inp} inputMode="decimal" value={t.price ?? ''} onChange={e => setTier(i, 'price', e.target.value)} placeholder="0 = free" /></label>
                   <label style={{ ...lab, flex: '1 1 90px', marginBottom: 0 }}>Max per order<input style={inp} inputMode="numeric" value={t.limit ?? ''} onChange={e => setTier(i, 'limit', e.target.value)} placeholder="50" /></label>
-                  {f.tiers.length > 1 && <button type="button" onClick={() => set('tiers', f.tiers.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#b3402a', fontSize: 18, cursor: 'pointer', paddingBottom: 6 }} aria-label="Remove this ticket type">×</button>}
+                  {f.tiers.length > 1 && <button type="button" className="edit-only" onClick={() => set('tiers', f.tiers.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#b3402a', fontSize: 18, cursor: 'pointer', paddingBottom: 6 }} aria-label="Remove this ticket type">×</button>}
                 </div>
               ))}
-              <button type="button" className="btn-ghost" style={{ fontSize: 12 }} onClick={() => set('tiers', [...f.tiers, { name: '', price: '', limit: '' }])}>+ Add another ticket type</button>
+              <button type="button" className="btn-ghost edit-only" style={{ fontSize: 12 }} onClick={() => set('tiers', [...f.tiers, { name: '', price: '', limit: '' }])}>+ Add another ticket type</button>
             </div>
           )}
 
@@ -830,15 +930,206 @@ function WebsiteEventPanel({ ev, onUpdate }) {
           </div>
           <label style={lab}>Pricing note<input style={inp} value={f.pricing} onChange={e => set('pricing', e.target.value)} placeholder="e.g. Free, or $25 adults / kids free" /></label>
 
+          </fieldset>
+
           {msg && <div style={{ fontSize: 12, margin: '8px 0', color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}
+          {!editing ? (
+            <div style={{ marginTop: 10 }}>
+              {missing(f).length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Still needed before pushing: {missing(f).join(', ')}. Click Edit.</div>}
+              <button className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing || missing(f).length > 0} onClick={() => push(f)}>{pushing ? 'Pushing…' : (ev.siteEventId ? 'Update website event' : 'Push to website')}</button>
+            </div>
+          ) : (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             <button className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => push(f)}>{pushing ? 'Pushing…' : (ev.siteEventId ? 'Save and update website' : 'Save and push to website')}</button>
             <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={save}>Save only</button>
-            <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => { setF(initial()); setMsg(null); }}>Reset</button>
+            <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => { setF(initial()); setMsg(null); setEditing(false); }}>Cancel</button>
           </div>
+          )}
         </div>
       ) : null}
       {picker && <MediaPicker supabaseUrl={SITE_SUPABASE_URL} supabaseKey={SITE_SUPABASE_KEY} onPick={img => { setF(o => ({ ...o, imageUrl: img.url, imageAlt: o.imageAlt || img.alt || '' })); setPicker(false); }} onClose={() => setPicker(false)} />}
+    </div>
+  );
+}
+
+// The event's task checklist: add items with a priority, due date and assignee; click one to edit it, add subtasks,
+// or attach estimated/actual $ and notes.
+function ChecklistTab({ ev, onUpdate, volunteers }) {
+  const [itemForm, setItemForm] = useState({ text: '', due: '', assignee: '', assigneeId: null, priority: '' });
+  const [expandedId, setExpandedId] = useState(null);
+  const [expandForm, setExpandForm] = useState({ text: '', due: '', assignee: '', assigneeId: null, priority: '', estimated: '', actual: '', notes: '' });
+  const [subtaskInput, setSubtaskInput] = useState('');
+  const sectionTitle = SECTION_HEAD;
+
+  function toggleItem(id) {
+    onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, done: !t.done } : t) }));
+  }
+  function deleteItem(id) {
+    onUpdate(e => ({ ...e, checklist: e.checklist.filter(t => t.id !== id) }));
+    if (expandedId === id) setExpandedId(null);
+  }
+  function cycleItemPriority(id) {
+    onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, priority: nextPriority(t.priority) } : t) }));
+  }
+  function addItem() {
+    if (!itemForm.text.trim()) return;
+    onUpdate(e => ({ ...e, checklist: [...e.checklist, {
+      id: cryptoId(), text: itemForm.text.trim(), done: false, due: itemForm.due,
+      assignee: itemForm.assignee.trim(), assigneeId: itemForm.assigneeId, priority: itemForm.priority || '',
+      estimated: 0, actual: 0, notes: '', subtasks: [],
+    }] }));
+    setItemForm({ text: '', due: '', assignee: '', assigneeId: null, priority: '' });
+  }
+
+  function startExpand(t) {
+    setExpandedId(expandedId === t.id ? null : t.id);
+    setExpandForm({
+      text: t.text, due: t.due || '', assignee: t.assignee || '', assigneeId: t.assigneeId || null, priority: t.priority || '',
+      estimated: t.estimated ? String(t.estimated) : '', actual: t.actual ? String(t.actual) : '', notes: t.notes || '',
+    });
+    setSubtaskInput('');
+  }
+  function saveExpand(id) {
+    if (!expandForm.text.trim()) return;
+    onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id
+      ? {
+          ...t, text: expandForm.text.trim(), due: expandForm.due, assignee: expandForm.assignee.trim(),
+          assigneeId: expandForm.assigneeId, priority: expandForm.priority,
+          estimated: Number(expandForm.estimated) || 0, actual: Number(expandForm.actual) || 0, notes: expandForm.notes.trim(),
+        }
+      : t) }));
+    setExpandedId(null);
+  }
+
+  function addSubtask(itemId) {
+    if (!subtaskInput.trim()) return;
+    onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === itemId
+      ? { ...t, subtasks: [...(t.subtasks || []), { id: cryptoId(), text: subtaskInput.trim(), done: false }] }
+      : t) }));
+    setSubtaskInput('');
+  }
+  function toggleSubtask(itemId, subId) {
+    onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === itemId
+      ? { ...t, subtasks: (t.subtasks || []).map(s => s.id === subId ? { ...s, done: !s.done } : s) }
+      : t) }));
+  }
+  function deleteSubtask(itemId, subId) {
+    onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === itemId
+      ? { ...t, subtasks: (t.subtasks || []).filter(s => s.id !== subId) }
+      : t) }));
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <div style={sectionTitle}>Checklist</div>
+          <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--muted)', marginBottom: 12 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: TASK_PRIORITY.high.color, display: 'inline-block' }} />High</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: TASK_PRIORITY.medium.color, display: 'inline-block' }} />Medium</span>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+          Click an item to edit it, add subtasks, or attach an estimated/actual $ amount and notes.
+        </div>
+        {ev.checklist.map(t => {
+          const hasMoney = t.estimated > 0 || t.actual > 0;
+          const hasNotes = !!(t.notes && t.notes.trim());
+          const subtasks = t.subtasks || [];
+          const subDone = subtasks.filter(s => s.done).length;
+          const isOpen = expandedId === t.id;
+          return (
+            <div key={t.id}>
+              <ItemRow done={t.done} onDelete={() => deleteItem(t.id)} accent={t.priority ? TASK_PRIORITY[t.priority].color : null}>
+                <PriorityDot priority={t.priority} onClick={() => cycleItemPriority(t.id)} />
+                <input type="checkbox" checked={t.done} onChange={() => toggleItem(t.id)} style={{ accentColor: 'var(--gold)', width: 15, height: 15 }} />
+                <button onClick={() => startExpand(t)} title="Edit item"
+                  style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+                  <span style={{ fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: 'var(--text)' }}>{t.text}</span>
+                  {(hasMoney || hasNotes || subtasks.length > 0) && (
+                    <span style={{ fontSize: 11, color: 'var(--gold)', marginLeft: 8 }}>
+                      {subtasks.length > 0 ? `${subDone}/${subtasks.length} subtasks` : ''}
+                      {subtasks.length > 0 && (hasMoney || hasNotes) ? ' · ' : ''}
+                      {hasMoney ? `Est. ${money(t.estimated)} · Act. ${money(t.actual)}` : ''}{hasMoney && hasNotes ? ' · ' : ''}{hasNotes ? 'notes' : ''}
+                    </span>
+                  )}
+                </button>
+                <span style={{ fontSize: 11, color: t.assigneeId ? 'var(--gold)' : 'var(--muted)', whiteSpace: 'nowrap' }}>{t.assignee ? `${t.assigneeId ? '@' : ''}${t.assignee} · ` : ''}{t.due ? fmtDateShort(t.due) : ''}</span>
+              </ItemRow>
+              {isOpen && (
+                <div style={{ padding: '10px 0 14px 33px' }}>
+                  <div className="label">Item</div>
+                  <input className="input" style={{ marginBottom: 8 }} value={expandForm.text} onChange={e => setExpandForm(f => ({ ...f, text: e.target.value }))} />
+                  <div style={{ display: 'flex', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                    <div>
+                      <div className="label">Priority</div>
+                      <select className="input" style={{ width: 118, appearance: 'auto' }} value={expandForm.priority} onChange={e => setExpandForm(f => ({ ...f, priority: e.target.value }))}>
+                        <option value="">No priority</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                    <div>
+                      <div className="label">Due</div>
+                      <input className="input" type="date" style={{ width: 130 }} value={expandForm.due} onChange={e => setExpandForm(f => ({ ...f, due: e.target.value }))} />
+                    </div>
+                    <div>
+                      <div className="label">Assignee</div>
+                      <AssigneeMentionInput key={t.id} assignee={expandForm.assignee} assigneeId={expandForm.assigneeId} volunteers={volunteers}
+                        onChange={(assignee, assigneeId) => setExpandForm(f => ({ ...f, assignee, assigneeId }))} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div className="label">Estimated $</div>
+                      <input className="input" type="number" value={expandForm.estimated} onChange={e => setExpandForm(f => ({ ...f, estimated: e.target.value }))} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div className="label">Actual $</div>
+                      <input className="input" type="number" value={expandForm.actual} onChange={e => setExpandForm(f => ({ ...f, actual: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="label">Notes</div>
+                  <textarea className="input" rows={3} style={{ resize: 'vertical', marginBottom: 12 }} value={expandForm.notes} onChange={e => setExpandForm(f => ({ ...f, notes: e.target.value }))} placeholder="Details for this item…" />
+
+                  <div className="label" style={{ marginBottom: 6 }}>Subtasks</div>
+                  {subtasks.map(s => (
+                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' }}>
+                      <input type="checkbox" checked={s.done} onChange={() => toggleSubtask(t.id, s.id)} style={{ accentColor: 'var(--gold)', width: 14, height: 14 }} />
+                      <span style={{ flex: 1, fontSize: 12, textDecoration: s.done ? 'line-through' : 'none', color: s.done ? 'var(--muted)' : 'var(--text)' }}>{s.text}</span>
+                      <button onClick={() => deleteSubtask(t.id, s.id)} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 13, cursor: 'pointer', padding: '0 2px' }}>×</button>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6, marginBottom: 12 }}>
+                    <input className="input" style={{ flex: 1, fontSize: 12 }} placeholder="Add a subtask…" value={subtaskInput}
+                      onChange={e => setSubtaskInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSubtask(t.id); } }} />
+                    <button className="btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => addSubtask(t.id)}>Add</button>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn-gold" style={{ fontSize: 12, padding: '6px 14px' }} onClick={() => saveExpand(t.id)}>Save</button>
+                    <button className="btn-ghost" style={{ fontSize: 12, padding: '6px 14px' }} onClick={() => setExpandedId(null)}>Close</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+          <input className="input" style={{ flex: 1, minWidth: 140 }} placeholder="Add an item…" value={itemForm.text} onChange={e => setItemForm(f => ({ ...f, text: e.target.value }))} />
+          <select className="input" style={{ width: 118, appearance: 'auto' }} value={itemForm.priority} onChange={e => setItemForm(f => ({ ...f, priority: e.target.value }))}>
+            <option value="">No priority</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+          <input className="input" type="date" style={{ width: 130 }} value={itemForm.due} onChange={e => setItemForm(f => ({ ...f, due: e.target.value }))} />
+          <AssigneeMentionInput assignee={itemForm.assignee} assigneeId={itemForm.assigneeId} volunteers={volunteers}
+            onChange={(assignee, assigneeId) => setItemForm(f => ({ ...f, assignee, assigneeId }))} />
+          <button className="btn-gold" style={{ padding: '9px 14px' }} onClick={addItem}>Add</button>
+        </div>
+      </div>
+
     </div>
   );
 }
@@ -860,12 +1151,7 @@ function PreplanningTab({ ev, onUpdate, volunteers }) {
 
   return (
     <div>
-      <WebsiteEventPanel key={[ev.id, ev.name, ev.date, ev.startTime, ev.endTime, ev.description, ev.siteEventId, ev.purpose, ev.eventLead, ev.expectedAttendance, ev.pricing].join('|')} ev={ev} onUpdate={onUpdate} />
-
-      <div style={{ marginBottom: 24 }}>
-        <div style={sectionTitle}>Vendors & contacts</div>
-        <VendorsPanel ev={ev} onUpdate={onUpdate} />
-      </div>
+      <WebsiteEventPanel key={ev.id} ev={ev} onUpdate={onUpdate} />
 
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>

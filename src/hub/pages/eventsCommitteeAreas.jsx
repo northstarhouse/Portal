@@ -199,7 +199,7 @@ function migrateStaffing(v) {
 
 // ---------- Generic field renderers ----------
 
-function Field({ field, value, onChange, volunteers }) {
+function Field({ field, value, onChange, volunteers, readOnly }) {
   const v = value !== undefined ? value : defaultValueFor(field);
 
   if (field.type === 'text') return <input className="input" value={v} onChange={e => onChange(e.target.value)} />;
@@ -251,7 +251,7 @@ function Field({ field, value, onChange, volunteers }) {
         {rows.map(r => (
           <div key={r.id} className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '7px 10px', marginBottom: 5 }}>
             {field.columns.map(c => <span key={c.key} style={{ flex: 1, fontSize: 12 }}>{r[c.key]}</span>)}
-            <button onClick={() => removeRow(r.id)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>×</button>
+            <button className="edit-only" onClick={() => removeRow(r.id)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>×</button>
           </div>
         ))}
         {showForm ? (
@@ -264,12 +264,12 @@ function Field({ field, value, onChange, volunteers }) {
             <button className="btn-ghost" style={{ padding: '8px 12px' }} onClick={() => { setDraft({}); setShowForm(false); }}>Cancel</button>
           </div>
         ) : (
-          <button className="btn-ghost" style={{ fontSize: 12, marginTop: 4 }} onClick={() => setShowForm(true)}>+ Add {field.label}</button>
+          <button className="btn-ghost edit-only" style={{ fontSize: 12, marginTop: 4 }} onClick={() => setShowForm(true)}>+ Add {field.label}</button>
         )}
       </div>
     );
   }
-  if (field.type === 'staffing') return <StaffingField roles={migrateStaffing(v)} onChange={onChange} volunteers={volunteers || []} />;
+  if (field.type === 'staffing') return <StaffingField roles={migrateStaffing(v)} onChange={onChange} volunteers={volunteers || []} readOnly={readOnly} />;
   if (field.type === 'channelChecklist') {
     const m = v || {};
     return (
@@ -323,7 +323,7 @@ function Field({ field, value, onChange, volunteers }) {
 // to assign/remove specific people from the active volunteer directory.
 function volName(vol) { return `${vol['First Name'] || ''} ${vol['Last Name'] || ''}`.trim() || 'Unnamed'; }
 
-function StaffingField({ roles, onChange, volunteers }) {
+function StaffingField({ roles, onChange, volunteers, readOnly }) {
   const [expandedId, setExpandedId] = useState(null);
   const [addingRole, setAddingRole] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -379,7 +379,7 @@ function StaffingField({ roles, onChange, volunteers }) {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 700 }}>Staffing Needs</div>
-        {!addingRole && <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setAddingRole(true)}>+ Add role</button>}
+        {!addingRole && <button className="btn-ghost edit-only" style={{ fontSize: 12 }} onClick={() => setAddingRole(true)}>+ Add role</button>}
       </div>
 
       {addingRole && (
@@ -407,12 +407,13 @@ function StaffingField({ roles, onChange, volunteers }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{role.name}</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>{assignedVols.length} of {target} assigned</div>
+                {readOnly && assignedVols.length > 0 && <div style={{ fontSize: 12, marginTop: 3 }}>{assignedVols.map(volName).join(', ')}</div>}
               </div>
-              <button onClick={() => adjustTarget(role, -1)} className="btn-ghost" style={{ width: 26, height: 26, padding: 0, borderRadius: '50%' }}>−</button>
+              <button onClick={() => adjustTarget(role, -1)} className="btn-ghost edit-only" style={{ width: 26, height: 26, padding: 0, borderRadius: '50%' }}>−</button>
               <span style={{ fontSize: 13, fontWeight: 600, minWidth: 16, textAlign: 'center' }}>{target}</span>
-              <button onClick={() => adjustTarget(role, 1)} className="btn-ghost" style={{ width: 26, height: 26, padding: 0, borderRadius: '50%' }}>+</button>
-              <button onClick={() => setExpandedId(isOpen ? null : role.id)} className="btn-ghost" style={{ width: 26, height: 26, padding: 0 }} title={isOpen ? 'Collapse' : 'Expand'}>{isOpen ? '▲' : '▼'}</button>
-              <button onClick={() => removeRole(role.id)} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 15, cursor: 'pointer', padding: '0 2px' }} title="Remove role">×</button>
+              <button onClick={() => adjustTarget(role, 1)} className="btn-ghost edit-only" style={{ width: 26, height: 26, padding: 0, borderRadius: '50%' }}>+</button>
+              <button onClick={() => setExpandedId(isOpen ? null : role.id)} className="btn-ghost edit-only" style={{ width: 26, height: 26, padding: 0 }} title={isOpen ? 'Collapse' : 'Expand'}>{isOpen ? '▲' : '▼'}</button>
+              <button className="edit-only" onClick={() => removeRole(role.id)} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 15, cursor: 'pointer', padding: '0 2px' }} title="Remove role">×</button>
             </div>
 
             {isOpen && (
@@ -451,13 +452,13 @@ function StaffingField({ roles, onChange, volunteers }) {
   );
 }
 
-function AreaFormSection({ fields, data, onFieldChange, volunteers }) {
+function AreaFormSection({ fields, data, onFieldChange, volunteers, readOnly }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <fieldset disabled={!!readOnly} className={'sheet-fieldset' + (readOnly ? ' sheet-readonly' : '')} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {fields.map(f => (
         <div key={f.key}>
           <div className="label">{f.label}</div>
-          <Field field={f} value={data[f.key]} onChange={val => onFieldChange(f.key, val)} volunteers={volunteers} />
+          <Field field={f} value={data[f.key]} onChange={val => onFieldChange(f.key, val)} volunteers={volunteers} readOnly={readOnly} />
           {f.pairedDateKey && (data[f.key] === 'Yes' || data[f.key] === '') && (
             <div style={{ marginTop: 6, maxWidth: 180 }}>
               <div className="label">Date</div>
@@ -466,7 +467,7 @@ function AreaFormSection({ fields, data, onFieldChange, volunteers }) {
           )}
         </div>
       ))}
-    </div>
+    </fieldset>
   );
 }
 
@@ -479,6 +480,7 @@ export default function AreasTab({ event, session, volunteer, initialArea }) {
   const [phase, setPhase] = useState('pre');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     fetchAreaData(event.id).then(setRows);
@@ -511,6 +513,7 @@ export default function AreasTab({ event, session, volunteer, initialArea }) {
     saveArea(event.id, activeArea, { ownerName: current.owner_name, preData: current.pre_data, postData: current.post_data, authUserId: session.user.id }).then(res => {
       setSaving(false);
       if (res.success) {
+        setEditing(false);
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
         logActivity({ vol: volunteer, authUserId: session.user.id, action: 'committee_area_updated', description: `${fullName || 'A volunteer'} updated ${areaDef.label} notes for "${event.name}"` });
@@ -547,7 +550,7 @@ export default function AreasTab({ event, session, volunteer, initialArea }) {
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif" }}>{areaDef.label}</div>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Section owner: <input value={ownerName} onChange={e => updateOwner(e.target.value)} style={{ border: 'none', borderBottom: '1px dashed var(--border)', background: 'none', fontSize: 12, color: 'var(--gold)', width: 140 }} />
+              Section owner: <input disabled={!editing} value={ownerName} onChange={e => updateOwner(e.target.value)} style={{ border: 'none', borderBottom: '1px dashed var(--border)', background: 'none', fontSize: 12, color: 'var(--gold)', width: 140 }} />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -561,10 +564,17 @@ export default function AreasTab({ event, session, volunteer, initialArea }) {
           </div>
         </div>
 
-        <AreaFormSection fields={fields} data={data} onFieldChange={updateField} volunteers={volunteersDir} />
+        <AreaFormSection fields={fields} data={data} onFieldChange={updateField} volunteers={volunteersDir} readOnly={!editing} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20 }}>
-          <button className="btn-gold" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</button>
+          {editing ? (
+            <>
+              <button className="btn-gold" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</button>
+              <button className="btn-ghost" disabled={saving} onClick={() => { fetchAreaData(event.id).then(setRows); setEditing(false); }}>Cancel</button>
+            </>
+          ) : (
+            <button className="btn-ghost" onClick={() => setEditing(true)}>Edit</button>
+          )}
           {saved && <span style={{ fontSize: 12, color: 'var(--gold)' }}>Saved ✓</span>}
         </div>
       </div>
