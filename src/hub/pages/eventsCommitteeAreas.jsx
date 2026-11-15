@@ -6,7 +6,7 @@
 // renderer + field list per area) instead of nine hand-written components,
 // and saved to a single `events_committee_areas` table row per (event, area)
 // instead of the old app's localStorage + event_forms dual-write.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchAreaData, saveArea, logActivity, fetchAllActiveVolunteers } from '../lib/db.js';
 
 export const AREA_DEFAULTS = [
@@ -463,7 +463,7 @@ function AreaFormSection({ fields, data, onFieldChange, volunteers, readOnly }) 
     <fieldset disabled={!!readOnly} className={'sheet-fieldset' + (readOnly ? ' sheet-readonly' : '')} style={{ display: 'flex', flexDirection: 'column', gap: readOnly ? 0 : 16 }}>
       {fields.map(f => (
         <div key={f.key} className="sheet-field">
-          <div className="label">{f.label}</div>
+          {f.type !== 'staffing' && <div className="label">{f.label}</div>}
           <Field field={f} value={data[f.key]} onChange={val => onFieldChange(f.key, val)} volunteers={volunteers} readOnly={readOnly} />
           {f.pairedDateKey && (data[f.key] === 'Yes' || data[f.key] === '') && (
             <div style={{ marginTop: 6, maxWidth: 180 }}>
@@ -487,11 +487,47 @@ export default function AreasTab({ event, session, volunteer, initialArea }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [editing, setEditing] = useState(false);
+  // While editing (say, one person typing during a meeting) changes save by themselves a moment after they stop typing.
+  const dirtyRef = useRef(false);
+  const dirtyAreaRef = useRef(null);
+  const rowsRef = useRef(null);
+  rowsRef.current = rows;
+  const persistRef = useRef(null);
 
   useEffect(() => {
     fetchAreaData(event.id).then(setRows);
     fetchAllActiveVolunteers().then(v => setVolunteersDir(Array.isArray(v) ? v : [])).catch(() => setVolunteersDir([]));
   }, [event.id]);
+
+  function persist(auto) {
+    const key = dirtyAreaRef.current || activeArea;
+    const def = AREA_DEFAULTS.find(a => a.key === key);
+    const current = (rowsRef.current || []).find(r => r.area_key === key) || { pre_data: {}, post_data: {}, owner_name: def.defaultOwner };
+    dirtyRef.current = false;
+    setSaving(true);
+    const fullName = `${volunteer?.['First Name'] || ''} ${volunteer?.['Last Name'] || ''}`.trim();
+    return saveArea(event.id, key, { ownerName: current.owner_name, preData: current.pre_data, postData: current.post_data, authUserId: session.user.id }).then(res => {
+      setSaving(false);
+      if (res.success) {
+        setSaved(true);
+        if (!auto) {
+          setEditing(false);
+          logActivity({ vol: volunteer, authUserId: session.user.id, action: 'committee_area_updated', description: `${fullName || 'A volunteer'} updated ${def.label} notes for "${event.name}"` });
+        }
+      } else {
+        dirtyRef.current = true;
+      }
+    });
+  }
+  persistRef.current = persist;
+
+  useEffect(() => {
+    if (!editing || !dirtyRef.current) return;
+    const t = setTimeout(() => persistRef.current(true), 1000);
+    return () => clearTimeout(t);
+  }, [rows, editing]);
+  // Leaving the section with unsaved typing still saves it.
+  useEffect(() => () => { if (dirtyRef.current && persistRef.current) persistRef.current(true); }, []);
 
   if (rows === null) return <div style={{ fontSize: 12, color: 'var(--muted)' }}>Loading…</div>;
 
@@ -499,12 +535,14 @@ export default function AreasTab({ event, session, volunteer, initialArea }) {
   const row = rows.find(r => r.area_key === activeArea);
   const preData = (row && row.pre_data) || {};
   const postData = (row && row.post_data) || {};
-  const ownerName = (row && row.owner_name) || areaDef.defaultOwner;
   const schema = SCHEMAS[activeArea];
-  const fields = phase === 'pre' ? schema.pre : schema.post;
+  const fields = (phase === 'pre' ? schema.pre : schema.post) || [];
   const data = phase === 'pre' ? preData : postData;
 
   function updateField(key, val) {
+    dirtyRef.current = true;
+    dirtyAreaRef.current = activeArea;
+    setSaved(false);
     setRows(prev => {
       const next = prev.some(r => r.area_key === activeArea) ? prev.map(r => r.area_key === activeArea ? { ...r, [phase === 'pre' ? 'pre_data' : 'post_data']: { ...(phase === 'pre' ? r.pre_data : r.post_data), [key]: val } } : r)
         : [...prev, { area_key: activeArea, owner_name: areaDef.defaultOwner, pre_data: phase === 'pre' ? { [key]: val } : {}, post_data: phase === 'post' ? { [key]: val } : {} }];
@@ -512,78 +550,40 @@ export default function AreasTab({ event, session, volunteer, initialArea }) {
     });
   }
 
-  function save() {
-    setSaving(true);
-    const current = rows.find(r => r.area_key === activeArea) || { pre_data: {}, post_data: {}, owner_name: areaDef.defaultOwner };
-    const fullName = `${volunteer?.['First Name'] || ''} ${volunteer?.['Last Name'] || ''}`.trim();
-    saveArea(event.id, activeArea, { ownerName: current.owner_name, preData: current.pre_data, postData: current.post_data, authUserId: session.user.id }).then(res => {
-      setSaving(false);
-      if (res.success) {
-        setEditing(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-        logActivity({ vol: volunteer, authUserId: session.user.id, action: 'committee_area_updated', description: `${fullName || 'A volunteer'} updated ${areaDef.label} notes for "${event.name}"` });
-      }
-    });
+  function done() {
+    if (dirtyRef.current) persist(false); else setEditing(false);
   }
 
-  function updateOwner(name) {
-    setRows(prev => prev.some(r => r.area_key === activeArea) ? prev.map(r => r.area_key === activeArea ? { ...r, owner_name: name } : r) : [...prev, { area_key: activeArea, owner_name: name, pre_data: {}, post_data: {} }]);
-  }
+  const tab = (active) => ({ background: 'none', border: 'none', borderBottom: active ? '2px solid var(--gold)' : '2px solid transparent', padding: '6px 0', marginBottom: -1, fontSize: 13, fontWeight: active ? 700 : 500, color: active ? 'var(--text)' : 'var(--muted)', cursor: 'pointer' });
 
   return (
     <div>
-      {/* Only show the area switcher when no specific area was requested --
-          Overview's Marketing/Volunteers planning-section rows pass
-          initialArea to jump straight to that area's form, so repeating
-          the full picker (including that area, already highlighted) here
-          would just be redundant chrome. "Other Planning Areas" passes no
-          initialArea and still needs it, to reach the other 6 areas. */}
+      {/* Only show the area switcher when no specific area was requested (Marketing and Volunteers jump straight to theirs). */}
       {!initialArea && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-          {AREA_DEFAULTS.map(a => (
-            <button key={a.key} onClick={() => setActiveArea(a.key)}
-              className={activeArea === a.key ? 'btn-gold' : 'btn-ghost'}
-              style={{ fontSize: 12, padding: '6px 12px' }}>
-              {a.label}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', borderBottom: '1px solid var(--border-light)', marginBottom: 16 }}>
+          {AREA_DEFAULTS.map(a => <button key={a.key} onClick={() => setActiveArea(a.key)} style={tab(activeArea === a.key)}>{a.label}</button>)}
         </div>
       )}
 
-      <div style={{ background: '#fff', border: '0.5px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif" }}>{areaDef.label}</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Section owner: <input disabled={!editing} value={ownerName} onChange={e => updateOwner(e.target.value)} style={{ border: 'none', borderBottom: '1px dashed var(--border)', background: 'none', fontSize: 12, color: 'var(--gold)', width: 140 }} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {event.status && (
-              <span className="badge" style={{ background: 'var(--light)', color: 'var(--text)', textTransform: 'capitalize' }}>{event.status.replace('_', ' ')}</span>
-            )}
-            <div style={{ display: 'flex', gap: 0, background: 'var(--light)', borderRadius: 8, padding: 2 }}>
-              <button onClick={() => setPhase('pre')} style={{ border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: phase === 'pre' ? 600 : 400, cursor: 'pointer', background: phase === 'pre' ? '#fff' : 'transparent' }}>Pre-Event</button>
-              <button onClick={() => setPhase('post')} style={{ border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, fontWeight: phase === 'post' ? 600 : 400, cursor: 'pointer', background: phase === 'post' ? '#fff' : 'transparent' }}>Post-Event</button>
-            </div>
-          </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 22, borderBottom: '1px solid var(--border-light)' }}>
+          <button onClick={() => setPhase('pre')} style={tab(phase === 'pre')}>Pre-Event</button>
+          <button onClick={() => setPhase('post')} style={tab(phase === 'post')}>Post-Event</button>
         </div>
-
-        <AreaFormSection fields={fields} data={data} onFieldChange={updateField} volunteers={volunteersDir} readOnly={!editing} />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20 }}>
-          {editing ? (
-            <>
-              <button className="btn-gold" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</button>
-              <button className="btn-ghost" disabled={saving} onClick={() => { fetchAreaData(event.id).then(setRows); setEditing(false); }}>Cancel</button>
-            </>
-          ) : (
-            <button className="btn-ghost" onClick={() => setEditing(true)}>Edit</button>
-          )}
-          {saved && <span style={{ fontSize: 12, color: 'var(--gold)' }}>Saved ✓</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {editing && <span style={{ fontSize: 12, color: saved && !saving ? '#2e7d32' : 'var(--muted)' }}>{saving ? 'Saving…' : saved ? 'All changes saved ✓' : 'Changes save automatically'}</span>}
+          {editing ? <button className="btn-gold" disabled={saving} onClick={done}>Done</button> : <button className="btn-ghost" onClick={() => setEditing(true)}>Edit</button>}
         </div>
       </div>
+
+      <AreaFormSection fields={fields} data={data} onFieldChange={updateField} volunteers={volunteersDir} readOnly={!editing} />
+
+      {editing && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20 }}>
+          <button className="btn-gold" disabled={saving} onClick={done}>Done</button>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{saving ? 'Saving…' : saved ? 'All changes saved ✓' : ''}</span>
+        </div>
+      )}
     </div>
   );
 }
