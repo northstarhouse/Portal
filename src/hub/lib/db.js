@@ -1295,6 +1295,17 @@ export async function castVotes({ itemId, voterId, voter, entries }) {
   }
 }
 
+// Emails the finished checklist to the committee through the same send-email function the vote notices use.
+export async function sendChecklistEmail({ to, subject, html, text }) {
+  const headers = await hdr(); delete headers.Prefer;
+  const r = await fetch(`${URL}/functions/v1/send-email`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ to, subject, body: text, html, sender: 'Events Committee' }),
+  });
+  return r.ok;
+}
+
 export async function sendVoteNotification({ to, title, link }) {
   const gold = '#886c44';
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

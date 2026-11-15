@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MediaPicker } from '../../media-library.jsx';
 import { useVol } from '../App.jsx';
 import {
-  insertReimbursement, fetchAreaData, saveArea, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
+  insertReimbursement, fetchAreaData, saveArea, sendChecklistEmail, matchVolunteerAreas, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
@@ -1556,6 +1556,102 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
   const isDone = (i) => (i.mk ? !!(mkData[i.c] || {}).done : i.need ? needHandled(i.v) : !!i.t.done);
   const catGroups = [...CHECKLIST_CATEGORIES.filter(c => c !== 'Marketing'), 'Marketing', DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : c === 'General' || c === 'Hospitality' ? (x, y) => (isDone(x) ? 1 : 0) - (isDone(y) ? 1 : 0) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
   const shownGroups = catGroups.filter(g => catFilter === 'All' || catFilter === g.cat);
+
+  // ---- Email the checklist to the committee: a finished, read-only copy of what is on screen.
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailNote, setEmailNote] = useState('');
+  const [emailPreview, setEmailPreview] = useState(false);
+  const [emailMsg, setEmailMsg] = useState(null);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const committee = (volunteers || []).filter(v => matchVolunteerAreas(v.Team).includes('Events'));
+  const committeeWithEmail = committee.filter(v => v.Email && String(v.Email).includes('@'));
+
+  function buildEmailHtml() {
+    const GOLD = '#886c44';
+    const esc = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const circle = (done) => (done
+      ? '<span style="display:inline-block;width:18px;height:18px;line-height:18px;border-radius:50%;background:' + GOLD + ';color:#ffffff;font-size:11px;text-align:center;">&#10003;</span>'
+      : '<span style="display:inline-block;width:15px;height:15px;border-radius:50%;border:1.5px solid #d8cfc0;"></span>');
+    const row = (done, titleHtml, subHtml, accent, badge) =>
+      '<tr><td style="padding:0;border-bottom:1px solid #ede8df;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-left:4px solid ' + (accent || '#fdfbf7') + ';"><tr>'
+      + '<td width="44" valign="top" style="padding:13px 0 13px 12px;">' + circle(done) + '</td>'
+      + '<td valign="top" style="padding:11px 8px 11px 0;"><div style="font-size:15px;font-weight:bold;color:#2a2a2a;line-height:1.35;">' + titleHtml + '</div>'
+      + (subHtml ? '<div style="font-size:12.5px;color:#888888;margin-top:2px;line-height:1.45;">' + subHtml + '</div>' : '') + '</td>'
+      + (badge ? '<td valign="top" align="right" style="padding:12px 12px 0 0;white-space:nowrap;"><span style="display:inline-block;background:#f0ebe2;color:#2a2a2a;font-size:11px;padding:2px 9px;border-radius:12px;">' + esc(badge) + '</span></td>' : '')
+      + '</tr></table></td></tr>';
+    const whenText = (t) => {
+      const tm = t.timing || (t.due ? 'before' : '');
+      const base = { asap: 'As soon as possible', month: '1 month out', twoweeks: '2 weeks out', week: '1 week out', meeting: 'Meeting before event', dayof: 'Day of event' }[tm];
+      const d = t.due && tm !== 'asap' && tm !== 'meeting' && tm !== 'dayof' ? fmtDateShort(t.due) : '';
+      if (base) return base + (d ? ' (' + d + ')' : '');
+      return d ? 'Due ' + d : '';
+    };
+    const itemRow = (it) => {
+      if (it.mk) return row(true, esc(it.c), '', null);
+      if (it.tl) {
+        const t = it.t; const who = whoOn(t, volunteers); const tg = Number(t.target) || 0;
+        const sub = (tg ? who.length + ' of ' + tg + ' assigned' : who.length ? who.length + ' assigned' : 'No one assigned yet') + (who.length ? ': ' + esc(whoText(who)) : '');
+        return row(!!t.done, esc(fmtTime12(t.time)) + ' &middot; ' + esc(t.activity), sub, null);
+      }
+      if (it.need) {
+        const v = it.v; const kind = v.kind || ''; const who = whoOn(v, volunteers); const tg = Number(v.target) || 0;
+        const title = v.who || !v.role ? v.name : v.role + ': ' + v.name;
+        let sub;
+        if (kind === 'volunteer' || kind === 'activity') sub = who.length + (tg ? ' of ' + tg : '') + ' assigned' + (who.length ? ': ' + esc(whoText(who)) : '');
+        else sub = [v.who ? v.who : (v.role ? v.name : ''), v.contact].filter(Boolean).map(esc).join(' &nbsp;&middot;&nbsp; ');
+        const found = !!(who.length || v.who || v.role || v.confirmed);
+        const cost = costLabel(v);
+        return row(needHandled(v), esc(title), (sub || (found ? '' : 'Still needed')) + (cost ? (sub ? ' &nbsp;&middot;&nbsp; ' : '') + esc(cost) : ''), null, kind ? NEED_KINDS[kind] : '');
+      }
+      const t = it.t;
+      const sub = [t.assignee ? esc(t.assignee) : '', esc(whenText(t))].filter(Boolean).join(' &nbsp;&middot;&nbsp; ');
+      return row(!!t.done, esc(t.text), sub, t.priority ? TASK_PRIORITY[t.priority].color : null);
+    };
+    const total = catGroups.reduce((n, g) => n + g.items.length, 0);
+    const doneTotal = catGroups.reduce((n, g) => n + g.items.filter(isDone).length, 0);
+    const groupsHtml = catGroups.map(g => {
+      const d = g.items.filter(isDone).length;
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px;"><tr><td style="padding:26px 0 4px;border-bottom:1.5px solid #e8dfd0;"><span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + esc(g.cat) + '</span>'
+        + (g.cat !== 'Marketing' ? '<span style="font-size:12px;color:#888888;margin-left:10px;">' + (d === g.items.length ? 'all figured out &#10003;' : d + ' of ' + g.items.length + ' done') + '</span>' : '') + '</td></tr>'
+        + g.items.map(itemRow).join('') + '</table>';
+    }).join('');
+    const w = ev.website || {};
+    const when = w.date_tbd ? 'Date to be announced' : [ev.date ? fmtDate(ev.date) : '', ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : ''].filter(Boolean).join('  ·  ');
+    const note = emailNote.trim();
+    return '<div style="background:#e6ded0;padding:28px 12px;font-family:Helvetica,Arial,sans-serif;"><div style="max-width:680px;margin:0 auto;background:#fdfbf7;">'
+      + '<div style="height:14px;background:' + GOLD + ';"></div>'
+      + '<div style="padding:34px 36px 8px;text-align:center;"><div style="font-size:12px;letter-spacing:3px;color:' + GOLD + ';font-weight:bold;margin-bottom:12px;">EVENTS COMMITTEE &middot; CHECKLIST</div>'
+      + '<h1 style="margin:0 0 8px;font-family:Georgia,serif;font-size:28px;font-weight:400;color:#2a2420;">' + esc(ev.name) + '</h1>'
+      + (when ? '<div style="font-size:14px;color:#777777;">' + esc(when) + '</div>' : '')
+      + '<div style="border-top:1px solid #e5ddcf;width:60%;margin:20px auto 0;"></div></div>'
+      + (note ? '<div style="padding:18px 36px 0;font-size:15px;line-height:1.6;color:#444444;">' + esc(note).replace(/\n/g, '<br>') + '</div>' : '')
+      + '<div style="padding:6px 36px 6px;"><div style="font-size:13px;color:#888888;padding-top:14px;">' + doneTotal + ' of ' + total + ' done</div>' + groupsHtml + '</div>'
+      + '<div style="padding:22px 36px 34px;text-align:center;"><a href="https://volunteerhub.northstarhouse.org/#/events-committee-planning" style="display:inline-block;background:' + GOLD + ';color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:15px 30px;">Open in the Volunteer Hub</a></div>'
+      + '<div style="background:#f7f3ec;padding:14px 36px;text-align:center;font-size:11px;color:#999999;">North Star House</div>'
+      + '</div></div>';
+  }
+  function buildEmailText() {
+    const lines = ['Events Committee checklist: ' + ev.name, ''];
+    catGroups.forEach(g => {
+      lines.push(g.cat.toUpperCase());
+      g.items.forEach(it => {
+        const label = it.mk ? it.c : it.tl ? fmtTime12(it.t.time) + ' ' + it.t.activity : it.need ? (it.v.who || !it.v.role ? it.v.name : it.v.role + ': ' + it.v.name) : it.t.text;
+        lines.push((isDone(it) ? '[x] ' : '[ ] ') + label);
+      });
+      lines.push('');
+    });
+    lines.push('Open in the Volunteer Hub: https://volunteerhub.northstarhouse.org/#/events-committee-planning');
+    return lines.join('\n');
+  }
+  async function sendEmail(list, who) {
+    if (!list.length) { setEmailMsg({ ok: false, text: 'No email address to send to.' }); return; }
+    if (who === 'committee' && !window.confirm('Send this checklist to ' + list.length + ' committee member' + (list.length > 1 ? 's' : '') + '?')) return;
+    setEmailBusy(true); setEmailMsg(null);
+    const ok = await sendChecklistEmail({ to: list, subject: emailSubject.trim() || ('Checklist: ' + ev.name), html: buildEmailHtml(), text: buildEmailText() }).catch(() => false);
+    setEmailBusy(false);
+    setEmailMsg({ ok, text: ok ? (who === 'committee' ? 'Sent to ' + list.length + ' committee member' + (list.length > 1 ? 's' : '') + '.' : 'Test sent to ' + list[0] + '.') : 'Could not send. Please try again.' });
+  }
   function patchItem(id, patch) {
     onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, ...patch } : t) }));
   }
@@ -1671,6 +1767,29 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
           </div>
         )}
         {attachedMsg && <div style={{ fontSize: 12, color: '#2e7d32', marginBottom: 10 }}>{attachedMsg}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0 0 10px' }}>
+          <button type="button" className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => { if (!emailSubject) setEmailSubject('Checklist: ' + ev.name); setEmailOpen(o => !o); setEmailMsg(null); }}>{emailOpen ? 'Close email' : '✉ Email to committee'}</button>
+        </div>
+        {emailOpen && (
+          <div style={{ border: '0.5px solid var(--border-light)', borderRadius: 10, padding: '14px 16px', marginBottom: 18, background: '#faf8f4' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Email this checklist</div>
+            <div className="label">Subject</div>
+            <input className="input" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} style={{ marginBottom: 10 }} />
+            <div className="label">A note at the top (optional)</div>
+            <textarea className="input" rows={3} value={emailNote} onChange={e => setEmailNote(e.target.value)} placeholder="For example: please check your lines before Thursday's meeting." style={{ resize: 'vertical', marginBottom: 10 }} />
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+              Goes to {committeeWithEmail.length} committee member{committeeWithEmail.length === 1 ? '' : 's'} (the Events team): {committeeWithEmail.map(volFullName).join(', ') || 'none found'}.
+              {committee.length > committeeWithEmail.length && ' No email on file for: ' + committee.filter(v => !committeeWithEmail.includes(v)).map(volFullName).join(', ') + '.'}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button type="button" className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setEmailPreview(p => !p)}>{emailPreview ? 'Hide preview' : 'Preview'}</button>
+              <button type="button" className="btn-ghost" style={{ fontSize: 12 }} disabled={emailBusy || !(volunteer && volunteer.Email)} onClick={() => sendEmail([volunteer.Email], 'me')} title={volunteer && volunteer.Email ? 'Sends only to ' + volunteer.Email : 'No email on your volunteer record'}>Send a test to me</button>
+              <button type="button" className="btn-gold" style={{ fontSize: 12 }} disabled={emailBusy || !committeeWithEmail.length} onClick={() => sendEmail(committeeWithEmail.map(v => v.Email), 'committee')}>{emailBusy ? 'Sending…' : 'Email to committee'}</button>
+              {emailMsg && <span style={{ fontSize: 12, color: emailMsg.ok ? '#2e7d32' : '#b3261e' }}>{emailMsg.text}</span>}
+            </div>
+            {emailPreview && <iframe title="Email preview" srcDoc={buildEmailHtml()} style={{ width: '100%', height: 560, border: '0.5px solid var(--border)', borderRadius: 8, marginTop: 12, background: '#fff' }} />}
+          </div>
+        )}
         {catGroups.length > 1 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '4px 0 14px' }}>
             <button type="button" className={catFilter === 'All' ? 'btn-gold' : 'btn-ghost'} style={{ fontSize: 11, padding: '4px 11px' }} onClick={() => setCatFilter('All')}>All ({allItems.filter(isDone).length}/{allItems.length})</button>
