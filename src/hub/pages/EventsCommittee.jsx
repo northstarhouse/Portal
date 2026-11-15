@@ -686,10 +686,10 @@ function WebsiteEventPanel({ ev, onUpdate }) {
     imageUrl: w.image_url || '', imageAlt: w.image_alt || '', dateTbd: w.date_tbd === true, date: ev.date || '',
     startTime: ev.startTime || '18:00', endTime: ev.endTime || '',
     locName: w.location_name || 'North Star House', locAddr: w.location_address || '12075 Auburn Rd, Grass Valley, CA 95949, USA',
+    purpose: ev.purpose || '', eventLead: ev.eventLead || '', expectedAttendance: ev.expectedAttendance || '', pricing: ev.pricing || '',
     sells: w.sells_tickets === true, tiers: (ev.ticketTiers && ev.ticketTiers.length) ? ev.ticketTiers : [{ name: 'General Admission', price: '', limit: '' }],
   });
   const [f, setF] = useState(initial);
-  const [editing, setEditing] = useState(false);
   const [picker, setPicker] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -699,6 +699,7 @@ function WebsiteEventPanel({ ev, onUpdate }) {
   // Turn the form into the committee event's fields.
   const toEvent = (form, base) => ({
     ...base, name: form.title.trim(), description: form.desc.trim(),
+    purpose: form.purpose, eventLead: form.eventLead.trim(), expectedAttendance: form.expectedAttendance.trim(), pricing: form.pricing.trim(),
     date: form.dateTbd ? base.date : form.date, startTime: form.startTime, endTime: form.endTime,
     ticketTiers: form.sells ? form.tiers.filter(t => String(t.name || '').trim()) : (base.ticketTiers || []),
     website: {
@@ -719,14 +720,10 @@ function WebsiteEventPanel({ ev, onUpdate }) {
     return m;
   };
 
-  // Show the saved values when not editing.
-  const saved = initial();
-  const savedMissing = missing(saved);
-
   function save() {
+    if (!f.title.trim()) { setMsg({ ok: false, text: 'Give the event a title first.' }); return; }
     onUpdate(e => toEvent(f, e));
-    setEditing(false);
-    setMsg(null);
+    setMsg({ ok: true, text: 'Saved.' });
   }
   async function push(form) {
     if (pushing) return;
@@ -738,7 +735,6 @@ function WebsiteEventPanel({ ev, onUpdate }) {
       const merged = toEvent(form, ev);
       const r = await pushCommitteeEventToWebsite(merged);
       onUpdate(e => ({ ...toEvent(form, e), siteEventId: r.siteEventId }));
-      setEditing(false);
       setMsg({ ok: true, text: r.status === 'archived' ? 'Updated. This event has ended, so it is not shown on the website.' : 'Done. The event is live on the website (it also shows in Admin > New Event).' });
     } catch (err) {
       setMsg({ ok: false, text: err.message || 'Could not push. Please try again.' });
@@ -746,33 +742,30 @@ function WebsiteEventPanel({ ev, onUpdate }) {
     setPushing(false);
   }
 
-  const inp = { width: '100%', boxSizing: 'border-box' };
-  const lab = { display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 12 };
-  const note = { fontSize: 11, color: 'var(--muted)' };
-  const head = { fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1.2, margin: '14px 0 8px' };
+  const inp = { width: '100%', boxSizing: 'border-box', padding: '9px 11px', border: '0.5px solid #d8d0c4', borderRadius: 8, fontSize: 14, fontFamily: 'inherit', background: '#fff' };
+  const lab = { display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#888', marginBottom: 14 };
+  const note = { fontSize: 11, color: '#aaa' };
+  const head = { fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, margin: '22px 0 12px', paddingTop: 16, borderTop: '0.5px solid #f0ebe0' };
 
   return (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <div style={SECTION_HEAD}>Website event page</div>
-        {!editing && <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => { setF(initial()); setEditing(true); }}>Edit</button>}
-      </div>
-      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+    <div style={{ marginBottom: 24, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: '18px 20px' }}>
+      <div style={{ ...SECTION_HEAD, marginBottom: 6 }}>Event Basics</div>
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>
         {ev.siteEventId
-          ? 'This event is on the website (also listed in Admin > New Event). Updating sends your changes live.'
-          : 'Fill this in, then Push to website. It goes live on the website right away and shows in Admin > New Event.'}
+          ? 'This is the event and its website page. Fill it in here; this event is on the website, so Save and update website sends your changes live.'
+          : 'This is the event and its website page. Fill it in here; Push to website makes the event live on the website right away.'}
       </div>
 
-      {editing ? (
+      {true ? (
         <div>
-          <div style={head}>The event</div>
-          <label style={lab}>Title *<input className="input" style={inp} value={f.title} onChange={e => { const v = e.target.value; setF(o => ({ ...o, title: v, slug: o.slugTouched ? o.slug : slugify(v) })); }} placeholder="e.g. Holiday Open House" /></label>
+          <div style={{ ...head, marginTop: 8, borderTop: 'none', paddingTop: 0 }}>The event</div>
+          <label style={lab}>Title *<input style={inp} value={f.title} onChange={e => { const v = e.target.value; setF(o => ({ ...o, title: v, slug: o.slugTouched ? o.slug : slugify(v) })); }} placeholder="e.g. Holiday Open House" /></label>
           <label style={lab}>Web address (the last part of the event's link)
-            <input className="input" style={inp} value={f.slug} onChange={e => setF(o => ({ ...o, slugTouched: true, slug: slugify(e.target.value) }))} placeholder="holiday-open-house" />
+            <input style={inp} value={f.slug} onChange={e => setF(o => ({ ...o, slugTouched: true, slug: slugify(e.target.value) }))} placeholder="holiday-open-house" />
             <span style={note}>Letters, numbers and dashes only. It fills in from the title unless you type your own.{ev.siteEventId ? ' Changing it after the event is published breaks links people already have.' : ''}</span>
           </label>
-          <label style={lab}>Short description (shown in lists and when shared) *<input className="input" style={inp} maxLength={300} value={f.short} onChange={e => set('short', e.target.value)} placeholder="One or two sentences" /></label>
-          <label style={lab}>Full description *<textarea className="input" rows={6} style={{ ...inp, resize: 'vertical' }} value={f.desc} onChange={e => set('desc', e.target.value)} placeholder={'Write it like an email. A blank line starts a new paragraph.\nStart a line with "- " to make a bullet list.'} /></label>
+          <label style={lab}>Short description (shown in lists and when shared) *<input style={inp} maxLength={300} value={f.short} onChange={e => set('short', e.target.value)} placeholder="One or two sentences" /></label>
+          <label style={lab}>Full description *<textarea rows={6} style={{ ...inp, resize: 'vertical' }} value={f.desc} onChange={e => set('desc', e.target.value)} placeholder={'Write it like an email. A blank line starts a new paragraph.\nStart a line with "- " to make a bullet list.'} /></label>
           <div style={lab}>Photo
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {f.imageUrl ? <img src={f.imageUrl} alt="" style={{ width: 110, height: 74, objectFit: 'cover', borderRadius: 8, border: '0.5px solid var(--border-light)' }} /> : <div style={{ width: 110, height: 74, borderRadius: 8, background: 'var(--light)', border: '0.5px solid var(--border-light)' }} />}
@@ -782,7 +775,7 @@ function WebsiteEventPanel({ ev, onUpdate }) {
                   {f.imageUrl && <button type="button" className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setF(o => ({ ...o, imageUrl: '', imageAlt: '' }))}>Remove</button>}
                   {!f.imageUrl && <span style={note}>No photo? The website shows "More information to come".</span>}
                 </div>
-                <input className="input" style={inp} value={f.imageAlt} onChange={e => set('imageAlt', e.target.value)} placeholder="Describe the photo (for screen readers)" />
+                <input style={inp} value={f.imageAlt} onChange={e => set('imageAlt', e.target.value)} placeholder="Describe the photo (for screen readers)" />
               </div>
             </div>
           </div>
@@ -791,17 +784,17 @@ function WebsiteEventPanel({ ev, onUpdate }) {
           <label style={{ ...lab, flexDirection: 'row', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={f.dateTbd} onChange={e => set('dateTbd', e.target.checked)} /> Date to be announced</label>
           {!f.dateTbd && (
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <label style={{ ...lab, flex: '1 1 150px' }}>Date *<input className="input" type="date" style={inp} value={f.date} onChange={e => set('date', e.target.value)} /></label>
-              <label style={{ ...lab, flex: '1 1 120px' }}>Starts (Pacific time) *<input className="input" type="time" style={inp} value={f.startTime} onChange={e => set('startTime', e.target.value)} /></label>
-              <label style={{ ...lab, flex: '1 1 120px' }}>Ends (optional)<input className="input" type="time" style={inp} value={f.endTime} onChange={e => set('endTime', e.target.value)} /></label>
+              <label style={{ ...lab, flex: '1 1 150px' }}>Date *<input type="date" style={inp} value={f.date} onChange={e => set('date', e.target.value)} /></label>
+              <label style={{ ...lab, flex: '1 1 120px' }}>Starts (Pacific time) *<input type="time" style={inp} value={f.startTime} onChange={e => set('startTime', e.target.value)} /></label>
+              <label style={{ ...lab, flex: '1 1 120px' }}>Ends (optional)<input type="time" style={inp} value={f.endTime} onChange={e => set('endTime', e.target.value)} /></label>
             </div>
           )}
-          <label style={lab}>Location *<input className="input" style={inp} value={f.locName} onChange={e => set('locName', e.target.value)} /></label>
-          <label style={lab}>Address *<input className="input" style={inp} value={f.locAddr} onChange={e => set('locAddr', e.target.value)} /></label>
+          <label style={lab}>Location *<input style={inp} value={f.locName} onChange={e => set('locName', e.target.value)} /></label>
+          <label style={lab}>Address *<input style={inp} value={f.locAddr} onChange={e => set('locAddr', e.target.value)} /></label>
 
           <div style={head}>Tickets</div>
           <label style={lab}>Does this event sell tickets?
-            <select className="input" style={{ ...inp, appearance: 'auto' }} value={f.sells ? 'yes' : 'no'} onChange={e => set('sells', e.target.value === 'yes')}>
+            <select style={{ ...inp, appearance: 'auto' }} value={f.sells ? 'yes' : 'no'} onChange={e => set('sells', e.target.value === 'yes')}>
               <option value="no">No, just list the event</option>
               <option value="yes">Yes, sell tickets online</option>
             </select>
@@ -810,9 +803,9 @@ function WebsiteEventPanel({ ev, onUpdate }) {
             <div style={{ marginBottom: 12 }}>
               {f.tiers.map((t, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                  <label style={{ ...lab, flex: '2 1 160px', marginBottom: 0 }}>Ticket name<input className="input" style={inp} value={t.name || ''} onChange={e => setTier(i, 'name', e.target.value)} /></label>
-                  <label style={{ ...lab, flex: '1 1 90px', marginBottom: 0 }}>Price ($)<input className="input" style={inp} inputMode="decimal" value={t.price ?? ''} onChange={e => setTier(i, 'price', e.target.value)} placeholder="0 = free" /></label>
-                  <label style={{ ...lab, flex: '1 1 90px', marginBottom: 0 }}>Max per order<input className="input" style={inp} inputMode="numeric" value={t.limit ?? ''} onChange={e => setTier(i, 'limit', e.target.value)} placeholder="50" /></label>
+                  <label style={{ ...lab, flex: '2 1 160px', marginBottom: 0 }}>Ticket name<input style={inp} value={t.name || ''} onChange={e => setTier(i, 'name', e.target.value)} /></label>
+                  <label style={{ ...lab, flex: '1 1 90px', marginBottom: 0 }}>Price ($)<input style={inp} inputMode="decimal" value={t.price ?? ''} onChange={e => setTier(i, 'price', e.target.value)} placeholder="0 = free" /></label>
+                  <label style={{ ...lab, flex: '1 1 90px', marginBottom: 0 }}>Max per order<input style={inp} inputMode="numeric" value={t.limit ?? ''} onChange={e => setTier(i, 'limit', e.target.value)} placeholder="50" /></label>
                   {f.tiers.length > 1 && <button type="button" onClick={() => set('tiers', f.tiers.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#b3402a', fontSize: 18, cursor: 'pointer', paddingBottom: 6 }} aria-label="Remove this ticket type">×</button>}
                 </div>
               ))}
@@ -820,30 +813,27 @@ function WebsiteEventPanel({ ev, onUpdate }) {
             </div>
           )}
 
+          <div style={head}>Planning notes (not on the website)</div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <label style={{ ...lab, flex: '1 1 200px' }}>Event type
+              <select style={{ ...inp, appearance: 'auto' }} value={f.purpose} onChange={e => set('purpose', e.target.value)}>
+                <option value="">Select a type…</option>
+                {EVENT_PURPOSES.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </label>
+            <label style={{ ...lab, flex: '1 1 200px' }}>Event lead<input style={inp} value={f.eventLead} onChange={e => set('eventLead', e.target.value)} placeholder="Responsible person" /></label>
+            <label style={{ ...lab, flex: '1 1 140px' }}>Expected attendance<input style={inp} value={f.expectedAttendance} onChange={e => set('expectedAttendance', e.target.value)} placeholder="e.g. 75" /></label>
+          </div>
+          <label style={lab}>Pricing note<input style={inp} value={f.pricing} onChange={e => set('pricing', e.target.value)} placeholder="e.g. Free, or $25 adults / kids free" /></label>
+
           {msg && <div style={{ fontSize: 12, margin: '8px 0', color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             <button className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => push(f)}>{pushing ? 'Pushing…' : (ev.siteEventId ? 'Save and update website' : 'Save and push to website')}</button>
             <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={save}>Save only</button>
-            <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => { setEditing(false); setMsg(null); }}>Cancel</button>
+            <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => { setF(initial()); setMsg(null); }}>Reset</button>
           </div>
         </div>
-      ) : (
-        <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div><strong>Title:</strong> {saved.title || <span style={{ color: 'var(--muted)' }}>not set</span>}</div>
-          <div><strong>Short description:</strong> {saved.short || <span style={{ color: 'var(--muted)' }}>not set</span>}</div>
-          <div><strong>Date:</strong> {saved.dateTbd ? 'To be announced' : (saved.date ? fmtDate(saved.date) : <span style={{ color: 'var(--muted)' }}>not set</span>)}</div>
-          <div><strong>Location:</strong> {saved.locName}</div>
-          <div><strong>Photo:</strong> {saved.imageUrl ? 'Chosen' : <span style={{ color: 'var(--muted)' }}>none (the website shows "More information to come")</span>}</div>
-          <div><strong>Tickets:</strong> {saved.sells ? saved.tiers.filter(t => String(t.name || '').trim()).map(t => t.name + ' ' + (Number(t.price) > 0 ? '$' + t.price : 'free')).join(' · ') : 'Not sold online'}</div>
-          {savedMissing.length > 0 && <div style={{ color: 'var(--muted)' }}>Still needed before pushing: {savedMissing.join(', ')}. Click Edit.</div>}
-          <div style={{ marginTop: 6 }}>
-            <button type="button" className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing || savedMissing.length > 0} onClick={() => push(saved)}>
-              {pushing ? 'Pushing…' : (ev.siteEventId ? 'Update website event' : 'Push to website')}
-            </button>
-            {msg && <div style={{ fontSize: 12, marginTop: 8, color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}
-          </div>
-        </div>
-      )}
+      ) : null}
       {picker && <MediaPicker supabaseUrl={SITE_SUPABASE_URL} supabaseKey={SITE_SUPABASE_KEY} onPick={img => { setF(o => ({ ...o, imageUrl: img.url, imageAlt: o.imageAlt || img.alt || '' })); setPicker(false); }} onClose={() => setPicker(false)} />}
     </div>
   );
@@ -851,31 +841,7 @@ function WebsiteEventPanel({ ev, onUpdate }) {
 
 function PreplanningTab({ ev, onUpdate, volunteers }) {
   const [guests, setGuests] = useState(ev.guestCount);
-  const [basics, setBasics] = useState({
-    name: ev.name, date: ev.date, startTime: ev.startTime, endTime: ev.endTime,
-    purpose: ev.purpose, eventLead: ev.eventLead, expectedAttendance: ev.expectedAttendance, description: ev.description,
-    pricing: ev.pricing,
-  });
-  const [basicsEditing, setBasicsEditing] = useState(false);
   const [guestsEditing, setGuestsEditing] = useState(false);
-
-  function saveBasics() {
-    if (!basics.name.trim() || !basics.date || !basics.eventLead.trim()) return;
-    onUpdate(e => ({
-      ...e, name: basics.name.trim(), date: basics.date, startTime: basics.startTime, endTime: basics.endTime,
-      purpose: basics.purpose, eventLead: basics.eventLead.trim(), expectedAttendance: basics.expectedAttendance.trim(),
-      description: basics.description.trim(), pricing: basics.pricing.trim(),
-    }));
-    setBasicsEditing(false);
-  }
-  function cancelBasics() {
-    setBasics({
-      name: ev.name, date: ev.date, startTime: ev.startTime, endTime: ev.endTime,
-      purpose: ev.purpose, eventLead: ev.eventLead, expectedAttendance: ev.expectedAttendance, description: ev.description,
-      pricing: ev.pricing,
-    });
-    setBasicsEditing(false);
-  }
 
   function saveGuests() {
     onUpdate(e => ({ ...e, guestCount: { invited: Number(guests.invited) || 0, confirmed: Number(guests.confirmed) || 0 } }));
@@ -890,79 +856,7 @@ function PreplanningTab({ ev, onUpdate, volunteers }) {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <div style={sectionTitle}>Event Basics</div>
-          {!basicsEditing && <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setBasicsEditing(true)}>Edit</button>}
-        </div>
-        {basicsEditing ? (
-          <>
-            <div style={{ marginBottom: 10 }}>
-              <div className="label">Event Name *</div>
-              <input className="input" value={basics.name} onChange={e => setBasics(b => ({ ...b, name: e.target.value }))} placeholder="e.g. Holiday Open House" />
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 8, maxWidth: 480 }}>
-              <div style={{ flex: 1 }}>
-                <div className="label">Event Type</div>
-                <select className="input" style={{ appearance: 'auto' }} value={basics.purpose} onChange={e => setBasics(b => ({ ...b, purpose: e.target.value }))}>
-                  <option value="">Select a type…</option>
-                  {EVENT_PURPOSES.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div className="label">Event Date *</div>
-                <input className="input" type="date" value={basics.date} onChange={e => setBasics(b => ({ ...b, date: e.target.value }))} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 8, maxWidth: 480 }}>
-              <div style={{ flex: 1 }}>
-                <div className="label">Start Time</div>
-                <TimeSelect value={basics.startTime} onChange={v => setBasics(b => ({ ...b, startTime: v }))} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div className="label">End Time</div>
-                <TimeSelect value={basics.endTime} onChange={v => setBasics(b => ({ ...b, endTime: v }))} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 8, maxWidth: 480 }}>
-              <div style={{ flex: 1 }}>
-                <div className="label">Event Lead *</div>
-                <input className="input" value={basics.eventLead} onChange={e => setBasics(b => ({ ...b, eventLead: e.target.value }))} placeholder="Responsible person" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div className="label">Expected Attendance</div>
-                <input className="input" value={basics.expectedAttendance} onChange={e => setBasics(b => ({ ...b, expectedAttendance: e.target.value }))} placeholder="e.g. 75" />
-              </div>
-            </div>
-            <div style={{ marginBottom: 10 }}>
-              <div className="label">Event Purpose (optional)</div>
-              <textarea className="input" rows={3} style={{ resize: 'vertical' }} value={basics.description} onChange={e => setBasics(b => ({ ...b, description: e.target.value }))} placeholder="Briefly describe the event's goal." />
-            </div>
-            <div style={{ marginBottom: 10 }}>
-              <div className="label">Pricing</div>
-              <input className="input" value={basics.pricing} onChange={e => setBasics(b => ({ ...b, pricing: e.target.value }))} placeholder="e.g. Free, or $25 adults / kids free" />
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={!basics.name.trim() || !basics.date || !basics.eventLead.trim()} onClick={saveBasics}>Save</button>
-              <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} onClick={cancelBasics}>Cancel</button>
-            </div>
-          </>
-        ) : (
-          <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div><strong>Event name:</strong> {ev.name}</div>
-            {ev.purpose && <div><strong>Event type:</strong> {ev.purpose}</div>}
-            <div><strong>Event date:</strong> {ev.date ? fmtDate(ev.date) : 'Not set'}</div>
-            {(ev.startTime || ev.endTime) && <div><strong>Time:</strong> {ev.startTime ? fmtTime12(ev.startTime) : '?'} – {ev.endTime ? fmtTime12(ev.endTime) : '?'}</div>}
-            {ev.eventLead && <div><strong>Event lead:</strong> {ev.eventLead}</div>}
-            {ev.expectedAttendance && <div><strong>Expected attendance:</strong> {ev.expectedAttendance}</div>}
-            {ev.description && <div><strong>Purpose:</strong> {ev.description}</div>}
-            {ev.pricing && <div><strong>Pricing:</strong> {ev.pricing}</div>}
-            {!ev.pricing && <div style={{ color: 'var(--muted)' }}><strong style={{ color: 'var(--text)' }}>Pricing:</strong> not set. Click Edit to add it.</div>}
-          </div>
-        )}
-      </div>
-
-      <WebsiteEventPanel ev={ev} onUpdate={onUpdate} />
+      <WebsiteEventPanel key={[ev.id, ev.name, ev.date, ev.startTime, ev.endTime, ev.description, ev.siteEventId, ev.purpose, ev.eventLead, ev.expectedAttendance, ev.pricing].join('|')} ev={ev} onUpdate={onUpdate} />
 
       <div style={{ marginBottom: 24 }}>
         <div style={sectionTitle}>Vendors & contacts</div>
