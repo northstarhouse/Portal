@@ -331,8 +331,6 @@ const PLANNING_SECTION_ICONS = {
 
 const PLANNING_SECTIONS = [
   { key: 'checklist', title: 'Checklist', desc: 'Type the duties in fast, then assign and date them' },
-  { key: 'volunteers', title: 'Volunteers, Staffing & Vendors', desc: 'What we need, who we found, contacts and volunteer roles', area: 'volunteers' },
-  { key: 'dayof', title: 'Day-Of Timeline', desc: 'Run of show for the day' },
   { key: 'marketing', title: 'Marketing & Promotion', desc: 'Flyers, newsletters, website, social media', area: 'marketing' },
   { key: 'budget', title: 'Budget & Transactions', desc: 'Income, expenses, reimbursements' },
   { key: 'after', title: 'After the Event', desc: 'What went well, final numbers, follow-ups, reviews and feedback' },
@@ -637,13 +635,13 @@ function CheckCircle({ checked, onChange, size }) {
 
 function ItemRow({ children, onDelete, done, accent, onAccent, accentTitle }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0 9px 10px', position: 'relative',
+    <div className="row-x-host" tabIndex={-1} style={{
+      outline: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0 9px 10px', position: 'relative',
       borderBottom: '0.5px solid var(--border-light)', borderLeft: `4px solid ${accent || 'transparent'}`,
     }}>
       {onAccent && <button type="button" onClick={onAccent} title={accentTitle} aria-label={accentTitle} style={{ position: 'absolute', left: -4, top: 0, bottom: 0, width: 12, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }} />}
       {children}
-      {onDelete && <button onClick={onDelete} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>×</button>}
+      {onDelete && <button className="row-x" onClick={onDelete} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>×</button>}
     </div>
   );
 }
@@ -788,7 +786,7 @@ function AssignVolunteers({ v, volunteers, onPatch, compact, target }) {
     <input className="input" placeholder="Phone" defaultValue={value || ''} key={value || ''} onBlur={e => { const t = e.target.value.trim(); if (t !== (value || '')) save(t); }}
       style={{ width: compact ? 110 : 140, fontSize: fs, padding: compact ? '3px 6px' : '5px 8px' }} />
   );
-  const removeBtn = (onClick) => <button type="button" onClick={onClick} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '0 4px', fontSize: 14 }}>×</button>;
+  const removeBtn = (onClick) => <button type="button" className="row-x" onClick={onClick} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '0 4px', fontSize: 14 }}>×</button>;
   return (
     <div style={{ width: compact ? 'auto' : '100%' }}>
       {Number(target) > 0 && <div style={{ fontSize: 12, color: full ? '#2e7d32' : '#b8863b', fontWeight: 600, marginBottom: 6 }}>{full ? 'All ' + target + ' spots filled ✓' : (Number(target) - filled) + ' of ' + target + ' spots still open'}</div>}
@@ -817,7 +815,7 @@ function AssignVolunteers({ v, volunteers, onPatch, compact, target }) {
       {(assigned.length > 0 || people.length > 0) && (
         <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {assigned.map(x => (
-            <div key={x.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: fs }}>
+            <div key={x.id} className="row-x-host" tabIndex={-1} style={{ outline: 'none', display: 'flex', alignItems: 'center', gap: 8, fontSize: fs }}>
               <span style={{ minWidth: compact ? 0 : 160 }}>{name(x)}</span>
               {/* a volunteer picked from the list keeps the phone number on their record, so it is shown, not editable */}
               <span style={{ width: compact ? 110 : 140, fontSize: fs, color: 'var(--muted)' }}>{(v.phones || {})[x.id] || x['Phone Number'] || 'No phone on file'}</span>
@@ -825,7 +823,7 @@ function AssignVolunteers({ v, volunteers, onPatch, compact, target }) {
             </div>
           ))}
           {people.map(pp => (
-            <div key={pp.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: fs }}>
+            <div key={pp.id} className="row-x-host" tabIndex={-1} style={{ outline: 'none', display: 'flex', alignItems: 'center', gap: 8, fontSize: fs }}>
               <input className="input" defaultValue={pp.name} key={pp.id + pp.name} onBlur={e => { const t = e.target.value.trim(); if (t && t !== pp.name) onPatch({ people: people.map(y => y.id === pp.id ? { ...y, name: t } : y) }); }}
                 style={{ width: compact ? 120 : 160, fontSize: fs, padding: compact ? '3px 6px' : '5px 8px' }} />
               {phoneBox(pp.phone, t => onPatch({ people: people.map(y => y.id === pp.id ? { ...y, phone: t } : y) }))}
@@ -1620,7 +1618,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
               <button className="btn-ghost" style={{ fontSize: 11, padding: '3px 10px' }} onClick={allToDuties}>Make all checklist duties</button>
             </div>
             {ev.notes.map(n => (
-              <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '0.5px solid var(--border-light)' }}>
+              <div key={n.id} className="row-x-host" tabIndex={-1} style={{ outline: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '0.5px solid var(--border-light)' }}>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflowWrap: 'anywhere' }}>{n.text}{n.category ? <span style={{ fontSize: 11, color: 'var(--muted)' }}> · {n.category}</span> : null}</span>
                 <select className="input" value="" onChange={e => attachNote(n, e.target.value)} style={{ width: 190, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}>
                   <option value="">Attach to…</option>
@@ -1629,7 +1627,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                   <option value="vendor">Volunteers & vendors list</option>
                   <option value="after">After Notes (follow-up)</option>
                 </select>
-                <button onClick={() => deleteNote(n.id)} title="Delete this note" style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>×</button>
+                <button className="row-x" onClick={() => deleteNote(n.id)} title="Delete this note" style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>×</button>
               </div>
             ))}
           </div>
@@ -1664,8 +1662,9 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
             return (
               <ItemRow key={'tl-' + t.id} done={t.done} onDelete={() => onUpdate(e => ({ ...e, timeline: e.timeline.filter(x => x.id !== t.id) }))}>
                 <CheckCircle checked={!!(!!t.done)} onChange={() => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, done: !x.done } : x) }))} />
-                <span style={{ fontSize: 12, color: 'var(--muted)', width: 70, flexShrink: 0 }}>{fmtTime12(t.time)}</span>
-                <span style={{ flex: 1, fontSize: 13, textDecoration: 'none', color: 'var(--text)' }}>{t.activity}</span>
+                <TimeSelect value={t.time} onChange={v => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, time: v || '00:00' } : x) }))} />
+                <input className="input" defaultValue={t.activity} key={t.id + t.activity} placeholder="What happens" style={{ flex: 1, minWidth: 120, fontSize: 13, padding: '5px 8px' }}
+                  onBlur={e => { const v = e.target.value.trim(); if (v && v !== t.activity) onUpdate(x => ({ ...x, timeline: x.timeline.map(y => y.id === t.id ? { ...y, activity: v } : y) })); }} />
                 <TimelineAssign t={t} volunteers={volunteers} onUpdate={onUpdate} />
               </ItemRow>
             );
