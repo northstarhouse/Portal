@@ -12,9 +12,6 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const GOOGLE_SERVICE_ACCOUNT_KEY = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY")!;
 const CALENDAR_ID = "thenorthstarhouse@gmail.com";
 const CAL = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events`;
-// The public "Event Booking Availability" calendar the website's date picker reads (all-day "Date Unavailable" entries).
-const AVAIL_ID = "c_4c721bbe9e8a5ae57d4b008c1d6ab9e1ee81cf528c710937056eda71a22cfc93@group.calendar.google.com";
-const AVAIL = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(AVAIL_ID)}/events`;
 // Main-calendar entries that hold the venue for a booking (by title), and titles that never do.
 const BOOKING_TITLE = /wedding|private|party|soft hold|bat mitzva|bar mitzva|memorial|celebration|reception|rehearsal|non-?profit|fundraiser|gala|\bevent\b/i;
 const NOT_BOOKING = /tour|walk.?through|meeting|dumpster|mahjong|\bdue\b|reflection|decorating|mixer|trivia|speaker|residency|magic|open house|presentation|class|workshop|volunteer|clean.?up|board|committee/i;
@@ -64,9 +61,9 @@ async function getCalendarAccessToken(): Promise<string> {
   return cachedToken.token;
 }
 
-async function gcal(method: string, path: string, body?: unknown, base = CAL) {
+async function gcal(method: string, path: string, body?: unknown) {
   const token = await getCalendarAccessToken();
-  const r = await fetch(base + path, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch(CAL + path, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
   if (method === "DELETE" && (r.status === 404 || r.status === 410)) return null;
   if (!r.ok) throw new Error(`Calendar ${method} failed: ${r.status} ${await r.text()}`);
   return r.status === 204 ? null : r.json();
@@ -112,7 +109,6 @@ function describe(inq: any, form: any, v: any, signers: any[]): string {
 const NOTE = "Added automatically from the Portal pre-booking form. Renamed when the agreement is fully signed; removed if the soft hold is released or the submission is deleted.";
 const allDay = (date: string) => ({ start: { date }, end: { date: nextDay(date) } });
 
-const AUTO_TAG = "Blocked automatically: booked or soft-held on the North Star House calendar.";
 // Days an ICS-cache entry covers (all-day entries span to DTEND; timed ones count their start day).
 function icsDays(e: any): string[] {
   const st = String(e.DTSTART || ""), en = String(e.DTEND || "");
@@ -123,12 +119,6 @@ function icsDays(e: any): string[] {
   const out: string[] = [];
   for (let d = first; d < iso(en) && out.length < 14; d = nextDay(d)) out.push(d);
   return out.length ? out : [first];
-}
-// Days an availability-calendar event (Calendar API shape) covers.
-function evDays(ev: any): string[] {
-  if (ev.start?.date) { const out: string[] = []; for (let d = ev.start.date; d < (ev.end?.date || nextDay(ev.start.date)) && out.length < 60; d = nextDay(d)) out.push(d); return out.length ? out : [ev.start.date]; }
-  const t = ev.start?.dateTime ? new Date(new Date(ev.start.dateTime).getTime() - 8 * 3600000).toISOString().slice(0, 10) : null;
-  return t ? [t] : [];
 }
 
 // Calendar entries already on that date (from the 15-minute ICS cache), for the "already on the calendar by hand" check.
@@ -230,10 +220,10 @@ Deno.serve(async (req) => {
       out.push({ removed: h.summary });
     }
 
-    // ---- Website availability: every booked / soft-held date on the main calendar (plus Portal pre-bookings) is blocked on
-    // the public availability calendar. Only adds blocks, and only removes the ones this sync added (marked in their
-    // description) once nothing on the main calendar holds that date any more. Blocks staff added by hand are never touched.
-    const avail: any = { added: [], removed: [] };
+    // ---- Website availability: every booked / soft-held date (main-calendar bookings by title, plus Portal pre-bookings) is
+    // saved to site_content "bookingHeldDates"; the website's booking-availability function merges it with the public
+    // availability calendar. (That calendar is not written to: Workspace sharing gives outside accounts view-only access.)
+    const avail: any = {};
     try {
       const held = new Set<string>();
       for (const e of cache) {
@@ -242,35 +232,8 @@ Deno.serve(async (req) => {
         for (const d of icsDays(e)) if (d >= today) held.add(d);
       }
       for (const [, w] of want) if (w && w.date >= today) held.add(w.date);
-      // The website's booking-availability function merges these dates in directly, so the site is right even when the
-      // availability calendar can't be written to (Workspace sharing limits outside accounts to view-only).
       avail.held = held.size;
       if (!dry) await rest(`site_content?on_conflict=page_key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ page_key: "bookingHeldDates", content: { dates: [...held].sort(), syncedAt: stamp() } }) });
-      const existing: any[] = [];
-      let pageToken = "";
-      do {
-        const page = await gcal("GET", `?singleEvents=true&maxResults=2500&timeMin=${today}T00:00:00Z${pageToken ? "&pageToken=" + pageToken : ""}`, undefined, AVAIL);
-        existing.push(...(page.items || []));
-        pageToken = page.nextPageToken || "";
-      } while (pageToken);
-      const blocked = new Set<string>();
-      for (const ev of existing) for (const d of evDays(ev)) blocked.add(d);
-      const mine = existing.filter((ev) => String(ev.description || "").includes(AUTO_TAG));
-      for (const d of [...held].sort()) {
-        if (blocked.has(d)) continue;
-        if (!dry) await gcal("POST", "", { summary: "Date Unavailable", description: AUTO_TAG, start: { date: d }, end: { date: nextDay(d) }, transparency: "transparent" }, AVAIL);
-        avail.added.push(d);
-      }
-      for (const ev of mine) {
-        const d = ev.start?.date;
-        if (!d || d < today || held.has(d)) continue;
-        if (!dry) await gcal("DELETE", "/" + encodeURIComponent(ev.id), undefined, AVAIL);
-        avail.removed.push(d);
-      }
-      if (!dry && (avail.added.length || avail.removed.length)) {
-        const all = [...new Set([...blocked, ...avail.added].filter((d) => !avail.removed.includes(d)))].sort();
-        await rest(`site_content?page_key=eq.bookingAvailability`, { method: "PATCH", body: JSON.stringify({ content: { bookedDates: all, syncedAt: stamp() } }) }).catch(() => {});
-      }
     } catch (e) { avail.error = String(e); }
 
     if (!dry && out.some((o) => !o.already_on_calendar)) fetch(`${SUPABASE_URL}/functions/v1/refresh-calendar-cache`, { method: "POST", headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } }).catch(() => {});
