@@ -21736,6 +21736,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
     none: { label: 'No tour', color: '#888', bg: '#f3f0ea' }
   };
   var [tourFilter, setTourFilter] = useState('all');
+  var [inqSearch, setInqSearch] = useState('');
   function matchedTour(sub) {
     if (!tours || !tours.length) return null;
     var email = (inquiryPreviewFields(sub).email || '').trim().toLowerCase();
@@ -21981,10 +21982,24 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
 
   function fmtTs(ts) { return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 
+  // Search: every word must appear somewhere in the inquiry (name, email, phone, form, answers, matched tour).
+  var searchWords = inqSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  function inquiryHaystack(sub) {
+    var t = matchedTour(sub);
+    var answers = sub.answers || {};
+    var vals = Object.keys(answers).filter(function(k) { return k.indexOf('__') !== 0; }).map(function(k) { var v = answers[k]; return typeof v === 'string' || typeof v === 'number' ? String(v) : ''; });
+    return [sub.form_name, sub.name, sub.email, sub.phone, sub.visitor_name, sub.visitor_email, sub.visitor_phone, t && t.visitor_name, t && t.visitor_email, t && t.guide_name].concat(vals).filter(Boolean).join(' ').toLowerCase();
+  }
+  var shownInquiryRows = displayRows.filter(function(sub) {
+    if (!clientsOnly && tourFilter !== 'all' && tourStateKey(sub) !== tourFilter) return false;
+    if (!searchWords.length) return true;
+    var hay = inquiryHaystack(sub);
+    return searchWords.every(function(w) { return hay.indexOf(w) !== -1; });
+  });
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
-        <div style={{ padding: '7px 0', fontSize: 20, fontFamily: "'Cardo', serif", fontWeight: 700, color: '#2a2a2a', textDecoration: 'underline', textDecorationColor: gold, textDecorationThickness: 2, textUnderlineOffset: 8 }}>{clientsOnly ? 'Clients' : 'Inquiries'}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
         <button type="button" onClick={function() { navigate('venue'); }} style={{ padding: '9px 16px', background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>← Venue Rentals</button>
       </div>
       <div style={{ fontSize: 12, color: '#aaa', marginBottom: clientsOnly ? 20 : 6 }}>{clientsOnly ? 'Official pre-booking form submissions — check off once handled.' : 'Wedding and Event Inquiry submissions — tours remain inquiries until an official pre-booking form is submitted.'}</div>
@@ -22057,6 +22072,9 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
           <div style={{ flex: 1, minWidth: 0, background: '#fff', border: '1px solid ' + gold + '40', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', padding: '14px 18px', background: gold }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', fontFamily: "'Cardo', serif" }}>{clientsOnly ? 'Clients' : 'Inquiries'} <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.9, fontFamily: 'system-ui, sans-serif' }}>({clientsOnly || tourFilter === 'all' ? displayRows.length : displayRows.filter(function(sub) { return tourStateKey(sub) === tourFilter; }).length})</span></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <input type="search" value={inqSearch} onChange={function(e) { setInqSearch(e.target.value); }} placeholder="Search name, email, phone…" aria-label={'Search ' + (clientsOnly ? 'clients' : 'inquiries')}
+                style={{ fontSize: 12, color: '#2a2a2a', background: '#fff', border: 'none', borderRadius: 7, padding: '6px 10px', width: 220, maxWidth: '100%' }} />
               {!clientsOnly && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)' }}>Show</label>
@@ -22072,11 +22090,12 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                   </select>
                 </div>
               )}
+              </div>
             </div>
-            {(clientsOnly || tourFilter === 'all' ? displayRows : displayRows.filter(function(sub) { return tourStateKey(sub) === tourFilter; })).length === 0 && (
-              <div style={{ padding: 30, textAlign: 'center', color: '#aaa', fontSize: 13 }}>No inquiries match this filter.</div>
+            {shownInquiryRows.length === 0 && (
+              <div style={{ padding: 30, textAlign: 'center', color: '#aaa', fontSize: 13 }}>{searchWords.length ? 'No inquiries match this search.' : 'No inquiries match this filter.'}</div>
             )}
-            {(clientsOnly || tourFilter === 'all' ? displayRows : displayRows.filter(function(sub) { return tourStateKey(sub) === tourFilter; })).map(function(sub, i, shownRows) {
+            {shownInquiryRows.map(function(sub, i, shownRows) {
               var p = inquiryPreviewFields(sub);
               var preview = p.name || p.email || 'Unknown';
               var isHandled = sub.status === 'handled';
