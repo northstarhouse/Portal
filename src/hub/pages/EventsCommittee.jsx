@@ -582,7 +582,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                   {s.key === 'preplanning' && <PreplanningTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} onRsvpChange={setRsvpOnly} />}
                   {s.key === 'checklist' && <ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}
                   {s.key === 'budget' && <FinancialsTab ev={ev} />}
-                  {s.key === 'dayof' && <SheetToggle view={<DayOfView ev={ev} />}><DayOfTab ev={ev} onUpdate={onUpdate} /></SheetToggle>}
+                  {s.key === 'dayof' && <SheetToggle view={<DayOfView ev={ev} onUpdate={onUpdate} />}><DayOfTab ev={ev} onUpdate={onUpdate} /></SheetToggle>}
                   {s.key === 'after' && (
                     <div>
                       <AfterTab ev={ev} onUpdate={onUpdate} />
@@ -736,7 +736,7 @@ const volFullName = (v) => `${v['First Name'] || ''} ${v['Last Name'] || ''}`.tr
 // Roster picks go in assignedIds (phone shown from the roster; an edited number is kept in phones[id]).
 // Typed-in names go in people [{ id, name, phone }]. Everyone assigned gets a phone box, blank when unknown.
 const needPeopleCount = (v) => (v.assignedIds || []).length + (v.people || []).length;
-function AssignVolunteers({ v, volunteers, onPatch, compact }) {
+function AssignVolunteers({ v, volunteers, onPatch, compact, target }) {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const roster = volunteers || [];
@@ -749,6 +749,8 @@ function AssignVolunteers({ v, volunteers, onPatch, compact }) {
   const pick = (x) => { onPatch({ assignedIds: [...(v.assignedIds || []), x.id] }); setQ(''); setOpen(false); };
   const addTyped = () => { const t = q.trim(); if (!t) return; onPatch({ people: [...people, { id: cryptoId(), name: t, phone: '' }] }); setQ(''); setOpen(false); };
   const fs = compact ? 12 : 13;
+  const filled = (v.assignedIds || []).length + (v.people || []).length;
+  const full = Number(target) > 0 && filled >= Number(target);
   const phoneBox = (value, save) => (
     <input className="input" placeholder="Phone" defaultValue={value || ''} key={value || ''} onBlur={e => { const t = e.target.value.trim(); if (t !== (value || '')) save(t); }}
       style={{ width: compact ? 110 : 140, fontSize: fs, padding: compact ? '3px 6px' : '5px 8px' }} />
@@ -756,8 +758,9 @@ function AssignVolunteers({ v, volunteers, onPatch, compact }) {
   const removeBtn = (onClick) => <button type="button" onClick={onClick} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '0 4px', fontSize: 14 }}>×</button>;
   return (
     <div style={{ width: compact ? 'auto' : '100%' }}>
-      <div style={{ position: 'relative', width: compact ? 190 : '100%' }}>
-        <input className="input" value={q} placeholder="Type a name to assign…" onChange={e => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
+      {Number(target) > 0 && <div style={{ fontSize: 12, color: full ? '#2e7d32' : '#b8863b', fontWeight: 600, marginBottom: 6 }}>{full ? 'All ' + target + ' spots filled ✓' : (Number(target) - filled) + ' of ' + target + ' spots still open'}</div>}
+      {!full && <div style={{ position: 'relative', width: compact ? 190 : '100%' }}>
+        <input className="input" value={q} placeholder={Number(target) > 0 ? 'Type a name for an open spot…' : 'Type a name to assign…'} onChange={e => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (exact) pick(exact); else if (matches.length === 1) pick(matches[0]); else addTyped(); } if (e.key === 'Escape') setOpen(false); }}
           style={{ width: '100%', boxSizing: 'border-box', fontSize: fs, padding: compact ? '5px 8px' : undefined }} />
@@ -777,7 +780,7 @@ function AssignVolunteers({ v, volunteers, onPatch, compact }) {
             )}
           </div>
         )}
-      </div>
+      </div>}
       {(assigned.length > 0 || people.length > 0) && (
         <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {assigned.map(x => (
@@ -801,40 +804,12 @@ function AssignVolunteers({ v, volunteers, onPatch, compact }) {
   );
 }
 
-function NeedsList({ ev, onUpdate, volunteers }) {
-  const [quick, setQuick] = useState('');
-  const [openId, setOpenId] = useState(null);
-  const items = ev.vendors;
-  const patch = (id, p) => onUpdate(e => ({ ...e, vendors: e.vendors.map(v => v.id === id ? { ...v, ...p } : v) }));
-
-  function add(text) {
-    const lines = String(text || '').split(/\r?\n/).map(l => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean);
-    if (!lines.length) return;
-    onUpdate(e => ({ ...e, vendors: [...e.vendors, ...lines.map(l => ({ id: cryptoId(), name: l, kind: '', who: '', contact: '', notes: '', confirmed: false }))] }));
-    setQuick('');
-  }
-  function remove(v) {
-    if (!window.confirm(`Remove "${v.name}" from the list?`)) return;
-    onUpdate(e => ({ ...e, vendors: e.vendors.filter(x => x.id !== v.id) }));
-    if (openId === v.id) setOpenId(null);
-  }
+// One line of the Volunteers, Staffing & Vendors list, with its check circle and its editor. Used by the list itself and by the Checklist.
+function NeedRow({ v, volunteers, patch, remove, isOpen, onToggle }) {
   const inp = { width: '100%', boxSizing: 'border-box', fontSize: 13 };
   const cap = { fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 };
-
-  return (
-    <div>
-      <input className="input" value={quick} placeholder="What do we need? Type it and press Enter… (a magician, a caterer, setup volunteers)"
-        onChange={e => setQuick(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(quick); } }}
-        onPaste={e => { const t = e.clipboardData.getData('text'); if (/\r?\n/.test(t.trim())) { e.preventDefault(); add(t); } }} />
-      <div style={{ fontSize: 11, color: 'var(--muted)', margin: '6px 0 14px' }}>
-        Later, click one to add who you found and their contact, and choose whether it is a vendor, a contact or a volunteer role.
-      </div>
-
-      {items.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)' }}>Nothing on the list yet.</div>}
-      {items.map(v => {
         const kind = v.kind || '';
-        const isOpen = openId === v.id;
+        const handled = needHandled(v);
         const assigned = (v.assignedIds || []).map(id => (volunteers || []).find(x => x.id === id)).filter(Boolean);
         const target = Number(v.target) || 0;
         const who = v.who || (v.role ? v.name : '');
@@ -849,12 +824,19 @@ function NeedsList({ ev, onUpdate, volunteers }) {
         return (
           <div key={v.id} style={{ borderBottom: '0.5px solid var(--border-light)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0' }}>
-              <button type="button" onClick={() => patch(v.id, { confirmed: !v.confirmed })} title={v.confirmed ? 'Confirmed. Click to undo.' : 'Click to mark as confirmed'}
-                style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: v.confirmed ? 'none' : '1.5px solid var(--border)', background: v.confirmed ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: 11, lineHeight: '18px' }}>{v.confirmed ? '✓' : ''}</button>
-              <button type="button" onClick={() => setOpenId(isOpen ? null : v.id)} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+              <button type="button" onClick={() => patch(v.id, handled ? { confirmed: false, who: '' } : { confirmed: true })} title={handled ? 'Figured out. Click to mark as still needed.' : 'Click when it is figured out'}
+                style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: handled ? 'none' : '1.5px dashed var(--border)', background: handled ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: 11, lineHeight: '18px' }}>{handled ? '✓' : ''}</button>
+              <button type="button" onClick={onToggle} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</div>
                 <div style={{ fontSize: 12, marginTop: 2, color: found || sub ? 'var(--muted)' : '#b8863b', fontStyle: found || sub ? 'normal' : 'italic' }}>{(sub || 'Still needed') + (costText ? '  ·  ' + costText : '')}</div>
               </button>
+              {(kind === 'volunteer' || kind === 'activity') && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--muted)', flexShrink: 0 }} title="How many people are needed">
+                  # needed
+                  <input className="input" type="number" min="0" defaultValue={v.target || ''} key={v.id + 'tg' + (v.target || '')} placeholder="1" style={{ width: 56, fontSize: 12, padding: '4px 6px' }}
+                    onBlur={e => { const n = Number(e.target.value) || 0; if (n !== (Number(v.target) || 0)) patch(v.id, { target: n }); }} />
+                </label>
+              )}
               {kind && <span className="badge" style={{ background: 'var(--light)', color: 'var(--text)', flexShrink: 0 }}>{NEED_KINDS[kind]}</span>}
               <span style={{ color: 'var(--muted)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>&rsaquo;</span>
             </div>
@@ -886,7 +868,7 @@ function NeedsList({ ev, onUpdate, volunteers }) {
                       </div>
                       <div style={{ flex: 1, minWidth: 200 }}>
                         <div style={cap}>Assign a volunteer</div>
-                        <AssignVolunteers v={v} volunteers={volunteers} onPatch={p => patch(v.id, p)} />
+                        <AssignVolunteers v={v} volunteers={volunteers} onPatch={p => patch(v.id, p)} target={Number(v.target) || 0} />
                       </div>
                     </div>
                   </div>
@@ -954,21 +936,58 @@ function NeedsList({ ev, onUpdate, volunteers }) {
             )}
           </div>
         );
-      })}
+}
+
+function NeedsList({ ev, onUpdate, volunteers }) {
+  const [quick, setQuick] = useState('');
+  const [openId, setOpenId] = useState(null);
+  const items = ev.vendors;
+  const patch = (id, p) => onUpdate(e => ({ ...e, vendors: e.vendors.map(v => v.id === id ? { ...v, ...p } : v) }));
+
+  function add(text) {
+    const lines = String(text || '').split(/\r?\n/).map(l => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean);
+    if (!lines.length) return;
+    onUpdate(e => ({ ...e, vendors: [...e.vendors, ...lines.map(l => ({ id: cryptoId(), name: l, kind: '', who: '', contact: '', notes: '', confirmed: false }))] }));
+    setQuick('');
+  }
+  function remove(v) {
+    if (!window.confirm(`Remove "${v.name}" from the list?`)) return;
+    onUpdate(e => ({ ...e, vendors: e.vendors.filter(x => x.id !== v.id) }));
+    if (openId === v.id) setOpenId(null);
+  }
+
+  return (
+    <div>
+      <input className="input" value={quick} placeholder="What do we need? Type it and press Enter… (a magician, a caterer, setup volunteers)"
+        onChange={e => setQuick(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(quick); } }}
+        onPaste={e => { const t = e.clipboardData.getData('text'); if (/\r?\n/.test(t.trim())) { e.preventDefault(); add(t); } }} />
+      <div style={{ fontSize: 11, color: 'var(--muted)', margin: '6px 0 14px' }}>
+        Later, click one to add who you found and their contact, and choose whether it is a vendor, a contact or a volunteer role.
+      </div>
+
+      {items.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)' }}>Nothing on the list yet.</div>}
+      {items.map(v => (
+        <NeedRow key={v.id} v={v} volunteers={volunteers} patch={patch} remove={remove} isOpen={openId === v.id} onToggle={() => setOpenId(openId === v.id ? null : v.id)} />
+      ))}
     </div>
   );
 }
 
-function DayOfView({ ev }) {
+function DayOfView({ ev, onUpdate }) {
   const sorted = [...ev.timeline].sort((a, b) => a.time.localeCompare(b.time));
   if (!sorted.length) return <div style={{ fontSize: 13, color: 'var(--muted)' }}>No timeline items yet. Click Edit to add some.</div>;
+  const doneCount = sorted.filter(t => t.done).length;
+  function toggle(id) { onUpdate(e => ({ ...e, timeline: e.timeline.map(t => t.id === id ? { ...t, done: !t.done } : t) })); }
   return (
     <div>
       <div style={SECTION_HEAD}>Run of Show</div>
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{doneCount} of {sorted.length} done</div>
       {sorted.map(t => (
-        <div key={t.id} style={{ display: 'flex', gap: 14, padding: '9px 0', borderBottom: '0.5px solid var(--border-light)', fontSize: 13 }}>
+        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: '0.5px solid var(--border-light)', fontSize: 13 }}>
+          <input type="checkbox" checked={!!t.done} onChange={() => toggle(t.id)} style={{ accentColor: 'var(--gold)', width: 15, height: 15, flexShrink: 0 }} />
           <span style={{ width: 70, flexShrink: 0, color: 'var(--muted)' }}>{fmtTime12(t.time)}</span>
-          <span style={{ flex: 1 }}>{t.activity}</span>
+          <span style={{ flex: 1, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--muted)' : 'var(--text)' }}>{t.activity}</span>
         </div>
       ))}
     </div>
@@ -1411,12 +1430,18 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   function patchNeed(id, patch) {
     onUpdate(e => ({ ...e, vendors: e.vendors.map(v => v.id === id ? { ...v, ...patch } : v) }));
   }
+  const [needOpenId, setNeedOpenId] = useState(null);
+  function removeNeed(v) {
+    if (!window.confirm('Remove "' + needTitle(v) + '" from the list?')) return;
+    onUpdate(e => ({ ...e, vendors: e.vendors.filter(x => x.id !== v.id) }));
+    if (needOpenId === v.id) setNeedOpenId(null);
+  }
   const allItems = [
     ...ev.checklist.map(t => ({ need: false, t, cat: checkCat(t.category) })),
     ...ev.vendors.map(v => ({ need: true, v, cat: needCategory(v) })),
   ];
   const isDone = (i) => (i.need ? needHandled(i.v) : !!i.t.done);
-  const catGroups = CHECKLIST_CATEGORIES.map(c => ({ cat: c, items: allItems.filter(i => i.cat === c) })).filter(g => g.items.length);
+  const catGroups = CHECKLIST_CATEGORIES.map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort((x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
   const shownGroups = catGroups.filter(g => catFilter === 'All' || catFilter === g.cat);
   function patchItem(id, patch) {
     onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, ...patch } : t) }));
@@ -1549,32 +1574,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
           </div>
         {g.items.map(it => {
           if (it.need) {
-            const v = it.v; const handled = needHandled(v);
-            return (
-              <ItemRow key={'need-' + v.id}>
-                <button type="button" onClick={() => patchNeed(v.id, handled ? { confirmed: false, who: '' } : { confirmed: true })} title={handled ? 'Click to mark as still needed' : 'Click when it is figured out'}
-                  style={{ width: 15, height: 15, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: handled ? 'none' : '1.5px dashed var(--border)', background: handled ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: 9, lineHeight: '15px' }}>{handled ? '✓' : ''}</button>
-                <input className="input" defaultValue={needTitle(v)} key={v.id + needTitle(v)} placeholder="What we need" title="Click to rename" style={{ flex: 1, minWidth: 120, fontSize: 13, padding: '5px 8px' }}
-                  onBlur={e => { const t = e.target.value.trim(); if (t && t !== needTitle(v)) patchNeed(v.id, v.role && !v.who ? { role: t } : { name: t }); }} />
-                <select className="input" value={v.kind || ''} onChange={e => patchNeed(v.id, { kind: e.target.value })} title="Type" style={{ width: 108, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}>
-                  <option value="">Type…</option>
-                  <option value="vendor">Vendor</option>
-                  <option value="contact">Contact</option>
-                  <option value="volunteer">Volunteer</option>
-                  <option value="activity">Activity</option>
-                  <option value="sponsor">Sponsor</option>
-                </select>
-                {['volunteer', 'activity'].includes(v.kind) && (
-                  <>
-                    <AssignVolunteers v={v} volunteers={volunteers} onPatch={p => patchNeed(v.id, p)} compact />
-                  </>
-                )}
-                {!['volunteer', 'activity'].includes(v.kind) && <input className="input" placeholder="Who we found" defaultValue={v.who || (v.role ? v.name : '')} key={v.id + 'who' + (v.who || '')} style={{ width: 140, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
-                  onBlur={e => { const t = e.target.value.trim(); if (t !== (v.who || (v.role ? v.name : ''))) patchNeed(v.id, v.role && !v.who ? { name: t } : { who: t }); }} />}
-                {!['volunteer', 'activity'].includes(v.kind) && <input className="input" placeholder="Phone or email" defaultValue={v.contact || ''} key={v.id + 'contact' + (v.contact || '')} style={{ width: 140, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
-                  onBlur={e => { const t = e.target.value.trim(); if (t !== (v.contact || '')) patchNeed(v.id, { contact: t }); }} />}
-              </ItemRow>
-            );
+            return <NeedRow key={'need-' + it.v.id} v={it.v} volunteers={volunteers} patch={patchNeed} remove={removeNeed} isOpen={needOpenId === it.v.id} onToggle={() => setNeedOpenId(needOpenId === it.v.id ? null : it.v.id)} />;
           }
           const t = it.t;
           const hasMoney = t.estimated > 0 || t.actual > 0;
@@ -1732,10 +1732,11 @@ function DayOfTab({ ev, onUpdate }) {
             <button className="btn-ghost" style={{ padding: '7px 12px', fontSize: 12 }} onClick={() => setEditingId(null)}>Cancel</button>
           </div>
         ) : (
-          <ItemRow key={t.id} onDelete={() => deleteItem(t.id)}>
+          <ItemRow key={t.id} onDelete={() => deleteItem(t.id)} done={t.done}>
+            <input type="checkbox" checked={!!t.done} onChange={() => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, done: !x.done } : x) }))} style={{ accentColor: 'var(--gold)', width: 15, height: 15, flexShrink: 0 }} />
             <span style={{ fontSize: 12, color: 'var(--muted)', width: 54, flexShrink: 0 }}>{t.time}</span>
             <button onClick={() => startEdit(t)} title="Edit"
-              style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 13, color: 'var(--text)', fontFamily: 'inherit' }}>
+              style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 13, color: 'var(--text)', fontFamily: 'inherit', textDecoration: t.done ? 'line-through' : 'none' }}>
               {t.activity}
             </button>
           </ItemRow>
