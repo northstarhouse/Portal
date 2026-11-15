@@ -23,7 +23,9 @@ const banner = (file) => `// GENERATED from volunteerhub/src/${file} by scripts/
 
 const files = {};
 
-files['pages/EventsCommittee.jsx'] = banner('pages/EventsCommittee.jsx') + read(path.join(hub, 'pages/EventsCommittee.jsx'));
+// The Hub's photo picker is a stand-in; the Portal uses its real media library.
+files['pages/EventsCommittee.jsx'] = banner('pages/EventsCommittee.jsx') + read(path.join(hub, 'pages/EventsCommittee.jsx')).replace("from '../lib/mediaPicker.jsx'", "from '../../media-library.jsx'");
+files['pages/EventPlan.jsx'] = banner('pages/EventPlan.jsx') + read(path.join(hub, 'pages/EventPlan.jsx'));
 files['pages/eventsCommitteeAreas.jsx'] = banner('pages/eventsCommitteeAreas.jsx') + read(path.join(hub, 'pages/eventsCommitteeAreas.jsx'));
 files['pages/RsvpPanel.jsx'] = banner('pages/RsvpPanel.jsx') + read(path.join(hub, 'pages/RsvpPanel.jsx'));
 

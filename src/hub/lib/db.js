@@ -973,6 +973,38 @@ export async function logActivity({ vol, authUserId, action, description, tag, d
 
 // ── Events Committee Planning Notes ────────────────────────────────────────
 
+// The committee's confirmed event list for a year (Events Committee > Event Plan), see EventPlan.jsx.
+export async function fetchEventPlan(year) {
+  const rows = await get(`events_plan?year=eq.${year}&select=*&order=sort_order.asc`);
+  return Array.isArray(rows) ? rows : [];
+}
+// How the committee voted on each event in the year's "<year> Events List" vote: { normalized part title: { Yes, No, ... , total } }.
+export const planKey = (s) => String(s || '').replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s+-\s+.*$/, '').replace(/[—–]/g, '-').replace(/\s+/g, ' ').trim().toLowerCase();
+export async function fetchPlanVotes(year) {
+  const items = await get(`events_vote_items?title=eq.${encodeURIComponent(year + ' Events List')}&select=id`);
+  const itemId = Array.isArray(items) && items[0] ? items[0].id : null;
+  if (!itemId) return {};
+  const [parts, votes] = await Promise.all([
+    get(`events_vote_parts?item_id=eq.${itemId}&select=id,title`),
+    get(`events_votes?item_id=eq.${itemId}&select=part_id,choice`),
+  ]);
+  const out = {};
+  (Array.isArray(parts) ? parts : []).forEach(p => {
+    const tally = { total: 0 };
+    (Array.isArray(votes) ? votes : []).filter(v => v.part_id === p.id).forEach(v => { tally[v.choice] = (tally[v.choice] || 0) + 1; tally.total++; });
+    out[planKey(p.title)] = tally;
+  });
+  return out;
+}
+export async function insertEventPlanRow(body) {
+  const rows = await post('events_plan', body, { Prefer: 'return=representation' });
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
+export async function updateEventPlanRow(id, body) {
+  const rows = await patch(`events_plan?id=eq.${id}`, body);
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
+
 export async function fetchCommitteeEvents() {
   const rows = await get('events_committee?select=*&order=date.asc.nullslast');
   return Array.isArray(rows) ? rows : [];

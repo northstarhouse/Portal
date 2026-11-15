@@ -10,6 +10,7 @@ import {
 import AreasTab from './eventsCommitteeAreas.jsx';
 import EventOverviews from './EventOverviews.jsx';
 import RsvpPanel from './RsvpPanel.jsx';
+import EventPlan from './EventPlan.jsx';
 
 const cryptoId = () => Math.random().toString(36).slice(2, 10);
 const nextDate = (offsetDays) => {
@@ -676,7 +677,7 @@ function VendorsPanel({ ev, onUpdate }) {
 }
 
 // "Website event page": everything the website event needs, filled in here, then Push to website sends it to
-// Admin > New Event (a draft the first time; later pushes update the same event and never unpublish it).
+// Admin > New Event and goes live (later pushes update the same event).
 function WebsiteEventPanel({ ev, onUpdate }) {
   const w = ev.website || {};
   const slugify = v => String(v || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
@@ -1647,7 +1648,10 @@ export default function EventsCommittee() {
         ) : selected ? (
           <EventDetail ev={selected} onUpdate={updateSelected} onBack={() => setSelectedId(null)} onEdit={openEditModal} volunteers={volunteers} session={session} volunteer={volunteer} />
         ) : (
-          <EventCardsGrid onOpen={openEventByName} />
+          <>
+            <EventPlan session={session} volunteer={volunteer} onFinalized={() => load()} />
+            <EventCardsGrid onOpen={openEventByName} />
+          </>
         )}
       </div>
 
