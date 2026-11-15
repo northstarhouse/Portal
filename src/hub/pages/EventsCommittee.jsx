@@ -1183,7 +1183,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   const [quick, setQuick] = useState('');
   const quickRef = useRef(null);
   const [showPrompts, setShowPrompts] = useState(false);
-  const { volunteer } = useVol();
+  const { volunteer, session } = useVol();
 
   // "Selling alcohol" does the paperwork setup in one click: the license costs are recorded as expenses and the steps
   // become checklist duties. ABC license $50 + sheriff signature $30 = $80.
@@ -1196,7 +1196,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
       const already = !!(fin && fin.expenses.some(r => /alcohol license|abc license/i.test(r.description || '')));
       if (!already) {
         const who = ((volunteer && volunteer['First Name']) || '') + ' ' + ((volunteer && volunteer['Last Name']) || '');
-        const base = { event_name: ev.name, area: 'Events', type: 'Purchase', status: 'Submitted', date: new Date().toISOString().slice(0, 10), purchased_by: who.trim() || null };
+        const base = { event_name: ev.name, area: 'Events', type: 'Purchase', status: 'Submitted', date: new Date().toISOString().slice(0, 10), purchased_by: who.trim() || null, volunteer_name: who.trim() || null, volunteer_id: (volunteer && volunteer.id) || null, volunteer_auth_user_id: (session && session.user && session.user.id) || null };
         const r1 = await insertReimbursement({ ...base, description: 'ABC alcohol license application fee', amount: 50 });
         const r2 = await insertReimbursement({ ...base, description: 'Sheriff signature for alcohol license', amount: 30 });
         if (r1.error || r2.error) throw new Error(r1.error || r2.error);
