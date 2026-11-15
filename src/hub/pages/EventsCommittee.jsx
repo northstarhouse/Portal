@@ -344,6 +344,8 @@ const checkCat = (c) => (CHECKLIST_CATEGORIES.includes(c) ? c : 'General');
 // Things we still need (a bartender, a sponsor...) are handled once someone is named, it is confirmed, or enough volunteers are assigned.
 const needHandled = (v) => !!v.confirmed || !!v.who || !!v.role
   || (['volunteer', 'activity'].includes(v.kind) && (v.assignedIds || []).length >= Math.max(1, Number(v.target) || 1));
+// What the line is about. Older entries stored the person in name and the job (Santa Claus) in role.
+const needTitle = (v) => (v.role && !v.who ? v.role : v.name);
 const needCategory = (v) => (v.kind === 'sponsor' ? 'Sponsorship' : 'Volunteers & vendors');
 const NEED_TAG = { vendor: 'Vendor', contact: 'Contact', volunteer: 'Volunteer', activity: 'Activity', sponsor: 'Sponsor' };
 
@@ -499,7 +501,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
           ) : cardRows.map(row => row.need ? (
             <div key={row.v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
               <span style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed var(--border)' }} />
-              <span style={{ fontSize: 13 }}>Find: {row.v.name}{row.v.kind ? <span style={{ fontSize: 11, color: 'var(--muted)' }}> · {NEED_TAG[row.v.kind]}</span> : null}</span>
+              <span style={{ fontSize: 13 }}>Find: {needTitle(row.v)}{row.v.kind ? <span style={{ fontSize: 11, color: 'var(--muted)' }}> · {NEED_TAG[row.v.kind]}</span> : null}</span>
             </div>
           ) : ((t) => (
             <div key={t.id} onClick={() => toggleChecklistItem(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer' }}>
@@ -1491,11 +1493,20 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
               <ItemRow key={'need-' + v.id}>
                 <button type="button" onClick={() => patchNeed(v.id, handled ? { confirmed: false, who: '' } : { confirmed: true })} title={handled ? 'Click to mark as still needed' : 'Click when it is figured out'}
                   style={{ width: 15, height: 15, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: handled ? 'none' : '1.5px dashed var(--border)', background: handled ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: 9, lineHeight: '15px' }}>{handled ? '✓' : ''}</button>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--text)' }}>
-                  {handled ? '' : 'Find: '}{v.name}{v.kind ? <span style={{ fontSize: 11, color: 'var(--muted)' }}> · {NEED_TAG[v.kind]}</span> : null}
-                </span>
-                {!['volunteer', 'activity'].includes(v.kind) && <input className="input" placeholder="Who we found" defaultValue={v.who || (v.role ? v.name : '')} key={v.id + (v.who || '')} style={{ width: 150, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
-                  onBlur={e => { const t = e.target.value.trim(); if (t !== (v.who || '')) patchNeed(v.id, { who: t }); }} />}
+                <input className="input" defaultValue={needTitle(v)} key={v.id + needTitle(v)} placeholder="What we need" title="Click to rename" style={{ flex: 1, minWidth: 120, fontSize: 13, padding: '5px 8px' }}
+                  onBlur={e => { const t = e.target.value.trim(); if (t && t !== needTitle(v)) patchNeed(v.id, v.role && !v.who ? { role: t } : { name: t }); }} />
+                <select className="input" value={v.kind || ''} onChange={e => patchNeed(v.id, { kind: e.target.value })} title="Type" style={{ width: 108, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}>
+                  <option value="">Type…</option>
+                  <option value="vendor">Vendor</option>
+                  <option value="contact">Contact</option>
+                  <option value="volunteer">Volunteer</option>
+                  <option value="activity">Activity</option>
+                  <option value="sponsor">Sponsor</option>
+                </select>
+                {!['volunteer', 'activity'].includes(v.kind) && <input className="input" placeholder="Who we found" defaultValue={v.who || (v.role ? v.name : '')} key={v.id + 'who' + (v.who || '')} style={{ width: 140, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
+                  onBlur={e => { const t = e.target.value.trim(); if (t !== (v.who || (v.role ? v.name : ''))) patchNeed(v.id, v.role && !v.who ? { name: t } : { who: t }); }} />}
+                {!['volunteer', 'activity'].includes(v.kind) && <input className="input" placeholder="Phone or email" defaultValue={v.contact || ''} key={v.id + 'contact' + (v.contact || '')} style={{ width: 140, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
+                  onBlur={e => { const t = e.target.value.trim(); if (t !== (v.contact || '')) patchNeed(v.id, { contact: t }); }} />}
               </ItemRow>
             );
           }

@@ -1162,7 +1162,7 @@ async function doVendorSync(eventName, vendors, revenue, authUserId) {
     if (v.costType === 'flat' && Number(v.cost) > 0) { amount = Number(v.cost); how = 'flat fee'; }
     else if (v.costType === 'split' && Number(v.splitPct) > 0) { amount = Math.round((Number(revenue) || 0) * Number(v.splitPct)) / 100; how = Number(v.splitPct) + '% of ticket sales'; }
     else return;
-    wanted[v.id] = { amount, description: 'Vendor fee — ' + (v.name || 'Vendor') + (v.who ? ' (' + v.who + ')' : '') + ' (' + how + ')' };
+    wanted[v.id] = { amount, description: 'Vendor fee — ' + ((v.role && !v.who ? v.role : v.name) || 'Vendor') + (v.who ? ' (' + v.who + ')' : (v.role ? ' (' + v.name + ')' : '')) + ' (' + how + ')' };
   });
   let changed = false;
   for (const id of Object.keys(wanted)) {
