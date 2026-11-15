@@ -613,6 +613,15 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
   );
 }
 
+// Round tick circle used on the checklist lines.
+function CheckCircle({ checked, onChange, size }) {
+  const d = size || 16;
+  return (
+    <button type="button" role="checkbox" aria-checked={checked} onClick={onChange}
+      style={{ width: d, height: d, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: checked ? 'none' : '1.5px solid var(--border)', background: checked ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: Math.round(d * 0.62), lineHeight: d + 'px', textAlign: 'center' }}>{checked ? '✓' : ''}</button>
+  );
+}
+
 function ItemRow({ children, onDelete, done, accent }) {
   return (
     <div style={{
@@ -979,7 +988,7 @@ function DayOfView({ ev, onUpdate }) {
       <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{doneCount} of {sorted.length} done</div>
       {sorted.map(t => (
         <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: '0.5px solid var(--border-light)', fontSize: 13 }}>
-          <input type="checkbox" checked={!!t.done} onChange={() => toggle(t.id)} style={{ accentColor: 'var(--gold)', width: 15, height: 15, flexShrink: 0 }} />
+          <CheckCircle checked={!!(!!t.done)} onChange={() => toggle(t.id)} />
           <span style={{ width: 70, flexShrink: 0, color: 'var(--muted)' }}>{fmtTime12(t.time)}</span>
           <span style={{ flex: 1, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--muted)' : 'var(--text)' }}>{t.activity}</span>
         </div>
@@ -1003,7 +1012,7 @@ function ChecklistView({ ev, onUpdate }) {
         const meta = [t.assignee ? (t.assigneeId ? '@' : '') + t.assignee : '', t.due ? 'Due ' + fmtDateShort(t.due) : '', subs.length ? subs.filter(s => s.done).length + '/' + subs.length + ' subtasks' : '', hasMoney ? 'Est. ' + money(t.estimated) + ' · Act. ' + money(t.actual) : ''].filter(Boolean).join(' · ');
         return (
           <div key={t.id} style={{ display: 'flex', gap: 10, padding: '9px 0', borderBottom: '0.5px solid var(--border-light)' }}>
-            <input type="checkbox" checked={!!t.done} onChange={() => toggle(t.id)} style={{ accentColor: 'var(--gold)', width: 15, height: 15, marginTop: 2, flexShrink: 0 }} />
+            <CheckCircle checked={!!(!!t.done)} onChange={() => toggle(t.id)} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--muted)' : 'var(--text)' }}>
                 {p && <span title={p.label} style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.color, marginRight: 7 }} />}{t.text}
@@ -1048,7 +1057,7 @@ function VendorsPanel({ ev, onUpdate }) {
     <div>
       {ev.vendors.map(v => (
         <ItemRow key={v.id} onDelete={() => deleteVendor(v.id)}>
-          <input type="checkbox" checked={v.confirmed} onChange={() => toggleVendor(v.id)} title="Confirmed" style={{ accentColor: 'var(--gold)', width: 15, height: 15 }} />
+          <CheckCircle checked={!!(v.confirmed)} onChange={() => toggleVendor(v.id)} />
           <span style={{ flex: 1, fontSize: 13 }}>{v.name} <span style={{ color: 'var(--muted)' }}>— {v.role}</span>
             {v.notes && <div style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'pre-wrap', marginTop: 2 }}>{v.notes}</div>}
           </span>
@@ -1591,7 +1600,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
             const done = !!(mkData[it.c] || {}).done;
             return (
               <ItemRow key={'mk-' + it.c} done={done}>
-                <input type="checkbox" checked={done} onChange={() => toggleChannel(it.c)} style={{ accentColor: 'var(--gold)', width: 15, height: 15 }} />
+                <CheckCircle checked={!!(done)} onChange={() => toggleChannel(it.c)} />
                 <span style={{ flex: 1, fontSize: 13, textDecoration: done ? 'line-through' : 'none', color: 'var(--text)' }}>{it.c}</span>
               </ItemRow>
             );
@@ -1600,7 +1609,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
             const t = it.t;
             return (
               <ItemRow key={'tl-' + t.id} done={t.done} onDelete={() => onUpdate(e => ({ ...e, timeline: e.timeline.filter(x => x.id !== t.id) }))}>
-                <input type="checkbox" checked={!!t.done} onChange={() => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, done: !x.done } : x) }))} style={{ accentColor: 'var(--gold)', width: 15, height: 15 }} />
+                <CheckCircle checked={!!(!!t.done)} onChange={() => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, done: !x.done } : x) }))} />
                 <span style={{ fontSize: 12, color: 'var(--muted)', width: 70, flexShrink: 0 }}>{fmtTime12(t.time)}</span>
                 <span style={{ flex: 1, fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: 'var(--text)' }}>{t.activity}</span>
               </ItemRow>
@@ -1619,7 +1628,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
             <div key={t.id}>
               <ItemRow done={t.done} onDelete={() => deleteItem(t.id)} accent={t.priority ? TASK_PRIORITY[t.priority].color : null}>
                 <PriorityDot priority={t.priority} onClick={() => cycleItemPriority(t.id)} />
-                <input type="checkbox" checked={t.done} onChange={() => toggleItem(t.id)} style={{ accentColor: 'var(--gold)', width: 15, height: 15 }} />
+                <CheckCircle checked={!!(t.done)} onChange={() => toggleItem(t.id)} />
                 <button onClick={() => startExpand(t)} title="Edit item"
                   style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
                   <span style={{ fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: 'var(--text)' }}>{t.text}</span>
@@ -1689,7 +1698,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                   <div className="label" style={{ marginBottom: 6 }}>Subtasks</div>
                   {subtasks.map(s => (
                     <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' }}>
-                      <input type="checkbox" checked={s.done} onChange={() => toggleSubtask(t.id, s.id)} style={{ accentColor: 'var(--gold)', width: 14, height: 14 }} />
+                      <CheckCircle checked={!!(s.done)} onChange={() => toggleSubtask(t.id, s.id)} size={14} />
                       <span style={{ flex: 1, fontSize: 12, textDecoration: s.done ? 'line-through' : 'none', color: s.done ? 'var(--muted)' : 'var(--text)' }}>{s.text}</span>
                       <button onClick={() => deleteSubtask(t.id, s.id)} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 13, cursor: 'pointer', padding: '0 2px' }}>×</button>
                     </div>
@@ -1766,7 +1775,7 @@ function DayOfTab({ ev, onUpdate }) {
           </div>
         ) : (
           <ItemRow key={t.id} onDelete={() => deleteItem(t.id)} done={t.done}>
-            <input type="checkbox" checked={!!t.done} onChange={() => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, done: !x.done } : x) }))} style={{ accentColor: 'var(--gold)', width: 15, height: 15, flexShrink: 0 }} />
+            <CheckCircle checked={!!(!!t.done)} onChange={() => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, done: !x.done } : x) }))} />
             <span style={{ fontSize: 12, color: 'var(--muted)', width: 54, flexShrink: 0 }}>{t.time}</span>
             <button onClick={() => startEdit(t)} title="Edit"
               style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 13, color: 'var(--text)', fontFamily: 'inherit', textDecoration: t.done ? 'line-through' : 'none' }}>

@@ -126,6 +126,7 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
   const savedRange = React.useRef(null);
   const tickT = React.useRef(null);
   const [pasteBox, setPasteBox] = React.useState(null);
+  const wrapRef = React.useRef(null);
   const [slides, setSlides] = React.useState([]);
   const [selImg, setSelImg] = React.useState(null);
   const [, setTick] = React.useState(0);
@@ -384,6 +385,7 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
         {htmlMode ? (
           <textarea value={post.body_html || ''} onChange={(e) => set('body_html', e.target.value)} style={{ ...inputStyle, minHeight: 340, borderRadius: '0 0 8px 8px', fontFamily: 'Consolas, monospace', fontSize: 13 }} />
         ) : (
+          <div ref={wrapRef} style={{ position: 'relative' }}>
           <div key={editorKey} ref={bodyRef} className="blog-body" contentEditable suppressContentEditableWarning
             dangerouslySetInnerHTML={{ __html: post.body_html || '<p><br></p>' }}
             onClick={selectImg} onKeyUp={() => { rememberSelection(); clearTimeout(tickT.current); tickT.current = setTimeout(() => setTick((n) => n + 1), 800); }} onMouseUp={rememberSelection}
@@ -395,6 +397,26 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
               if (html) document.execCommand('insertHTML', false, cleanPasted(html));
               else document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
             }} />
+          {selImg && bodyRef.current && bodyRef.current.contains(selImg) && wrapRef.current && (() => {
+            // The same photo controls, right under the picture that is selected.
+            const r = selImg.getBoundingClientRect(); const w = wrapRef.current.getBoundingClientRect();
+            const top = r.bottom - w.top + 6; const left = Math.max(0, Math.min(r.left - w.left, w.width - 380));
+            const mb = (label, title, fn) => (
+              <button type="button" key={title} title={title} onMouseDown={(e) => { e.preventDefault(); fn(); }}
+                style={{ background: '#fff', border: '0.5px solid #d8d0c4', borderRadius: 6, padding: '5px 9px', fontSize: 12, cursor: 'pointer', color: '#444', whiteSpace: 'nowrap' }}>{label}</button>
+            );
+            return (
+              <div style={{ position: 'absolute', top, left, zIndex: 20, display: 'flex', gap: 4, flexWrap: 'wrap', maxWidth: 380, background: '#faf7f2', border: '0.5px solid #b5a185', borderRadius: 8, padding: 5, boxShadow: '0 4px 14px rgba(0,0,0,0.15)' }}>
+                {mb('◧ Wraps right', 'Photo on the left, text wraps around it', () => wrapImg('left'))}
+                {mb('◨ Wraps left', 'Photo on the right, text wraps around it', () => wrapImg('right'))}
+                {mb('▬ Full width', 'Photo on its own line', () => wrapImg('center'))}
+                {mb('Smaller', 'Make the photo smaller', () => wrapImg('smaller'))}
+                {mb('Larger', 'Make the photo larger', () => wrapImg('larger'))}
+                {mb('✕ Remove', 'Delete this photo from the post', () => { const el = selImg; setSelImg(null); const par = el.parentNode; el.remove(); if (par && par !== bodyRef.current && !par.textContent.trim() && !par.querySelector('img')) par.remove(); setTick((n) => n + 1); })}
+              </div>
+            );
+          })()}
+          </div>
         )}
         <div style={{ textAlign: 'right', marginTop: 6 }}>
           <button type="button" onClick={switchMode} style={{ background: 'none', border: 'none', color: '#888', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>{htmlMode ? 'Back to the editor' : 'Edit as HTML'}</button>
