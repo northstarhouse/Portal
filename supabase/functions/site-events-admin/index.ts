@@ -169,6 +169,12 @@ Deno.serve(async (req) => {
           if (clash.length) return json({ error: 'That web address is already used by another event. Choose a different one.' }, 409)
           row.slug = wantedSlug
         }
+        // A partial update (the Events Committee "Push to website") leaves the photo and short description alone unless it sends them.
+        if (e.partial === true) {
+          if (!String(e.image_url || '').trim()) { delete row.image_url; delete row.image_alt }
+          if (!String(e.short_description || '').trim()) { delete row.short_description; delete row.seo_description }
+          if (e.ticket_limit_per_order == null) delete row.ticket_limit_per_order
+        }
         const saved = await rest(`site_events?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(row) })
         if (!saved?.[0]) return json({ error: 'Event not found.' }, 404)
         return json({ event: saved[0], refreshed: await refreshSite() })

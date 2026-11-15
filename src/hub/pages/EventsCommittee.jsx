@@ -1,8 +1,9 @@
 // GENERATED from volunteerhub/src/pages/EventsCommittee.jsx by scripts/sync-hub-events-committee.mjs. Do not edit here: change it in the Hub, then re-run the script.
 import { useState, useEffect, useRef } from 'react';
+import { MediaPicker } from '../../media-library.jsx';
 import { useVol } from '../App.jsx';
 import {
-  fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
+  pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
@@ -67,7 +68,7 @@ const EVENT_PURPOSES = ['Educational', 'Entertainment', 'Community Engagement', 
 function emptyEvent(name) {
   return {
     id: cryptoId(), name, date: '', startTime: '', endTime: '', location: '', description: '', status: 'planning',
-    purpose: '', expectedAttendance: '', pricing: '', eventLead: '', volunteersNeeded: '',
+    purpose: '', expectedAttendance: '', pricing: '', ticketTiers: [], siteEventId: null, website: {}, eventLead: '', volunteersNeeded: '',
     checklist: [], vendors: [], guestCount: { invited: 0, confirmed: 0 }, timeline: [],
     afterNotes: { wentWell: '', wentWrong: '', finalAttendance: '', finalBudget: '', followUps: '' },
   };
@@ -88,6 +89,9 @@ function fromDb(row) {
     purpose: row.purpose || '',
     expectedAttendance: row.expected_attendance || '',
     pricing: row.pricing || '',
+    ticketTiers: Array.isArray(row.ticket_tiers) ? row.ticket_tiers : [],
+    siteEventId: row.site_event_id || null,
+    website: row.website && typeof row.website === 'object' ? row.website : {},
     eventLead: row.event_lead || '',
     volunteersNeeded: row.volunteers_needed ?? '',
     guestCount: { invited: row.guest_invited || 0, confirmed: row.guest_confirmed || 0 },
@@ -111,6 +115,9 @@ function toDb(ev) {
     purpose: ev.purpose || null,
     expected_attendance: ev.expectedAttendance || null,
     pricing: ev.pricing || null,
+    ticket_tiers: ev.ticketTiers || [],
+    site_event_id: ev.siteEventId || null,
+    website: ev.website || {},
     event_lead: ev.eventLead || null,
     volunteers_needed: ev.volunteersNeeded === '' || ev.volunteersNeeded == null ? null : Number(ev.volunteersNeeded),
     guest_invited: ev.guestCount.invited || 0,
@@ -476,9 +483,10 @@ function OverviewTab({ ev, onUpdate, onEdit, volunteers, session, volunteer }) {
           <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 7 }}>
             {ev.eventLead && <div><strong>Event lead:</strong> {ev.eventLead}</div>}
             {ev.location && <div><strong>Location:</strong> {ev.location}</div>}
+            {ev.pricing && <div><strong>Pricing:</strong> {ev.pricing}</div>}
             {(ev.guestCount.invited || ev.expectedAttendance) && <div><strong>Expected guests:</strong> {ev.guestCount.invited || ev.expectedAttendance}</div>}
             {ev.volunteersNeeded !== '' && ev.volunteersNeeded != null && <div><strong>Volunteers needed:</strong> {ev.volunteersNeeded}</div>}
-            {!ev.eventLead && !ev.location && !ev.guestCount.invited && !ev.expectedAttendance && (ev.volunteersNeeded === '' || ev.volunteersNeeded == null) && (
+            {!ev.eventLead && !ev.location && !ev.pricing && !ev.guestCount.invited && !ev.expectedAttendance && (ev.volunteersNeeded === '' || ev.volunteersNeeded == null) && (
               <div style={{ color: 'var(--muted)' }}>Nothing set yet -- fill these in under Pre-Planning.</div>
             )}
           </div>
@@ -667,11 +675,185 @@ function VendorsPanel({ ev, onUpdate }) {
   );
 }
 
+// "Website event page": everything the website event needs, filled in here, then Push to website sends it to
+// Admin > New Event (a draft the first time; later pushes update the same event and never unpublish it).
+function WebsiteEventPanel({ ev, onUpdate }) {
+  const w = ev.website || {};
+  const slugify = v => String(v || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
+  const initial = () => ({
+    title: ev.name || '', slug: w.slug || '', slugTouched: !!w.slug, short: w.short_description || '', desc: ev.description || '',
+    imageUrl: w.image_url || '', imageAlt: w.image_alt || '', dateTbd: w.date_tbd === true, date: ev.date || '',
+    startTime: ev.startTime || '18:00', endTime: ev.endTime || '',
+    locName: w.location_name || 'North Star House', locAddr: w.location_address || '12075 Auburn Rd, Grass Valley, CA 95949, USA',
+    sells: w.sells_tickets === true, tiers: (ev.ticketTiers && ev.ticketTiers.length) ? ev.ticketTiers : [{ name: 'General Admission', price: '', limit: '' }],
+  });
+  const [f, setF] = useState(initial);
+  const [editing, setEditing] = useState(false);
+  const [picker, setPicker] = useState(false);
+  const [pushing, setPushing] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const set = (k, v) => setF(o => ({ ...o, [k]: v }));
+  const setTier = (i, k, v) => setF(o => ({ ...o, tiers: o.tiers.map((t, j) => j === i ? { ...t, [k]: v } : t) }));
+
+  // Turn the form into the committee event's fields.
+  const toEvent = (form, base) => ({
+    ...base, name: form.title.trim(), description: form.desc.trim(),
+    date: form.dateTbd ? base.date : form.date, startTime: form.startTime, endTime: form.endTime,
+    ticketTiers: form.sells ? form.tiers.filter(t => String(t.name || '').trim()) : (base.ticketTiers || []),
+    website: {
+      slug: form.slug, short_description: form.short.trim(), image_url: form.imageUrl, image_alt: form.imageAlt.trim(),
+      date_tbd: form.dateTbd, location_name: form.locName.trim(), location_address: form.locAddr.trim(), sells_tickets: form.sells,
+    },
+  });
+  const missing = form => {
+    const m = [];
+    if (!form.title.trim()) m.push('title');
+    if (!form.short.trim()) m.push('short description');
+    if (!form.desc.trim()) m.push('full description');
+    if (!form.dateTbd && !form.date) m.push('date');
+    if (!form.dateTbd && !form.startTime) m.push('start time');
+    if (!form.locName.trim()) m.push('location');
+    if (!form.locAddr.trim()) m.push('address');
+    if (form.sells && !form.tiers.some(t => String(t.name || '').trim() && String(t.price ?? '').trim() !== '')) m.push('a ticket name and price');
+    return m;
+  };
+
+  // Show the saved values when not editing.
+  const saved = initial();
+  const savedMissing = missing(saved);
+
+  function save() {
+    onUpdate(e => toEvent(f, e));
+    setEditing(false);
+    setMsg(null);
+  }
+  async function push(form) {
+    if (pushing) return;
+    const m = missing(form);
+    if (m.length) { setMsg({ ok: false, text: 'Fill in first: ' + m.join(', ') + '.' }); return; }
+    if (!ev.siteEventId && !window.confirm('Push this event to the website? It goes live right away.')) return;
+    setPushing(true); setMsg(null);
+    try {
+      const merged = toEvent(form, ev);
+      const r = await pushCommitteeEventToWebsite(merged);
+      onUpdate(e => ({ ...toEvent(form, e), siteEventId: r.siteEventId }));
+      setEditing(false);
+      setMsg({ ok: true, text: r.status === 'archived' ? 'Updated. This event has ended, so it is not shown on the website.' : 'Done. The event is live on the website (it also shows in Admin > New Event).' });
+    } catch (err) {
+      setMsg({ ok: false, text: err.message || 'Could not push. Please try again.' });
+    }
+    setPushing(false);
+  }
+
+  const inp = { width: '100%', boxSizing: 'border-box' };
+  const lab = { display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 12 };
+  const note = { fontSize: 11, color: 'var(--muted)' };
+  const head = { fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1.2, margin: '14px 0 8px' };
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <div style={SECTION_HEAD}>Website event page</div>
+        {!editing && <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => { setF(initial()); setEditing(true); }}>Edit</button>}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+        {ev.siteEventId
+          ? 'This event is on the website (also listed in Admin > New Event). Updating sends your changes live.'
+          : 'Fill this in, then Push to website. It goes live on the website right away and shows in Admin > New Event.'}
+      </div>
+
+      {editing ? (
+        <div>
+          <div style={head}>The event</div>
+          <label style={lab}>Title *<input className="input" style={inp} value={f.title} onChange={e => { const v = e.target.value; setF(o => ({ ...o, title: v, slug: o.slugTouched ? o.slug : slugify(v) })); }} placeholder="e.g. Holiday Open House" /></label>
+          <label style={lab}>Web address (the last part of the event's link)
+            <input className="input" style={inp} value={f.slug} onChange={e => setF(o => ({ ...o, slugTouched: true, slug: slugify(e.target.value) }))} placeholder="holiday-open-house" />
+            <span style={note}>Letters, numbers and dashes only. It fills in from the title unless you type your own.{ev.siteEventId ? ' Changing it after the event is published breaks links people already have.' : ''}</span>
+          </label>
+          <label style={lab}>Short description (shown in lists and when shared) *<input className="input" style={inp} maxLength={300} value={f.short} onChange={e => set('short', e.target.value)} placeholder="One or two sentences" /></label>
+          <label style={lab}>Full description *<textarea className="input" rows={6} style={{ ...inp, resize: 'vertical' }} value={f.desc} onChange={e => set('desc', e.target.value)} placeholder={'Write it like an email. A blank line starts a new paragraph.\nStart a line with "- " to make a bullet list.'} /></label>
+          <div style={lab}>Photo
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {f.imageUrl ? <img src={f.imageUrl} alt="" style={{ width: 110, height: 74, objectFit: 'cover', borderRadius: 8, border: '0.5px solid var(--border-light)' }} /> : <div style={{ width: 110, height: 74, borderRadius: 8, background: 'var(--light)', border: '0.5px solid var(--border-light)' }} />}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button type="button" className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setPicker(true)}>{f.imageUrl ? 'Change photo' : 'Choose a photo'}</button>
+                  {f.imageUrl && <button type="button" className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setF(o => ({ ...o, imageUrl: '', imageAlt: '' }))}>Remove</button>}
+                  {!f.imageUrl && <span style={note}>No photo? The website shows "More information to come".</span>}
+                </div>
+                <input className="input" style={inp} value={f.imageAlt} onChange={e => set('imageAlt', e.target.value)} placeholder="Describe the photo (for screen readers)" />
+              </div>
+            </div>
+          </div>
+
+          <div style={head}>When and where</div>
+          <label style={{ ...lab, flexDirection: 'row', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={f.dateTbd} onChange={e => set('dateTbd', e.target.checked)} /> Date to be announced</label>
+          {!f.dateTbd && (
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <label style={{ ...lab, flex: '1 1 150px' }}>Date *<input className="input" type="date" style={inp} value={f.date} onChange={e => set('date', e.target.value)} /></label>
+              <label style={{ ...lab, flex: '1 1 120px' }}>Starts (Pacific time) *<input className="input" type="time" style={inp} value={f.startTime} onChange={e => set('startTime', e.target.value)} /></label>
+              <label style={{ ...lab, flex: '1 1 120px' }}>Ends (optional)<input className="input" type="time" style={inp} value={f.endTime} onChange={e => set('endTime', e.target.value)} /></label>
+            </div>
+          )}
+          <label style={lab}>Location *<input className="input" style={inp} value={f.locName} onChange={e => set('locName', e.target.value)} /></label>
+          <label style={lab}>Address *<input className="input" style={inp} value={f.locAddr} onChange={e => set('locAddr', e.target.value)} /></label>
+
+          <div style={head}>Tickets</div>
+          <label style={lab}>Does this event sell tickets?
+            <select className="input" style={{ ...inp, appearance: 'auto' }} value={f.sells ? 'yes' : 'no'} onChange={e => set('sells', e.target.value === 'yes')}>
+              <option value="no">No, just list the event</option>
+              <option value="yes">Yes, sell tickets online</option>
+            </select>
+          </label>
+          {f.sells && (
+            <div style={{ marginBottom: 12 }}>
+              {f.tiers.map((t, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <label style={{ ...lab, flex: '2 1 160px', marginBottom: 0 }}>Ticket name<input className="input" style={inp} value={t.name || ''} onChange={e => setTier(i, 'name', e.target.value)} /></label>
+                  <label style={{ ...lab, flex: '1 1 90px', marginBottom: 0 }}>Price ($)<input className="input" style={inp} inputMode="decimal" value={t.price ?? ''} onChange={e => setTier(i, 'price', e.target.value)} placeholder="0 = free" /></label>
+                  <label style={{ ...lab, flex: '1 1 90px', marginBottom: 0 }}>Max per order<input className="input" style={inp} inputMode="numeric" value={t.limit ?? ''} onChange={e => setTier(i, 'limit', e.target.value)} placeholder="50" /></label>
+                  {f.tiers.length > 1 && <button type="button" onClick={() => set('tiers', f.tiers.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#b3402a', fontSize: 18, cursor: 'pointer', paddingBottom: 6 }} aria-label="Remove this ticket type">×</button>}
+                </div>
+              ))}
+              <button type="button" className="btn-ghost" style={{ fontSize: 12 }} onClick={() => set('tiers', [...f.tiers, { name: '', price: '', limit: '' }])}>+ Add another ticket type</button>
+            </div>
+          )}
+
+          {msg && <div style={{ fontSize: 12, margin: '8px 0', color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            <button className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => push(f)}>{pushing ? 'Pushing…' : (ev.siteEventId ? 'Save and update website' : 'Save and push to website')}</button>
+            <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={save}>Save only</button>
+            <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => { setEditing(false); setMsg(null); }}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div><strong>Title:</strong> {saved.title || <span style={{ color: 'var(--muted)' }}>not set</span>}</div>
+          <div><strong>Short description:</strong> {saved.short || <span style={{ color: 'var(--muted)' }}>not set</span>}</div>
+          <div><strong>Date:</strong> {saved.dateTbd ? 'To be announced' : (saved.date ? fmtDate(saved.date) : <span style={{ color: 'var(--muted)' }}>not set</span>)}</div>
+          <div><strong>Location:</strong> {saved.locName}</div>
+          <div><strong>Photo:</strong> {saved.imageUrl ? 'Chosen' : <span style={{ color: 'var(--muted)' }}>none (the website shows "More information to come")</span>}</div>
+          <div><strong>Tickets:</strong> {saved.sells ? saved.tiers.filter(t => String(t.name || '').trim()).map(t => t.name + ' ' + (Number(t.price) > 0 ? '$' + t.price : 'free')).join(' · ') : 'Not sold online'}</div>
+          {savedMissing.length > 0 && <div style={{ color: 'var(--muted)' }}>Still needed before pushing: {savedMissing.join(', ')}. Click Edit.</div>}
+          <div style={{ marginTop: 6 }}>
+            <button type="button" className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing || savedMissing.length > 0} onClick={() => push(saved)}>
+              {pushing ? 'Pushing…' : (ev.siteEventId ? 'Update website event' : 'Push to website')}
+            </button>
+            {msg && <div style={{ fontSize: 12, marginTop: 8, color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}
+          </div>
+        </div>
+      )}
+      {picker && <MediaPicker supabaseUrl={SITE_SUPABASE_URL} supabaseKey={SITE_SUPABASE_KEY} onPick={img => { setF(o => ({ ...o, imageUrl: img.url, imageAlt: o.imageAlt || img.alt || '' })); setPicker(false); }} onClose={() => setPicker(false)} />}
+    </div>
+  );
+}
+
 function PreplanningTab({ ev, onUpdate, volunteers }) {
   const [guests, setGuests] = useState(ev.guestCount);
   const [basics, setBasics] = useState({
     name: ev.name, date: ev.date, startTime: ev.startTime, endTime: ev.endTime,
     purpose: ev.purpose, eventLead: ev.eventLead, expectedAttendance: ev.expectedAttendance, description: ev.description,
+    pricing: ev.pricing,
   });
   const [basicsEditing, setBasicsEditing] = useState(false);
   const [guestsEditing, setGuestsEditing] = useState(false);
@@ -681,7 +863,7 @@ function PreplanningTab({ ev, onUpdate, volunteers }) {
     onUpdate(e => ({
       ...e, name: basics.name.trim(), date: basics.date, startTime: basics.startTime, endTime: basics.endTime,
       purpose: basics.purpose, eventLead: basics.eventLead.trim(), expectedAttendance: basics.expectedAttendance.trim(),
-      description: basics.description.trim(),
+      description: basics.description.trim(), pricing: basics.pricing.trim(),
     }));
     setBasicsEditing(false);
   }
@@ -689,6 +871,7 @@ function PreplanningTab({ ev, onUpdate, volunteers }) {
     setBasics({
       name: ev.name, date: ev.date, startTime: ev.startTime, endTime: ev.endTime,
       purpose: ev.purpose, eventLead: ev.eventLead, expectedAttendance: ev.expectedAttendance, description: ev.description,
+      pricing: ev.pricing,
     });
     setBasicsEditing(false);
   }
@@ -754,6 +937,10 @@ function PreplanningTab({ ev, onUpdate, volunteers }) {
               <div className="label">Event Purpose (optional)</div>
               <textarea className="input" rows={3} style={{ resize: 'vertical' }} value={basics.description} onChange={e => setBasics(b => ({ ...b, description: e.target.value }))} placeholder="Briefly describe the event's goal." />
             </div>
+            <div style={{ marginBottom: 10 }}>
+              <div className="label">Pricing</div>
+              <input className="input" value={basics.pricing} onChange={e => setBasics(b => ({ ...b, pricing: e.target.value }))} placeholder="e.g. Free, or $25 adults / kids free" />
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={!basics.name.trim() || !basics.date || !basics.eventLead.trim()} onClick={saveBasics}>Save</button>
               <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} onClick={cancelBasics}>Cancel</button>
@@ -768,9 +955,13 @@ function PreplanningTab({ ev, onUpdate, volunteers }) {
             {ev.eventLead && <div><strong>Event lead:</strong> {ev.eventLead}</div>}
             {ev.expectedAttendance && <div><strong>Expected attendance:</strong> {ev.expectedAttendance}</div>}
             {ev.description && <div><strong>Purpose:</strong> {ev.description}</div>}
+            {ev.pricing && <div><strong>Pricing:</strong> {ev.pricing}</div>}
+            {!ev.pricing && <div style={{ color: 'var(--muted)' }}><strong style={{ color: 'var(--text)' }}>Pricing:</strong> not set. Click Edit to add it.</div>}
           </div>
         )}
       </div>
+
+      <WebsiteEventPanel ev={ev} onUpdate={onUpdate} />
 
       <div style={{ marginBottom: 24 }}>
         <div style={sectionTitle}>Vendors & contacts</div>

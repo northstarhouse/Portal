@@ -6,6 +6,8 @@ import { supabase } from '../supabase.js';
 
 const URL  = "https://uvzwhhwzelaelfhfkvdb.supabase.co";
 const KEY  = "sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do";
+export const SITE_SUPABASE_URL = URL;
+export const SITE_SUPABASE_KEY = KEY;
 const VOL  = encodeURIComponent('2026 Volunteers');
 
 async function hdr(extra = {}) {
@@ -1068,6 +1070,40 @@ export async function syncInHouseEvent({ name, date, ihEventId }) {
   } catch {
     return null;
   }
+}
+
+// "Push to website": sends a committee event (name, date, times, description, ticket pricing) to the website's event list
+// (Admin > New Event) and PUBLISHES it, so it is live on the website right away. Pushing again updates that same website
+// event and keeps its photo (an ended event stays ended). Returns { siteEventId, status }.
+export async function pushCommitteeEventToWebsite(ev) {
+  const call = async (body) => {
+    const r = await fetch(`${URL}/functions/v1/site-events-admin`, {
+      method: 'POST', headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error(j.error || 'Something went wrong. Please try again.');
+    return j;
+  };
+  let id = ev.siteEventId || '';
+  let status = 'published';
+  if (id) {
+    const l = await call({ action: 'list' });
+    const cur = (l.events || []).find(x => x.id === id);
+    if (cur) status = cur.status === 'archived' ? 'archived' : 'published'; else id = '';
+  }
+  const w = ev.website || {};
+  const sells = w.sells_tickets === true;
+  const tiers = sells ? (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim()) : [];
+  const event = {
+    ...(id ? { id, partial: true } : {}),
+    title: ev.name, slug: w.slug || '', short_description: w.short_description || '', description: String(ev.description || '').trim(), status,
+    image_url: w.image_url || '', image_alt: w.image_alt || '',
+    date: w.date_tbd ? '' : (ev.date || ''), date_tbd: w.date_tbd === true, start_time: ev.startTime || '18:00', end_time: ev.endTime || '',
+    location_name: w.location_name || 'North Star House', location_address: w.location_address || '12075 Auburn Rd, Grass Valley, CA 95949, USA',
+    registration_type: sells ? 'TICKETING' : 'NONE', ticket_tiers: tiers,
+  };
+  const j = await call({ action: 'save', event });
+  return { siteEventId: j.event.id, status: j.event.status };
 }
 
 export async function deleteCommitteeEvent(id) {
