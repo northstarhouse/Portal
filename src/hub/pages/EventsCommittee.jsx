@@ -332,7 +332,7 @@ const PLANNING_SECTION_ICONS = {
 const PLANNING_SECTIONS = [
   { key: 'preplanning', title: 'Event Basics', desc: 'Event details, website page, tickets' },
   { key: 'checklist', title: 'Checklist', desc: 'Type the duties in fast, then assign and date them' },
-  { key: 'volunteers', title: 'Volunteers, Staffing & Vendors', desc: 'Who is needed, who is assigned, vendors and contacts', area: 'volunteers' },
+  { key: 'volunteers', title: 'Volunteers, Staffing & Vendors', desc: 'What we need, who we found, contacts and volunteer roles', area: 'volunteers' },
   { key: 'marketing', title: 'Marketing & Promotion', desc: 'Flyers, newsletters, website, social media', area: 'marketing' },
   { key: 'areas-other', title: 'Other Planning Areas', desc: 'Logistics, hospitality, finance, sponsorship, interiors' },
   { key: 'budget', title: 'Budget & Transactions', desc: 'Income, expenses, reimbursements' },
@@ -555,7 +555,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                   ) : (s.key === 'marketing') && (
                     <AreasTab event={ev} session={session} volunteer={volunteer} initialArea={s.area} />
                   )}
-                  {s.key === 'volunteers' && <VolunteersVendorsTab ev={ev} onUpdate={onUpdate} session={session} volunteer={volunteer} />}
+                  {s.key === 'volunteers' && <NeedsList ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}
                   {s.key === 'areas-other' && <AreasTab event={ev} session={session} volunteer={volunteer} />}
                 </div>
               )}
@@ -679,17 +679,138 @@ function VendorsView({ ev }) {
   );
 }
 
-// Volunteers, Staffing & Vendors: staffing roles (with who is assigned) and vendors together, behind one Edit button.
-function VolunteersVendorsTab({ ev, onUpdate, session, volunteer }) {
-  const [editing, setEditing] = useState(false);
+// Volunteers, Staffing & Vendors as one list: write down what we need ("Magician", "4 setup volunteers"), then later fill in
+// who we found and how to reach them, and say whether it is a vendor, a contact or a volunteer role.
+const NEED_KINDS = { vendor: 'Vendor', contact: 'Contact', volunteer: 'Volunteer' };
+const volFullName = (v) => `${v['First Name'] || ''} ${v['Last Name'] || ''}`.trim() || 'Unnamed';
+
+function NeedsList({ ev, onUpdate, volunteers }) {
+  const [quick, setQuick] = useState('');
+  const [openId, setOpenId] = useState(null);
+  const items = ev.vendors;
+  const patch = (id, p) => onUpdate(e => ({ ...e, vendors: e.vendors.map(v => v.id === id ? { ...v, ...p } : v) }));
+
+  function add(text) {
+    const lines = String(text || '').split(/\r?\n/).map(l => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean);
+    if (!lines.length) return;
+    onUpdate(e => ({ ...e, vendors: [...e.vendors, ...lines.map(l => ({ id: cryptoId(), name: l, kind: '', who: '', contact: '', notes: '', confirmed: false }))] }));
+    setQuick('');
+  }
+  function remove(v) {
+    if (!window.confirm(`Remove "${v.name}" from the list?`)) return;
+    onUpdate(e => ({ ...e, vendors: e.vendors.filter(x => x.id !== v.id) }));
+    if (openId === v.id) setOpenId(null);
+  }
+  const inp = { width: '100%', boxSizing: 'border-box', fontSize: 13 };
+  const cap = { fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 };
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
-        <button className={editing ? 'btn-gold' : 'btn-ghost'} style={{ fontSize: 12, padding: '5px 14px' }} onClick={() => setEditing(v => !v)}>{editing ? 'Done' : 'Edit'}</button>
+      <input className="input" value={quick} placeholder="What do we need? Type it and press Enter… (a magician, a caterer, setup volunteers)"
+        onChange={e => setQuick(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(quick); } }}
+        onPaste={e => { const t = e.clipboardData.getData('text'); if (/\r?\n/.test(t.trim())) { e.preventDefault(); add(t); } }} />
+      <div style={{ fontSize: 11, color: 'var(--muted)', margin: '6px 0 14px' }}>
+        Later, click one to add who you found and their contact, and choose whether it is a vendor, a contact or a volunteer role.
       </div>
-      <AreasTab event={ev} session={session} volunteer={volunteer} initialArea="volunteers" embedded editing={editing} />
-      <div style={{ ...SECTION_HEAD, marginTop: 26 }}>Vendors & contacts</div>
-      {editing ? <VendorsPanel ev={ev} onUpdate={onUpdate} /> : <VendorsView ev={ev} />}
+
+      {items.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)' }}>Nothing on the list yet.</div>}
+      {items.map(v => {
+        const kind = v.kind || '';
+        const isOpen = openId === v.id;
+        const assigned = (v.assignedIds || []).map(id => (volunteers || []).find(x => x.id === id)).filter(Boolean);
+        const target = Number(v.target) || 0;
+        const who = v.who || (v.role ? v.name : '');
+        const title = v.who || !v.role ? v.name : v.role + ': ' + v.name;
+        const found = !!v.confirmed || !!who || assigned.length > 0;
+        let sub;
+        if (kind === 'volunteer') sub = assigned.length + (target ? ' of ' + target : '') + ' assigned' + (assigned.length ? ': ' + assigned.map(volFullName).join(', ') : '');
+        else if (who || v.contact) sub = [v.who ? v.who : (v.role ? v.name : ''), v.contact].filter(Boolean).join('  ·  ');
+        else sub = '';
+        return (
+          <div key={v.id} style={{ borderBottom: '0.5px solid var(--border-light)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0' }}>
+              <button type="button" onClick={() => patch(v.id, { confirmed: !v.confirmed })} title={v.confirmed ? 'Confirmed. Click to undo.' : 'Click to mark as confirmed'}
+                style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: v.confirmed ? 'none' : '1.5px solid var(--border)', background: v.confirmed ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: 11, lineHeight: '18px' }}>{v.confirmed ? '✓' : ''}</button>
+              <button type="button" onClick={() => setOpenId(isOpen ? null : v.id)} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</div>
+                <div style={{ fontSize: 12, marginTop: 2, color: found || sub ? 'var(--muted)' : '#b8863b', fontStyle: found || sub ? 'normal' : 'italic' }}>{sub || 'Still needed'}</div>
+              </button>
+              {kind && <span className="badge" style={{ background: 'var(--light)', color: 'var(--text)', flexShrink: 0 }}>{NEED_KINDS[kind]}</span>}
+              <span style={{ color: 'var(--muted)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>&rsaquo;</span>
+            </div>
+            {isOpen && (
+              <div key={v.id + '-edit'} style={{ padding: '4px 0 18px 30px' }}>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <div style={{ flex: '1 1 170px' }}>
+                    <div style={cap}>What is it?</div>
+                    <select className="input" value={kind} onChange={e => patch(v.id, { kind: e.target.value })} style={{ ...inp, appearance: 'auto' }}>
+                      <option value="">Choose a type…</option>
+                      <option value="vendor">Vendor</option>
+                      <option value="contact">Contact</option>
+                      <option value="volunteer">Volunteer role</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: '2 1 240px' }}>
+                    <div style={cap}>What we need</div>
+                    <input className="input" defaultValue={v.name} style={inp} onBlur={e => { const t = e.target.value.trim(); if (t && t !== v.name) patch(v.id, { name: t }); }} />
+                  </div>
+                </div>
+                {kind === 'volunteer' ? (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+                      <div style={{ width: 120 }}>
+                        <div style={cap}>How many</div>
+                        <input className="input" type="number" min="0" defaultValue={v.target || ''} style={inp} onBlur={e => patch(v.id, { target: Number(e.target.value) || 0 })} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 200 }}>
+                        <div style={cap}>Assign a volunteer</div>
+                        <select className="input" value="" onChange={e => { if (e.target.value) patch(v.id, { assignedIds: [...(v.assignedIds || []), e.target.value] }); }} style={{ ...inp, appearance: 'auto' }}>
+                          <option value="">Choose a volunteer…</option>
+                          {(volunteers || []).filter(x => !(v.assignedIds || []).includes(x.id)).map(x => <option key={x.id} value={x.id}>{volFullName(x)}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    {assigned.map(x => (
+                      <div key={x.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: 13 }}>
+                        <span>{volFullName(x)}</span>
+                        <button className="btn-ghost" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => patch(v.id, { assignedIds: (v.assignedIds || []).filter(id => id !== x.id) })}>Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <div style={{ flex: '1 1 200px' }}>
+                      <div style={cap}>Who we found</div>
+                      <input className="input" defaultValue={v.who || (v.role ? v.name : '')} placeholder="Name or business" style={inp} onBlur={e => { const t = e.target.value.trim(); if (t !== (v.who || '')) patch(v.id, { who: t }); }} />
+                    </div>
+                    <div style={{ flex: '1 1 200px' }}>
+                      <div style={cap}>Phone or email</div>
+                      <input className="input" defaultValue={v.contact || ''} style={inp} onBlur={e => { const t = e.target.value.trim(); if (t !== (v.contact || '')) patch(v.id, { contact: t }); }} />
+                    </div>
+                  </div>
+                )}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={cap}>Notes (staff only)</div>
+                  <textarea className="input" rows={2} defaultValue={v.notes || ''} style={{ ...inp, resize: 'vertical' }} onBlur={e => { const t = e.target.value.trim(); if (t !== (v.notes || '')) patch(v.id, { notes: t }); }} />
+                </div>
+                {kind === 'vendor' && (
+                  <div style={{ marginBottom: 12, maxWidth: 220 }}>
+                    <div style={cap}>Vendor form</div>
+                    <select className="input" value={v.formStatus || ''} onChange={e => patch(v.id, { formStatus: e.target.value })} style={{ ...inp, appearance: 'auto' }}>
+                      <option value="">Not tracked</option>
+                      <option value="Not sent">Not sent</option>
+                      <option value="Sent">Sent</option>
+                      <option value="Received">Received</option>
+                    </select>
+                  </div>
+                )}
+                <button className="btn-ghost" style={{ fontSize: 12, color: '#a04545' }} onClick={() => remove(v)}>Remove from the list</button>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1083,7 +1204,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
       setAttachedMsg('Added to the Day-Of Timeline.');
     } else if (target === 'vendor') {
       onUpdate(e => ({ ...e, notes: drop(e), vendors: [...e.vendors, { id: cryptoId(), name: note.text, role: '', contact: '', notes: '', confirmed: false }] }));
-      setAttachedMsg('Added to Vendors & contacts (under Volunteers, Staffing & Vendors).');
+      setAttachedMsg('Added to the Volunteers, Staffing & Vendors list.');
     } else if (target === 'after') {
       onUpdate(e => ({ ...e, notes: drop(e), afterNotes: { ...e.afterNotes, followUps: e.afterNotes.followUps ? e.afterNotes.followUps + '\n' + note.text : note.text } }));
       setAttachedMsg('Added to After Notes as a follow-up.');
@@ -1188,7 +1309,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
                   <option value="">Attach to…</option>
                   <option value="task">Checklist duty</option>
                   <option value="dayof">Day-Of Timeline</option>
-                  <option value="vendor">Vendors & contacts</option>
+                  <option value="vendor">Volunteers & vendors list</option>
                   <option value="after">After Notes (follow-up)</option>
                 </select>
                 <button onClick={() => deleteNote(n.id)} title="Delete this note" style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>×</button>
