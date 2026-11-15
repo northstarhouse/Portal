@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MediaPicker } from '../../media-library.jsx';
 import { useVol } from '../App.jsx';
 import {
-  insertReimbursement, fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
+  insertReimbursement, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
@@ -340,7 +340,7 @@ const PLANNING_SECTIONS = [
 ];
 
 // The checklist is the one place everything lives, tagged by category so each area can be checked off as figured out.
-const CHECKLIST_CATEGORIES = ['Logistics', 'Hospitality', 'Sponsorship', 'Interiors', 'Marketing', 'Money', 'Volunteers & vendors', 'General'];
+const CHECKLIST_CATEGORIES = ['General', 'Logistics', 'Hospitality', 'Sponsorship', 'Interiors', 'Marketing', 'Money', 'Volunteers & vendors'];
 const checkCat = (c) => (CHECKLIST_CATEGORIES.includes(c) ? c : 'General');
 // Things we still need (a bartender, a sponsor...) are handled once someone is named, it is confirmed, or enough volunteers are assigned.
 const needHandled = (v) => !!v.confirmed || !!v.who || !!v.role
@@ -381,6 +381,14 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
     fetchEventCardImage(ev.name).then(setFlyerUrl).catch(() => setFlyerUrl(null));
   }, [ev.name]);
 
+  // Vendor costs log themselves as expenses (and a share of ticket sales follows the sales so far).
+  const costSig = JSON.stringify(ev.vendors.map(v => [v.id, v.name, v.who || '', v.costType || '', v.cost || 0, v.splitPct || 0]));
+  useEffect(() => {
+    let live = true;
+    fetchEventTicketStats(ev.name).catch(() => ({ revenue: 0 })).then(t => syncVendorExpenses(ev.name, ev.vendors, rsvpOnly ? 0 : t.revenue, session && session.user && session.user.id))
+      .then(changed => { if (live && changed) fetchEventFinancials(ev.name).then(setFinancials).catch(() => {}); }).catch(() => {});
+    return () => { live = false; };
+  }, [ev.name, costSig, rsvpOnly]);
   const openNeeds = ev.vendors.filter(v => !needHandled(v));
   const doneT = ev.checklist.filter(t => t.done).length + (ev.vendors.length - openNeeds.length);
   const total = ev.checklist.length + ev.vendors.length;
@@ -501,16 +509,33 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif" }}>Event details</div>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           </div>
-          <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {ev.eventLead && <div><strong>Event lead:</strong> {ev.eventLead}</div>}
-            {ev.location && <div><strong>Location:</strong> {ev.location}</div>}
-            {ev.pricing && <div><strong>Pricing:</strong> {ev.pricing}</div>}
-            {(ev.expectedAttendance || ev.guestCount.invited) && <div><strong>Expected guests:</strong> {ev.expectedAttendance || ev.guestCount.invited}</div>}
-            {ev.volunteersNeeded !== '' && ev.volunteersNeeded != null && <div><strong>Volunteers needed:</strong> {ev.volunteersNeeded}</div>}
-            {!ev.eventLead && !ev.location && !ev.pricing && !ev.guestCount.invited && !ev.expectedAttendance && (ev.volunteersNeeded === '' || ev.volunteersNeeded == null) && (
-              <div style={{ color: 'var(--muted)' }}>Nothing set yet -- fill these in under Event Basics.</div>
-            )}
-          </div>
+          {(() => {
+            // Everything here comes from Event Basics.
+            const w = ev.website || {};
+            const when = w.date_tbd ? 'To be announced' : [ev.date ? fmtDate(ev.date) : '', ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : ''].filter(Boolean).join('  ·  ');
+            const where = [w.location_name || ev.location, (w.spaces || []).length ? (w.spaces || []).join(', ') : ''].filter(Boolean).join(' — ');
+            const tiers = (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim());
+            const tickets = rsvpOnly ? 'RSVP only (no ticket sales)' : (w.sells_tickets && tiers.length ? tiers.map(t => t.name + ' ' + (Number(t.price) > 0 ? '$' + t.price : 'free')).join(', ') : '');
+            const volNeed = ev.vendors.filter(v => ['volunteer', 'activity'].includes(v.kind)).reduce((n, v) => n + (Number(v.target) || 0), 0) || (ev.volunteersNeeded === '' || ev.volunteersNeeded == null ? 0 : Number(ev.volunteersNeeded));
+            const rows = [
+              ['Date and time', when, true],
+              ['Event type', ev.purpose],
+              ['Location', where],
+              ['Event lead', ev.eventLead, true],
+              ['Expected guests', ev.expectedAttendance || (ev.guestCount.invited ? String(ev.guestCount.invited) : '')],
+              ['Tickets', tickets],
+              ['Pricing', ev.pricing],
+              ['Volunteers needed', volNeed ? String(volNeed) : ''],
+              ['Website', ev.siteEventId ? 'Live on the website' : 'Not on the website yet'],
+            ];
+            return (
+              <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {rows.filter(r => r[1] || r[2]).map(r => (
+                  <div key={r[0]}><strong>{r[0]}:</strong> {r[1] ? r[1] : <span style={{ color: '#b8863b', fontStyle: 'italic' }}>not filled in yet</span>}</div>
+                ))}
+              </div>
+            );
+          })()}
           {upcomingDeadlines.length > 0 && (
             <>
               <div style={{ fontSize: 13, fontWeight: 700, marginTop: 14, marginBottom: 6, paddingTop: 12, borderTop: '0.5px solid var(--border-light)' }}>Upcoming deadlines</div>
@@ -695,6 +720,9 @@ function VendorsView({ ev }) {
 
 // Volunteers, Staffing & Vendors as one list: write down what we need ("Magician", "4 setup volunteers"), then later fill in
 // who we found and how to reach them, and say whether it is a vendor, a contact or a volunteer role.
+// A vendor's cost is a flat fee, or their share of ticket sales (50/50, 60/40...).
+const SPLIT_PRESETS = [['50', '50 / 50  (vendor 50%, North Star 50%)'], ['60', '60 / 40  (vendor 60%, North Star 40%)'], ['70', '70 / 30  (vendor 70%, North Star 30%)'], ['40', '40 / 60  (vendor 40%, North Star 60%)'], ['30', '30 / 70  (vendor 30%, North Star 70%)']];
+const costLabel = (v) => (v.costType === 'flat' && Number(v.cost) > 0 ? '$' + Number(v.cost).toLocaleString() + ' flat' : v.costType === 'split' && Number(v.splitPct) > 0 ? Number(v.splitPct) + '% of ticket sales' : '');
 const NEED_KINDS = { vendor: 'Vendor', contact: 'Contact', volunteer: 'Volunteer', activity: 'Activity', sponsor: 'Sponsor' };
 const volFullName = (v) => `${v['First Name'] || ''} ${v['Last Name'] || ''}`.trim() || 'Unnamed';
 
@@ -737,6 +765,7 @@ function NeedsList({ ev, onUpdate, volunteers }) {
         const who = v.who || (v.role ? v.name : '');
         const title = v.who || !v.role ? v.name : v.role + ': ' + v.name;
         const found = !!v.confirmed || !!who || assigned.length > 0;
+        const costText = costLabel(v);
         let sub;
         if (kind === 'volunteer' || kind === 'activity') sub = assigned.length + (target ? ' of ' + target : '') + ' assigned' + (assigned.length ? ': ' + assigned.map(volFullName).join(', ') : '');
         else if (who || v.contact) sub = [v.who ? v.who : (v.role ? v.name : ''), v.contact].filter(Boolean).join('  ·  ');
@@ -748,7 +777,7 @@ function NeedsList({ ev, onUpdate, volunteers }) {
                 style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: v.confirmed ? 'none' : '1.5px solid var(--border)', background: v.confirmed ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: 11, lineHeight: '18px' }}>{v.confirmed ? '✓' : ''}</button>
               <button type="button" onClick={() => setOpenId(isOpen ? null : v.id)} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</div>
-                <div style={{ fontSize: 12, marginTop: 2, color: found || sub ? 'var(--muted)' : '#b8863b', fontStyle: found || sub ? 'normal' : 'italic' }}>{sub || 'Still needed'}</div>
+                <div style={{ fontSize: 12, marginTop: 2, color: found || sub ? 'var(--muted)' : '#b8863b', fontStyle: found || sub ? 'normal' : 'italic' }}>{(sub || 'Still needed') + (costText ? '  ·  ' + costText : '')}</div>
               </button>
               {kind && <span className="badge" style={{ background: 'var(--light)', color: 'var(--text)', flexShrink: 0 }}>{NEED_KINDS[kind]}</span>}
               <span style={{ color: 'var(--muted)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>&rsaquo;</span>
@@ -806,6 +835,38 @@ function NeedsList({ ev, onUpdate, volunteers }) {
                     </div>
                   </div>
                 )}
+                {kind !== 'volunteer' && (
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <div style={{ flex: '1 1 200px' }}>
+                      <div style={cap}>Cost</div>
+                      <select className="input" value={v.costType || ''} onChange={e => patch(v.id, { costType: e.target.value })} style={{ ...inp, appearance: 'auto' }}>
+                        <option value="">No cost</option>
+                        <option value="flat">Flat fee</option>
+                        <option value="split">Share of ticket sales</option>
+                      </select>
+                    </div>
+                    {v.costType === 'flat' && (
+                      <div style={{ flex: '1 1 140px' }}>
+                        <div style={cap}>Amount ($)</div>
+                        <input className="input" type="number" min="0" step="any" defaultValue={v.cost || ''} style={inp} onBlur={e => patch(v.id, { cost: Number(e.target.value) || 0 })} />
+                      </div>
+                    )}
+                    {v.costType === 'split' && (
+                      <div style={{ flex: '2 1 280px' }}>
+                        <div style={cap}>How the ticket sales split</div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <select className="input" value={v.splitCustom ? 'custom' : String(v.splitPct || '')} onChange={e => { const val = e.target.value; if (val === 'custom') patch(v.id, { splitCustom: true }); else patch(v.id, { splitCustom: false, splitPct: Number(val) || 0 }); }} style={{ ...inp, appearance: 'auto', flex: 1 }}>
+                            <option value="">Choose a split…</option>
+                            {SPLIT_PRESETS.map(sp => <option key={sp[0]} value={sp[0]}>{sp[1]}</option>)}
+                            <option value="custom">Custom…</option>
+                          </select>
+                          {v.splitCustom && <input className="input" type="number" min="0" max="100" step="any" placeholder="Vendor %" defaultValue={v.splitPct || ''} style={{ ...inp, width: 100 }} onBlur={e => patch(v.id, { splitPct: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {kind !== 'volunteer' && v.costType && <div style={{ fontSize: 11, color: 'var(--muted)', margin: '-6px 0 12px' }}>This is added to the event's expenses automatically{v.costType === 'split' ? ' and follows the ticket sales' : ''}.</div>}
                 <div style={{ marginBottom: 12 }}>
                   <div style={cap}>Notes (staff only)</div>
                   <textarea className="input" rows={2} defaultValue={v.notes || ''} style={{ ...inp, resize: 'vertical' }} onBlur={e => { const t = e.target.value.trim(); if (t !== (v.notes || '')) patch(v.id, { notes: t }); }} />
@@ -1212,8 +1273,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
       const fin = await fetchEventFinancials(ev.name).catch(() => null);
       const already = !!(fin && fin.expenses.some(r => /alcohol license|abc license/i.test(r.description || '')));
       if (!already) {
-        const who = ((volunteer && volunteer['First Name']) || '') + ' ' + ((volunteer && volunteer['Last Name']) || '');
-        const base = { event_name: ev.name, area: 'Events', type: 'Purchase', status: 'Submitted', date: new Date().toISOString().slice(0, 10), purchased_by: who.trim() || null, volunteer_name: who.trim() || null, volunteer_id: (volunteer && volunteer.id) || null, volunteer_auth_user_id: (session && session.user && session.user.id) || null };
+        const base = { event_name: ev.name, area: 'Events', type: 'Purchase', status: 'Submitted', date: new Date().toISOString().slice(0, 10), volunteer_id: (volunteer && volunteer.id) || null, volunteer_auth_user_id: (session && session.user && session.user.id) || null };
         const r1 = await insertReimbursement({ ...base, description: 'ABC alcohol license fee (money order)', amount: 50 });
         const r2 = await insertReimbursement({ ...base, description: 'Sheriff signature for alcohol license', amount: 30 });
         if (r1.error || r2.error) throw new Error(r1.error || r2.error);
@@ -1755,6 +1815,7 @@ function FinancialsTab({ ev }) {
           </ItemRow>
         ))}
       </div>
+
     </div>
   );
 }

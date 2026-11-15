@@ -1142,6 +1142,50 @@ export async function pushCommitteeEventToWebsite(ev) {
 
 // Also removes the event's card from Event Overviews: the Events Committee grid is built from those cards, so a card
 // left behind brings the event straight back (opening it re-creates the committee event).
+// Vendor costs log themselves as expenses. Each vendor with a cost gets one Op Budget row tagged 'auto-vendor:<vendor id>' in
+// notes: created when a cost is set, updated when it changes (a share of ticket sales follows the sales so far), and
+// removed when the cost or the vendor is removed. Runs one at a time per event so two screens cannot make duplicates.
+const vendorSyncChain = {};
+export function syncVendorExpenses(eventName, vendors, ticketRevenue, authUserId) {
+  const run = (vendorSyncChain[eventName] || Promise.resolve()).catch(() => {}).then(() => doVendorSync(eventName, vendors, ticketRevenue, authUserId));
+  vendorSyncChain[eventName] = run;
+  return run;
+}
+async function doVendorSync(eventName, vendors, revenue, authUserId) {
+  const enc = encodeURIComponent(eventName);
+  const found = await get(`Op%20Budget?event_name=eq.${enc}&area=eq.Events&notes=like.${encodeURIComponent('auto-vendor:*')}&select=id,amount,notes,description`);
+  if (!Array.isArray(found)) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  const wanted = {};
+  (vendors || []).forEach(v => {
+    let amount = 0; let how = '';
+    if (v.costType === 'flat' && Number(v.cost) > 0) { amount = Number(v.cost); how = 'flat fee'; }
+    else if (v.costType === 'split' && Number(v.splitPct) > 0) { amount = Math.round((Number(revenue) || 0) * Number(v.splitPct)) / 100; how = Number(v.splitPct) + '% of ticket sales'; }
+    else return;
+    wanted[v.id] = { amount, description: (v.name || 'Vendor') + (v.who ? ' (' + v.who + ')' : '') + ' — ' + how };
+  });
+  let changed = false;
+  for (const id of Object.keys(wanted)) {
+    const w = wanted[id];
+    const row = found.find(r => r.notes === 'auto-vendor:' + id);
+    if (!row) {
+      const res = await post('Op%20Budget', { event_name: eventName, area: 'Events', type: 'Purchase', status: 'Submitted', date: today, description: w.description, amount: w.amount, notes: 'auto-vendor:' + id, volunteer_auth_user_id: authUserId || null });
+      if (!(res && res.code)) changed = true;
+    } else if (Number(row.amount) !== w.amount || row.description !== w.description) {
+      await patch(`Op%20Budget?id=eq.${row.id}`, { amount: w.amount, description: w.description });
+      changed = true;
+    }
+  }
+  for (const row of found) {
+    const id = String(row.notes || '').slice('auto-vendor:'.length);
+    if (wanted[id]) continue;
+    const ok = await del(`Op%20Budget?id=eq.${row.id}`);
+    if (!ok) await patch(`Op%20Budget?id=eq.${row.id}`, { amount: 0 });
+    changed = true;
+  }
+  return changed;
+}
+
 export async function deleteCommitteeEvent(id, name) {
   const ok = await del(`events_committee?id=eq.${id}`);
   if (ok && name) await del(`event_overview_cards?event_name=eq.${encodeURIComponent(name)}`);
