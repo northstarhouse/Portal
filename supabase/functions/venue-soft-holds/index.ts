@@ -242,6 +242,10 @@ Deno.serve(async (req) => {
         for (const d of icsDays(e)) if (d >= today) held.add(d);
       }
       for (const [, w] of want) if (w && w.date >= today) held.add(w.date);
+      // The website's booking-availability function merges these dates in directly, so the site is right even when the
+      // availability calendar can't be written to (Workspace sharing limits outside accounts to view-only).
+      avail.held = held.size;
+      if (!dry) await rest(`site_content?on_conflict=page_key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ page_key: "bookingHeldDates", content: { dates: [...held].sort(), syncedAt: stamp() } }) });
       const existing: any[] = [];
       let pageToken = "";
       do {
