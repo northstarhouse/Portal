@@ -1021,9 +1021,7 @@ function TimelineAssign({ t, volunteers, onUpdate }) {
 }
 function TimelineRow({ t, volunteers, onUpdate, isOpen, onToggle }) {
   const patch = (pt) => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => (x.id === t.id ? { ...x, ...pt } : x)) }));
-  const who = whoOn(t, volunteers);
   const target = Number(t.target) || 0;
-  const sub = (target ? who.length + ' of ' + target + ' assigned' : who.length ? who.length + ' assigned' : 'No one assigned yet') + (who.length ? ': ' + whoText(who) : '');
   const cap = { fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 };
   const inp = { width: '100%', boxSizing: 'border-box', fontSize: 13 };
   return (
@@ -1032,8 +1030,8 @@ function TimelineRow({ t, volunteers, onUpdate, isOpen, onToggle }) {
         <CheckCircle checked={!!t.done} onChange={() => patch({ done: !t.done })} />
         <button type="button" onClick={onToggle} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{fmtTime12(t.time)}  ·  {t.activity}</div>
-          <div style={{ fontSize: 12, marginTop: 2, color: who.length ? 'var(--muted)' : '#b8863b', fontStyle: who.length ? 'normal' : 'italic' }}>{sub}</div>
         </button>
+        <AssignVolunteers v={t} volunteers={volunteers} compact target={target} onPatch={patch} />
         <span style={{ color: 'var(--muted)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>&rsaquo;</span>
       </div>
       {isOpen && (
@@ -1051,10 +1049,6 @@ function TimelineRow({ t, volunteers, onUpdate, isOpen, onToggle }) {
               <div style={cap}>How many needed</div>
               <input className="input" type="number" min="0" defaultValue={t.target || ''} style={inp} onBlur={e => { const n = Number(e.target.value) || 0; if (n !== (Number(t.target) || 0)) patch({ target: n }); }} />
             </div>
-          </div>
-          <div style={{ marginBottom: 12 }}>
-            <div style={cap}>Assign volunteers</div>
-            <AssignVolunteers v={t} volunteers={volunteers} target={target} onPatch={patch} />
           </div>
           <button className="btn-ghost" style={{ fontSize: 12, color: '#a04545' }} onClick={() => { if (window.confirm('Remove "' + t.activity + '" from the timeline?')) onUpdate(e => ({ ...e, timeline: e.timeline.filter(x => x.id !== t.id) })); }}>Remove from the timeline</button>
         </div>
