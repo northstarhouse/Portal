@@ -19819,7 +19819,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   var [sendFormOpen, setSendFormOpen] = useState(false);
   var [movementOpen, setMovementOpen] = useState(false);
   var colorCoding = venueTab === 'clients' ? true : inquiriesColorCoding;
-  const [clientFilter, setClientFilter] = useS('all');
+  const [clientFilter, setClientFilter] = useS('attention'); // the Clients view opens on Needs attention
   const [clientQuery, setClientQuery] = useS('');
 
   // Detail popup for a row in the new Upcoming Tours card -- shows the
@@ -20438,8 +20438,8 @@ function VenueRentalsView({ navigate, initialTab }) {
           <div style={{ flexBasis: '100%', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               <select aria-label="Filter clients" value={clientFilter} onChange={function(e) { setClientFilter(e.target.value); }}
                 style={{ height: 38, boxSizing: 'border-box', border: '1px solid #ded7cb', background: '#fff', borderRadius: 8, padding: '0 10px', fontSize: 13, color: '#333', cursor: 'pointer' }}>
-                <option value="all">All upcoming</option>
                 <option value="attention">Needs attention</option>
+                <option value="all">All upcoming</option>
                 <option value="viewall">View all events</option>
                 <option value="recent">Most recent</option>
                 <option value="past">Past events</option>
