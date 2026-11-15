@@ -6,7 +6,12 @@ const MAX_SIDE = 2400;
 export function mediaClient(supabaseUrl, supabaseKey, authToken) {
   const headers = { apikey: supabaseKey, Authorization: 'Bearer ' + (authToken || supabaseKey) };
   async function call(init) {
-    const r = await fetch(supabaseUrl + '/functions/v1/site-media', { method: 'POST', ...init });
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 90000);
+    let r;
+    try { r = await fetch(supabaseUrl + '/functions/v1/site-media', { method: 'POST', signal: ctl.signal, ...init }); }
+    catch (e) { throw new Error(e && e.name === 'AbortError' ? 'The photo service did not answer in time. Try again, or use a smaller photo.' : 'Could not reach the photo service. Check your connection.'); }
+    finally { clearTimeout(timer); }
     const out = await r.json().catch(() => ({}));
     if (!r.ok || out.error) throw new Error(out.error || 'Request failed (' + r.status + ')');
     return out;

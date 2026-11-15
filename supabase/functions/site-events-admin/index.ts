@@ -103,16 +103,17 @@ async function refreshSite() {
 
 
 // Volunteer Hub staff (signed in with their Hub account, Team includes "staff") may also call this, not just a Portal session.
-async function hubStaff(req: Request): Promise<boolean> {
-  const bearer = (req.headers.get('authorization') || '').replace(/^Bearers+/i, '')
-  if (!bearer || bearer === KEY) return false
+async function hubStaff(req: Request): Promise<string | true> {
+  const bearer = (req.headers.get('authorization') || '').replace(/^Bearer /i, '')
+  if (!bearer || bearer === KEY) return 'no sign-in reached the server (hard-refresh the page and sign in again)'
   const u = await fetch(`${URL_}/auth/v1/user`, { headers: { apikey: KEY, Authorization: `Bearer ${bearer}` } })
-  if (!u.ok) return false
+  if (!u.ok) return `the Volunteer Hub sign-in was not accepted (${u.status}); sign out and back in`
   const email = String((await u.json().catch(() => ({}))).email || '').trim()
-  if (!email) return false
+  if (!email) return 'the sign-in has no email'
   const r = await fetch(`${URL_}/rest/v1/${encodeURIComponent('2026 Volunteers')}?Email=ilike.${encodeURIComponent(email)}&select=Team&limit=5`, { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } })
   const rows = await r.json().catch(() => [])
-  return Array.isArray(rows) && rows.some((v) => String(v.Team || '').split(/[|,]/).some((t) => t.trim().toLowerCase() === 'staff'))
+  if (!Array.isArray(rows)) return 'could not look up the volunteer record'
+  return rows.some((v) => String(v.Team || '').split(/[|,]/).some((t) => t.trim().toLowerCase() === 'staff')) ? true : `${email} is not marked Staff in the volunteer list`
 }
 
 Deno.serve(async (req) => {
@@ -121,7 +122,7 @@ Deno.serve(async (req) => {
   try {
     const token = req.headers.get('x-app-token') || ''
     const ok = token ? await rest('rpc/has_valid_app_session', { method: 'POST', headers: { 'x-app-token': token }, body: '{}' }) : false
-    if (ok !== true && !(await hubStaff(req))) return json({ error: token ? 'Staff session expired. Sign in again.' : 'Staff sign-in required.' }, 403)
+    if (ok !== true) { const why = await hubStaff(req); if (why !== true) return json({ error: (token ? 'Staff session expired. Sign in again.' : 'Staff sign-in required') + ' (' + why + ')' }, 403) }
 
     const body = await req.json()
     const action = String(body.action || '')
