@@ -1426,7 +1426,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     if (!target) return;
     const drop = e => (e.notes || []).filter(n => n.id !== note.id);
     if (target === 'task') {
-      onUpdate(e => ({ ...e, notes: drop(e), checklist: [...e.checklist, { id: cryptoId(), text: note.text, category: note.category || '', done: false, due: '', assignee: '', assigneeId: null, priority: '', estimated: 0, actual: 0, notes: '', subtasks: [] }] }));
+      onUpdate(e => ({ ...e, notes: drop(e), checklist: [...e.checklist, { id: cryptoId(), text: note.text, category: note.category || '', done: false, due: '', assignee: mkWho(note.category).assignee || '', assigneeId: mkWho(note.category).assigneeId || null, priority: '', estimated: 0, actual: 0, notes: '', subtasks: [] }] }));
       setAttachedMsg('Added to the checklist below. Set who and when on its line.');
     } else if (target === 'dayof') {
       let time = parseClock(note.text);
@@ -1445,9 +1445,17 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
   function allToDuties() {
     const list = ev.notes || [];
     if (!list.length) return;
-    onUpdate(e => ({ ...e, notes: [], checklist: [...e.checklist, ...list.map(n => ({ id: cryptoId(), text: n.text, category: n.category || '', done: false, due: '', assignee: '', assigneeId: null, priority: '', estimated: 0, actual: 0, notes: '', subtasks: [] }))] }));
+    onUpdate(e => ({ ...e, notes: [], checklist: [...e.checklist, ...list.map(n => ({ id: cryptoId(), text: n.text, category: n.category || '', done: false, due: '', assignee: mkWho(n.category).assignee || '', assigneeId: mkWho(n.category).assigneeId || null, priority: '', estimated: 0, actual: 0, notes: '', subtasks: [] }))] }));
     setAttachedMsg('All notes added to the checklist below.');
   }
+  // Marketing is Haley Wright's: marketing lines get her as the person unless someone else is named.
+  const haley = (volunteers || []).find(v => ((v['First Name'] || '') + ' ' + (v['Last Name'] || '')).trim().toLowerCase() === 'haley wright');
+  const mkWho = (cat) => (cat === 'Marketing' ? { assignee: 'Haley Wright', assigneeId: haley ? haley.id : null } : {});
+  useEffect(() => {
+    if (!volunteers || !volunteers.length) return;
+    if (!ev.checklist.some(t => t.category === 'Marketing' && !t.assignee)) return;
+    onUpdate(e => ({ ...e, checklist: e.checklist.map(t => (t.category === 'Marketing' && !t.assignee ? { ...t, ...mkWho('Marketing') } : t)) }));
+  }, [ev.id, ev.checklist.length, !!haley]);
   function patchNeed(id, patch) {
     onUpdate(e => ({ ...e, vendors: e.vendors.map(v => v.id === id ? { ...v, ...patch } : v) }));
   }
@@ -1640,7 +1648,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                     </span>
                   )}
                 </button>
-                <select className="input" value={t.category || ''} onChange={e => patchItem(t.id, { category: e.target.value })} title="Category" style={{ width: 118, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}>
+                <select className="input" value={t.category || ''} onChange={e => patchItem(t.id, { category: e.target.value, ...(e.target.value === 'Marketing' && !t.assignee ? mkWho('Marketing') : {}) })} title="Category" style={{ width: 118, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}>
                   <option value="">General</option>
                   {CHECKLIST_CATEGORIES.filter(c => c !== 'General').map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
