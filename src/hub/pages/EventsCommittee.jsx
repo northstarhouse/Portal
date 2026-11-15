@@ -1574,7 +1574,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
       ? '<span style="display:inline-block;width:18px;height:18px;line-height:18px;border-radius:50%;background:' + GOLD + ';color:#ffffff;font-size:11px;text-align:center;">&#10003;</span>'
       : '<span style="display:inline-block;width:15px;height:15px;border-radius:50%;border:1.5px solid #d8cfc0;"></span>');
     const row = (done, titleHtml, subHtml, accent, badge) =>
-      '<tr><td style="padding:0;border-bottom:1px solid #ede8df;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-left:4px solid ' + (accent || '#fdfbf7') + ';"><tr>'
+      '<tr><td bgcolor="#ffffff" style="padding:0;background:#ffffff;border-bottom:1px solid #ede8df;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border-left:4px solid ' + (accent || '#ffffff') + ';"><tr>'
       + '<td width="44" valign="top" style="padding:13px 0 13px 12px;">' + circle(done) + '</td>'
       + '<td valign="top" style="padding:11px 8px 11px 0;"><div style="font-size:15px;font-weight:bold;color:#2a2a2a;line-height:1.35;">' + titleHtml + '</div>'
       + (subHtml ? '<div style="font-size:12.5px;color:#888888;margin-top:2px;line-height:1.45;">' + subHtml + '</div>' : '') + '</td>'
@@ -1591,15 +1591,15 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
       if (it.mk) return row(true, esc(it.c), '', null);
       if (it.tl) {
         const t = it.t; const who = whoOn(t, volunteers); const tg = Number(t.target) || 0;
-        const sub = (tg ? who.length + ' of ' + tg + ' assigned' : who.length ? who.length + ' assigned' : 'No one assigned yet') + (who.length ? ': ' + esc(whoText(who)) : '');
+        const sub = (tg ? who.length + ' of ' + tg + ' assigned' : who.length ? who.length + ' assigned' : 'No one assigned yet') + (who.length ? ': ' + esc(who.map(w => w.name).join(', ')) : '');
         return row(!!t.done, esc(fmtTime12(t.time)) + ' &middot; ' + esc(t.activity), sub, null);
       }
       if (it.need) {
         const v = it.v; const kind = v.kind || ''; const who = whoOn(v, volunteers); const tg = Number(v.target) || 0;
         const title = v.who || !v.role ? v.name : v.role + ': ' + v.name;
         let sub;
-        if (kind === 'volunteer' || kind === 'activity') sub = who.length + (tg ? ' of ' + tg : '') + ' assigned' + (who.length ? ': ' + esc(whoText(who)) : '');
-        else sub = [v.who ? v.who : (v.role ? v.name : ''), v.contact].filter(Boolean).map(esc).join(' &nbsp;&middot;&nbsp; ');
+        if (kind === 'volunteer' || kind === 'activity') sub = who.length + (tg ? ' of ' + tg : '') + ' assigned' + (who.length ? ': ' + esc(who.map(w => w.name).join(', ')) : '');
+        else sub = [v.who ? v.who : (v.role ? v.name : '')].filter(Boolean).map(esc).join(' &nbsp;&middot;&nbsp; ');
         const found = !!(who.length || v.who || v.role || v.confirmed);
         const cost = costLabel(v);
         return row(needHandled(v), esc(title), (sub || (found ? '' : 'Still needed')) + (cost ? (sub ? ' &nbsp;&middot;&nbsp; ' : '') + esc(cost) : ''), null, kind ? NEED_KINDS[kind] : '');
@@ -1610,9 +1610,11 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     };
     const total = catGroups.reduce((n, g) => n + g.items.length, 0);
     const doneTotal = catGroups.reduce((n, g) => n + g.items.filter(isDone).length, 0);
+    const ICON_BASE = 'https://northstarhouse.github.io/Portal/assets/icons/cat-';
+    const ICON_KEY = { General: 'general', Logistics: 'logistics', Hospitality: 'hospitality', Sponsorship: 'sponsorship', Interiors: 'interiors', Marketing: 'marketing', Money: 'money', 'Volunteers & vendors': 'volunteers', [DAYOF_CAT]: 'dayof' };
     const groupsHtml = catGroups.map(g => {
       const d = g.items.filter(isDone).length;
-      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px;"><tr><td style="padding:26px 0 4px;border-bottom:1.5px solid #e8dfd0;"><span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + esc(g.cat) + '</span>'
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px;"><tr><td style="padding:26px 0 6px;border-bottom:1.5px solid #e8dfd0;">' + (ICON_KEY[g.cat] ? '<img src="' + ICON_BASE + ICON_KEY[g.cat] + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + esc(g.cat) + '</span>'
         + (g.cat !== 'Marketing' ? '<span style="font-size:12px;color:#888888;margin-left:10px;">' + (d === g.items.length ? 'all figured out &#10003;' : d + ' of ' + g.items.length + ' done') + '</span>' : '') + '</td></tr>'
         + g.items.map(itemRow).join('') + '</table>';
     }).join('');
