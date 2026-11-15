@@ -819,7 +819,8 @@ function AssignVolunteers({ v, volunteers, onPatch, compact, target }) {
           {assigned.map(x => (
             <div key={x.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: fs }}>
               <span style={{ minWidth: compact ? 0 : 160 }}>{name(x)}</span>
-              {phoneBox((v.phones || {})[x.id] ?? x['Phone Number'], t => onPatch({ phones: { ...(v.phones || {}), [x.id]: t } }))}
+              {/* a volunteer picked from the list keeps the phone number on their record, so it is shown, not editable */}
+              <span style={{ width: compact ? 110 : 140, fontSize: fs, color: 'var(--muted)' }}>{(v.phones || {})[x.id] || x['Phone Number'] || 'No phone on file'}</span>
               {removeBtn(() => onPatch({ assignedIds: (v.assignedIds || []).filter(id => id !== x.id) }))}
             </div>
           ))}
