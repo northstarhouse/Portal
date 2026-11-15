@@ -3,11 +3,11 @@ import { useState, useEffect, useRef } from 'react';
 import { MediaPicker } from '../../media-library.jsx';
 import { useVol } from '../App.jsx';
 import {
-  insertReimbursement, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
+  insertReimbursement, fetchAreaData, saveArea, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
-import AreasTab, { PLANNING_PROMPTS, NSH_SPACES } from './eventsCommitteeAreas.jsx';
+import AreasTab, { PLANNING_PROMPTS, NSH_SPACES, MARKETING_CHANNELS } from './eventsCommitteeAreas.jsx';
 import EventOverviews from './EventOverviews.jsx';
 import RsvpPanel from './RsvpPanel.jsx';
 import EventPlan from './EventPlan.jsx';
@@ -340,6 +340,7 @@ const PLANNING_SECTIONS = [
 
 // The checklist is the one place everything lives, tagged by category so each area can be checked off as figured out.
 const CHECKLIST_CATEGORIES = ['General', 'Logistics', 'Hospitality', 'Sponsorship', 'Interiors', 'Marketing', 'Money', 'Volunteers & vendors'];
+const DAYOF_CAT = 'Day-of timeline';
 const checkCat = (c) => (CHECKLIST_CATEGORIES.includes(c) ? c : 'General');
 // Things we still need (a bartender, a sponsor...) are handled once someone is named, it is confirmed, or enough volunteers are assigned.
 const needHandled = (v) => !!v.confirmed || !!v.who || !!v.role
@@ -580,7 +581,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               {isOpen && (
                 <div style={{ padding: '4px 16px 18px' }}>
                   {s.key === 'preplanning' && <PreplanningTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} onRsvpChange={setRsvpOnly} />}
-                  {s.key === 'checklist' && <ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}
+                  {s.key === 'checklist' && <ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} showMarketing={!marketingNA} />}
                   {s.key === 'budget' && <FinancialsTab ev={ev} />}
                   {s.key === 'dayof' && <SheetToggle view={<DayOfView ev={ev} onUpdate={onUpdate} />}><DayOfTab ev={ev} onUpdate={onUpdate} /></SheetToggle>}
                   {s.key === 'after' && (
@@ -825,18 +826,11 @@ function NeedRow({ v, volunteers, patch, remove, isOpen, onToggle }) {
           <div key={v.id} style={{ borderBottom: '0.5px solid var(--border-light)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0' }}>
               <button type="button" onClick={() => patch(v.id, handled ? { confirmed: false, who: '' } : { confirmed: true })} title={handled ? 'Figured out. Click to mark as still needed.' : 'Click when it is figured out'}
-                style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: handled ? 'none' : '1.5px dashed var(--border)', background: handled ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: 11, lineHeight: '18px' }}>{handled ? '✓' : ''}</button>
+                style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: handled ? 'none' : '1.5px solid var(--border)', background: handled ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: 11, lineHeight: '18px' }}>{handled ? '✓' : ''}</button>
               <button type="button" onClick={onToggle} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</div>
                 <div style={{ fontSize: 12, marginTop: 2, color: found || sub ? 'var(--muted)' : '#b8863b', fontStyle: found || sub ? 'normal' : 'italic' }}>{(sub || 'Still needed') + (costText ? '  ·  ' + costText : '')}</div>
               </button>
-              {(kind === 'volunteer' || kind === 'activity') && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--muted)', flexShrink: 0 }} title="How many people are needed">
-                  # needed
-                  <input className="input" type="number" min="0" defaultValue={v.target || ''} key={v.id + 'tg' + (v.target || '')} placeholder="1" style={{ width: 56, fontSize: 12, padding: '4px 6px' }}
-                    onBlur={e => { const n = Number(e.target.value) || 0; if (n !== (Number(v.target) || 0)) patch(v.id, { target: n }); }} />
-                </label>
-              )}
               {kind && <span className="badge" style={{ background: 'var(--light)', color: 'var(--text)', flexShrink: 0 }}>{NEED_KINDS[kind]}</span>}
               <span style={{ color: 'var(--muted)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>&rsaquo;</span>
             </div>
@@ -1339,7 +1333,25 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
 
 // The event's task checklist: add items with a priority, due date and assignee; click one to edit it, add subtasks,
 // or attach estimated/actual $ and notes.
-function ChecklistTab({ ev, onUpdate, volunteers }) {
+function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
+  // The Marketing channel boxes live with the Marketing section; they are shown (and can be ticked) here too.
+  const [mkData, setMkData] = useState(null);
+  useEffect(() => {
+    let live = true;
+    fetchAreaData(ev.id).then(rows => { if (live) setMkData((((rows || []).find(r => r.area_key === 'marketing') || {}).pre_data || {}).channels || {}); }).catch(() => { if (live) setMkData({}); });
+    return () => { live = false; };
+  }, [ev.id]);
+  async function toggleChannel(c) {
+    const cur = (mkData || {})[c] || { done: false, date: '' };
+    const mine = { ...cur, done: !cur.done };
+    setMkData(m => ({ ...(m || {}), [c]: mine }));
+    try {
+      const rows = await fetchAreaData(ev.id);
+      const r = (rows || []).find(x => x.area_key === 'marketing') || {};
+      const pre = { ...(r.pre_data || {}), channels: { ...((r.pre_data || {}).channels || {}), [c]: mine } };
+      await saveArea(ev.id, 'marketing', { ownerName: r.owner_name || 'Haley Wright', preData: pre, postData: r.post_data || {}, authUserId: session && session.user && session.user.id });
+    } catch (e) { setMkData(m => ({ ...(m || {}), [c]: cur })); }
+  }
   const [itemForm, setItemForm] = useState({ text: '', due: '', assignee: '', assigneeId: null, priority: '' });
   const [expandedId, setExpandedId] = useState(null);
   const [expandForm, setExpandForm] = useState({ text: '', due: '', assignee: '', assigneeId: null, priority: '', estimated: '', actual: '', notes: '' });
@@ -1439,9 +1451,11 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   const allItems = [
     ...ev.checklist.map(t => ({ need: false, t, cat: checkCat(t.category) })),
     ...ev.vendors.map(v => ({ need: true, v, cat: needCategory(v) })),
+    ...ev.timeline.map(t => ({ tl: true, t, cat: DAYOF_CAT })),
+    ...(showMarketing && mkData ? MARKETING_CHANNELS.map(c => ({ mk: true, c, cat: 'Marketing' })) : []),
   ];
-  const isDone = (i) => (i.need ? needHandled(i.v) : !!i.t.done);
-  const catGroups = CHECKLIST_CATEGORIES.map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort((x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
+  const isDone = (i) => (i.mk ? !!(mkData[i.c] || {}).done : i.need ? needHandled(i.v) : !!i.t.done);
+  const catGroups = [...CHECKLIST_CATEGORIES, DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
   const shownGroups = catGroups.filter(g => catFilter === 'All' || catFilter === g.cat);
   function patchItem(id, patch) {
     onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, ...patch } : t) }));
@@ -1573,6 +1587,25 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
             <span style={{ fontWeight: 500, color: g.items.every(isDone) ? '#2e7d32' : 'var(--muted)', textTransform: 'none', letterSpacing: 0 }}>{g.items.every(isDone) ? 'all figured out ✓' : g.items.filter(isDone).length + ' of ' + g.items.length + ' done'}</span>
           </div>
         {g.items.map(it => {
+          if (it.mk) {
+            const done = !!(mkData[it.c] || {}).done;
+            return (
+              <ItemRow key={'mk-' + it.c} done={done}>
+                <input type="checkbox" checked={done} onChange={() => toggleChannel(it.c)} style={{ accentColor: 'var(--gold)', width: 15, height: 15 }} />
+                <span style={{ flex: 1, fontSize: 13, textDecoration: done ? 'line-through' : 'none', color: 'var(--text)' }}>{it.c}</span>
+              </ItemRow>
+            );
+          }
+          if (it.tl) {
+            const t = it.t;
+            return (
+              <ItemRow key={'tl-' + t.id} done={t.done} onDelete={() => onUpdate(e => ({ ...e, timeline: e.timeline.filter(x => x.id !== t.id) }))}>
+                <input type="checkbox" checked={!!t.done} onChange={() => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, done: !x.done } : x) }))} style={{ accentColor: 'var(--gold)', width: 15, height: 15 }} />
+                <span style={{ fontSize: 12, color: 'var(--muted)', width: 70, flexShrink: 0 }}>{fmtTime12(t.time)}</span>
+                <span style={{ flex: 1, fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: 'var(--text)' }}>{t.activity}</span>
+              </ItemRow>
+            );
+          }
           if (it.need) {
             return <NeedRow key={'need-' + it.v.id} v={it.v} volunteers={volunteers} patch={patchNeed} remove={removeNeed} isOpen={needOpenId === it.v.id} onToggle={() => setNeedOpenId(needOpenId === it.v.id ? null : it.v.id)} />;
           }

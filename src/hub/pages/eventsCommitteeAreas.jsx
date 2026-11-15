@@ -32,8 +32,8 @@ export const PLANNING_PROMPTS = [
 // The spaces at North Star House (from the site manager walk-through) for "Spaces used".
 export const NSH_SPACES = ['Living Room', 'Dining Room', 'Library', 'Julia Morgan Room', 'Mudroom & Study', 'Kitchen', 'Restrooms & Foyer', 'Terrace & West Lawn', 'Courtyard & East Lawn', 'Garden', 'Parking Lot'];
 
-const MARKETING_CHANNELS = [
-  'Create Press Release', 'Send Email Blast', 'YubaNet (Press Release Only)', 'Go Nevada County Calendar - Community Blast',
+export const MARKETING_CHANNELS = [
+  'Make Flyer', 'Create Press Release', 'Send Email Blast', 'YubaNet (Press Release Only)', 'Go Nevada County Calendar - Community Blast',
   'Arts Council Calendar', 'Grass Valley Chamber Newsletter', 'KVMR Calendar', 'Facebook Event Page', 'NSH Facebook Page',
   'NSH Instagram Page', 'Nevada County Peeps', 'Grass Valley Peeps', 'Lake Wildwood Page', 'Next Door', 'Union Event Calendar', 'Union Advertisement ($270)',
 ];
@@ -157,9 +157,7 @@ const SCHEMAS = {
       { key: 'channels', label: 'Channels', type: 'channelChecklist' },
       { key: 'notes', label: 'Notes', type: 'textarea' },
     ],
-    post: [
-      { key: 'photosTaken', label: 'Photos Taken?', type: 'checkbox' },
-    ],
+    post: [],
   },
 };
 
@@ -571,7 +569,7 @@ export default function AreasTab({ event, session, volunteer, initialArea, editi
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 22, borderBottom: '1px solid var(--border-light)' }}>
           <button onClick={() => setPhase('pre')} style={tab(phase === 'pre')}>Pre-Event</button>
-          <button onClick={() => setPhase('post')} style={tab(phase === 'post')}>Post-Event</button>
+          {schema.post && schema.post.length > 0 && <button onClick={() => setPhase('post')} style={tab(phase === 'post')}>Post-Event</button>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {editing && <span style={{ fontSize: 12, color: saved && !saving ? '#2e7d32' : 'var(--muted)' }}>{saving ? 'Saving…' : saved ? 'All changes saved ✓' : 'Changes save automatically'}</span>}
