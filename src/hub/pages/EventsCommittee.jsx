@@ -339,6 +339,15 @@ const PLANNING_SECTIONS = [
   { key: 'after', title: 'After the Event', desc: 'What went well, final numbers, follow-ups, reviews and feedback' },
 ];
 
+// The checklist is the one place everything lives, tagged by category so each area can be checked off as figured out.
+const CHECKLIST_CATEGORIES = ['Logistics', 'Hospitality', 'Sponsorship', 'Interiors', 'Marketing', 'Money', 'Volunteers & vendors', 'General'];
+const checkCat = (c) => (CHECKLIST_CATEGORIES.includes(c) ? c : 'General');
+// Things we still need (a bartender, a sponsor...) are handled once someone is named, it is confirmed, or enough volunteers are assigned.
+const needHandled = (v) => !!v.confirmed || !!v.who || !!v.role
+  || (['volunteer', 'activity'].includes(v.kind) && (v.assignedIds || []).length >= Math.max(1, Number(v.target) || 1));
+const needCategory = (v) => (v.kind === 'sponsor' ? 'Sponsorship' : 'Volunteers & vendors');
+const NEED_TAG = { vendor: 'Vendor', contact: 'Contact', volunteer: 'Volunteer', activity: 'Activity', sponsor: 'Sponsor' };
+
 function StatBox({ label, value, sub, color }) {
   return (
     <div style={{ border: '0.5px solid var(--border)', borderRadius: 10, padding: 14 }}>
@@ -372,8 +381,10 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
     fetchEventCardImage(ev.name).then(setFlyerUrl).catch(() => setFlyerUrl(null));
   }, [ev.name]);
 
-  const doneT = ev.checklist.filter(t => t.done).length;
-  const total = ev.checklist.length;
+  const openNeeds = ev.vendors.filter(v => !needHandled(v));
+  const doneT = ev.checklist.filter(t => t.done).length + (ev.vendors.length - openNeeds.length);
+  const total = ev.checklist.length + ev.vendors.length;
+  const cardRows = [...ev.checklist.filter(t => !t.done).map(t => ({ need: false, t })), ...openNeeds.map(v => ({ need: true, v })), ...ev.checklist.filter(t => t.done).map(t => ({ need: false, t }))].slice(0, 6);
   const pct = total ? Math.round((doneT / total) * 100) : 0;
 
   // Ticket Sales and Other Earnings are two separate, non-overlapping
@@ -465,9 +476,14 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif" }}>Planning checklist</div>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           </div>
-          {ev.checklist.length === 0 ? (
+          {ev.checklist.length + ev.vendors.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>No checklist items yet -- add some in Checklist.</div>
-          ) : ev.checklist.slice(0, 6).map(t => (
+          ) : cardRows.map(row => row.need ? (
+            <div key={row.v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
+              <span style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed var(--border)' }} />
+              <span style={{ fontSize: 13 }}>Find: {row.v.name}{row.v.kind ? <span style={{ fontSize: 11, color: 'var(--muted)' }}> · {NEED_TAG[row.v.kind]}</span> : null}</span>
+            </div>
+          ) : ((t) => (
             <div key={t.id} onClick={() => toggleChecklistItem(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer' }}>
               <span style={{
                 width: 20, height: 20, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -477,7 +493,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               </span>
               <span style={{ fontSize: 13, color: t.done ? 'var(--muted)' : 'var(--text)', textDecoration: t.done ? 'line-through' : 'none' }}>{t.text}</span>
             </div>
-          ))}
+          ))(row.t))}
         </div>
 
         <div className="card" style={{ padding: 16 }}>
@@ -679,7 +695,7 @@ function VendorsView({ ev }) {
 
 // Volunteers, Staffing & Vendors as one list: write down what we need ("Magician", "4 setup volunteers"), then later fill in
 // who we found and how to reach them, and say whether it is a vendor, a contact or a volunteer role.
-const NEED_KINDS = { vendor: 'Vendor', contact: 'Contact', volunteer: 'Volunteer', activity: 'Activity' };
+const NEED_KINDS = { vendor: 'Vendor', contact: 'Contact', volunteer: 'Volunteer', activity: 'Activity', sponsor: 'Sponsor' };
 const volFullName = (v) => `${v['First Name'] || ''} ${v['Last Name'] || ''}`.trim() || 'Unnamed';
 
 function NeedsList({ ev, onUpdate, volunteers }) {
@@ -748,6 +764,7 @@ function NeedsList({ ev, onUpdate, volunteers }) {
                       <option value="contact">Contact</option>
                       <option value="volunteer">Volunteer role</option>
                       <option value="activity">Activity or program</option>
+                      <option value="sponsor">Sponsor</option>
                     </select>
                   </div>
                   <div style={{ flex: '2 1 240px' }}>
@@ -1201,7 +1218,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
         const r2 = await insertReimbursement({ ...base, description: 'Sheriff signature for alcohol license', amount: 30 });
         if (r1.error || r2.error) throw new Error(r1.error || r2.error);
       }
-      const duty = (text, estimated) => ({ id: cryptoId(), text, done: false, due: '', timing: 'before', assignee: '', assigneeId: null, priority: '', estimated, actual: 0, notes: '', subtasks: [], auto: 'alcohol-license' });
+      const duty = (text, estimated) => ({ id: cryptoId(), text, category: 'Hospitality', done: false, due: '', timing: 'before', assignee: '', assigneeId: null, priority: '', estimated, actual: 0, notes: '', subtasks: [], auto: 'alcohol-license' });
       onUpdate(e => ({ ...e, checklist: [...e.checklist,
         duty('Fill out the ABC alcohol license application', 0),
         duty('Take the application to the sheriff for signature ($30 fee)', 30),
@@ -1212,7 +1229,9 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
       setAttachedMsg('Could not add the alcohol license expenses: ' + (err.message || 'please try again') + '. Nothing was added to the checklist.');
     }
   }
-  function startPrompt(text) { setQuick(text + ': '); setTimeout(() => { if (quickRef.current) { quickRef.current.focus(); const n = quickRef.current.value.length; quickRef.current.setSelectionRange(n, n); } }, 0); }
+  const [quickCat, setQuickCat] = useState('');
+  const [catFilter, setCatFilter] = useState('All');
+  function startPrompt(text, group) { setQuickCat(checkCat(group)); setQuick(text + ': '); setTimeout(() => { if (quickRef.current) { quickRef.current.focus(); const n = quickRef.current.value.length; quickRef.current.setSelectionRange(n, n); } }, 0); }
 
   // Note taker: type a thought and press Enter, then the next. Pasting several lines adds one note per line.
   // Later each note is attached to where it belongs (a duty, the day-of timeline, a vendor, the after notes).
@@ -1220,8 +1239,9 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   function addQuick(text) {
     const lines = String(text || '').split(/\r?\n/).map(l => l.replace(/^\s*(?:[-*\u2022]|\d+[.)])\s*/, '').trim()).filter(Boolean);
     if (!lines.length) return;
-    onUpdate(e => ({ ...e, notes: [...(e.notes || []), ...lines.map(l => ({ id: cryptoId(), text: l }))] }));
+    onUpdate(e => ({ ...e, notes: [...(e.notes || []), ...lines.map(l => ({ id: cryptoId(), text: l, category: quickCat || '' }))] }));
     setQuick('');
+    setQuickCat('');
   }
   // "doors open at 4:30" -> 16:30. Without am/pm, 1 to 7 is read as the afternoon.
   function parseClock(text) {
@@ -1238,7 +1258,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
     if (!target) return;
     const drop = e => (e.notes || []).filter(n => n.id !== note.id);
     if (target === 'task') {
-      onUpdate(e => ({ ...e, notes: drop(e), checklist: [...e.checklist, { id: cryptoId(), text: note.text, done: false, due: '', assignee: '', assigneeId: null, priority: '', estimated: 0, actual: 0, notes: '', subtasks: [] }] }));
+      onUpdate(e => ({ ...e, notes: drop(e), checklist: [...e.checklist, { id: cryptoId(), text: note.text, category: note.category || '', done: false, due: '', assignee: '', assigneeId: null, priority: '', estimated: 0, actual: 0, notes: '', subtasks: [] }] }));
       setAttachedMsg('Added to the checklist below. Set who and when on its line.');
     } else if (target === 'dayof') {
       let time = parseClock(note.text);
@@ -1257,9 +1277,19 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   function allToDuties() {
     const list = ev.notes || [];
     if (!list.length) return;
-    onUpdate(e => ({ ...e, notes: [], checklist: [...e.checklist, ...list.map(n => ({ id: cryptoId(), text: n.text, done: false, due: '', assignee: '', assigneeId: null, priority: '', estimated: 0, actual: 0, notes: '', subtasks: [] }))] }));
+    onUpdate(e => ({ ...e, notes: [], checklist: [...e.checklist, ...list.map(n => ({ id: cryptoId(), text: n.text, category: n.category || '', done: false, due: '', assignee: '', assigneeId: null, priority: '', estimated: 0, actual: 0, notes: '', subtasks: [] }))] }));
     setAttachedMsg('All notes added to the checklist below.');
   }
+  function patchNeed(id, patch) {
+    onUpdate(e => ({ ...e, vendors: e.vendors.map(v => v.id === id ? { ...v, ...patch } : v) }));
+  }
+  const allItems = [
+    ...ev.checklist.map(t => ({ need: false, t, cat: checkCat(t.category) })),
+    ...ev.vendors.map(v => ({ need: true, v, cat: needCategory(v) })),
+  ];
+  const isDone = (i) => (i.need ? needHandled(i.v) : !!i.t.done);
+  const catGroups = CHECKLIST_CATEGORIES.map(c => ({ cat: c, items: allItems.filter(i => i.cat === c) })).filter(g => g.items.length);
+  const shownGroups = catGroups.filter(g => catFilter === 'All' || catFilter === g.cat);
   function patchItem(id, patch) {
     onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, ...patch } : t) }));
   }
@@ -1347,7 +1377,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
               <div key={g.group} style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 }}>{g.group}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {g.items.map(it => { const label = typeof it === 'string' ? it : it.label; return <button key={label} type="button" className="btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => (typeof it === 'string' ? startPrompt(it) : (it.action === 'alcohol' ? addAlcoholLicense() : null))}>{label}</button>; })}
+                  {g.items.map(it => { const label = typeof it === 'string' ? it : it.label; return <button key={label} type="button" className="btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => (typeof it === 'string' ? startPrompt(it, g.group) : (it.action === 'alcohol' ? addAlcoholLicense() : null))}>{label}</button>; })}
                 </div>
               </div>
             ))}
@@ -1361,7 +1391,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
             </div>
             {ev.notes.map(n => (
               <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '0.5px solid var(--border-light)' }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflowWrap: 'anywhere' }}>{n.text}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflowWrap: 'anywhere' }}>{n.text}{n.category ? <span style={{ fontSize: 11, color: 'var(--muted)' }}> · {n.category}</span> : null}</span>
                 <select className="input" value="" onChange={e => attachNote(n, e.target.value)} style={{ width: 190, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}>
                   <option value="">Attach to…</option>
                   <option value="task">Checklist duty</option>
@@ -1375,7 +1405,36 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
           </div>
         )}
         {attachedMsg && <div style={{ fontSize: 12, color: '#2e7d32', marginBottom: 10 }}>{attachedMsg}</div>}
-        {ev.checklist.map(t => {
+        {catGroups.length > 1 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '4px 0 14px' }}>
+            <button type="button" className={catFilter === 'All' ? 'btn-gold' : 'btn-ghost'} style={{ fontSize: 11, padding: '4px 11px' }} onClick={() => setCatFilter('All')}>All ({allItems.filter(isDone).length}/{allItems.length})</button>
+            {catGroups.map(g => (
+              <button key={g.cat} type="button" className={catFilter === g.cat ? 'btn-gold' : 'btn-ghost'} style={{ fontSize: 11, padding: '4px 11px' }} onClick={() => setCatFilter(g.cat)}>{g.cat} ({g.items.filter(isDone).length}/{g.items.length})</button>
+            ))}
+          </div>
+        )}
+        {shownGroups.map(g => (
+        <div key={g.cat} style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.8, padding: '4px 0 2px', borderBottom: '1.5px solid #e8dfd0' }}>
+            {g.cat}
+            <span style={{ fontWeight: 500, color: g.items.every(isDone) ? '#2e7d32' : 'var(--muted)', textTransform: 'none', letterSpacing: 0 }}>{g.items.every(isDone) ? 'all figured out ✓' : g.items.filter(isDone).length + ' of ' + g.items.length + ' done'}</span>
+          </div>
+        {g.items.map(it => {
+          if (it.need) {
+            const v = it.v; const handled = needHandled(v);
+            return (
+              <ItemRow key={'need-' + v.id} done={handled}>
+                <button type="button" onClick={() => patchNeed(v.id, handled ? { confirmed: false, who: '' } : { confirmed: true })} title={handled ? 'Click to mark as still needed' : 'Click when it is figured out'}
+                  style={{ width: 15, height: 15, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: handled ? 'none' : '1.5px dashed var(--border)', background: handled ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: 9, lineHeight: '15px' }}>{handled ? '✓' : ''}</button>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, textDecoration: handled ? 'line-through' : 'none', color: handled ? 'var(--muted)' : 'var(--text)' }}>
+                  {handled ? '' : 'Find: '}{v.name}{v.kind ? <span style={{ fontSize: 11, color: 'var(--muted)' }}> · {NEED_TAG[v.kind]}</span> : null}
+                </span>
+                {!['volunteer', 'activity'].includes(v.kind) && <input className="input" placeholder="Who we found" defaultValue={v.who || (v.role ? v.name : '')} key={v.id + (v.who || '')} style={{ width: 150, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
+                  onBlur={e => { const t = e.target.value.trim(); if (t !== (v.who || '')) patchNeed(v.id, { who: t }); }} />}
+              </ItemRow>
+            );
+          }
+          const t = it.t;
           const hasMoney = t.estimated > 0 || t.actual > 0;
           const hasNotes = !!(t.notes && t.notes.trim());
           const subtasks = t.subtasks || [];
@@ -1397,6 +1456,10 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
                     </span>
                   )}
                 </button>
+                <select className="input" value={t.category || ''} onChange={e => patchItem(t.id, { category: e.target.value })} title="Category" style={{ width: 118, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}>
+                  <option value="">General</option>
+                  {CHECKLIST_CATEGORIES.filter(c => c !== 'General').map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
                 <input className="input" list={'vols-' + ev.id} placeholder="Who" defaultValue={t.assignee || ''} key={t.id + (t.assignee || '')} style={{ width: 130, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
                   onBlur={e => {
                     const name = e.target.value.trim();
@@ -1472,6 +1535,8 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
             </div>
           );
         })}
+        </div>
+        ))}
         <datalist id={'vols-' + ev.id}>{(volunteers || []).map(v => <option key={v.id} value={(v['First Name'] + ' ' + v['Last Name']).trim()} />)}</datalist>
       </div>
 
