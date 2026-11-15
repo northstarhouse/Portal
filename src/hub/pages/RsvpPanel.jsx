@@ -9,7 +9,7 @@ const DECLINED = /can'?t|cannot|not attending|decline|\bno\b/i;
 const heads = (r) => (DECLINED.test(r.response || '') ? 0 : /\+\s*1|plus/i.test(r.response || '') ? 2 : 1);
 const FORM_BASE = 'https://northstarhouse.github.io/NSH-forms/';
 
-export default function RsvpPanel({ eventName, onSaved }) {
+export default function RsvpPanel({ eventName, onSaved, hideToggle }) {
   const [meta, setMeta] = useState(null);       // { rsvp_only, rsvp_event_id }
   const [forms, setForms] = useState([]);
   const [responses, setResponses] = useState(null);
@@ -44,6 +44,7 @@ export default function RsvpPanel({ eventName, onSaved }) {
 
   if (!meta) return <div style={{ fontSize: 12, color: 'var(--muted, #888)', margin: '14px 0' }}>Loading RSVP settings…</div>;
 
+  if (hideToggle && !meta.rsvp_only) return null;
   const linked = forms.find(f => f.id === meta.rsvp_event_id) || null;
   const norm = (t) => String(t || '').trim().toLowerCase();
   const suggestion = !linked ? forms.find(f => norm(f.title) === norm(eventName)) : null;
@@ -54,10 +55,10 @@ export default function RsvpPanel({ eventName, onSaved }) {
 
   return (
     <div style={{ border: '0.5px dashed #d8cdb9', borderRadius: 10, background: '#faf8f4', padding: '12px 14px', margin: '14px 0' }}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+      {!hideToggle && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
         <input type="checkbox" checked={meta.rsvp_only} disabled={saving} onChange={e => save({ rsvp_only: e.target.checked })} style={{ accentColor: gold, width: 15, height: 15 }} />
         RSVP event (no ticket sales)
-      </label>
+      </label>}
 
       {meta.rsvp_only && (
         <div style={{ marginTop: 10 }}>

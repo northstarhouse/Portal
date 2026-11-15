@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MediaPicker } from '../../media-library.jsx';
 import { useVol } from '../App.jsx';
 import {
-  fetchEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
+  fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
@@ -432,7 +432,6 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             <StatBox label="Expenses" value={money(expenses)} />
             <StatBox label="Net" value={money(netProfit)} color={netProfit >= 0 ? '#4a5d3a' : '#8a4a2e'} />
           </div>
-          <RsvpPanel eventName={ev.name} onSaved={patch => { if (patch && 'rsvp_only' in patch) setRsvpOnly(!!patch.rsvp_only); }} />
         </div>
 
         <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -533,7 +532,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               </div>
               {isOpen && (
                 <div style={{ padding: '4px 16px 18px' }}>
-                  {s.key === 'preplanning' && <PreplanningTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}
+                  {s.key === 'preplanning' && <PreplanningTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} onRsvpChange={setRsvpOnly} />}
                   {s.key === 'checklist' && <ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}
                   {s.key === 'budget' && <FinancialsTab ev={ev} />}
                   {s.key === 'dayof' && <SheetToggle view={<DayOfView ev={ev} />}><DayOfTab ev={ev} onUpdate={onUpdate} /></SheetToggle>}
@@ -780,7 +779,7 @@ function VendorsPanel({ ev, onUpdate }) {
 }
 
 // Event Basics as a ready sheet: every question with its answer, and anything not filled in shown plainly so it can be spotted.
-function EventBasicsView({ f, ev }) {
+function EventBasicsView({ f, ev, rsvp }) {
   const group = { fontSize: 12, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 1, margin: '28px 0 0', paddingBottom: 8, borderBottom: '1.5px solid #e8dfd0' };
   const cap = { width: 150, flexShrink: 0, fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, paddingTop: 3 };
   const empty = (req) => <span style={{ color: '#b8863b', fontStyle: 'italic' }}>{req ? 'Not filled in yet (required)' : 'Not filled in yet'}</span>;
@@ -816,7 +815,7 @@ function EventBasicsView({ f, ev }) {
 
       <div style={group}>Website</div>
       {row('Web address', f.slug)}
-      {row('Tickets', f.sells ? (tiers.length ? tiers.map(t => t.name + ' — ' + (Number(t.price) > 0 ? '$' + t.price : 'Free') + (t.limit ? ' (max ' + t.limit + ' per order)' : '')).join('\n') : null) : 'Not sold online', f.sells)}
+      {row('Tickets', rsvp ? 'RSVP only (no ticket sales)' : f.sells ? (tiers.length ? tiers.map(t => t.name + ' — ' + (Number(t.price) > 0 ? '$' + t.price : 'Free') + (t.limit ? ' (max ' + t.limit + ' per order)' : '')).join('\n') : null) : 'Not sold online', f.sells)}
 
       <div style={group}>Planning notes (not on the website)</div>
       {row('Event type', f.purpose)}
@@ -829,7 +828,7 @@ function EventBasicsView({ f, ev }) {
 
 // "Website event page": everything the website event needs, filled in here, then Push to website sends it to
 // Admin > New Event and goes live (later pushes update the same event).
-function WebsiteEventPanel({ ev, onUpdate }) {
+function WebsiteEventPanel({ ev, onUpdate, onRsvpChange }) {
   const w = ev.website || {};
   const slugify = v => String(v || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
   const initial = () => ({
@@ -843,6 +842,16 @@ function WebsiteEventPanel({ ev, onUpdate }) {
   const [f, setF] = useState(initial);
   const [picker, setPicker] = useState(false);
   const [editing, setEditing] = useState(false);
+  // RSVP-only events (no ticket sales) are a third choice next to the ticket options; the flag lives on the event's overview card.
+  const [rsvpSaved, setRsvpSaved] = useState(false);
+  const [rsvp, setRsvp] = useState(false);
+  useEffect(() => { let live = true; fetchEventCardMeta(ev.name).then(m => { if (live) { setRsvpSaved(!!(m && m.rsvp_only)); setRsvp(!!(m && m.rsvp_only)); } }).catch(() => {}); return () => { live = false; }; }, [ev.name]);
+  function saveRsvp(name) {
+    if (rsvp === rsvpSaved) return;
+    setRsvpSaved(rsvp);
+    if (onRsvpChange) onRsvpChange(rsvp);
+    saveEventCardMeta(name, { rsvp_only: rsvp }).catch(() => { setRsvpSaved(!rsvp); alert('Could not save the RSVP setting. Please try again.'); });
+  }
   const [pushing, setPushing] = useState(false);
   const [msg, setMsg] = useState(null);
   const set = (k, v) => setF(o => ({ ...o, [k]: v }));
@@ -879,6 +888,7 @@ function WebsiteEventPanel({ ev, onUpdate }) {
   function save() {
     if (!f.title.trim()) { setMsg({ ok: false, text: 'Give the event a title first.' }); return; }
     onUpdate(e => toEvent(f, e));
+    saveRsvp(f.title.trim());
     setEditing(false);
     setMsg({ ok: true, text: 'Saved.' });
   }
@@ -888,6 +898,7 @@ function WebsiteEventPanel({ ev, onUpdate }) {
     if (m.length) { setMsg({ ok: false, text: 'Fill in first: ' + m.join(', ') + '.' }); return; }
     if (!ev.siteEventId && !window.confirm('Push this event to the website? It goes live right away.')) return;
     setPushing(true); setMsg(null);
+    saveRsvp(form.title.trim());
     try {
       const merged = toEvent(form, ev);
       const r = await pushCommitteeEventToWebsite(merged);
@@ -918,7 +929,8 @@ function WebsiteEventPanel({ ev, onUpdate }) {
 
       {!editing ? (
         <div>
-          <EventBasicsView f={f} ev={ev} />
+          <EventBasicsView f={f} ev={ev} rsvp={rsvpSaved} />
+          <RsvpPanel key={String(rsvpSaved)} eventName={ev.name} hideToggle />
           {msg && <div style={{ fontSize: 12, margin: '12px 0 0', color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}
           <div style={{ marginTop: 16 }}>
             {missing(f).length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Still needed before pushing: {missing(f).join(', ')}. Click Edit.</div>}
@@ -964,9 +976,10 @@ function WebsiteEventPanel({ ev, onUpdate }) {
 
           <div style={head}>Tickets</div>
           <label style={lab}>Does this event sell tickets?
-            <select style={{ ...inp, appearance: 'auto' }} value={f.sells ? 'yes' : 'no'} onChange={e => set('sells', e.target.value === 'yes')}>
+            <select style={{ ...inp, appearance: 'auto' }} value={rsvp ? 'rsvp' : (f.sells ? 'yes' : 'no')} onChange={e => { const v = e.target.value; setRsvp(v === 'rsvp'); set('sells', v === 'yes'); }}>
               <option value="no">No, just list the event</option>
               <option value="yes">Yes, sell tickets online</option>
+              <option value="rsvp">RSVP only (no ticket sales)</option>
             </select>
           </label>
           {f.sells && (
@@ -1002,7 +1015,7 @@ function WebsiteEventPanel({ ev, onUpdate }) {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             <button className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => push(f)}>{pushing ? 'Pushing…' : (ev.siteEventId ? 'Save and update website' : 'Save and push to website')}</button>
             <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={save}>Save only</button>
-            <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => { setF(initial()); setMsg(null); setEditing(false); }}>Cancel</button>
+            <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => { setF(initial()); setRsvp(rsvpSaved); setMsg(null); setEditing(false); }}>Cancel</button>
           </div>
         </div>
       )}
@@ -1139,7 +1152,13 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
                     const match = (volunteers || []).find(v => (v['First Name'] + ' ' + v['Last Name']).trim().toLowerCase() === name.toLowerCase());
                     patchItem(t.id, { assignee: match ? (match['First Name'] + ' ' + match['Last Name']).trim() : name, assigneeId: match ? match.id : null });
                   }} />
-                <input className="input" type="date" value={t.due || ''} onChange={e => patchItem(t.id, { due: e.target.value })} style={{ width: 128, flexShrink: 0, fontSize: 12, padding: '5px 8px' }} />
+                <select className="input" value={t.timing || (t.due ? 'before' : '')} style={{ width: 132, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}
+                  onChange={e => { const v = e.target.value; patchItem(t.id, { timing: v, due: v === 'dayof' ? (ev.date || '') : (v === 'before' && t.timing === 'dayof' ? '' : (v === 'before' ? (t.due || '') : '')) }); }}>
+                  <option value="">When?</option>
+                  <option value="before">Before event</option>
+                  <option value="dayof">Day of event</option>
+                </select>
+                {(t.timing || (t.due ? 'before' : '')) === 'before' && <input className="input" type="date" value={t.due || ''} onChange={e => patchItem(t.id, { due: e.target.value })} style={{ width: 128, flexShrink: 0, fontSize: 12, padding: '5px 8px' }} />}
               </ItemRow>
               {isOpen && (
                 <div style={{ padding: '10px 0 14px 33px' }}>
@@ -1208,8 +1227,8 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   );
 }
 
-function PreplanningTab({ ev, onUpdate }) {
-  return <WebsiteEventPanel key={ev.id} ev={ev} onUpdate={onUpdate} />;
+function PreplanningTab({ ev, onUpdate, onRsvpChange }) {
+  return <WebsiteEventPanel key={ev.id} ev={ev} onUpdate={onUpdate} onRsvpChange={onRsvpChange} />;
 }
 
 function DayOfTab({ ev, onUpdate }) {
@@ -1346,23 +1365,31 @@ function AfterTab({ ev, onUpdate }) {
 function FinancialsTab({ ev }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [tickets, setTickets] = useState({ ticketsSold: 0, revenue: 0 });
+  const [rsvpOnly, setRsvpOnly] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    fetchEventFinancials(ev.name).then(res => { setData(res); setLoading(false); }).catch(() => setLoading(false));
+    Promise.all([
+      fetchEventFinancials(ev.name).catch(() => null),
+      fetchEventTicketStats(ev.name).catch(() => ({ ticketsSold: 0, revenue: 0 })),
+      fetchEventCardMeta(ev.name).catch(() => null),
+    ]).then(([res, t, meta]) => { setData(res); setTickets(t); setRsvpOnly(!!(meta && meta.rsvp_only)); setLoading(false); });
   }, [ev.name]);
 
   if (loading) return <div style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: 20 }}>Loading…</div>;
 
   const earnings = data?.earnings || [];
   const expenses = data?.expenses || [];
-  const totalEarnings = earnings.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+  // Website ticket sales are their own income source (separate from earnings logged by hand), so they are added in here.
+  const ticketRevenue = rsvpOnly ? 0 : tickets.revenue;
+  const totalEarnings = ticketRevenue + earnings.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
   const totalExpenses = expenses.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
 
   return (
     <div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
-        Pulled live from this event's entries in Portal's budget tracking (Op Budget / Op Earnings) — read-only here.
+        Pulled live: website ticket sales for this event, plus the entries logged in the Portal's budget tracking (Op Budget / Op Earnings). Read-only here; the names must match exactly.
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px 36px', marginBottom: 22 }}>
         <div>
@@ -1381,8 +1408,12 @@ function FinancialsTab({ ev }) {
 
       <div style={{ marginBottom: 24 }}>
         <div style={SECTION_HEAD}>Earnings</div>
+        <ItemRow>
+          <span style={{ flex: 1, fontSize: 13 }}>Website ticket sales{!rsvpOnly && tickets.ticketsSold > 0 ? ' (' + tickets.ticketsSold + ' sold)' : ''}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: rsvpOnly ? 'var(--muted)' : '#4a5d3a' }}>{rsvpOnly ? 'N/A (RSVP event)' : money(tickets.revenue)}</span>
+        </ItemRow>
         {earnings.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>No earnings logged for this event yet.</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>No other earnings logged for this event yet.</div>
         ) : earnings.map(r => (
           <ItemRow key={r.id}>
             <span style={{ flex: 1, fontSize: 13 }}>{r.earning_source || 'Earning'}</span>
