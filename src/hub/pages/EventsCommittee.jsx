@@ -583,7 +583,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                   {s.key === 'preplanning' && <PreplanningTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} onRsvpChange={setRsvpOnly} />}
                   {s.key === 'checklist' && <ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} showMarketing={!marketingNA} />}
                   {s.key === 'budget' && <FinancialsTab ev={ev} />}
-                  {s.key === 'dayof' && <SheetToggle view={<DayOfView ev={ev} onUpdate={onUpdate} />}><DayOfTab ev={ev} onUpdate={onUpdate} /></SheetToggle>}
+                  {s.key === 'dayof' && <SheetToggle view={<DayOfView ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}><DayOfTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} /></SheetToggle>}
                   {s.key === 'after' && (
                     <div>
                       <AfterTab ev={ev} onUpdate={onUpdate} />
@@ -615,7 +615,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
 
 // Round tick circle used on the checklist lines.
 function CheckCircle({ checked, onChange, size }) {
-  const d = size || 16;
+  const d = size || 18;
   return (
     <button type="button" role="checkbox" aria-checked={checked} onClick={onChange}
       style={{ width: d, height: d, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: checked ? 'none' : '1.5px solid var(--border)', background: checked ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: Math.round(d * 0.62), lineHeight: d + 'px', textAlign: 'center' }}>{checked ? '✓' : ''}</button>
@@ -627,7 +627,6 @@ function ItemRow({ children, onDelete, done, accent, onAccent, accentTitle }) {
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0 9px 10px', position: 'relative',
       borderBottom: '0.5px solid var(--border-light)', borderLeft: `4px solid ${accent || 'transparent'}`,
-      opacity: done ? 0.6 : 1,
     }}>
       {onAccent && <button type="button" onClick={onAccent} title={accentTitle} aria-label={accentTitle} style={{ position: 'absolute', left: -4, top: 0, bottom: 0, width: 12, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }} />}
       {children}
@@ -636,6 +635,16 @@ function ItemRow({ children, onDelete, done, accent, onAccent, accentTitle }) {
   );
 }
 
+// When a duty is due, counted back from the event: a month, two weeks or a week out. As soon as possible has no date.
+function dueForTiming(timing, eventDate) {
+  if (timing === 'dayof') return eventDate || '';
+  const back = { month: 'month', twoweeks: 14, week: 7 }[timing];
+  if (!back || !eventDate) return '';
+  const d = new Date(eventDate + 'T12:00:00');
+  if (isNaN(d)) return '';
+  if (back === 'month') d.setMonth(d.getMonth() - 1); else d.setDate(d.getDate() - back);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 const TASK_PRIORITY = {
   high:   { label: 'High priority',   color: '#c0392b' },
   medium: { label: 'Medium priority', color: '#d9822b' },
@@ -834,9 +843,8 @@ function NeedRow({ v, volunteers, patch, remove, isOpen, onToggle }) {
         else sub = '';
         return (
           <div key={v.id} style={{ borderBottom: '0.5px solid var(--border-light)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0' }}>
-              <button type="button" onClick={() => patch(v.id, handled ? { confirmed: false, who: '' } : { confirmed: true })} title={handled ? 'Figured out. Click to mark as still needed.' : 'Click when it is figured out'}
-                style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: handled ? 'none' : '1.5px solid var(--border)', background: handled ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: 11, lineHeight: '18px' }}>{handled ? '✓' : ''}</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 0 11px 14px' }}>
+              <CheckCircle checked={handled} onChange={() => patch(v.id, handled ? { confirmed: false, who: '' } : { confirmed: true })} />
               <button type="button" onClick={onToggle} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</div>
                 <div style={{ fontSize: 12, marginTop: 2, color: found || sub ? 'var(--muted)' : '#b8863b', fontStyle: found || sub ? 'normal' : 'italic' }}>{(sub || 'Still needed') + (costText ? '  ·  ' + costText : '')}</div>
@@ -845,7 +853,7 @@ function NeedRow({ v, volunteers, patch, remove, isOpen, onToggle }) {
               <span style={{ color: 'var(--muted)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>&rsaquo;</span>
             </div>
             {isOpen && (
-              <div key={v.id + '-edit'} style={{ padding: '4px 0 18px 30px' }}>
+              <div key={v.id + '-edit'} style={{ padding: '4px 0 18px 42px' }}>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
                   <div style={{ flex: '1 1 170px' }}>
                     <div style={cap}>What is it?</div>
@@ -978,7 +986,16 @@ function NeedsList({ ev, onUpdate, volunteers }) {
   );
 }
 
-function DayOfView({ ev, onUpdate }) {
+function whoOn(t, volunteers) {
+  const roster = volunteers || [];
+  return [
+    ...(t.assignedIds || []).map(id => roster.find(x => x.id === id)).filter(Boolean).map(x => ({ name: volFullName(x), phone: (t.phones || {})[x.id] ?? x['Phone Number'] })),
+    ...(t.people || []).map(pp => ({ name: pp.name, phone: pp.phone })),
+  ];
+}
+const whoText = (list) => list.map(w => w.name + (w.phone ? ' (' + w.phone + ')' : '')).join(', ');
+
+function DayOfView({ ev, onUpdate, volunteers }) {
   const sorted = [...ev.timeline].sort((a, b) => a.time.localeCompare(b.time));
   if (!sorted.length) return <div style={{ fontSize: 13, color: 'var(--muted)' }}>No timeline items yet. Click Edit to add some.</div>;
   const doneCount = sorted.filter(t => t.done).length;
@@ -991,7 +1008,7 @@ function DayOfView({ ev, onUpdate }) {
         <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: '0.5px solid var(--border-light)', fontSize: 13 }}>
           <CheckCircle checked={!!(!!t.done)} onChange={() => toggle(t.id)} />
           <span style={{ width: 70, flexShrink: 0, color: 'var(--muted)' }}>{fmtTime12(t.time)}</span>
-          <span style={{ flex: 1, textDecoration: 'none', color: t.done ? 'var(--muted)' : 'var(--text)' }}>{t.activity}</span>
+          <span style={{ flex: 1, textDecoration: 'none', color: t.done ? 'var(--muted)' : 'var(--text)' }}>{t.activity}{whoOn(t, volunteers).length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{whoText(whoOn(t, volunteers))}</div>}</span>
         </div>
       ))}
     </div>
@@ -1473,7 +1490,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     ...(showMarketing && mkData ? MARKETING_CHANNELS.filter(c => (mkData[c] || {}).done).map(c => ({ mk: true, c, cat: 'Marketing' })) : []),
   ];
   const isDone = (i) => (i.mk ? !!(mkData[i.c] || {}).done : i.need ? needHandled(i.v) : !!i.t.done);
-  const catGroups = [...CHECKLIST_CATEGORIES.filter(c => c !== 'Marketing'), 'Marketing', DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
+  const catGroups = [...CHECKLIST_CATEGORIES.filter(c => c !== 'Marketing'), 'Marketing', DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : c === 'General' || c === 'Hospitality' ? (x, y) => (isDone(x) ? 1 : 0) - (isDone(y) ? 1 : 0) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
   const shownGroups = catGroups.filter(g => catFilter === 'All' || catFilter === g.cat);
   function patchItem(id, patch) {
     onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, ...patch } : t) }));
@@ -1602,7 +1619,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
         <div key={g.cat} style={{ marginBottom: 18 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.8, padding: '4px 0 2px', borderBottom: '1.5px solid #e8dfd0' }}>
             {g.cat}
-            <span style={{ fontWeight: 500, color: g.items.every(isDone) ? '#2e7d32' : 'var(--muted)', textTransform: 'none', letterSpacing: 0 }}>{g.items.every(isDone) ? 'all figured out ✓' : g.items.filter(isDone).length + ' of ' + g.items.length + ' done'}</span>
+            {g.cat !== 'Marketing' && <span style={{ fontWeight: 500, color: g.items.every(isDone) ? '#2e7d32' : 'var(--muted)', textTransform: 'none', letterSpacing: 0 }}>{g.items.every(isDone) ? 'all figured out ✓' : g.items.filter(isDone).length + ' of ' + g.items.length + ' done'}</span>}
           </div>
         {g.items.map(it => {
           if (it.mk) {
@@ -1620,7 +1637,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
               <ItemRow key={'tl-' + t.id} done={t.done} onDelete={() => onUpdate(e => ({ ...e, timeline: e.timeline.filter(x => x.id !== t.id) }))}>
                 <CheckCircle checked={!!(!!t.done)} onChange={() => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, done: !x.done } : x) }))} />
                 <span style={{ fontSize: 12, color: 'var(--muted)', width: 70, flexShrink: 0 }}>{fmtTime12(t.time)}</span>
-                <span style={{ flex: 1, fontSize: 13, textDecoration: 'none', color: 'var(--text)' }}>{t.activity}</span>
+                <span style={{ flex: 1, fontSize: 13, textDecoration: 'none', color: 'var(--text)' }}>{t.activity}{whoOn(t, volunteers).length > 0 && <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 10 }}>{whoText(whoOn(t, volunteers))}</span>}</span>
               </ItemRow>
             );
           }
@@ -1660,11 +1677,16 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                     patchItem(t.id, { assignee: match ? (match['First Name'] + ' ' + match['Last Name']).trim() : name, assigneeId: match ? match.id : null });
                   }} />
                 <select className="input" value={t.timing || (t.due ? 'before' : '')} style={{ width: 132, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}
-                  onChange={e => { const v = e.target.value; patchItem(t.id, { timing: v, due: v === 'dayof' ? (ev.date || '') : (v === 'before' && t.timing === 'dayof' ? '' : (v === 'before' ? (t.due || '') : '')) }); }}>
+                  onChange={e => { const v = e.target.value; patchItem(t.id, { timing: v, due: v === 'before' ? (t.timing === 'dayof' ? '' : (t.due || '')) : dueForTiming(v, ev.date) }); }}>
                   <option value="">When?</option>
-                  <option value="before">Before event</option>
+                  <option value="asap">As soon as possible</option>
+                  <option value="month">1 month out</option>
+                  <option value="twoweeks">2 weeks out</option>
+                  <option value="week">1 week out</option>
                   <option value="dayof">Day of event</option>
+                  <option value="before">Pick a date</option>
                 </select>
+                {['month', 'twoweeks', 'week'].includes(t.timing) && <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, width: 70 }}>{t.due ? fmtDateShort(t.due) : 'set the event date'}</span>}
                 {(t.timing || (t.due ? 'before' : '')) === 'before' && <input className="input" type="date" value={t.due || ''} onChange={e => patchItem(t.id, { due: e.target.value })} style={{ width: 128, flexShrink: 0, fontSize: 12, padding: '5px 8px' }} />}
               </ItemRow>
               {isOpen && (
@@ -1740,7 +1762,7 @@ function PreplanningTab({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
   return <WebsiteEventPanel key={ev.id} ev={ev} onUpdate={onUpdate} onRsvpChange={onRsvpChange} autoEdit={autoEdit} onClose={onClose} />;
 }
 
-function DayOfTab({ ev, onUpdate }) {
+function DayOfTab({ ev, onUpdate, volunteers }) {
   const [form, setForm] = useState({ time: '', activity: '' });
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ time: '', activity: '' });
@@ -1789,6 +1811,7 @@ function DayOfTab({ ev, onUpdate }) {
               style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 13, color: 'var(--text)', fontFamily: 'inherit', textDecoration: 'none' }}>
               {t.activity}
             </button>
+            <AssignVolunteers v={t} volunteers={volunteers} compact onPatch={pt => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, ...pt } : x) }))} />
           </ItemRow>
         )
       ))}
