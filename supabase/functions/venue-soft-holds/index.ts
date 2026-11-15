@@ -75,6 +75,40 @@ async function gcal(method: string, path: string, body?: unknown, base = CAL) {
 const nextDay = (d: string) => new Date(Date.parse(d + "T12:00:00Z") + 86400000).toISOString().slice(0, 10);
 const GENERIC = new Set(["wedding", "party", "event", "private", "public", "soft", "hold", "rehearsal", "inquiry", "with"]);
 const words = (s: string) => String(s || "").toLowerCase().split(/[^a-z]+/).filter((w) => w.length >= 4 && !GENERIC.has(w));
+const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+const laDay = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", year: "numeric" }) : "";
+const phoneFmt = (p: unknown) => { const d = String(p || "").replace(/[^0-9]/g, "").replace(/^1(?=[0-9]{10}$)/, ""); return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : String(p || "").trim(); };
+const clean = (x: unknown) => String(x ?? "").trim();
+
+// The calendar entry's notes: who the clients are and where the booking stands, rebuilt whenever any of it changes.
+function describe(inq: any, form: any, v: any, signers: any[]): string {
+  const a = form?.answers || {};
+  const status = v?.status || null;
+  const lines: string[] = [];
+  if (status === "completed") lines.push(`BOOKED · agreement fully signed ${laDay(v.completed_at)}`);
+  else {
+    lines.push(`SOFT HOLD · pre-booking form received ${laDay(form?.created_at || inq.created_at)}`);
+    lines.push(status === "pending" ? `Agreement sent ${laDay(v.issued_at)}, waiting for signatures${v.expires_at ? ` (sign by ${laDay(v.expires_at)} or the hold is released)` : ""}`
+      : status === "draft" ? "Agreement drafted, not sent yet" : status === "void" || status === "superseded" ? "Agreement being revised" : "Agreement not created yet");
+  }
+  const guests = clean(a.max_guests || inq.guest_count);
+  lines.push([clean(inq.event_type || a.__event_type), guests ? `up to ${guests} guests` : ""].filter(Boolean).join(" · "));
+  lines.push("", "Clients");
+  const people = signers.filter((x) => x.role !== "venue").map((x) => ({ name: clean(x.name), email: clean(x.email), signed: x.status === "signed" ? laDay(x.signed_at) : "" }));
+  if (!people.length) {
+    const p1 = clean(a["7fnabd0i"] || a.evp_name || inq.name), p2 = clean(a["7leui2ic"] || inq.partner_name);
+    people.push({ name: p1, email: clean(a.c9u1sxb4 || a.evp_email || inq.email), signed: "" });
+    if (p2) people.push({ name: p2, email: clean(a.pt4mail1), signed: "" });
+  }
+  for (const x of people) lines.push([x.name, x.email.toLowerCase(), x.signed ? `signed ${x.signed}` : ""].filter(Boolean).join(" · "));
+  if (clean(a.evp_org)) lines.push(`Organization: ${clean(a.evp_org)}`);
+  const phones = [...new Set([a["163otrai"], a.pt4phon1, a.evp_phone, inq.phone].map(phoneFmt).filter(Boolean))];
+  if (phones.length) lines.push(`Phone: ${phones.join(" / ")}`);
+  const m = String(inq.event_date || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) lines.push("", `Venue code: ${MONTHS[+m[2] - 1]}-${m[3]}-${m[1]}`);
+  lines.push("Kept up to date automatically from the Portal.");
+  return lines.join("\n");
+}
 const NOTE = "Added automatically from the Portal pre-booking form. Renamed when the agreement is fully signed; removed if the soft hold is released or the submission is deleted.";
 const allDay = (date: string) => ({ start: { date }, end: { date: nextDay(date) } });
 
@@ -108,10 +142,13 @@ Deno.serve(async (req) => {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const dry = body?.dry_run === true;
     const today = new Date(Date.now() - 8 * 3600000).toISOString().slice(0, 10);
-    const inqs: any[] = await rest(`venue_inquiries?select=id,name,event_date,status,prebooking_form_response_id&prebooking_form_response_id=not.is.null&status=neq.HoneyBook%20Imported`);
+    const inqs: any[] = await rest(`venue_inquiries?select=id,name,email,phone,partner_name,event_type,guest_count,event_date,status,prebooking_form_response_id&prebooking_form_response_id=not.is.null&status=neq.HoneyBook%20Imported`);
     const respIds = [...new Set(inqs.map((i) => i.prebooking_form_response_id))];
-    const live = new Set<string>(respIds.length ? (await rest(`nsh_form_responses?select=id&id=in.(${respIds.join(",")})`)).map((r: any) => r.id) : []);
-    const versions: any[] = respIds.length ? await rest(`venue_agreement_versions?select=response_id,version,status&response_id=in.(${respIds.join(",")})&order=version.desc`) : [];
+    let forms: any[] = [];
+    const live = new Set<string>(respIds.length ? (forms = await rest(`nsh_form_responses?select=id,created_at,answers&id=in.(${respIds.join(",")})`)).map((r: any) => r.id) : []);
+    const versions: any[] = respIds.length ? await rest(`venue_agreement_versions?select=id,response_id,version,status,issued_at,expires_at,completed_at&response_id=in.(${respIds.join(",")})&order=version.desc`) : [];
+    const latestIds = respIds.map((r) => versions.find((v) => v.response_id === r)?.id).filter(Boolean);
+    const signers: any[] = latestIds.length ? await rest(`venue_agreement_signers?select=version_id,name,email,role,status,signed_at&version_id=in.(${latestIds.join(",")})`) : [];
     const holds: any[] = await rest(`venue_soft_holds?select=*`);
     const cacheRow = (await rest(`calendar_events_cache?select=events&id=eq.1`))?.[0];
     const cache: any[] = Array.isArray(cacheRow?.events) ? cacheRow.events : [];
@@ -119,13 +156,15 @@ Deno.serve(async (req) => {
     const stamp = () => new Date().toISOString();
 
     // What each pre-booking should look like on the calendar (null = no entry).
-    const want = new Map<string, { date: string; summary: string; name: string } | null>();
+    const want = new Map<string, { date: string; summary: string; name: string; details: string } | null>();
     for (const i of inqs) {
       const rid = i.prebooking_form_response_id;
       if (!live.has(rid) || !i.event_date || /\btest\b/i.test(i.name || "")) continue;
-      const ag = versions.find((v) => v.response_id === rid)?.status || null;
+      const v = versions.find((x) => x.response_id === rid) || null;
+      const ag = v?.status || null;
       const name = String(i.name || "Venue booking").trim();
-      want.set(rid, ag === "expired" || ag === "declined" ? null : { date: i.event_date, name, summary: ag === "completed" ? name : `Soft hold: ${name}` });
+      const details = describe(i, forms.find((f) => f.id === rid), v, signers.filter((x) => x.version_id === v?.id));
+      want.set(rid, ag === "expired" || ag === "declined" ? null : { date: i.event_date, name, details, summary: ag === "completed" ? name : `Soft hold: ${name}` });
     }
 
     for (const [rid, w] of want) {
@@ -162,8 +201,8 @@ Deno.serve(async (req) => {
             : await rest(`venue_soft_holds?response_id=eq.${rid}&updated_at=eq.${encodeURIComponent(h.updated_at)}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(claim) });
           if (!got?.length) continue;
           try {
-            const ev = await gcal("POST", "", { summary: w.summary, description: NOTE, ...allDay(w.date), transparency: "transparent" });
-            await rest(`venue_soft_holds?response_id=eq.${rid}`, { method: "PATCH", body: JSON.stringify({ gcal_event_id: ev.id, state: "active", updated_at: stamp() }) });
+            const ev = await gcal("POST", "", { summary: w.summary, description: w.details, ...allDay(w.date), transparency: "transparent" });
+            await rest(`venue_soft_holds?response_id=eq.${rid}`, { method: "PATCH", body: JSON.stringify({ gcal_event_id: ev.id, details: w.details, state: "active", updated_at: stamp() }) });
           } catch (e) {
             await rest(`venue_soft_holds?response_id=eq.${rid}`, { method: "PATCH", body: JSON.stringify({ state: "released", gcal_event_id: null, updated_at: stamp() }) }).catch(() => {});
             throw e;
@@ -172,10 +211,10 @@ Deno.serve(async (req) => {
         out.push({ created: w.summary, date: w.date });
         continue;
       }
-      if (h.summary !== w.summary || h.event_date !== w.date) {
+      if (h.summary !== w.summary || h.event_date !== w.date || h.details !== w.details) {
         if (!dry) {
-          await gcal("PATCH", "/" + encodeURIComponent(h.gcal_event_id), { summary: w.summary, ...allDay(w.date) });
-          await rest(`venue_soft_holds?response_id=eq.${rid}`, { method: "PATCH", body: JSON.stringify({ event_date: w.date, summary: w.summary, updated_at: stamp() }) });
+          await gcal("PATCH", "/" + encodeURIComponent(h.gcal_event_id), { summary: w.summary, description: w.details, ...allDay(w.date) });
+          await rest(`venue_soft_holds?response_id=eq.${rid}`, { method: "PATCH", body: JSON.stringify({ event_date: w.date, summary: w.summary, details: w.details, updated_at: stamp() }) });
         }
         out.push({ updated: w.summary, date: w.date });
       }
