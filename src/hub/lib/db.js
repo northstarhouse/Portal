@@ -1140,8 +1140,11 @@ export async function pushCommitteeEventToWebsite(ev) {
   return { siteEventId: j.event.id, status: j.event.status };
 }
 
-export async function deleteCommitteeEvent(id) {
+// Also removes the event's card from Event Overviews: the Events Committee grid is built from those cards, so a card
+// left behind brings the event straight back (opening it re-creates the committee event).
+export async function deleteCommitteeEvent(id, name) {
   const ok = await del(`events_committee?id=eq.${id}`);
+  if (ok && name) await del(`event_overview_cards?event_name=eq.${encodeURIComponent(name)}`);
   return { success: ok };
 }
 

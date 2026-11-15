@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MediaPicker } from '../../media-library.jsx';
 import { useVol } from '../App.jsx';
 import {
-  pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
+  fetchEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
@@ -356,6 +356,9 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
     setEventMarketingNA(ev.name, v).catch(() => { setMarketingNA(!v); alert('Could not save. Please try again.'); });
   }
   const [ticketStats, setTicketStats] = useState(null);
+  // RSVP events have no ticket sales, so that box reads N/A.
+  const [rsvpOnly, setRsvpOnly] = useState(false);
+  useEffect(() => { let live = true; setRsvpOnly(false); fetchEventCardMeta(ev.name).then(m => { if (live) setRsvpOnly(!!(m && m.rsvp_only)); }).catch(() => {}); return () => { live = false; }; }, [ev.name]);
   const [financials, setFinancials] = useState(null);
   const [flyerUrl, setFlyerUrl] = useState(null);
   const [uploadingFlyer, setUploadingFlyer] = useState(false);
@@ -377,7 +380,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
   // earnings logged by hand in Portal's Op Earnings (sponsorships, door
   // cash, etc.) -- shown as their own boxes rather than combined, since
   // that's how the committee actually tracks where the money came from.
-  const ticketSales = ticketStats ? ticketStats.revenue : 0;
+  const ticketSales = !rsvpOnly && ticketStats ? ticketStats.revenue : 0;
   const otherEarnings = financials ? financials.earnings.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) : 0;
   const expenses = financials ? financials.expenses.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) : 0;
   const netProfit = ticketSales + otherEarnings - expenses;
@@ -423,12 +426,12 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <StatBox label="Ticket Sales" value={money(ticketSales)} sub={ticketStats ? `${ticketStats.ticketsSold} sold` : null} />
+            <StatBox label="Ticket Sales" value={rsvpOnly ? 'N/A' : money(ticketSales)} sub={rsvpOnly ? 'RSVP event, no tickets' : (ticketStats ? `${ticketStats.ticketsSold} sold` : null)} color={rsvpOnly ? 'var(--muted)' : undefined} />
             <StatBox label="Other Earnings" value={money(otherEarnings)} />
             <StatBox label="Expenses" value={money(expenses)} />
             <StatBox label="Net" value={money(netProfit)} color={netProfit >= 0 ? '#4a5d3a' : '#8a4a2e'} />
           </div>
-          <RsvpPanel eventName={ev.name} />
+          <RsvpPanel eventName={ev.name} onSaved={patch => { if (patch && 'rsvp_only' in patch) setRsvpOnly(!!patch.rsvp_only); }} />
         </div>
 
         <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -1438,7 +1441,7 @@ export default function EventsCommittee() {
   function deleteEvent(ev) {
     if (!confirm(`Delete "${ev.name}"? This can't be undone.`)) return false;
     setEvents(prev => prev.filter(e => e.id !== ev.id));
-    deleteCommitteeEvent(ev.id);
+    deleteCommitteeEvent(ev.id, ev.name).then(r => { if (!r.success) { alert('Could not delete this event. Please try again.'); load(); } });
     const fullName = `${volunteer?.['First Name'] || ''} ${volunteer?.['Last Name'] || ''}`.trim();
     logActivity({
       vol: volunteer,
