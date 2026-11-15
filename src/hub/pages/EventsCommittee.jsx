@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MediaPicker } from '../../media-library.jsx';
 import { useVol } from '../App.jsx';
 import {
-  fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
+  insertReimbursement, fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
@@ -1183,6 +1183,35 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   const [quick, setQuick] = useState('');
   const quickRef = useRef(null);
   const [showPrompts, setShowPrompts] = useState(false);
+  const { volunteer } = useVol();
+
+  // "Selling alcohol" does the paperwork setup in one click: the license costs are recorded as expenses and the steps
+  // become checklist duties. ABC license $50 + sheriff signature $30 = $80.
+  async function addAlcoholLicense() {
+    if (ev.checklist.some(t => t.auto === 'alcohol-license')) { setAttachedMsg('The alcohol license duties are already on the checklist.'); return; }
+    if (!window.confirm('Selling alcohol needs an ABC license.\n\nThis adds to Expenses:\n   ABC license application fee   $50\n   Sheriff signature fee   $30\n   Total   $80\n\nand three duties to the checklist: fill out the application, take it to the sheriff, and send it in with a money order.\n\nAdd them?')) return;
+    setAttachedMsg('Adding…');
+    try {
+      const fin = await fetchEventFinancials(ev.name).catch(() => null);
+      const already = !!(fin && fin.expenses.some(r => /alcohol license|abc license/i.test(r.description || '')));
+      if (!already) {
+        const who = ((volunteer && volunteer['First Name']) || '') + ' ' + ((volunteer && volunteer['Last Name']) || '');
+        const base = { event_name: ev.name, area: 'Events', type: 'Purchase', status: 'Submitted', date: new Date().toISOString().slice(0, 10), purchased_by: who.trim() || null };
+        const r1 = await insertReimbursement({ ...base, description: 'ABC alcohol license application fee', amount: 50 });
+        const r2 = await insertReimbursement({ ...base, description: 'Sheriff signature for alcohol license', amount: 30 });
+        if (r1.error || r2.error) throw new Error(r1.error || r2.error);
+      }
+      const duty = (text, estimated) => ({ id: cryptoId(), text, done: false, due: '', timing: 'before', assignee: '', assigneeId: null, priority: '', estimated, actual: 0, notes: '', subtasks: [], auto: 'alcohol-license' });
+      onUpdate(e => ({ ...e, checklist: [...e.checklist,
+        duty('Fill out the ABC alcohol license application ($50 fee)', 50),
+        duty('Take the application to the sheriff for signature ($30 fee)', 30),
+        duty('Get a money order and mail the application off at the post office', 0),
+      ] }));
+      setAttachedMsg(already ? 'Added the three duties. The expenses were already recorded.' : 'Added $80 to Expenses ($50 ABC license + $30 sheriff) and three duties to the checklist below.');
+    } catch (err) {
+      setAttachedMsg('Could not add the alcohol license expenses: ' + (err.message || 'please try again') + '. Nothing was added to the checklist.');
+    }
+  }
   function startPrompt(text) { setQuick(text + ': '); setTimeout(() => { if (quickRef.current) { quickRef.current.focus(); const n = quickRef.current.value.length; quickRef.current.setSelectionRange(n, n); } }, 0); }
 
   // Note taker: type a thought and press Enter, then the next. Pasting several lines adds one note per line.
@@ -1313,12 +1342,12 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
         </div>
         {showPrompts && (
           <div style={{ border: '0.5px solid var(--border-light)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Tap one to start a note with it, then type your answer and press Enter.</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Tap one to start a note with it, then type your answer and press Enter. "Selling alcohol" sets up the license costs and duties for you.</div>
             {PLANNING_PROMPTS.map(g => (
               <div key={g.group} style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 }}>{g.group}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {g.items.map(it => <button key={it} type="button" className="btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => startPrompt(it)}>{it}</button>)}
+                  {g.items.map(it => { const label = typeof it === 'string' ? it : it.label; return <button key={label} type="button" className="btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => (typeof it === 'string' ? startPrompt(it) : (it.action === 'alcohol' ? addAlcoholLicense() : null))}>{label}</button>; })}
                 </div>
               </div>
             ))}

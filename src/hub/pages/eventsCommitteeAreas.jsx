@@ -23,7 +23,7 @@ export const AREA_DEFAULTS = [
 // Questions worth asking while building the checklist (the old planning-area boxes, as prompts).
 export const PLANNING_PROMPTS = [
   { group: 'Logistics', items: ['Setup plan', 'Equipment needed', 'Safety considerations', 'Backup plan (weather, power, no-shows)'] },
-  { group: 'Hospitality', items: ['Serving style (self-serve, served, passed)', 'Alcohol involved?', 'Food and beverage plan', 'Shopping list', 'Rental equipment', 'Cleanup plan'] },
+  { group: 'Hospitality', items: ['Serving style (self-serve, served, passed)', { label: 'Selling alcohol (needs a license)', action: 'alcohol' }, 'Food and beverage plan', 'Shopping list', 'Rental equipment', 'Cleanup plan'] },
   { group: 'Sponsorship', items: ['Potential sponsors', 'How we will recognize sponsors', 'Outreach to sponsors', 'Intentional invites'] },
   { group: 'Interiors', items: ['Historic approach (what stays in place)', 'Items to move or remove, and why', 'Decor to add', 'Decor cost'] },
   { group: 'Money', items: ['Projected expenses', 'Projected income', 'Reimbursements needed?'] },
