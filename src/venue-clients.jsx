@@ -163,8 +163,9 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   const siteManager = a.__venue_checklist?.site_manager?.name || '';
   const eventDay = a.__venue_checklist?.event_day || null;
   const smPaperwork = Array.isArray(a.__venue_checklist?.site_manager_paperwork) ? a.__venue_checklist.site_manager_paperwork : [];
+  const portalEmail = a.__venue_checklist?.portal_email || null;
   const feedbackSentAt = live?.feedback_sent_at || null;
-  return { id:sub.id, sub, clientsSigned, questionnaireSentAt: live?.questionnaire_sent_at || null, isPast, needsPaperwork, maxGuests:String(a.max_guests||'').trim()||null, name, email, contacts, siteManager, questionnaire, hbQa, feedbackSentAt, eventDay, smPaperwork, hb, eventDate, eventEnd, nativeAgreement, legacy, type: a.__event_type ? String(a.__event_type) : sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : evType(live?.event_type), days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount != null ? payments.total.amount + extraTotal : null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount + extraTotal - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
+  return { id:sub.id, sub, clientsSigned, questionnaireSentAt: live?.questionnaire_sent_at || null, isPast, needsPaperwork, maxGuests:String(a.max_guests||'').trim()||null, name, email, contacts, siteManager, questionnaire, hbQa, feedbackSentAt, eventDay, smPaperwork, portalEmail, hb, eventDate, eventEnd, nativeAgreement, legacy, type: a.__event_type ? String(a.__event_type) : sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : evType(live?.event_type), days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount != null ? payments.total.amount + extraTotal : null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount + extraTotal - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
 }
 
 const css = `
@@ -201,6 +202,61 @@ async function uploadSiteManagerPaperwork(responseId, file) {
   const out = await res.json().catch(() => ({}));
   if (!res.ok || !out.ok || !out.record) throw new Error(out.error || 'The upload did not go through. Please try again.');
   return { record: out.record, emailed: !!out.emailed };
+}
+
+// ── "We've updated our booking system" email for clients booked in the old system ──
+// One email to everyone on the booking: their venue code (the event date, like OCT-03-2027) and a button to the client portal.
+const VENUE_MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const CLIENT_PORTAL_URL = 'https://venue.northstarhouse.org/';
+const venueCodeFor = (iso) => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m && VENUE_MONTHS[+m[2] - 1] ? VENUE_MONTHS[+m[2] - 1] + '-' + m[3] + '-' + m[1] : ''; };
+const escMail = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const joinAmp = (list) => list.length <= 1 ? (list[0] || 'there') : list.slice(0, -1).join(', ') + ' & ' + list[list.length - 1];
+function buildPortalEmail(client) {
+  const code = venueCodeFor(client.eventDate);
+  if (!code) return { error: 'This client has no event date yet, so there is no venue code to send.' };
+  const isEmail = (x) => /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(String(x || '').trim());
+  const people = (client.contacts || []).filter((c) => isEmail(c.email));
+  if (!people.length && isEmail(client.email)) people.push({ full_name: '', email: client.email });
+  const to = [...new Set(people.map((c) => String(c.email).trim().toLowerCase()))];
+  if (!to.length) return { error: 'There is no email address on file for this client.' };
+  // First names: "Julia Yousif" -> Julia. A name written "Last, First" is turned around first.
+  const firstOf = (full) => { const n = String(full || '').trim(); const w = (n.includes(',') ? n.split(',')[1] : n).trim().split(/\s+/)[0] || ''; return /^[A-Za-z][A-Za-z'.-]*$/.test(w) ? w : ''; };
+  const seen = new Set(), names = [];
+  people.forEach((c) => { const f = firstOf(c.full_name); if (f && !seen.has(f.toLowerCase())) { seen.add(f.toLowerCase()); names.push(f); } });
+  const who = joinAmp(names);
+  const wedding = client.type === 'Wedding';
+  const todo = 'make payments, upload your event insurance, ' + (wedding ? 'submit your brick wording, ' : '') + 'complete your pre-event questionnaire, and manage other details for your event';
+  const subject = 'Your North Star House client portal';
+  const p = (t) => '<p style="margin:0 0 18px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.6;text-align:left;">' + t + '</p>';
+  const html = '<div style="display:none;max-height:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;">We have updated our venue booking system. Enter your venue code to open your client portal.</div>'
+    + '<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,\'Times New Roman\',serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:#886c44;"></div><div style="padding:44px 40px 36px;text-align:center;">'
+    + '<div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:1px;color:#886c44;font-weight:bold;margin-bottom:14px;">North Star House</div>'
+    + '<h1 style="margin:0 0 24px;font-size:30px;font-weight:400;color:#2a2420;">Your Client Portal</h1><div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>'
+    + p('Hi ' + escMail(who) + ',')
+    + p('We&rsquo;ve updated our venue booking system! Please click the button below and enter your venue code to access your client portal.')
+    + '<div style="margin:6px 0 24px;padding:16px;background:#fff;border:1px solid #e5ddcf;text-align:center;"><div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;color:#888;margin-bottom:6px;">Your venue code</div><div style="font-family:Helvetica,Arial,sans-serif;font-size:24px;font-weight:bold;letter-spacing:3px;color:#2a2420;">' + escMail(code) + '</div></div>'
+    + '<a href="' + CLIENT_PORTAL_URL + '" style="display:inline-block;background:#886c44;color:#fff;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-weight:bold;font-size:15px;padding:16px 32px;margin:0 0 26px;">Access Your Client Portal</a>'
+    + p('<strong>Please bookmark the portal page!</strong> This is where you&rsquo;ll ' + todo + '.')
+    + p('If you have any questions or trouble getting in, just reply to this email. We&rsquo;re happy to help!')
+    + '</div></div></div>';
+  const text = 'Hi ' + who + ',\n\nWe\u2019ve updated our venue booking system! Please open the link below and enter your venue code to access your client portal.\n\nYour venue code: ' + code + '\n\nAccess your client portal: ' + CLIENT_PORTAL_URL + '\n\nPlease bookmark the portal page! This is where you\u2019ll ' + todo + '.\n\nIf you have any questions or trouble getting in, just reply to this email. We\u2019re happy to help!\n\nNorth Star House';
+  return { to, names, who, code, subject, html, text };
+}
+
+// Remember that it was sent (on the client's own record, beside the other checklist items), so nobody sends it twice by accident.
+async function savePortalEmail(responseId, info) {
+  if (!responseId) throw new Error('Choose a client.');
+  const headers = { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY, 'Content-Type': 'application/json' };
+  const resource = PB_URL + '/rest/v1/nsh_form_responses?id=eq.' + encodeURIComponent(responseId);
+  const cur = await fetch(resource + '&select=id,form_id,answers', { headers });
+  const rows = cur.ok ? await cur.json() : null;
+  if (!Array.isArray(rows) || rows.length !== 1) throw new Error('Client record is unavailable or you do not have permission to update it.');
+  const checklist = { ...(rows[0].answers?.__venue_checklist || {}), portal_email: { sent_at: new Date().toISOString(), to: info.to } };
+  const answers = { ...rows[0].answers, __venue_checklist: checklist };
+  const res = await fetch(resource + '&form_id=eq.' + encodeURIComponent(rows[0].form_id), { method: 'PATCH', headers: { ...headers, Prefer: 'return=representation' }, body: JSON.stringify({ answers }) });
+  const saved = res.ok ? await res.json() : null;
+  if (!Array.isArray(saved) || saved.length !== 1) throw new Error('could not record it');
+  return saved[0];
 }
 
 // Event-day times for billing: when the last guest actually left, and when the site manager left (they are often different).
@@ -566,7 +622,7 @@ function OutTimeSelect({ value, onChange, style, label }) {
   </span>;
 }
 
-function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignSite, onSaveEventDay, onUploadPaperwork, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
+function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignSite, onSaveEventDay, onSavePortalEmail, onUploadPaperwork, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [typeEdit, setTypeEdit] = React.useState(false);
@@ -576,6 +632,38 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
   const [dayTimes, setDayTimes] = React.useState({ guests_out: client.eventDay?.guests_out || '', sm_out: client.eventDay?.sm_out || '' });
   const [dayBusy, setDayBusy] = React.useState(false);
   const [dayMsg, setDayMsg] = React.useState(null);
+  const [mailBusy, setMailBusy] = React.useState(false);
+  // Opens the email exactly as the client will get it, with who it goes to, without sending anything.
+  function previewPortalEmail() {
+    const t = buildPortalEmail(client);
+    if (t.error) { alert(t.error); return; }
+    const w = window.open('', '_blank');
+    if (!w) { alert('Allow pop-ups to see the preview.'); return; }
+    w.document.open();
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Preview: ' + escMail(t.subject) + '</title></head><body style="margin:0;font-family:Helvetica,Arial,sans-serif;">'
+      + '<div style="background:#fff;border-bottom:1px solid #ddd;padding:10px 16px;font-size:13px;color:#555;"><strong>To:</strong> ' + escMail(t.to.join(', ')) + ' &nbsp;·&nbsp; <strong>From:</strong> venue@northstarhouse.org &nbsp;·&nbsp; <strong>Subject:</strong> ' + escMail(t.subject) + '</div>'
+      + t.html + '</body></html>');
+    w.document.close();
+  }
+  async function sendPortalEmail() {
+    if (mailBusy) return;
+    const t = buildPortalEmail(client);
+    if (t.error) { alert(t.error); return; }
+    const prior = client.portalEmail && client.portalEmail.sent_at;
+    const ask = (prior ? 'This was already sent on ' + dateLabel(prior) + '. Send it again to ' : 'Email the client portal link and venue code to ') + t.who + ' (' + t.to.join(', ') + ')? Their venue code is ' + t.code + '.';
+    if (!window.confirm(ask)) return;
+    setMailBusy(true);
+    try {
+      const r = await fetch(PB_URL + '/functions/v1/send-email', { method: 'POST', headers: { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: t.to, subject: t.subject, body: t.text, html: t.html, sender: 'North Star House', fromEmail: 'venue@northstarhouse.org' }) });
+      if (!r.ok) throw new Error('The email could not be sent. Please try again.');
+      fetch(PB_URL + '/rest/v1/activity_log', { method: 'POST', headers: { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ description: 'Client portal email sent to ' + t.who + ' (' + t.code + ')', action: 'client_portal_email', tag: 'Venue Rentals' }) }).catch(() => {});
+      let recorded = true;
+      try { if (onSavePortalEmail) await onSavePortalEmail(client.id, { to: t.to }); } catch (e) { recorded = false; }
+      alert('Sent to ' + t.to.join(', ') + '.' + (recorded ? '' : ' (It could not be marked as sent on their profile.)'));
+    } catch (e) { alert(e.message || 'The email could not be sent.'); } finally { setMailBusy(false); }
+  }
   const [tl, setTl] = React.useState({ tour: null, sentAt: null, loaded: false });
   // The tour and the "client guide + pre-booking form" email, found by the couple's email addresses.
   React.useEffect(() => {
@@ -668,7 +756,7 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
   step('Post-event feedback', !!tl.feedbackAt, tl.feedbackAt ? 'Received ' + dateLabel(String(tl.feedbackAt).slice(0, 10)) : client.feedbackSentAt ? 'Sent ' + dateLabel(String(client.feedbackSentAt).slice(0, 10)) + ', no response yet' : (client.eventEnd || client.eventDate) ? 'Sends about ' + dateLabel(shiftDate(String(client.eventEnd || client.eventDate).slice(0, 10), 8)) : 'After the event', null, false, <PostEventFeedback client={client}/>);
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
   return <dialog ref={ref} className="vc-dialog" aria-labelledby="vc-client-title" onCancel={onClose} onClick={e => { if(e.target === ref.current) onClose(); }}>
-    <div className="vc-modal-head"><div style={{flex:1}}><h2 id="vc-client-title" className="vc-name" style={{fontSize:25,margin:0}}>{client.name} - {client.type}</h2>{onRename&&<a onClick={async()=>{const cur=client.name;const v=window.prompt('Event name (leave empty to go back to the original name):',cur);if(v===null)return;try{await onRename(client.id,v.trim());}catch(e){alert(e.message||'Could not save.');}}} style={{cursor:'pointer',color:'#886c44',fontSize:12,fontWeight:600,textDecoration:'underline'}}>Edit name</a>}{onRetype&&<span style={{marginLeft:12,fontSize:12}}>{typeEdit?<select autoFocus value={client.sub?.answers?.__event_type||''} onBlur={()=>setTypeEdit(false)} onChange={async e=>{const v=e.target.value;try{await onRetype(client.id,v);setTypeEdit(false);}catch(err){alert(err.message||'Could not save.');}}} style={{fontSize:12,padding:'3px 6px',border:'1px solid #886c44',borderRadius:6,color:'#886c44',background:'#fff'}}><option value=''>Automatic (from the form)</option>{EVENT_TYPE_OPTIONS.map(t=><option key={t} value={t}>{t}</option>)}</select>:<a onClick={()=>setTypeEdit(true)} style={{cursor:'pointer',color:'#886c44',fontWeight:600,textDecoration:'underline'}}>Edit type</a>}</span>}{onDelete&&!client.nativeAgreement&&!client.hb&&client.sub?.answers&&<a onClick={async()=>{if(!confirm('Delete the pre-booking form submission from '+client.name+'? This removes the client from the Portal along with any unsent contract drafts. It cannot be undone.'))return;const pw=window.prompt('Enter the delete password:');if(pw===null)return;try{await onDelete(client.id,pw);}catch(e){alert(e.message||'Could not delete.');}}} style={{marginLeft:12,cursor:'pointer',color:'#a64f3c',fontSize:12,fontWeight:600,textDecoration:'underline'}}>Delete submission</a>}{client.siteManager&&<div style={{marginTop:4,fontSize:13,color:'#6b5d4a'}}>Site manager: <strong style={{color:'#2a2420'}}>{client.siteManager}</strong></div>}<div style={{fontFamily:'Cardo,Georgia,serif',fontSize:22,fontWeight:700,color:'#886c44',marginTop:6}}>{dateLabel(client.eventDate)}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10,flexShrink:0}}><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button><button type="button" onClick={()=>openSitePacket(client)} style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap'}}>Print Site Manager Packet</button><a href="https://venue.northstarhouse.org/guidebook/" target="_blank" rel="noopener noreferrer" style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap',textDecoration:'none',fontSize:'inherit'}}>Client Guidebook</a></div></div>
+    <div className="vc-modal-head"><div style={{flex:1}}><h2 id="vc-client-title" className="vc-name" style={{fontSize:25,margin:0}}>{client.name} - {client.type}</h2>{onRename&&<a onClick={async()=>{const cur=client.name;const v=window.prompt('Event name (leave empty to go back to the original name):',cur);if(v===null)return;try{await onRename(client.id,v.trim());}catch(e){alert(e.message||'Could not save.');}}} style={{cursor:'pointer',color:'#886c44',fontSize:12,fontWeight:600,textDecoration:'underline'}}>Edit name</a>}{onRetype&&<span style={{marginLeft:12,fontSize:12}}>{typeEdit?<select autoFocus value={client.sub?.answers?.__event_type||''} onBlur={()=>setTypeEdit(false)} onChange={async e=>{const v=e.target.value;try{await onRetype(client.id,v);setTypeEdit(false);}catch(err){alert(err.message||'Could not save.');}}} style={{fontSize:12,padding:'3px 6px',border:'1px solid #886c44',borderRadius:6,color:'#886c44',background:'#fff'}}><option value=''>Automatic (from the form)</option>{EVENT_TYPE_OPTIONS.map(t=><option key={t} value={t}>{t}</option>)}</select>:<a onClick={()=>setTypeEdit(true)} style={{cursor:'pointer',color:'#886c44',fontWeight:600,textDecoration:'underline'}}>Edit type</a>}</span>}{onDelete&&!client.nativeAgreement&&!client.hb&&client.sub?.answers&&<a onClick={async()=>{if(!confirm('Delete the pre-booking form submission from '+client.name+'? This removes the client from the Portal along with any unsent contract drafts. It cannot be undone.'))return;const pw=window.prompt('Enter the delete password:');if(pw===null)return;try{await onDelete(client.id,pw);}catch(e){alert(e.message||'Could not delete.');}}} style={{marginLeft:12,cursor:'pointer',color:'#a64f3c',fontSize:12,fontWeight:600,textDecoration:'underline'}}>Delete submission</a>}{client.siteManager&&<div style={{marginTop:4,fontSize:13,color:'#6b5d4a'}}>Site manager: <strong style={{color:'#2a2420'}}>{client.siteManager}</strong></div>}<div style={{fontFamily:'Cardo,Georgia,serif',fontSize:22,fontWeight:700,color:'#886c44',marginTop:6}}>{dateLabel(client.eventDate)}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10,flexShrink:0}}><button className="vc-open" onClick={onClose} aria-label="Close client details">Close ×</button><button type="button" onClick={()=>openSitePacket(client)} style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap'}}>Print Site Manager Packet</button><button type="button" onClick={previewPortalEmail} title="See the email before it is sent" style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap'}}>Preview Portal Email</button><button type="button" disabled={mailBusy} onClick={sendPortalEmail} title="Email the client portal link and their venue code (for clients booked in the old system)" style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap',opacity:mailBusy?0.6:1}}>{mailBusy?'Sending…':'Email Portal Access'}</button>{client.portalEmail&&client.portalEmail.sent_at&&<div style={{fontSize:11,color:'#2e6b4f',marginTop:-6}}>✓ Portal email sent {dateLabel(client.portalEmail.sent_at)}</div>}<a href="https://venue.northstarhouse.org/guidebook/" target="_blank" rel="noopener noreferrer" style={{background:'#fff',color:'#886c44',border:'0.5px solid #886c44',borderRadius:8,padding:'7px 14px',fontWeight:600,whiteSpace:'nowrap',textDecoration:'none',fontSize:'inherit'}}>Client Guidebook</a></div></div>
     {client.payments && <div className="vc-hstepper" aria-label="Payment timeline">
       {client.schedule.map((s,i) => {
         const pastDue = s.due && s.due < venueDateKey() && !s.paid && client.clientsSigned;
@@ -913,6 +1001,10 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     const record = await saveSiteManager(id,name);
     setSavedResponses(prev=>({...prev,[id]:record}));
   }
+  async function recordPortalEmail(id,info) {
+    const record = await savePortalEmail(id,info);
+    setSavedResponses(prev=>({...prev,[id]:record}));
+  }
   async function recordEventDay(id,times) {
     const record = await saveEventDay(id,times);
     setSavedResponses(prev=>({...prev,[id]:record}));
@@ -946,6 +1038,6 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, showSite: showSi
     </aside></div>
     </>}
     {statsOpen&&<ClientStats clients={upcomingClients} onClose={onCloseStats}/>}
-    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onUploadPaperwork={uploadPaperwork} onAssignSite={assignSite} onSavePayments={recordPayments} onRename={renameClient} onRetype={retypeClient} onDelete={deleteSubmission} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
+    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onSavePortalEmail={recordPortalEmail} onUploadPaperwork={uploadPaperwork} onAssignSite={assignSite} onSavePayments={recordPayments} onRename={renameClient} onRetype={retypeClient} onDelete={deleteSubmission} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }
