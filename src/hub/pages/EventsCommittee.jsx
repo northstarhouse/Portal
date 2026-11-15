@@ -343,7 +343,7 @@ const CHECKLIST_CATEGORIES = ['General', 'Logistics', 'Hospitality', 'Sponsorshi
 const checkCat = (c) => (CHECKLIST_CATEGORIES.includes(c) ? c : 'General');
 // Things we still need (a bartender, a sponsor...) are handled once someone is named, it is confirmed, or enough volunteers are assigned.
 const needHandled = (v) => !!v.confirmed || !!v.who || !!v.role
-  || (['volunteer', 'activity'].includes(v.kind) && (v.assignedIds || []).length >= Math.max(1, Number(v.target) || 1));
+  || (['volunteer', 'activity'].includes(v.kind) && needPeopleCount(v) >= Math.max(1, Number(v.target) || 1));
 // What the line is about. Older entries stored the person in name and the job (Santa Claus) in role.
 const needTitle = (v) => (v.role && !v.who ? v.role : v.name);
 const needCategory = (v) => (v.kind === 'sponsor' ? 'Sponsorship' : 'Volunteers & vendors');
@@ -732,6 +732,75 @@ const costLabel = (v) => (v.costType === 'flat' && Number(v.cost) > 0 ? '$' + Nu
 const NEED_KINDS = { vendor: 'Vendor', contact: 'Contact', volunteer: 'Volunteer', activity: 'Activity', sponsor: 'Sponsor' };
 const volFullName = (v) => `${v['First Name'] || ''} ${v['Last Name'] || ''}`.trim() || 'Unnamed';
 
+// Assign volunteers to a need: type to search the roster, or type any name that isn't on it.
+// Roster picks go in assignedIds (phone shown from the roster; an edited number is kept in phones[id]).
+// Typed-in names go in people [{ id, name, phone }]. Everyone assigned gets a phone box, blank when unknown.
+const needPeopleCount = (v) => (v.assignedIds || []).length + (v.people || []).length;
+function AssignVolunteers({ v, volunteers, onPatch, compact }) {
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(false);
+  const roster = volunteers || [];
+  const name = (x) => ((x['First Name'] || '') + ' ' + (x['Last Name'] || '')).trim() || 'Unnamed';
+  const assigned = (v.assignedIds || []).map(id => roster.find(x => x.id === id)).filter(Boolean);
+  const people = v.people || [];
+  const term = q.trim().toLowerCase();
+  const matches = term ? roster.filter(x => !(v.assignedIds || []).includes(x.id) && name(x).toLowerCase().includes(term)).slice(0, 8) : [];
+  const exact = matches.find(x => name(x).toLowerCase() === term);
+  const pick = (x) => { onPatch({ assignedIds: [...(v.assignedIds || []), x.id] }); setQ(''); setOpen(false); };
+  const addTyped = () => { const t = q.trim(); if (!t) return; onPatch({ people: [...people, { id: cryptoId(), name: t, phone: '' }] }); setQ(''); setOpen(false); };
+  const fs = compact ? 12 : 13;
+  const phoneBox = (value, save) => (
+    <input className="input" placeholder="Phone" defaultValue={value || ''} key={value || ''} onBlur={e => { const t = e.target.value.trim(); if (t !== (value || '')) save(t); }}
+      style={{ width: compact ? 110 : 140, fontSize: fs, padding: compact ? '3px 6px' : '5px 8px' }} />
+  );
+  const removeBtn = (onClick) => <button type="button" onClick={onClick} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '0 4px', fontSize: 14 }}>×</button>;
+  return (
+    <div style={{ width: compact ? 'auto' : '100%' }}>
+      <div style={{ position: 'relative', width: compact ? 190 : '100%' }}>
+        <input className="input" value={q} placeholder="Type a name to assign…" onChange={e => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (exact) pick(exact); else if (matches.length === 1) pick(matches[0]); else addTyped(); } if (e.key === 'Escape') setOpen(false); }}
+          style={{ width: '100%', boxSizing: 'border-box', fontSize: fs, padding: compact ? '5px 8px' : undefined }} />
+        {open && term && (
+          <div style={{ position: 'absolute', zIndex: 30, top: '100%', left: 0, right: 0, marginTop: 2, background: '#fff', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 6px 18px rgba(0,0,0,0.12)', maxHeight: 260, overflowY: 'auto' }}>
+            {matches.map(x => (
+              <button type="button" key={x.id} onMouseDown={e => { e.preventDefault(); pick(x); }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', borderBottom: '0.5px solid var(--border-light)', padding: '7px 10px', cursor: 'pointer', fontSize: fs, fontFamily: 'inherit' }}>
+                {name(x)}{x['Phone Number'] ? <span style={{ color: 'var(--muted)' }}> · {x['Phone Number']}</span> : null}
+              </button>
+            ))}
+            {!exact && (
+              <button type="button" onMouseDown={e => { e.preventDefault(); addTyped(); }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '7px 10px', cursor: 'pointer', fontSize: fs, fontFamily: 'inherit', color: '#886c44' }}>
+                + Add “{q.trim()}” (not on the volunteer list)
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {(assigned.length > 0 || people.length > 0) && (
+        <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {assigned.map(x => (
+            <div key={x.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: fs }}>
+              <span style={{ minWidth: compact ? 0 : 160 }}>{name(x)}</span>
+              {phoneBox((v.phones || {})[x.id] ?? x['Phone Number'], t => onPatch({ phones: { ...(v.phones || {}), [x.id]: t } }))}
+              {removeBtn(() => onPatch({ assignedIds: (v.assignedIds || []).filter(id => id !== x.id) }))}
+            </div>
+          ))}
+          {people.map(pp => (
+            <div key={pp.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: fs }}>
+              <input className="input" defaultValue={pp.name} key={pp.id + pp.name} onBlur={e => { const t = e.target.value.trim(); if (t && t !== pp.name) onPatch({ people: people.map(y => y.id === pp.id ? { ...y, name: t } : y) }); }}
+                style={{ width: compact ? 120 : 160, fontSize: fs, padding: compact ? '3px 6px' : '5px 8px' }} />
+              {phoneBox(pp.phone, t => onPatch({ people: people.map(y => y.id === pp.id ? { ...y, phone: t } : y) }))}
+              {removeBtn(() => onPatch({ people: people.filter(y => y.id !== pp.id) }))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NeedsList({ ev, onUpdate, volunteers }) {
   const [quick, setQuick] = useState('');
   const [openId, setOpenId] = useState(null);
@@ -770,10 +839,11 @@ function NeedsList({ ev, onUpdate, volunteers }) {
         const target = Number(v.target) || 0;
         const who = v.who || (v.role ? v.name : '');
         const title = v.who || !v.role ? v.name : v.role + ': ' + v.name;
-        const found = !!v.confirmed || !!who || assigned.length > 0;
+        const found = !!v.confirmed || !!who || needPeopleCount(v) > 0;
         const costText = costLabel(v);
         let sub;
-        if (kind === 'volunteer' || kind === 'activity') sub = assigned.length + (target ? ' of ' + target : '') + ' assigned' + (assigned.length ? ': ' + assigned.map(volFullName).join(', ') : '');
+        const names = [...assigned.map(volFullName), ...(v.people || []).map(pp => pp.name)];
+        if (kind === 'volunteer' || kind === 'activity') sub = names.length + (target ? ' of ' + target : '') + ' assigned' + (names.length ? ': ' + names.join(', ') : '');
         else if (who || v.contact) sub = [v.who ? v.who : (v.role ? v.name : ''), v.contact].filter(Boolean).join('  ·  ');
         else sub = '';
         return (
@@ -816,18 +886,9 @@ function NeedsList({ ev, onUpdate, volunteers }) {
                       </div>
                       <div style={{ flex: 1, minWidth: 200 }}>
                         <div style={cap}>Assign a volunteer</div>
-                        <select className="input" value="" onChange={e => { const pick = (volunteers || []).find(x => x.id === e.target.value); if (pick) patch(v.id, { assignedIds: [...(v.assignedIds || []), pick.id], contact: v.contact || pick['Phone Number'] || '' }); }} style={{ ...inp, appearance: 'auto' }}>
-                          <option value="">Choose a volunteer…</option>
-                          {(volunteers || []).filter(x => !(v.assignedIds || []).includes(x.id)).map(x => <option key={x.id} value={x.id}>{volFullName(x)}</option>)}
-                        </select>
+                        <AssignVolunteers v={v} volunteers={volunteers} onPatch={p => patch(v.id, p)} />
                       </div>
                     </div>
-                    {assigned.map(x => (
-                      <div key={x.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: 13 }}>
-                        <span>{volFullName(x)}{x['Phone Number'] ? <span style={{ color: 'var(--muted)' }}> · {x['Phone Number']}</span> : null}</span>
-                        <button className="btn-ghost" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => patch(v.id, { assignedIds: (v.assignedIds || []).filter(id => id !== x.id) })}>Remove</button>
-                      </div>
-                    ))}
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -1489,8 +1550,6 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
         {g.items.map(it => {
           if (it.need) {
             const v = it.v; const handled = needHandled(v);
-            const assignedList = (v.assignedIds || []).map(id => (volunteers || []).find(x => x.id === id)).filter(Boolean);
-            const vName = (x) => ((x['First Name'] || '') + ' ' + (x['Last Name'] || '')).trim() || 'Unnamed';
             return (
               <ItemRow key={'need-' + v.id}>
                 <button type="button" onClick={() => patchNeed(v.id, handled ? { confirmed: false, who: '' } : { confirmed: true })} title={handled ? 'Click to mark as still needed' : 'Click when it is figured out'}
@@ -1507,15 +1566,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
                 </select>
                 {['volunteer', 'activity'].includes(v.kind) && (
                   <>
-                    <select className="input" value="" onChange={e => { const pick = (volunteers || []).find(x => x.id === e.target.value); if (pick) patchNeed(v.id, { assignedIds: [...(v.assignedIds || []), pick.id], contact: v.contact || pick['Phone Number'] || '' }); }} style={{ width: 170, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}>
-                      <option value="">Assign a volunteer…</option>
-                      {(volunteers || []).filter(x => !(v.assignedIds || []).includes(x.id)).map(x => <option key={x.id} value={x.id}>{vName(x)}</option>)}
-                    </select>
-                    {assignedList.map(x => (
-                      <span key={x.id} className="badge" style={{ background: 'var(--light)', color: 'var(--text)', flexShrink: 0 }}>{vName(x)}{x['Phone Number'] ? ' · ' + x['Phone Number'] : ''}
-                        <button type="button" onClick={() => patchNeed(v.id, { assignedIds: (v.assignedIds || []).filter(id => id !== x.id) })} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', marginLeft: 4, padding: 0 }}>×</button>
-                      </span>
-                    ))}
+                    <AssignVolunteers v={v} volunteers={volunteers} onPatch={p => patchNeed(v.id, p)} compact />
                   </>
                 )}
                 {!['volunteer', 'activity'].includes(v.kind) && <input className="input" placeholder="Who we found" defaultValue={v.who || (v.role ? v.name : '')} key={v.id + 'who' + (v.who || '')} style={{ width: 140, flexShrink: 0, fontSize: 12, padding: '5px 8px' }}
