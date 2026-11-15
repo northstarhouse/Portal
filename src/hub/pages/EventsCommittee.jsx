@@ -769,6 +769,54 @@ function VendorsPanel({ ev, onUpdate }) {
   );
 }
 
+// Event Basics as a ready sheet: every question with its answer, and anything not filled in shown plainly so it can be spotted.
+function EventBasicsView({ f, ev }) {
+  const group = { fontSize: 12, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 1, margin: '28px 0 0', paddingBottom: 8, borderBottom: '1.5px solid #e8dfd0' };
+  const cap = { width: 150, flexShrink: 0, fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, paddingTop: 3 };
+  const empty = (req) => <span style={{ color: '#b8863b', fontStyle: 'italic' }}>{req ? 'Not filled in yet (required)' : 'Not filled in yet'}</span>;
+  const row = (label, value, req) => (
+    <div style={{ display: 'flex', gap: 20, padding: '14px 0', borderBottom: '0.5px solid var(--border-light)' }}>
+      <div style={cap}>{label}</div>
+      <div style={{ flex: 1, minWidth: 0, fontSize: 15, color: 'var(--text)', lineHeight: 1.55, overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>{value ? value : empty(req)}</div>
+    </div>
+  );
+  const when = f.dateTbd ? 'To be announced' : [f.date ? fmtDate(f.date) : '', f.startTime ? fmtTime12(f.startTime) + (f.endTime ? ' – ' + fmtTime12(f.endTime) : '') : ''].filter(Boolean).join('  ·  ');
+  const tiers = f.sells ? f.tiers.filter(t => String(t.name || '').trim()) : [];
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start' }}>
+        {f.imageUrl && <img src={f.imageUrl} alt={f.imageAlt || ''} style={{ width: 150, height: 100, objectFit: 'cover', borderRadius: 10, flexShrink: 0 }} />}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Cardo','Georgia',serif", fontSize: 26, fontWeight: 700, lineHeight: 1.2 }}>{f.title || empty(true)}</div>
+          <div style={{ marginTop: 10 }}>
+            <span className="badge" style={ev.siteEventId ? { background: '#e8f5e9', color: '#2e7d32' } : { background: 'var(--light)', color: 'var(--muted)' }}>{ev.siteEventId ? 'On the website' : 'Not on the website yet'}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={group}>The event</div>
+      {row('Short description', f.short, true)}
+      {row('Full description', f.desc, true)}
+      {row('Photo', f.imageUrl ? 'Chosen' : null)}
+
+      <div style={group}>When and where</div>
+      {row('Date and time', when, true)}
+      {row('Location', f.locName, true)}
+      {row('Address', f.locAddr, true)}
+
+      <div style={group}>Website</div>
+      {row('Web address', f.slug)}
+      {row('Tickets', f.sells ? (tiers.length ? tiers.map(t => t.name + ' — ' + (Number(t.price) > 0 ? '$' + t.price : 'Free') + (t.limit ? ' (max ' + t.limit + ' per order)' : '')).join('\n') : null) : 'Not sold online', f.sells)}
+
+      <div style={group}>Planning notes (not on the website)</div>
+      {row('Event type', f.purpose)}
+      {row('Event lead', f.eventLead)}
+      {row('Expected attendance', f.expectedAttendance)}
+      {row('Pricing note', f.pricing)}
+    </div>
+  );
+}
+
 // "Website event page": everything the website event needs, filled in here, then Push to website sends it to
 // Admin > New Event and goes live (later pushes update the same event).
 function WebsiteEventPanel({ ev, onUpdate }) {
@@ -852,15 +900,24 @@ function WebsiteEventPanel({ ev, onUpdate }) {
       <div style={{ display: 'flex', justifyContent: 'flex-end', minHeight: 28 }}>
         {!editing && <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 14px' }} onClick={() => setEditing(true)}>Edit</button>}
       </div>
-      <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>
+      {editing && <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>
         {ev.siteEventId
           ? 'This is the event and its website page. Fill it in here; this event is on the website, so Save and update website sends your changes live.'
           : 'This is the event and its website page. Fill it in here; Push to website makes the event live on the website right away.'}
-      </div>
+      </div>}
 
-      {true ? (
+      {!editing ? (
         <div>
-          <fieldset disabled={!editing} className={'sheet-fieldset' + (editing ? '' : ' sheet-readonly')}>
+          <EventBasicsView f={f} ev={ev} />
+          {msg && <div style={{ fontSize: 12, margin: '12px 0 0', color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}
+          <div style={{ marginTop: 16 }}>
+            {missing(f).length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Still needed before pushing: {missing(f).join(', ')}. Click Edit.</div>}
+            <button className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing || missing(f).length > 0} onClick={() => push(f)}>{pushing ? 'Pushing…' : (ev.siteEventId ? 'Update website event' : 'Push to website')}</button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <fieldset className="sheet-fieldset">
           <div style={{ ...head, marginTop: 8, borderTop: 'none', paddingTop: 0 }}>The event</div>
           <label style={lab}>Title *<input style={inp} value={f.title} onChange={e => { const v = e.target.value; setF(o => ({ ...o, title: v, slug: o.slugTouched ? o.slug : slugify(v) })); }} placeholder="e.g. Holiday Open House" /></label>
           <label style={lab}>Web address (the last part of the event's link)
@@ -932,20 +989,13 @@ function WebsiteEventPanel({ ev, onUpdate }) {
           </fieldset>
 
           {msg && <div style={{ fontSize: 12, margin: '8px 0', color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}
-          {!editing ? (
-            <div style={{ marginTop: 10 }}>
-              {missing(f).length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Still needed before pushing: {missing(f).join(', ')}. Click Edit.</div>}
-              <button className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing || missing(f).length > 0} onClick={() => push(f)}>{pushing ? 'Pushing…' : (ev.siteEventId ? 'Update website event' : 'Push to website')}</button>
-            </div>
-          ) : (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             <button className="btn-gold" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => push(f)}>{pushing ? 'Pushing…' : (ev.siteEventId ? 'Save and update website' : 'Save and push to website')}</button>
             <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={save}>Save only</button>
             <button className="btn-ghost" style={{ fontSize: 12, padding: '7px 14px' }} disabled={pushing} onClick={() => { setF(initial()); setMsg(null); setEditing(false); }}>Cancel</button>
           </div>
-          )}
         </div>
-      ) : null}
+      )}
       {picker && <MediaPicker supabaseUrl={SITE_SUPABASE_URL} supabaseKey={SITE_SUPABASE_KEY} onPick={img => { setF(o => ({ ...o, imageUrl: img.url, imageAlt: o.imageAlt || img.alt || '' })); setPicker(false); }} onClose={() => setPicker(false)} />}
     </div>
   );

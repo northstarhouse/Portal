@@ -202,6 +202,12 @@ function migrateStaffing(v) {
 function Field({ field, value, onChange, volunteers, readOnly }) {
   const v = value !== undefined ? value : defaultValueFor(field);
 
+  // Ready sheet: plain text, and anything not filled in says so.
+  if (readOnly && (field.type === 'text' || field.type === 'textarea' || field.type === 'select')) {
+    return <div className="sheet-answer">{v ? v : <span className="sheet-empty">Not filled in yet</span>}</div>;
+  }
+  if (readOnly && field.type === 'table' && !(Array.isArray(v) && v.length)) return <div className="sheet-answer"><span className="sheet-empty">Not filled in yet</span></div>;
+
   if (field.type === 'text') return <input className="input" value={v} onChange={e => onChange(e.target.value)} />;
   if (field.type === 'textarea') return <textarea className="input" rows={3} style={{ resize: 'vertical' }} value={v} onChange={e => onChange(e.target.value)} />;
   if (field.type === 'select') return (
@@ -454,9 +460,9 @@ function StaffingField({ roles, onChange, volunteers, readOnly }) {
 
 function AreaFormSection({ fields, data, onFieldChange, volunteers, readOnly }) {
   return (
-    <fieldset disabled={!!readOnly} className={'sheet-fieldset' + (readOnly ? ' sheet-readonly' : '')} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <fieldset disabled={!!readOnly} className={'sheet-fieldset' + (readOnly ? ' sheet-readonly' : '')} style={{ display: 'flex', flexDirection: 'column', gap: readOnly ? 0 : 16 }}>
       {fields.map(f => (
-        <div key={f.key}>
+        <div key={f.key} className="sheet-field">
           <div className="label">{f.label}</div>
           <Field field={f} value={data[f.key]} onChange={val => onFieldChange(f.key, val)} volunteers={volunteers} readOnly={readOnly} />
           {f.pairedDateKey && (data[f.key] === 'Yes' || data[f.key] === '') && (
