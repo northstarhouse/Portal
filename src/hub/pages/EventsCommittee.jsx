@@ -1189,7 +1189,7 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   // become checklist duties. ABC license $50 + sheriff signature $30 = $80.
   async function addAlcoholLicense() {
     if (ev.checklist.some(t => t.auto === 'alcohol-license')) { setAttachedMsg('The alcohol license duties are already on the checklist.'); return; }
-    if (!window.confirm('Selling alcohol needs an ABC license.\n\nThis adds to Expenses:\n   ABC license application fee   $50\n   Sheriff signature fee   $30\n   Total   $80\n\nand three duties to the checklist: fill out the application, take it to the sheriff, and send it in with a money order.\n\nAdd them?')) return;
+    if (!window.confirm('Selling alcohol needs an ABC license.\n\nThis adds to Expenses:\n   ABC license fee (money order)   $50\n   Sheriff signature fee   $30\n   Total   $80\n\nand three duties to the checklist: fill out the application, take it to the sheriff, and send it in with a money order.\n\nAdd them?')) return;
     setAttachedMsg('Adding…');
     try {
       const fin = await fetchEventFinancials(ev.name).catch(() => null);
@@ -1197,15 +1197,15 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
       if (!already) {
         const who = ((volunteer && volunteer['First Name']) || '') + ' ' + ((volunteer && volunteer['Last Name']) || '');
         const base = { event_name: ev.name, area: 'Events', type: 'Purchase', status: 'Submitted', date: new Date().toISOString().slice(0, 10), purchased_by: who.trim() || null, volunteer_name: who.trim() || null, volunteer_id: (volunteer && volunteer.id) || null, volunteer_auth_user_id: (session && session.user && session.user.id) || null };
-        const r1 = await insertReimbursement({ ...base, description: 'ABC alcohol license application fee', amount: 50 });
+        const r1 = await insertReimbursement({ ...base, description: 'ABC alcohol license fee (money order)', amount: 50 });
         const r2 = await insertReimbursement({ ...base, description: 'Sheriff signature for alcohol license', amount: 30 });
         if (r1.error || r2.error) throw new Error(r1.error || r2.error);
       }
       const duty = (text, estimated) => ({ id: cryptoId(), text, done: false, due: '', timing: 'before', assignee: '', assigneeId: null, priority: '', estimated, actual: 0, notes: '', subtasks: [], auto: 'alcohol-license' });
       onUpdate(e => ({ ...e, checklist: [...e.checklist,
-        duty('Fill out the ABC alcohol license application ($50 fee)', 50),
+        duty('Fill out the ABC alcohol license application', 0),
         duty('Take the application to the sheriff for signature ($30 fee)', 30),
-        duty('Get a money order and mail the application off at the post office', 0),
+        duty('Get a $50 money order for the ABC fee and mail the application off at the post office', 50),
       ] }));
       setAttachedMsg(already ? 'Added the three duties. The expenses were already recorded.' : 'Added $80 to Expenses ($50 ABC license + $30 sheriff) and three duties to the checklist below.');
     } catch (err) {
