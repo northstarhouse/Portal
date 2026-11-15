@@ -141,21 +141,33 @@ Deno.serve(async (req) => {
         continue;
       }
       if (h?.state === "existing") continue;
-      if (!h || h.state === "released" || !h.gcal_event_id) {
+      // Another run is creating this one right now (triggers can fire close together); a claim older than 10 minutes is stale.
+      if (h?.state === "creating" && Date.now() - Date.parse(h.updated_at) < 600000) continue;
+      if (!h || h.state === "released" || h.state === "creating" || !h.gcal_event_id) {
         if (w.date < today) continue;
         if (!h) {
           const own = words(w.name);
           const manual = entriesOn(cache, w.date).find((s) => !/^soft hold: /i.test(s) && words(s).some((x) => own.includes(x)));
           if (manual) {
-            if (!dry) await rest(`venue_soft_holds`, { method: "POST", body: JSON.stringify({ response_id: rid, event_date: w.date, summary: manual, state: "existing" }) });
+            if (!dry) await rest(`venue_soft_holds?on_conflict=response_id`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates" }, body: JSON.stringify({ response_id: rid, event_date: w.date, summary: manual, state: "existing" }) });
             out.push({ already_on_calendar: manual, date: w.date });
             continue;
           }
         }
         if (!dry) {
-          const ev = await gcal("POST", "", { summary: w.summary, description: NOTE, ...allDay(w.date), transparency: "transparent" });
-          const row = { response_id: rid, gcal_event_id: ev.id, event_date: w.date, summary: w.summary, state: "active", updated_at: stamp() };
-          await rest(`venue_soft_holds`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates" }, body: JSON.stringify(row) });
+          // Claim the row first so two overlapping runs can never both create a calendar entry for the same booking.
+          const claim = { event_date: w.date, summary: w.summary, state: "creating", updated_at: stamp() };
+          const got: any[] = !h
+            ? await rest(`venue_soft_holds?on_conflict=response_id`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify({ response_id: rid, ...claim }) })
+            : await rest(`venue_soft_holds?response_id=eq.${rid}&updated_at=eq.${encodeURIComponent(h.updated_at)}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(claim) });
+          if (!got?.length) continue;
+          try {
+            const ev = await gcal("POST", "", { summary: w.summary, description: NOTE, ...allDay(w.date), transparency: "transparent" });
+            await rest(`venue_soft_holds?response_id=eq.${rid}`, { method: "PATCH", body: JSON.stringify({ gcal_event_id: ev.id, state: "active", updated_at: stamp() }) });
+          } catch (e) {
+            await rest(`venue_soft_holds?response_id=eq.${rid}`, { method: "PATCH", body: JSON.stringify({ state: "released", gcal_event_id: null, updated_at: stamp() }) }).catch(() => {});
+            throw e;
+          }
         }
         out.push({ created: w.summary, date: w.date });
         continue;
