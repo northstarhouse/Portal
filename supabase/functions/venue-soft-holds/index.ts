@@ -113,11 +113,17 @@ const NOTE = "Added automatically from the Portal pre-booking form. Renamed when
 const allDay = (date: string) => ({ start: { date }, end: { date: nextDay(date) } });
 
 // Days an ICS-cache entry covers (all-day entries span to DTEND; timed ones count their start day).
+function icsLocalDay(v: string): string {
+  const iso = `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}`;
+  if (!v.endsWith("Z") || v.length < 15) return iso;
+  const utc = Date.parse(`${iso}T${v.slice(9, 11)}:${v.slice(11, 13)}:00Z`);
+  return new Date(utc).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+}
 function icsDays(e: any): string[] {
   const st = String(e.DTSTART || ""), en = String(e.DTEND || "");
   if (!/^\d{8}/.test(st)) return [];
   const iso = (x: string) => `${x.slice(0, 4)}-${x.slice(4, 6)}-${x.slice(6, 8)}`;
-  const first = iso(st);
+  const first = icsLocalDay(st);
   if (st.length !== 8 || !/^\d{8}$/.test(en)) return [first];
   const out: string[] = [];
   for (let d = first; d < iso(en) && out.length < 14; d = nextDay(d)) out.push(d);
@@ -126,8 +132,7 @@ function icsDays(e: any): string[] {
 
 // Calendar entries already on that date (from the 15-minute ICS cache), for the "already on the calendar by hand" check.
 function entriesOn(cache: any[], date: string): string[] {
-  const d = date.replace(/-/g, "");
-  return cache.filter((e) => String(e.DTSTART || "").slice(0, 8) === d).map((e) => String(e.SUMMARY || ""));
+  return cache.filter((e) => /^\d{8}/.test(String(e.DTSTART || "")) && icsLocalDay(String(e.DTSTART)) === date).map((e) => String(e.SUMMARY || ""));
 }
 
 Deno.serve(async (req) => {
@@ -234,6 +239,78 @@ Deno.serve(async (req) => {
       out.push({ removed: h.summary });
     }
 
+    // ---- 2027 Event List (Events Committee, events_plan): every event marked "Moving Forward" with a date goes on the NSH
+    // calendar (timed when it has start and end times, otherwise all day; one entry per day for multi-day events) and blocks
+    // the date on the website. A changed date/time/name moves or renames the entry; a changed decision, removed day or
+    // deleted row takes it off. Days already on the calendar by hand (an entry that day sharing a name word) are left alone.
+    // Tracked in events_plan_calendar.
+    const planRows: any[] = await rest(`events_plan?select=id,name,date,start_time,end_time,multi_day,days,final_decision&final_decision=eq.Moving%20Forward`);
+    const planCal: any[] = await rest(`events_plan_calendar?select=*`);
+    const planWant = new Map<string, { plan_id: string; day_index: number; date: string; start: string | null; end: string | null; summary: string }>();
+    const hm = (t: unknown) => /^\d{1,2}:\d{2}/.test(String(t || "")) ? String(t).slice(0, 5).padStart(5, "0") : null;
+    for (const r of planRows) {
+      const days: any[] = r.multi_day && Array.isArray(r.days) ? r.days : [{ date: r.date, start_time: r.start_time, end_time: r.end_time }];
+      days.forEach((d, idx) => {
+        if (!d?.date) return;
+        const start = hm(d.start_time), end = hm(d.end_time);
+        const timed = !!(start && end && end > start);
+        planWant.set(`${r.id}:${idx}`, { plan_id: r.id, day_index: idx, date: d.date, start: timed ? start : null, end: timed ? end : null, summary: String(r.name || "Event").trim() });
+      });
+    }
+    const when = (w: any) => w.start ? { start: { dateTime: `${w.date}T${w.start}:00`, timeZone: "America/Los_Angeles" }, end: { dateTime: `${w.date}T${w.end}:00`, timeZone: "America/Los_Angeles" } } : allDay(w.date);
+    const PLAN_NOTE = "2027 Events Committee event. Added automatically from the Portal 2027 Event List; changes there update this entry.";
+    const planPath = (w: any) => `events_plan_calendar?plan_id=eq.${w.plan_id}&day_index=eq.${w.day_index}`;
+    for (const [key, w] of planWant) {
+      const h = planCal.find((x) => `${x.plan_id}:${x.day_index}` === key);
+      if (h?.state === "existing") continue;
+      if (h?.state === "creating" && Date.now() - Date.parse(h.updated_at) < 600000) continue;
+      if (!h || h.state === "creating" || !h.gcal_event_id) {
+        if (w.date < today) continue;
+        if (!h) {
+          const own = words(w.summary);
+          const manual = entriesOn(cache, w.date).find((x) => words(x).some((y) => own.includes(y)));
+          if (manual) {
+            if (!dry) await rest(`events_plan_calendar?on_conflict=plan_id,day_index`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates" }, body: JSON.stringify({ plan_id: w.plan_id, day_index: w.day_index, event_date: w.date, summary: manual, state: "existing" }) });
+            out.push({ event_already_on_calendar: manual, date: w.date });
+            continue;
+          }
+        }
+        if (!dry) {
+          const claim = { event_date: w.date, start_time: w.start, end_time: w.end, summary: w.summary, state: "creating", updated_at: stamp() };
+          const got: any[] = !h
+            ? await rest(`events_plan_calendar?on_conflict=plan_id,day_index`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify({ plan_id: w.plan_id, day_index: w.day_index, ...claim }) })
+            : await rest(`${planPath(w)}&updated_at=eq.${encodeURIComponent(h.updated_at)}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(claim) });
+          if (!got?.length) continue;
+          try {
+            const ev = await gcal("POST", "", { summary: w.summary, description: PLAN_NOTE, ...when(w) });
+            await rest(planPath(w), { method: "PATCH", body: JSON.stringify({ gcal_event_id: ev.id, state: "active", updated_at: stamp() }) });
+          } catch (e) {
+            await rest(planPath(w), { method: "DELETE" }).catch(() => {});
+            throw e;
+          }
+        }
+        out.push({ event_created: w.summary, date: w.date });
+        continue;
+      }
+      if (h.summary !== w.summary || h.event_date !== w.date || (h.start_time || null) !== w.start || (h.end_time || null) !== w.end) {
+        if (!dry) {
+          await gcal("PATCH", "/" + encodeURIComponent(h.gcal_event_id), { summary: w.summary, ...when(w) });
+          await rest(planPath(w), { method: "PATCH", body: JSON.stringify({ event_date: w.date, start_time: w.start, end_time: w.end, summary: w.summary, updated_at: stamp() }) });
+        }
+        out.push({ event_updated: w.summary, date: w.date });
+      }
+    }
+    for (const h of planCal) {
+      if (planWant.has(`${h.plan_id}:${h.day_index}`)) continue;
+      const upcoming = !h.event_date || h.event_date >= today;
+      if (!upcoming && h.state === "active") continue;
+      if (!dry) {
+        if (h.state === "active" && h.gcal_event_id) await gcal("DELETE", "/" + encodeURIComponent(h.gcal_event_id));
+        await rest(planPath(h), { method: "DELETE" });
+      }
+      if (h.state === "active") out.push({ event_removed: h.summary, date: h.event_date });
+    }
+
     // ---- Website availability: every booked / soft-held date (main-calendar bookings by title, plus Portal pre-bookings) is
     // saved to site_content "bookingHeldDates"; the website's booking-availability function merges it with the public
     // availability calendar. (That calendar is not written to: Workspace sharing gives outside accounts view-only access.)
@@ -246,6 +323,7 @@ Deno.serve(async (req) => {
         for (const d of icsDays(e)) if (d >= today) held.add(d);
       }
       for (const [, w] of want) if (w && w.date >= today) held.add(w.date);
+      for (const [, w] of planWant) if (w.date >= today) held.add(w.date);
       avail.held = held.size;
       if (!dry) await rest(`site_content?on_conflict=page_key`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates" }, body: JSON.stringify({ page_key: "bookingHeldDates", content: { dates: [...held].sort(), syncedAt: stamp() } }) });
     } catch (e) { avail.error = String(e); }
