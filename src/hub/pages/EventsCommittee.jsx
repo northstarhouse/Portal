@@ -1019,6 +1019,49 @@ function TimelineAssign({ t, volunteers, onUpdate }) {
     </>
   );
 }
+function TimelineRow({ t, volunteers, onUpdate, isOpen, onToggle }) {
+  const patch = (pt) => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => (x.id === t.id ? { ...x, ...pt } : x)) }));
+  const who = whoOn(t, volunteers);
+  const target = Number(t.target) || 0;
+  const sub = (target ? who.length + ' of ' + target + ' assigned' : who.length ? who.length + ' assigned' : 'No one assigned yet') + (who.length ? ': ' + whoText(who) : '');
+  const cap = { fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 };
+  const inp = { width: '100%', boxSizing: 'border-box', fontSize: 13 };
+  return (
+    <div style={{ borderBottom: '0.5px solid var(--border-light)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 0 11px 14px' }}>
+        <CheckCircle checked={!!t.done} onChange={() => patch({ done: !t.done })} />
+        <button type="button" onClick={onToggle} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{fmtTime12(t.time)}  ·  {t.activity}</div>
+          <div style={{ fontSize: 12, marginTop: 2, color: who.length ? 'var(--muted)' : '#b8863b', fontStyle: who.length ? 'normal' : 'italic' }}>{sub}</div>
+        </button>
+        <span style={{ color: 'var(--muted)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>&rsaquo;</span>
+      </div>
+      {isOpen && (
+        <div style={{ padding: '4px 0 18px 42px' }}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+            <div style={{ flex: '0 0 auto' }}>
+              <div style={cap}>Time</div>
+              <TimeSelect value={t.time} onChange={v => patch({ time: v || '00:00' })} />
+            </div>
+            <div style={{ flex: '2 1 240px' }}>
+              <div style={cap}>What happens</div>
+              <input className="input" defaultValue={t.activity} style={inp} onBlur={e => { const v = e.target.value.trim(); if (v && v !== t.activity) patch({ activity: v }); }} />
+            </div>
+            <div style={{ width: 120 }}>
+              <div style={cap}>How many needed</div>
+              <input className="input" type="number" min="0" defaultValue={t.target || ''} style={inp} onBlur={e => { const n = Number(e.target.value) || 0; if (n !== (Number(t.target) || 0)) patch({ target: n }); }} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={cap}>Assign volunteers</div>
+            <AssignVolunteers v={t} volunteers={volunteers} target={target} onPatch={patch} />
+          </div>
+          <button className="btn-ghost" style={{ fontSize: 12, color: '#a04545' }} onClick={() => { if (window.confirm('Remove "' + t.activity + '" from the timeline?')) onUpdate(e => ({ ...e, timeline: e.timeline.filter(x => x.id !== t.id) })); }}>Remove from the timeline</button>
+        </div>
+      )}
+    </div>
+  );
+}
 const whoText = (list) => list.map(w => w.name + (w.phone ? ' (' + w.phone + ')' : '')).join(', ');
 
 function DayOfView({ ev, onUpdate, volunteers }) {
@@ -1504,6 +1547,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     onUpdate(e => ({ ...e, vendors: e.vendors.map(v => v.id === id ? { ...v, ...patch } : v) }));
   }
   const [needOpenId, setNeedOpenId] = useState(null);
+  const [tlOpenId, setTlOpenId] = useState(null);
   function removeNeed(v) {
     if (!window.confirm('Remove "' + needTitle(v) + '" from the list?')) return;
     onUpdate(e => ({ ...e, vendors: e.vendors.filter(x => x.id !== v.id) }));
@@ -1658,16 +1702,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
             );
           }
           if (it.tl) {
-            const t = it.t;
-            return (
-              <ItemRow key={'tl-' + t.id} done={t.done} onDelete={() => onUpdate(e => ({ ...e, timeline: e.timeline.filter(x => x.id !== t.id) }))}>
-                <CheckCircle checked={!!(!!t.done)} onChange={() => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, done: !x.done } : x) }))} />
-                <TimeSelect value={t.time} onChange={v => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, time: v || '00:00' } : x) }))} />
-                <input className="input" defaultValue={t.activity} key={t.id + t.activity} placeholder="What happens" style={{ flex: 1, minWidth: 120, fontSize: 13, padding: '5px 8px' }}
-                  onBlur={e => { const v = e.target.value.trim(); if (v && v !== t.activity) onUpdate(x => ({ ...x, timeline: x.timeline.map(y => y.id === t.id ? { ...y, activity: v } : y) })); }} />
-                <TimelineAssign t={t} volunteers={volunteers} onUpdate={onUpdate} />
-              </ItemRow>
-            );
+            return <TimelineRow key={'tl-' + it.t.id} t={it.t} volunteers={volunteers} onUpdate={onUpdate} isOpen={tlOpenId === it.t.id} onToggle={() => setTlOpenId(tlOpenId === it.t.id ? null : it.t.id)} />;
           }
           if (it.need) {
             return <NeedRow key={'need-' + it.v.id} v={it.v} volunteers={volunteers} patch={patchNeed} remove={removeNeed} isOpen={needOpenId === it.v.id} onToggle={() => setNeedOpenId(needOpenId === it.v.id ? null : it.v.id)} />;
