@@ -341,6 +341,19 @@ const PLANNING_SECTIONS = [
 // The checklist is the one place everything lives, tagged by category so each area can be checked off as figured out.
 const CHECKLIST_CATEGORIES = ['General', 'Logistics', 'Hospitality', 'Sponsorship', 'Interiors', 'Marketing', 'Money', 'Volunteers & vendors'];
 const DAYOF_CAT = 'Day-of timeline';
+// The little icon at the start of each checklist group.
+const catIcon = (inner) => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{inner}</svg>;
+const CATEGORY_ICONS = {
+  General: catIcon(<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>),
+  Logistics: catIcon(<><path d="M16.5 9.4L7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>),
+  Hospitality: catIcon(<><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></>),
+  Sponsorship: catIcon(<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>),
+  Interiors: catIcon(<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>),
+  Marketing: catIcon(<><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></>),
+  Money: catIcon(<><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>),
+  'Volunteers & vendors': catIcon(<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>),
+  'Day-of timeline': catIcon(<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>),
+};
 const checkCat = (c) => (CHECKLIST_CATEGORIES.includes(c) ? c : 'General');
 // Things we still need (a bartender, a sponsor...) are handled once someone is named, it is confirmed, or enough volunteers are assigned.
 const needHandled = (v) => !!v.confirmed || !!v.who || !!v.role
@@ -993,6 +1006,20 @@ function whoOn(t, volunteers) {
     ...(t.people || []).map(pp => ({ name: pp.name, phone: pp.phone })),
   ];
 }
+// Number needed and the assign box for one Day-Of item, open right on the line.
+function TimelineAssign({ t, volunteers, onUpdate }) {
+  const patch = (pt) => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => (x.id === t.id ? { ...x, ...pt } : x)) }));
+  return (
+    <>
+      <label title="How many people are needed" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>
+        # needed
+        <input className="input" type="number" min="0" defaultValue={t.target || ''} key={t.id + 'tg' + (t.target || '')} placeholder="0" style={{ width: 58, fontSize: 12, padding: '4px 6px' }}
+          onBlur={e => { const n = Number(e.target.value) || 0; if (n !== (Number(t.target) || 0)) patch({ target: n }); }} />
+      </label>
+      <AssignVolunteers v={t} volunteers={volunteers} compact target={Number(t.target) || 0} onPatch={patch} />
+    </>
+  );
+}
 const whoText = (list) => list.map(w => w.name + (w.phone ? ' (' + w.phone + ')' : '')).join(', ');
 
 function DayOfView({ ev, onUpdate, volunteers }) {
@@ -1008,7 +1035,7 @@ function DayOfView({ ev, onUpdate, volunteers }) {
         <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: '0.5px solid var(--border-light)', fontSize: 13 }}>
           <CheckCircle checked={!!(!!t.done)} onChange={() => toggle(t.id)} />
           <span style={{ width: 70, flexShrink: 0, color: 'var(--muted)' }}>{fmtTime12(t.time)}</span>
-          <span style={{ flex: 1, textDecoration: 'none', color: t.done ? 'var(--muted)' : 'var(--text)' }}>{t.activity}{whoOn(t, volunteers).length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{whoText(whoOn(t, volunteers))}</div>}</span>
+          <span style={{ flex: 1, textDecoration: 'none', color: t.done ? 'var(--muted)' : 'var(--text)' }}>{t.activity}{(whoOn(t, volunteers).length > 0 || Number(t.target) > 0) && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{Number(t.target) > 0 ? whoOn(t, volunteers).length + ' of ' + t.target + ' assigned' + (whoOn(t, volunteers).length ? ': ' : '') : ''}{whoText(whoOn(t, volunteers))}</div>}</span>
         </div>
       ))}
     </div>
@@ -1618,7 +1645,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
         {shownGroups.map(g => (
         <div key={g.cat} style={{ marginBottom: 18 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.8, padding: '4px 0 2px', borderBottom: '1.5px solid #e8dfd0' }}>
-            {g.cat}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{CATEGORY_ICONS[g.cat]}{g.cat}</span>
             {g.cat !== 'Marketing' && <span style={{ fontWeight: 500, color: g.items.every(isDone) ? '#2e7d32' : 'var(--muted)', textTransform: 'none', letterSpacing: 0 }}>{g.items.every(isDone) ? 'all figured out ✓' : g.items.filter(isDone).length + ' of ' + g.items.length + ' done'}</span>}
           </div>
         {g.items.map(it => {
@@ -1637,7 +1664,8 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
               <ItemRow key={'tl-' + t.id} done={t.done} onDelete={() => onUpdate(e => ({ ...e, timeline: e.timeline.filter(x => x.id !== t.id) }))}>
                 <CheckCircle checked={!!(!!t.done)} onChange={() => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, done: !x.done } : x) }))} />
                 <span style={{ fontSize: 12, color: 'var(--muted)', width: 70, flexShrink: 0 }}>{fmtTime12(t.time)}</span>
-                <span style={{ flex: 1, fontSize: 13, textDecoration: 'none', color: 'var(--text)' }}>{t.activity}{whoOn(t, volunteers).length > 0 && <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 10 }}>{whoText(whoOn(t, volunteers))}</span>}</span>
+                <span style={{ flex: 1, fontSize: 13, textDecoration: 'none', color: 'var(--text)' }}>{t.activity}</span>
+                <TimelineAssign t={t} volunteers={volunteers} onUpdate={onUpdate} />
               </ItemRow>
             );
           }
@@ -1683,6 +1711,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                   <option value="month">1 month out</option>
                   <option value="twoweeks">2 weeks out</option>
                   <option value="week">1 week out</option>
+                  <option value="meeting">Meeting before event</option>
                   <option value="dayof">Day of event</option>
                   <option value="before">Pick a date</option>
                 </select>
@@ -1811,7 +1840,7 @@ function DayOfTab({ ev, onUpdate, volunteers }) {
               style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 13, color: 'var(--text)', fontFamily: 'inherit', textDecoration: 'none' }}>
               {t.activity}
             </button>
-            <AssignVolunteers v={t} volunteers={volunteers} compact onPatch={pt => onUpdate(e => ({ ...e, timeline: e.timeline.map(x => x.id === t.id ? { ...x, ...pt } : x) }))} />
+            <TimelineAssign t={t} volunteers={volunteers} onUpdate={onUpdate} />
           </ItemRow>
         )
       ))}

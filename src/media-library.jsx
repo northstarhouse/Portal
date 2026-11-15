@@ -144,7 +144,9 @@ function MediaGrid({ supabaseUrl, supabaseKey, authToken, onPick }) {
             </div>
             <div style={{ padding: '6px 8px' }}>
               <div title={img.name} style={{ fontSize: 11, color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{img.name}</div>
-              {!img.alt && <div style={{ fontSize: 10, color: '#b45309' }}>No alt text</div>}
+              {onPick
+                ? <AltEditor key={img.id + '|' + (img.alt || '')} img={img} onSave={(alt) => save(img, { name: img.name, alt, folder: img.folder || '' })} />
+                : (!img.alt && <div style={{ fontSize: 10, color: '#b45309' }}>No alt text</div>)}
               {onPick && <button onClick={() => onPick(img)} style={{ ...small, marginTop: 5, width: '100%' }}>Use this</button>}
             </div>
           </div>
@@ -153,6 +155,26 @@ function MediaGrid({ supabaseUrl, supabaseKey, authToken, onPick }) {
       {shown.length > limit && <div style={{ textAlign: 'center', marginTop: 14 }}><button onClick={() => setLimit(limit + 120)} style={btn(false)}>Show more ({shown.length - limit} left)</button></div>}
       {open && !onPick && (
         <PhotoDetails key={open.id} img={open} onSave={(c) => save(open, c)} onCopy={() => copy(open)} copied={copied === open.id} onDelete={() => remove(open)} onClose={() => setOpen(null)} />
+      )}
+    </div>
+  );
+}
+
+// Alt text edited right on the photo's tile while choosing photos.
+function AltEditor({ img, onSave }) {
+  const [v, setV] = React.useState(img.alt || '');
+  const [state, setState] = React.useState('');
+  const changed = v.trim() !== (img.alt || '').trim();
+  async function go() { setState('saving'); await onSave(v.trim()); setState('saved'); }
+  return (
+    <div style={{ marginTop: 3 }}>
+      <input value={v} onChange={(e) => { setV(e.target.value); setState(''); }} onKeyDown={(e) => { if (e.key === 'Enter' && changed) { e.preventDefault(); go(); } }}
+        placeholder="Alt text (describe the photo)" style={{ width: '100%', boxSizing: 'border-box', fontSize: 11, padding: '4px 6px', border: '0.5px solid ' + (img.alt ? '#d8d0c4' : '#e6b87a'), borderRadius: 6 }} />
+      {(changed || state) && (
+        <button type="button" disabled={!changed || state === 'saving'} onClick={go}
+          style={{ marginTop: 3, width: '100%', fontSize: 11, padding: '3px 0', borderRadius: 6, border: '1px solid ' + GOLD, background: changed ? GOLD : '#fff', color: changed ? '#fff' : GOLD, cursor: changed ? 'pointer' : 'default' }}>
+          {state === 'saving' ? 'Saving…' : changed ? 'Save alt text' : 'Saved ✓'}
+        </button>
       )}
     </div>
   );
