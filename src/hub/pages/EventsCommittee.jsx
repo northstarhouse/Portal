@@ -7,7 +7,7 @@ import {
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
-import AreasTab from './eventsCommitteeAreas.jsx';
+import AreasTab, { PLANNING_PROMPTS, NSH_SPACES } from './eventsCommitteeAreas.jsx';
 import EventOverviews from './EventOverviews.jsx';
 import RsvpPanel from './RsvpPanel.jsx';
 import EventPlan from './EventPlan.jsx';
@@ -334,7 +334,6 @@ const PLANNING_SECTIONS = [
   { key: 'checklist', title: 'Checklist', desc: 'Type the duties in fast, then assign and date them' },
   { key: 'volunteers', title: 'Volunteers, Staffing & Vendors', desc: 'What we need, who we found, contacts and volunteer roles', area: 'volunteers' },
   { key: 'marketing', title: 'Marketing & Promotion', desc: 'Flyers, newsletters, website, social media', area: 'marketing' },
-  { key: 'areas-other', title: 'Other Planning Areas', desc: 'Logistics, hospitality, finance, sponsorship, interiors' },
   { key: 'budget', title: 'Budget & Transactions', desc: 'Income, expenses, reimbursements' },
   { key: 'dayof', title: 'Day-Of Timeline', desc: 'Run of show for the day' },
   { key: 'after', title: 'After the Event', desc: 'What went well, final numbers, follow-ups, reviews and feedback' },
@@ -556,7 +555,6 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                     <AreasTab event={ev} session={session} volunteer={volunteer} initialArea={s.area} />
                   )}
                   {s.key === 'volunteers' && <NeedsList ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}
-                  {s.key === 'areas-other' && <AreasTab event={ev} session={session} volunteer={volunteer} />}
                 </div>
               )}
             </div>
@@ -681,7 +679,7 @@ function VendorsView({ ev }) {
 
 // Volunteers, Staffing & Vendors as one list: write down what we need ("Magician", "4 setup volunteers"), then later fill in
 // who we found and how to reach them, and say whether it is a vendor, a contact or a volunteer role.
-const NEED_KINDS = { vendor: 'Vendor', contact: 'Contact', volunteer: 'Volunteer' };
+const NEED_KINDS = { vendor: 'Vendor', contact: 'Contact', volunteer: 'Volunteer', activity: 'Activity' };
 const volFullName = (v) => `${v['First Name'] || ''} ${v['Last Name'] || ''}`.trim() || 'Unnamed';
 
 function NeedsList({ ev, onUpdate, volunteers }) {
@@ -724,7 +722,7 @@ function NeedsList({ ev, onUpdate, volunteers }) {
         const title = v.who || !v.role ? v.name : v.role + ': ' + v.name;
         const found = !!v.confirmed || !!who || assigned.length > 0;
         let sub;
-        if (kind === 'volunteer') sub = assigned.length + (target ? ' of ' + target : '') + ' assigned' + (assigned.length ? ': ' + assigned.map(volFullName).join(', ') : '');
+        if (kind === 'volunteer' || kind === 'activity') sub = assigned.length + (target ? ' of ' + target : '') + ' assigned' + (assigned.length ? ': ' + assigned.map(volFullName).join(', ') : '');
         else if (who || v.contact) sub = [v.who ? v.who : (v.role ? v.name : ''), v.contact].filter(Boolean).join('  ·  ');
         else sub = '';
         return (
@@ -749,6 +747,7 @@ function NeedsList({ ev, onUpdate, volunteers }) {
                       <option value="vendor">Vendor</option>
                       <option value="contact">Contact</option>
                       <option value="volunteer">Volunteer role</option>
+                      <option value="activity">Activity or program</option>
                     </select>
                   </div>
                   <div style={{ flex: '2 1 240px' }}>
@@ -756,11 +755,11 @@ function NeedsList({ ev, onUpdate, volunteers }) {
                     <input className="input" defaultValue={v.name} style={inp} onBlur={e => { const t = e.target.value.trim(); if (t && t !== v.name) patch(v.id, { name: t }); }} />
                   </div>
                 </div>
-                {kind === 'volunteer' ? (
+                {(kind === 'volunteer' || kind === 'activity') ? (
                   <div style={{ marginBottom: 12 }}>
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
                       <div style={{ width: 120 }}>
-                        <div style={cap}>How many</div>
+                        <div style={cap}>{kind === 'activity' ? 'Volunteers needed' : 'How many'}</div>
                         <input className="input" type="number" min="0" defaultValue={v.target || ''} style={inp} onBlur={e => patch(v.id, { target: Number(e.target.value) || 0 })} />
                       </div>
                       <div style={{ flex: 1, minWidth: 200 }}>
@@ -949,6 +948,7 @@ function EventBasicsView({ f, ev, rsvp }) {
       {row('Date and time', when, true)}
       {row('Location', f.locName, true)}
       {row('Address', f.locAddr, true)}
+      {row('Spaces used', (f.spaces || []).join(', '))}
 
       <div style={group}>Website</div>
       {row('Web address', f.slug)}
@@ -972,6 +972,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange }) {
     title: ev.name || '', slug: w.slug || '', slugTouched: !!w.slug, short: w.short_description || '', desc: ev.description || '',
     imageUrl: w.image_url || '', imageAlt: w.image_alt || '', dateTbd: w.date_tbd === true, date: ev.date || '',
     startTime: ev.startTime || '18:00', endTime: ev.endTime || '',
+    spaces: Array.isArray(w.spaces) ? w.spaces : [],
     locName: w.location_name || 'North Star House', locAddr: w.location_address || '12075 Auburn Rd, Grass Valley, CA 95949, USA',
     purpose: ev.purpose || '', eventLead: ev.eventLead || '', expectedAttendance: ev.expectedAttendance || '', pricing: ev.pricing || '',
     sells: w.sells_tickets === true, tiers: (ev.ticketTiers && ev.ticketTiers.length) ? ev.ticketTiers : [{ name: 'General Admission', price: '', limit: '' }],
@@ -1006,7 +1007,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange }) {
     ticketTiers: form.sells ? form.tiers.filter(t => String(t.name || '').trim()) : (base.ticketTiers || []),
     website: {
       slug: form.slug, short_description: form.short.trim(), image_url: form.imageUrl, image_alt: form.imageAlt.trim(),
-      date_tbd: form.dateTbd, location_name: form.locName.trim(), location_address: form.locAddr.trim(), sells_tickets: form.sells,
+      date_tbd: form.dateTbd, location_name: form.locName.trim(), location_address: form.locAddr.trim(), sells_tickets: form.sells, spaces: form.spaces || [],
     },
   });
   const missing = form => {
@@ -1110,6 +1111,16 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange }) {
           )}
           <label style={lab}>Location *<input style={inp} value={f.locName} onChange={e => set('locName', e.target.value)} /></label>
           <label style={lab}>Address *<input style={inp} value={f.locAddr} onChange={e => set('locAddr', e.target.value)} /></label>
+          <div style={lab}>Spaces used
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 18px', margin: '4px 0 6px' }}>
+              {NSH_SPACES.concat((f.spaces || []).filter(x => !NSH_SPACES.includes(x))).map(sp => (
+                <label key={sp} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 400, color: '#2a2a2a', textTransform: 'none', letterSpacing: 0, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={(f.spaces || []).includes(sp)} onChange={() => setF(o => ({ ...o, spaces: (o.spaces || []).includes(sp) ? o.spaces.filter(x => x !== sp) : [...(o.spaces || []), sp] }))} style={{ accentColor: '#886c44' }} /> {sp}
+                </label>
+              ))}
+            </div>
+            <input style={inp} placeholder="Another space… (press Enter to add)" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const t = e.target.value.trim(); if (t) { setF(o => ({ ...o, spaces: (o.spaces || []).includes(t) ? o.spaces : [...(o.spaces || []), t] })); e.target.value = ''; } } }} />
+          </div>
 
           <div style={head}>Tickets</div>
           <label style={lab}>Does this event sell tickets?
@@ -1170,6 +1181,9 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
   const [subtaskInput, setSubtaskInput] = useState('');
   const sectionTitle = SECTION_HEAD;
   const [quick, setQuick] = useState('');
+  const quickRef = useRef(null);
+  const [showPrompts, setShowPrompts] = useState(false);
+  function startPrompt(text) { setQuick(text + ': '); setTimeout(() => { if (quickRef.current) { quickRef.current.focus(); const n = quickRef.current.value.length; quickRef.current.setSelectionRange(n, n); } }, 0); }
 
   // Note taker: type a thought and press Enter, then the next. Pasting several lines adds one note per line.
   // Later each note is attached to where it belongs (a duty, the day-of timeline, a vendor, the after notes).
@@ -1289,13 +1303,27 @@ function ChecklistTab({ ev, onUpdate, volunteers }) {
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: TASK_PRIORITY.medium.color, display: 'inline-block' }} />Medium</span>
           </div>
         </div>
-        <input className="input" style={{ marginBottom: 12 }} autoFocus value={quick} placeholder="Type a note and press Enter…"
+        <input ref={quickRef} className="input" style={{ marginBottom: 12 }} autoFocus value={quick} placeholder="Type a note and press Enter…"
           onChange={e => setQuick(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addQuick(quick); } }}
           onPaste={e => { const t = e.clipboardData.getData('text'); if (/\r?\n/.test(t.trim())) { e.preventDefault(); addQuick(t); } }} />
         <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>
           Just get everything down, one per line. Afterwards, attach each note to where it belongs.
+          {' '}<button type="button" onClick={() => setShowPrompts(v => !v)} style={{ background: 'none', border: 'none', color: 'var(--gold)', fontWeight: 600, cursor: 'pointer', padding: 0, fontSize: 11 }}>{showPrompts ? 'Hide prompts' : 'Need ideas? Show prompts'}</button>
         </div>
+        {showPrompts && (
+          <div style={{ border: '0.5px solid var(--border-light)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Tap one to start a note with it, then type your answer and press Enter.</div>
+            {PLANNING_PROMPTS.map(g => (
+              <div key={g.group} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 }}>{g.group}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {g.items.map(it => <button key={it} type="button" className="btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => startPrompt(it)}>{it}</button>)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {(ev.notes || []).length > 0 && (
           <div style={{ border: '0.5px solid var(--border-light)', borderRadius: 10, padding: '10px 14px', marginBottom: 18, background: '#faf8f4' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>

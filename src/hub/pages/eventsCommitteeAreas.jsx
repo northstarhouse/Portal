@@ -20,6 +20,18 @@ export const AREA_DEFAULTS = [
   { key: 'marketing', label: 'Marketing', role: 'Marketing', defaultOwner: 'Haley Wright' },
 ];
 
+// Questions worth asking while building the checklist (the old planning-area boxes, as prompts).
+export const PLANNING_PROMPTS = [
+  { group: 'Logistics', items: ['Setup plan', 'Equipment needed', 'Safety considerations', 'Backup plan (weather, power, no-shows)'] },
+  { group: 'Hospitality', items: ['Serving style (self-serve, served, passed)', 'Alcohol involved?', 'Food and beverage plan', 'Shopping list', 'Rental equipment', 'Cleanup plan'] },
+  { group: 'Sponsorship', items: ['Potential sponsors', 'How we will recognize sponsors', 'Outreach to sponsors', 'Intentional invites'] },
+  { group: 'Interiors', items: ['Historic approach (what stays in place)', 'Items to move or remove, and why', 'Decor to add', 'Decor cost'] },
+  { group: 'Money', items: ['Projected expenses', 'Projected income', 'Reimbursements needed?'] },
+];
+
+// The spaces at North Star House (from the site manager walk-through) for "Spaces used".
+export const NSH_SPACES = ['Living Room', 'Dining Room', 'Library', 'Julia Morgan Room', 'Mudroom & Study', "Mary Huck's Boat Room", 'Kitchen', 'Restrooms & Foyer', 'Terrace & West Lawn', 'Courtyard & East Lawn', 'Garden', 'Parking Lot'];
+
 const MARKETING_CHANNELS = [
   'Create Press Release', 'Send Email Blast', 'YubaNet (Press Release Only)', 'Go Nevada County Calendar - Community Blast',
   'Arts Council Calendar', 'Grass Valley Chamber Newsletter', 'KVMR Calendar', 'Facebook Event Page', 'NSH Facebook Page',
