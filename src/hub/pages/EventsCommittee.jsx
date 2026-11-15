@@ -531,7 +531,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               ['Date and time', when, true],
               ['Event type', ev.purpose],
               ['Location', where],
-              ['Event lead', ev.eventLead, true],
+              ['Event lead', ev.eventLead],
               ['Expected guests', ev.expectedAttendance || (ev.guestCount.invited ? String(ev.guestCount.invited) : '')],
               ['Tickets', tickets],
               ['Pricing', ev.pricing],
