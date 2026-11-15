@@ -247,10 +247,12 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
     if (forWhat === 'slide') setSlides([]);
     setPicker(true);
   }
-  // A slideshow is a row of photos that snaps as you swipe or scroll sideways. It needs no script, so it works wherever the post's HTML is shown.
-  const slideshowHtml = (list) => '<div class="nsh-slideshow" contenteditable="false" style="display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:8px;margin:18px 0;border-radius:6px;-webkit-overflow-scrolling:touch">'
-    + list.map((s) => '<img src="' + s.url + '" alt="' + String(s.alt || '').replace(/"/g, '&quot;') + '" loading="lazy" style="flex:0 0 100%;width:100%;max-height:520px;object-fit:contain;scroll-snap-align:center;background:#f5f0e8">').join('')
-    + '</div><p><br></p>';
+  // A slideshow is one row of photos at the same height, edge to edge, with an arrow on each side.
+  // The arrows are small inline scripts; where a site drops those, the row still scrolls by swipe or trackpad.
+  const arrow = (dir) => `<button type="button" aria-label="${dir < 0 ? 'Previous photos' : 'Next photos'}" onclick="var t=this.parentNode.querySelector('.nsh-track');t.scrollBy({left:${dir < 0 ? '-' : ''}t.clientWidth*0.8,behavior:'smooth'})" style="position:absolute;top:50%;${dir < 0 ? 'left' : 'right'}:10px;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;border:0;background:rgba(255,255,255,0.9);color:#5a4a30;font-size:26px;line-height:40px;padding:0;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.25);z-index:2">${dir < 0 ? '&#8249;' : '&#8250;'}</button>`;
+  const slideshowHtml = (list) => `<div class="nsh-slideshow" contenteditable="false" style="position:relative;margin:18px 0;border-radius:6px;overflow:hidden;background:#f5f0e8"><div class="nsh-track" style="display:flex;gap:0;align-items:stretch;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch">`
+    + list.map((x) => '<img src="' + x.url + '" alt="' + String(x.alt || '').replace(/"/g, '&quot;') + '" loading="lazy" style="display:block;flex:0 0 auto;height:320px;width:auto;max-width:none;scroll-snap-align:start;margin:0">').join('')
+    + '</div>' + arrow(-1) + arrow(1) + '</div><p><br></p>';
   function insertSlideshow() {
     const list = slides;
     setPicker(false); setSlides([]);
