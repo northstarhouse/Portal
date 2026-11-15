@@ -1452,10 +1452,10 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     ...ev.checklist.map(t => ({ need: false, t, cat: checkCat(t.category) })),
     ...ev.vendors.map(v => ({ need: true, v, cat: needCategory(v) })),
     ...ev.timeline.map(t => ({ tl: true, t, cat: DAYOF_CAT })),
-    ...(showMarketing && mkData ? MARKETING_CHANNELS.map(c => ({ mk: true, c, cat: 'Marketing' })) : []),
+    ...(showMarketing && mkData ? MARKETING_CHANNELS.filter(c => (mkData[c] || {}).done).map(c => ({ mk: true, c, cat: 'Marketing' })) : []),
   ];
   const isDone = (i) => (i.mk ? !!(mkData[i.c] || {}).done : i.need ? needHandled(i.v) : !!i.t.done);
-  const catGroups = [...CHECKLIST_CATEGORIES, DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
+  const catGroups = [...CHECKLIST_CATEGORIES.filter(c => c !== 'Marketing'), 'Marketing', DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
   const shownGroups = catGroups.filter(g => catFilter === 'All' || catFilter === g.cat);
   function patchItem(id, patch) {
     onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, ...patch } : t) }));

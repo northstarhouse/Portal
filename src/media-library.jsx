@@ -196,15 +196,16 @@ export function MediaLibraryView({ navigate, supabaseUrl, supabaseKey }) {
   );
 }
 
-export function MediaPicker({ supabaseUrl, supabaseKey, authToken, onPick, onClose }) {
+export function MediaPicker({ supabaseUrl, supabaseKey, authToken, onPick, onClose, title, footer }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#fdfcfb', borderRadius: 12, width: '100%', maxWidth: 860, maxHeight: '88vh', overflow: 'auto', padding: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Cardo', serif", fontSize: 18, color: GOLD, fontWeight: 700 }}>Choose a photo</div>
+          <div style={{ fontFamily: "'Cardo', serif", fontSize: 18, color: GOLD, fontWeight: 700 }}>{title || 'Choose a photo'}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888' }}>×</button>
         </div>
         <MediaGrid supabaseUrl={supabaseUrl} supabaseKey={supabaseKey} authToken={authToken} onPick={onPick} />
+        {footer}
       </div>
     </div>
   );

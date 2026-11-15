@@ -76,7 +76,7 @@ function youtubeId(text) {
 }
 const videoHtml = (id) => '<div class="nsh-video" contenteditable="false" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;margin:18px 0;border-radius:6px"><iframe src="https://www.youtube.com/embed/' + id + '" title="YouTube video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p><br></p>';
 
-function Toolbar({ run, onLink, onImage, onVideo, uploading }) {
+function Toolbar({ run, onLink, onImage, onVideo, uploading, onWrap, onSlides, hasImg }) {
   const b = (label, title, fn, extra) => (
     <button type="button" key={title} title={title} onMouseDown={(e) => { e.preventDefault(); fn(); }}
       style={{ background: '#fff', border: '0.5px solid #d8d0c4', borderRadius: 6, padding: '5px 10px', fontSize: 13, cursor: 'pointer', color: '#444', minWidth: 32, ...(extra || {}) }}>{label}</button>
@@ -96,6 +96,14 @@ function Toolbar({ run, onLink, onImage, onVideo, uploading }) {
       {b('Unlink', 'Remove link', () => run('unlink'))}
       {b(uploading ? 'Uploading…' : 'Image', 'Insert an image', onImage)}
       {b('▶ Video', 'Insert a YouTube video (paste the embed code or link)', onVideo)}
+      {b('Slideshow', 'Insert a slideshow of several photos', onSlides)}
+      <span style={{ width: 1, background: '#d8d0c4', margin: '0 4px' }} />
+      <span style={{ fontSize: 11, color: hasImg ? '#886c44' : '#aaa', alignSelf: 'center', fontWeight: 600 }}>{hasImg ? 'Photo:' : 'Click a photo, then:'}</span>
+      {b('◧ Text wraps right', 'Photo on the left, text wraps around it', () => onWrap('left'), { opacity: hasImg ? 1 : 0.5 })}
+      {b('◨ Text wraps left', 'Photo on the right, text wraps around it', () => onWrap('right'), { opacity: hasImg ? 1 : 0.5 })}
+      {b('▬ Full width', 'Photo on its own line, centered', () => onWrap('center'), { opacity: hasImg ? 1 : 0.5 })}
+      {b('Smaller', 'Make the photo smaller', () => onWrap('smaller'), { opacity: hasImg ? 1 : 0.5 })}
+      {b('Larger', 'Make the photo larger', () => onWrap('larger'), { opacity: hasImg ? 1 : 0.5 })}
       {b('Clear', 'Clear formatting', () => run('removeFormat'))}
     </div>
   );
@@ -118,6 +126,8 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
   const savedRange = React.useRef(null);
   const tickT = React.useRef(null);
   const [pasteBox, setPasteBox] = React.useState(null);
+  const [slides, setSlides] = React.useState([]);
+  const [selImg, setSelImg] = React.useState(null);
   const [, setTick] = React.useState(0);
 
   async function api(action, data) {
@@ -174,10 +184,11 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
     setPasteBox('');
   }
 
-  function currentHtmlSafe() { return htmlMode ? post.body_html || '' : bodyRef.current ? bodyRef.current.innerHTML : post.body_html || ''; }
+  const stripSel = (h) => String(h || '').replace(/\sclass="nsh-sel"/g, '');
+  function currentHtmlSafe() { return stripSel(htmlMode ? post.body_html || '' : bodyRef.current ? bodyRef.current.innerHTML : post.body_html || ''); }
   function currentHtml() {
     if (htmlMode) return post.body_html || '';
-    return bodyRef.current ? bodyRef.current.innerHTML : post.body_html || '';
+    return stripSel(bodyRef.current ? bodyRef.current.innerHTML : post.body_html || '');
   }
 
   function withLists(p) {
@@ -229,10 +240,43 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
 
   function pickImage(forWhat) {
     picking.current = forWhat;
-    if (forWhat === 'body') rememberSelection();
+    if (forWhat === 'body' || forWhat === 'slide') rememberSelection();
+    if (forWhat === 'slide') setSlides([]);
     setPicker(true);
   }
+  // A slideshow is a row of photos that snaps as you swipe or scroll sideways. It needs no script, so it works wherever the post's HTML is shown.
+  const slideshowHtml = (list) => '<div class="nsh-slideshow" contenteditable="false" style="display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:8px;margin:18px 0;border-radius:6px;-webkit-overflow-scrolling:touch">'
+    + list.map((s) => '<img src="' + s.url + '" alt="' + String(s.alt || '').replace(/"/g, '&quot;') + '" loading="lazy" style="flex:0 0 100%;width:100%;max-height:520px;object-fit:contain;scroll-snap-align:center;background:#f5f0e8">').join('')
+    + '</div><p><br></p>';
+  function insertSlideshow() {
+    const list = slides;
+    setPicker(false); setSlides([]);
+    if (!list.length) return;
+    if (htmlMode) { set('body_html', (post.body_html || '') + '\n' + slideshowHtml(list)); return; }
+    restoreSelection();
+    document.execCommand('insertHTML', false, slideshowHtml(list));
+  }
+  // Clicking a photo in the post selects it; the toolbar then wraps text around it or resizes it.
+  function selectImg(e) {
+    const t = e.target;
+    const prev = bodyRef.current && bodyRef.current.querySelector('img.nsh-sel');
+    if (prev && prev !== t) prev.classList.remove('nsh-sel');
+    if (t && t.tagName === 'IMG' && !t.closest('.nsh-slideshow')) { t.classList.add('nsh-sel'); setSelImg(t); } else setSelImg(null);
+  }
+  function wrapImg(mode) {
+    const el = selImg;
+    if (!el || htmlMode || !bodyRef.current || !bodyRef.current.contains(el)) { setMsg({ ok: false, text: 'Click a photo in the post first, then choose how the text wraps.' }); return; }
+    const w = parseInt(el.style.width, 10) || (el.style.float && el.style.float !== 'none' ? 40 : 100);
+    if (mode === 'left') { el.style.float = 'left'; el.style.margin = '4px 20px 12px 0'; el.style.width = (w < 100 ? w : 40) + '%'; }
+    else if (mode === 'right') { el.style.float = 'right'; el.style.margin = '4px 0 12px 20px'; el.style.width = (w < 100 ? w : 40) + '%'; }
+    else if (mode === 'center') { el.style.float = 'none'; el.style.display = 'block'; el.style.margin = '14px auto'; el.style.width = '100%'; }
+    else if (mode === 'smaller') el.style.width = Math.max(15, w - 10) + '%';
+    else if (mode === 'larger') el.style.width = Math.min(100, w + 10) + '%';
+    el.style.maxWidth = '100%'; el.style.height = 'auto';
+    setTick((n) => n + 1);
+  }
   function onPicked(img) {
+    if (picking.current === 'slide') { setSlides((s) => (s.some((x) => x.url === img.url) ? s.filter((x) => x.url !== img.url) : [...s, { url: img.url, alt: img.alt || '' }])); return; }
     setPicker(false);
     const url = img.url;
     const alt = String(img.alt || '').replace(/"/g, '&quot;');
@@ -285,7 +329,7 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
     return (
       <div>
         {back('All posts', () => { setPost(null); setMsg(null); })}
-        <style>{'.blog-body{min-height:340px;padding:16px 18px;border:0.5px solid #d8d0c4;border-radius:0 0 8px 8px;background:#fff;font-size:16px;line-height:1.7;outline:none}.blog-body img{max-width:100%;height:auto}.blog-body h2{font-family:Cardo,serif;font-size:24px}.blog-body h3{font-family:Cardo,serif;font-size:19px}.blog-body blockquote{border-left:3px solid #b5a185;margin:12px 0;padding:2px 14px;color:#555}.blog-body a{color:#886c44}.blog-body .nsh-video iframe{pointer-events:none}'}</style>
+        <style>{'.blog-body{min-height:340px;padding:16px 18px;border:0.5px solid #d8d0c4;border-radius:0 0 8px 8px;background:#fff;font-size:16px;line-height:1.7;outline:none}.blog-body img{max-width:100%;height:auto}.blog-body img.nsh-sel{outline:3px solid #b5a185;outline-offset:2px}.blog-body:after{content:"";display:block;clear:both}.blog-body h2{font-family:Cardo,serif;font-size:24px}.blog-body h3{font-family:Cardo,serif;font-size:19px}.blog-body blockquote{border-left:3px solid #b5a185;margin:12px 0;padding:2px 14px;color:#555}.blog-body a{color:#886c44}.blog-body .nsh-video iframe{pointer-events:none}'}</style>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
           <span style={{ background: st.bg, color: st.color, borderRadius: 10, padding: '2px 10px', fontSize: 11, fontWeight: 700 }}>{st.label}</span>
           {post.id && post.status === 'published' && <a href={SITE + '/journal/' + post.slug} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: GOLD }}>View on website ↗</a>}
@@ -336,13 +380,13 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
         </div>
 
         <label style={labelStyle}>Post</label>
-        <Toolbar run={run} onLink={addLink} onImage={() => pickImage('body')} onVideo={addVideo} uploading={uploading} />
+        <Toolbar run={run} onLink={addLink} onImage={() => pickImage('body')} onVideo={addVideo} uploading={uploading} onWrap={wrapImg} onSlides={() => pickImage('slide')} hasImg={!!selImg} />
         {htmlMode ? (
           <textarea value={post.body_html || ''} onChange={(e) => set('body_html', e.target.value)} style={{ ...inputStyle, minHeight: 340, borderRadius: '0 0 8px 8px', fontFamily: 'Consolas, monospace', fontSize: 13 }} />
         ) : (
           <div key={editorKey} ref={bodyRef} className="blog-body" contentEditable suppressContentEditableWarning
             dangerouslySetInnerHTML={{ __html: post.body_html || '<p><br></p>' }}
-            onKeyUp={() => { rememberSelection(); clearTimeout(tickT.current); tickT.current = setTimeout(() => setTick((n) => n + 1), 800); }} onMouseUp={rememberSelection}
+            onClick={selectImg} onKeyUp={() => { rememberSelection(); clearTimeout(tickT.current); tickT.current = setTimeout(() => setTick((n) => n + 1), 800); }} onMouseUp={rememberSelection}
             onPaste={(e) => {
               const html = e.clipboardData.getData('text/html');
               const plain = e.clipboardData.getData('text/plain');
@@ -355,7 +399,17 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
         <div style={{ textAlign: 'right', marginTop: 6 }}>
           <button type="button" onClick={switchMode} style={{ background: 'none', border: 'none', color: '#888', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>{htmlMode ? 'Back to the editor' : 'Edit as HTML'}</button>
         </div>
-        {picker && <MediaPicker supabaseUrl={supabaseUrl} supabaseKey={supabaseKey} onPick={onPicked} onClose={() => setPicker(false)} />}
+        {picker && <MediaPicker supabaseUrl={supabaseUrl} supabaseKey={supabaseKey} onPick={onPicked} onClose={() => setPicker(false)}
+          title={picking.current === 'slide' ? 'Choose photos for the slideshow (click each one)' : undefined}
+          footer={picking.current === 'slide' ? (
+            <div style={{ position: 'sticky', bottom: -18, background: '#fdfcfb', borderTop: '0.5px solid #e0d8cc', marginTop: 14, padding: '10px 0 0', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 4, flex: 1, minWidth: 0, overflowX: 'auto' }}>
+                {slides.map((s) => <img key={s.url} src={s.url.replace(/\/public$/, '/w=120,h=80,fit=cover,q=70')} alt="" title="Click the photo in the grid again to remove it" style={{ width: 48, height: 36, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />)}
+                {!slides.length && <span style={{ fontSize: 12, color: '#999' }}>No photos chosen yet.</span>}
+              </div>
+              <span style={{ fontSize: 12, color: '#666' }}>{slides.length} chosen</span>
+              <button type="button" onClick={insertSlideshow} disabled={!slides.length} style={{ ...btn(true), opacity: slides.length ? 1 : 0.5 }}>Add slideshow</button>
+            </div>) : null} />}
 
         <div style={{ ...cardBox, marginTop: 18 }}>
           <div style={cardHead}>Organize</div>
