@@ -348,7 +348,7 @@ function StatBox({ label, value, sub, color }) {
   );
 }
 
-function OverviewTab({ ev, onUpdate, onEdit, volunteers, session, volunteer }) {
+function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volunteer }) {
   const [marketingNA, setMarketingNA] = useState(false);
   useEffect(() => { fetchEventMarketingNA(ev.name).then(setMarketingNA).catch(() => {}); }, [ev.name]);
   function toggleMarketingNA(v) {
@@ -419,6 +419,7 @@ function OverviewTab({ ev, onUpdate, onEdit, volunteers, session, volunteer }) {
                 <option value="cancelled">Cancelled</option>
               </select>
               <button className="btn-ghost" style={{ fontSize: 12 }} onClick={onEdit}>Edit</button>
+              {onDelete && <button className="btn-ghost" style={{ fontSize: 12, color: '#a04545' }} onClick={onDelete}>Delete</button>}
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -1242,7 +1243,7 @@ function ReviewsTab({ ev }) {
 
 // ── Detail page ───────────────────────────────────────────────────────────
 
-function EventDetail({ ev, onUpdate, onBack, onEdit, volunteers, session, volunteer }) {
+function EventDetail({ ev, onUpdate, onBack, onEdit, onDelete, volunteers, session, volunteer }) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => { fetchHiddenCommitteeEvents().then(rows => setHidden(rows.some(r => r.id === ev.id))).catch(() => {}); }, [ev.id]);
   async function toggleHidden(v) {
@@ -1261,7 +1262,7 @@ function EventDetail({ ev, onUpdate, onBack, onEdit, volunteers, session, volunt
       </div>
 
       <div className="card" style={{ padding: '20px 22px 24px' }}>
-        <OverviewTab ev={ev} onUpdate={onUpdate} onEdit={onEdit} volunteers={volunteers} session={session} volunteer={volunteer} />
+        <OverviewTab ev={ev} onUpdate={onUpdate} onEdit={onEdit} onDelete={onDelete} volunteers={volunteers} session={session} volunteer={volunteer} />
       </div>
     </div>
   );
@@ -1435,7 +1436,7 @@ export default function EventsCommittee() {
   }
 
   function deleteEvent(ev) {
-    if (!confirm(`Delete "${ev.name}"? This can't be undone.`)) return;
+    if (!confirm(`Delete "${ev.name}"? This can't be undone.`)) return false;
     setEvents(prev => prev.filter(e => e.id !== ev.id));
     deleteCommitteeEvent(ev.id);
     const fullName = `${volunteer?.['First Name'] || ''} ${volunteer?.['Last Name'] || ''}`.trim();
@@ -1445,6 +1446,7 @@ export default function EventsCommittee() {
       action: 'committee_event_deleted',
       description: `${fullName || 'A volunteer'} deleted the event "${ev.name}"`,
     });
+    return true;
   }
 
   function openNewModal() {
@@ -1540,7 +1542,7 @@ export default function EventsCommittee() {
         {loading ? (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)', fontSize: 13 }}>Loading…</div>
         ) : selected ? (
-          <EventDetail ev={selected} onUpdate={updateSelected} onBack={() => setSelectedId(null)} onEdit={openEditModal} volunteers={volunteers} session={session} volunteer={volunteer} />
+          <EventDetail ev={selected} onUpdate={updateSelected} onBack={() => setSelectedId(null)} onEdit={openEditModal} onDelete={() => { if (deleteEvent(selected)) setSelectedId(null); }} volunteers={volunteers} session={session} volunteer={volunteer} />
         ) : (
           <>
             <EventPlan session={session} volunteer={volunteer} onFinalized={() => load()} />

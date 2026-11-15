@@ -34,6 +34,15 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
   const loadEvents = React.useCallback(() => { call({ action: 'list' }).then((j) => setEvents(j.events || [])).catch(() => setEvents([])); }, []);
   React.useEffect(() => { loadEvents(); }, [loadEvents]);
 
+  function removeEvent(ev) {
+    const live = ev.status === 'published';
+    if (!window.confirm('Delete "' + ev.title + '"?' + (live ? ' It is live on the website, so its page comes down right away.' : '') + ' This cannot be undone.')) return;
+    setMsg(null);
+    call({ action: 'delete', id: ev.id })
+      .then(() => { if (f.id === ev.id) { setF(blank()); setSlugTouched(false); } loadEvents(); })
+      .catch((e) => setMsg({ ok: false, text: e.message }));
+  }
+
   function save(status) {
     if (busy) return;
     if (status === 'published' && !window.confirm('Publish this event? It goes on the website right away.')) return;
@@ -128,7 +137,10 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
               <div style={{ fontWeight: 600, color: '#2a2a2a' }}>{ev.title}</div>
               <div style={{ fontSize: 12, color: '#888' }}>{ev.date_tbd ? 'Date to be announced' : ev.start_at ? new Date(ev.start_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) : 'No date'}</div>
             </div>
-            <span style={{ alignSelf: 'center', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 9px', borderRadius: 20, color: ev.status === 'published' ? '#2e7d32' : '#6b7280', background: ev.status === 'published' ? '#e8f5e9' : '#f3f4f6' }}>{ev.status === 'published' ? 'Published' : ev.status === 'archived' ? 'Ended' : 'Draft'}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 9px', borderRadius: 20, color: ev.status === 'published' ? '#2e7d32' : '#6b7280', background: ev.status === 'published' ? '#e8f5e9' : '#f3f4f6' }}>{ev.status === 'published' ? 'Published' : ev.status === 'archived' ? 'Ended' : 'Draft'}</span>
+              <button type="button" onClick={() => removeEvent(ev)} style={{ background: 'none', border: '1px solid #e3c4bd', color: '#b3402a', borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+            </div>
           </div>
         ))}
       </div>
