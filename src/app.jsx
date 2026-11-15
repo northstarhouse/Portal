@@ -21702,20 +21702,30 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
   // Everyone who has filled out a pre-booking form (wedding or events), by email address: their inquiry stays in the list and
   // gets a "Booked" tag. The form's own email, and the second signer's if there is one, both count.
   var [bookedEmails, setBookedEmails] = useState({});
+  // 'paid' = booked (first payment received, or a HoneyBook client); 'hold' = pre-booking form in, no payment yet (soft hold).
   function isBookedInquiry(sub) {
     var e = (inquiryPreviewFields(sub).email || '').trim().toLowerCase();
-    return !!e && !!bookedEmails[e];
+    return (!!e && bookedEmails[e]) || null;
   }
   function load() {
     fetchVenueInquiries().then(function(r) {
       setRows(r.filter(function(sub) { return isVenueClientSubmission(sub) === !!clientsOnly && !(clientsOnly && isTestVenueBooking(sub)); }));
-      var booked = {};
-      r.forEach(function(sub) {
-        if (!isVenueClientSubmission(sub) || isTestVenueBooking(sub)) return;
-        var a = sub.answers || {};
-        ['c9u1sxb4', 'pt4mail1', 'evp_email'].forEach(function(k) { var v = String(a[k] || '').trim().toLowerCase(); if (v) booked[v] = true; });
-      });
-      setBookedEmails(booked);
+      var clientRows = r.filter(function(sub) { return isVenueClientSubmission(sub) && !isTestVenueBooking(sub); });
+      var sbH = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+      fetch(SUPABASE_URL + '/rest/v1/venue_inquiries?select=prebooking_form_response_id,venue_payment_schedule(amount_paid_cents)&prebooking_form_response_id=not.is.null', { headers: sbH })
+        .then(function(res) { return res.ok ? res.json() : []; }).catch(function() { return []; })
+        .then(function(inqs) {
+          var paidByResponse = {};
+          (Array.isArray(inqs) ? inqs : []).forEach(function(q) { var c = (q.venue_payment_schedule || []).reduce(function(n, x) { return n + (Number(x.amount_paid_cents) || 0); }, 0); if (c > 0) paidByResponse[q.prebooking_form_response_id] = true; });
+          var booked = {};
+          clientRows.forEach(function(sub) {
+            var a = sub.answers || {};
+            var manual = (a.__venue_checklist && Array.isArray(a.__venue_checklist.manual_payments) ? a.__venue_checklist.manual_payments : []).reduce(function(n, x) { return n + (Number(x && x.cents) || 0); }, 0);
+            var paid = !!a.__honeybook || manual > 0 || !!paidByResponse[sub.id];
+            ['c9u1sxb4', 'pt4mail1', 'evp_email'].forEach(function(k) { var v = String(a[k] || '').trim().toLowerCase(); if (v && booked[v] !== 'paid') booked[v] = paid ? 'paid' : 'hold'; });
+          });
+          setBookedEmails(booked);
+        });
     });
   }
   useEffect(function() { load(); }, []);
@@ -22114,7 +22124,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                           {tour && (function() { var st = TOUR_STATES[tourStateKey(sub)]; return (
                             <span title={st.label + ': ' + fmtTourWhen(tour)} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: st.color, background: st.bg }}>{st.label}</span>
                           ); })()}
-                          {!sub.tourOnly && isBookedInquiry(sub) && <span title="They have filled out the pre-booking form" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: '#fff', background: '#886c44' }}>Booked</span>}
+                          {!sub.tourOnly && isBookedInquiry(sub) && <span title={isBookedInquiry(sub) === 'paid' ? 'Booked: first payment received' : 'Soft hold: pre-booking form submitted, no payment yet'} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: isBookedInquiry(sub) === 'paid' ? '#fff' : '#886c44', background: isBookedInquiry(sub) === 'paid' ? '#886c44' : '#f3ead9' }}>{isBookedInquiry(sub) === 'paid' ? 'Booked' : 'Soft hold'}</span>}
                           {tour && tour.confirmed_at && <span title={'Confirmed from the reminder email: ' + tourConfirmedText(tour)} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: '#1b5e20', background: '#e3f4e3' }}>✓ Confirmed</span>}
                           {false && tour && (
                             <span title={(tour.status === 'booked' ? 'Tour booked: ' : 'Tour requested: ') + fmtTourWhen(tour)}
