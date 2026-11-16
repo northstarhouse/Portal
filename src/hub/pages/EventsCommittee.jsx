@@ -1740,7 +1740,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
   const committeeWithEmail = committee.filter(v => v.Email && String(v.Email).includes('@'));
 
   function buildEmailHtml() {
-    const GOLD = '#886c44';
+    const GOLD = '#9a8c84';
     const esc = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const circle = (done) => (done
       ? '<span style="display:inline-block;width:18px;height:18px;line-height:18px;border-radius:50%;background:' + GOLD + ';color:#ffffff;font-size:11px;text-align:center;">&#10003;</span>'
@@ -1809,13 +1809,13 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
     };
     const groupsHtml = catGroups.map(g => {
       const d = g.items.filter(isDone).length;
-      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border:1px solid #cdb78e;border-collapse:separate;"><tr><td bgcolor="#f1ece8" style="background:#f1ece8;padding:12px 16px;">' + (ICON_KEY[g.cat] ? '<img src="' + ICON_BASE + ICON_KEY[g.cat] + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + esc(g.cat) + '</span>'
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border:1px solid #d3cac4;border-collapse:separate;"><tr><td bgcolor="#f1ece8" style="background:#f1ece8;padding:12px 16px;">' + (ICON_KEY[g.cat] ? '<img src="' + ICON_BASE + ICON_KEY[g.cat] + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + esc(g.cat) + '</span>'
         + (g.cat !== 'Marketing' && g.items.length > 0 ? '<span style="font-size:12px;color:#888888;margin-left:10px;">' + (d === g.items.length ? 'all figured out &#10003;' : d + ' of ' + g.items.length + ' done') + '</span>' : '') + '</td></tr>'
         + g.items.map(itemRow).join('') + (g.cat === 'Money' ? budgetStats() + budgetDetail() : '') + '</table>';
     }).join('');
     const w0 = ev.website || {};
     const ICONS = 'https://northstarhouse.github.io/Portal/assets/icons/cat-';
-    const box = (title, inner, iconKey) => '<table role="presentation" width="100%" height="100%" cellpadding="0" cellspacing="0" style="height:100%;margin:0;border:1px solid #cdb78e;border-collapse:separate;background:#ffffff;"><tr><td bgcolor="#f1ece8" style="background:#f1ece8;padding:12px 16px;">' + (iconKey ? '<img src="' + ICONS + iconKey + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-family:Cardo,Georgia,serif;font-size:14px;font-weight:bold;color:' + GOLD + ';">' + title + '</span></td></tr><tr><td style="padding:6px 16px 12px;">' + inner + '</td></tr></table>';
+    const box = (title, inner, iconKey) => '<table role="presentation" width="100%" height="100%" cellpadding="0" cellspacing="0" style="height:100%;margin:0;border:1px solid #d3cac4;border-collapse:separate;background:#ffffff;"><tr><td bgcolor="#f1ece8" style="background:#f1ece8;padding:12px 16px;">' + (iconKey ? '<img src="' + ICONS + iconKey + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-family:Cardo,Georgia,serif;font-size:14px;font-weight:bold;color:' + GOLD + ';">' + title + '</span></td></tr><tr><td style="padding:6px 16px 12px;">' + inner + '</td></tr></table>';
     // Event details: what Event Basics holds
     const dateTxt = w0.date_tbd ? 'To be announced' : (ev.date ? fmtDate(ev.date) : '');
     const timeTxt = w0.date_tbd ? '' : (ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : '');
