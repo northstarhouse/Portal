@@ -539,7 +539,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             const when = w.date_tbd ? 'To be announced' : [ev.date ? fmtDate(ev.date) : '', ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : ''].filter(Boolean).join('  ·  ');
             const where = [w.location_name || ev.location, (w.spaces || []).length ? (w.spaces || []).join(', ') : ''].filter(Boolean).join(' — ');
             const tiers = (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim());
-            const tickets = rsvpOnly ? 'RSVP only (no ticket sales)' : (w.sells_tickets && tiers.length ? tiers.map(t => t.name + ' ' + (Number(t.price) > 0 ? '$' + t.price : 'free')).join(', ') : '');
+            const tickets = rsvpOnly ? 'RSVP only (no ticket sales)' : (w.sells_tickets && tiers.length ? tiers.map(t => t.name + ' ' + (Number(t.price) > 0 ? '$' + t.price : 'free')).join('  |  ') : '');
             const volNeed = ev.vendors.filter(v => ['volunteer', 'activity'].includes(v.kind)).reduce((n, v) => n + (Number(v.target) || 0), 0) || (ev.volunteersNeeded === '' || ev.volunteersNeeded == null ? 0 : Number(ev.volunteersNeeded));
             const rows = [
               ['Date and time', when, true],
@@ -1661,19 +1661,19 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
         + g.items.map(itemRow).join('') + '</table>';
     }).join('');
     const w0 = ev.website || {};
-    const box = (title, inner) => '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;border:1px solid #efe6d5;border-collapse:separate;background:#ffffff;"><tr><td style="padding:16px 18px;"><div style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;margin-bottom:10px;">' + title + '</div>' + inner + '</td></tr></table>';
+    const box = (title, inner) => '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;border:1px solid #efe6d5;border-collapse:separate;background:#ffffff;"><tr><td style="padding:16px 18px;"><div style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;margin-bottom:10px;">' + title + '</div>' + inner + '</td></tr></table>';
     // Event details: what Event Basics holds
     const whenTxt = w0.date_tbd ? 'To be announced' : [ev.date ? fmtDate(ev.date) : '', ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : ''].filter(Boolean).join('  ·  ');
     const whereTxt = [w0.location_name || ev.location, (w0.spaces || []).length ? (w0.spaces || []).join(', ') : ''].filter(Boolean).join(' — ');
     const tierList = (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim());
-    const ticketTxt = w0.sells_tickets && tierList.length ? tierList.map(t => t.name + ' ' + (Number(t.price) > 0 ? '$' + t.price : 'free')).join(', ') : '';
+    const ticketTxt = w0.sells_tickets && tierList.length ? tierList.map(t => t.name + ' ' + (Number(t.price) > 0 ? '$' + t.price : 'free')).join('  |  ') : '';
     const detailRows = [
       ['Date and time', whenTxt], ['Event type', ev.purpose], ['Location', whereTxt], ['Event lead', ev.eventLead],
       ['Expected guests', ev.expectedAttendance || (ev.guestCount && ev.guestCount.invited ? String(ev.guestCount.invited) : '')],
       ['Tickets', ticketTxt], ['Pricing', ev.pricing],
     ].filter(r => r[1]);
     const detailsBox = box('Event details', detailRows.length
-      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + detailRows.map(r => '<tr><td valign="top" width="130" style="padding:4px 10px 4px 0;font-size:12px;color:#888888;">' + esc(r[0]) + '</td><td valign="top" style="padding:4px 0;font-size:14px;color:#2a2a2a;line-height:1.45;">' + esc(r[1]) + '</td></tr>').join('') + '</table>'
+      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + detailRows.map(r => '<tr><td valign="top" width="110" style="padding:8px 10px 8px 0;border-bottom:1px solid #f3ecdf;font-size:12px;color:#888888;">' + esc(r[0]) + '</td><td valign="top" style="padding:8px 0;border-bottom:1px solid #f3ecdf;font-size:14px;color:#2a2a2a;line-height:1.45;">' + esc(r[1]) + '</td></tr>').join('') + '</table>'
       : '<div style="font-size:13px;color:#888888;">Event details have not been filled in yet.</div>');
     // Volunteers confirmed: everyone assigned anywhere on the checklist, with what they are on
     const onWhat = {};
@@ -1683,19 +1683,19 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     ev.vendors.filter(v => ['volunteer', 'activity'].includes(v.kind)).forEach(v => whoOn(v, volunteers).forEach(x => addPerson(x.name, v.name)));
     const peopleNames = Object.keys(onWhat).sort((x, y) => x.localeCompare(y));
     const volsBox = box('Volunteers confirmed to be in attendance', peopleNames.length
-      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + peopleNames.map(n => '<tr><td valign="top" style="padding:5px 0;border-bottom:1px solid #f3ecdf;"><div style="font-size:14px;font-weight:bold;color:#2a2a2a;">' + esc(n) + '</div>' + (onWhat[n].length ? '<div style="font-size:12px;color:#888888;line-height:1.45;">' + esc(onWhat[n].join('  ·  ')) + '</div>' : '') + '</td></tr>').join('') + '</table>'
+      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + peopleNames.map(n => '<tr><td valign="top" style="padding:8px 0;border-bottom:1px solid #f3ecdf;font-size:14px;color:#2a2a2a;">' + esc(n) + '</td></tr>').join('') + '</table>'
       : '<div style="font-size:13px;color:#888888;">No volunteers assigned yet.</div>');
     const w = ev.website || {};
     const when = w.date_tbd ? 'Date to be announced' : [ev.date ? fmtDate(ev.date) : '', ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : ''].filter(Boolean).join('  ·  ');
     const note = emailNote.trim();
-    return '<div style="background:#e6ded0;padding:28px 12px;font-family:Helvetica,Arial,sans-serif;"><div style="max-width:680px;margin:0 auto;background:#fdfbf7;">'
+    return '<style>@media only screen and (max-width:540px){.ec-col{display:block!important;width:100%!important;padding:0 0 12px 0!important;box-sizing:border-box!important}}</style><div style="background:#e6ded0;padding:28px 12px;font-family:Helvetica,Arial,sans-serif;"><div style="max-width:680px;margin:0 auto;background:#fdfbf7;">'
       + '<div style="height:14px;background:' + GOLD + ';"></div>'
       + '<div style="padding:34px 36px 8px;text-align:center;"><div style="font-size:12px;letter-spacing:3px;color:' + GOLD + ';font-weight:bold;margin-bottom:12px;">EVENTS COMMITTEE &middot; CHECKLIST</div>'
       + '<h1 style="margin:0 0 8px;font-family:Georgia,serif;font-size:28px;font-weight:400;color:#2a2420;">' + esc(ev.name) + '</h1>'
       + (when ? '<div style="font-size:14px;color:#777777;">' + esc(when) + '</div>' : '')
       + '<div style="border-top:1px solid #e5ddcf;width:60%;margin:20px auto 0;"></div></div>'
       + (note ? '<div style="padding:18px 36px 0;font-size:15px;line-height:1.6;color:#444444;">' + esc(note).replace(/\n/g, '<br>') + '</div>' : '')
-      + '<div style="padding:18px 36px 0;">' + detailsBox + volsBox + '</div>'
+      + '<div style="padding:18px 36px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td class="ec-col" valign="top" width="58%" style="padding:0 7px 14px 0;">' + detailsBox + '</td><td class="ec-col" valign="top" width="42%" style="padding:0 0 14px 7px;">' + volsBox + '</td></tr></table></div>'
       + '<div style="padding:6px 36px 6px;"><div style="font-size:13px;color:#888888;padding-top:14px;">' + doneTotal + ' of ' + total + ' done</div>' + groupsHtml + '</div>'
       + '<div style="padding:22px 36px 34px;text-align:center;"><a href="https://volunteerhub.northstarhouse.org/#/events-committee-planning" style="display:inline-block;background:' + GOLD + ';color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:15px 30px;">Open in the Volunteer Hub</a></div>'
       + '<div style="background:#f7f3ec;padding:14px 36px;text-align:center;font-size:11px;color:#999999;">North Star House</div>'
