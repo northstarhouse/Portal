@@ -772,7 +772,7 @@ const volFullName = (v) => `${v['First Name'] || ''} ${v['Last Name'] || ''}`.tr
 // Roster picks go in assignedIds (phone shown from the roster; an edited number is kept in phones[id]).
 // Typed-in names go in people [{ id, name, phone }]. Everyone assigned gets a phone box, blank when unknown.
 const needPeopleCount = (v) => (v.assignedIds || []).length + (v.people || []).length;
-function AssignVolunteers({ v, volunteers, onPatch, compact, target }) {
+function AssignVolunteers({ v, volunteers, onPatch, compact, target, hideList }) {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const roster = volunteers || [];
@@ -817,7 +817,7 @@ function AssignVolunteers({ v, volunteers, onPatch, compact, target }) {
           </div>
         )}
       </div>}
-      {(assigned.length > 0 || people.length > 0) && (
+      {!hideList && (assigned.length > 0 || people.length > 0) && (
         <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {assigned.map(x => (
             <div key={x.id} className="row-x-host" tabIndex={-1} style={{ outline: 'none', display: 'flex', alignItems: 'center', gap: 8, fontSize: fs }}>
@@ -1003,6 +1003,8 @@ function NeedsList({ ev, onUpdate, volunteers }) {
   );
 }
 
+const hasBudget = (b) => b !== '' && b != null && !isNaN(Number(b));
+const budgetText = (b) => (hasBudget(b) ? money(Number(b)) : 'Undecided');
 const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 function dutyPeople(t) {
   return {
@@ -1045,22 +1047,25 @@ function DutyWho({ t, volunteers, onPatch }) {
 function assignedPeople(ev, volunteers, extra) {
   const roster = volunteers || [];
   const out = new Map();
-  const add = (key, name, phone, label) => {
+  const add = (key, name, phone, label, ref) => {
     if (!name) return;
     const e = out.get(key) || { key, name, phone: '', on: [] };
     if (!e.phone && phone) e.phone = phone;
     if (label && !e.on.includes(label)) e.on.push(label);
+    if (ref && !e.extraRef) e.extraRef = ref;
     out.set(key, e);
   };
-  const scan = (t, label) => {
-    (t.assignedIds || []).forEach(id => { const x = roster.find(r => String(r.id) === String(id)); if (x) add('v' + x.id, volFullName(x), (t.phones || {})[x.id] || x['Phone Number'], label); });
-    (t.people || []).forEach(pp => { const n = String(pp.name || '').trim(); if (n) add('n' + n.toLowerCase(), n, pp.phone, label); });
+  const scan = (t, label, byHand) => {
+    (t.assignedIds || []).forEach(id => { const x = roster.find(r => String(r.id) === String(id)); if (x) add('v' + x.id, volFullName(x), (t.phones || {})[x.id] || x['Phone Number'], label, byHand ? { kind: 'id', id: x.id } : null); });
+    (t.people || []).forEach(pp => { const n = String(pp.name || '').trim(); if (n) add('n' + n.toLowerCase(), n, pp.phone, label, byHand ? { kind: 'person', id: pp.id } : null); });
   };
+  // Events Committee members come first.
+  roster.filter(v => matchVolunteerAreas(v.Team).includes('Events')).forEach(v => { add('v' + v.id, volFullName(v), v['Phone Number'], 'Events Committee'); out.get('v' + v.id).committee = true; });
   ev.checklist.forEach(t => scan(dutyPeople(t), t.text));
   ev.timeline.filter(t => !t.noAssign).forEach(t => scan(t, fmtTime12(t.time) + ' ' + t.activity));
   ev.vendors.filter(v => ['volunteer', 'activity'].includes(v.kind)).forEach(v => scan(v, needTitle(v)));
-  if (extra) scan({ assignedIds: extra.assignedIds || [], people: extra.people || [], phones: extra.phones || {} }, '');
-  return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
+  if (extra) scan({ assignedIds: extra.assignedIds || [], people: extra.people || [], phones: extra.phones || {} }, '', true);
+  return [...out.values()].sort((a, b) => (b.committee ? 1 : 0) - (a.committee ? 1 : 0) || a.name.localeCompare(b.name));
 }
 
 function AttendanceTab({ ev, volunteers }) {
@@ -1081,26 +1086,30 @@ function AttendanceTab({ ev, volunteers }) {
     } catch (e) { /* the list on screen stays; the next change tries again */ }
   }
   if (!extra) return <div style={{ fontSize: 13, color: 'var(--muted)' }}>Loading…</div>;
-  const auto = assignedPeople(ev, volunteers);
-  const extraNames = assignedPeople({ checklist: [], timeline: [], vendors: [] }, volunteers, extra);
   const everyone = assignedPeople(ev, volunteers, extra);
   const cap = { fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 };
+  function removeByHand(ref) {
+    if (ref.kind === 'id') patchExtra({ assignedIds: (extra.assignedIds || []).filter(i => String(i) !== String(ref.id)) });
+    else patchExtra({ people: (extra.people || []).filter(y => y.id !== ref.id) });
+  }
   return (
     <div>
-      <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
-        {everyone.length} volunteer{everyone.length === 1 ? '' : 's'} in attendance. Anyone you assign on the checklist is added here automatically. Add anyone else below.
-      </div>
-      <div style={cap}>Assigned on the checklist ({auto.length})</div>
-      {auto.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>No one is assigned on the checklist yet.</div>}
-      {auto.map(x => (
-        <div key={x.key} style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', padding: '9px 0', borderBottom: '0.5px solid var(--border-light)' }}>
-          <span style={{ fontSize: 14, fontWeight: 600, minWidth: 160 }}>{x.name}</span>
-          <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 110 }}>{x.phone || ''}</span>
-          <span style={{ flex: 1, fontSize: 12, color: 'var(--muted)' }}>{x.on.join('  ·  ')}</span>
+      <div style={cap}>Confirmed volunteers who will be in attendance ({everyone.length})</div>
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Anyone you assign on the checklist is added automatically, with what they are on. Add anyone else below.</div>
+      {everyone.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)', margin: '8px 0 14px' }}>No one yet.</div>}
+      {everyone.map(x => (
+        <div key={x.key} className="row-x-host" tabIndex={-1} style={{ outline: 'none', display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', padding: '9px 0', borderBottom: '0.5px solid var(--border-light)' }}>
+          <span style={{ fontSize: 14, fontWeight: 600, width: 170, flexShrink: 0 }}>{x.name}</span>
+          {x.extraRef && x.extraRef.kind === 'person'
+            ? <input className="input" placeholder="Phone" defaultValue={x.phone || ''} key={x.key + (x.phone || '')} style={{ width: 130, flexShrink: 0, fontSize: 12, padding: '4px 8px' }}
+                onBlur={e => { const v = e.target.value.trim(); if (v !== (x.phone || '')) patchExtra({ people: (extra.people || []).map(y => (y.id === x.extraRef.id ? { ...y, phone: v } : y)) }); }} />
+            : <span style={{ fontSize: 12, color: 'var(--muted)', width: 130, flexShrink: 0 }}>{x.phone || ''}</span>}
+          <span style={{ flex: 1, minWidth: 160, fontSize: 12, color: 'var(--muted)' }}>{x.on.length ? x.on.join('  ·  ') : 'Added by hand'}</span>
+          {x.extraRef && x.on.length === 0 && <button type="button" className="row-x" onClick={() => removeByHand(x.extraRef)} title="Remove from the list" style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 14, cursor: 'pointer', padding: '0 2px' }}>×</button>}
         </div>
       ))}
-      <div style={{ ...cap, marginTop: 20 }}>Add more volunteers ({extraNames.length})</div>
-      <AssignVolunteers v={extra} volunteers={volunteers} onPatch={patchExtra} />
+      <div style={{ ...cap, marginTop: 20 }}>Add a volunteer</div>
+      <AssignVolunteers v={extra} volunteers={volunteers} onPatch={patchExtra} hideList />
     </div>
   );
 }
@@ -1549,6 +1558,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
   useEffect(() => { let live = true; fetchAreaData(ev.id).then(rows => { if (live) setAttendExtra((((rows || []).find(r => r.area_key === 'volunteers') || {}).pre_data || {}).attendance || null); }).catch(() => {}); return () => { live = false; }; }, [ev.id]);
   const [fin, setFin] = useState(null);
   const [budgetDone, setBudgetDone] = useState(false);
+  const [budgetAmount, setBudgetAmount] = useState('');
   useEffect(() => {
     let live = true;
     Promise.all([
@@ -1565,6 +1575,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
       const totalExpenses = expenses.reduce((n, r) => n + (parseFloat(r.amount) || 0), 0);
       setFin({ earnings, expenses, rsvpOnly, ticketRevenue, ticketsSold: t.ticketsSold, totalEarnings, totalExpenses });
       setBudgetDone(!!((((rows || []).find(r => r.area_key === 'finance') || {}).pre_data || {}).budgetDone));
+      { const b = (((rows || []).find(r => r.area_key === 'finance') || {}).pre_data || {}).budgetAmount; setBudgetAmount(b == null ? '' : String(b)); }
     });
     return () => { live = false; };
   }, [ev.id, ev.name]);
@@ -1764,9 +1775,9 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     const budgetStats = () => {
       if (!fin) return '';
       const net = fin.totalEarnings - fin.totalExpenses;
-      const stat = (label, amount, color) => '<tr><td style="padding:10px 0;border-bottom:1px solid #ede8df;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;color:#2a2a2a;">' + label + '</td><td align="right" style="padding:10px 0;border-bottom:1px solid #ede8df;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;color:' + color + ';white-space:nowrap;">' + esc(money(amount)) + '</td></tr>';
-      return '<tr><td bgcolor="#ffffff" style="padding:6px 16px 4px 16px;background:#ffffff;"><div style="font-size:11px;color:#888888;padding:4px 0 2px;">Budget as of ' + esc(fmtDate(todayStr())) + '</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
-        + stat('Earnings', fin.totalEarnings, '#4a5d3a') + stat('Expenses', fin.totalExpenses, '#8a4a2e') + stat('Net', net, net >= 0 ? '#4a5d3a' : '#8a4a2e') + '</table></td></tr>';
+      const stat = (label, amount, color) => '<tr><td style="padding:10px 0;border-bottom:1px solid #ede8df;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;color:#2a2a2a;">' + label + '</td><td align="right" style="padding:10px 0;border-bottom:1px solid #ede8df;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;color:' + color + ';white-space:nowrap;">' + esc(label === 'Budget' ? budgetText(budgetAmount) : money(amount)) + '</td></tr>';
+      return '<tr><td bgcolor="#ffffff" style="padding:6px 16px 4px 16px;background:#ffffff;"><div style="font-size:11px;color:#888888;padding:4px 0 2px;">As of ' + esc(fmtDate(todayStr())) + '</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+        + stat('Budget', null, '#2a2a2a') + stat('Earnings', fin.totalEarnings, '#4a5d3a') + stat('Expenses', fin.totalExpenses, '#8a4a2e') + stat('Net', net, net >= 0 ? '#4a5d3a' : '#8a4a2e') + '</table></td></tr>';
     };
     const budgetDetail = () => {
       if (!fin) return '';
@@ -2126,12 +2137,12 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
         })}
         {g.cat === 'Money' && fin && (
           <div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', padding: '8px 0 2px 14px' }}>Budget as of {fmtDate(todayStr())}</div>
-            {[['Earnings', fin.totalEarnings, '#4a5d3a'], ['Expenses', fin.totalExpenses, '#8a4a2e'], ['Net', fin.totalEarnings - fin.totalExpenses, fin.totalEarnings - fin.totalExpenses >= 0 ? '#4a5d3a' : '#8a4a2e']].map(r => (
+            <div style={{ fontSize: 11, color: 'var(--muted)', padding: '8px 0 2px 14px' }}>As of {fmtDate(todayStr())}</div>
+            {[['Budget', null, '#2a2a2a'], ['Earnings', fin.totalEarnings, '#4a5d3a'], ['Expenses', fin.totalExpenses, '#8a4a2e'], ['Net', fin.totalEarnings - fin.totalExpenses, fin.totalEarnings - fin.totalExpenses >= 0 ? '#4a5d3a' : '#8a4a2e']].map(r => (
               <div key={r[0]} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0 10px 14px', borderBottom: '0.5px solid var(--border-light)' }}>
                 <span style={{ width: 18, flexShrink: 0 }} />
                 <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{r[0]}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: r[2], paddingRight: 4 }}>{money(r[1])}</span>
+                <span style={{ fontSize: 14, fontWeight: r[0] === 'Budget' && !hasBudget(budgetAmount) ? 500 : 700, fontStyle: r[0] === 'Budget' && !hasBudget(budgetAmount) ? 'italic' : 'normal', color: r[0] === 'Budget' && !hasBudget(budgetAmount) ? '#b8863b' : r[2], paddingRight: 4 }}>{r[0] === 'Budget' ? budgetText(budgetAmount) : money(r[1])}</span>
               </div>
             ))}
           </div>
@@ -2287,9 +2298,20 @@ function FinancialsTab({ ev }) {
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState({ ticketsSold: 0, revenue: 0 });
   const [rsvpOnly, setRsvpOnly] = useState(false);
+  const { session } = useVol();
+  const [budgetAmount, setBudgetAmount] = useState('');
+  async function saveBudgetAmount(val) {
+    setBudgetAmount(val);
+    try {
+      const rows = await fetchAreaData(ev.id);
+      const r = (rows || []).find(x => x.area_key === 'finance') || {};
+      await saveArea(ev.id, 'finance', { ownerName: r.owner_name || 'Ken Underwood', preData: { ...(r.pre_data || {}), budgetAmount: val }, postData: r.post_data || {}, authUserId: session && session.user && session.user.id });
+    } catch (e) { /* kept on screen; the next change tries again */ }
+  }
 
   useEffect(() => {
     setLoading(true);
+    fetchAreaData(ev.id).then(rows => { const b = (((rows || []).find(r => r.area_key === 'finance') || {}).pre_data || {}).budgetAmount; setBudgetAmount(b == null ? '' : String(b)); }).catch(() => {});
     Promise.all([
       fetchEventFinancials(ev.name).catch(() => null),
       fetchEventTicketStats(ev.name).catch(() => ({ ticketsSold: 0, revenue: 0 })),
@@ -2310,6 +2332,14 @@ function FinancialsTab({ ev }) {
     <div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
         Pulled live: website ticket sales for this event, plus the entries logged in the Portal's budget tracking (Op Budget / Op Earnings). Read-only here; the names must match exactly.
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 15, fontWeight: 700 }}>Budget:</span>
+        <span style={{ fontSize: 15, color: 'var(--muted)' }}>$</span>
+        <input className="input" type="number" min="0" step="any" defaultValue={budgetAmount} key={'bud' + budgetAmount} placeholder="Undecided" style={{ width: 150, fontSize: 14 }}
+          onBlur={e => { const v = e.target.value.trim(); if (v !== budgetAmount) saveBudgetAmount(v); }} />
+        {!hasBudget(budgetAmount) && <span style={{ fontSize: 12, color: '#b8863b', fontStyle: 'italic' }}>Undecided until you fill it in</span>}
+        {hasBudget(budgetAmount) && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{money(Number(budgetAmount) - totalExpenses)} left after expenses</span>}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px 36px', marginBottom: 22 }}>
         <div>
