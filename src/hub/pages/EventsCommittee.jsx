@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MediaPicker } from '../../media-library.jsx';
 import { useVol } from '../App.jsx';
 import {
-  insertReimbursement, fetchAreaData, saveArea, sendChecklistEmail, matchVolunteerAreas, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, fetchSponsorItems, insertSponsorItem, updateSponsorItem, deleteSponsorItem, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
+  insertReimbursement, fetchAreaData, saveArea, sendChecklistEmail, matchVolunteerAreas, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, fetchWebsiteEvents, fetchWebsiteEvent, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, fetchSponsorItems, insertSponsorItem, updateSponsorItem, deleteSponsorItem, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
@@ -1498,6 +1498,65 @@ function EventBasicsView({ f, ev, rsvp }) {
   );
 }
 
+// Dropdown that connects this committee event to an event on the website (Admin > New Event). Picking one fills this event's
+// details from the website event, marks it as on the website, and lets "Update website event" keep them in step.
+function WebsiteLink({ ev, onUpdate }) {
+  const [list, setList] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  useEffect(() => { let live = true; fetchWebsiteEvents().then(l => { if (live) setList(l); }).catch(() => { if (live) setList([]); }); return () => { live = false; }; }, []);
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const statusText = s => s === 'published' ? 'live' : s === 'archived' ? 'ended' : 'draft';
+  const when = x => x.date_tbd ? 'date to be announced' : (x.start_at ? new Date(x.start_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) : 'no date');
+  const linked = list && ev.siteEventId ? list.find(x => x.id === ev.siteEventId) : null;
+  const apply = (id, w) => onUpdate(e => {
+    const ticketed = w.registration_type === 'TICKETING';
+    return {
+      ...e, siteEventId: id,
+      description: w.description || e.description,
+      date: w.date_tbd ? e.date : (w.date || e.date), startTime: w.date_tbd ? e.startTime : (w.start_time || e.startTime), endTime: w.date_tbd ? e.endTime : (w.end_time || ''),
+      location: w.location_name || e.location,
+      ticketTiers: ticketed ? (w.ticket_tiers || []).filter(t => String(t.name || '').trim()) : (e.ticketTiers || []),
+      website: { ...(e.website || {}), slug: w.slug || '', short_description: w.short_description || '', image_url: w.image_url || '', image_alt: w.image_alt || '', date_tbd: !!w.date_tbd, location_name: w.location_name || '', location_address: w.location_address || '', sells_tickets: ticketed },
+    };
+  });
+  async function choose(id) {
+    setMsg(null);
+    if (!id) {
+      if (!window.confirm('Disconnect this event from its website event? The website event stays as it is.')) return;
+      onUpdate(e => ({ ...e, siteEventId: null }));
+      return;
+    }
+    if (ev.siteEventId !== id && !window.confirm('Connect to this website event? This event\'s description, date, times, photo and tickets are filled in from the website event.')) return;
+    setBusy(true);
+    try { apply(id, await fetchWebsiteEvent(id)); setMsg({ ok: true, text: 'Connected. Details were filled in from the website event.' }); }
+    catch (err) { setMsg({ ok: false, text: err.message || 'Could not load the website event.' }); }
+    setBusy(false);
+  }
+  const suggested = list && !ev.siteEventId ? list.find(x => norm(x.title) === norm(ev.name)) : null;
+  const badge = linked
+    ? { text: linked.status === 'published' ? 'Live on the website' : linked.status === 'archived' ? 'On the website (ended)' : 'Draft on the website, not public yet', color: linked.status === 'published' ? '#2e7d32' : linked.status === 'archived' ? '#777' : '#c77700' }
+    : null;
+  return (
+    <div style={{ background: '#faf6ef', border: '0.5px solid #e6dcc8', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2 }}>Website event</div>
+        {badge && <span style={{ fontSize: 11, fontWeight: 600, color: badge.color, border: '0.5px solid ' + badge.color, borderRadius: 999, padding: '2px 9px' }}>{badge.text}</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select value={ev.siteEventId || ''} disabled={busy || list === null} onChange={e => choose(e.target.value)} style={{ flex: '1 1 260px', padding: '8px 10px', border: '0.5px solid #d8d0c4', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
+          <option value="">{list === null ? 'Loading website events…' : 'Not connected to a website event'}</option>
+          {(list || []).map(x => <option key={x.id} value={x.id}>{x.title} · {when(x)} · {statusText(x.status)}</option>)}
+        </select>
+        {ev.siteEventId && <button className="btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }} disabled={busy} onClick={() => choose(ev.siteEventId)}>{busy ? 'Loading…' : 'Refresh from website'}</button>}
+      </div>
+      {suggested && <div style={{ fontSize: 12, color: '#886c44', marginTop: 8 }}>There is a website event called "{suggested.title}". <button className="btn-ghost" style={{ fontSize: 12, padding: '3px 10px', marginLeft: 6 }} disabled={busy} onClick={() => choose(suggested.id)}>Connect it</button></div>}
+      {ev.siteEventId && list && !linked && <div style={{ fontSize: 12, color: '#b3402a', marginTop: 8 }}>The connected website event was not found (it may have been deleted). Pick another, or choose "Not connected".</div>}
+      {msg && <div style={{ fontSize: 12, marginTop: 8, color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}
+    </div>
+  );
+}
+
 // "Website event page": everything the website event needs, filled in here, then Push to website sends it to
 // Admin > New Event and goes live (later pushes update the same event).
 function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
@@ -1603,6 +1662,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
 
       {!editing ? (
         <div>
+          <WebsiteLink ev={ev} onUpdate={onUpdate} />
           <EventBasicsView f={f} ev={ev} rsvp={rsvpSaved} />
           <RsvpPanel key={String(rsvpSaved)} eventName={ev.name} hideToggle />
           {msg && <div style={{ fontSize: 12, margin: '12px 0 0', color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}

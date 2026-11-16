@@ -1130,6 +1130,28 @@ export async function syncInHouseEvent({ name, date, ihEventId }) {
   }
 }
 
+// Website events (Admin > New Event), for the committee card's "Website event" dropdown.
+async function siteEventsCall(body) {
+  const { data: sess } = await supabase.auth.getSession();
+  const bearer = (sess && sess.session && sess.session.access_token) || KEY;
+  const r = await fetch(`${URL}/functions/v1/site-events-admin`, {
+    method: 'POST', headers: { apikey: KEY, Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(j.error || 'Something went wrong. Please try again.');
+  return j;
+}
+// [{ id, slug, title, status ('draft'|'published'|'archived'), start_at, date_tbd, ... }]
+export async function fetchWebsiteEvents() {
+  const j = await siteEventsCall({ action: 'list' });
+  return j.events || [];
+}
+// One website event shaped like the committee/Portal forms (date and times in Pacific, description as text).
+export async function fetchWebsiteEvent(id) {
+  const j = await siteEventsCall({ action: 'get', id });
+  return j.event;
+}
+
 // "Push to website": sends a committee event (name, date, times, description, ticket pricing) to the website's event list
 // (Admin > New Event) and PUBLISHES it, so it is live on the website right away. Pushing again updates that same website
 // event and keeps its photo (an ended event stays ended). Returns { siteEventId, status }.
