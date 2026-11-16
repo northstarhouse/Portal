@@ -1832,7 +1832,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
       : '<div style="font-size:13px;color:#888888;">Event details have not been filled in yet.</div>', 'event');
     // Volunteers confirmed: everyone assigned anywhere on the checklist, with what they are on
     const peopleNames = assignedPeople(ev, volunteers, attendExtra).map(x => x.name);
-    const volsBox = box('Confirmed Volunteers', peopleNames.length
+    const volsBox = box('Day Of Volunteers', peopleNames.length
       ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + peopleNames.map(n => '<tr><td valign="top" style="padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45;color:#2a2a2a;">' + esc(n) + '</td></tr>').join('') + '</table>'
       : '<div style="font-size:13px;color:#888888;">No volunteers assigned yet.</div>', 'volunteers');
     const w = ev.website || {};
