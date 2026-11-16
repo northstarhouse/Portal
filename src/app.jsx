@@ -15874,7 +15874,7 @@ function SuFormResponses({ form }) {
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: email.to, bcc: [ADMIN_NOTIFY_BCC], subject: email.subject, body: email.text, html: email.html, sender: 'North Star House' })
+      body: JSON.stringify({ to: email.to, bcc: [ADMIN_NOTIFY_BCC], subject: email.subject, body: email.text, html: email.html, sender: 'North Star House', fromEmail: 'venue@northstarhouse.org' })
     }).then(function(res) {
       setSendingFollowUpId(null);
       if (res.ok) {
@@ -21912,7 +21912,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: email.to, bcc: [ADMIN_NOTIFY_BCC], subject: email.subject, body: email.text, html: email.html, sender: 'North Star House' })
+      body: JSON.stringify({ to: email.to, bcc: [ADMIN_NOTIFY_BCC], subject: email.subject, body: email.text, html: email.html, sender: 'North Star House', fromEmail: 'venue@northstarhouse.org' })
     }).then(function(res) {
       setSendingFollowUpId(null);
       if (res.ok) {

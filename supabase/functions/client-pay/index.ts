@@ -509,6 +509,7 @@ Deno.serve(async req => {
             subject: `Message from ${fromName} · ${inq.name} (${code})`,
             body: `${fromName} sent a message from their client event page.\n\n${replyLine}\n\nBooking: ${inq.name}\nEvent date: ${new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}\n\n${text}\n\nReply to this email to answer them. A copy is saved with the booking.`,
             sender: 'Event Page',
+            fromEmail: 'venue@northstarhouse.org',
             replyTo: fromEmail || inq.email || undefined,
           }),
         });
@@ -535,7 +536,7 @@ Deno.serve(async req => {
       const when = `${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
       const guide = row.guide_name && String(row.guide_name).toLowerCase() !== 'default' ? row.guide_name : ([1, 2, 4].includes(new Date(`${row.date}T12:00:00`).getDay()) ? 'Jen' : '');
       try {
-        await fetch(`${URL_}/functions/v1/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ to: 'venue@thenorthstarhouse.org', subject: `Second walk-through booked: ${inq.name} (${code})`, body: `${inq.name} booked a second walk-through from the client event page.\n\n${when}\nPhone: ${phone || 'not given'}\nEmail: ${inq.email || 'none on file'}`, sender: 'Event Page' }) });
+        await fetch(`${URL_}/functions/v1/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ to: 'venue@thenorthstarhouse.org', subject: `Second walk-through booked: ${inq.name} (${code})`, body: `${inq.name} booked a second walk-through from the client event page.\n\n${when}\nPhone: ${phone || 'not given'}\nEmail: ${inq.email || 'none on file'}`, sender: 'Event Page', fromEmail: 'venue@northstarhouse.org' }) });
         if (inq.email) await fetch(`${URL_}/functions/v1/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + KEY }, body: JSON.stringify({ to: inq.email, subject: `Your North Star House walk-through is confirmed - ${when}`, body: `Hi,\n\nYour second walk-through is booked.\n\nDate & Time: ${when}\n${guide ? `Your guide: ${guide}\n` : ''}Address: ${TOUR_ADDRESS}\n\n${TOUR_DIRECTIONS_TEXT}\n\nGo to your event page: ${PAGE_URL}\n\nNorth Star House`, html: walkthroughEmailHtml(when, guide), sender: 'Estate Tours', fromEmail: 'venue@northstarhouse.org', replyTo: 'venue@thenorthstarhouse.org' }) });
       } catch (e) { console.error('client-pay tour email', e instanceof Error ? e.message : e); }
       return json({ booked: true, when, walkthrough: { date: row.date, start_time: row.start_time } });

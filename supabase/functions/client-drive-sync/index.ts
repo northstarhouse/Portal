@@ -305,7 +305,7 @@ async function emailPaperwork(fileName: string, data: string, client: string, da
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: "Venue Portal · North Star House <info@northstarhouse.org>",
+      from: "Venue Portal · North Star House <venue@northstarhouse.org>",
       // test bookings (+test@ addresses) only go to media@
       to: isTest ? PAPERWORK_EMAIL_TO.slice(0, 1) : PAPERWORK_EMAIL_TO,
       subject: `FINAL site manager paperwork: ${client} (${when})`,

@@ -3,7 +3,7 @@
 // vote). Each event has a highlighted "Committee decisions" note, kept current after each meeting, and is finalized into a
 // real Events Committee event once its date, start and end times, pricing and budget are filled in.
 import { useState, useEffect } from 'react';
-import { fetchEventPlan, fetchPlanVotes, planKey, updateEventPlanRow, insertEventPlanRow,insertCommitteeEvent, syncOverviewCardsFromCommittee, syncInHouseEvent, updateCommitteeEvent, logActivity } from '../lib/db.js';
+import { fetchEventPlan, fetchPlanVotes, planKey, updateEventPlanRow, insertEventPlanRow,insertCommitteeEvent, syncOverviewCardsFromCommittee, syncInHouseEvent, updateCommitteeEvent, logActivity, fetchAllActiveVolunteers, matchVolunteerAreas, sendChecklistEmail } from '../lib/db.js';
 
 const PLAN_YEAR = 2027;
 const REQUIRED = [
@@ -38,6 +38,76 @@ const rankOf = (d) => (d in DECISION_RANK ? DECISION_RANK[d] : 2);
 const sortPlan = (rows) => rows.slice().sort((a, b) => rankOf(a.final_decision) - rankOf(b.final_decision) || a.sort_order - b.sort_order);
 const volName = (v) => v ? `${v['First Name'] || ''} ${v['Last Name'] || ''}`.trim() : '';
 
+
+// ── Email update to the committee ────────────────────────────────────────────────────────────────────────────────────────
+// A branded, read-only copy of the plan: each event with its details, the vote result and the committee's decisions, grouped by
+// the final decision. Same look as the checklist email (taupe headers, one body font); titles are never all caps.
+const decisionGroup = (r) => (r.final_decision && DECISIONS.includes(r.final_decision) ? r.final_decision : 'No Decision Yet');
+const GROUP_ORDER = ['Moving Forward', 'Merging with Another Event', 'No Decision Yet', 'Needs Further Discussion', 'Not Moving Forward'];
+function buildPlanEmail({ rows, votes, note }) {
+  const GOLD = '#a28b75'; const TITLE = '#8c6d36';
+  const daysOf = (r) => (Array.isArray(r.days) ? r.days : []);
+  const esc = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const ICON = 'https://northstarhouse.github.io/Portal/assets/icons/cat-event.png';
+  const sorted = sortPlan(rows || []);
+  const detailLine = (r) => [
+    r.multi_day ? `${daysOf(r).length || 'Multi'}-day: ` + (daysOf(r).filter((d) => d.date).map((d) => fmtShort(d.date)).join(', ') || 'dates to set') : '',
+    !r.multi_day && r.date ? fmtDay(r.date) : '',
+    !r.multi_day && r.start_time ? `${fmtTime(r.start_time)}${r.end_time ? ' – ' + fmtTime(r.end_time) : ''}` : '',
+    r.pricing ? `Pricing: ${r.pricing}` : '', r.budget ? `Budget: ${r.budget}` : '',
+  ].filter(Boolean);
+  const eventRow = (r) => {
+    const vr = voteResult(votes && votes[planKey(r.name)]);
+    const dt = DECISION_TONE[r.final_decision];
+    const edge = dt ? dt.color : '#e0a800';
+    const sub = detailLine(r);
+    return '<tr><td bgcolor="#ffffff" style="background:#ffffff;padding:13px 18px;border-bottom:1px solid #ede8df;">'
+      + '<div style="font-size:15px;font-weight:bold;color:#2a2a2a;line-height:1.35;">' + esc(r.name)
+      + (r.finalized_event_id ? ' <span style="font-size:11px;font-weight:bold;color:#2e7d32;">&#10003; Finalized' + (r.finalized_at ? ' ' + esc(fmtStamp(r.finalized_at)) : '') + '</span>' : '') + '</div>'
+      + '<div style="font-size:12px;color:#888888;margin-top:3px;line-height:1.5;">' + (sub.length ? esc(sub.join('  ·  ')) : 'No details yet')
+      + (vr ? '  &nbsp;·&nbsp;  Committee vote: ' + esc(vr.label + ' ' + vr.count + '/' + vr.total) : '') + '</div>'
+      + '<div style="margin-top:9px;border-left:3px solid ' + edge + ';background:#faf7f2;padding:8px 12px;">'
+      + '<div style="font-size:11px;font-weight:bold;color:#8c6d36;margin-bottom:3px;">Committee Decisions' + (r.decisions_updated_at ? ' · as of ' + esc(fmtStamp(r.decisions_updated_at)) : '') + '</div>'
+      + '<div style="font-size:13px;line-height:1.55;color:' + (r.decisions ? '#3a332a' : '#999999') + ';' + (r.decisions ? '' : 'font-style:italic;') + '">' + (r.decisions ? esc(r.decisions).replace(/\n/g, '<br>') : 'No decisions recorded yet.') + '</div></div>'
+      + '</td></tr>';
+  };
+  const groups = GROUP_ORDER.map((g) => ({ g, items: sorted.filter((r) => decisionGroup(r) === g) })).filter((x) => x.items.length);
+  const groupsHtml = groups.map(({ g, items }) =>
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border:1px solid #ece3d7;border-collapse:separate;">'
+    + '<tr><td bgcolor="#f7f4f1" style="background:#f7f4f1;padding:12px 16px;border:1px solid #ae9a86;"><img src="' + ICON + '" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">'
+    + '<span style="font-family:Cardo,Georgia,serif;font-size:14px;font-weight:bold;color:' + TITLE + ';vertical-align:middle;">' + esc(g) + '</span>'
+    + '<span style="font-size:12px;color:#888888;margin-left:10px;vertical-align:middle;">' + items.length + (items.length === 1 ? ' event' : ' events') + '</span></td></tr>'
+    + items.map(eventRow).join('') + '</table>').join('');
+  const movingN = sorted.filter((r) => r.final_decision === 'Moving Forward').length;
+  const finalN = sorted.filter((r) => r.finalized_event_id).length;
+  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const html = '<style>@media only screen and (max-width:540px){.pe-pad{padding-left:18px!important;padding-right:18px!important}}</style>'
+    + '<div style="background:#e6ded0;padding:28px 12px;font-family:Helvetica,Arial,sans-serif;"><div style="max-width:680px;margin:0 auto;background:#fdfbf7;">'
+    + '<div style="height:14px;background:' + GOLD + ';"></div>'
+    + '<div class="pe-pad" style="padding:34px 36px 8px;text-align:center;"><div style="font-size:12px;letter-spacing:3px;color:' + GOLD + ';font-weight:bold;margin-bottom:12px;">Events Committee Update</div>'
+    + '<h1 style="margin:0 0 8px;font-family:Georgia,serif;font-size:28px;font-weight:400;color:#2a2420;">' + PLAN_YEAR + ' Event Plan</h1>'
+    + '<div style="font-size:13px;color:#777777;">As of ' + esc(today) + '</div>'
+    + '<div style="border-top:1px solid #e5ddcf;width:60%;margin:20px auto 0;"></div></div>'
+    + (note && note.trim() ? '<div class="pe-pad" style="padding:18px 36px 0;font-size:15px;line-height:1.6;color:#444444;">' + esc(note.trim()).replace(/\n/g, '<br>') + '</div>' : '')
+    + '<div class="pe-pad" style="padding:6px 36px 6px;"><div style="font-size:13px;color:#888888;padding-top:14px;">' + sorted.length + ' events on the plan  ·  ' + movingN + ' moving forward  ·  ' + finalN + ' finalized</div>' + groupsHtml + '</div>'
+    + '<div class="pe-pad" style="padding:24px 36px 34px;text-align:center;"><a href="https://volunteerhub.northstarhouse.org/#/events-committee-planning" style="display:inline-block;background:' + GOLD + ';color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:15px 30px;">Open in the Volunteer Hub</a></div>'
+    + '<div style="background:#f7f4f1;padding:14px 36px;text-align:center;font-size:11px;color:#999999;">North Star House</div></div></div>';
+  return html.replace(/style="/g, 'style="font-family:Helvetica,Arial,sans-serif;');
+}
+function buildPlanText({ rows, note }) {
+  const lines = [`${PLAN_YEAR} Event Plan`, ''];
+  if (note && note.trim()) lines.push(note.trim(), '');
+  sortPlan(rows || []).forEach((r) => {
+    lines.push(`${r.name} (${decisionGroup(r)})`);
+    const d = [r.date ? fmtDay(r.date) : '', r.pricing ? `Pricing: ${r.pricing}` : '', r.budget ? `Budget: ${r.budget}` : ''].filter(Boolean).join(' · ');
+    if (d) lines.push('  ' + d);
+    if (r.decisions) lines.push('  Committee decisions: ' + r.decisions.replace(/\n/g, ' '));
+    lines.push('');
+  });
+  lines.push('Open in the Volunteer Hub: https://volunteerhub.northstarhouse.org/#/events-committee-planning');
+  return lines.join('\n');
+}
+
 export default function EventPlan({ session, volunteer, onFinalized }) {
   const [rows, setRows] = useState(null);
   const [open, setOpen] = useState(null); // id of the row being edited
@@ -47,6 +117,25 @@ export default function EventPlan({ session, volunteer, onFinalized }) {
   const [collapsed, setCollapsed] = useState(true); // a dropdown: closed until clicked
 
   const [votes, setVotes] = useState({});
+  // Email update to the committee: a note from you, a preview, a test to yourself, then the real send.
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState(PLAN_YEAR + ' Event Plan Update');
+  const [emailNote, setEmailNote] = useState('');
+  const [emailPreview, setEmailPreview] = useState(false);
+  const [emailMsg, setEmailMsg] = useState(null);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [roster, setRoster] = useState([]);
+  useEffect(() => { if (emailOpen && !roster.length) fetchAllActiveVolunteers().then(v => setRoster(Array.isArray(v) ? v : [])).catch(() => {}); }, [emailOpen]);
+  const committee = roster.filter(v => matchVolunteerAreas(v.Team).includes('Events'));
+  const committeeWithEmail = committee.filter(v => v.Email && String(v.Email).includes('@'));
+  async function sendPlanEmail(list, who) {
+    if (!list.length) { setEmailMsg({ ok: false, text: 'No email address to send to.' }); return; }
+    if (who === 'committee' && !window.confirm('Send the ' + PLAN_YEAR + ' Event Plan to ' + list.length + ' committee member' + (list.length > 1 ? 's' : '') + '?')) return;
+    setEmailBusy(true); setEmailMsg(null);
+    const ok = await sendChecklistEmail({ to: list, subject: emailSubject.trim() || (PLAN_YEAR + ' Event Plan Update'), html: buildPlanEmail({ rows, votes, note: emailNote }), text: buildPlanText({ rows, note: emailNote }) }).catch(() => false);
+    setEmailBusy(false);
+    setEmailMsg({ ok, text: ok ? (who === 'committee' ? 'Sent to ' + list.length + ' committee member' + (list.length > 1 ? 's' : '') + '.' : 'Test sent to ' + list[0] + '.') : 'Could not send. Please try again.' });
+  }
   useEffect(() => { fetchEventPlan(PLAN_YEAR).then(setRows).catch(() => setRows([])); fetchPlanVotes(PLAN_YEAR).then(setVotes).catch(() => {}); }, []);
 
   // Add an event to the plan (e.g. the combined event when two are merged). It starts as Moving Forward and opens for editing.
@@ -159,10 +248,36 @@ export default function EventPlan({ session, volunteer, onFinalized }) {
   const lab = { fontSize: 11, fontWeight: 600, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 4 };
   return (
     <div className="card" style={{ padding: 0, marginBottom: 16, overflow: 'hidden' }}>
-      <button type="button" onClick={() => setCollapsed(!collapsed)} style={{ width: '100%', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 16 }}>
+      <button type="button" onClick={() => setCollapsed(!collapsed)} style={{ flex: '1 1 260px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
         <span style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif", color: 'var(--gold)' }}>{PLAN_YEAR} Event Plan</span>
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>{rows ? `${done} of ${rows.length} finalized` : ''} {collapsed ? '▸' : '▾'}</span>
       </button>
+      <button type="button" className="btn-gold" style={{ fontSize: 12, padding: '8px 14px' }} onClick={() => { setEmailOpen(o => !o); setEmailMsg(null); }}>✉ Email update to committee</button>
+      </div>
+      {emailOpen && (
+        <div style={{ margin: '0 16px 16px', border: '0.5px solid var(--border-light)', borderRadius: 10, padding: '14px 16px', background: '#faf8f4' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Email the {PLAN_YEAR} Event Plan to the committee</div>
+            <button type="button" className="btn-ghost" style={{ fontSize: 12, padding: '4px 12px' }} onClick={() => setEmailOpen(false)}>Close</button>
+          </div>
+          <div className="label">Subject</div>
+          <input className="input" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} style={{ marginBottom: 10 }} />
+          <div className="label">Your note (shown at the top of the email)</div>
+          <textarea className="input" rows={4} value={emailNote} onChange={e => setEmailNote(e.target.value)} placeholder="For example: here is where the plan stands after our notes. Please read through each event and add anything I missed before the next meeting." style={{ resize: 'vertical', marginBottom: 10 }} />
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+            Goes to {committeeWithEmail.length} committee member{committeeWithEmail.length === 1 ? '' : 's'} (the Events team): {committeeWithEmail.map(volName).join(', ') || 'none found'}.
+            {committee.length > committeeWithEmail.length && ' No email on file for: ' + committee.filter(v => !committeeWithEmail.includes(v)).map(volName).join(', ') + '.'}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button type="button" className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setEmailPreview(p => !p)}>{emailPreview ? 'Hide preview' : 'Preview'}</button>
+            <button type="button" className="btn-ghost" style={{ fontSize: 12 }} disabled={emailBusy || !(volunteer && volunteer.Email)} onClick={() => sendPlanEmail([volunteer.Email], 'me')} title={volunteer && volunteer.Email ? 'Sends only to ' + volunteer.Email : 'No email on your volunteer record'}>Send a test to me</button>
+            <button type="button" className="btn-gold" style={{ fontSize: 12 }} disabled={emailBusy || !committeeWithEmail.length || !rows} onClick={() => sendPlanEmail(committeeWithEmail.map(v => v.Email), 'committee')}>{emailBusy ? 'Sending…' : 'Email update to committee'}</button>
+            {emailMsg && <span style={{ fontSize: 12, color: emailMsg.ok ? '#2e7d32' : '#b3261e' }}>{emailMsg.text}</span>}
+          </div>
+          {emailPreview && <iframe title="Email preview" srcDoc={buildPlanEmail({ rows, votes, note: emailNote })} style={{ width: '100%', height: 620, border: '0.5px solid var(--border)', borderRadius: 8, marginTop: 12, background: '#fff' }} />}
+        </div>
+      )}
       {!collapsed && (
         <div style={{ borderTop: '0.5px solid var(--border-light)' }}>
           <div style={{ fontSize: 12, color: 'var(--muted)', padding: '10px 16px 4px' }}>The committee's confirmed events for {PLAN_YEAR}. Once an event has a date, start and end times, pricing and a budget, finalize it to add it to the events below.</div>

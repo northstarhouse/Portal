@@ -1840,7 +1840,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
     const note = emailNote.trim();
     const emailHtml = '<style>@media only screen and (max-width:540px){.ec-col{display:block!important;width:100%!important;padding:0 0 12px 0!important;box-sizing:border-box!important}}</style><div style="background:#e6ded0;padding:28px 12px;font-family:Helvetica,Arial,sans-serif;"><div style="max-width:680px;margin:0 auto;background:#fdfbf7;">'
       + '<div style="height:14px;background:' + GOLD + ';"></div>'
-      + '<div style="padding:34px 36px 8px;text-align:center;"><div style="font-size:12px;letter-spacing:3px;color:' + GOLD + ';font-weight:bold;margin-bottom:12px;">EVENTS COMMITTEE &middot; CHECKLIST</div>'
+      + '<div style="padding:34px 36px 8px;text-align:center;"><div style="font-size:12px;letter-spacing:3px;color:' + GOLD + ';font-weight:bold;margin-bottom:12px;">Events Committee Checklist</div>'
       + '<h1 style="margin:0 0 8px;font-family:Georgia,serif;font-size:28px;font-weight:400;color:#2a2420;">' + esc(ev.name) + '</h1>'
       + '<div style="border-top:1px solid #e5ddcf;width:60%;margin:20px auto 0;"></div></div>'
       + (note ? '<div style="padding:18px 36px 0;font-size:15px;line-height:1.6;color:#444444;">' + esc(note).replace(/\n/g, '<br>') + '</div>' : '')

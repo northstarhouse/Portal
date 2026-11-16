@@ -58,7 +58,9 @@ Deno.serve(async (req) => {
     const callerBcc: string[] = bcc
       ? (Array.isArray(bcc) ? bcc : String(bcc).split(',').map((e: string) => e.trim()).filter(Boolean))
       : []
-    const bccList: string[] = Array.from(new Set([ADMIN_BCC, ...callerBcc, ...(wantedFrom ? [VENUE_BCC] : [])]))
+    // Nobody is blind-copied on a message they are already addressed on (e.g. venue@ mail sent to venue@).
+    const addressed = new Set([...recipients, ...ccList].map((e) => String(e).toLowerCase()))
+    const bccList: string[] = Array.from(new Set([ADMIN_BCC, ...callerBcc, ...(wantedFrom ? [VENUE_BCC] : [])])).filter((b) => !addressed.has(b.toLowerCase()))
 
     const toVenue = [...recipients, ...ccList].some((e) => e.toLowerCase() === VENUE_BCC)
     const finalHtml = html || (toVenue ? brandPlain(String(subject || ''), String(body || '')) : '')
@@ -84,11 +86,9 @@ Deno.serve(async (req) => {
     })
 
     const replyTo = callerReplyTo || (wantedFrom ? VENUE_REPLY_TO : null)
-    let res = await send(wantedFrom || DEFAULT_FROM, replyTo)
-    if (!res.ok && wantedFrom) {
-      console.error('send-email: sender rejected, falling back to default', wantedFrom, res.status)
-      res = await send(DEFAULT_FROM, replyTo)
-    }
+    // Venue mail is always sent from venue@; if the sender is refused the send fails (and is logged) instead of coming from info@.
+    const res = await send(wantedFrom || DEFAULT_FROM, replyTo)
+    if (!res.ok && wantedFrom) console.error('send-email: venue@ sender was refused', wantedFrom, res.status)
 
     const data = await res.json()
     if (!res.ok) throw new Error(JSON.stringify(data))
