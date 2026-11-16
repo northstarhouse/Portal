@@ -1,13 +1,13 @@
 // GENERATED from volunteerhub/src/pages/EventPlan.jsx by scripts/sync-hub-events-committee.mjs. Do not edit here: change it in the Hub, then re-run the script.
 // Events Committee > 2027 Event Plan: the committee's confirmed list of events for the year (from the "2027 Events List"
 // vote). Each event has a highlighted "Committee decisions" note, kept current after each meeting, and is finalized into a
-// real Events Committee event once its date, start and end times, pricing and budget are filled in.
+// real Events Committee event once its date, start and end times and pricing are filled in.
 import { useState, useEffect } from 'react';
 import { fetchEventPlan, fetchPlanVotes, planKey, updateEventPlanRow, insertEventPlanRow,insertCommitteeEvent, syncOverviewCardsFromCommittee, syncInHouseEvent, updateCommitteeEvent, logActivity, fetchAllActiveVolunteers, matchVolunteerAreas, sendChecklistEmail } from '../lib/db.js';
 
 const PLAN_YEAR = 2027;
 const REQUIRED = [
-  ['date', 'Date'], ['start_time', 'Start time'], ['end_time', 'End time'], ['pricing', 'Pricing'], ['budget', 'Budget'],
+  ['date', 'Date'], ['start_time', 'Start time'], ['end_time', 'End time'], ['pricing', 'Pricing'],
 ];
 const fmtDay = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '';
 const fmtShort = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
@@ -170,7 +170,7 @@ export default function EventPlan({ session, volunteer, onFinalized }) {
   const daysOf = (r) => (Array.isArray(r.days) ? r.days : []);
   const reqs = (r) => {
     const has = (v) => !!String(v || '').trim();
-    const base = [['pricing', 'Pricing', has(r.pricing)], ['budget', 'Budget', has(r.budget)]];
+    const base = [['pricing', 'Pricing', has(r.pricing)]];
     if (r.multi_day) {
       const days = daysOf(r);
       if (days.length < 2) return [['days', 'Number of days', false]].concat(base);
@@ -185,7 +185,7 @@ export default function EventPlan({ session, volunteer, onFinalized }) {
     setOpen(r.id); setErr('');
     const days = daysOf(r).length ? daysOf(r).map((d) => ({ date: d.date || '', start_time: d.start_time || '', end_time: d.end_time || '' }))
       : [{ date: r.date || '', start_time: r.start_time || '', end_time: r.end_time || '' }, { date: '', start_time: '', end_time: '' }];
-    setDraft({ multi_day: !!r.multi_day, days, date: r.date || '', start_time: r.start_time || '', end_time: r.end_time || '', pricing: r.pricing || '', budget: r.budget || '', decisions: r.decisions || '' });
+    setDraft({ multi_day: !!r.multi_day, days, date: r.date || '', start_time: r.start_time || '', end_time: r.end_time || '', pricing: r.pricing || '', decisions: r.decisions || '' });
   }
   function setDayCount(n) {
     const count = Math.max(2, Math.min(30, parseInt(n, 10) || 2));
@@ -200,7 +200,7 @@ export default function EventPlan({ session, volunteer, onFinalized }) {
     // a multi-day event keeps every day; its first (earliest) day also fills the plain date/time fields
     const days = draft.multi_day ? draft.days.slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999')) : null;
     const first = days ? days[0] : draft;
-    const body = { multi_day: !!draft.multi_day, days, end_date: null, date: first.date || null, start_time: first.start_time || null, end_time: first.end_time || null, pricing: draft.pricing.trim() || null, budget: draft.budget.trim() || null, updated_at: new Date().toISOString() };
+    const body = { multi_day: !!draft.multi_day, days, end_date: null, date: first.date || null, start_time: first.start_time || null, end_time: first.end_time || null, pricing: draft.pricing.trim() || null, updated_at: new Date().toISOString() };
     if ((draft.decisions || '').trim() !== (r.decisions || '').trim()) {
       body.decisions = draft.decisions.trim() || null;
       body.decisions_updated_at = new Date().toISOString();
@@ -283,7 +283,7 @@ export default function EventPlan({ session, volunteer, onFinalized }) {
       )}
       {!collapsed && (
         <div style={{ borderTop: '0.5px solid var(--border-light)' }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)', padding: '10px 16px 4px' }}>The committee's confirmed events for {PLAN_YEAR}. Once an event has a date, start and end times, pricing and a budget, finalize it to add it to the events below.</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', padding: '10px 16px 4px' }}>The committee's confirmed events for {PLAN_YEAR}. Once an event has a date, start and end times and pricing, finalize it to add it to the events below.</div>
           {err && <div style={{ color: '#b3261e', fontSize: 12, padding: '4px 16px' }}>{err}</div>}
           {rows === null ? <div style={{ padding: 16, fontSize: 13, color: 'var(--muted)' }}>Loading…</div> : sortPlan(rows).map((r, i) => {
             const need = missing(r);
@@ -366,7 +366,6 @@ export default function EventPlan({ session, volunteer, onFinalized }) {
                       {!draft.multi_day && <label style={lab}>Start time<input className="input" type="time" step="900" value={draft.start_time} onChange={e => setDraft({ ...draft, start_time: e.target.value })} /></label>}
                       {!draft.multi_day && <label style={lab}>End time<input className="input" type="time" step="900" value={draft.end_time} onChange={e => setDraft({ ...draft, end_time: e.target.value })} /></label>}
                       <label style={lab}>Pricing<input className="input" value={draft.pricing} onChange={e => setDraft({ ...draft, pricing: e.target.value })} placeholder="e.g. $25 / $15 members" /></label>
-                      <label style={lab}>Budget<input className="input" value={draft.budget} onChange={e => setDraft({ ...draft, budget: e.target.value })} placeholder="e.g. $1,500" /></label>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button type="button" className="btn-gold" disabled={busy === r.id} onClick={() => save(r)} style={{ fontSize: 12, padding: '7px 16px' }}>{busy === r.id ? 'Saving…' : 'Save'}</button>
