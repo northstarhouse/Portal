@@ -329,8 +329,11 @@ const PLANNING_SECTION_ICONS = {
   after: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
 };
 
+PLANNING_SECTION_ICONS.attendance = PLANNING_SECTION_ICONS.volunteers;
+
 const PLANNING_SECTIONS = [
   { key: 'checklist', title: 'Checklist', desc: 'Type the duties in fast, then assign and date them' },
+  { key: 'attendance', title: 'Volunteers in Attendance', desc: 'Everyone assigned on the checklist, plus anyone you add' },
   { key: 'marketing', title: 'Marketing & Promotion', desc: 'Flyers, newsletters, website, social media', area: 'marketing' },
   { key: 'budget', title: 'Budget & Transactions', desc: 'Income, expenses, reimbursements' },
   { key: 'after', title: 'After the Event', desc: 'What went well, final numbers, follow-ups, reviews and feedback' },
@@ -527,6 +530,14 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               <span style={{ fontSize: 13, color: t.done ? 'var(--muted)' : 'var(--text)', textDecoration: 'none' }}>{t.text}{t.assignee ? <span style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 600 }}>  —  {t.assignee}</span> : null}</span>
             </div>
           ))(row.t))}
+          {upcomingDeadlines.length > 0 && (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 14, marginBottom: 6, paddingTop: 12, borderTop: '0.5px solid var(--border-light)' }}>Upcoming deadlines</div>
+              {upcomingDeadlines.map(t => (
+                <div key={t.id} style={{ fontSize: 13, marginBottom: 4 }}>{fmtDateShort(t.due)} &middot; {t.text}</div>
+              ))}
+            </>
+          )}
         </div>
 
         <div className="card" style={{ padding: 16 }}>
@@ -561,14 +572,6 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               </div>
             );
           })()}
-          {upcomingDeadlines.length > 0 && (
-            <>
-              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 14, marginBottom: 6, paddingTop: 12, borderTop: '0.5px solid var(--border-light)' }}>Upcoming deadlines</div>
-              {upcomingDeadlines.map(t => (
-                <div key={t.id} style={{ fontSize: 13, marginBottom: 4 }}>{fmtDateShort(t.due)} &middot; {t.text}</div>
-              ))}
-            </>
-          )}
         </div>
       </div>
 
@@ -593,6 +596,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               {isOpen && (
                 <div style={{ padding: '4px 16px 18px' }}>
                   {s.key === 'preplanning' && <PreplanningTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} onRsvpChange={setRsvpOnly} />}
+                  {s.key === 'attendance' && <AttendanceTab ev={ev} volunteers={volunteers} />}
                   {s.key === 'checklist' && <ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} showMarketing={!marketingNA} />}
                   {s.key === 'budget' && <FinancialsTab ev={ev} />}
                   {s.key === 'dayof' && <SheetToggle view={<DayOfView ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}><DayOfTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} /></SheetToggle>}
@@ -1037,6 +1041,70 @@ function DutyWho({ t, volunteers, onPatch }) {
     </div>
   );
 }
+// Everyone assigned anywhere on the event (duties, Day-Of items, volunteer roles), plus people added by hand (extra).
+function assignedPeople(ev, volunteers, extra) {
+  const roster = volunteers || [];
+  const out = new Map();
+  const add = (key, name, phone, label) => {
+    if (!name) return;
+    const e = out.get(key) || { key, name, phone: '', on: [] };
+    if (!e.phone && phone) e.phone = phone;
+    if (label && !e.on.includes(label)) e.on.push(label);
+    out.set(key, e);
+  };
+  const scan = (t, label) => {
+    (t.assignedIds || []).forEach(id => { const x = roster.find(r => String(r.id) === String(id)); if (x) add('v' + x.id, volFullName(x), (t.phones || {})[x.id] || x['Phone Number'], label); });
+    (t.people || []).forEach(pp => { const n = String(pp.name || '').trim(); if (n) add('n' + n.toLowerCase(), n, pp.phone, label); });
+  };
+  ev.checklist.forEach(t => scan(dutyPeople(t), t.text));
+  ev.timeline.filter(t => !t.noAssign).forEach(t => scan(t, fmtTime12(t.time) + ' ' + t.activity));
+  ev.vendors.filter(v => ['volunteer', 'activity'].includes(v.kind)).forEach(v => scan(v, needTitle(v)));
+  if (extra) scan({ assignedIds: extra.assignedIds || [], people: extra.people || [], phones: extra.phones || {} }, '');
+  return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function AttendanceTab({ ev, volunteers }) {
+  const { session } = useVol();
+  const [extra, setExtra] = useState(null);
+  useEffect(() => {
+    let live = true;
+    fetchAreaData(ev.id).then(rows => { if (live) setExtra((((rows || []).find(r => r.area_key === 'volunteers') || {}).pre_data || {}).attendance || { assignedIds: [], people: [], phones: {} }); }).catch(() => { if (live) setExtra({ assignedIds: [], people: [], phones: {} }); });
+    return () => { live = false; };
+  }, [ev.id]);
+  async function patchExtra(pt) {
+    const next = { assignedIds: [], people: [], phones: {}, ...(extra || {}), ...pt };
+    setExtra(next);
+    try {
+      const rows = await fetchAreaData(ev.id);
+      const r = (rows || []).find(x => x.area_key === 'volunteers') || {};
+      await saveArea(ev.id, 'volunteers', { ownerName: r.owner_name || 'Events Committee', preData: { ...(r.pre_data || {}), attendance: next }, postData: r.post_data || {}, authUserId: session && session.user && session.user.id });
+    } catch (e) { /* the list on screen stays; the next change tries again */ }
+  }
+  if (!extra) return <div style={{ fontSize: 13, color: 'var(--muted)' }}>Loading…</div>;
+  const auto = assignedPeople(ev, volunteers);
+  const extraNames = assignedPeople({ checklist: [], timeline: [], vendors: [] }, volunteers, extra);
+  const everyone = assignedPeople(ev, volunteers, extra);
+  const cap = { fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 };
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
+        {everyone.length} volunteer{everyone.length === 1 ? '' : 's'} in attendance. Anyone you assign on the checklist is added here automatically. Add anyone else below.
+      </div>
+      <div style={cap}>Assigned on the checklist ({auto.length})</div>
+      {auto.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>No one is assigned on the checklist yet.</div>}
+      {auto.map(x => (
+        <div key={x.key} style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', padding: '9px 0', borderBottom: '0.5px solid var(--border-light)' }}>
+          <span style={{ fontSize: 14, fontWeight: 600, minWidth: 160 }}>{x.name}</span>
+          <span style={{ fontSize: 12, color: 'var(--muted)', minWidth: 110 }}>{x.phone || ''}</span>
+          <span style={{ flex: 1, fontSize: 12, color: 'var(--muted)' }}>{x.on.join('  ·  ')}</span>
+        </div>
+      ))}
+      <div style={{ ...cap, marginTop: 20 }}>Add more volunteers ({extraNames.length})</div>
+      <AssignVolunteers v={extra} volunteers={volunteers} onPatch={patchExtra} />
+    </div>
+  );
+}
+
 function whoOn(t, volunteers) {
   const roster = volunteers || [];
   return [
@@ -1477,6 +1545,8 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
   // The Budget line: live numbers from the budget tracking, and a tick for "budget is done" (saved with the finance planning area).
   const [flyerUrl, setFlyerUrl] = useState(null);
   useEffect(() => { let live = true; fetchEventCardImage(ev.name).then(u => { if (live) setFlyerUrl(u || null); }).catch(() => {}); return () => { live = false; }; }, [ev.name]);
+  const [attendExtra, setAttendExtra] = useState(null);
+  useEffect(() => { let live = true; fetchAreaData(ev.id).then(rows => { if (live) setAttendExtra((((rows || []).find(r => r.area_key === 'volunteers') || {}).pre_data || {}).attendance || null); }).catch(() => {}); return () => { live = false; }; }, [ev.id]);
   const [fin, setFin] = useState(null);
   const [budgetDone, setBudgetDone] = useState(false);
   useEffect(() => {
@@ -1734,12 +1804,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
       ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + detailRows.map(r => '<tr><td width="110" style="vertical-align:baseline;padding:8px 10px 8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;color:#888888;">' + esc(r[0]) + '</td><td style="vertical-align:baseline;padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;color:#2a2a2a;">' + esc(r[1]) + '</td></tr>').join('') + '</table>'
       : '<div style="font-size:13px;color:#888888;">Event details have not been filled in yet.</div>');
     // Volunteers confirmed: everyone assigned anywhere on the checklist, with what they are on
-    const onWhat = {};
-    const addPerson = (name, label) => { if (!name) return; (onWhat[name] = onWhat[name] || []); if (label && !onWhat[name].includes(label)) onWhat[name].push(label); };
-    ev.checklist.forEach(t => whoOn(dutyPeople(t), volunteers).forEach(x => addPerson(x.name, t.text)));
-    ev.timeline.filter(t => !t.noAssign).forEach(t => whoOn(t, volunteers).forEach(x => addPerson(x.name, fmtTime12(t.time) + ' ' + t.activity)));
-    ev.vendors.filter(v => ['volunteer', 'activity'].includes(v.kind)).forEach(v => whoOn(v, volunteers).forEach(x => addPerson(x.name, v.name)));
-    const peopleNames = Object.keys(onWhat).sort((x, y) => x.localeCompare(y));
+    const peopleNames = assignedPeople(ev, volunteers, attendExtra).map(x => x.name);
     const volsBox = box('Volunteers confirmed to be in attendance', peopleNames.length
       ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + peopleNames.map(n => '<tr><td valign="top" style="padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;color:#2a2a2a;">' + esc(n) + '</td></tr>').join('') + '</table>'
       : '<div style="font-size:13px;color:#888888;">No volunteers assigned yet.</div>');
