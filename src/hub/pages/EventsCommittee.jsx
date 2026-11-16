@@ -513,7 +513,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
           ) : cardRows.map(row => row.need ? (
             <div key={row.v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
               <span style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed var(--border)' }} />
-              <span style={{ fontSize: 13 }}>Find: {needTitle(row.v)}{row.v.kind ? <span style={{ fontSize: 11, color: 'var(--muted)' }}> · {NEED_TAG[row.v.kind]}</span> : null}</span>
+              <span style={{ fontSize: 13 }}>Find: {needTitle(row.v)}{row.v.kind ? <span style={{ fontSize: 11, color: 'var(--muted)' }}> · {NEED_TAG[row.v.kind]}</span> : null}{(() => { const n = whoOn(row.v, volunteers).map(x => x.name).join(', ') || row.v.who || ''; return n ? <span style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 600 }}>  —  {n}</span> : null; })()}</span>
             </div>
           ) : ((t) => (
             <div key={t.id} onClick={() => toggleChecklistItem(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer' }}>
@@ -523,7 +523,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               }}>
                 {t.done && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
               </span>
-              <span style={{ fontSize: 13, color: t.done ? 'var(--muted)' : 'var(--text)', textDecoration: 'none' }}>{t.text}</span>
+              <span style={{ fontSize: 13, color: t.done ? 'var(--muted)' : 'var(--text)', textDecoration: 'none' }}>{t.text}{t.assignee ? <span style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 600 }}>  —  {t.assignee}</span> : null}</span>
             </div>
           ))(row.t))}
         </div>
