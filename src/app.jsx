@@ -12423,43 +12423,6 @@ function FinancialOverviewView({ navigate }) {
             <div style={card}><div style={cardLabel}>Office Cash Out</div><div style={{ ...cardValue, color: '#c07040' }}>{money(stats.cashOut)}</div></div>
           </div>
 
-          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Office Earnings by Category — {year}</div>
-            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Creative Rentals income, grouped by the same category picked when logging each earning</div>
-            {Object.keys(stats.earningsByCategory).length === 0 ? (
-              <div style={{ fontSize: 12, color: '#bbb' }}>No earnings recorded for {year}.</div>
-            ) : Object.keys(stats.earningsByCategory).sort(function(a, b) { return stats.earningsByCategory[b] - stats.earningsByCategory[a]; }).map(function(cat) {
-              var isOpen = expandedEarningCat === cat;
-              var catEntries = rentals.filter(function(r) { return inYear(r.date) && (r.name || 'Other') === cat; })
-                .sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
-              return (
-                <div key={cat}>
-                  <div onClick={function() { setExpandedEarningCat(isOpen ? null : cat); }} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12, cursor: 'pointer', background: isOpen ? '#faf8f4' : 'transparent' }}>
-                    <span style={{ color: '#555', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 10, color: '#bbb', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s', display: 'inline-block' }}>▶</span>
-                      {cat}
-                    </span>
-                    <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(stats.earningsByCategory[cat])}</span>
-                  </div>
-                  {isOpen && (
-                    <div style={{ background: '#faf8f4', padding: '4px 0 8px 20px' }}>
-                      {catEntries.map(function(r, i) {
-                        var isNew = isSinceReconciliation(r.date);
-                        return (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < catEntries.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12, opacity: isNew ? 1 : 0.45 }}>
-                            <span style={{ width: 90, color: '#aaa', fontSize: 11 }}>{r.date || '—'}</span>
-                            <span style={{ flex: 1, color: '#2a2a2a' }}>{r.name || '—'}</span>
-                            <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(r.amount)}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
           {(function() {
             // Office cash in and out together: money in is logged under Earnings (Creative Rentals), money out in the Cash Log.
             var yearCashRows = cashLog.filter(function(c) { return inYear(c.date); })
@@ -12506,6 +12469,47 @@ function FinancialOverviewView({ navigate }) {
               </div>
             );
           })()}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16, alignItems: 'start' }}>
+            <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Office Earnings by Category — {year}</div>
+              <div style={{ fontSize: 11, color: '#aaa', marginBottom: 12 }}>Creative Rentals income, grouped by the same category picked when logging each earning</div>
+              {Object.keys(stats.earningsByCategory).length === 0 ? (
+                <div style={{ fontSize: 12, color: '#bbb' }}>No earnings recorded for {year}.</div>
+              ) : Object.keys(stats.earningsByCategory).sort(function(a, b) { return stats.earningsByCategory[b] - stats.earningsByCategory[a]; }).map(function(cat) {
+                var isOpen = expandedEarningCat === cat;
+                var catEntries = rentals.filter(function(r) { return inYear(r.date) && (r.name || 'Other') === cat; })
+                  .sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+                return (
+                  <div key={cat}>
+                    <div onClick={function() { setExpandedEarningCat(isOpen ? null : cat); }} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12, cursor: 'pointer', background: isOpen ? '#faf8f4' : 'transparent' }}>
+                      <span style={{ color: '#555', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10, color: '#bbb', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s', display: 'inline-block' }}>▶</span>
+                        {cat}
+                      </span>
+                      <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(stats.earningsByCategory[cat])}</span>
+                    </div>
+                    {isOpen && (
+                      <div style={{ background: '#faf8f4', padding: '4px 0 8px 20px' }}>
+                        {catEntries.map(function(r, i) {
+                          var isNew = isSinceReconciliation(r.date);
+                          return (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < catEntries.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12, opacity: isNew ? 1 : 0.45 }}>
+                              <span style={{ width: 90, color: '#aaa', fontSize: 11 }}>{r.date || '—'}</span>
+                              <span style={{ flex: 1, color: '#2a2a2a' }}>{r.name || '—'}</span>
+                              <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(r.amount)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <CashInTheBoxCard rentals={rentals} cashLog={cashLog} loading={loading} />
+          </div>
           </div>
           )}
 
@@ -12893,39 +12897,40 @@ function OfficeCashFlowView({ navigate }) {
           );
         })()}
 
-        {/* Cash in the box: cash earnings + cash log in - cash log out (earnings were logged under Earnings through
-            August 2026 and as Cash Log "In" entries from September on, so both count). */}
-        {(function() {
-          var num = function(x) { return parseFloat(x) || 0; };
-          // 2026 only (matches the Financials page totals).
-          var BOX_YEAR = '2026';
-          var inYear = function(d) { return String(d || '').slice(0, 4) === BOX_YEAR; };
-          var earnCash = rentals.filter(function(r) { return inYear(r.date) && (!r.payment_type || r.payment_type === 'Cash'); }).reduce(function(s, r) { return s + num(r.amount); }, 0);
-          var logIn = cashLog.filter(function(c) { return inYear(c.date) && c.direction === 'In'; }).reduce(function(s, c) { return s + num(c.amount); }, 0);
-          var logOut = cashLog.filter(function(c) { return inYear(c.date) && c.direction === 'Out'; }).reduce(function(s, c) { return s + num(c.amount); }, 0);
-          var total = earnCash + logIn - logOut;
-          var loading = rentalsLoading || cashLoading;
-          var row = function(label, value, color) { return <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, padding: '6px 0', borderTop: '0.5px solid #f3eee6' }}><span style={{ color: '#888' }}>{label}</span><span style={{ fontWeight: 600, color: color }}>{value}</span></div>; };
-          return (
-            <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
-              <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Cash in the Box</div>
-                <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>What should be in the office cash box now · 2026</div>
-              </div>
-              <div style={{ padding: '16px 18px' }}>
-                <div style={{ fontSize: 30, fontWeight: 700, color: loading ? '#ccc' : total < 0 ? '#c0392b' : gold, fontFamily: "'Cardo', serif", lineHeight: 1.1, marginBottom: 12 }}>{loading ? '…' : fmt(total)}</div>
-                {!loading && row('Cash earnings', '+ ' + fmt(earnCash), '#059669')}
-                {!loading && row('Cash log in', '+ ' + fmt(logIn), '#059669')}
-                {!loading && row('Cash log out', '− ' + fmt(logOut), '#c0392b')}
-                {!loading && total < 0 && <div style={{ fontSize: 11, color: '#c0392b', marginTop: 8 }}>Below zero: an entry may be missing or logged twice.</div>}
-                {!loading && <OfficeCashCounts expected={Math.round(total * 100) / 100} fmt={fmt} />}
-              </div>
-            </div>
-          );
-        })()}
       </div>
     </div>
   );
+}
+
+// Cash in the box: cash earnings + cash log in - cash log out (earnings were logged under Earnings through
+// August 2026 and as Cash Log "In" entries from September on, so both count). Shown on Financial Overview > Office Cashflow.
+function CashInTheBoxCard({ rentals, cashLog, loading }) {
+  function fmt(n) { return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        var num = function(x) { return parseFloat(x) || 0; };
+        // 2026 only (matches the Financials page totals).
+        var BOX_YEAR = '2026';
+        var inYear = function(d) { return String(d || '').slice(0, 4) === BOX_YEAR; };
+        var earnCash = rentals.filter(function(r) { return inYear(r.date) && (!r.payment_type || r.payment_type === 'Cash'); }).reduce(function(s, r) { return s + num(r.amount); }, 0);
+        var logIn = cashLog.filter(function(c) { return inYear(c.date) && c.direction === 'In'; }).reduce(function(s, c) { return s + num(c.amount); }, 0);
+        var logOut = cashLog.filter(function(c) { return inYear(c.date) && c.direction === 'Out'; }).reduce(function(s, c) { return s + num(c.amount); }, 0);
+        var total = earnCash + logIn - logOut;
+        var row = function(label, value, color) { return <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, padding: '6px 0', borderTop: '0.5px solid #f3eee6' }}><span style={{ color: '#888' }}>{label}</span><span style={{ fontWeight: 600, color: color }}>{value}</span></div>; };
+        return (
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 18px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>Cash in the Box</div>
+              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>What should be in the office cash box now · 2026</div>
+            </div>
+            <div style={{ padding: '16px 18px' }}>
+              <div style={{ fontSize: 30, fontWeight: 700, color: loading ? '#ccc' : total < 0 ? '#c0392b' : gold, fontFamily: "'Cardo', serif", lineHeight: 1.1, marginBottom: 12 }}>{loading ? '…' : fmt(total)}</div>
+              {!loading && row('Cash earnings', '+ ' + fmt(earnCash), '#059669')}
+              {!loading && row('Cash log in', '+ ' + fmt(logIn), '#059669')}
+              {!loading && row('Cash log out', '− ' + fmt(logOut), '#c0392b')}
+              {!loading && total < 0 && <div style={{ fontSize: 11, color: '#c0392b', marginTop: 8 }}>Below zero: an entry may be missing or logged twice.</div>}
+              {!loading && <OfficeCashCounts expected={Math.round(total * 100) / 100} fmt={fmt} />}
+            </div>
+          </div>
+        );
 }
 
 function FinancialsView({ navigate }) {
