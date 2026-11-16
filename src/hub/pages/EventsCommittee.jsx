@@ -1656,10 +1656,35 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     const ICON_KEY = { General: 'general', Logistics: 'logistics', Hospitality: 'hospitality', Sponsorship: 'sponsorship', Interiors: 'interiors', Marketing: 'marketing', Money: 'money', 'Volunteers & vendors': 'volunteers', [DAYOF_CAT]: 'dayof' };
     const groupsHtml = catGroups.map(g => {
       const d = g.items.filter(isDone).length;
-      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border:1px solid ' + GOLD + ';border-collapse:separate;"><tr><td style="padding:14px 16px 8px;border-bottom:1.5px solid #e8dfd0;">' + (ICON_KEY[g.cat] ? '<img src="' + ICON_BASE + ICON_KEY[g.cat] + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + esc(g.cat) + '</span>'
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border:1px solid #efe6d5;border-collapse:separate;"><tr><td style="padding:14px 16px 8px;border-bottom:1.5px solid #e8dfd0;">' + (ICON_KEY[g.cat] ? '<img src="' + ICON_BASE + ICON_KEY[g.cat] + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + esc(g.cat) + '</span>'
         + (g.cat !== 'Marketing' ? '<span style="font-size:12px;color:#888888;margin-left:10px;">' + (d === g.items.length ? 'all figured out &#10003;' : d + ' of ' + g.items.length + ' done') + '</span>' : '') + '</td></tr>'
         + g.items.map(itemRow).join('') + '</table>';
     }).join('');
+    const w0 = ev.website || {};
+    const box = (title, inner) => '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;border:1px solid #efe6d5;border-collapse:separate;background:#ffffff;"><tr><td style="padding:16px 18px;"><div style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;margin-bottom:10px;">' + title + '</div>' + inner + '</td></tr></table>';
+    // Event details: what Event Basics holds
+    const whenTxt = w0.date_tbd ? 'To be announced' : [ev.date ? fmtDate(ev.date) : '', ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : ''].filter(Boolean).join('  ·  ');
+    const whereTxt = [w0.location_name || ev.location, (w0.spaces || []).length ? (w0.spaces || []).join(', ') : ''].filter(Boolean).join(' — ');
+    const tierList = (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim());
+    const ticketTxt = w0.sells_tickets && tierList.length ? tierList.map(t => t.name + ' ' + (Number(t.price) > 0 ? '$' + t.price : 'free')).join(', ') : '';
+    const detailRows = [
+      ['Date and time', whenTxt], ['Event type', ev.purpose], ['Location', whereTxt], ['Event lead', ev.eventLead],
+      ['Expected guests', ev.expectedAttendance || (ev.guestCount && ev.guestCount.invited ? String(ev.guestCount.invited) : '')],
+      ['Tickets', ticketTxt], ['Pricing', ev.pricing],
+    ].filter(r => r[1]);
+    const detailsBox = box('Event details', detailRows.length
+      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + detailRows.map(r => '<tr><td valign="top" width="130" style="padding:4px 10px 4px 0;font-size:12px;color:#888888;">' + esc(r[0]) + '</td><td valign="top" style="padding:4px 0;font-size:14px;color:#2a2a2a;line-height:1.45;">' + esc(r[1]) + '</td></tr>').join('') + '</table>'
+      : '<div style="font-size:13px;color:#888888;">Event details have not been filled in yet.</div>');
+    // Volunteers confirmed: everyone assigned anywhere on the checklist, with what they are on
+    const onWhat = {};
+    const addPerson = (name, label) => { if (!name) return; (onWhat[name] = onWhat[name] || []); if (label && !onWhat[name].includes(label)) onWhat[name].push(label); };
+    ev.checklist.forEach(t => whoOn(dutyPeople(t), volunteers).forEach(x => addPerson(x.name, t.text)));
+    ev.timeline.filter(t => !t.noAssign).forEach(t => whoOn(t, volunteers).forEach(x => addPerson(x.name, fmtTime12(t.time) + ' ' + t.activity)));
+    ev.vendors.filter(v => ['volunteer', 'activity'].includes(v.kind)).forEach(v => whoOn(v, volunteers).forEach(x => addPerson(x.name, v.name)));
+    const peopleNames = Object.keys(onWhat).sort((x, y) => x.localeCompare(y));
+    const volsBox = box('Volunteers confirmed to be in attendance', peopleNames.length
+      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + peopleNames.map(n => '<tr><td valign="top" style="padding:5px 0;border-bottom:1px solid #f3ecdf;"><div style="font-size:14px;font-weight:bold;color:#2a2a2a;">' + esc(n) + '</div>' + (onWhat[n].length ? '<div style="font-size:12px;color:#888888;line-height:1.45;">' + esc(onWhat[n].join('  ·  ')) + '</div>' : '') + '</td></tr>').join('') + '</table>'
+      : '<div style="font-size:13px;color:#888888;">No volunteers assigned yet.</div>');
     const w = ev.website || {};
     const when = w.date_tbd ? 'Date to be announced' : [ev.date ? fmtDate(ev.date) : '', ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : ''].filter(Boolean).join('  ·  ');
     const note = emailNote.trim();
@@ -1670,6 +1695,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
       + (when ? '<div style="font-size:14px;color:#777777;">' + esc(when) + '</div>' : '')
       + '<div style="border-top:1px solid #e5ddcf;width:60%;margin:20px auto 0;"></div></div>'
       + (note ? '<div style="padding:18px 36px 0;font-size:15px;line-height:1.6;color:#444444;">' + esc(note).replace(/\n/g, '<br>') + '</div>' : '')
+      + '<div style="padding:18px 36px 0;">' + detailsBox + volsBox + '</div>'
       + '<div style="padding:6px 36px 6px;"><div style="font-size:13px;color:#888888;padding-top:14px;">' + doneTotal + ' of ' + total + ' done</div>' + groupsHtml + '</div>'
       + '<div style="padding:22px 36px 34px;text-align:center;"><a href="https://volunteerhub.northstarhouse.org/#/events-committee-planning" style="display:inline-block;background:' + GOLD + ';color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:15px 30px;">Open in the Volunteer Hub</a></div>'
       + '<div style="background:#f7f3ec;padding:14px 36px;text-align:center;font-size:11px;color:#999999;">North Star House</div>'
