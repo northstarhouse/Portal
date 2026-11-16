@@ -462,7 +462,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                 <option value="cancelled">Cancelled</option>
               </select>
               <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setBasicsOpen(v => !v)}>{basicsOpen ? 'Close' : 'Edit'}</button>
-              {onDelete && <button className="btn-ghost" style={{ fontSize: 12, color: '#a04545' }} onClick={onDelete}>Delete</button>}
+              {onDelete && basicsOpen && <button className="btn-ghost" style={{ fontSize: 12, color: '#a04545' }} onClick={onDelete}>Delete</button>}
             </div>
             <button className="btn-gold" style={{ fontSize: 12, padding: '8px 14px' }} onClick={() => setEmailPanelOpen(o => !o)}>✉ Email update to committee</button>
             </div>
@@ -1718,7 +1718,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
     ...(showMarketing && mkData ? MARKETING_CHANNELS.filter(c => (mkData[c] || {}).done).map(c => ({ mk: true, c, cat: 'Marketing' })) : []),
   ];
   const isDone = (i) => (i.budget ? budgetDone : i.mk ? !!(mkData[i.c] || {}).done : i.need ? needHandled(i.v) : !!i.t.done);
-  const catGroups = [...CHECKLIST_CATEGORIES.filter(c => c !== 'Marketing' && c !== 'Volunteers & vendors'), 'Marketing', 'Volunteers & vendors', DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : c === 'General' || c === 'Hospitality' ? (x, y) => (isDone(x) ? 1 : 0) - (isDone(y) ? 1 : 0) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length || (g.cat === 'Money' && !!fin));
+  const catGroups = [...CHECKLIST_CATEGORIES.filter(c => c !== 'Marketing' && c !== 'Volunteers & vendors' && c !== 'Money'), 'Marketing', 'Volunteers & vendors', DAYOF_CAT, 'Money'].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : c === 'General' || c === 'Hospitality' ? (x, y) => (isDone(x) ? 1 : 0) - (isDone(y) ? 1 : 0) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length || (g.cat === 'Money' && !!fin));
   const shownGroups = catGroups.filter(g => catFilter === 'All' || catFilter === g.cat);
 
   // ---- Email the checklist to the committee: a finished, read-only copy of what is on screen.
