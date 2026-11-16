@@ -1010,6 +1010,13 @@ function NeedsList({ ev, onUpdate, volunteers }) {
 
 const hasBudget = (b) => b !== '' && b != null && !isNaN(Number(b));
 const budgetText = (b) => (hasBudget(b) ? money(Number(b)) : 'Undecided');
+// An expense that was added for a checklist step (alcohol license) stays on the list, but shows no date until that step is checked off.
+const expensePending = (r, ev) => {
+  const d = String(r.description || '').toLowerCase();
+  const duties = (ev.checklist || []).filter(t => t.auto === 'alcohol-license');
+  const hit = /sheriff/.test(d) ? duties.find(t => /sheriff/i.test(t.text)) : /abc|money order|alcohol license/.test(d) ? duties.find(t => /money order/i.test(t.text)) : null;
+  return !!hit && !hit.done;
+};
 const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 function dutyPeople(t) {
   return {
@@ -1808,7 +1815,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
     }).join('');
     const w0 = ev.website || {};
     const ICONS = 'https://northstarhouse.github.io/Portal/assets/icons/cat-';
-    const box = (title, inner, iconKey) => '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;border:1px solid #efe6d5;border-collapse:separate;background:#ffffff;"><tr><td style="padding:16px 18px;"><div style="border:1px solid #cdb78e;padding:9px 12px;margin:0 0 12px;font-family:Helvetica,Arial,sans-serif;font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;line-height:1.4;">' + (iconKey ? '<img src="' + ICONS + iconKey + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="vertical-align:middle;">' + title + '</span></div>' + inner + '</td></tr></table>';
+    const box = (title, inner, iconKey) => '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;border:1px solid #cdb78e;border-collapse:separate;background:#ffffff;"><tr><td style="padding:14px 16px 8px;border-bottom:1px solid #cdb78e;">' + (iconKey ? '<img src="' + ICONS + iconKey + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + title + '</span></td></tr><tr><td style="padding:6px 16px 12px;">' + inner + '</td></tr></table>';
     // Event details: what Event Basics holds
     const dateTxt = w0.date_tbd ? 'To be announced' : (ev.date ? fmtDate(ev.date) : '');
     const timeTxt = w0.date_tbd ? '' : (ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : '');
@@ -1825,7 +1832,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
       : '<div style="font-size:13px;color:#888888;">Event details have not been filled in yet.</div>', 'event');
     // Volunteers confirmed: everyone assigned anywhere on the checklist, with what they are on
     const peopleNames = assignedPeople(ev, volunteers, attendExtra).map(x => x.name);
-    const volsBox = box('Confirmed Day-Of Attendance', peopleNames.length
+    const volsBox = box('Confirmed Volunteers', peopleNames.length
       ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + peopleNames.map(n => '<tr><td valign="top" style="padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;color:#2a2a2a;">' + esc(n) + '</td></tr>').join('') + '</table>'
       : '<div style="font-size:13px;color:#888888;">No volunteers assigned yet.</div>', 'volunteers');
     const w = ev.website || {};
@@ -2394,7 +2401,7 @@ function FinancialsTab({ ev }) {
               <div style={{ fontSize: 13 }}>{r.description || r.type || 'Expense'}</div>
               {r.purchased_by && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>Purchased by {r.purchased_by}</div>}
             </div>
-            <span style={{ fontSize: 11, color: 'var(--muted)' }}>{r.date ? fmtDateShort(r.date) : ''}</span>
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>{r.date && !expensePending(r, ev) ? fmtDateShort(r.date) : ''}</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: '#8a4a2e' }}>{money(r.amount)}</span>
           </ItemRow>
         ))}
