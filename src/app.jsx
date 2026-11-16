@@ -22105,13 +22105,15 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                     style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 10, color: '#8a6d1d', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, background: '#fdf3e3', padding: '2px 8px', borderRadius: 20 }}>{sub.form_name}</span>
+                        {preview && <div style={{ fontSize: 14, fontWeight: 600, color: isHandled ? '#aaa' : '#2a2a2a' }}>{preview + ' - ' + String(sub.form_name || '').replace(/\s*inquiry\s*$/i, '')}</div>}
+                        <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>Inquired {fmtTs(sub.created_at)}</div>
+                        {p.email && p.email !== preview && <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{p.email}</div>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                           {tour && (function() { var st = TOUR_STATES[tourStateKey(sub)]; return (
-                            <span title={st.label + ': ' + fmtTourWhen(tour)} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: st.color, background: st.bg }}>{st.label}</span>
+                            <span title={st.label + ': ' + fmtTourWhen(tour)} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, color: st.color, background: st.bg }}>{st.label}</span>
                           ); })()}
-                          {!sub.tourOnly && isBookedInquiry(sub) && <span title={isBookedInquiry(sub) === 'paid' ? 'Booked: first payment received' : 'Soft hold: pre-booking form submitted, no payment yet'} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: isBookedInquiry(sub) === 'paid' ? '#fff' : '#886c44', background: isBookedInquiry(sub) === 'paid' ? '#886c44' : '#f3ead9' }}>{isBookedInquiry(sub) === 'paid' ? 'Booked' : 'Soft hold'}</span>}
-                          {tour && tour.confirmed_at && <span title={'Confirmed from the reminder email: ' + tourConfirmedText(tour)} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: '#1b5e20', background: '#e3f4e3' }}>✓ Confirmed</span>}
+                          {!sub.tourOnly && isBookedInquiry(sub) && <span title={isBookedInquiry(sub) === 'paid' ? 'Booked: first payment received' : 'Soft hold: pre-booking form submitted, no payment yet'} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, color: isBookedInquiry(sub) === 'paid' ? '#fff' : '#886c44', background: isBookedInquiry(sub) === 'paid' ? '#886c44' : '#f3ead9' }}>{isBookedInquiry(sub) === 'paid' ? 'Booked' : 'Soft hold'}</span>}
+                          {tour && tour.confirmed_at && <span title={'Confirmed from the reminder email: ' + tourConfirmedText(tour)} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, color: '#1b5e20', background: '#e3f4e3' }}>✓ Confirmed</span>}
                           {false && tour && (
                             <span title={(tour.status === 'booked' ? 'Tour booked: ' : 'Tour requested: ') + fmtTourWhen(tour)}
                               style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 8px', borderRadius: 20, color: tour.status === 'booked' ? '#2e7d32' : '#a15c00', background: tour.status === 'booked' ? '#eafaf0' : '#fdf3e3' }}>
@@ -22119,10 +22121,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                             </span>
                           )}
                         </div>
-                        {preview && <div style={{ fontSize: 14, fontWeight: 600, color: isHandled ? '#aaa' : '#2a2a2a' }}>{preview}</div>}
-                        {p.email && p.email !== preview && <div style={{ fontSize: 12, color: '#999', marginTop: 1 }}>{p.email}</div>}
                       </div>
-                      <div style={{ fontSize: 11, color: '#bbb', flexShrink: 0, whiteSpace: 'nowrap' }}>{fmtTs(sub.created_at)}</div>
                     </div>
                   </button>
                 </div>
