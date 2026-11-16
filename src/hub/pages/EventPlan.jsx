@@ -42,6 +42,8 @@ const volName = (v) => v ? `${v['First Name'] || ''} ${v['Last Name'] || ''}`.tr
 // ── Email update to the committee ────────────────────────────────────────────────────────────────────────────────────────
 // A branded, read-only copy of the plan: each event with its details, the vote result and the committee's decisions, grouped by
 // the final decision. Same look as the checklist email (taupe headers, one body font); titles are never all caps.
+const dollars = (t) => String(t || '').replace(/(^|[^$\d.,])(\d[\d,]*(?:\.\d+)?)/g, (m, a, n) => a + '$' + n);
+const bulletLines = (t) => String(t || '').split(/\r?\n/).map((l) => l.replace(/^\s*(?:[-*\u2022]|\d+[.)])\s*/, '').trim()).filter(Boolean);
 const decisionGroup = (r) => (r.final_decision && DECISIONS.includes(r.final_decision) ? r.final_decision : 'No Decision Yet');
 const GROUP_ORDER = ['Moving Forward', 'Merging with Another Event', 'No Decision Yet', 'Needs Further Discussion', 'Not Moving Forward'];
 function buildPlanEmail({ rows, votes, note }) {
@@ -54,21 +56,23 @@ function buildPlanEmail({ rows, votes, note }) {
     r.multi_day ? `${daysOf(r).length || 'Multi'}-day: ` + (daysOf(r).filter((d) => d.date).map((d) => fmtShort(d.date)).join(', ') || 'dates to set') : '',
     !r.multi_day && r.date ? fmtDay(r.date) : '',
     !r.multi_day && r.start_time ? `${fmtTime(r.start_time)}${r.end_time ? ' – ' + fmtTime(r.end_time) : ''}` : '',
-    r.pricing ? `Pricing: ${r.pricing}` : '', r.budget ? `Budget: ${r.budget}` : '',
+    r.pricing ? `Pricing: ${dollars(r.pricing)}` : '', r.budget ? `Budget: ${dollars(r.budget)}` : '',
   ].filter(Boolean);
   const eventRow = (r) => {
-    const vr = voteResult(votes && votes[planKey(r.name)]);
     const dt = DECISION_TONE[r.final_decision];
     const edge = dt ? dt.color : '#e0a800';
     const sub = detailLine(r);
     return '<tr><td bgcolor="#ffffff" style="background:#ffffff;padding:13px 18px;border-bottom:1px solid #ede8df;">'
       + '<div style="font-size:15px;font-weight:bold;color:#2a2a2a;line-height:1.35;">' + esc(r.name)
       + (r.finalized_event_id ? ' <span style="font-size:11px;font-weight:bold;color:#2e7d32;">&#10003; Finalized' + (r.finalized_at ? ' ' + esc(fmtStamp(r.finalized_at)) : '') + '</span>' : '') + '</div>'
-      + '<div style="font-size:12px;color:#888888;margin-top:3px;line-height:1.5;">' + (sub.length ? esc(sub.join('  ·  ')) : 'No details yet')
-      + (vr ? '  &nbsp;·&nbsp;  Committee vote: ' + esc(vr.label + ' ' + vr.count + '/' + vr.total) : '') + '</div>'
+      + (sub.length
+        ? '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#666666;line-height:1.55;">' + sub.map((x) => '<li style="margin:0 0 2px;">' + esc(x) + '</li>').join('') + '</ul>'
+        : '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#999999;line-height:1.55;"><li style="font-style:italic;">No details yet</li></ul>')
       + '<div style="margin-top:9px;border-left:3px solid ' + edge + ';background:#faf7f2;padding:8px 12px;">'
       + '<div style="font-size:11px;font-weight:bold;color:#8c6d36;margin-bottom:3px;">Committee Decisions' + (r.decisions_updated_at ? ' · as of ' + esc(fmtStamp(r.decisions_updated_at)) : '') + '</div>'
-      + '<div style="font-size:13px;line-height:1.55;color:' + (r.decisions ? '#3a332a' : '#999999') + ';' + (r.decisions ? '' : 'font-style:italic;') + '">' + (r.decisions ? esc(r.decisions).replace(/\n/g, '<br>') : 'No decisions recorded yet.') + '</div></div>'
+      + (bulletLines(r.decisions).length
+        ? '<ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.55;color:#3a332a;">' + bulletLines(r.decisions).map((x) => '<li style="margin:0 0 3px;">' + esc(x) + '</li>').join('') + '</ul>'
+        : '<ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.55;color:#999999;"><li style="font-style:italic;">No decisions recorded yet.</li></ul>') + '</div>'
       + '</td></tr>';
   };
   const groups = GROUP_ORDER.map((g) => ({ g, items: sorted.filter((r) => decisionGroup(r) === g) })).filter((x) => x.items.length);
@@ -99,9 +103,8 @@ function buildPlanText({ rows, note }) {
   if (note && note.trim()) lines.push(note.trim(), '');
   sortPlan(rows || []).forEach((r) => {
     lines.push(`${r.name} (${decisionGroup(r)})`);
-    const d = [r.date ? fmtDay(r.date) : '', r.pricing ? `Pricing: ${r.pricing}` : '', r.budget ? `Budget: ${r.budget}` : ''].filter(Boolean).join(' · ');
-    if (d) lines.push('  ' + d);
-    if (r.decisions) lines.push('  Committee decisions: ' + r.decisions.replace(/\n/g, ' '));
+    [r.date ? fmtDay(r.date) : '', r.pricing ? `Pricing: ${dollars(r.pricing)}` : '', r.budget ? `Budget: ${dollars(r.budget)}` : ''].filter(Boolean).forEach((x) => lines.push('  - ' + x));
+    bulletLines(r.decisions).forEach((x) => lines.push('  - ' + x));
     lines.push('');
   });
   lines.push('Open in the Volunteer Hub: https://volunteerhub.northstarhouse.org/#/events-committee-planning');
