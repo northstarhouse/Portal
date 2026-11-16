@@ -1595,7 +1595,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     ...(showMarketing && mkData ? MARKETING_CHANNELS.filter(c => (mkData[c] || {}).done).map(c => ({ mk: true, c, cat: 'Marketing' })) : []),
   ];
   const isDone = (i) => (i.mk ? !!(mkData[i.c] || {}).done : i.need ? needHandled(i.v) : !!i.t.done);
-  const catGroups = [...CHECKLIST_CATEGORIES.filter(c => c !== 'Marketing'), 'Marketing', DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : c === 'General' || c === 'Hospitality' ? (x, y) => (isDone(x) ? 1 : 0) - (isDone(y) ? 1 : 0) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
+  const catGroups = [...CHECKLIST_CATEGORIES.filter(c => c !== 'Marketing' && c !== 'Volunteers & vendors'), 'Marketing', 'Volunteers & vendors', DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : c === 'General' || c === 'Hospitality' ? (x, y) => (isDone(x) ? 1 : 0) - (isDone(y) ? 1 : 0) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
   const shownGroups = catGroups.filter(g => catFilter === 'All' || catFilter === g.cat);
 
   // ---- Email the checklist to the committee: a finished, read-only copy of what is on screen.
@@ -1656,7 +1656,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     const ICON_KEY = { General: 'general', Logistics: 'logistics', Hospitality: 'hospitality', Sponsorship: 'sponsorship', Interiors: 'interiors', Marketing: 'marketing', Money: 'money', 'Volunteers & vendors': 'volunteers', [DAYOF_CAT]: 'dayof' };
     const groupsHtml = catGroups.map(g => {
       const d = g.items.filter(isDone).length;
-      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px;"><tr><td style="padding:26px 0 6px;border-bottom:1.5px solid #e8dfd0;">' + (ICON_KEY[g.cat] ? '<img src="' + ICON_BASE + ICON_KEY[g.cat] + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + esc(g.cat) + '</span>'
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border:1px solid ' + GOLD + ';border-collapse:separate;"><tr><td style="padding:14px 16px 8px;border-bottom:1.5px solid #e8dfd0;">' + (ICON_KEY[g.cat] ? '<img src="' + ICON_BASE + ICON_KEY[g.cat] + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + esc(g.cat) + '</span>'
         + (g.cat !== 'Marketing' ? '<span style="font-size:12px;color:#888888;margin-left:10px;">' + (d === g.items.length ? 'all figured out &#10003;' : d + ' of ' + g.items.length + ' done') + '</span>' : '') + '</td></tr>'
         + g.items.map(itemRow).join('') + '</table>';
     }).join('');
