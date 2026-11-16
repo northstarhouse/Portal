@@ -1742,13 +1742,13 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
   function buildEmailHtml() {
     const GOLD = '#a28b75';
     const esc = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const circle = (done) => (done
-      ? '<span style="display:inline-block;width:18px;height:18px;line-height:18px;border-radius:50%;background:' + GOLD + ';color:#ffffff;font-size:11px;text-align:center;">&#10003;</span>'
-      : '<span style="display:inline-block;width:15px;height:15px;border-radius:50%;border:1.5px solid #d8cfc0;"></span>');
+    const circle = (done, ring) => (done
+      ? '<span style="display:inline-block;width:' + (ring ? 14 : 18) + 'px;height:' + (ring ? 14 : 18) + 'px;line-height:' + (ring ? 14 : 18) + 'px;border-radius:50%;background:' + GOLD + ';color:#ffffff;font-size:10px;text-align:center;' + (ring ? 'border:2px solid ' + ring + ';' : '') + '">&#10003;</span>'
+      : '<span style="display:inline-block;width:' + (ring ? 14 : 15) + 'px;height:' + (ring ? 14 : 15) + 'px;border-radius:50%;border:' + (ring ? '2px solid ' + ring : '1.5px solid #d8cfc0') + ';"></span>');
     const star = '<span style="display:inline-block;width:18px;text-align:center;font-size:19px;line-height:18px;color:' + GOLD + ';">&#9733;</span>';
     const row = (done, titleHtml, subHtml, accent, badge, marker) =>
-      '<tr><td bgcolor="#ffffff" style="padding:0;background:#ffffff;border-bottom:1px solid #ede8df;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border-left:4px solid ' + (accent || '#ffffff') + ';"><tr>'
-      + '<td width="44" valign="top" style="padding:13px 0 13px 12px;">' + (marker || circle(done)) + '</td>'
+      '<tr><td bgcolor="#ffffff" style="padding:0;background:#ffffff;border-bottom:1px solid #ede8df;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;"><tr>'
+      + '<td width="44" valign="top" style="padding:13px 0 13px 12px;">' + (marker || circle(done, accent)) + '</td>'
       + '<td valign="top" style="padding:11px 8px 11px 0;"><div style="font-size:14px;font-weight:bold;color:#2a2a2a;line-height:1.35;">' + titleHtml + '</div>'
       + (subHtml ? '<div style="font-size:12px;color:#888888;margin-top:2px;line-height:1.45;">' + subHtml + '</div>' : '') + '</td>'
       + (badge ? '<td valign="top" align="right" style="padding:12px 12px 0 0;white-space:nowrap;"><span style="display:inline-block;background:#f0ebe2;color:#2a2a2a;font-size:11px;padding:2px 9px;border-radius:12px;">' + esc(badge) + '</span></td>' : '')
