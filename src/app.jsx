@@ -22096,8 +22096,19 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
               var preview = p.name || p.email || 'Unknown';
               var isHandled = sub.status === 'handled';
               var tour = matchedTour(sub);
+              var monthOf = function(s) { return String(s.created_at || '').slice(0, 7); };
+              var newMonth = i === 0 || monthOf(shownRows[i - 1]) !== monthOf(sub);
+              var monthTotal = newMonth ? shownRows.filter(function(s) { return monthOf(s) === monthOf(sub); }).length : 0;
+              var monthLabel = newMonth ? (function() { try { return new Date(monthOf(sub) + '-15T12:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); } catch (e) { return monthOf(sub); } })() : '';
               return (
-                <div key={sub.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 18px', borderBottom: i < shownRows.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
+                <React.Fragment key={sub.id}>
+                {newMonth && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '10px 18px', background: '#faf6ef', borderTop: i > 0 ? '1.5px solid ' + gold + '60' : 'none', borderBottom: '0.5px solid #f0ece2' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{monthLabel}</span>
+                    <span style={{ fontSize: 12, color: '#888' }}>{monthTotal} {monthTotal === 1 ? 'inquiry' : 'inquiries'}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 18px', borderBottom: i < shownRows.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
                   {sub.tourOnly ? <span style={{ width: 16, flexShrink: 0 }} /> : <input type="checkbox" title="Mark as handled" checked={isHandled} disabled={handlingId === sub.id}
                     onChange={function() { toggleHandled(sub); }}
                     style={{ marginTop: 4, width: 16, height: 16, accentColor: '#2e7d32', cursor: 'pointer', flexShrink: 0, opacity: handlingId === sub.id ? 0.5 : 1 }} />}
@@ -22125,6 +22136,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                     </div>
                   </button>
                 </div>
+                </React.Fragment>
               );
             })}
           </div>
