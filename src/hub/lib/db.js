@@ -1016,6 +1016,26 @@ export async function fetchCommitteeEvents() {
   return Array.isArray(rows) ? rows : [];
 }
 
+// Sponsor Provided Items = the Portal's Sponsors > Auction Items list (auction_items); its `event` is the event an item is attached to.
+export async function fetchSponsorItems() {
+  const rows = await get('auction_items?select=*&order=created_at.desc');
+  return Array.isArray(rows) ? rows : [];
+}
+export async function insertSponsorItem(payload) {
+  const rows = await post('auction_items', payload);
+  if (rows && rows.code) return { error: rows.message || rows.code };
+  return { success: true, row: Array.isArray(rows) ? rows[0] : null };
+}
+export async function updateSponsorItem(id, payload) {
+  const rows = await patch(`auction_items?id=eq.${id}`, { ...payload, updated_at: new Date().toISOString() });
+  if (rows && rows.code) return { error: rows.message || rows.code };
+  return { success: true, row: Array.isArray(rows) ? rows[0] : null };
+}
+export async function deleteSponsorItem(id) {
+  const ok = await del(`auction_items?id=eq.${id}`);
+  return { success: ok };
+}
+
 export async function insertCommitteeEvent(payload) {
   const rows = await post('events_committee', payload);
   if (rows && rows.code) return { error: rows.message || rows.code };

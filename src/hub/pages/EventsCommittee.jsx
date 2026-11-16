@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MediaPicker } from '../../media-library.jsx';
 import { useVol } from '../App.jsx';
 import {
-  insertReimbursement, fetchAreaData, saveArea, sendChecklistEmail, matchVolunteerAreas, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
+  insertReimbursement, fetchAreaData, saveArea, sendChecklistEmail, matchVolunteerAreas, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, fetchSponsorItems, insertSponsorItem, updateSponsorItem, deleteSponsorItem, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
@@ -330,10 +330,12 @@ const PLANNING_SECTION_ICONS = {
 };
 
 PLANNING_SECTION_ICONS.attendance = PLANNING_SECTION_ICONS.volunteers;
+PLANNING_SECTION_ICONS.sponsoritems = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>;
 
 const PLANNING_SECTIONS = [
   { key: 'checklist', title: 'Checklist', desc: 'Type the duties in fast, then assign and date them' },
   { key: 'attendance', title: 'Volunteers in Attendance', desc: 'Everyone assigned on the checklist, plus anyone you add' },
+  { key: 'sponsoritems', title: 'Sponsor Provided Items', desc: 'Pick sponsor items to use at this event, or add new ones' },
   { key: 'marketing', title: 'Marketing & Promotion', desc: 'Flyers, newsletters, website, social media', area: 'marketing' },
   { key: 'budget', title: 'Budget & Transactions', desc: 'Income, expenses, reimbursements' },
   { key: 'after', title: 'After the Event', desc: 'What went well, final numbers, follow-ups, reviews and feedback' },
@@ -602,6 +604,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                 <div style={{ padding: '4px 16px 18px' }}>
                   {s.key === 'preplanning' && <PreplanningTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} onRsvpChange={setRsvpOnly} />}
                   {s.key === 'attendance' && <AttendanceTab ev={ev} volunteers={volunteers} />}
+                  {s.key === 'sponsoritems' && <SponsorItems ev={ev} />}
                   {s.key === 'checklist' && <ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} showMarketing={!marketingNA} />}
                   {s.key === 'budget' && <FinancialsTab ev={ev} />}
                   {s.key === 'dayof' && <SheetToggle view={<DayOfView ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}><DayOfTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} /></SheetToggle>}
@@ -1124,6 +1127,156 @@ function AttendanceTab({ ev, volunteers }) {
       ))}
       <div style={{ ...cap, marginTop: 20 }}>Add a volunteer</div>
       <AssignVolunteers v={extra} volunteers={volunteers} onPatch={patchExtra} hideList />
+    </div>
+  );
+}
+
+// Sponsor Provided Items = the Portal's Sponsors > Auction Items list (table auction_items), shown here for event planning.
+// An item is attached to an event by choosing it from that event's "Do you want to use any sponsor items?" list, which sets its
+// Event / auction to this event; it is then marked "For <event>" everywhere, including Sponsors > Auction Items in the Portal.
+const SPONSOR_ITEM_STATUSES = ['Pledged', 'Received', 'Sold', 'Unsold', 'Returned'];
+const SPONSOR_STATUS_STYLE = {
+  Pledged: { bg: '#fff8e1', fg: '#8a6200' }, Received: { bg: '#e3f2fd', fg: '#1565c0' }, Sold: { bg: '#e8f5e9', fg: '#2e7d32' },
+  Unsold: { bg: '#f3e5f5', fg: '#6a1b9a' }, Returned: { bg: '#eceff1', fg: '#546e7a' },
+};
+const sameEventName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase() && !!String(a || '').trim();
+const itemMoney = (n) => (n == null || n === '' ? '' : '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: Number(n) % 1 ? 2 : 0 }));
+// With `ev`: this event's items, plus a pick list of unassigned ones. Without: the master list of everything.
+function SponsorItems({ ev }) {
+  const [items, setItems] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [open, setOpen] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    let live = true;
+    fetchSponsorItems().then(r => { if (live) setItems(r); }).catch(() => { if (live) setItems([]); });
+    fetchCommitteeEvents().then(rows => { if (live) setEvents((Array.isArray(rows) ? rows : []).filter(r => r && r.id && r.name).sort((a, b) => String(a.name).localeCompare(String(b.name)))); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  if (!items) return <div style={{ fontSize: 13, color: 'var(--muted)' }}>Loading…</div>;
+  const mine = ev ? items.filter(x => sameEventName(x.event, ev.name)) : items;
+  const available = ev ? items.filter(x => !String(x.event || '').trim() && x.status !== 'Returned') : [];
+  async function patch(id, pt) {
+    setItems(prev => prev.map(x => (x.id === id ? { ...x, ...pt } : x)));
+    const res = await updateSponsorItem(id, pt);
+    if (res.error) setErr('Could not save that change. ' + res.error);
+  }
+  async function add() {
+    setErr('');
+    const res = await insertSponsorItem({ item: 'New item', status: 'Pledged', event: ev ? ev.name : null });
+    if (res.error || !res.row) { setErr('Could not add the item. ' + (res.error || '')); return; }
+    setItems(prev => [res.row, ...prev]);
+    setOpen(res.row.id);
+  }
+  async function remove(x) {
+    if (!window.confirm('Delete "' + (x.item || 'this item') + '" from Sponsors > Auction Items? This removes it everywhere.')) return;
+    setItems(prev => prev.filter(y => y.id !== x.id));
+    await deleteSponsorItem(x.id);
+  }
+  const cap = { fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 };
+  const inp = { width: '100%', boxSizing: 'border-box', fontSize: 13 };
+  const field = (x, k, label, ph, extra, num) => (
+    <label style={{ display: 'block', ...(extra || {}) }}>
+      <div style={cap}>{label}</div>
+      <input className="input" defaultValue={x[k] == null ? '' : x[k]} key={x.id + k + (x[k] == null ? '' : x[k])} placeholder={ph || ''} style={inp}
+        onBlur={e => {
+          const raw = e.target.value.trim();
+          const v = num ? (raw === '' ? null : parseFloat(raw.replace(/[$,]/g, ''))) : (raw || null);
+          if (num && raw !== '' && Number.isNaN(v)) return;
+          if (v !== (x[k] == null ? null : x[k])) patch(x.id, { [k]: v });
+        }} />
+    </label>
+  );
+  const counts = SPONSOR_ITEM_STATUSES.map(s => [s, mine.filter(x => (x.status || 'Pledged') === s).length]).filter(c => c[1]);
+  return (
+    <div>
+      {ev ? (
+        <div style={{ background: 'var(--light)', border: '0.5px solid var(--border-light)', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Do you want to use any sponsor items?</div>
+          {available.length === 0
+            ? <div style={{ fontSize: 12, color: 'var(--muted)' }}>No unassigned sponsor items right now. Add one below, or add to the full list in Sponsors &gt; Auction Items.</div>
+            : (
+              <select className="input" value="" onChange={e => { if (e.target.value) patch(e.target.value, { event: ev.name }); }} style={{ ...inp, maxWidth: 460 }}>
+                <option value="">Choose a sponsor item to use at this event…</option>
+                {available.map(x => <option key={x.id} value={x.id}>{(x.item || 'Untitled item') + (x.donor ? ' · ' + x.donor : '') + ' (' + (x.status || 'Pledged') + ')'}</option>)}
+              </select>
+            )}
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>Everything sponsors are giving, across all events. This is the same list as Sponsors &gt; Auction Items in the Portal. Attach an item to an event here, or from that event's planning page.</div>
+      )}
+      {counts.length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{mine.length} {mine.length === 1 ? 'item' : 'items'}  ·  {counts.map(c => c[1] + ' ' + c[0].toLowerCase()).join('  ·  ')}</div>}
+      {err && <div style={{ fontSize: 12, color: '#c0392b', marginBottom: 8 }}>{err}</div>}
+      {mine.length === 0 && <div style={{ fontSize: 13, color: 'var(--muted)', margin: '8px 0 14px' }}>{ev ? 'No sponsor items for this event yet.' : 'No items yet.'}</div>}
+      {mine.map(x => {
+        const isOpen = open === x.id;
+        const st = SPONSOR_STATUS_STYLE[x.status || 'Pledged'] || SPONSOR_STATUS_STYLE.Pledged;
+        const forEvent = String(x.event || '').trim();
+        return (
+          <div key={x.id} style={{ borderBottom: '0.5px solid var(--border-light)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 0 11px 4px', flexWrap: 'wrap' }}>
+              <button type="button" onClick={() => setOpen(isOpen ? null : x.id)} style={{ flex: '1 1 220px', minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{x.item || 'Untitled item'}{x.donor ? <span style={{ fontWeight: 400, color: 'var(--muted)' }}>  ·  {x.donor}</span> : null}</div>
+                {(x.donor_contact || x.est_value != null) && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{[x.donor_contact && 'Contact: ' + x.donor_contact, x.est_value != null && 'Value: ' + itemMoney(x.est_value)].filter(Boolean).join('  ·  ')}</div>}
+              </button>
+              {!ev && (forEvent
+                ? <span className="badge" style={{ background: '#f3ead9', color: '#886c44', flexShrink: 0 }}>For: {forEvent}</span>
+                : <span className="badge" style={{ background: 'var(--light)', color: 'var(--muted)', flexShrink: 0 }}>Not assigned</span>)}
+              <select className="input" value={x.status || 'Pledged'} onChange={e => patch(x.id, { status: e.target.value })} style={{ width: 120, fontSize: 12, padding: '4px 8px', background: st.bg, color: st.fg, fontWeight: 600, flexShrink: 0 }}>
+                {SPONSOR_ITEM_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            {isOpen && (
+              <div style={{ padding: '2px 4px 16px' }}>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+                  {field(x, 'item', 'Item', 'e.g. Wine basket', { flex: '2 1 220px' })}
+                  {field(x, 'donor', 'Sponsor / donor', '', { flex: '2 1 200px' })}
+                  {field(x, 'est_value', 'Estimated value ($)', '', { flex: '1 1 120px' }, true)}
+                </div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+                  {field(x, 'donor_contact', 'Contact (name, email or phone)', '', { flex: '1 1 260px' })}
+                </div>
+                {!ev && events.length > 0 && (
+                  <label style={{ display: 'block', marginBottom: 10, maxWidth: 360 }}>
+                    <div style={cap}>Assigned to event</div>
+                    <select className="input" value={forEvent} onChange={e => patch(x.id, { event: e.target.value || null })} style={inp}>
+                      <option value="">Not assigned to an event</option>
+                      {forEvent && !events.some(e => sameEventName(e.name, forEvent)) && <option value={forEvent}>{forEvent}</option>}
+                      {events.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
+                    </select>
+                  </label>
+                )}
+                <div style={cap}>Details</div>
+                <textarea className="input" defaultValue={x.description || ''} key={x.id + 'd' + (x.description || '')} rows={3} placeholder="What it is, pickup, restrictions, how it will be displayed…" style={{ ...inp, resize: 'vertical' }}
+                  onBlur={e => { const v = e.target.value.trim() || null; if (v !== (x.description || null)) patch(x.id, { description: v }); }} />
+                <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+                  {ev && <button type="button" onClick={() => patch(x.id, { event: null })} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', padding: 0 }}>Take off this event</button>}
+                  <button type="button" onClick={() => remove(x)} style={{ background: 'none', border: 'none', color: '#c0392b', fontSize: 12, cursor: 'pointer', padding: 0 }}>Delete item</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <button type="button" onClick={add} className="btn-gold" style={{ marginTop: 14, fontSize: 12, padding: '7px 16px' }}>{ev ? '+ New item for this event' : '+ Add item'}</button>
+    </div>
+  );
+}
+
+// The master list, as a drop-down card on the Events Committee page.
+function SponsorItemsCard() {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+      <div onClick={() => setIsOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer' }}>
+        <span style={{ color: 'var(--gold)', flexShrink: 0 }}>{PLANNING_SECTION_ICONS.sponsoritems}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif" }}>Sponsor Provided Items</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>Auction items and other things sponsors are giving, across all events</div>
+        </div>
+        <span style={{ color: 'var(--muted)', flexShrink: 0, transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>&rsaquo;</span>
+      </div>
+      {isOpen && <div style={{ padding: '4px 16px 18px', borderTop: '0.5px solid var(--border-light)' }}><SponsorItems /></div>}
     </div>
   );
 }
@@ -2859,6 +3012,7 @@ export default function EventsCommittee() {
         ) : (
           <>
             <EventPlan session={session} volunteer={volunteer} onFinalized={() => load()} />
+            <SponsorItemsCard />
             <EventCardsGrid onOpen={openEventByName} />
           </>
         )}
