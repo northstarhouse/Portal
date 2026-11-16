@@ -43,14 +43,28 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
       .catch((e) => setMsg({ ok: false, text: e.message }));
   }
 
+  function editEvent(ev) {
+    if (busy) return;
+    setBusy(true); setMsg(null);
+    call({ action: 'get', id: ev.id })
+      .then((j) => {
+        setF({ ...blank(), ...j.event });
+        setSlugTouched(true);
+        setMsg({ ok: true, text: 'Editing "' + j.event.title + '". Change what you need, then ' + (j.event.status === 'published' ? 'press Save changes.' : 'save or publish.') });
+        window.scrollTo(0, 0);
+      })
+      .catch((e) => setMsg({ ok: false, text: e.message }))
+      .finally(() => setBusy(false));
+  }
+
   function save(status) {
     if (busy) return;
-    if (status === 'published' && !window.confirm('Publish this event? It goes on the website right away.')) return;
+    if (status === 'published' && !f.id && !window.confirm('Publish this event? It goes on the website right away.')) return;
     setBusy(true); setMsg(null);
     call({ action: 'save', event: { ...f, status } })
       .then((j) => {
-        set('id', j.event.id);
-        setMsg({ ok: true, text: status === 'published' ? 'Published. It is on the website' + (j.refreshed ? '.' : ' (the site can take a few minutes to show it).') : 'Saved as a draft. It is not on the website yet.' });
+        setF((o) => ({ ...o, id: j.event.id, status: j.event.status || status }));
+        setMsg({ ok: true, text: status === 'published' ? (f.status === 'published' ? 'Changes saved. They are on the website' + (j.refreshed ? '.' : ' (the site can take a few minutes to show them).') : 'Published. It is on the website' + (j.refreshed ? '.' : ' (the site can take a few minutes to show it).')) : (f.status === 'published' ? 'Saved.' : 'Saved as a draft. It is not on the website yet.') });
         loadEvents();
       })
       .catch((e) => setMsg({ ok: false, text: e.message }))
@@ -122,8 +136,17 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
 
       {msg && <div style={{ fontSize: 13, marginBottom: 12, color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 28 }}>
-        <button type="button" disabled={busy} onClick={() => save('draft')} style={{ background: '#fff', color: GOLD, border: '1px solid ' + GOLD, borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Saving…' : 'Save as draft'}</button>
-        <button type="button" disabled={busy} onClick={() => save('published')} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>Publish to website</button>
+        {(() => {
+          const live = f.status === 'published';
+          const primary = { background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 };
+          const secondary = { background: '#fff', color: GOLD, border: '1px solid ' + GOLD, borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: busy ? 0.6 : 1 };
+          return live
+            ? <button type="button" disabled={busy} onClick={() => save('published')} style={primary}>{busy ? 'Saving…' : 'Save changes'}</button>
+            : <React.Fragment>
+                <button type="button" disabled={busy} onClick={() => save('draft')} style={secondary}>{busy ? 'Saving…' : 'Save as draft'}</button>
+                <button type="button" disabled={busy} onClick={() => save('published')} style={primary}>Publish to website</button>
+              </React.Fragment>;
+        })()}
         {f.id && <button type="button" onClick={() => { setF(blank()); setSlugTouched(false); setMsg(null); }} style={{ background: 'none', color: '#888', border: 'none', fontSize: 14, cursor: 'pointer' }}>Start another event</button>}
       </div>
 
@@ -139,6 +162,7 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
               <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, padding: '2px 9px', borderRadius: 20, color: ev.status === 'published' ? '#2e7d32' : '#6b7280', background: ev.status === 'published' ? '#e8f5e9' : '#f3f4f6' }}>{ev.status === 'published' ? 'Published' : ev.status === 'archived' ? 'Ended' : 'Draft'}</span>
+              <button type="button" onClick={() => editEvent(ev)} disabled={busy} style={{ background: '#fff', border: '1px solid ' + GOLD, color: GOLD, borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{f.id === ev.id ? 'Editing' : 'Edit'}</button>
               <button type="button" onClick={() => removeEvent(ev)} style={{ background: 'none', border: '1px solid #e3c4bd', color: '#b3402a', borderRadius: 8, padding: '3px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
             </div>
           </div>

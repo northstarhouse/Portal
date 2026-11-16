@@ -132,6 +132,40 @@ Deno.serve(async (req) => {
       return json({ events: rows })
     }
 
+    // One event, shaped like the Portal's edit form (Pacific date/times, description as plain text).
+    if (action === 'get') {
+      const id = String(body.id || '')
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'Event not found.' }, 404)
+      const rows = await rest(`site_events?id=eq.${id}&select=*&limit=1`)
+      const r = rows?.[0]
+      if (!r) return json({ error: 'Event not found.' }, 404)
+      const pac = (iso: string | null) => {
+        if (!iso) return { date: '', time: '' }
+        const p = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(iso))
+        const g = (k: string) => p.find((x) => x.type === k)?.value || ''
+        return { date: `${g('year')}-${g('month')}-${g('day')}`, time: `${g('hour')}:${g('minute')}` }
+      }
+      const s = pac(r.start_at), en = pac(r.end_at)
+      // deno-lint-ignore no-explicit-any
+      const textOf = (n: any): string => (n?.nodes || []).map((c: any) => (c.type === 'TEXT' ? c.textData?.text || '' : textOf(c))).join('')
+      // deno-lint-ignore no-explicit-any
+      const lines = ((r.description?.nodes || []) as any[]).flatMap((n) => n.type === 'BULLETED_LIST' || n.type === 'ORDERED_LIST'
+        // deno-lint-ignore no-explicit-any
+        ? (n.nodes || []).map((li: any) => '- ' + textOf(li)) : [textOf(n)])
+      const isPlaceholder = String(r.image_url || '') === PLACEHOLDER_IMAGE
+      return json({ event: {
+        id: r.id, slug: r.slug, title: r.title, status: r.status,
+        short_description: r.short_description || '', description: lines.join('\n').replace(/\n{3,}/g, '\n\n').trim(),
+        image_url: isPlaceholder ? '' : (r.image_url || ''), image_alt: isPlaceholder ? '' : (r.image_alt || ''),
+        date: s.date, start_time: s.time || '18:00', end_time: en.time, date_tbd: !!r.date_tbd,
+        location_name: r.location_name || '', location_address: r.location_address || '',
+        registration_type: r.registration_type === 'TICKETING' ? 'TICKETING' : 'NONE',
+        // deno-lint-ignore no-explicit-any
+        ticket_tiers: (Array.isArray(r.ticket_tiers) && r.ticket_tiers.length ? r.ticket_tiers : [{ name: 'General Admission', price: '', limit: '' }]).map((t: any) => ({ name: t.name || '', price: t.price != null ? String(t.price) : '', limit: t.limitPerCheckout != null ? String(t.limitPerCheckout) : '' })),
+        ticket_limit_per_order: String(r.ticket_limit_per_order || 20),
+      } })
+    }
+
     if (action === 'delete') {
       const id = String(body.id || '')
       if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'Event not found.' }, 404)
