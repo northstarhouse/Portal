@@ -451,7 +451,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif", marginBottom: 4 }}>{ev.name}</div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>{fmtDate(ev.date)}</div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0, marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <select className="input" style={{ appearance: 'auto', fontSize: 12 }} value={ev.status}
                 onChange={e => onUpdate(x => ({ ...x, status: e.target.value }))}>
@@ -556,7 +556,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             const when = w.date_tbd ? 'To be announced' : [ev.date ? fmtDate(ev.date) : '', ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : ''].filter(Boolean).join('  ·  ');
             const where = [w.location_name || ev.location, (w.spaces || []).length ? (w.spaces || []).join(', ') : ''].filter(Boolean).join(' — ');
             const tiers = (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim());
-            const tickets = rsvpOnly ? 'RSVP only (no ticket sales)' : (w.sells_tickets && tiers.length ? tiers.map(t => t.name + ' ' + (Number(t.price) > 0 ? '$' + t.price : 'free')).join('  |  ') : '');
+            const ticketRows = rsvpOnly ? [['Tickets', 'RSVP only (no ticket sales)']] : (w.sells_tickets && tiers.length ? tiers.map(t => [t.name, Number(t.price) > 0 ? '$' + t.price : 'free']) : [['Tickets', '']]);
             const volNeed = ev.vendors.filter(v => ['volunteer', 'activity'].includes(v.kind)).reduce((n, v) => n + (Number(v.target) || 0), 0) || (ev.volunteersNeeded === '' || ev.volunteersNeeded == null ? 0 : Number(ev.volunteersNeeded));
             const rows = [
               ['Date and time', when, true],
@@ -564,7 +564,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               ['Location', where],
               ['Event lead', ev.eventLead],
               ['Expected guests', ev.expectedAttendance || (ev.guestCount.invited ? String(ev.guestCount.invited) : '')],
-              ['Tickets', tickets],
+              ...ticketRows,
               ['Pricing', ev.pricing],
               ['Volunteers needed', volNeed ? String(volNeed) : ''],
               ['Website', ev.siteEventId ? 'Live on the website' : 'Not on the website yet'],
@@ -1224,7 +1224,7 @@ function ChecklistView({ ev, onUpdate }) {
         const subs = t.subtasks || [];
         const p = TASK_PRIORITY[t.priority];
         const hasMoney = t.estimated > 0 || t.actual > 0;
-        const meta = [t.assignee ? (t.assigneeId ? '@' : '') + t.assignee : '', t.due ? 'Due ' + fmtDateShort(t.due) : '', subs.length ? subs.filter(s => s.done).length + '/' + subs.length + ' subtasks' : '', hasMoney ? 'Est. ' + money(t.estimated) + ' · Act. ' + money(t.actual) : ''].filter(Boolean).join(' · ');
+        const meta = [t.assignee ? (t.assigneeId ? '@' : '') + t.assignee : '', t.due ? 'Due ' + fmtDateShort(t.due) : '', subs.length ? subs.filter(s => s.done).length + '/' + subs.length + ' subtasks' : '', hasMoney ? 'Est. ' + money(t.estimated) : ''].filter(Boolean).join(' · ');
         return (
           <div key={t.id} style={{ display: 'flex', gap: 10, padding: '9px 0', borderBottom: '0.5px solid var(--border-light)' }}>
             <CheckCircle checked={!!(!!t.done)} onChange={() => toggle(t.id)} />
@@ -1821,11 +1821,11 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
     const timeTxt = w0.date_tbd ? '' : (ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : '');
     const whereTxt = [w0.location_name || ev.location, (w0.spaces || []).length ? (w0.spaces || []).join(', ') : ''].filter(Boolean).join(' — ');
     const tierList = (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim());
-    const ticketTxt = w0.sells_tickets && tierList.length ? tierList.map(t => t.name + ' ' + (Number(t.price) > 0 ? '$' + t.price : 'free')).join('  |  ') : '';
+    const ticketRows = w0.sells_tickets && tierList.length ? tierList.map(t => [t.name, Number(t.price) > 0 ? '$' + t.price : 'Free']) : [];
     const detailRows = [
       ['Date', dateTxt], ['Time', timeTxt], ['Event type', ev.purpose], ['Event lead', ev.eventLead],
       ['Expected guests', ev.expectedAttendance || (ev.guestCount && ev.guestCount.invited ? String(ev.guestCount.invited) : '')],
-      ['Tickets', ticketTxt], ['Pricing', ev.pricing],
+      ...ticketRows, ['Pricing', ev.pricing],
     ].filter(r => r[1]);
     const detailsBox = box('Event details', detailRows.length
       ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + detailRows.map(r => '<tr><td width="110" style="vertical-align:baseline;padding:8px 10px 8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;color:#888888;">' + esc(r[0]) + '</td><td style="vertical-align:baseline;padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;color:#2a2a2a;">' + esc(r[1]) + '</td></tr>').join('') + '</table>'
@@ -2065,7 +2065,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
                     <span style={{ fontSize: 11, color: 'var(--gold)', marginLeft: 8 }}>
                       {subtasks.length > 0 ? `${subDone}/${subtasks.length} subtasks` : ''}
                       {subtasks.length > 0 && (hasMoney || hasNotes) ? ' · ' : ''}
-                      {hasMoney ? `Est. ${money(t.estimated)} · Act. ${money(t.actual)}` : ''}{hasMoney && hasNotes ? ' · ' : ''}{hasNotes ? 'notes' : ''}
+                      {hasMoney ? `Est. ${money(t.estimated)}` : ''}{hasMoney && hasNotes ? ' · ' : ''}{hasNotes ? 'notes' : ''}
                     </span>
                   )}
                 </button>
