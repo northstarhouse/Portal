@@ -26,6 +26,17 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
   const slugify = (v) => String(v || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
   const [events, setEvents] = React.useState(null);
   const set = (k, v) => setF((o) => ({ ...o, [k]: v }));
+  // B / I buttons: wrap the selected words in ** or * (click again to take it off).
+  const descRef = React.useRef(null);
+  const wrapSel = (mark) => {
+    const ta = descRef.current; if (!ta) return;
+    const a = ta.selectionStart, b = ta.selectionEnd, v = ta.value, n = mark.length;
+    if (a === b) { setMsg({ ok: false, text: 'Select the words you want to format first.' }); return; }
+    const sel = v.slice(a, b), wrapped = sel.length > 2 * n && sel.startsWith(mark) && sel.endsWith(mark);
+    const text = wrapped ? sel.slice(n, sel.length - n) : mark + sel + mark;
+    set('description', v.slice(0, a) + text + v.slice(b));
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(a, a + text.length); }, 0);
+  };
   const setTier = (i, k, v) => setF((o) => ({ ...o, ticket_tiers: o.ticket_tiers.map((t, j) => (j === i ? { ...t, [k]: v } : t)) }));
   const call = (body) => fetch(supabaseUrl + '/functions/v1/site-events-admin', {
     method: 'POST', headers: { apikey: supabaseKey, Authorization: 'Bearer ' + supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -81,7 +92,14 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
         <label style={label}>Title *<input style={input} value={f.title} onChange={(e) => { const v = e.target.value; setF((o) => ({ ...o, title: v, slug: slugTouched ? o.slug : slugify(v) })); }} placeholder="e.g. Holiday Open House" /></label>
         <label style={label}>Web address (the last part of the event's link)<input style={input} value={f.slug} onChange={(e) => { setSlugTouched(true); set('slug', slugify(e.target.value)); }} placeholder="holiday-open-house" /><span style={{ fontSize: 11, color: '#aaa' }}>Letters, numbers and dashes only. It fills in from the title unless you type your own.{f.id ? ' Changing it after the event is published breaks links people already have.' : ''}</span></label>
         <label style={label}>Short description (shown in lists and when shared)<input style={input} maxLength={300} value={f.short_description} onChange={(e) => set('short_description', e.target.value)} placeholder="One or two sentences" /></label>
-        <label style={label}>Full description<textarea style={{ ...input, minHeight: 130, resize: 'vertical' }} value={f.description} onChange={(e) => set('description', e.target.value)} placeholder={'Write it like an email. A blank line starts a new paragraph.\nStart a line with "- " to make a bullet list.'} /></label>
+        <div style={label}>Full description
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button type="button" title="Bold: select text, then click" onMouseDown={(e) => e.preventDefault()} onClick={() => wrapSel('**')} style={{ width: 30, height: 28, border: '0.5px solid #d9d0c0', borderRadius: 6, background: '#fff', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>B</button>
+            <button type="button" title="Italic: select text, then click" onMouseDown={(e) => e.preventDefault()} onClick={() => wrapSel('*')} style={{ width: 30, height: 28, border: '0.5px solid #d9d0c0', borderRadius: 6, background: '#fff', fontStyle: 'italic', cursor: 'pointer', fontFamily: 'inherit' }}>I</button>
+            <span style={{ fontSize: 11, color: '#aaa' }}>Select words, then click B or I (adds ** or * around them)</span>
+          </div>
+          <textarea ref={descRef} style={{ ...input, minHeight: 130, resize: 'vertical' }} value={f.description} onChange={(e) => set('description', e.target.value)} placeholder={'Write it like an email. A blank line starts a new paragraph.\nStart a line with "- " to make a bullet list.\nPut **two stars** around words for bold and *one star* for italics.'} />
+        </div>
         <div style={{ ...label, marginBottom: 0 }}>Photo
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {f.image_url ? <img src={f.image_url} alt="" style={{ width: 110, height: 74, objectFit: 'cover', borderRadius: 8, border: '0.5px solid #e0d8cc' }} /> : <img src="assets/event-placeholder.png" alt="" style={{ width: 110, height: 74, objectFit: 'cover', borderRadius: 8, border: '0.5px solid #e0d8cc', opacity: 0.85 }} />}

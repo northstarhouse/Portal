@@ -55,9 +55,32 @@ function pacificToUtc(date: string, time: string): string | null {
 }
 
 const rid = () => Math.random().toString(36).slice(2, 10)
+// **bold**, *italic* and ***both*** inside a line become formatted runs of text.
+function inlineNodes(text: string, bold = false) {
+  const out: unknown[] = []
+  const run = (t: string, b: boolean, i: boolean) => {
+    if (!t) return
+    const decorations: unknown[] = []
+    if (b) decorations.push({ type: 'BOLD', fontWeightValue: 700 })
+    if (i) decorations.push({ type: 'ITALIC', italicData: true })
+    out.push({ id: '', type: 'TEXT', nodes: [], textData: { text: t, decorations } })
+  }
+  let last = 0
+  const re = /\*\*\*([^*]+)\*\*\*|\*\*([^*]+)\*\*|\*([^*\s][^*]*)\*/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text))) {
+    run(text.slice(last, m.index), bold, false)
+    if (m[1] !== undefined) run(m[1], true, true)
+    else if (m[2] !== undefined) run(m[2], true, false)
+    else run(m[3], bold, true)
+    last = m.index + m[0].length
+  }
+  run(text.slice(last), bold, false)
+  return out
+}
 const para = (text: string, bold = false) => ({
   id: rid(), type: 'PARAGRAPH',
-  nodes: text ? [{ id: '', type: 'TEXT', nodes: [], textData: { text, decorations: bold ? [{ type: 'BOLD', fontWeightValue: 700 }] : [] } }] : [],
+  nodes: inlineNodes(text, bold),
   paragraphData: { textStyle: { textAlignment: 'AUTO' } },
 })
 // Plain text -> the website's rich-text document. A blank line starts a new paragraph; lines starting "- " become a bulleted list.
@@ -147,7 +170,16 @@ Deno.serve(async (req) => {
       }
       const s = pac(r.start_at), en = pac(r.end_at)
       // deno-lint-ignore no-explicit-any
-      const textOf = (n: any): string => (n?.nodes || []).map((c: any) => (c.type === 'TEXT' ? c.textData?.text || '' : textOf(c))).join('')
+      const textOf = (n: any): string => (n?.nodes || []).map((c: any) => {
+        if (c.type !== 'TEXT') return textOf(c)
+        const t = String(c.textData?.text || '')
+        const d = (c.textData?.decorations || []) as { type: string }[]
+        const b = d.some((x) => x.type === 'BOLD'), i = d.some((x) => x.type === 'ITALIC')
+        const core = t.trim()
+        if (!core || (!b && !i)) return t
+        const mark = b && i ? '***' : b ? '**' : '*'
+        return t.slice(0, t.indexOf(core)) + mark + core + mark + t.slice(t.indexOf(core) + core.length)
+      }).join('')
       // deno-lint-ignore no-explicit-any
       const lines = ((r.description?.nodes || []) as any[]).flatMap((n) => n.type === 'BULLETED_LIST' || n.type === 'ORDERED_LIST'
         // deno-lint-ignore no-explicit-any
