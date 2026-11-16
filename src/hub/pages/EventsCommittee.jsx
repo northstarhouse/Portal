@@ -1068,7 +1068,7 @@ function TimelineRow({ t, volunteers, onUpdate, isOpen, onToggle }) {
         <button type="button" onClick={onToggle} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{fmtTime12(t.time)}  ·  {t.activity}</div>
         </button>
-        <div style={{ width: 300, flexShrink: 0 }}><AssignVolunteers v={t} volunteers={volunteers} compact target={target} onPatch={patch} /></div>
+        <div style={{ width: 300, flexShrink: 0 }}>{t.noAssign ? <span style={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic' }}>No one needed</span> : <AssignVolunteers v={t} volunteers={volunteers} compact target={target} onPatch={patch} />}</div>
         <span style={{ color: 'var(--muted)', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>&rsaquo;</span>
       </div>
       {isOpen && (
@@ -1087,6 +1087,10 @@ function TimelineRow({ t, volunteers, onUpdate, isOpen, onToggle }) {
               <input className="input" type="number" min="0" defaultValue={t.target || ''} style={inp} onBlur={e => { const n = Number(e.target.value) || 0; if (n !== (Number(t.target) || 0)) patch({ target: n }); }} />
             </div>
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '0 0 12px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={!!t.noAssign} onChange={e => patch({ noAssign: e.target.checked })} style={{ accentColor: 'var(--gold)', width: 16, height: 16 }} />
+            No one needs to be assigned (just a moment in the day, like guests arriving)
+          </label>
           <button className="btn-ghost" style={{ fontSize: 12, color: '#a04545' }} onClick={() => { if (window.confirm('Remove "' + t.activity + '" from the timeline?')) onUpdate(e => ({ ...e, timeline: e.timeline.filter(x => x.id !== t.id) })); }}>Remove from the timeline</button>
         </div>
       )}
@@ -1622,13 +1626,13 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
       const base = { asap: 'As soon as possible', month: '1 month out', twoweeks: '2 weeks out', week: '1 week out', meeting: 'Meeting before event', dayof: 'Day of event' }[tm];
       const d = t.due && tm !== 'asap' && tm !== 'meeting' && tm !== 'dayof' ? fmtDateShort(t.due) : '';
       if (base) return base + (d ? ' (' + d + ')' : '');
-      return d ? 'Due ' + d : '';
+      return d;
     };
     const itemRow = (it) => {
       if (it.mk) return row(true, esc(it.c), '', null);
       if (it.tl) {
         const t = it.t; const who = whoOn(t, volunteers); const tg = Number(t.target) || 0;
-        const sub = (tg ? who.length + ' of ' + tg + ' assigned' : who.length ? who.length + ' assigned' : 'No one assigned yet') + (who.length ? ': ' + esc(who.map(w => w.name).join(', ')) : '');
+        const sub = t.noAssign ? '' : (tg ? who.length + ' of ' + tg + ' assigned' : who.length ? who.length + ' assigned' : 'No one assigned yet') + (who.length ? ': ' + esc(who.map(w => w.name).join(', ')) : '');
         return row(!!t.done, esc(fmtTime12(t.time)) + ' &middot; ' + esc(t.activity), sub, null);
       }
       if (it.need) {
@@ -1642,7 +1646,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
         return row(needHandled(v), esc(title), (sub || (found ? '' : 'Still needed')) + (cost ? (sub ? ' &nbsp;&middot;&nbsp; ' : '') + esc(cost) : ''), null, kind ? NEED_KINDS[kind] : '');
       }
       const t = it.t;
-      const sub = [t.assignee ? esc(t.assignee) : '', esc(whenText(t))].filter(Boolean).join(' &nbsp;&middot;&nbsp; ');
+      const sub = [t.assignee ? esc(t.assignee) : 'No one assigned yet', t.done ? 'Done' : esc(whenText(t))].filter(Boolean).join(' &nbsp;&middot;&nbsp; ');
       return row(!!t.done, esc(t.text), sub, t.priority ? TASK_PRIORITY[t.priority].color : null);
     };
     const total = catGroups.reduce((n, g) => n + g.items.length, 0);
@@ -1891,7 +1895,8 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                   {CHECKLIST_CATEGORIES.filter(c => c !== 'General').map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <DutyWho t={t} volunteers={volunteers} onPatch={pt => patchDutyPeople(t, pt)} />
-                {!((t.timing === 'before' || (!t.timing && t.due)) && t.due) && <select className="input" value={t.timing || (t.due ? 'before' : '')} style={{ width: 152, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}
+                {t.done && <span style={{ width: 152, flexShrink: 0, fontSize: 12, fontWeight: 600, color: '#2e7d32', paddingLeft: 8 }}>Done</span>}
+                {!t.done && !((t.timing === 'before' || (!t.timing && t.due)) && t.due) && <select className="input" value={t.timing || (t.due ? 'before' : '')} style={{ width: 152, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}
                   onChange={e => { const v = e.target.value; patchItem(t.id, { timing: v, due: v === 'before' ? (t.timing === 'dayof' ? '' : (t.due || '')) : dueForTiming(v, ev.date) }); }}>
                   <option value="">When?</option>
                   <option value="asap">As soon as possible</option>
@@ -1902,7 +1907,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
                   <option value="dayof">Day of event</option>
                   <option value="before">Pick a date</option>
                 </select>}
-                {(t.timing || (t.due ? 'before' : '')) === 'before' && <input className="input" type="date" value={t.due || ''} title="Clear the date to pick a different timing" onChange={e => patchItem(t.id, { due: e.target.value })} style={{ width: 152, flexShrink: 0, fontSize: 12, padding: '5px 8px' }} />}
+                {!t.done && (t.timing || (t.due ? 'before' : '')) === 'before' && <input className="input" type="date" value={t.due || ''} title="Clear the date to pick a different timing" onChange={e => patchItem(t.id, { due: e.target.value })} style={{ width: 152, flexShrink: 0, fontSize: 12, padding: '5px 8px' }} />}
               </ItemRow>
               {isOpen && (
                 <div style={{ padding: '10px 0 14px 33px' }}>
