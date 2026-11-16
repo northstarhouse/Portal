@@ -1828,12 +1828,12 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
       ...ticketRows, ['Pricing', ev.pricing],
     ].filter(r => r[1]);
     const detailsBox = box('Event Details', detailRows.length
-      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + detailRows.map(r => '<tr><td width="122" style="vertical-align:baseline;padding:8px 10px 8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;color:#888888;">' + esc(r[0]) + '</td><td style="vertical-align:baseline;padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45;color:#2a2a2a;">' + esc(r[1]) + '</td></tr>').join('') + '</table>'
+      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + detailRows.map(r => '<tr><td width="150" style="vertical-align:baseline;padding:8px 10px 8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;line-height:1.35;color:#2a2a2a;">' + esc(r[0]) + ':</td><td style="vertical-align:baseline;padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.45;color:#888888;">' + esc(r[1]) + '</td></tr>').join('') + '</table>'
       : '<div style="font-size:13px;color:#888888;">Event details have not been filled in yet.</div>', 'event');
     // Volunteers confirmed: everyone assigned anywhere on the checklist, with what they are on
     const peopleNames = assignedPeople(ev, volunteers, attendExtra).map(x => x.name);
     const volsBox = box('Day Of Volunteers', peopleNames.length
-      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + peopleNames.map(n => '<tr><td valign="top" style="padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45;color:#2a2a2a;">' + esc(n) + '</td></tr>').join('') + '</table>'
+      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + peopleNames.map(n => '<tr><td valign="top" style="padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.45;color:#888888;">' + esc(n) + '</td></tr>').join('') + '</table>'
       : '<div style="font-size:13px;color:#888888;">No volunteers assigned yet.</div>', 'volunteers');
     const w = ev.website || {};
     const when = w.date_tbd ? 'Date to be announced' : [ev.date ? fmtDate(ev.date) : '', ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : ''].filter(Boolean).join('  ·  ');
