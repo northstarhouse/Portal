@@ -386,6 +386,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
   // RSVP events have no ticket sales, so that box reads N/A.
   const [rsvpOnly, setRsvpOnly] = useState(false);
   const [basicsOpen, setBasicsOpen] = useState(false);
+  const [emailTick, setEmailTick] = useState(0);
   useEffect(() => { let live = true; setRsvpOnly(false); fetchEventCardMeta(ev.name).then(m => { if (live) setRsvpOnly(!!(m && m.rsvp_only)); }).catch(() => {}); return () => { live = false; }; }, [ev.name]);
   const [financials, setFinancials] = useState(null);
   const [flyerUrl, setFlyerUrl] = useState(null);
@@ -450,7 +451,8 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif", marginBottom: 4 }}>{ev.name}</div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>{fmtDate(ev.date)}</div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <select className="input" style={{ appearance: 'auto', fontSize: 12 }} value={ev.status}
                 onChange={e => onUpdate(x => ({ ...x, status: e.target.value }))}>
                 <option value="planning">Planning</option>
@@ -461,6 +463,8 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               </select>
               <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setBasicsOpen(v => !v)}>{basicsOpen ? 'Close' : 'Edit'}</button>
               {onDelete && <button className="btn-ghost" style={{ fontSize: 12, color: '#a04545' }} onClick={onDelete}>Delete</button>}
+            </div>
+            <button className="btn-gold" style={{ fontSize: 12, padding: '8px 14px' }} onClick={() => { setExpandedSection('checklist'); setEmailTick(n => n + 1); }}>✉ Email update to committee</button>
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -597,7 +601,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                 <div style={{ padding: '4px 16px 18px' }}>
                   {s.key === 'preplanning' && <PreplanningTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} onRsvpChange={setRsvpOnly} />}
                   {s.key === 'attendance' && <AttendanceTab ev={ev} volunteers={volunteers} />}
-                  {s.key === 'checklist' && <ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} showMarketing={!marketingNA} />}
+                  {s.key === 'checklist' && <ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} showMarketing={!marketingNA} emailTick={emailTick} />}
                   {s.key === 'budget' && <FinancialsTab ev={ev} />}
                   {s.key === 'dayof' && <SheetToggle view={<DayOfView ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}><DayOfTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} /></SheetToggle>}
                   {s.key === 'after' && (
@@ -1061,7 +1065,9 @@ function assignedPeople(ev, volunteers, extra) {
   };
   // Events Committee members come first.
   roster.filter(v => matchVolunteerAreas(v.Team).includes('Events')).forEach(v => { add('v' + v.id, volFullName(v), v['Phone Number'], 'Events Committee'); out.get('v' + v.id).committee = true; });
-  ev.checklist.forEach(t => scan(dutyPeople(t), t.text));
+  // Only things that happen at the event count as being in attendance: Day-Of items, volunteer roles, and duties set to the day of the event.
+  // Someone who only has work to do ahead of time (decorating the week before, a license, a phone call) is not listed.
+  ev.checklist.filter(t => t.timing === 'dayof').forEach(t => scan(dutyPeople(t), t.text));
   ev.timeline.filter(t => !t.noAssign).forEach(t => scan(t, fmtTime12(t.time) + ' ' + t.activity));
   ev.vendors.filter(v => ['volunteer', 'activity'].includes(v.kind)).forEach(v => scan(v, needTitle(v)));
   if (extra) scan({ assignedIds: extra.assignedIds || [], people: extra.people || [], phones: extra.phones || {} }, '', true);
@@ -1543,7 +1549,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
 
 // The event's task checklist: add items with a priority, due date and assignee; click one to edit it, add subtasks,
 // or attach estimated/actual $ and notes.
-function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
+function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailTick }) {
   // The Marketing channel boxes live with the Marketing section; they are shown (and can be ticked) here too.
   const [mkData, setMkData] = useState(null);
   useEffect(() => {
@@ -1716,11 +1722,18 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
 
   // ---- Email the checklist to the committee: a finished, read-only copy of what is on screen.
   const [emailOpen, setEmailOpen] = useState(false);
+  const emailRef = useRef(null);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailNote, setEmailNote] = useState('');
   const [emailPreview, setEmailPreview] = useState(false);
   const [emailMsg, setEmailMsg] = useState(null);
   const [emailBusy, setEmailBusy] = useState(false);
+  useEffect(() => {
+    if (!emailTick) return;
+    setEmailOpen(true); setEmailSubject(sub => sub || 'Checklist: ' + ev.name); setEmailMsg(null);
+    const t = setTimeout(() => { if (emailRef.current) emailRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 200);
+    return () => clearTimeout(t);
+  }, [emailTick]);
   const committee = (volunteers || []).filter(v => matchVolunteerAreas(v.Team).includes('Events'));
   const committeeWithEmail = committee.filter(v => v.Email && String(v.Email).includes('@'));
 
@@ -1978,10 +1991,10 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
         )}
         {attachedMsg && <div style={{ fontSize: 12, color: '#2e7d32', marginBottom: 10 }}>{attachedMsg}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0 0 10px' }}>
-          <button type="button" className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => { if (!emailSubject) setEmailSubject('Checklist: ' + ev.name); setEmailOpen(o => !o); setEmailMsg(null); }}>{emailOpen ? 'Close email' : '✉ Email to committee'}</button>
+          <button type="button" className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => { if (!emailSubject) setEmailSubject('Checklist: ' + ev.name); setEmailOpen(o => !o); setEmailMsg(null); }}>{emailOpen ? 'Close email' : '✉ Email update to committee'}</button>
         </div>
         {emailOpen && (
-          <div style={{ border: '0.5px solid var(--border-light)', borderRadius: 10, padding: '14px 16px', marginBottom: 18, background: '#faf8f4' }}>
+          <div ref={emailRef} style={{ border: '0.5px solid var(--border-light)', borderRadius: 10, padding: '14px 16px', marginBottom: 18, background: '#faf8f4' }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Email this checklist</div>
             <div className="label">Subject</div>
             <input className="input" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} style={{ marginBottom: 10 }} />
@@ -1994,7 +2007,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <button type="button" className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setEmailPreview(p => !p)}>{emailPreview ? 'Hide preview' : 'Preview'}</button>
               <button type="button" className="btn-ghost" style={{ fontSize: 12 }} disabled={emailBusy || !(volunteer && volunteer.Email)} onClick={() => sendEmail([volunteer.Email], 'me')} title={volunteer && volunteer.Email ? 'Sends only to ' + volunteer.Email : 'No email on your volunteer record'}>Send a test to me</button>
-              <button type="button" className="btn-gold" style={{ fontSize: 12 }} disabled={emailBusy || !committeeWithEmail.length} onClick={() => sendEmail(committeeWithEmail.map(v => v.Email), 'committee')}>{emailBusy ? 'Sending…' : 'Email to committee'}</button>
+              <button type="button" className="btn-gold" style={{ fontSize: 12 }} disabled={emailBusy || !committeeWithEmail.length} onClick={() => sendEmail(committeeWithEmail.map(v => v.Email), 'committee')}>{emailBusy ? 'Sending…' : 'Email update to committee'}</button>
               {emailMsg && <span style={{ fontSize: 12, color: emailMsg.ok ? '#2e7d32' : '#b3261e' }}>{emailMsg.text}</span>}
             </div>
             {emailPreview && <iframe title="Email preview" srcDoc={buildEmailHtml()} style={{ width: '100%', height: 560, border: '0.5px solid var(--border)', borderRadius: 8, marginTop: 12, background: '#fff' }} />}
