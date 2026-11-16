@@ -1063,14 +1063,14 @@ function assignedPeople(ev, volunteers, extra) {
     (t.assignedIds || []).forEach(id => { const x = roster.find(r => String(r.id) === String(id)); if (x) add('v' + x.id, volFullName(x), (t.phones || {})[x.id] || x['Phone Number'], label, byHand ? { kind: 'id', id: x.id } : null); });
     (t.people || []).forEach(pp => { const n = String(pp.name || '').trim(); if (n) add('n' + n.toLowerCase(), n, pp.phone, label, byHand ? { kind: 'person', id: pp.id } : null); });
   };
-  // Events Committee members come first.
-  roster.filter(v => matchVolunteerAreas(v.Team).includes('Events')).forEach(v => { add('v' + v.id, volFullName(v), v['Phone Number'], 'Events Committee'); out.get('v' + v.id).committee = true; });
   // Only things that happen at the event count as being in attendance: Day-Of items, volunteer roles, and duties set to the day of the event.
   // Someone who only has work to do ahead of time (decorating the week before, a license, a phone call) is not listed.
   ev.checklist.filter(t => t.timing === 'dayof').forEach(t => scan(dutyPeople(t), t.text));
   ev.timeline.filter(t => !t.noAssign).forEach(t => scan(t, fmtTime12(t.time) + ' ' + t.activity));
   ev.vendors.filter(v => ['volunteer', 'activity'].includes(v.kind)).forEach(v => scan(v, needTitle(v)));
   if (extra) scan({ assignedIds: extra.assignedIds || [], people: extra.people || [], phones: extra.phones || {} }, '', true);
+  // Committee members who are on the list sort to the top; nobody is added just for being on the committee.
+  out.forEach(e => { const v = e.key.startsWith('v') ? roster.find(r => 'v' + r.id === e.key) : null; if (v && matchVolunteerAreas(v.Team).includes('Events')) e.committee = true; });
   return [...out.values()].sort((a, b) => (b.committee ? 1 : 0) - (a.committee ? 1 : 0) || a.name.localeCompare(b.name));
 }
 
@@ -1829,7 +1829,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailTick }) {
       : '<div style="font-size:13px;color:#888888;">Event details have not been filled in yet.</div>');
     // Volunteers confirmed: everyone assigned anywhere on the checklist, with what they are on
     const peopleNames = assignedPeople(ev, volunteers, attendExtra).map(x => x.name);
-    const volsBox = box('Volunteers confirmed to be in attendance', peopleNames.length
+    const volsBox = box('Confirmed Day-Of Attendance', peopleNames.length
       ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + peopleNames.map(n => '<tr><td valign="top" style="padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;color:#2a2a2a;">' + esc(n) + '</td></tr>').join('') + '</table>'
       : '<div style="font-size:13px;color:#888888;">No volunteers assigned yet.</div>');
     const w = ev.website || {};
