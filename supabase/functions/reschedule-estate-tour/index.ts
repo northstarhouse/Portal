@@ -108,19 +108,15 @@ function tourGuideFor(date: string, guideName?: string | null) {
   return Number.isNaN(d.getTime()) ? '' : DEFAULT_GUIDES_BY_WEEKDAY[d.getDay()] || ''
 }
 
-// Tour emails come from venue@northstarhouse.org (replies go to the venue inbox) and are copied to media@.
-// If Resend refuses that sender, the email goes from info@ instead so it is never lost.
+// Tour emails come from venue@northstarhouse.org, replies go to the venue inbox, and media@ and venue@ are both copied (bcc).
 async function sendMail(to: string, subject: string, text: string, html: string) {
   const send = (from: string) => fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to: [to], reply_to: 'venue@thenorthstarhouse.org', bcc: ['media@thenorthstarhouse.org'], subject, text, html }),
+    body: JSON.stringify({ from, to: [to], reply_to: 'venue@thenorthstarhouse.org', bcc: ['media@thenorthstarhouse.org', 'venue@thenorthstarhouse.org'], subject, text, html }),
   })
-  let res = await send('Estate Tours · North Star House <venue@northstarhouse.org>')
-  if (!res.ok) {
-    console.error('tour email: venue@ sender rejected, falling back to info@', res.status)
-    res = await send('Estate Tours · North Star House <info@northstarhouse.org>')
-  }
+  const res = await send('Estate Tours · North Star House <venue@northstarhouse.org>')
+  if (!res.ok) console.error('tour email: send failed', res.status)
   return res.ok
 }
 

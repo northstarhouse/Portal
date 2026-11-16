@@ -103,7 +103,7 @@ async function sendMail(to: string, subject: string, text: string, html: string)
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: 'Estate Tours · North Star House <info@northstarhouse.org>', to: [to], bcc: ['media@thenorthstarhouse.org'], subject, text, html }),
+    body: JSON.stringify({ from: 'Estate Tours · North Star House <venue@northstarhouse.org>', to: [to], reply_to: 'venue@thenorthstarhouse.org', bcc: ['media@thenorthstarhouse.org', 'venue@thenorthstarhouse.org'], subject, text, html }),
   })
   return res.ok
 }
