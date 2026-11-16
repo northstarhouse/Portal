@@ -760,6 +760,12 @@ export async function fetchMyReimbursements(authUserId) {
   return Array.isArray(rows) ? rows : [];
 }
 
+// Treasurer's view: every reimbursement request from every volunteer (drafts are the volunteer's own).
+export async function fetchAllReimbursements() {
+  const rows = await get('Op%20Budget?or=(needs_reimbursement.eq.true,volunteer_auth_user_id.not.is.null)&select=*&order=date.desc,id.desc&limit=1000');
+  return (Array.isArray(rows) ? rows : []).filter(r => r.status !== 'Draft' && r.type !== 'In-Kind');
+}
+
 export async function insertReimbursement(payload) {
   const rows = await post('Op%20Budget', payload);
   if (rows && rows.code) return { error: rows.message || rows.code };
