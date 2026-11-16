@@ -1749,8 +1749,8 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
     const row = (done, titleHtml, subHtml, accent, badge, marker) =>
       '<tr><td bgcolor="#ffffff" style="padding:0;background:#ffffff;border-bottom:1px solid #ede8df;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border-left:4px solid ' + (accent || '#ffffff') + ';"><tr>'
       + '<td width="44" valign="top" style="padding:13px 0 13px 12px;">' + (marker || circle(done)) + '</td>'
-      + '<td valign="top" style="padding:11px 8px 11px 0;"><div style="font-size:15px;font-weight:bold;color:#2a2a2a;line-height:1.35;">' + titleHtml + '</div>'
-      + (subHtml ? '<div style="font-size:12.5px;color:#888888;margin-top:2px;line-height:1.45;">' + subHtml + '</div>' : '') + '</td>'
+      + '<td valign="top" style="padding:11px 8px 11px 0;"><div style="font-size:14px;font-weight:bold;color:#2a2a2a;line-height:1.35;">' + titleHtml + '</div>'
+      + (subHtml ? '<div style="font-size:12px;color:#888888;margin-top:2px;line-height:1.45;">' + subHtml + '</div>' : '') + '</td>'
       + (badge ? '<td valign="top" align="right" style="padding:12px 12px 0 0;white-space:nowrap;"><span style="display:inline-block;background:#f0ebe2;color:#2a2a2a;font-size:11px;padding:2px 9px;border-radius:12px;">' + esc(badge) + '</span></td>' : '')
       + '</tr></table></td></tr>';
     const whenText = (t) => {
@@ -1790,7 +1790,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
     const budgetStats = () => {
       if (!fin) return '';
       const net = fin.totalEarnings - fin.totalExpenses;
-      const stat = (label, amount, color) => '<tr><td style="padding:10px 0;border-bottom:1px solid #ede8df;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;color:#2a2a2a;">' + label + '</td><td align="right" style="padding:10px 0;border-bottom:1px solid #ede8df;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;color:' + color + ';white-space:nowrap;">' + esc(label === 'Budget' ? budgetText(budgetAmount) : money(amount)) + '</td></tr>';
+      const stat = (label, amount, color) => '<tr><td style="padding:10px 0;border-bottom:1px solid #ede8df;font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:bold;color:#2a2a2a;">' + label + '</td><td align="right" style="padding:10px 0;border-bottom:1px solid #ede8df;font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:bold;color:' + color + ';white-space:nowrap;">' + esc(label === 'Budget' ? budgetText(budgetAmount) : money(amount)) + '</td></tr>';
       return '<tr><td bgcolor="#ffffff" style="padding:6px 16px 4px 16px;background:#ffffff;"><div style="font-size:11px;color:#888888;padding:4px 0 2px;">As of ' + esc(fmtDate(todayStr())) + '</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
         + stat('Budget', null, '#2a2a2a') + stat('Earnings', fin.totalEarnings, '#4a5d3a') + stat('Expenses', fin.totalExpenses, '#8a4a2e') + stat('Net', net, net >= 0 ? '#4a5d3a' : '#8a4a2e') + '</table></td></tr>';
     };
@@ -1828,7 +1828,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
       ...ticketRows, ['Pricing', ev.pricing],
     ].filter(r => r[1]);
     const detailsBox = box('Event Details', detailRows.length
-      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + detailRows.map(r => '<tr><td width="150" style="vertical-align:baseline;padding:8px 10px 8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;line-height:1.35;color:#2a2a2a;">' + esc(r[0]) + ':</td><td style="vertical-align:baseline;padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.45;color:#888888;">' + esc(r[1]) + '</td></tr>').join('') + '</table>'
+      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + detailRows.map(r => '<tr><td width="128" style="vertical-align:baseline;padding:7px 8px 7px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:bold;line-height:1.4;color:#2a2a2a;">' + esc(r[0]) + ':</td><td style="vertical-align:baseline;padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.45;color:#888888;">' + esc(r[1]) + '</td></tr>').join('') + '</table>'
       : '<div style="font-size:13px;color:#888888;">Event details have not been filled in yet.</div>', 'event');
     // Volunteers confirmed: everyone assigned anywhere on the checklist, with what they are on
     const peopleNames = assignedPeople(ev, volunteers, attendExtra).map(x => x.name);
