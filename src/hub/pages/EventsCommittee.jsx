@@ -1614,9 +1614,10 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     const circle = (done) => (done
       ? '<span style="display:inline-block;width:18px;height:18px;line-height:18px;border-radius:50%;background:' + GOLD + ';color:#ffffff;font-size:11px;text-align:center;">&#10003;</span>'
       : '<span style="display:inline-block;width:15px;height:15px;border-radius:50%;border:1.5px solid #d8cfc0;"></span>');
-    const row = (done, titleHtml, subHtml, accent, badge) =>
+    const star = '<span style="display:inline-block;width:18px;text-align:center;font-size:19px;line-height:18px;color:' + GOLD + ';">&#9733;</span>';
+    const row = (done, titleHtml, subHtml, accent, badge, marker) =>
       '<tr><td bgcolor="#ffffff" style="padding:0;background:#ffffff;border-bottom:1px solid #ede8df;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border-left:4px solid ' + (accent || '#ffffff') + ';"><tr>'
-      + '<td width="44" valign="top" style="padding:13px 0 13px 12px;">' + circle(done) + '</td>'
+      + '<td width="44" valign="top" style="padding:13px 0 13px 12px;">' + (marker || circle(done)) + '</td>'
       + '<td valign="top" style="padding:11px 8px 11px 0;"><div style="font-size:15px;font-weight:bold;color:#2a2a2a;line-height:1.35;">' + titleHtml + '</div>'
       + (subHtml ? '<div style="font-size:12.5px;color:#888888;margin-top:2px;line-height:1.45;">' + subHtml + '</div>' : '') + '</td>'
       + (badge ? '<td valign="top" align="right" style="padding:12px 12px 0 0;white-space:nowrap;"><span style="display:inline-block;background:#f0ebe2;color:#2a2a2a;font-size:11px;padding:2px 9px;border-radius:12px;">' + esc(badge) + '</span></td>' : '')
@@ -1633,7 +1634,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
       if (it.tl) {
         const t = it.t; const who = whoOn(t, volunteers); const tg = Number(t.target) || 0;
         const sub = t.noAssign ? '' : (tg ? who.length + ' of ' + tg + ' assigned' : who.length ? who.length + ' assigned' : 'No one assigned yet') + (who.length ? ': ' + esc(who.map(w => w.name).join(', ')) : '');
-        return row(!!t.done, esc(fmtTime12(t.time)) + ' &middot; ' + esc(t.activity), sub, null);
+        return row(!!t.done, esc(fmtTime12(t.time)) + ' &middot; ' + esc(t.activity), sub, null, '', star);
       }
       if (it.need) {
         const v = it.v; const kind = v.kind || ''; const who = whoOn(v, volunteers); const tg = Number(v.target) || 0;
