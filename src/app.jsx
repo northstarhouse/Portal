@@ -21986,7 +21986,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
     var vals = Object.keys(answers).filter(function(k) { return k.indexOf('__') !== 0; }).map(function(k) { var v = answers[k]; return typeof v === 'string' || typeof v === 'number' ? String(v) : ''; });
     return [sub.form_name, sub.name, sub.email, sub.phone, sub.visitor_name, sub.visitor_email, sub.visitor_phone, t && t.visitor_name, t && t.visitor_email, t && t.guide_name].concat(vals).filter(Boolean).join(' ').toLowerCase();
   }
-  var shownInquiryRows = displayRows.filter(function(sub) {
+  var shownInquiryRows = (displayRows || []).filter(function(sub) {
     if (!clientsOnly && tourFilter !== 'all' && tourStateKey(sub) !== tourFilter) return false;
     if (!searchWords.length) return true;
     var hay = inquiryHaystack(sub);
