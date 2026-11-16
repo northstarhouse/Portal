@@ -999,6 +999,7 @@ function NeedsList({ ev, onUpdate, volunteers }) {
   );
 }
 
+const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 function dutyPeople(t) {
   return {
     assignedIds: t.assignedIds || (t.assigneeId ? [t.assigneeId] : []),
@@ -1474,6 +1475,8 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     return () => { live = false; };
   }, [ev.id]);
   // The Budget line: live numbers from the budget tracking, and a tick for "budget is done" (saved with the finance planning area).
+  const [flyerUrl, setFlyerUrl] = useState(null);
+  useEffect(() => { let live = true; fetchEventCardImage(ev.name).then(u => { if (live) setFlyerUrl(u || null); }).catch(() => {}); return () => { live = false; }; }, [ev.name]);
   const [fin, setFin] = useState(null);
   const [budgetDone, setBudgetDone] = useState(false);
   useEffect(() => {
@@ -1624,11 +1627,10 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     ...ev.checklist.map(t => ({ need: false, t, cat: checkCat(t.category) })),
     ...ev.vendors.map(v => ({ need: true, v, cat: needCategory(v) })),
     ...ev.timeline.map(t => ({ tl: true, t, cat: DAYOF_CAT })),
-    ...(fin ? [{ budget: true, cat: 'Budget' }] : []),
     ...(showMarketing && mkData ? MARKETING_CHANNELS.filter(c => (mkData[c] || {}).done).map(c => ({ mk: true, c, cat: 'Marketing' })) : []),
   ];
   const isDone = (i) => (i.budget ? budgetDone : i.mk ? !!(mkData[i.c] || {}).done : i.need ? needHandled(i.v) : !!i.t.done);
-  const catGroups = [...CHECKLIST_CATEGORIES.filter(c => c !== 'Marketing' && c !== 'Volunteers & vendors'), 'Budget', 'Marketing', 'Volunteers & vendors', DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : c === 'General' || c === 'Hospitality' ? (x, y) => (isDone(x) ? 1 : 0) - (isDone(y) ? 1 : 0) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
+  const catGroups = [...CHECKLIST_CATEGORIES.filter(c => c !== 'Marketing' && c !== 'Volunteers & vendors'), 'Marketing', 'Volunteers & vendors', DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : c === 'General' || c === 'Hospitality' ? (x, y) => (isDone(x) ? 1 : 0) - (isDone(y) ? 1 : 0) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length || (g.cat === 'Money' && !!fin));
   const shownGroups = catGroups.filter(g => catFilter === 'All' || catFilter === g.cat);
 
   // ---- Email the checklist to the committee: a finished, read-only copy of what is on screen.
@@ -1663,7 +1665,6 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
       return d;
     };
     const itemRow = (it) => {
-      if (it.budget) return row(budgetDone, 'Budget', 'Earnings ' + esc(money(fin.totalEarnings)) + ' &nbsp;&middot;&nbsp; Expenses ' + esc(money(fin.totalExpenses)) + ' &nbsp;&middot;&nbsp; Net ' + esc(money(fin.totalEarnings - fin.totalExpenses)), null);
       if (it.mk) return row(true, esc(it.c), '', null);
       if (it.tl) {
         const t = it.t; const who = whoOn(t, volunteers); const tg = Number(t.target) || 0;
@@ -1689,6 +1690,14 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     const ICON_BASE = 'https://northstarhouse.github.io/Portal/assets/icons/cat-';
     const ICON_KEY = { General: 'general', Logistics: 'logistics', Hospitality: 'hospitality', Sponsorship: 'sponsorship', Interiors: 'interiors', Marketing: 'marketing', Money: 'money', 'Volunteers & vendors': 'volunteers', Budget: 'money', [DAYOF_CAT]: 'dayof' };
     // The budget's own lines: what comes in (website tickets and logged earnings) and what has been spent.
+    // Earnings, expenses and net as of today, each on its own line.
+    const budgetStats = () => {
+      if (!fin) return '';
+      const net = fin.totalEarnings - fin.totalExpenses;
+      const stat = (label, amount, color) => '<tr><td style="padding:10px 0;border-bottom:1px solid #ede8df;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;color:#2a2a2a;">' + label + '</td><td align="right" style="padding:10px 0;border-bottom:1px solid #ede8df;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;color:' + color + ';white-space:nowrap;">' + esc(money(amount)) + '</td></tr>';
+      return '<tr><td bgcolor="#ffffff" style="padding:6px 16px 4px 16px;background:#ffffff;"><div style="font-size:11px;color:#888888;padding:4px 0 2px;">Budget as of ' + esc(fmtDate(todayStr())) + '</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+        + stat('Earnings', fin.totalEarnings, '#4a5d3a') + stat('Expenses', fin.totalExpenses, '#8a4a2e') + stat('Net', net, net >= 0 ? '#4a5d3a' : '#8a4a2e') + '</table></td></tr>';
+    };
     const budgetDetail = () => {
       if (!fin) return '';
       const line = (label, amount, color, strong) => '<tr><td style="padding:6px 8px 6px 0;border-bottom:1px solid #f3ecdf;font-size:13px;color:#2a2a2a;' + (strong ? 'font-weight:bold;' : '') + '">' + esc(label) + '</td><td align="right" style="padding:6px 0;border-bottom:1px solid #f3ecdf;font-size:13px;font-weight:bold;color:' + color + ';white-space:nowrap;">' + esc(money(amount)) + '</td></tr>';
@@ -1704,24 +1713,25 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     };
     const groupsHtml = catGroups.map(g => {
       const d = g.items.filter(isDone).length;
-      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border:1px solid #efe6d5;border-collapse:separate;"><tr><td style="padding:14px 16px 8px;border-bottom:1.5px solid #e8dfd0;">' + (ICON_KEY[g.cat] ? '<img src="' + ICON_BASE + ICON_KEY[g.cat] + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + esc(g.cat) + '</span>'
-        + (g.cat !== 'Marketing' ? '<span style="font-size:12px;color:#888888;margin-left:10px;">' + (d === g.items.length ? 'all figured out &#10003;' : d + ' of ' + g.items.length + ' done') + '</span>' : '') + '</td></tr>'
-        + g.items.map(itemRow).join('') + (g.cat === 'Budget' ? budgetDetail() : '') + '</table>';
+      return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border:1px solid #cdb78e;border-collapse:separate;"><tr><td style="padding:14px 16px 8px;border-bottom:1px solid #cdb78e;">' + (ICON_KEY[g.cat] ? '<img src="' + ICON_BASE + ICON_KEY[g.cat] + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + esc(g.cat) + '</span>'
+        + (g.cat !== 'Marketing' && g.items.length > 0 ? '<span style="font-size:12px;color:#888888;margin-left:10px;">' + (d === g.items.length ? 'all figured out &#10003;' : d + ' of ' + g.items.length + ' done') + '</span>' : '') + '</td></tr>'
+        + g.items.map(itemRow).join('') + (g.cat === 'Money' ? budgetStats() + budgetDetail() : '') + '</table>';
     }).join('');
     const w0 = ev.website || {};
-    const box = (title, inner) => '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;border:1px solid #efe6d5;border-collapse:separate;background:#ffffff;"><tr><td style="padding:16px 18px;"><div style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;margin-bottom:10px;">' + title + '</div>' + inner + '</td></tr></table>';
+    const box = (title, inner) => '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;border:1px solid #efe6d5;border-collapse:separate;background:#ffffff;"><tr><td style="padding:16px 18px;"><div style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;margin-bottom:10px;line-height:1.4;">' + title + '</div>' + inner + '</td></tr></table>';
     // Event details: what Event Basics holds
-    const whenTxt = w0.date_tbd ? 'To be announced' : [ev.date ? fmtDate(ev.date) : '', ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : ''].filter(Boolean).join('  ·  ');
+    const dateTxt = w0.date_tbd ? 'To be announced' : (ev.date ? fmtDate(ev.date) : '');
+    const timeTxt = w0.date_tbd ? '' : (ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : '');
     const whereTxt = [w0.location_name || ev.location, (w0.spaces || []).length ? (w0.spaces || []).join(', ') : ''].filter(Boolean).join(' — ');
     const tierList = (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim());
     const ticketTxt = w0.sells_tickets && tierList.length ? tierList.map(t => t.name + ' ' + (Number(t.price) > 0 ? '$' + t.price : 'free')).join('  |  ') : '';
     const detailRows = [
-      ['Date and time', whenTxt], ['Event type', ev.purpose], ['Location', whereTxt], ['Event lead', ev.eventLead],
+      ['Date', dateTxt], ['Time', timeTxt], ['Event type', ev.purpose], ['Event lead', ev.eventLead],
       ['Expected guests', ev.expectedAttendance || (ev.guestCount && ev.guestCount.invited ? String(ev.guestCount.invited) : '')],
       ['Tickets', ticketTxt], ['Pricing', ev.pricing],
     ].filter(r => r[1]);
     const detailsBox = box('Event details', detailRows.length
-      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + detailRows.map(r => '<tr><td valign="top" width="110" style="padding:8px 10px 8px 0;border-bottom:1px solid #f3ecdf;font-size:12px;color:#888888;">' + esc(r[0]) + '</td><td valign="top" style="padding:8px 0;border-bottom:1px solid #f3ecdf;font-size:14px;color:#2a2a2a;line-height:1.45;">' + esc(r[1]) + '</td></tr>').join('') + '</table>'
+      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + detailRows.map(r => '<tr><td width="110" style="vertical-align:baseline;padding:8px 10px 8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;color:#888888;">' + esc(r[0]) + '</td><td style="vertical-align:baseline;padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;color:#2a2a2a;">' + esc(r[1]) + '</td></tr>').join('') + '</table>'
       : '<div style="font-size:13px;color:#888888;">Event details have not been filled in yet.</div>');
     // Volunteers confirmed: everyone assigned anywhere on the checklist, with what they are on
     const onWhat = {};
@@ -1731,7 +1741,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     ev.vendors.filter(v => ['volunteer', 'activity'].includes(v.kind)).forEach(v => whoOn(v, volunteers).forEach(x => addPerson(x.name, v.name)));
     const peopleNames = Object.keys(onWhat).sort((x, y) => x.localeCompare(y));
     const volsBox = box('Volunteers confirmed to be in attendance', peopleNames.length
-      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + peopleNames.map(n => '<tr><td valign="top" style="padding:8px 0;border-bottom:1px solid #f3ecdf;font-size:14px;color:#2a2a2a;">' + esc(n) + '</td></tr>').join('') + '</table>'
+      ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + peopleNames.map(n => '<tr><td valign="top" style="padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;color:#2a2a2a;">' + esc(n) + '</td></tr>').join('') + '</table>'
       : '<div style="font-size:13px;color:#888888;">No volunteers assigned yet.</div>');
     const w = ev.website || {};
     const when = w.date_tbd ? 'Date to be announced' : [ev.date ? fmtDate(ev.date) : '', ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : ''].filter(Boolean).join('  ·  ');
@@ -1740,11 +1750,11 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
       + '<div style="height:14px;background:' + GOLD + ';"></div>'
       + '<div style="padding:34px 36px 8px;text-align:center;"><div style="font-size:12px;letter-spacing:3px;color:' + GOLD + ';font-weight:bold;margin-bottom:12px;">EVENTS COMMITTEE &middot; CHECKLIST</div>'
       + '<h1 style="margin:0 0 8px;font-family:Georgia,serif;font-size:28px;font-weight:400;color:#2a2420;">' + esc(ev.name) + '</h1>'
-      + (when ? '<div style="font-size:14px;color:#777777;">' + esc(when) + '</div>' : '')
       + '<div style="border-top:1px solid #e5ddcf;width:60%;margin:20px auto 0;"></div></div>'
       + (note ? '<div style="padding:18px 36px 0;font-size:15px;line-height:1.6;color:#444444;">' + esc(note).replace(/\n/g, '<br>') + '</div>' : '')
       + '<div style="padding:18px 36px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td class="ec-col" valign="top" width="58%" style="padding:0 7px 14px 0;">' + detailsBox + '</td><td class="ec-col" valign="top" width="42%" style="padding:0 0 14px 7px;">' + volsBox + '</td></tr></table></div>'
       + '<div style="padding:6px 36px 6px;"><div style="font-size:13px;color:#888888;padding-top:14px;">' + doneTotal + ' of ' + total + ' done</div>' + groupsHtml + '</div>'
+      + (flyerUrl ? '<div style="padding:18px 36px 0;text-align:center;"><div style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;margin-bottom:10px;">Event flyer</div><img src="' + esc(flyerUrl) + '" alt="' + esc(ev.name) + ' flyer" width="420" style="display:block;margin:0 auto;width:100%;max-width:420px;height:auto;border:0;"></div>' : '')
       + '<div style="padding:22px 36px 34px;text-align:center;"><a href="https://volunteerhub.northstarhouse.org/#/events-committee-planning" style="display:inline-block;background:' + GOLD + ';color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:15px 30px;">Open in the Volunteer Hub</a></div>'
       + '<div style="background:#f7f3ec;padding:14px 36px;text-align:center;font-size:11px;color:#999999;">North Star House</div>'
       + '</div></div>';
@@ -1754,7 +1764,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     catGroups.forEach(g => {
       lines.push(g.cat.toUpperCase());
       g.items.forEach(it => {
-        const label = it.budget ? 'Budget' : it.mk ? it.c : it.tl ? fmtTime12(it.t.time) + ' ' + it.t.activity : it.need ? (it.v.who || !it.v.role ? it.v.name : it.v.role + ': ' + it.v.name) : it.t.text;
+        const label = it.mk ? it.c : it.tl ? fmtTime12(it.t.time) + ' ' + it.t.activity : it.need ? (it.v.who || !it.v.role ? it.v.name : it.v.role + ': ' + it.v.name) : it.t.text;
         lines.push((isDone(it) ? '[x] ' : '[ ] ') + label);
       });
       lines.push('');
@@ -1926,20 +1936,9 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
         <div key={g.cat} style={{ marginBottom: 18 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.8, padding: '4px 0 2px', borderBottom: '1.5px solid #e8dfd0' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{CATEGORY_ICONS[g.cat]}{g.cat}</span>
-            {g.cat !== 'Marketing' && <span style={{ fontWeight: 500, color: g.items.every(isDone) ? '#2e7d32' : 'var(--muted)', textTransform: 'none', letterSpacing: 0 }}>{g.items.every(isDone) ? 'all figured out ✓' : g.items.filter(isDone).length + ' of ' + g.items.length + ' done'}</span>}
+            {g.cat !== 'Marketing' && g.items.length > 0 && <span style={{ fontWeight: 500, color: g.items.every(isDone) ? '#2e7d32' : 'var(--muted)', textTransform: 'none', letterSpacing: 0 }}>{g.items.every(isDone) ? 'all figured out ✓' : g.items.filter(isDone).length + ' of ' + g.items.length + ' done'}</span>}
           </div>
         {g.items.map(it => {
-          if (it.budget) {
-            return (
-              <ItemRow key="budget" done={budgetDone}>
-                <CheckCircle checked={budgetDone} onChange={toggleBudget} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Budget</div>
-                  <div style={{ fontSize: 12, marginTop: 2, color: 'var(--muted)' }}>Earnings {money(fin.totalEarnings)}  ·  Expenses {money(fin.totalExpenses)}  ·  Net {money(fin.totalEarnings - fin.totalExpenses)}</div>
-                </div>
-              </ItemRow>
-            );
-          }
           if (it.mk) {
             const done = !!(mkData[it.c] || {}).done;
             return (
@@ -2060,6 +2059,18 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
             </div>
           );
         })}
+        {g.cat === 'Money' && fin && (
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', padding: '8px 0 2px 14px' }}>Budget as of {fmtDate(todayStr())}</div>
+            {[['Earnings', fin.totalEarnings, '#4a5d3a'], ['Expenses', fin.totalExpenses, '#8a4a2e'], ['Net', fin.totalEarnings - fin.totalExpenses, fin.totalEarnings - fin.totalExpenses >= 0 ? '#4a5d3a' : '#8a4a2e']].map(r => (
+              <div key={r[0]} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0 10px 14px', borderBottom: '0.5px solid var(--border-light)' }}>
+                <span style={{ width: 18, flexShrink: 0 }} />
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{r[0]}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: r[2], paddingRight: 4 }}>{money(r[1])}</span>
+              </div>
+            ))}
+          </div>
+        )}
         </div>
         ))}
         <datalist id={'vols-' + ev.id}>{(volunteers || []).map(v => <option key={v.id} value={(v['First Name'] + ' ' + v['Last Name']).trim()} />)}</datalist>

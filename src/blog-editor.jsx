@@ -395,6 +395,8 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
             <button type="button" onClick={() => pickImage('hero')} style={btn(false)}>{uploading ? 'Uploading…' : post.hero_image_url ? 'Replace image' : 'Choose or upload image'}</button>
             {post.hero_image_url && <button type="button" onClick={() => set('hero_image_url', '')} style={{ ...btn(false), marginLeft: 8, color: '#888', borderColor: '#d8d0c4' }}>Remove</button>}
             <input value={post.hero_image_alt || ''} onChange={(e) => set('hero_image_alt', e.target.value)} placeholder="Describe the image (for screen readers and search)" style={{ ...inputStyle, marginTop: 8 }} />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 13, cursor: 'pointer' }}><input type="checkbox" checked={!!post.hide_hero_banner} onChange={(e) => set('hide_hero_banner', e.target.checked)} /> Don't show this as a big banner at the top of the post</label>
+            <div style={{ fontSize: 11, color: '#999', marginTop: 3 }}>It is still used for the post's card in lists and when the post is shared.</div>
           </div>
         </div>
 
