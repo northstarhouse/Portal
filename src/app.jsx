@@ -22105,7 +22105,18 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                 {newMonth && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '10px 18px', background: '#faf6ef', borderTop: i > 0 ? '1.5px solid ' + gold + '60' : 'none', borderBottom: '0.5px solid #f0ece2' }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>{monthLabel}</span>
-                    <span style={{ fontSize: 12, color: '#888' }}>{monthTotal} {monthTotal === 1 ? 'inquiry' : 'inquiries'}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <span style={{ fontSize: 12, color: '#888', marginRight: 2 }}>{monthTotal} {monthTotal === 1 ? 'inquiry' : 'inquiries'}</span>
+                      {!clientsOnly && (function() {
+                        var inMonth = shownRows.filter(function(s) { return monthOf(s) === monthOf(sub); });
+                        return [['booked', 'Booked'], ['completed', 'Toured'], ['cancelled', 'Cancelled'], ['no_show', "Didn't show up"]].map(function(pair) {
+                          var n = inMonth.filter(function(s) { return tourStateKey(s) === pair[0]; }).length;
+                          if (!n) return null;
+                          var st = TOUR_STATES[pair[0]];
+                          return <span key={pair[0]} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, color: st.color, background: st.bg }}>{n} {pair[1]}</span>;
+                        });
+                      })()}
+                    </span>
                   </div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 18px', borderBottom: i < shownRows.length - 1 ? '0.5px solid #f5f1eb' : 'none', background: (selected && selected.id === sub.id) ? '#fdf8ee' : (isHandled ? '#fafafa' : 'transparent') }}>
