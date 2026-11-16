@@ -348,6 +348,7 @@ const CATEGORY_ICONS = {
   Sponsorship: catIcon(<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>),
   Interiors: catIcon(<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>),
   Marketing: catIcon(<><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></>),
+  Budget: catIcon(<><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>),
   Money: catIcon(<><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>),
   'Volunteers & vendors': catIcon(<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>),
   'Day-of timeline': catIcon(<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>),
@@ -1472,6 +1473,37 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     fetchAreaData(ev.id).then(rows => { if (live) setMkData((((rows || []).find(r => r.area_key === 'marketing') || {}).pre_data || {}).channels || {}); }).catch(() => { if (live) setMkData({}); });
     return () => { live = false; };
   }, [ev.id]);
+  // The Budget line: live numbers from the budget tracking, and a tick for "budget is done" (saved with the finance planning area).
+  const [fin, setFin] = useState(null);
+  const [budgetDone, setBudgetDone] = useState(false);
+  useEffect(() => {
+    let live = true;
+    Promise.all([
+      fetchEventFinancials(ev.name).catch(() => null),
+      fetchEventTicketStats(ev.name).catch(() => ({ ticketsSold: 0, revenue: 0 })),
+      fetchEventCardMeta(ev.name).catch(() => null),
+      fetchAreaData(ev.id).catch(() => []),
+    ]).then(([f, t, meta, rows]) => {
+      if (!live) return;
+      const rsvpOnly = !!(meta && meta.rsvp_only);
+      const earnings = (f && f.earnings) || []; const expenses = (f && f.expenses) || [];
+      const ticketRevenue = rsvpOnly ? 0 : t.revenue;
+      const totalEarnings = ticketRevenue + earnings.reduce((n, r) => n + (parseFloat(r.amount) || 0), 0);
+      const totalExpenses = expenses.reduce((n, r) => n + (parseFloat(r.amount) || 0), 0);
+      setFin({ earnings, expenses, rsvpOnly, ticketRevenue, ticketsSold: t.ticketsSold, totalEarnings, totalExpenses });
+      setBudgetDone(!!((((rows || []).find(r => r.area_key === 'finance') || {}).pre_data || {}).budgetDone));
+    });
+    return () => { live = false; };
+  }, [ev.id, ev.name]);
+  async function toggleBudget() {
+    const next = !budgetDone;
+    setBudgetDone(next);
+    try {
+      const rows = await fetchAreaData(ev.id);
+      const r = (rows || []).find(x => x.area_key === 'finance') || {};
+      await saveArea(ev.id, 'finance', { ownerName: r.owner_name || 'Ken Underwood', preData: { ...(r.pre_data || {}), budgetDone: next }, postData: r.post_data || {}, authUserId: session && session.user && session.user.id });
+    } catch (e) { setBudgetDone(!next); }
+  }
   async function toggleChannel(c) {
     const cur = (mkData || {})[c] || { done: false, date: '' };
     const mine = { ...cur, done: !cur.done };
@@ -1592,10 +1624,11 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     ...ev.checklist.map(t => ({ need: false, t, cat: checkCat(t.category) })),
     ...ev.vendors.map(v => ({ need: true, v, cat: needCategory(v) })),
     ...ev.timeline.map(t => ({ tl: true, t, cat: DAYOF_CAT })),
+    ...(fin ? [{ budget: true, cat: 'Budget' }] : []),
     ...(showMarketing && mkData ? MARKETING_CHANNELS.filter(c => (mkData[c] || {}).done).map(c => ({ mk: true, c, cat: 'Marketing' })) : []),
   ];
-  const isDone = (i) => (i.mk ? !!(mkData[i.c] || {}).done : i.need ? needHandled(i.v) : !!i.t.done);
-  const catGroups = [...CHECKLIST_CATEGORIES.filter(c => c !== 'Marketing' && c !== 'Volunteers & vendors'), 'Marketing', 'Volunteers & vendors', DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : c === 'General' || c === 'Hospitality' ? (x, y) => (isDone(x) ? 1 : 0) - (isDone(y) ? 1 : 0) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
+  const isDone = (i) => (i.budget ? budgetDone : i.mk ? !!(mkData[i.c] || {}).done : i.need ? needHandled(i.v) : !!i.t.done);
+  const catGroups = [...CHECKLIST_CATEGORIES.filter(c => c !== 'Marketing' && c !== 'Volunteers & vendors'), 'Budget', 'Marketing', 'Volunteers & vendors', DAYOF_CAT].map(c => ({ cat: c, items: allItems.filter(i => i.cat === c).sort(c === DAYOF_CAT ? (x, y) => String(x.t.time).localeCompare(String(y.t.time)) : c === 'General' || c === 'Hospitality' ? (x, y) => (isDone(x) ? 1 : 0) - (isDone(y) ? 1 : 0) : (x, y) => (isDone(y) ? 1 : 0) - (isDone(x) ? 1 : 0)) })).filter(g => g.items.length);
   const shownGroups = catGroups.filter(g => catFilter === 'All' || catFilter === g.cat);
 
   // ---- Email the checklist to the committee: a finished, read-only copy of what is on screen.
@@ -1630,6 +1663,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
       return d;
     };
     const itemRow = (it) => {
+      if (it.budget) return row(budgetDone, 'Budget', 'Earnings ' + esc(money(fin.totalEarnings)) + ' &nbsp;&middot;&nbsp; Expenses ' + esc(money(fin.totalExpenses)) + ' &nbsp;&middot;&nbsp; Net ' + esc(money(fin.totalEarnings - fin.totalExpenses)), null);
       if (it.mk) return row(true, esc(it.c), '', null);
       if (it.tl) {
         const t = it.t; const who = whoOn(t, volunteers); const tg = Number(t.target) || 0;
@@ -1653,12 +1687,26 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     const total = catGroups.reduce((n, g) => n + g.items.length, 0);
     const doneTotal = catGroups.reduce((n, g) => n + g.items.filter(isDone).length, 0);
     const ICON_BASE = 'https://northstarhouse.github.io/Portal/assets/icons/cat-';
-    const ICON_KEY = { General: 'general', Logistics: 'logistics', Hospitality: 'hospitality', Sponsorship: 'sponsorship', Interiors: 'interiors', Marketing: 'marketing', Money: 'money', 'Volunteers & vendors': 'volunteers', [DAYOF_CAT]: 'dayof' };
+    const ICON_KEY = { General: 'general', Logistics: 'logistics', Hospitality: 'hospitality', Sponsorship: 'sponsorship', Interiors: 'interiors', Marketing: 'marketing', Money: 'money', 'Volunteers & vendors': 'volunteers', Budget: 'money', [DAYOF_CAT]: 'dayof' };
+    // The budget's own lines: what comes in (website tickets and logged earnings) and what has been spent.
+    const budgetDetail = () => {
+      if (!fin) return '';
+      const line = (label, amount, color, strong) => '<tr><td style="padding:6px 8px 6px 0;border-bottom:1px solid #f3ecdf;font-size:13px;color:#2a2a2a;' + (strong ? 'font-weight:bold;' : '') + '">' + esc(label) + '</td><td align="right" style="padding:6px 0;border-bottom:1px solid #f3ecdf;font-size:13px;font-weight:bold;color:' + color + ';white-space:nowrap;">' + esc(money(amount)) + '</td></tr>';
+      const head = (t) => '<tr><td colspan="2" style="padding:12px 0 2px;font-size:11px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + t + '</td></tr>';
+      const ern = [line('Website ticket sales' + (!fin.rsvpOnly && fin.ticketsSold > 0 ? ' (' + fin.ticketsSold + ' sold)' : ''), fin.rsvpOnly ? 0 : fin.ticketRevenue, '#4a5d3a')]
+        .concat(fin.earnings.map(r => line(r.earning_source || 'Earning', parseFloat(r.amount) || 0, '#4a5d3a')));
+      const exp = fin.expenses.length ? fin.expenses.map(r => line(r.description || r.type || 'Expense', parseFloat(r.amount) || 0, '#8a4a2e')) : ['<tr><td colspan="2" style="padding:6px 0;font-size:13px;color:#888888;">No expenses logged yet.</td></tr>'];
+      return '<tr><td bgcolor="#ffffff" style="padding:0 16px 12px 46px;background:#ffffff;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+        + head('Earnings') + ern.join('') + line('Total earnings', fin.totalEarnings, '#4a5d3a', true)
+        + head('Expenses') + exp.join('') + line('Total expenses', fin.totalExpenses, '#8a4a2e', true)
+        + line('Net', fin.totalEarnings - fin.totalExpenses, fin.totalEarnings - fin.totalExpenses >= 0 ? '#4a5d3a' : '#8a4a2e', true)
+        + '</table></td></tr>';
+    };
     const groupsHtml = catGroups.map(g => {
       const d = g.items.filter(isDone).length;
       return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border:1px solid #efe6d5;border-collapse:separate;"><tr><td style="padding:14px 16px 8px;border-bottom:1.5px solid #e8dfd0;">' + (ICON_KEY[g.cat] ? '<img src="' + ICON_BASE + ICON_KEY[g.cat] + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + esc(g.cat) + '</span>'
         + (g.cat !== 'Marketing' ? '<span style="font-size:12px;color:#888888;margin-left:10px;">' + (d === g.items.length ? 'all figured out &#10003;' : d + ' of ' + g.items.length + ' done') + '</span>' : '') + '</td></tr>'
-        + g.items.map(itemRow).join('') + '</table>';
+        + g.items.map(itemRow).join('') + (g.cat === 'Budget' ? budgetDetail() : '') + '</table>';
     }).join('');
     const w0 = ev.website || {};
     const box = (title, inner) => '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;border:1px solid #efe6d5;border-collapse:separate;background:#ffffff;"><tr><td style="padding:16px 18px;"><div style="font-size:12px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;margin-bottom:10px;">' + title + '</div>' + inner + '</td></tr></table>';
@@ -1706,7 +1754,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
     catGroups.forEach(g => {
       lines.push(g.cat.toUpperCase());
       g.items.forEach(it => {
-        const label = it.mk ? it.c : it.tl ? fmtTime12(it.t.time) + ' ' + it.t.activity : it.need ? (it.v.who || !it.v.role ? it.v.name : it.v.role + ': ' + it.v.name) : it.t.text;
+        const label = it.budget ? 'Budget' : it.mk ? it.c : it.tl ? fmtTime12(it.t.time) + ' ' + it.t.activity : it.need ? (it.v.who || !it.v.role ? it.v.name : it.v.role + ': ' + it.v.name) : it.t.text;
         lines.push((isDone(it) ? '[x] ' : '[ ] ') + label);
       });
       lines.push('');
@@ -1881,6 +1929,17 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing }) {
             {g.cat !== 'Marketing' && <span style={{ fontWeight: 500, color: g.items.every(isDone) ? '#2e7d32' : 'var(--muted)', textTransform: 'none', letterSpacing: 0 }}>{g.items.every(isDone) ? 'all figured out ✓' : g.items.filter(isDone).length + ' of ' + g.items.length + ' done'}</span>}
           </div>
         {g.items.map(it => {
+          if (it.budget) {
+            return (
+              <ItemRow key="budget" done={budgetDone}>
+                <CheckCircle checked={budgetDone} onChange={toggleBudget} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Budget</div>
+                  <div style={{ fontSize: 12, marginTop: 2, color: 'var(--muted)' }}>Earnings {money(fin.totalEarnings)}  ·  Expenses {money(fin.totalExpenses)}  ·  Net {money(fin.totalEarnings - fin.totalExpenses)}</div>
+                </div>
+              </ItemRow>
+            );
+          }
           if (it.mk) {
             const done = !!(mkData[it.c] || {}).done;
             return (
