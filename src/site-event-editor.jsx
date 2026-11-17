@@ -55,6 +55,32 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
     set('description', v.slice(0, e) + ins + v.slice(e).replace(/^\n+/, ''));
     setTimeout(() => { ta.focus(); ta.setSelectionRange(e + ins.length, e + ins.length); }, 0);
   };
+  // Preview: shows the description the way it will read on the website (bold, italics, bullets, quotes, divider lines).
+  const [preview, setPreview] = React.useState(false);
+  const inline = (text) => {
+    const out = []; const re = /\*\*\*([^*]+)\*\*\*|\*\*([^*]+)\*\*|\*([^*\s][^*]*)\*/g; let last = 0, m, k = 0;
+    while ((m = re.exec(text))) {
+      if (m.index > last) out.push(text.slice(last, m.index));
+      out.push(m[1] !== undefined ? <strong key={k++}><em>{m[1]}</em></strong> : m[2] !== undefined ? <strong key={k++}>{m[2]}</strong> : <em key={k++}>{m[3]}</em>);
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) out.push(text.slice(last));
+    return out;
+  };
+  const renderPreview = (text) => {
+    const blocks = []; let bullets = [];
+    const flush = () => { if (bullets.length) { blocks.push(<ul key={blocks.length} style={{ margin: '0 0 12px', paddingLeft: 22 }}>{bullets.map((b, i) => <li key={i}>{inline(b)}</li>)}</ul>); bullets = []; } };
+    String(text || '').replace(/\r/g, '').split('\n').forEach((raw) => {
+      const line = raw.trim();
+      if (/^(-{3,}|_{3,})$/.test(line)) { flush(); blocks.push(<hr key={blocks.length} style={{ border: 0, borderTop: '1px solid #d9d0c0', margin: '14px 0' }} />); return; }
+      if (/^>\s*\S/.test(line)) { flush(); blocks.push(<div key={blocks.length} style={{ borderLeft: '3px solid ' + GOLD, paddingLeft: 12, margin: '0 0 12px', fontStyle: 'italic', color: '#555' }}>{inline(line.replace(/^>\s*/, ''))}</div>); return; }
+      if (/^[-•*]\s+/.test(line)) { bullets.push(line.replace(/^[-•*]\s+/, '')); return; }
+      flush();
+      if (line) blocks.push(<p key={blocks.length} style={{ margin: '0 0 12px' }}>{inline(line)}</p>);
+    });
+    flush();
+    return blocks.length ? blocks : <div style={{ color: '#aaa' }}>Nothing to preview yet.</div>;
+  };
   const setTier = (i, k, v) => setF((o) => ({ ...o, ticket_tiers: o.ticket_tiers.map((t, j) => (j === i ? { ...t, [k]: v } : t)) }));
   const call = (body) => fetch(supabaseUrl + '/functions/v1/site-events-admin', {
     method: 'POST', headers: { apikey: supabaseKey, Authorization: 'Bearer ' + supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -117,9 +143,11 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
             <button type="button" title="Bullets: turns the selected lines (or the current line) into a bullet list" onMouseDown={(e) => e.preventDefault()} onClick={() => prefixSel('-')} style={{ height: 28, padding: '0 10px', border: '0.5px solid #d9d0c0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>• Bullets</button>
             <button type="button" title="Quote: turns the selected lines (or the current line) into an indented quote" onMouseDown={(e) => e.preventDefault()} onClick={() => prefixSel('>')} style={{ height: 28, padding: '0 10px', border: '0.5px solid #d9d0c0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>❝ Quote</button>
             <button type="button" title="Adds a thin line across the page" onMouseDown={(e) => e.preventDefault()} onClick={lineSel} style={{ height: 28, padding: '0 10px', border: '0.5px solid #d9d0c0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>— Line</button>
-            <span style={{ fontSize: 11, color: '#aaa' }}>Select words, then click B or I. Bullets and Line work on the line you are on.</span>
+            <button type="button" title="See how the description will read" onMouseDown={(e) => e.preventDefault()} onClick={() => setPreview((p) => !p)} style={{ height: 28, padding: '0 10px', border: '0.5px solid ' + (preview ? GOLD : '#d9d0c0'), borderRadius: 6, background: preview ? GOLD : '#fff', color: preview ? '#fff' : 'inherit', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, marginLeft: 'auto' }}>{preview ? 'Back to editing' : 'Preview'}</button>
           </div>
-          <textarea ref={descRef} style={{ ...input, minHeight: 130, resize: 'vertical' }} value={f.description} onChange={(e) => set('description', e.target.value)} placeholder={'Write it like an email. A blank line starts a new paragraph.\nStart a line with "- " to make a bullet list.\nPut **two stars** around words for bold and *one star* for italics.'} />
+          <div style={{ fontSize: 11, color: '#aaa' }}>Select words, then click B or I. Bullets, Quote and Line work on the line you are on.</div>
+          {preview && <div style={{ ...input, minHeight: 130, fontSize: 15, lineHeight: 1.6, color: '#444', background: '#fffdf8' }}>{renderPreview(f.description)}</div>}
+          <textarea ref={descRef} style={{ ...input, minHeight: 130, resize: 'vertical', display: preview ? 'none' : 'block' }} value={f.description} onChange={(e) => set('description', e.target.value)} placeholder={'Write it like an email. A blank line starts a new paragraph.\nStart a line with "- " to make a bullet list.\nPut **two stars** around words for bold and *one star* for italics.'} />
         </div>
         <div style={{ ...label, marginBottom: 0 }}>Photo
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
