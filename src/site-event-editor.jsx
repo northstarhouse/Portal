@@ -70,14 +70,23 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
     return out;
   };
   const renderPreview = (text) => {
-    const blocks = []; let bullets = []; let quote = [];
-    const flushQuote = () => { if (quote.length) { blocks.push(<div key={blocks.length} style={{ borderLeft: '3px solid ' + GOLD, paddingLeft: 12, margin: '0 0 12px', fontStyle: 'italic', color: '#555' }}>{quote.map((q, i) => <p key={i} style={{ margin: i ? '10px 0 0' : 0 }}>{inline(q)}</p>)}</div>); quote = []; } };
+    const blocks = []; let bullets = []; let quote = []; let qLines = []; let qGap = false;
+    const flushQuote = () => {
+      if (qLines.length) { quote.push(qLines.join('\n')); qLines = []; }
+      qGap = false;
+      if (quote.length) { blocks.push(<div key={blocks.length} style={{ borderLeft: '3px solid ' + GOLD, paddingLeft: 12, margin: '0 0 12px', fontStyle: 'italic', color: '#555' }}>{quote.map((q, i) => <p key={i} style={{ margin: i ? '10px 0 0' : 0, whiteSpace: 'pre-line' }}>{inline(q)}</p>)}</div>); quote = []; }
+    };
     const flush = () => { if (bullets.length) { blocks.push(<ul key={blocks.length} style={{ margin: '0 0 12px', paddingLeft: 22 }}>{bullets.map((b, i) => <li key={i}>{inline(b)}</li>)}</ul>); bullets = []; } };
     String(text || '').replace(/\r/g, '').split('\n').forEach((raw) => {
       const line = raw.trim();
       // quoted lines (even with blank lines between) stay in one block so the vertical line is unbroken
-      if (/^>\s*\S/.test(line)) { flush(); quote.push(line.replace(/^>\s*/, '')); return; }
-      if (!line && quote.length) return;
+      if (/^>\s*\S/.test(line)) {
+        flush();
+        const t = line.replace(/^>\s*/, '');
+        if (qGap || !qLines.length) { if (qLines.length) quote.push(qLines.join('\n')); qLines = [t]; } else qLines.push(t);
+        qGap = false; return;
+      }
+      if (!line && (quote.length || qLines.length)) { qGap = true; return; }
       flushQuote();
       if (/^(-{3,}|_{3,})$/.test(line)) { flush(); blocks.push(<hr key={blocks.length} style={{ border: 0, borderTop: '1px solid #d9d0c0', margin: '14px 0' }} />); return; }
       if (/^[-•*]\s+/.test(line)) { bullets.push(line.replace(/^[-•*]\s+/, '')); return; }

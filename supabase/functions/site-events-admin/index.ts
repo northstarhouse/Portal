@@ -94,15 +94,26 @@ function toDocument(text: string) {
   }
   // Consecutive quoted lines (even with blank lines between them) become one quote block, so its vertical line runs unbroken.
   let quote: unknown[] = []
+  let quoteLines: string[] = []
+  let quoteGap = false
   const flushQuote = () => {
+    if (quoteLines.length) quote.push(para(quoteLines.join('\n')))
+    quoteLines = []; quoteGap = false
     if (!quote.length) return
     nodes.push({ id: rid(), type: 'BLOCKQUOTE', nodes: quote, blockquoteData: { indentation: 0 } })
     quote = []
   }
   for (const raw of String(text || '').replace(/\r/g, '').split('\n')) {
     const line = raw.trim()
-    if (/^>\s*\S/.test(line)) { flush(); quote.push(para(line.replace(/^>\s*/, ''))); continue }
-    if (!line && quote.length) continue
+    // Quoted lines with no blank line between them stay together as one paragraph (line breaks kept); a blank line starts a new one.
+    if (/^>\s*\S/.test(line)) {
+      flush()
+      const t = line.replace(/^>\s*/, '')
+      if (quoteGap || !quoteLines.length) { if (quoteLines.length) quote.push(para(quoteLines.join('\n'))); quoteLines = [t] } else quoteLines.push(t)
+      quoteGap = false
+      continue
+    }
+    if (!line && (quote.length || quoteLines.length)) { quoteGap = true; continue }
     flushQuote()
     // a line of three or more dashes becomes a thin divider line
     if (/^(-{3,}|_{3,})$/.test(line)) { flush(); nodes.push({ id: rid(), type: 'DIVIDER', nodes: [], dividerData: { lineStyle: 'SINGLE', width: 'LARGE', alignment: 'CENTER' } }); continue }
@@ -194,7 +205,7 @@ Deno.serve(async (req) => {
         return t.slice(0, t.indexOf(core)) + mark + core + mark + t.slice(t.indexOf(core) + core.length)
       }).join('')
       // deno-lint-ignore no-explicit-any
-      const lines = ((r.description?.nodes || []) as any[]).flatMap((n) => n.type === 'DIVIDER' ? ['---'] : n.type === 'BLOCKQUOTE' ? [(n.nodes || []).map((p: any) => '> ' + textOf(p)).join('\n\n')] : n.type === 'BULLETED_LIST' || n.type === 'ORDERED_LIST'
+      const lines = ((r.description?.nodes || []) as any[]).flatMap((n) => n.type === 'DIVIDER' ? ['---'] : n.type === 'BLOCKQUOTE' ? [(n.nodes || []).map((p: any) => textOf(p).split('\n').map((l: string) => '> ' + l).join('\n')).join('\n\n')] : n.type === 'BULLETED_LIST' || n.type === 'ORDERED_LIST'
         // deno-lint-ignore no-explicit-any
         ? (n.nodes || []).map((li: any) => '- ' + textOf(li)) : [textOf(n)])
       const isPlaceholder = String(r.image_url || '') === PLACEHOLDER_IMAGE
