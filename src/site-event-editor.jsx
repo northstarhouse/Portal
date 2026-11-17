@@ -3,6 +3,7 @@
 // (not on the website) until Publish is pressed.
 import React from 'react';
 import { MediaPicker } from './media-library.jsx';
+import { PhotoCropper } from './photo-crop.jsx';
 const GOLD = '#886c44';
 const input = { width: '100%', boxSizing: 'border-box', padding: '9px 11px', border: '0.5px solid #d8d0c4', borderRadius: 8, fontSize: 14, fontFamily: 'inherit', background: '#fff' };
 const label = { display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: '#888', marginBottom: 14 };
@@ -21,6 +22,7 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState(null);
   const [picker, setPicker] = React.useState(false);
+  const [crop, setCrop] = React.useState(false);
   // The web address follows the title until the team types their own.
   const [slugTouched, setSlugTouched] = React.useState(false);
   const slugify = (v) => String(v || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
@@ -68,16 +70,21 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
     return out;
   };
   const renderPreview = (text) => {
-    const blocks = []; let bullets = [];
+    const blocks = []; let bullets = []; let quote = [];
+    const flushQuote = () => { if (quote.length) { blocks.push(<div key={blocks.length} style={{ borderLeft: '3px solid ' + GOLD, paddingLeft: 12, margin: '0 0 12px', fontStyle: 'italic', color: '#555' }}>{quote.map((q, i) => <p key={i} style={{ margin: i ? '10px 0 0' : 0 }}>{inline(q)}</p>)}</div>); quote = []; } };
     const flush = () => { if (bullets.length) { blocks.push(<ul key={blocks.length} style={{ margin: '0 0 12px', paddingLeft: 22 }}>{bullets.map((b, i) => <li key={i}>{inline(b)}</li>)}</ul>); bullets = []; } };
     String(text || '').replace(/\r/g, '').split('\n').forEach((raw) => {
       const line = raw.trim();
+      // quoted lines (even with blank lines between) stay in one block so the vertical line is unbroken
+      if (/^>\s*\S/.test(line)) { flush(); quote.push(line.replace(/^>\s*/, '')); return; }
+      if (!line && quote.length) return;
+      flushQuote();
       if (/^(-{3,}|_{3,})$/.test(line)) { flush(); blocks.push(<hr key={blocks.length} style={{ border: 0, borderTop: '1px solid #d9d0c0', margin: '14px 0' }} />); return; }
-      if (/^>\s*\S/.test(line)) { flush(); blocks.push(<div key={blocks.length} style={{ borderLeft: '3px solid ' + GOLD, paddingLeft: 12, margin: '0 0 12px', fontStyle: 'italic', color: '#555' }}>{inline(line.replace(/^>\s*/, ''))}</div>); return; }
       if (/^[-•*]\s+/.test(line)) { bullets.push(line.replace(/^[-•*]\s+/, '')); return; }
       flush();
       if (line) blocks.push(<p key={blocks.length} style={{ margin: '0 0 12px' }}>{inline(line)}</p>);
     });
+    flushQuote();
     flush();
     return blocks.length ? blocks : <div style={{ color: '#aaa' }}>Nothing to preview yet.</div>;
   };
@@ -151,10 +158,11 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
         </div>
         <div style={{ ...label, marginBottom: 0 }}>Photo
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {f.image_url ? <img src={f.image_url} alt="" style={{ width: 110, height: 74, objectFit: 'cover', borderRadius: 8, border: '0.5px solid #e0d8cc' }} /> : <img src="assets/event-placeholder.png" alt="" style={{ width: 110, height: 74, objectFit: 'cover', borderRadius: 8, border: '0.5px solid #e0d8cc', opacity: 0.85 }} />}
+            {f.image_url ? <img src={f.image_url} alt="" style={{ maxWidth: 160, maxHeight: 130, objectFit: 'contain', borderRadius: 8, border: '0.5px solid #e0d8cc', background: '#faf6ef' }} /> : <img src="assets/event-placeholder.png" alt="" style={{ width: 110, height: 74, objectFit: 'cover', borderRadius: 8, border: '0.5px solid #e0d8cc', opacity: 0.85 }} />}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="button" onClick={() => setPicker(true)} style={{ background: '#fff', color: GOLD, border: '1px solid ' + GOLD, borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{f.image_url ? 'Change photo' : 'Choose a photo'}</button>
+                {f.image_url && <button type="button" onClick={() => setCrop(true)} style={{ background: '#fff', color: GOLD, border: '1px solid ' + GOLD, borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Crop / position</button>}
                 {!f.image_url && <span style={{ alignSelf: 'center', fontSize: 12, color: '#888' }}>No photo? The website shows "More information to come".</span>}
                 {f.image_url && <button type="button" onClick={() => { set('image_url', ''); set('image_alt', ''); }} style={{ background: 'none', color: '#888', border: 'none', fontSize: 13, cursor: 'pointer' }}>Remove</button>}
               </div>
@@ -236,6 +244,7 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
         ))}
       </div>
 
+      {crop && f.image_url && <PhotoCropper url={f.image_url} alt={f.image_alt} supabaseUrl={supabaseUrl} supabaseKey={supabaseKey} onDone={(img) => { set('image_url', img.url); if (img.alt && !f.image_alt) set('image_alt', img.alt); setCrop(false); setMsg({ ok: true, text: 'Cropped photo ready. Press Save to put it on the website.' }); }} onClose={() => setCrop(false)} />}
       {picker && <MediaPicker supabaseUrl={supabaseUrl} supabaseKey={supabaseKey} onPick={(img) => { set('image_url', img.url); if (img.alt && !f.image_alt) set('image_alt', img.alt); setPicker(false); }} onClose={() => setPicker(false)} />}
     </div>
   );
