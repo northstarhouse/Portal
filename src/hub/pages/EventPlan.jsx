@@ -227,7 +227,9 @@ export default function EventPlan({ session, volunteer, onFinalized }) {
       const name = days.length > 1 ? `${r.name} – ${fmtShort(d.date)}` : base;
       const ins = await insertCommitteeEvent({
         name, date: d.date, start_time: d.start_time, end_time: d.end_time, pricing: r.pricing, status: 'planning',
-        description: [days.length > 1 ? `Day ${i + 1} of ${days.length} of ${base}: ${days.map((x) => fmtShort(x.date)).join(', ')}` : '', ...notes].filter(Boolean).join('\n\n'),
+        // the committee's decisions and budget go in the separate Committee Notes section, never the (website) description
+        description: days.length > 1 ? `Day ${i + 1} of ${days.length} of ${base}: ${days.map((x) => fmtShort(x.date)).join(', ')}` : '',
+        committee_notes: notes.join('\n\n') || null,
         checklist: [], vendors: [], timeline: [], after_notes: {}, created_by: session?.user?.id || null,
       });
       if (ins.error || !ins.row) {

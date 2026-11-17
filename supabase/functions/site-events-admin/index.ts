@@ -105,15 +105,9 @@ function toDocument(text: string) {
   }
   for (const raw of String(text || '').replace(/\r/g, '').split('\n')) {
     const line = raw.trim()
-    // Quoted lines with no blank line between them stay together as one paragraph (line breaks kept); a blank line starts a new one.
-    if (/^>\s*\S/.test(line)) {
-      flush()
-      const t = line.replace(/^>\s*/, '')
-      if (quoteGap || !quoteLines.length) { if (quoteLines.length) quote.push(para(quoteLines.join('\n'))); quoteLines = [t] } else quoteLines.push(t)
-      quoteGap = false
-      continue
-    }
-    if (!line && (quote.length || quoteLines.length)) { quoteGap = true; continue }
+    // Every quoted line (blank lines between them are ignored) stays in one single-spaced paragraph, one line under the next.
+    if (/^>\s*\S/.test(line)) { flush(); quoteLines.push(line.replace(/^>\s*/, '')); continue }
+    if (!line && quoteLines.length) continue
     flushQuote()
     // a line of three or more dashes becomes a thin divider line
     if (/^(-{3,}|_{3,})$/.test(line)) { flush(); nodes.push({ id: rid(), type: 'DIVIDER', nodes: [], dividerData: { lineStyle: 'SINGLE', width: 'LARGE', alignment: 'CENTER' } }); continue }

@@ -69,7 +69,7 @@ const EVENT_PURPOSES = ['Educational', 'Entertainment', 'Community Engagement', 
 function emptyEvent(name) {
   return {
     id: cryptoId(), name, date: '', startTime: '', endTime: '', location: '', description: '', status: 'planning',
-    purpose: '', expectedAttendance: '', pricing: '', ticketTiers: [], siteEventId: null, website: {}, eventLead: '', volunteersNeeded: '',
+    purpose: '', expectedAttendance: '', pricing: '', ticketTiers: [], siteEventId: null, website: {}, eventLead: '', volunteersNeeded: '', committeeNotes: '',
     checklist: [], notes: [], vendors: [], guestCount: { invited: 0, confirmed: 0 }, timeline: [],
     afterNotes: { wentWell: '', wentWrong: '', finalAttendance: '', finalBudget: '', followUps: '' },
   };
@@ -94,6 +94,7 @@ function fromDb(row) {
     siteEventId: row.site_event_id || null,
     website: row.website && typeof row.website === 'object' ? row.website : {},
     eventLead: row.event_lead || '',
+    committeeNotes: row.committee_notes || '',
     volunteersNeeded: row.volunteers_needed ?? '',
     guestCount: { invited: row.guest_invited || 0, confirmed: row.guest_confirmed || 0 },
     checklist: row.checklist || [],
@@ -121,6 +122,7 @@ function toDb(ev) {
     site_event_id: ev.siteEventId || null,
     website: ev.website || {},
     event_lead: ev.eventLead || null,
+    committee_notes: ev.committeeNotes || null,
     volunteers_needed: ev.volunteersNeeded === '' || ev.volunteersNeeded == null ? null : Number(ev.volunteersNeeded),
     guest_invited: ev.guestCount.invited || 0,
     guest_confirmed: ev.guestCount.confirmed || 0,
@@ -393,7 +395,10 @@ const PLANNING_SECTION_ICONS = {
 PLANNING_SECTION_ICONS.attendance = PLANNING_SECTION_ICONS.volunteers;
 PLANNING_SECTION_ICONS.sponsoritems = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>;
 
+PLANNING_SECTION_ICONS.committeenotes = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></svg>;
+
 const PLANNING_SECTIONS = [
+  { key: 'committeenotes', title: 'Committee Notes', desc: 'Decisions and notes from committee meetings (internal, never shown on the website)' },
   { key: 'checklist', title: 'Checklist', desc: 'Type the duties in fast, then assign and date them' },
   { key: 'attendance', title: 'Volunteers in Attendance', desc: 'Everyone assigned on the checklist, plus anyone you add' },
   { key: 'sponsoritems', title: 'Sponsor Provided Items', desc: 'Pick sponsor items to use at this event, or add new ones' },
@@ -665,6 +670,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                 <div style={{ padding: '4px 16px 18px' }}>
                   {s.key === 'preplanning' && <PreplanningTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} onRsvpChange={setRsvpOnly} />}
                   {s.key === 'attendance' && <AttendanceTab ev={ev} volunteers={volunteers} />}
+                  {s.key === 'committeenotes' && <CommitteeNotes ev={ev} onUpdate={onUpdate} />}
                   {s.key === 'sponsoritems' && <SponsorItems ev={ev} />}
                   {s.key === 'checklist' && <ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} showMarketing={!marketingNA} />}
                   {s.key === 'budget' && <FinancialsTab ev={ev} />}
@@ -1203,6 +1209,32 @@ const SPONSOR_STATUS_STYLE = {
 const sameEventName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase() && !!String(a || '').trim();
 const itemMoney = (n) => (n == null || n === '' ? '' : '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: Number(n) % 1 ? 2 : 0 }));
 // With `ev`: this event's items, plus a pick list of unassigned ones. Without: the master list of everything.
+// Decisions and notes from committee meetings. Kept apart from the event description, so they never go to the website.
+function CommitteeNotes({ ev, onUpdate }) {
+  const [text, setText] = useState(ev.committeeNotes || '');
+  const [editing, setEditing] = useState(false);
+  useEffect(() => { if (!editing) setText(ev.committeeNotes || ''); }, [ev.committeeNotes, editing]);
+  function save() { const t = text.trim(); onUpdate(e => ({ ...e, committeeNotes: t })); setEditing(false); }
+  const note = { background: '#fffbea', border: '1px solid #e8d48a', borderRadius: 8, padding: '10px 12px', fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.5 };
+  if (!editing) {
+    return (
+      <div>
+        {(ev.committeeNotes || '').trim() ? <div style={note}>{ev.committeeNotes}</div> : <div style={{ fontSize: 13, color: 'var(--muted)' }}>No committee notes yet. Click Edit to add what the committee decided.</div>}
+        <div style={{ marginTop: 10 }}><button className="btn-ghost" style={{ fontSize: 12, padding: '5px 14px' }} onClick={() => setEditing(true)}>Edit</button></div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <textarea className="input" rows={6} value={text} onChange={e => setText(e.target.value)} placeholder="What the committee decided (lead, budget, open questions…)" style={{ ...note, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
+      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        <button className="btn-gold" style={{ fontSize: 12, padding: '6px 16px' }} onClick={save}>Save</button>
+        <button className="btn-ghost" style={{ fontSize: 12, padding: '6px 14px' }} onClick={() => { setText(ev.committeeNotes || ''); setEditing(false); }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 function SponsorItems({ ev }) {
   const [items, setItems] = useState(null);
   const [events, setEvents] = useState([]);
