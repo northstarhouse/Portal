@@ -401,7 +401,7 @@ const PLANNING_SECTIONS = [
   { key: 'after', title: 'After the Event', desc: 'What went well, final numbers, follow-ups, reviews and feedback' },
 ];
 
-// The checklist is the one place everything lives, tagged by category so each area can be checked off as figured out.
+// The checklist is the one place everything lives, tagged by category so each area can be checked off as it is finished.
 const CHECKLIST_CATEGORIES = ['General', 'Logistics', 'Hospitality', 'Sponsorship', 'Interiors', 'Marketing', 'Money', 'Volunteers & vendors'];
 const DAYOF_CAT = 'Day-of timeline';
 // The little icon at the start of each checklist group.
@@ -2113,7 +2113,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
     const groupsHtml = catGroups.map(g => {
       const d = g.items.filter(isDone).length;
       return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border:1px solid #ece3d7;border-collapse:separate;"><tr><td bgcolor="#f7f4f1" style="background:#f7f4f1;padding:12px 16px;border:1px solid #ae9a86;">' + (ICON_KEY[g.cat] ? '<img src="' + ICON_BASE + ICON_KEY[g.cat] + '.png" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">' : '') + '<span style="font-size:12px;font-weight:bold;letter-spacing:1px;color:#8c6d36;text-transform:uppercase;">' + esc(g.cat) + '</span>'
-        + (g.cat !== 'Marketing' && g.items.length > 0 ? '<span style="font-size:12px;color:#888888;margin-left:10px;">' + (d === g.items.length ? 'all figured out &#10003;' : d + ' of ' + g.items.length + ' done') + '</span>' : '') + '</td></tr>'
+        + (g.cat !== 'Marketing' && g.items.length > 0 ? '<span style="font-size:12px;color:#888888;margin-left:10px;">' + (d + ' of ' + g.items.length + ' done') + '</span>' : '') + '</td></tr>'
         + g.items.map(itemRow).join('') + (g.cat === 'Money' ? budgetStats() + budgetDetail() : '') + '</table>';
     }).join('');
     const w0 = ev.website || {};
@@ -2334,7 +2334,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
         <div key={g.cat} style={{ marginBottom: 18 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.8, padding: '4px 0 2px', borderBottom: '1.5px solid #e8dfd0' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{CATEGORY_ICONS[g.cat]}{g.cat}</span>
-            {g.cat !== 'Marketing' && g.items.length > 0 && <span style={{ fontWeight: 500, color: g.items.every(isDone) ? '#2e7d32' : 'var(--muted)', textTransform: 'none', letterSpacing: 0 }}>{g.items.every(isDone) ? 'all figured out ✓' : g.items.filter(isDone).length + ' of ' + g.items.length + ' done'}</span>}
+            {g.cat !== 'Marketing' && g.items.length > 0 && <span style={{ fontWeight: 500, color: g.items.every(isDone) ? '#2e7d32' : 'var(--muted)', textTransform: 'none', letterSpacing: 0 }}>{g.items.filter(isDone).length + ' of ' + g.items.length + ' done'}</span>}
           </div>
         {g.items.map(it => {
           if (it.mk) {
