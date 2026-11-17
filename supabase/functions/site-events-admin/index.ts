@@ -209,7 +209,7 @@ Deno.serve(async (req) => {
         image_url: isPlaceholder ? '' : (r.image_url || ''), image_alt: isPlaceholder ? '' : (r.image_alt || ''),
         date: s.date, start_time: s.time || '18:00', end_time: en.time, date_tbd: !!r.date_tbd,
         location_name: r.location_name || '', location_address: r.location_address || '',
-        registration_type: r.registration_type === 'TICKETING' ? 'TICKETING' : 'NONE',
+        registration_type: r.registration_type === 'TICKETING' ? 'TICKETING' : r.registration_type === 'RSVP' ? 'RSVP' : 'NONE',
         // deno-lint-ignore no-explicit-any
         ticket_tiers: (Array.isArray(r.ticket_tiers) && r.ticket_tiers.length ? r.ticket_tiers : [{ name: 'General Admission', price: '', limit: '' }]).map((t: any) => ({ name: t.name || '', price: t.price != null ? String(t.price) : '', limit: t.limitPerCheckout != null ? String(t.limitPerCheckout) : '' })),
         ticket_limit_per_order: String(r.ticket_limit_per_order || 20),
@@ -232,7 +232,8 @@ Deno.serve(async (req) => {
       const dateTbd = e.date_tbd === true
       if (status === 'published' && !dateTbd && !/^\d{4}-\d{2}-\d{2}$/.test(String(e.date || ''))) return json({ error: 'Choose the event date, or mark it "date to be announced".' }, 400)
 
-      const regType = e.registration_type === 'TICKETING' ? 'TICKETING' : 'NONE'
+      // 'RSVP' = free event with the website's own RSVP form (calendar button shows the RSVP button, no tickets)
+      const regType = e.registration_type === 'TICKETING' ? 'TICKETING' : e.registration_type === 'RSVP' ? 'RSVP' : 'NONE'
       const tierList = regType === 'TICKETING' ? tiers(e.ticket_tiers) : []
       if (regType === 'TICKETING' && !tierList.length) return json({ error: 'Add at least one ticket type with a name and price.' }, 400)
 

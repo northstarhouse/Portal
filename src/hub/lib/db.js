@@ -1108,7 +1108,7 @@ export async function ensureRsvpForm(d) {
   const name = String(d.name || '').trim();
   if (!name) return { error: 'No event name.' };
   const plain = String(d.description || '').replace(/\*\*\*|\*\*|\*/g, '').replace(/^\s*(- |> )/gm, '').replace(/^\s*---\s*$/gm, '').trim();
-  const fields = { title: name, date: d.date || null, time: clock12(d.startTime), description: plain ? plain.slice(0, 1500) : null };
+  const fields = { title: String(d.title || '').trim() || name, date: d.date || null, time: clock12(d.startTime), description: plain ? plain.slice(0, 1500) : null };
   const meta = await fetchEventCardMeta(name);
   const flyer = d.flyer || (meta && meta.image_url);
   if (flyer) fields.image_url = flyer;
@@ -1205,7 +1205,7 @@ export async function fetchWebsiteEvent(id) {
 // "Push to website": sends a committee event (name, date, times, description, ticket pricing) to the website's event list
 // (Admin > New Event) and PUBLISHES it, so it is live on the website right away. Pushing again updates that same website
 // event and keeps its photo (an ended event stays ended). Returns { siteEventId, status }.
-export async function pushCommitteeEventToWebsite(ev) {
+export async function pushCommitteeEventToWebsite(ev, opts) {
   const { data: sess } = await supabase.auth.getSession();
   const bearer = (sess && sess.session && sess.session.access_token) || KEY;
   const call = async (body) => {
@@ -1224,15 +1224,19 @@ export async function pushCommitteeEventToWebsite(ev) {
     if (cur) status = cur.status === 'archived' ? 'archived' : 'published'; else id = '';
   }
   const w = ev.website || {};
-  const sells = w.sells_tickets === true;
+  // An RSVP-only event goes to the website as an RSVP event (free, RSVP button on the calendar), not as ticketed or plain.
+  // (`opts.rsvp` is passed when the caller just changed the setting and it may not be saved yet.)
+  const card = opts && typeof opts.rsvp === 'boolean' ? null : await fetchEventCardMeta(ev.name).catch(() => null);
+  const isRsvp = opts && typeof opts.rsvp === 'boolean' ? opts.rsvp : !!(card && card.rsvp_only);
+  const sells = !isRsvp && w.sells_tickets === true;
   const tiers = sells ? (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim()) : [];
   const event = {
     ...(id ? { id, partial: true } : {}),
-    title: ev.name, slug: w.slug || '', short_description: w.short_description || '', description: String(ev.description || '').trim(), status,
+    title: (w.title && String(w.title).trim()) || ev.name, slug: w.slug || '', short_description: w.short_description || '', description: String(ev.description || '').trim(), status,
     image_url: w.image_url || '', image_alt: w.image_alt || '',
     date: w.date_tbd ? '' : (ev.date || ''), date_tbd: w.date_tbd === true, start_time: ev.startTime || '18:00', end_time: ev.endTime || '',
     location_name: w.location_name || 'North Star House', location_address: w.location_address || '12075 Auburn Rd, Grass Valley, CA 95949, USA',
-    registration_type: sells ? 'TICKETING' : 'NONE', ticket_tiers: tiers,
+    registration_type: isRsvp ? 'RSVP' : sells ? 'TICKETING' : 'NONE', ticket_tiers: tiers,
   };
   const j = await call({ action: 'save', event });
   return { siteEventId: j.event.id, status: j.event.status };

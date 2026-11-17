@@ -1604,7 +1604,7 @@ function WebsiteLink({ ev, onUpdate, onConnected }) {
       date: w.date_tbd ? e.date : (w.date || e.date), startTime: w.date_tbd ? e.startTime : (w.start_time || e.startTime), endTime: w.date_tbd ? e.endTime : (w.end_time || ''),
       location: w.location_name || e.location,
       ticketTiers: ticketed ? (w.ticket_tiers || []).filter(t => String(t.name || '').trim()) : (e.ticketTiers || []),
-      website: { ...(e.website || {}), slug: w.slug || '', short_description: w.short_description || '', image_url: w.image_url || '', image_alt: w.image_alt || '', date_tbd: !!w.date_tbd, location_name: w.location_name || '', location_address: w.location_address || '', sells_tickets: ticketed },
+      website: { ...(e.website || {}), title: (w.title && w.title !== e.name) ? w.title : '', slug: w.slug || '', short_description: w.short_description || '', image_url: w.image_url || '', image_alt: w.image_alt || '', date_tbd: !!w.date_tbd, location_name: w.location_name || '', location_address: w.location_address || '', sells_tickets: ticketed },
     };
   });
   async function choose(id) {
@@ -1652,7 +1652,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
   // While typing a web address, keep a trailing dash so a dash can be added; it is trimmed when you leave the box.
   const slugTyping = v => String(v || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 80);
   const initial = () => ({
-    title: ev.name || '', slug: w.slug || '', slugTouched: !!w.slug, short: w.short_description || '', desc: ev.description || '',
+    title: w.title || ev.name || '', slug: w.slug || '', slugTouched: !!w.slug, short: w.short_description || '', desc: ev.description || '',
     imageUrl: w.image_url || '', imageAlt: w.image_alt || '', dateTbd: w.date_tbd === true, date: ev.date || '',
     startTime: ev.startTime || '18:00', endTime: ev.endTime || '',
     spaces: Array.isArray(w.spaces) ? w.spaces : [],
@@ -1671,12 +1671,12 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
   // RSVP only: also make sure there is an RSVP form with this event's title, date, time, description and flyer
   // (created the first time, kept in step after that).
   function syncRsvpForm(form) {
-    ensureRsvpForm({ name: form.title.trim(), date: form.dateTbd ? '' : form.date, startTime: form.startTime, description: form.short.trim() || form.desc, flyer: form.imageUrl })
+    ensureRsvpForm({ name: ev.name, title: form.title.trim(), date: form.dateTbd ? '' : form.date, startTime: form.startTime, description: form.short.trim() || form.desc, flyer: form.imageUrl })
       .then(r => { if (r && r.error) alert('The event is set to RSVP, but its RSVP form could not be made: ' + r.error); else setRsvpTick(n => n + 1); })
       .catch(() => alert('The event is set to RSVP, but its RSVP form could not be made. Please try again.'));
   }
   function saveRsvp(form) {
-    const name = form.title.trim();
+    const name = ev.name;
     if (rsvp === rsvpSaved) { if (rsvp) syncRsvpForm(form); return; }
     setRsvpSaved(rsvp);
     if (onRsvpChange) onRsvpChange(rsvp);
@@ -1695,13 +1695,14 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
 
   // Turn the form into the committee event's fields.
   const toEvent = (form, base) => ({
-    ...base, name: form.title.trim(), description: form.desc.trim(),
+    // the title typed here is the WEBSITE title; the event's own name (used everywhere inside the Hub) is not changed by it
+    ...base, name: base.name || form.title.trim(), description: form.desc.trim(),
     purpose: form.purpose, eventLead: form.eventLead.trim(), expectedAttendance: form.expectedAttendance.trim(), pricing: form.pricing.trim(),
     date: form.dateTbd ? base.date : form.date, startTime: form.startTime, endTime: form.endTime,
     ticketTiers: form.sells ? form.tiers.filter(t => String(t.name || '').trim()) : (base.ticketTiers || []),
     website: {
       ...(base.website || {}),
-      slug: form.slug, short_description: form.short.trim(), image_url: form.imageUrl, image_alt: form.imageAlt.trim(),
+      title: form.title.trim() !== (base.name || '') ? form.title.trim() : '', slug: form.slug, short_description: form.short.trim(), image_url: form.imageUrl, image_alt: form.imageAlt.trim(),
       date_tbd: form.dateTbd, location_name: form.locName.trim(), location_address: form.locAddr.trim(), sells_tickets: form.sells, spaces: form.spaces || [],
     },
   });
@@ -1735,7 +1736,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
     saveRsvp(form);
     try {
       const merged = toEvent(form, ev);
-      const r = await pushCommitteeEventToWebsite(merged);
+      const r = await pushCommitteeEventToWebsite(merged, { rsvp });
       onUpdate(e => ({ ...toEvent(form, e), siteEventId: r.siteEventId }));
       setEditing(false);
       setMsg({ ok: true, text: r.status === 'archived' ? 'Updated. This event has ended, so it is not shown on the website.' : 'Done. The event is live on the website (it also shows in Admin > New Event).' });
@@ -1776,7 +1777,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
         <div>
           <fieldset className="sheet-fieldset">
           <div style={{ ...head, marginTop: 8, borderTop: 'none', paddingTop: 0 }}>The event</div>
-          <label style={lab}>Title *<input style={inp} value={f.title} onChange={e => { const v = e.target.value; setF(o => ({ ...o, title: v, slug: o.slugTouched ? o.slug : slugify(v) })); }} placeholder="e.g. Holiday Open House" /></label>
+          <label style={lab}>Website title * <span className="edit-only" style={note}>(what visitors see; the event's own name in the Hub stays "{ev.name}")</span><input style={inp} value={f.title} onChange={e => { const v = e.target.value; setF(o => ({ ...o, title: v, slug: o.slugTouched ? o.slug : slugify(v) })); }} placeholder="e.g. Holiday Open House" /></label>
           <label style={lab}>Web address (the last part of the event's link)
             <input style={inp} value={f.slug} onChange={e => setF(o => ({ ...o, slugTouched: true, slug: slugTyping(e.target.value) }))} onBlur={() => setF(o => ({ ...o, slug: slugify(o.slug) }))} placeholder="holiday-open-house" />
             <span className="edit-only" style={note}>Letters, numbers and dashes only. It fills in from the title unless you type your own.{ev.siteEventId ? ' Changing it after the event is published breaks links people already have.' : ''}</span>
@@ -3004,7 +3005,7 @@ async function autoLinkToWebsite(list) {
         date: e.date || (w.date_tbd ? '' : w.date) || '', startTime: e.startTime || (w.date_tbd ? '' : w.start_time) || '', endTime: e.endTime || (w.date_tbd ? '' : w.end_time) || '',
         location: e.location || w.location_name || '',
         ticketTiers: (e.ticketTiers && e.ticketTiers.length) ? e.ticketTiers : (ticketed ? (w.ticket_tiers || []).filter(t => String(t.name || '').trim()) : []),
-        website: { ...(e.website || {}), slug: w.slug || '', short_description: w.short_description || '', image_url: w.image_url || '', image_alt: w.image_alt || '', date_tbd: !!w.date_tbd, location_name: w.location_name || '', location_address: w.location_address || '', sells_tickets: ticketed },
+        website: { ...(e.website || {}), title: (w.title && w.title !== e.name) ? w.title : '', slug: w.slug || '', short_description: w.short_description || '', image_url: w.image_url || '', image_alt: w.image_alt || '', date_tbd: !!w.date_tbd, location_name: w.location_name || '', location_address: w.location_address || '', sells_tickets: ticketed },
       };
       const saved = await updateCommitteeEvent(e.id, toDb(linked));
       out.push(saved && saved.error ? e : linked);
