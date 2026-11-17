@@ -1094,6 +1094,46 @@ export async function fetchRsvpForms() {
   const rows = await get('vol_events?select=id,title,date,slug&event_type=eq.rsvp&order=date.desc.nullslast,created_at.desc');
   return Array.isArray(rows) ? rows : [];
 }
+// When an event is set to RSVP only, make sure it has an RSVP form carrying the same title, date, time, description and
+// flyer, and link it (event_overview_cards.rsvp_event_id). An existing linked form (or a form with the same name) is reused
+// and brought up to date instead of creating a second one. `d` = { name, date, startTime, description, flyer }.
+const RSVP_DEFAULT_OPTIONS = ['Attending', 'Attending +1', "Can't Make It"];
+function clock12(t) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(t || ''));
+  if (!m) return null;
+  const h = Number(m[1]);
+  return `${h % 12 || 12}:${m[2]} ${h >= 12 ? 'PM' : 'AM'}`;
+}
+export async function ensureRsvpForm(d) {
+  const name = String(d.name || '').trim();
+  if (!name) return { error: 'No event name.' };
+  const plain = String(d.description || '').replace(/\*\*\*|\*\*|\*/g, '').replace(/^\s*(- |> )/gm, '').replace(/^\s*---\s*$/gm, '').trim();
+  const fields = { title: name, date: d.date || null, time: clock12(d.startTime), description: plain ? plain.slice(0, 1500) : null };
+  const meta = await fetchEventCardMeta(name);
+  const flyer = d.flyer || (meta && meta.image_url);
+  if (flyer) fields.image_url = flyer;
+  let formId = meta && meta.rsvp_event_id;
+  if (formId) {
+    const cur = await get(`vol_events?id=eq.${encodeURIComponent(formId)}&select=id`);
+    if (!Array.isArray(cur) || !cur.length) formId = null;
+  }
+  if (!formId) {
+    const forms = await get('vol_events?select=id,title&event_type=eq.rsvp');
+    const hit = (Array.isArray(forms) ? forms : []).find((f) => String(f.title || '').trim().toLowerCase() === name.toLowerCase());
+    if (hit) formId = hit.id;
+  }
+  if (formId) {
+    const up = await patch(`vol_events?id=eq.${encodeURIComponent(formId)}`, fields);
+    if (up && up.code) return { error: up.message || 'Could not update the RSVP form.' };
+  } else {
+    const rows = await post('vol_events', { ...fields, event_type: 'rsvp', options: RSVP_DEFAULT_OPTIONS }, { Prefer: 'return=representation' });
+    if (rows && rows.code) return { error: rows.message || 'Could not create the RSVP form.' };
+    formId = Array.isArray(rows) ? rows[0] && rows[0].id : rows && rows.id;
+    if (!formId) return { error: 'Could not create the RSVP form.' };
+  }
+  if (!meta || meta.rsvp_event_id !== formId) await saveEventCardMeta(name, { rsvp_only: true, rsvp_event_id: formId });
+  return { success: true, formId };
+}
 export async function fetchRsvpResponses(eventId) {
   const rows = await get(`vol_event_responses?select=id,name,response,created_at&event_id=eq.${encodeURIComponent(eventId)}&order=created_at.desc`);
   return Array.isArray(rows) ? rows : [];

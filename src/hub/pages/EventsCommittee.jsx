@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MediaPicker } from '../../media-library.jsx';
 import { useVol } from '../App.jsx';
 import {
-  insertReimbursement, fetchAreaData, saveArea, sendChecklistEmail, matchVolunteerAreas, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, previewCommitteeMerge, mergeCommitteeEvents, pushCommitteeEventToWebsite, fetchWebsiteEvents, fetchWebsiteEvent, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, fetchSponsorItems, insertSponsorItem, updateSponsorItem, deleteSponsorItem, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, renameCommitteeEventRecords, deleteCommitteeEvent,
+  insertReimbursement, fetchAreaData, saveArea, sendChecklistEmail, matchVolunteerAreas, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, previewCommitteeMerge, mergeCommitteeEvents, pushCommitteeEventToWebsite, fetchWebsiteEvents, fetchWebsiteEvent, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, fetchSponsorItems, insertSponsorItem, updateSponsorItem, deleteSponsorItem, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, ensureRsvpForm, renameCommitteeEventRecords, deleteCommitteeEvent,
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
@@ -1667,11 +1667,22 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
   const [rsvpSaved, setRsvpSaved] = useState(false);
   const [rsvp, setRsvp] = useState(false);
   useEffect(() => { let live = true; fetchEventCardMeta(ev.name).then(m => { if (live) { setRsvpSaved(!!(m && m.rsvp_only)); setRsvp(!!(m && m.rsvp_only)); } }).catch(() => {}); return () => { live = false; }; }, [ev.name]);
-  function saveRsvp(name) {
-    if (rsvp === rsvpSaved) return;
+  const [rsvpTick, setRsvpTick] = useState(0);
+  // RSVP only: also make sure there is an RSVP form with this event's title, date, time, description and flyer
+  // (created the first time, kept in step after that).
+  function syncRsvpForm(form) {
+    ensureRsvpForm({ name: form.title.trim(), date: form.dateTbd ? '' : form.date, startTime: form.startTime, description: form.short.trim() || form.desc, flyer: form.imageUrl })
+      .then(r => { if (r && r.error) alert('The event is set to RSVP, but its RSVP form could not be made: ' + r.error); else setRsvpTick(n => n + 1); })
+      .catch(() => alert('The event is set to RSVP, but its RSVP form could not be made. Please try again.'));
+  }
+  function saveRsvp(form) {
+    const name = form.title.trim();
+    if (rsvp === rsvpSaved) { if (rsvp) syncRsvpForm(form); return; }
     setRsvpSaved(rsvp);
     if (onRsvpChange) onRsvpChange(rsvp);
-    saveEventCardMeta(name, { rsvp_only: rsvp }).catch(() => { setRsvpSaved(!rsvp); alert('Could not save the RSVP setting. Please try again.'); });
+    saveEventCardMeta(name, { rsvp_only: rsvp })
+      .then(() => { if (rsvp) syncRsvpForm(form); })
+      .catch(() => { setRsvpSaved(!rsvp); alert('Could not save the RSVP setting. Please try again.'); });
   }
   const [pushing, setPushing] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -1710,7 +1721,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
   function save() {
     if (!f.title.trim()) { setMsg({ ok: false, text: 'Give the event a title first.' }); return; }
     onUpdate(e => toEvent(f, e));
-    saveRsvp(f.title.trim());
+    saveRsvp(f);
     setEditing(false);
     setMsg({ ok: true, text: 'Saved.' });
     if (onClose) onClose();
@@ -1721,7 +1732,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
     if (m.length) { setMsg({ ok: false, text: 'Fill in first: ' + m.join(', ') + '.' }); return; }
     if (!ev.siteEventId && !window.confirm('Push this event to the website? It goes live right away.')) return;
     setPushing(true); setMsg(null);
-    saveRsvp(form.title.trim());
+    saveRsvp(form);
     try {
       const merged = toEvent(form, ev);
       const r = await pushCommitteeEventToWebsite(merged);
@@ -1754,7 +1765,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
       {!editing ? (
         <div>
           <EventBasicsView f={f} ev={ev} rsvp={rsvpSaved} />
-          <RsvpPanel key={String(rsvpSaved)} eventName={ev.name} hideToggle />
+          <RsvpPanel key={String(rsvpSaved) + rsvpTick} eventName={ev.name} hideToggle />
           {msg && <div style={{ fontSize: 12, margin: '12px 0 0', color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}
           <div style={{ marginTop: 16 }}>
             {missing(f).length > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Still needed before pushing: {missing(f).join(', ')}. Click Edit.</div>}
