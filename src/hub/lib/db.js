@@ -1250,6 +1250,41 @@ export async function deleteCommitteeEvent(id, name) {
   return { success: ok };
 }
 
+// ── Rename: carry the event's name-keyed records to the new name ─────────────
+// Event cards are matched by name, so renaming only events_committee used to leave the old flyer card / budget /
+// earnings / feedback behind under the old name, which then showed up as a second (duplicate) event.
+export async function renameCommitteeEventRecords(oldName, newName) {
+  const o = String(oldName || '').trim(), n = String(newName || '').trim();
+  if (!o || !n || o === n) return { failed: [] };
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  const failed = [];
+  // flyer/overview card: rename it, or (if a card for the new name was already created) fold into it and drop the old one
+  const [oc, nc] = await Promise.all([get(`event_overview_cards?event_name=eq.${enc(o)}&select=*`), get(`event_overview_cards?event_name=eq.${enc(n)}&select=*`)]);
+  const oldCard = arr(oc)[0], newCard = arr(nc)[0];
+  if (oldCard && !newCard) {
+    const r = await patch(`event_overview_cards?event_name=eq.${enc(o)}`, { event_name: n, updated_at: new Date().toISOString() });
+    if (r && r.code) failed.push('flyer card');
+  } else if (oldCard && newCard) {
+    const fill = {};
+    Object.keys(oldCard).forEach((k) => {
+      if (['event_name', 'id', 'created_at', 'updated_at'].includes(k)) return;
+      const nv = newCard[k], ov = oldCard[k];
+      const blank = nv == null || nv === '' || (Array.isArray(nv) && !nv.length);
+      if (blank && ov != null && ov !== '' && !(Array.isArray(ov) && !ov.length)) fill[k] = ov;
+    });
+    if (Object.keys(fill).length) await patch(`event_overview_cards?event_name=eq.${enc(n)}`, { ...fill, updated_at: new Date().toISOString() });
+    const d = await del(`event_overview_cards?event_name=eq.${enc(o)}`);
+    if (!d) failed.push('old flyer card');
+  }
+  for (const tb of [...MERGE_NAME_TABLES, { key: 'tickets', path: 'ticket_orders', col: 'event_title' }]) {
+    const present = await get(`${tb.path}?${tb.col}=eq.${enc(o)}&select=${tb.col}&limit=1`);
+    if (!Array.isArray(present) || !present.length) continue;
+    const r = await patch(`${tb.path}?${tb.col}=eq.${enc(o)}`, { [tb.col]: n });
+    if (r && r.code) failed.push(tb.path.replace('%20', ' '));
+  }
+  return { failed };
+}
+
 // ── Merge one committee event into another ───────────────────────────────────
 // The source's checklist, vendors, notes, timeline, committee notes, name-keyed records (Op Budget, Op Earnings, sponsor
 // items, feedback), planning areas and flyer move onto the target; blanks on the target are filled from the source; then the

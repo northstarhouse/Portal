@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MediaPicker } from '../../media-library.jsx';
 import { useVol } from '../App.jsx';
 import {
-  insertReimbursement, fetchAreaData, saveArea, sendChecklistEmail, matchVolunteerAreas, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, previewCommitteeMerge, mergeCommitteeEvents, pushCommitteeEventToWebsite, fetchWebsiteEvents, fetchWebsiteEvent, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, fetchSponsorItems, insertSponsorItem, updateSponsorItem, deleteSponsorItem, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
+  insertReimbursement, fetchAreaData, saveArea, sendChecklistEmail, matchVolunteerAreas, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, previewCommitteeMerge, mergeCommitteeEvents, pushCommitteeEventToWebsite, fetchWebsiteEvents, fetchWebsiteEvent, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, fetchSponsorItems, insertSponsorItem, updateSponsorItem, deleteSponsorItem, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, renameCommitteeEventRecords, deleteCommitteeEvent,
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
@@ -3126,7 +3126,15 @@ export default function EventsCommittee() {
     if (editingEvent.id) {
       const merged = { ...selected, ...data };
       setEvents(prev => prev.map(e => e.id === editingEvent.id ? merged : e));
-      updateCommitteeEvent(editingEvent.id, toDb(merged));
+      const renamed = merged.name !== selected.name;
+      const saving = updateCommitteeEvent(editingEvent.id, toDb(merged));
+      // a rename must carry the flyer card, budget, earnings, etc. (matched by name) to the new name, or the old name
+      // lingers as a duplicate event
+      if (renamed) {
+        saving.then(() => renameCommitteeEventRecords(selected.name, merged.name)).then(r => {
+          if (r && r.failed && r.failed.length) alert(`Renamed, but these records could not be moved to the new name: ${r.failed.join(', ')}. They may show as a separate event until fixed.`);
+        }).catch(() => {});
+      }
 
       // Keep the Leadership Dashboard's In-House Events entry in sync on rename/reschedule.
       const nameOrDateChanged = merged.name !== selected.name || merged.date !== selected.date;
