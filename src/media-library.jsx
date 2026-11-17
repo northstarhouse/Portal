@@ -96,7 +96,7 @@ function MediaGrid({ supabaseUrl, supabaseKey, authToken, onPick }) {
   }
   async function save(img, changes) {
     setErr('');
-    try { const o = await api.update(img.id, changes); setImages((prev) => prev.map((i) => (i.id === img.id ? o.image : i))); setOpen(o.image); }
+    try { const o = await api.update(img.id, changes); setImages((prev) => prev.map((i) => (i.id === img.id ? o.image : i))); setOpen((cur) => (cur && cur.id === img.id ? o.image : cur)); }
     catch (e) { setErr(e.message); }
   }
   function copy(img) {
@@ -144,9 +144,7 @@ function MediaGrid({ supabaseUrl, supabaseKey, authToken, onPick }) {
             </div>
             <div style={{ padding: '6px 8px' }}>
               <div title={img.name} style={{ fontSize: 11, color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{img.name}</div>
-              {onPick
-                ? <AltEditor key={img.id + '|' + (img.alt || '')} img={img} onSave={(alt) => save(img, { name: img.name, alt, folder: img.folder || '' })} />
-                : (!img.alt && <div style={{ fontSize: 10, color: '#b45309' }}>No alt text</div>)}
+              <AltEditor key={img.id + '|' + (img.alt || '')} img={img} onSave={(alt) => save(img, { name: img.name, alt, folder: img.folder || '' })} />
               {onPick && <button onClick={() => onPick(img)} style={{ ...small, marginTop: 5, width: '100%' }}>Use this</button>}
             </div>
           </div>
