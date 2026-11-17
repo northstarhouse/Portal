@@ -3,7 +3,7 @@
 // vote). Each event has a highlighted "Committee decisions" note, kept current after each meeting, and is finalized into a
 // real Events Committee event once its date, start and end times and pricing are filled in.
 import { useState, useEffect } from 'react';
-import { fetchEventPlan, fetchPlanVotes, planKey, updateEventPlanRow, insertEventPlanRow,insertCommitteeEvent, syncOverviewCardsFromCommittee, syncInHouseEvent, updateCommitteeEvent, logActivity, fetchAllActiveVolunteers, matchVolunteerAreas, sendChecklistEmail } from '../lib/db.js';
+import { fetchEventPlan, fetchPlanVotes, planKey, updateEventPlanRow, insertEventPlanRow, insertCommitteeEvent, fetchCommitteeEventsOnDate, syncOverviewCardsFromCommittee, syncInHouseEvent, updateCommitteeEvent, logActivity, fetchAllActiveVolunteers, matchVolunteerAreas, sendChecklistEmail } from '../lib/db.js';
 
 const PLAN_YEAR = 2027;
 const REQUIRED = [
@@ -225,6 +225,24 @@ export default function EventPlan({ session, volunteer, onFinalized }) {
       const d = days[i];
       // one event per day; for multi-day events each name carries its date (days can be months apart)
       const name = days.length > 1 ? `${r.name} – ${fmtShort(d.date)}` : base;
+      // An event may already be on that date (made earlier from the website or the calendar). Offer to fill that one in
+      // rather than creating a second copy.
+      const same = (await fetchCommitteeEventsOnDate(d.date).catch(() => [])).filter((x) => !created.some((c) => c.id === x.id));
+      if (same.length) {
+        const hit = same[0];
+        if (window.confirm(`"${hit.name}" is already an event on ${fmtShort(d.date)}.\n\nOK = add this plan's details to "${hit.name}" (no second event is created).\nCancel = create a separate new event "${name}".`)) {
+          const prevNotes = String(hit.committee_notes || '').trim();
+          const add = notes.join('\n\n');
+          const fillBody = {
+            pricing: hit.pricing || r.pricing || null, start_time: hit.start_time || d.start_time || null, end_time: hit.end_time || d.end_time || null,
+            committee_notes: add && !prevNotes.includes(add) ? [prevNotes, add].filter(Boolean).join('\n\n') : (prevNotes || null),
+          };
+          const up = await updateCommitteeEvent(hit.id, fillBody);
+          if (up && up.error) { setBusy(''); setErr(`could not add to "${hit.name}": ${up.error}`); return; }
+          created.push({ ...hit, ...fillBody });
+          continue;
+        }
+      }
       const ins = await insertCommitteeEvent({
         name, date: d.date, start_time: d.start_time, end_time: d.end_time, pricing: r.pricing, status: 'planning',
         // the committee's decisions and budget go in the separate Committee Notes section, never the (website) description

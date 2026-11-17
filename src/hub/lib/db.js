@@ -1039,6 +1039,13 @@ export async function deleteSponsorItem(id) {
   return { success: ok };
 }
 
+// Committee events already on a given date (used by the Event Plan so finalizing doesn't create a second copy of an event).
+export async function fetchCommitteeEventsOnDate(date) {
+  if (!date) return [];
+  const rows = await get(`events_committee?date=eq.${encodeURIComponent(date)}&select=*`);
+  return Array.isArray(rows) ? rows : [];
+}
+
 export async function insertCommitteeEvent(payload) {
   const rows = await post('events_committee', payload);
   if (rows && rows.code) return { error: rows.message || rows.code };
@@ -1241,6 +1248,86 @@ export async function deleteCommitteeEvent(id, name) {
   const ok = await del(`events_committee?id=eq.${id}`);
   if (ok && name) await del(`event_overview_cards?event_name=eq.${encodeURIComponent(name)}`);
   return { success: ok };
+}
+
+// ── Merge one committee event into another ───────────────────────────────────
+// The source's checklist, vendors, notes, timeline, committee notes, name-keyed records (Op Budget, Op Earnings, sponsor
+// items, feedback), planning areas and flyer move onto the target; blanks on the target are filled from the source; then the
+// source is deleted. Ticket orders are left alone, so an event that has sold tickets under its name cannot be merged away.
+const enc = encodeURIComponent;
+const MERGE_NAME_TABLES = [
+  { key: 'budget', path: 'Op%20Budget', col: 'event_name' },
+  { key: 'earnings', path: 'Op%20Earnings', col: 'event' },
+  { key: 'auction', path: 'auction_items', col: 'event' },
+  { key: 'feedback', path: 'Event%20Feedback', col: 'event_name' },
+];
+async function mergeRows(sourceId, targetId) {
+  const [s, t] = await Promise.all([get(`events_committee?id=eq.${enc(sourceId)}&select=*`), get(`events_committee?id=eq.${enc(targetId)}&select=*`)]);
+  const source = Array.isArray(s) ? s[0] : null, target = Array.isArray(t) ? t[0] : null;
+  if (!source || !target) throw new Error('One of these events could not be found. Refresh and try again.');
+  if (source.id === target.id) throw new Error('Pick a different event to merge into.');
+  return { source, target };
+}
+export async function previewCommitteeMerge(sourceId, targetId) {
+  const { source, target } = await mergeRows(sourceId, targetId);
+  const count = async (path) => { const r = await get(path); return Array.isArray(r) ? r.length : 0; };
+  const orders = await count(`ticket_orders?event_title=eq.${enc(source.name)}&select=event_title`);
+  if (orders > 0) throw new Error(`"${source.name}" has ${orders} ticket orders under its name, so it can't be merged away. Merge the other way around, or keep both.`);
+  const out = {};
+  for (const tb of MERGE_NAME_TABLES) out[tb.key] = await count(`${tb.path}?${tb.col}=eq.${enc(source.name)}&select=${tb.col}`);
+  const len = (v) => (Array.isArray(v) ? v.length : 0);
+  out.checklist = len(source.checklist); out.vendors = len(source.vendors); out.notes = len(source.notes); out.timeline = len(source.timeline);
+  const areas = await get(`events_committee_areas?event_id=eq.${enc(source.id)}&select=area_key`);
+  out.areas = Array.isArray(areas) ? areas.length : 0;
+  out.committeeNotes = !!String(source.committee_notes || '').trim();
+  out.total = out.budget + out.earnings + out.auction + out.feedback + out.checklist + out.vendors + out.notes + out.timeline + out.areas + (out.committeeNotes ? 1 : 0);
+  return out;
+}
+export async function mergeCommitteeEvents(sourceId, targetId) {
+  const { source, target } = await mergeRows(sourceId, targetId);
+  const orders = await get(`ticket_orders?event_title=eq.${enc(source.name)}&select=event_title`);
+  if (Array.isArray(orders) && orders.length) throw new Error(`"${source.name}" has ticket orders under its name, so it can't be merged away.`);
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  const uniq = (list, keyOf) => { const seen = new Set(); return list.filter((x) => { const k = keyOf(x); if (seen.has(k)) return false; seen.add(k); return true; }); };
+  const blank = (v) => v == null || v === '' || (Array.isArray(v) && !v.length) || (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length);
+  const fill = {};
+  ['date', 'start_time', 'end_time', 'location', 'pricing', 'purpose', 'expected_attendance', 'event_lead', 'volunteers_needed', 'site_event_id', 'ticket_tiers', 'website']
+    .forEach((k) => { if (blank(target[k]) && !blank(source[k])) fill[k] = source[k]; });
+  const tNotes = String(target.committee_notes || '').trim(), sNotes = String(source.committee_notes || '').trim();
+  const patchBody = {
+    ...fill,
+    description: blank(target.description) ? (source.description || null) : target.description,
+    checklist: uniq([...arr(target.checklist), ...arr(source.checklist)], (x) => (x.id || '') + '|' + String(x.text || x.label || '').toLowerCase() + '|' + (x.category || '')),
+    vendors: uniq([...arr(target.vendors), ...arr(source.vendors)], (x) => String(x.id || x.name || '').toLowerCase()),
+    notes: uniq([...arr(target.notes), ...arr(source.notes)], (x) => x.id || JSON.stringify(x)),
+    timeline: uniq([...arr(target.timeline), ...arr(source.timeline)], (x) => x.id || JSON.stringify(x)),
+    committee_notes: sNotes && sNotes !== tNotes ? [tNotes, `From ${source.name}:\n${sNotes}`].filter(Boolean).join('\n\n') : (tNotes || null),
+    guest_invited: Math.max(Number(target.guest_invited) || 0, Number(source.guest_invited) || 0),
+    guest_confirmed: Math.max(Number(target.guest_confirmed) || 0, Number(source.guest_confirmed) || 0),
+  };
+  const up = await patch(`events_committee?id=eq.${enc(target.id)}`, patchBody);
+  if (up && up.code) throw new Error(up.message || 'Could not update the event you are merging into.');
+  // records that point at the event by name
+  const failed = [];
+  for (const tb of MERGE_NAME_TABLES) {
+    const r = await patch(`${tb.path}?${tb.col}=eq.${enc(source.name)}`, { [tb.col]: target.name });
+    if (r && r.code) failed.push(tb.path.replace('%20', ' '));
+  }
+  // planning areas: move the ones the target does not have yet
+  const [sa, ta] = await Promise.all([get(`events_committee_areas?event_id=eq.${enc(source.id)}&select=area_key`), get(`events_committee_areas?event_id=eq.${enc(target.id)}&select=area_key`)]);
+  const have = new Set(arr(ta).map((a) => a.area_key));
+  for (const a of arr(sa)) {
+    if (have.has(a.area_key)) continue;
+    const r = await patch(`events_committee_areas?event_id=eq.${enc(source.id)}&area_key=eq.${enc(a.area_key)}`, { event_id: target.id });
+    if (r && r.code) failed.push('planning areas');
+  }
+  // the flyer, if the target has none
+  const [sc, tc] = await Promise.all([get(`event_overview_cards?event_name=eq.${enc(source.name)}&select=image_url`), get(`event_overview_cards?event_name=eq.${enc(target.name)}&select=image_url`)]);
+  const sImg = arr(sc)[0] && arr(sc)[0].image_url, tImg = arr(tc)[0] && arr(tc)[0].image_url;
+  if (sImg && !tImg) await saveEventCardMeta(target.name, { image_url: sImg }).catch(() => failed.push('flyer'));
+  if (failed.length) throw new Error(`Some records could not be moved (${[...new Set(failed)].join(', ')}), so ${source.name} was NOT deleted. Everything already moved is on ${target.name}; try again or tell me what this says.`);
+  await deleteCommitteeEvent(source.id, source.name);
+  return { targetName: target.name };
 }
 
 // ── Events Committee area planning (Overall/Programs/Volunteers/Logistics/

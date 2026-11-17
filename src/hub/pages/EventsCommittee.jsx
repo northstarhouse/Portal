@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MediaPicker } from '../../media-library.jsx';
 import { useVol } from '../App.jsx';
 import {
-  insertReimbursement, fetchAreaData, saveArea, sendChecklistEmail, matchVolunteerAreas, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, pushCommitteeEventToWebsite, fetchWebsiteEvents, fetchWebsiteEvent, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, fetchSponsorItems, insertSponsorItem, updateSponsorItem, deleteSponsorItem, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
+  insertReimbursement, fetchAreaData, saveArea, sendChecklistEmail, matchVolunteerAreas, syncVendorExpenses, fetchEventCardMeta, saveEventCardMeta, previewCommitteeMerge, mergeCommitteeEvents, pushCommitteeEventToWebsite, fetchWebsiteEvents, fetchWebsiteEvent, SITE_SUPABASE_URL, SITE_SUPABASE_KEY, fetchEventNames, fetchEventFinancials, fetchEventTicketStats, fetchEventCardImage, uploadEventFlyer, fetchAllEventCards, fetchCommitteeEvents, fetchSponsorItems, insertSponsorItem, updateSponsorItem, deleteSponsorItem, insertCommitteeEvent, insertCommitteeEventIfMissing, updateCommitteeEvent, deleteCommitteeEvent,
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
@@ -184,65 +184,10 @@ const STATUS_STYLE = {
 // Event Overviews page -- the committee's full list should look like those,
 // not a from-scratch calendar grid.
 
-// How a flyer sits in its card: whole flyer ("contain") or filling the card ("cover") with a focus point (x/y percent).
-const flyerFrame = (w) => {
-  const x = Number.isFinite(Number(w && w.card_x)) && w && w.card_x != null ? Number(w.card_x) : 50;
-  const y = Number.isFinite(Number(w && w.card_y)) && w && w.card_y != null ? Number(w.card_y) : 50;
-  return { fit: w && w.card_fit === 'cover' ? 'cover' : 'contain', x, y };
-};
-
-// Popup to change how the flyer sits in the card: show it whole, or fill the card and slide it into place.
-function FlyerAdjust({ c, onClose, onSaved }) {
-  const start = flyerFrame(c.website);
-  const [fit, setFit] = useState(start.fit);
-  const [x, setX] = useState(start.x);
-  const [y, setY] = useState(start.y);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  async function save() {
-    setBusy(true); setErr('');
-    const r = await updateCommitteeEvent(c.committee_id, { website: { ...(c.website || {}), card_fit: fit, card_x: x, card_y: y } });
-    setBusy(false);
-    if (r && r.error) { setErr('Could not save. Please try again.'); return; }
-    onSaved();
-  }
-  const slider = (label, v, set, disabled) => (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--muted)', opacity: disabled ? 0.45 : 1 }}>{label}
-      <input type="range" min="0" max="100" value={v} disabled={disabled} onChange={e => set(Number(e.target.value))} />
-    </label>
-  );
-  return (
-    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(35,38,43,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
-      <div style={{ background: '#fff', borderRadius: 12, padding: 18, width: '100%', maxWidth: 520, display: 'flex', gap: 18, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-        <div style={{ width: 180, aspectRatio: '3/4', borderRadius: 8, border: '0.5px solid var(--border-light)', backgroundColor: 'var(--light)', backgroundImage: `url(${c.image_url})`, backgroundSize: fit, backgroundRepeat: 'no-repeat', backgroundPosition: `${x}% ${y}%`, flexShrink: 0 }} />
-        <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif" }}>Adjust flyer</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{c.name}</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className={fit === 'contain' ? 'btn-gold' : 'btn-ghost'} style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => setFit('contain')}>Show whole flyer</button>
-            <button className={fit === 'cover' ? 'btn-gold' : 'btn-ghost'} style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => setFit('cover')}>Fill the card</button>
-          </div>
-          {slider('Left / right', x, setX, fit !== 'cover')}
-          {slider('Up / down', y, setY, fit !== 'cover')}
-          {fit !== 'cover' && <div style={{ fontSize: 11, color: 'var(--muted)' }}>Choose "Fill the card" to slide the flyer into position.</div>}
-          {err && <div style={{ fontSize: 12, color: '#b3402a' }}>{err}</div>}
-          <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
-            <button className="btn-gold" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
-            <button className="btn-ghost" onClick={onClose}>Cancel</button>
-            <button className="btn-ghost" style={{ marginLeft: 'auto' }} onClick={() => { setFit('contain'); setX(50); setY(50); }}>Reset</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EventFlyerCard({ c, onOpen, onChanged }) {
+function EventFlyerCard({ c, onOpen, onMerge }) {
   const dateStr = c.date ? new Date(`${c.date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No date set';
   const cancelled = c.status === 'cancelled';
   const style = cancelled ? STATUS_STYLE.cancelled : null;
-  const frame = flyerFrame(c.website);
-  const [adjusting, setAdjusting] = useState(false);
   return (
     <div onClick={() => onOpen(c.name)}
       style={{ background: '#fff', border: '0.5px solid ' + (cancelled ? style.fg : 'var(--border-light)'), borderRadius: 12, overflow: 'hidden', cursor: 'pointer', position: 'relative', opacity: cancelled ? 0.75 : 1 }}>
@@ -252,21 +197,68 @@ function EventFlyerCard({ c, onOpen, onChanged }) {
       <div style={{
         width: '100%', aspectRatio: '3/4', backgroundColor: 'var(--light)',
         backgroundImage: c.image_url ? `url(${c.image_url})` : 'linear-gradient(135deg,var(--light),#e4d9c6)',
-        backgroundSize: frame.fit, backgroundRepeat: 'no-repeat', backgroundPosition: `${frame.x}% ${frame.y}%`,
-        filter: cancelled ? 'grayscale(0.6)' : 'none', position: 'relative',
-      }}>
-        {c.image_url && c.committee_id && (
-          <button type="button" title="Change how the flyer sits in this card" onClick={e => { e.stopPropagation(); setAdjusting(true); }}
-            style={{ position: 'absolute', left: 8, bottom: 8, background: 'rgba(255,255,255,0.92)', border: '0.5px solid var(--border)', borderRadius: 20, fontSize: 11, padding: '3px 10px', cursor: 'pointer' }}>Adjust flyer</button>
-        )}
-      </div>
-      {adjusting && <div onClick={e => e.stopPropagation()}><FlyerAdjust c={c} onClose={() => setAdjusting(false)} onSaved={() => { setAdjusting(false); if (onChanged) onChanged(); }} /></div>}
+        backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center',
+        filter: cancelled ? 'grayscale(0.6)' : 'none',
+      }} />
       <div style={{ padding: '10px 12px' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{dateStr}</div>
         <div style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 11 }}>
           {!cancelled && (c.rsvp_only ? <span style={{ background: '#f0ebe2', color: 'var(--gold)', fontSize: 10, fontWeight: 700, padding: '1px 8px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: 0.4 }}>RSVP</span> : <span style={{ color: '#4a5d3a', fontWeight: 600 }}>{money(c.earnings)}</span>)}
           <span style={{ color: '#c07040', fontWeight: 600 }}>-{money(c.costs)}</span>
+          {c.committee_id && onMerge && (
+            <button type="button" title="Merge this event into another one" onClick={e => { e.stopPropagation(); onMerge(c); }}
+              style={{ marginLeft: 'auto', background: 'none', border: '0.5px solid var(--border)', borderRadius: 20, fontSize: 11, padding: '2px 10px', cursor: 'pointer', color: 'var(--muted)' }}>Merge</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Merge one event into another: everything on the card you start from (checklist, vendors, notes, budget and earnings lines,
+// sponsor items, feedback, planning areas, flyer) moves onto the event you pick, then the starting card is removed.
+function MergeEvents({ source, targets, onClose, onDone }) {
+  const [targetId, setTargetId] = useState('');
+  const [preview, setPreview] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const target = targets.find(t => t.committee_id === targetId);
+  async function check() {
+    setBusy(true); setErr('');
+    try { setPreview(await previewCommitteeMerge(source.committee_id, targetId)); } catch (e) { setErr(e.message || 'Could not check these events.'); }
+    setBusy(false);
+  }
+  async function run() {
+    setBusy(true); setErr('');
+    try { await mergeCommitteeEvents(source.committee_id, targetId); onDone(); } catch (e) { setErr(e.message || 'Could not merge. Nothing was deleted.'); setBusy(false); }
+  }
+  const line = (n, label) => n > 0 && <li key={label}>{n} {label}</li>;
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget && !busy) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(35,38,43,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 20, width: '100%', maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif", marginBottom: 6 }}>Merge events</div>
+        <div style={{ fontSize: 13, marginBottom: 12 }}>Move everything from <strong>{source.name}</strong> into the event you pick. The one you pick stays; <strong>{source.name}</strong> is removed afterward.</div>
+        <select value={targetId} disabled={busy} onChange={e => { setTargetId(e.target.value); setPreview(null); setErr(''); }} style={{ width: '100%', padding: '9px 10px', border: '0.5px solid #d8d0c4', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', marginBottom: 12 }}>
+          <option value="">Merge into…</option>
+          {targets.map(t => <option key={t.committee_id} value={t.committee_id}>{t.name}{t.date ? ' · ' + t.date : ''}</option>)}
+        </select>
+        {preview && (
+          <div style={{ fontSize: 13, background: '#faf6ef', border: '0.5px solid #e6dcc8', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+            {preview.total === 0 ? 'Nothing to move except the card itself.' : <>These move onto <strong>{target && target.name}</strong>:<ul style={{ margin: '6px 0 0', paddingLeft: 20 }}>
+              {line(preview.checklist, 'checklist items')}{line(preview.vendors, 'vendors / needs')}{line(preview.notes, 'quick notes')}{line(preview.timeline, 'day-of timeline items')}
+              {line(preview.budget, 'budget lines')}{line(preview.earnings, 'earnings lines')}{line(preview.auction, 'sponsor items')}{line(preview.feedback, 'feedback entries')}{line(preview.areas, 'planning areas')}
+              {preview.committeeNotes ? <li>Committee notes (added under the other event's notes)</li> : null}
+            </ul></>}
+            <div style={{ marginTop: 8, color: 'var(--muted)' }}>Details the other event already has are kept; blanks are filled in from this one.</div>
+          </div>
+        )}
+        {err && <div style={{ fontSize: 12, color: '#b3402a', marginBottom: 10 }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {!preview
+            ? <button className="btn-gold" disabled={!targetId || busy} onClick={check}>{busy ? 'Checking…' : 'Review merge'}</button>
+            : <button className="btn-gold" disabled={busy} onClick={run}>{busy ? 'Merging…' : 'Merge and remove this card'}</button>}
+          <button className="btn-ghost" disabled={busy} onClick={onClose}>Cancel</button>
         </div>
       </div>
     </div>
@@ -275,6 +267,7 @@ function EventFlyerCard({ c, onOpen, onChanged }) {
 
 function EventCardsGrid({ onOpen }) {
   const [cards, setCards] = useState(null);
+  const [merging, setMerging] = useState(null);
 
   const load = () => fetchAllEventCards().then(setCards).catch(() => setCards({ upcoming: [], past: [] }));
   useEffect(() => { load(); }, []);
@@ -290,7 +283,7 @@ function EventCardsGrid({ onOpen }) {
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Upcoming Events</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 }}>
-            {cards.upcoming.map(c => <EventFlyerCard key={c.name} c={c} onOpen={onOpen} onChanged={load} />)}
+            {cards.upcoming.map(c => <EventFlyerCard key={c.name} c={c} onOpen={onOpen} onMerge={setMerging} />)}
           </div>
         </div>
       )}
@@ -298,11 +291,12 @@ function EventCardsGrid({ onOpen }) {
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Past Events</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 }}>
-            {cards.past.map(c => <EventFlyerCard key={c.name} c={c} onOpen={onOpen} onChanged={load} />)}
+            {cards.past.map(c => <EventFlyerCard key={c.name} c={c} onOpen={onOpen} onMerge={setMerging} />)}
           </div>
         </div>
       )}
       <HiddenEvents onChanged={load} />
+      {merging && <MergeEvents source={merging} targets={[...cards.upcoming, ...cards.past].filter(c => c.committee_id && c.committee_id !== merging.committee_id)} onClose={() => setMerging(null)} onDone={() => { setMerging(null); load(); }} />}
     </div>
   );
 }
