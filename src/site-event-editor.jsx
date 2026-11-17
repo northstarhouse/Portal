@@ -13,7 +13,54 @@ const blank = () => ({
   date: '', start_time: '18:00', end_time: '', date_tbd: false,
   location_name: 'North Star House', location_address: '12075 Auburn Rd, Grass Valley, CA 95949, USA',
   registration_type: 'NONE', ticket_tiers: [{ name: 'General Admission', price: '', limit: '' }], ticket_limit_per_order: '20',
+  featured_frame: null,
 });
+
+// A small copy of the website's homepage "Featured event" box (shown there for the next upcoming event).
+// Two sliders trim a too-long flyer: how much of its height shows, and which part stays in view.
+// frame = {keep, focusY, ratio} (ratio = width/height of the trimmed frame); null = the whole flyer.
+function HomepagePreview({ f, frame, onChange }) {
+  const [nat, setNat] = React.useState(null); // flyer's own width / height
+  const keep = frame ? Number(frame.keep) : 1;
+  const focusY = frame ? Number(frame.focusY) || 0 : 0;
+  const update = (k, y) => onChange(k >= 0.995 || !nat ? null : { keep: k, focusY: y, ratio: Math.round((nat / k) * 10000) / 10000 });
+  const when = f.date_tbd || !f.date ? '' : new Date(f.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const box = frame && nat ? { aspectRatio: String(frame.ratio) } : {};
+  return (
+    <div style={{ marginTop: 16, paddingTop: 14, borderTop: '0.5px solid #f0ebe0' }}>
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>Homepage preview: how the photo looks in the "Featured event" box when this is the next event. Use the sliders if the flyer is too long.</div>
+      {/* Same size as on the website (desktop): the photo column is 461px wide there. */}
+      <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '0.5px solid #e0d8cc', overflow: 'hidden' }}>
+        <div style={{ width: 461, maxWidth: '100%', flexShrink: 0, position: 'relative', overflow: 'hidden', background: '#3a3d40', ...box }}>
+          <img
+            src={f.image_url}
+            alt=""
+            onLoad={(e) => setNat(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)}
+            style={frame && nat
+              ? { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% ' + focusY + '%' }
+              : { display: 'block', width: '100%', height: 'auto' }}
+          />
+        </div>
+        <div style={{ padding: '16px 20px', minWidth: 0 }}>
+          <div style={{ fontSize: 12, color: '#888' }}>Featured event</div>
+          <div style={{ fontFamily: 'Georgia, serif', fontSize: 22, fontWeight: 600, color: '#2a2a2a', lineHeight: 1.2, margin: '4px 0 8px' }}>{f.title || 'Event title'}</div>
+          {when && <div style={{ fontSize: 13, color: '#555' }}>{when}</div>}
+          <div style={{ display: 'inline-block', marginTop: 12, background: GOLD, color: '#fff', borderRadius: 20, padding: '7px 16px', fontSize: 12 }}>{f.registration_type === 'TICKETING' ? 'Get tickets' : 'View details'}</div>
+        </div>
+      </div>
+      <label style={{ ...label, marginTop: 12, marginBottom: 6, maxWidth: 520 }}>How much of the flyer's height shows: {Math.round(keep * 100)}%
+        <input type="range" min="50" max="100" step="1" disabled={!nat} value={Math.round(keep * 100)} onChange={(e) => update(Number(e.target.value) / 100, focusY)} />
+      </label>
+      {frame && (
+        <label style={{ ...label, marginBottom: 6, maxWidth: 520 }}>Which part stays in view: {focusY <= 3 ? 'the top' : focusY >= 97 ? 'the bottom' : focusY > 40 && focusY < 60 ? 'the middle' : focusY + '% down'}
+          <input type="range" min="0" max="100" step="1" value={focusY} onChange={(e) => update(keep, Number(e.target.value))} />
+        </label>
+      )}
+      {frame && <button type="button" onClick={() => onChange(null)} style={{ background: 'none', color: GOLD, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>Show the whole flyer again</button>}
+      <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>Only the homepage box is trimmed. The event's own page always shows the whole flyer. Press Save to apply.</div>
+    </div>
+  );
+}
 
 export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
   const [f, setF] = React.useState(blank);
@@ -163,11 +210,12 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="button" onClick={() => setPicker(true)} style={{ background: '#fff', color: GOLD, border: '1px solid ' + GOLD, borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{f.image_url ? 'Change photo' : 'Choose a photo'}</button>
                 {!f.image_url && <span style={{ alignSelf: 'center', fontSize: 12, color: '#888' }}>No photo? The website shows "More information to come".</span>}
-                {f.image_url && <button type="button" onClick={() => { set('image_url', ''); set('image_alt', ''); }} style={{ background: 'none', color: '#888', border: 'none', fontSize: 13, cursor: 'pointer' }}>Remove</button>}
+                {f.image_url && <button type="button" onClick={() => { set('image_url', ''); set('image_alt', ''); set('featured_frame', null); }} style={{ background: 'none', color: '#888', border: 'none', fontSize: 13, cursor: 'pointer' }}>Remove</button>}
               </div>
               <input style={input} value={f.image_alt} onChange={(e) => set('image_alt', e.target.value)} placeholder="Describe the photo (for screen readers)" />
             </div>
           </div>
+          {f.image_url && <HomepagePreview key={f.image_url} f={f} frame={f.featured_frame || null} onChange={(v) => set('featured_frame', v)} />}
         </div>
       </div>
 
@@ -243,7 +291,7 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
         ))}
       </div>
 
-      {picker && <MediaPicker supabaseUrl={supabaseUrl} supabaseKey={supabaseKey} onPick={(img) => { set('image_url', img.url); if (img.alt && !f.image_alt) set('image_alt', img.alt); setPicker(false); }} onClose={() => setPicker(false)} />}
+      {picker && <MediaPicker supabaseUrl={supabaseUrl} supabaseKey={supabaseKey} onPick={(img) => { set('image_url', img.url); set('featured_frame', null); if (img.alt && !f.image_alt) set('image_alt', img.alt); setPicker(false); }} onClose={() => setPicker(false)} />}
     </div>
   );
 }

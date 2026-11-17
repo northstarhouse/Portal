@@ -213,6 +213,7 @@ Deno.serve(async (req) => {
         // deno-lint-ignore no-explicit-any
         ticket_tiers: (Array.isArray(r.ticket_tiers) && r.ticket_tiers.length ? r.ticket_tiers : [{ name: 'General Admission', price: '', limit: '' }]).map((t: any) => ({ name: t.name || '', price: t.price != null ? String(t.price) : '', limit: t.limitPerCheckout != null ? String(t.limitPerCheckout) : '' })),
         ticket_limit_per_order: String(r.ticket_limit_per_order || 20),
+        featured_frame: r.featured_frame || null,
       } })
     }
 
@@ -257,6 +258,15 @@ Deno.serve(async (req) => {
         currency: 'USD',
         seo_description: String(e.short_description || '').trim().slice(0, 300),
         updated_at: new Date().toISOString(),
+      }
+      // Homepage "Featured event" box: how much of a too-long flyer shows ({keep, focusY, ratio}; null = whole flyer).
+      // Only touched when the form sends it, so other callers (Events Committee push) leave it alone.
+      if ('featured_frame' in e) {
+        const f = e.featured_frame
+        const keep = Number(f?.keep), ratio = Number(f?.ratio)
+        row.featured_frame = String(e.image_url || '').trim() && f && keep > 0 && keep < 1 && ratio > 0 && ratio < 10
+          ? { keep: Math.max(0.4, keep), focusY: Math.max(0, Math.min(100, Number(f.focusY) || 0)), ratio }
+          : null
       }
 
       const id = String(e.id || '')
