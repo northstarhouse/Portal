@@ -1591,7 +1591,7 @@ function WebsiteLink({ ev, onUpdate }) {
   const [list, setList] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
-  useEffect(() => { let live = true; fetchWebsiteEvents().then(l => { if (live) setList(l); }).catch(() => { if (live) setList([]); }); return () => { live = false; }; }, []);
+  useEffect(() => { let live = true; fetchWebsiteEvents().then(l => { if (live) setList(l); }).catch((e) => { if (live) { setList([]); setMsg({ ok: false, text: 'Could not load the website events: ' + (e && e.message ? e.message : 'try again') }); } }); return () => { live = false; }; }, []);
   const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const statusText = s => s === 'published' ? 'live' : s === 'archived' ? 'ended' : 'draft';
   const when = x => x.date_tbd ? 'date to be announced' : (x.start_at ? new Date(x.start_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) : 'no date');
