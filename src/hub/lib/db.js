@@ -1301,7 +1301,7 @@ export async function mergeCommitteeEvents(sourceId, targetId) {
     vendors: uniq([...arr(target.vendors), ...arr(source.vendors)], (x) => String(x.id || x.name || '').toLowerCase()),
     notes: uniq([...arr(target.notes), ...arr(source.notes)], (x) => x.id || JSON.stringify(x)),
     timeline: uniq([...arr(target.timeline), ...arr(source.timeline)], (x) => x.id || JSON.stringify(x)),
-    committee_notes: sNotes && sNotes !== tNotes ? [tNotes, `From ${source.name}:\n${sNotes}`].filter(Boolean).join('\n\n') : (tNotes || null),
+    committee_notes: sNotes && !tNotes.includes(sNotes) ? [tNotes, `From ${source.name}:\n${sNotes}`].filter(Boolean).join('\n\n') : (tNotes || null),
     guest_invited: Math.max(Number(target.guest_invited) || 0, Number(source.guest_invited) || 0),
     guest_confirmed: Math.max(Number(target.guest_confirmed) || 0, Number(source.guest_confirmed) || 0),
   };
@@ -1310,6 +1310,9 @@ export async function mergeCommitteeEvents(sourceId, targetId) {
   // records that point at the event by name
   const failed = [];
   for (const tb of MERGE_NAME_TABLES) {
+    // nothing under the old name: nothing to move (and some tables refuse an update even when no rows match)
+    const present = await get(`${tb.path}?${tb.col}=eq.${enc(source.name)}&select=${tb.col}&limit=1`);
+    if (!Array.isArray(present) || !present.length) continue;
     const r = await patch(`${tb.path}?${tb.col}=eq.${enc(source.name)}`, { [tb.col]: target.name });
     if (r && r.code) failed.push(tb.path.replace('%20', ' '));
   }
