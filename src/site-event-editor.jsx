@@ -69,6 +69,8 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
   const [picker, setPicker] = React.useState(false);  // The web address follows the title until the team types their own.
   const [slugTouched, setSlugTouched] = React.useState(false);
   const slugify = (v) => String(v || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
+  // While typing a web address, keep a trailing dash so a dash can be added; it is trimmed when you leave the box.
+  const slugTyping = (v) => String(v || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 80);
   const [events, setEvents] = React.useState(null);
   const set = (k, v) => setF((o) => ({ ...o, [k]: v }));
   // B / I buttons: wrap the selected words in ** or * (click again to take it off).
@@ -188,7 +190,7 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
       <div style={card}>
         <div style={heading}>The event</div>
         <label style={label}>Title *<input style={input} value={f.title} onChange={(e) => { const v = e.target.value; setF((o) => ({ ...o, title: v, slug: slugTouched ? o.slug : slugify(v) })); }} placeholder="e.g. Holiday Open House" /></label>
-        <label style={label}>Web address (the last part of the event's link)<input style={input} value={f.slug} onChange={(e) => { setSlugTouched(true); set('slug', slugify(e.target.value)); }} placeholder="holiday-open-house" /><span style={{ fontSize: 11, color: '#aaa' }}>Letters, numbers and dashes only. It fills in from the title unless you type your own.{f.id ? ' Changing it after the event is published breaks links people already have.' : ''}</span></label>
+        <label style={label}>Web address (the last part of the event's link)<input style={input} value={f.slug} onChange={(e) => { setSlugTouched(true); set('slug', slugTyping(e.target.value)); }} onBlur={() => set('slug', slugify(f.slug))} placeholder="holiday-open-house" /><span style={{ fontSize: 11, color: '#aaa' }}>Letters, numbers and dashes only. It fills in from the title unless you type your own.{f.id ? ' Changing it after the event is published breaks links people already have.' : ''}</span></label>
         <label style={label}>Short description (shown in lists and when shared)<input style={input} maxLength={300} value={f.short_description} onChange={(e) => set('short_description', e.target.value)} placeholder="One or two sentences" /></label>
         <div style={label}>Full description
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>

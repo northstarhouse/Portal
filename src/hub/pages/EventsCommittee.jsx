@@ -1587,7 +1587,7 @@ function EventBasicsView({ f, ev, rsvp }) {
 
 // Dropdown that connects this committee event to an event on the website (Admin > New Event). Picking one fills this event's
 // details from the website event, marks it as on the website, and lets "Update website event" keep them in step.
-function WebsiteLink({ ev, onUpdate }) {
+function WebsiteLink({ ev, onUpdate, onConnected }) {
   const [list, setList] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -1616,7 +1616,7 @@ function WebsiteLink({ ev, onUpdate }) {
     }
     if (ev.siteEventId !== id && !window.confirm('Connect to this website event? This event\'s description, date, times, photo and tickets are filled in from the website event.')) return;
     setBusy(true);
-    try { apply(id, await fetchWebsiteEvent(id)); setMsg({ ok: true, text: 'Connected. Details were filled in from the website event.' }); }
+    try { apply(id, await fetchWebsiteEvent(id)); setMsg({ ok: true, text: 'Connected. Details were filled in from the website event.' }); if (onConnected) onConnected(); }
     catch (err) { setMsg({ ok: false, text: err.message || 'Could not load the website event.' }); }
     setBusy(false);
   }
@@ -1649,6 +1649,8 @@ function WebsiteLink({ ev, onUpdate }) {
 function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
   const w = ev.website || {};
   const slugify = v => String(v || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
+  // While typing a web address, keep a trailing dash so a dash can be added; it is trimmed when you leave the box.
+  const slugTyping = v => String(v || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 80);
   const initial = () => ({
     title: ev.name || '', slug: w.slug || '', slugTouched: !!w.slug, short: w.short_description || '', desc: ev.description || '',
     imageUrl: w.image_url || '', imageAlt: w.image_alt || '', dateTbd: w.date_tbd === true, date: ev.date || '',
@@ -1739,6 +1741,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
 
   return (
     <div style={{ marginBottom: 24 }}>
+      <WebsiteLink ev={ev} onUpdate={onUpdate} onConnected={() => setEditing(false)} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', minHeight: 28 }}>
         {!editing && <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 14px' }} onClick={() => setEditing(true)}>Edit</button>}
       </div>
@@ -1750,7 +1753,6 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
 
       {!editing ? (
         <div>
-          <WebsiteLink ev={ev} onUpdate={onUpdate} />
           <EventBasicsView f={f} ev={ev} rsvp={rsvpSaved} />
           <RsvpPanel key={String(rsvpSaved)} eventName={ev.name} hideToggle />
           {msg && <div style={{ fontSize: 12, margin: '12px 0 0', color: msg.ok ? '#2e7d32' : '#b3402a' }}>{msg.text}</div>}
@@ -1765,7 +1767,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
           <div style={{ ...head, marginTop: 8, borderTop: 'none', paddingTop: 0 }}>The event</div>
           <label style={lab}>Title *<input style={inp} value={f.title} onChange={e => { const v = e.target.value; setF(o => ({ ...o, title: v, slug: o.slugTouched ? o.slug : slugify(v) })); }} placeholder="e.g. Holiday Open House" /></label>
           <label style={lab}>Web address (the last part of the event's link)
-            <input style={inp} value={f.slug} onChange={e => setF(o => ({ ...o, slugTouched: true, slug: slugify(e.target.value) }))} placeholder="holiday-open-house" />
+            <input style={inp} value={f.slug} onChange={e => setF(o => ({ ...o, slugTouched: true, slug: slugTyping(e.target.value) }))} onBlur={() => setF(o => ({ ...o, slug: slugify(o.slug) }))} placeholder="holiday-open-house" />
             <span className="edit-only" style={note}>Letters, numbers and dashes only. It fills in from the title unless you type your own.{ev.siteEventId ? ' Changing it after the event is published breaks links people already have.' : ''}</span>
           </label>
           <label style={lab}>Short description (shown in lists and when shared) *<input style={inp} maxLength={300} value={f.short} onChange={e => set('short', e.target.value)} placeholder="One or two sentences" /></label>
@@ -2955,6 +2957,51 @@ function EventModal({ editing, onSave, onCancel }) {
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
+// Connects committee events to their website events by themselves, so nobody has to: a website event whose date (Pacific)
+// matches the committee event's date, or whose title matches its name. Details the committee event is missing are filled
+// in from the website event (nothing already filled in is overwritten). Silent when the website list can't be read.
+async function autoLinkToWebsite(list) {
+  let site;
+  try { site = await fetchWebsiteEvents(); } catch { return list; }
+  if (!Array.isArray(site) || !site.length) return list;
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const dateOf = s => (s.start_at && !s.date_tbd) ? new Date(s.start_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '';
+  const used = new Set(list.map(e => e.siteEventId).filter(Boolean));
+  const links = new Map(); // committee event id -> website event id
+  const take = (e, s) => { links.set(e.id, s.id); used.add(s.id); };
+  const open = () => list.filter(e => !e.siteEventId && !links.has(e.id));
+  // 1. same title
+  open().forEach(e => { const s = site.find(x => !used.has(x.id) && norm(x.title) === norm(e.name)); if (s) take(e, s); });
+  // 2. same date, when it is unambiguous (one website event free that day, one committee event waiting that day)
+  open().forEach(e => {
+    if (!e.date) return;
+    const sameDay = open().filter(x => x.date === e.date);
+    const cands = site.filter(x => !used.has(x.id) && dateOf(x) === e.date);
+    if (sameDay.length === 1 && cands.length === 1) take(e, cands[0]);
+  });
+  if (!links.size) return list;
+  const out = [];
+  for (const e of list) {
+    const siteId = links.get(e.id);
+    if (!siteId) { out.push(e); continue; }
+    try {
+      const w = await fetchWebsiteEvent(siteId);
+      const ticketed = w.registration_type === 'TICKETING';
+      const linked = {
+        ...e, siteEventId: siteId,
+        description: e.description || w.description || '',
+        date: e.date || (w.date_tbd ? '' : w.date) || '', startTime: e.startTime || (w.date_tbd ? '' : w.start_time) || '', endTime: e.endTime || (w.date_tbd ? '' : w.end_time) || '',
+        location: e.location || w.location_name || '',
+        ticketTiers: (e.ticketTiers && e.ticketTiers.length) ? e.ticketTiers : (ticketed ? (w.ticket_tiers || []).filter(t => String(t.name || '').trim()) : []),
+        website: { ...(e.website || {}), slug: w.slug || '', short_description: w.short_description || '', image_url: w.image_url || '', image_alt: w.image_alt || '', date_tbd: !!w.date_tbd, location_name: w.location_name || '', location_address: w.location_address || '', sells_tickets: ticketed },
+      };
+      const saved = await updateCommitteeEvent(e.id, toDb(linked));
+      out.push(saved && saved.error ? e : linked);
+    } catch { out.push(e); }
+  }
+  return out;
+}
+
 export default function EventsCommittee() {
   const { session, volunteer, currentCommitteeEvent, setCurrentCommitteeEvent } = useVol();
   const [events, setEvents] = useState([]);
@@ -3003,6 +3050,10 @@ export default function EventsCommittee() {
         if (match) setSelectedId(match.id);
         setCurrentCommitteeEvent(null);
       }
+
+      // connect events to their website events by date/title (quietly; staff only, since the website list needs a staff sign-in)
+      const linkedList = await autoLinkToWebsite(mapped).catch(() => mapped);
+      mapped.splice(0, mapped.length, ...linkedList);
 
       setEvents(mapped);
       setLoading(false);
