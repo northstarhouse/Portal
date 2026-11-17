@@ -251,7 +251,8 @@ Deno.serve(async (req) => {
     const up = await sb(`/rest/v1/estate_tours?id=eq.${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ date, start_time: time, reminder_24h_sent_at: null, reminder_1h_sent_at: null }),
+      // a moved tour gets its reminders AND its after-tour pre-booking email for the new time, not the old one
+      body: JSON.stringify({ date, start_time: time, reminder_24h_sent_at: null, reminder_1h_sent_at: null, prebooking_form_sent_at: null }),
     })
     if (!up.ok) {
       const err = await up.text()

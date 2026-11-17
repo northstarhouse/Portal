@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
   // ── On-demand action: coordinator clicked "Reviewed - Send Proposal" ──
   if (req.method === 'POST') {
     let body: any = {};
-    try { body = await req.json(); } catch { /* no body / not JSON */ }
+    try { body = await req.clone().json(); } catch { /* no body / not JSON */ }
     if (body?.action === 'send_proposal' && body?.inquiryId) {
       try {
         const templates = await getTemplates();
@@ -223,6 +223,34 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
       } catch (e: any) {
         return new Response(JSON.stringify({ error: e.message || String(e) }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+  }
+
+  // On-demand: send the after-tour pre-booking email for one estate tour that missed the automatic 1-2 hour window.
+  // Sends once only (it records prebooking_form_sent_at, and refuses if that is already set).
+  if (req.method === 'POST') {
+    let b2: any = {};
+    try { b2 = await req.clone().json(); } catch { /* no body */ }
+    if (b2?.action === 'send_tour_prebooking' && b2?.estateTourId) {
+      const jh = { 'Content-Type': 'application/json' };
+      try {
+        const rows = await rest(`estate_tours?select=*&id=eq.${encodeURIComponent(b2.estateTourId)}`);
+        const tour = rows?.[0];
+        if (!tour) return new Response(JSON.stringify({ error: 'Tour not found' }), { status: 404, headers: jh });
+        if (!tour.visitor_email) return new Response(JSON.stringify({ error: 'This tour has no email address' }), { status: 400, headers: jh });
+        if (tour.status !== 'booked') return new Response(JSON.stringify({ error: `This tour is ${tour.status}, so no email was sent` }), { status: 409, headers: jh });
+        if (tour.prebooking_form_sent_at) return new Response(JSON.stringify({ error: 'The pre-booking email was already sent for this tour' }), { status: 409, headers: jh });
+        const templates = await getTemplates();
+        const category = estateTourCategory(tour);
+        const prebookingLink = prebookingFormUrlFor(category);
+        await sendTemplated(touredDocsFor(templates.toured_docs, category), tour.visitor_email,
+          { name: tour.visitor_name || 'there', host_name: tour.guide_name || '', guidebook_link: GUIDEBOOK_URL, prebooking_link: prebookingLink, availability_calendar_link: AVAILABILITY_CALENDAR_URL },
+          { name: escapeHtml(tour.visitor_name || 'there'), host_name: escapeHtml(tour.guide_name || ''), guidebook_link: GUIDEBOOK_URL, prebooking_link: prebookingLink, availability_calendar_link: AVAILABILITY_CALENDAR_URL });
+        await rest(`estate_tours?id=eq.${tour.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ prebooking_form_sent_at: new Date().toISOString() }) });
+        return new Response(JSON.stringify({ success: true, to: tour.visitor_email }), { headers: jh });
+      } catch (e: any) {
+        return new Response(JSON.stringify({ error: e.message || String(e) }), { status: 500, headers: jh });
       }
     }
   }
