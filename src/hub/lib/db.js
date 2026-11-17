@@ -703,6 +703,9 @@ export async function fetchMergedEventCards() {
     const b = ensure(r.name, r.date);
     if (!b) return;
     b.status = r.status || null;
+    // how the flyer sits in the card (set with "Adjust flyer"); kept in the committee event's website settings
+    b.committee_id = r.id;
+    b.website = r.website && typeof r.website === 'object' ? r.website : {};
     if (!b.date && r.date) b.date = toIsoDate(r.date);
     if (r.hidden) b.hidden = true; // staff chose to hide this event from the cards
   });

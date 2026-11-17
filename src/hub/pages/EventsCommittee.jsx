@@ -182,10 +182,65 @@ const STATUS_STYLE = {
 // Event Overviews page -- the committee's full list should look like those,
 // not a from-scratch calendar grid.
 
-function EventFlyerCard({ c, onOpen }) {
+// How a flyer sits in its card: whole flyer ("contain") or filling the card ("cover") with a focus point (x/y percent).
+const flyerFrame = (w) => {
+  const x = Number.isFinite(Number(w && w.card_x)) && w && w.card_x != null ? Number(w.card_x) : 50;
+  const y = Number.isFinite(Number(w && w.card_y)) && w && w.card_y != null ? Number(w.card_y) : 50;
+  return { fit: w && w.card_fit === 'cover' ? 'cover' : 'contain', x, y };
+};
+
+// Popup to change how the flyer sits in the card: show it whole, or fill the card and slide it into place.
+function FlyerAdjust({ c, onClose, onSaved }) {
+  const start = flyerFrame(c.website);
+  const [fit, setFit] = useState(start.fit);
+  const [x, setX] = useState(start.x);
+  const [y, setY] = useState(start.y);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  async function save() {
+    setBusy(true); setErr('');
+    const r = await updateCommitteeEvent(c.committee_id, { website: { ...(c.website || {}), card_fit: fit, card_x: x, card_y: y } });
+    setBusy(false);
+    if (r && r.error) { setErr('Could not save. Please try again.'); return; }
+    onSaved();
+  }
+  const slider = (label, v, set, disabled) => (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--muted)', opacity: disabled ? 0.45 : 1 }}>{label}
+      <input type="range" min="0" max="100" value={v} disabled={disabled} onChange={e => set(Number(e.target.value))} />
+    </label>
+  );
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(35,38,43,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 18, width: '100%', maxWidth: 520, display: 'flex', gap: 18, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: 180, aspectRatio: '3/4', borderRadius: 8, border: '0.5px solid var(--border-light)', backgroundColor: 'var(--light)', backgroundImage: `url(${c.image_url})`, backgroundSize: fit, backgroundRepeat: 'no-repeat', backgroundPosition: `${x}% ${y}%`, flexShrink: 0 }} />
+        <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif" }}>Adjust flyer</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{c.name}</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className={fit === 'contain' ? 'btn-gold' : 'btn-ghost'} style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => setFit('contain')}>Show whole flyer</button>
+            <button className={fit === 'cover' ? 'btn-gold' : 'btn-ghost'} style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => setFit('cover')}>Fill the card</button>
+          </div>
+          {slider('Left / right', x, setX, fit !== 'cover')}
+          {slider('Up / down', y, setY, fit !== 'cover')}
+          {fit !== 'cover' && <div style={{ fontSize: 11, color: 'var(--muted)' }}>Choose "Fill the card" to slide the flyer into position.</div>}
+          {err && <div style={{ fontSize: 12, color: '#b3402a' }}>{err}</div>}
+          <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
+            <button className="btn-gold" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
+            <button className="btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="btn-ghost" style={{ marginLeft: 'auto' }} onClick={() => { setFit('contain'); setX(50); setY(50); }}>Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EventFlyerCard({ c, onOpen, onChanged }) {
   const dateStr = c.date ? new Date(`${c.date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No date set';
   const cancelled = c.status === 'cancelled';
   const style = cancelled ? STATUS_STYLE.cancelled : null;
+  const frame = flyerFrame(c.website);
+  const [adjusting, setAdjusting] = useState(false);
   return (
     <div onClick={() => onOpen(c.name)}
       style={{ background: '#fff', border: '0.5px solid ' + (cancelled ? style.fg : 'var(--border-light)'), borderRadius: 12, overflow: 'hidden', cursor: 'pointer', position: 'relative', opacity: cancelled ? 0.75 : 1 }}>
@@ -195,9 +250,15 @@ function EventFlyerCard({ c, onOpen }) {
       <div style={{
         width: '100%', aspectRatio: '3/4', backgroundColor: 'var(--light)',
         backgroundImage: c.image_url ? `url(${c.image_url})` : 'linear-gradient(135deg,var(--light),#e4d9c6)',
-        backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center',
-        filter: cancelled ? 'grayscale(0.6)' : 'none',
-      }} />
+        backgroundSize: frame.fit, backgroundRepeat: 'no-repeat', backgroundPosition: `${frame.x}% ${frame.y}%`,
+        filter: cancelled ? 'grayscale(0.6)' : 'none', position: 'relative',
+      }}>
+        {c.image_url && c.committee_id && (
+          <button type="button" title="Change how the flyer sits in this card" onClick={e => { e.stopPropagation(); setAdjusting(true); }}
+            style={{ position: 'absolute', left: 8, bottom: 8, background: 'rgba(255,255,255,0.92)', border: '0.5px solid var(--border)', borderRadius: 20, fontSize: 11, padding: '3px 10px', cursor: 'pointer' }}>Adjust flyer</button>
+        )}
+      </div>
+      {adjusting && <div onClick={e => e.stopPropagation()}><FlyerAdjust c={c} onClose={() => setAdjusting(false)} onSaved={() => { setAdjusting(false); if (onChanged) onChanged(); }} /></div>}
       <div style={{ padding: '10px 12px' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{dateStr}</div>
@@ -227,7 +288,7 @@ function EventCardsGrid({ onOpen }) {
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Upcoming Events</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 }}>
-            {cards.upcoming.map(c => <EventFlyerCard key={c.name} c={c} onOpen={onOpen} />)}
+            {cards.upcoming.map(c => <EventFlyerCard key={c.name} c={c} onOpen={onOpen} onChanged={load} />)}
           </div>
         </div>
       )}
@@ -235,7 +296,7 @@ function EventCardsGrid({ onOpen }) {
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Past Events</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 }}>
-            {cards.past.map(c => <EventFlyerCard key={c.name} c={c} onOpen={onOpen} />)}
+            {cards.past.map(c => <EventFlyerCard key={c.name} c={c} onOpen={onOpen} onChanged={load} />)}
           </div>
         </div>
       )}
@@ -1600,6 +1661,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
     date: form.dateTbd ? base.date : form.date, startTime: form.startTime, endTime: form.endTime,
     ticketTiers: form.sells ? form.tiers.filter(t => String(t.name || '').trim()) : (base.ticketTiers || []),
     website: {
+      ...(base.website || {}),
       slug: form.slug, short_description: form.short.trim(), image_url: form.imageUrl, image_alt: form.imageAlt.trim(),
       date_tbd: form.dateTbd, location_name: form.locName.trim(), location_address: form.locAddr.trim(), sells_tickets: form.sells, spaces: form.spaces || [],
     },

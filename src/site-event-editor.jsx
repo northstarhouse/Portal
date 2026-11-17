@@ -37,6 +37,24 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
     set('description', v.slice(0, a) + text + v.slice(b));
     setTimeout(() => { ta.focus(); ta.setSelectionRange(a, a + text.length); }, 0);
   };
+  // Bullets: add (or take off) "- " at the start of each selected line. Line: put "---" (a divider) on its own line after the current one.
+  const prefixSel = (mark) => {
+    const ta = descRef.current; if (!ta) return;
+    const has = (l) => l.trimStart().startsWith(mark + ' ');
+    const v = ta.value, a = v.lastIndexOf('\n', ta.selectionStart - 1) + 1;
+    let e = v.indexOf('\n', ta.selectionEnd); if (e < 0) e = v.length;
+    const lines = v.slice(a, e).split('\n'), all = lines.every((l) => has(l) || !l.trim());
+    const out = lines.map((l) => (!l.trim() ? l : all ? l.replace(mark + ' ', '') : has(l) ? l : mark + ' ' + l)).join('\n');
+    set('description', v.slice(0, a) + out + v.slice(e));
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(a, a + out.length); }, 0);
+  };
+  const lineSel = () => {
+    const ta = descRef.current; if (!ta) return;
+    const v = ta.value; let e = v.indexOf('\n', ta.selectionEnd); if (e < 0) e = v.length;
+    const ins = '\n\n---\n\n';
+    set('description', v.slice(0, e) + ins + v.slice(e).replace(/^\n+/, ''));
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(e + ins.length, e + ins.length); }, 0);
+  };
   const setTier = (i, k, v) => setF((o) => ({ ...o, ticket_tiers: o.ticket_tiers.map((t, j) => (j === i ? { ...t, [k]: v } : t)) }));
   const call = (body) => fetch(supabaseUrl + '/functions/v1/site-events-admin', {
     method: 'POST', headers: { apikey: supabaseKey, Authorization: 'Bearer ' + supabaseKey, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -96,7 +114,10 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <button type="button" title="Bold: select text, then click" onMouseDown={(e) => e.preventDefault()} onClick={() => wrapSel('**')} style={{ width: 30, height: 28, border: '0.5px solid #d9d0c0', borderRadius: 6, background: '#fff', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>B</button>
             <button type="button" title="Italic: select text, then click" onMouseDown={(e) => e.preventDefault()} onClick={() => wrapSel('*')} style={{ width: 30, height: 28, border: '0.5px solid #d9d0c0', borderRadius: 6, background: '#fff', fontStyle: 'italic', cursor: 'pointer', fontFamily: 'inherit' }}>I</button>
-            <span style={{ fontSize: 11, color: '#aaa' }}>Select words, then click B or I (adds ** or * around them)</span>
+            <button type="button" title="Bullets: turns the selected lines (or the current line) into a bullet list" onMouseDown={(e) => e.preventDefault()} onClick={() => prefixSel('-')} style={{ height: 28, padding: '0 10px', border: '0.5px solid #d9d0c0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>• Bullets</button>
+            <button type="button" title="Quote: turns the selected lines (or the current line) into an indented quote" onMouseDown={(e) => e.preventDefault()} onClick={() => prefixSel('>')} style={{ height: 28, padding: '0 10px', border: '0.5px solid #d9d0c0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>❝ Quote</button>
+            <button type="button" title="Adds a thin line across the page" onMouseDown={(e) => e.preventDefault()} onClick={lineSel} style={{ height: 28, padding: '0 10px', border: '0.5px solid #d9d0c0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>— Line</button>
+            <span style={{ fontSize: 11, color: '#aaa' }}>Select words, then click B or I. Bullets and Line work on the line you are on.</span>
           </div>
           <textarea ref={descRef} style={{ ...input, minHeight: 130, resize: 'vertical' }} value={f.description} onChange={(e) => set('description', e.target.value)} placeholder={'Write it like an email. A blank line starts a new paragraph.\nStart a line with "- " to make a bullet list.\nPut **two stars** around words for bold and *one star* for italics.'} />
         </div>

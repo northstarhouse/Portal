@@ -94,6 +94,10 @@ function toDocument(text: string) {
   }
   for (const raw of String(text || '').replace(/\r/g, '').split('\n')) {
     const line = raw.trim()
+    // a line of three or more dashes becomes a thin divider line
+    if (/^(-{3,}|_{3,})$/.test(line)) { flush(); nodes.push({ id: rid(), type: 'DIVIDER', nodes: [], dividerData: { lineStyle: 'SINGLE', width: 'LARGE', alignment: 'CENTER' } }); continue }
+    // a line starting "> " becomes a quote block
+    if (/^>\s*\S/.test(line)) { flush(); nodes.push({ id: rid(), type: 'BLOCKQUOTE', nodes: [para(line.replace(/^>\s*/, ''))], blockquoteData: { indentation: 0 } }); continue }
     if (/^[-•*]\s+/.test(line)) { bullets.push(line.replace(/^[-•*]\s+/, '')); continue }
     flush()
     nodes.push(para(line))
@@ -181,7 +185,7 @@ Deno.serve(async (req) => {
         return t.slice(0, t.indexOf(core)) + mark + core + mark + t.slice(t.indexOf(core) + core.length)
       }).join('')
       // deno-lint-ignore no-explicit-any
-      const lines = ((r.description?.nodes || []) as any[]).flatMap((n) => n.type === 'BULLETED_LIST' || n.type === 'ORDERED_LIST'
+      const lines = ((r.description?.nodes || []) as any[]).flatMap((n) => n.type === 'DIVIDER' ? ['---'] : n.type === 'BLOCKQUOTE' ? ['> ' + textOf(n)] : n.type === 'BULLETED_LIST' || n.type === 'ORDERED_LIST'
         // deno-lint-ignore no-explicit-any
         ? (n.nodes || []).map((li: any) => '- ' + textOf(li)) : [textOf(n)])
       const isPlaceholder = String(r.image_url || '') === PLACEHOLDER_IMAGE
