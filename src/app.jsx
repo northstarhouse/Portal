@@ -16199,7 +16199,7 @@ function TourDetails({ tourId }) {
   var tourDay = t.date ? new Date(t.date + 'T' + (t.start_time || '12:00')) : null;
   var past = tourDay && tourDay < new Date();
   var status = t.status === 'booked' && past ? 'Toured' : (TOUR_STATUS_TEXT[t.status] || t.status);
-  var row = function(k, v) { return v ? <div style={{ display: 'flex', gap: 8, fontSize: 12, marginTop: 2 }}><span style={{ flex: '0 0 130px', color: '#999' }}>{k}</span><span style={{ color: '#3a3226', wordBreak: 'break-word' }}>{v}</span></div> : null; };
+  var row = function(k, v) { return v ? <div style={{ display: 'flex', gap: 8, fontSize: 12, marginTop: 3 }}><span style={{ flex: '0 0 130px', color: '#999' }}>{k}</span><span style={{ color: '#3a3226', fontWeight: 500, wordBreak: 'break-word' }}>{v}</span></div> : null; };
   var history = [];
   if (t.created_at) history.push({ at: t.created_at, text: 'Tour booked or requested' });
   data.log.forEach(function(l) {
@@ -16207,23 +16207,37 @@ function TourDetails({ tourId }) {
     history.push({ at: l.created_at, text: (l.actor_name || 'Someone') + (l.op === 'insert' ? ' added the tour' : l.op === 'delete' ? ' deleted the tour' : ' changed ' + (what.length ? what.join(', ') : 'the tour')) });
   });
   history.sort(function(a, b) { return String(a.at).localeCompare(String(b.at)); });
+  var sec = function(title, children, last) {
+    return <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: '8px 12px', marginTop: last ? 0 : 0, marginBottom: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#886c44', textTransform: 'uppercase', letterSpacing: 0.9, paddingBottom: 5, marginBottom: 4, borderBottom: '1px solid #f0e8d9' }}>{title}</div>
+      {children}
+    </div>;
+  };
+  var sentRow = function(k, at, none) { return row(k, at ? '✓ Sent ' + fmt(at) : none); };
   return (
-    <div style={{ marginTop: 8, padding: '8px 12px', background: '#faf6ef', border: '0.5px solid #eee4d6', borderRadius: 8 }}>
-      {row('Visitor', t.visitor_name)}
-      {row('Email', t.visitor_email)}
-      {row('Phone', t.visitor_phone)}
-      {row('Tour type', t.category)}
-      {row('Guide', t.guide_name)}
-      {row('Tour time', tourDay ? tourDay.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + tourDay.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '')}
-      {row('Status now', status)}
-      {row('Visitor confirmed', t.confirmed_at ? fmt(t.confirmed_at) : '')}
-      {row('24-hour reminder', t.reminder_24h_sent_at ? 'Sent ' + fmt(t.reminder_24h_sent_at) : '')}
-      {row('1-hour reminder', t.reminder_1h_sent_at ? 'Sent ' + fmt(t.reminder_1h_sent_at) : '')}
-      {row('Pre-booking email', t.prebooking_form_sent_at ? 'Sent ' + fmt(t.prebooking_form_sent_at) : (t.status === 'booked' ? 'Not sent yet' : ''))}
-      {row('Staff notes', t.staff_notes)}
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#8a7a62', textTransform: 'uppercase', letterSpacing: 0.8, margin: '10px 0 4px' }}>Changes</div>
-      {history.map(function(h, i) { return <div key={i} style={{ fontSize: 12, color: '#555', marginTop: 2 }}><span style={{ color: '#999' }}>{fmt(h.at)}</span> · {h.text}</div>; })}
-      <div style={{ fontSize: 11, color: '#aaa', marginTop: 6 }}>Changes are listed from when the Portal started recording them; earlier or automatic changes (reminders, cancel links) may not appear.</div>
+    <div style={{ marginTop: 8, padding: 10, background: '#faf6ef', border: '0.5px solid #eee4d6', borderRadius: 10 }}>
+      {sec('Visitor', <div>
+        {row('Name', t.visitor_name)}
+        {row('Email', t.visitor_email)}
+        {row('Phone', t.visitor_phone)}
+      </div>)}
+      {sec('Tour', <div>
+        {row('Type', t.category)}
+        {row('Guide', t.guide_name)}
+        {row('When', tourDay ? tourDay.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + tourDay.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '')}
+        {row('Status now', status)}
+        {row('Visitor confirmed', t.confirmed_at ? '✓ ' + fmt(t.confirmed_at) : '')}
+      </div>)}
+      {sec('Emails sent', <div>
+        {sentRow('24-hour reminder', t.reminder_24h_sent_at, 'Not sent')}
+        {sentRow('1-hour reminder', t.reminder_1h_sent_at, 'Not sent')}
+        {sentRow('Pre-booking form', t.prebooking_form_sent_at, t.status === 'booked' ? 'Not sent yet' : 'Not sent')}
+      </div>)}
+      {t.staff_notes ? sec('Staff notes', <div style={{ fontSize: 12, color: '#3a3226', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{t.staff_notes}</div>) : null}
+      {sec('Changes', <div>
+        {history.map(function(h, i) { return <div key={i} style={{ display: 'flex', gap: 8, fontSize: 12, color: '#3a3226', marginTop: 3 }}><span style={{ flex: '0 0 130px', color: '#999' }}>{fmt(h.at)}</span><span>{h.text}</span></div>; })}
+        <div style={{ fontSize: 11, color: '#aaa', marginTop: 6 }}>Listed from when the Portal started recording changes; earlier or automatic changes (reminders, cancel links) may not appear.</div>
+      </div>)}
     </div>
   );
 }
