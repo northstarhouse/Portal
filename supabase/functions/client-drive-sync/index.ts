@@ -252,12 +252,27 @@ async function invoiceData(pb: any, inq: any, name: string, date: string): Promi
   return { number: code, issued, eventName: name, eventDate: date || null, eventType: evType, clients: people, lines, total, paid: paidAmt, balance: Math.max(0, total - paidAmt), payments: schedule };
 }
 
+// A client's Drive folder is only made once they have paid something: an online payment, a payment logged by hand,
+// or (for HoneyBook bookings) money already collected on the invoice.
+async function hasPayment(pb: any, inq: any): Promise<boolean> {
+  const a = pb.answers || {};
+  const manual = (Array.isArray(a.__venue_checklist?.manual_payments) ? a.__venue_checklist.manual_payments : []).some((m: any) => m?.cents > 0);
+  if (manual) return true;
+  for (const r of a.__honeybook?.file_responses || []) { const p = r?.responses?.payments; if (p && typeof p === "object" && p.amount_paid?.amount > 0) return true; }
+  if (inq?.id) {
+    const rows = await rest("venue_payment_schedule?select=amount_paid_cents,status&inquiry_id=eq." + inq.id);
+    if (Array.isArray(rows) && rows.some((r: any) => r.amount_paid_cents > 0 || r.status === "paid")) return true;
+  }
+  return false;
+}
+
 async function syncClient(pbId: string) {
   const pb = (await rest(`nsh_form_responses?select=id,form_id,answers,created_at&id=eq.${pbId}`))?.[0];
   if (!pb) return { skipped: "no such response" };
   const a = pb.answers || {};
   if (Object.values(a).some((v) => typeof v === "string" && /\+test@thenorthstarhouse\.org/i.test(v))) return { skipped: "test booking" };
   const inq = (await rest(`venue_inquiries?select=*&prebooking_form_response_id=eq.${pbId}&limit=1`))?.[0] || null;
+  if (!(await hasPayment(pb, inq))) return { skipped: "no payment yet, so no Drive folder" };
   const { folderId, folderUrl, folderName, name, date } = await clientFolder(pbId, a, inq);
   const have = await listChildren(folderId);
   const has = (prefix: string) => have.find((f) => f.name.toLowerCase().startsWith(prefix.toLowerCase()));
@@ -265,6 +280,8 @@ async function syncClient(pbId: string) {
 
   const formDoc = async (label: string, formId: string, answers: Record<string, any> | null, when: string | null, refresh = false) => {
     if (!answers || !Object.keys(answers).length) return;
+    // already filed and not one that is refreshed: skip the (memory-heavy) PDF build
+    if (!refresh && have.some((f) => f.name.toLowerCase() === (label + ".pdf").toLowerCase())) return;
     const form = (await rest(`nsh_forms?select=title,fields&id=eq.${formId}`))?.[0];
     const pdfBytes = await formPdf(`${label} - ${name}`, `${form?.title || label}${when ? " - submitted " + String(when).slice(0, 10) : ""}${date ? " - event " + writtenDate(date) : ""}`, buildItems(form?.fields || [], answers));
     const fileName = `${label}.pdf`;
@@ -296,6 +313,23 @@ async function syncClient(pbId: string) {
   };
   if (!qAnswers) { const q = await byEmail(QUESTIONNAIRE_FORM, QUESTIONNAIRE_EMAIL_FIELD); if (q) { qAnswers = q.answers; qWhen = q.created_at; } }
   await formDoc("Pre-Event Questionnaire", QUESTIONNAIRE_FORM, qAnswers, qWhen, true);
+
+  // 2b. clients brought over from HoneyBook answered their questionnaire there: file those answers as the pre-event questionnaire
+  if (!qAnswers && !has("Pre-Event Questionnaire")) {
+    try {
+      const plain = (h: unknown) => String(h || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+      const hbq = (a.__honeybook?.file_responses || []).find((r: any) => /(?:wedding|event) info questionnaire/i.test(r?.title || "") && (r?.responses?.questionnaire?.questions || []).some((q: any) => q.answered));
+      if (hbq) {
+        const items: FormItem[] = (hbq.responses.questionnaire.questions as any[]).filter((q) => q.answered || (q.answer != null && String(q.answer).trim())).map((q) => ({
+          kind: "qa", label: plain(q.question), text: Array.isArray(q.answer) ? q.answer.map(String).join(", ") : typeof q.answer === "object" && q.answer ? JSON.stringify(q.answer) : String(q.answer ?? ""),
+        }) as FormItem);
+        if (items.length) {
+          await uploadFile("Pre-Event Questionnaire.pdf", folderId, "application/pdf", await formPdf("Pre-Event Questionnaire - " + name, "Completed in HoneyBook" + (date ? " - event " + writtenDate(date) : ""), items));
+          done.push("Pre-Event Questionnaire (from HoneyBook)");
+        }
+      }
+    } catch (e: any) { done.push("Questionnaire failed: " + (e?.message || e)); }
+  }
 
   // 3. post-event feedback form
   let fb: any = null;
@@ -345,7 +379,34 @@ async function syncClient(pbId: string) {
     }
   } catch (e: any) { done.push("Invoice failed: " + (e?.message || e)); }
 
+  // 7. brick wording the client chose (3 lines). It cannot be changed once submitted, so it is written once.
+  try {
+    const brick: string[] = Array.isArray(inq?.brick_lines) ? inq.brick_lines.map((l: any) => String(l || "").trim()) : [];
+    if (brick.some((l) => l) && !has("Brick Wording")) {
+      const bytes = await formPdf("Brick Wording - " + name, "Wedding brick engraving" + (inq.brick_submitted_at ? " - submitted " + String(inq.brick_submitted_at).slice(0, 10) : "") + (date ? " - event " + writtenDate(date) : ""),
+        brick.map((l, i) => ({ kind: "qa", label: "Line " + (i + 1), text: l || "(blank)" }) as FormItem));
+      await uploadFile("Brick Wording.pdf", folderId, "application/pdf", bytes);
+      done.push("Brick Wording");
+    }
+  } catch (e: any) { done.push("Brick wording failed: " + (e?.message || e)); }
+
   return { folder: folderName, url: folderUrl, added: done };
+}
+
+// Just the invoice, for a client whose full sync is too heavy to finish in one run.
+async function invoiceOnly(pbId: string) {
+  const pb = (await rest("nsh_form_responses?select=id,form_id,answers,created_at&id=eq." + pbId))?.[0];
+  if (!pb) return { skipped: "no such response" };
+  const a = pb.answers || {};
+  const inq = (await rest("venue_inquiries?select=*&prebooking_form_response_id=eq." + pbId + "&limit=1"))?.[0] || null;
+  if (!(await hasPayment(pb, inq))) return { skipped: "no payment yet, so no Drive folder" };
+  const { folderId, folderName, name, date } = await clientFolder(pbId, a, inq);
+  const have = await listChildren(folderId);
+  if (have.some((f) => f.name.toLowerCase().startsWith("invoice"))) return { folder: folderName, skipped: "invoice already filed" };
+  const inv = await invoiceData(pb, inq, name, date);
+  if (!inv || !(inv.lines.length || inv.payments.length)) return { folder: folderName, skipped: "no invoice on record" };
+  await uploadFile("Invoice.pdf", folderId, "application/pdf", await invoicePdf(inv));
+  return { folder: folderName, added: ["Invoice"] };
 }
 
 // The site manager's final paperwork from the event (checklists, notes, incident forms), uploaded from
@@ -445,6 +506,13 @@ Deno.serve(async (req) => {
       const pbId = await resolvePrebookingId(id);
       if (!pbId) return json({ ok: true, skipped: "not tied to a client" });
       return json({ ok: true, ...(await syncLocked(pbId)) });
+    }
+    if (body.action === "invoice") {
+      const id = String(body.response_id || "");
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "response_id required" }, 400);
+      const pbId = await resolvePrebookingId(id);
+      if (!pbId) return json({ ok: true, skipped: "not tied to a client" });
+      return json({ ok: true, ...(await invoiceOnly(pbId)) });
     }
     if (body.action === "upload_site_manager") {
       const id = String(body.response_id || "");
