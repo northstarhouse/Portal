@@ -876,13 +876,16 @@ function bookingRows(clients, today) {
   return clients.slice().sort((a, b) => (a.eventDate || '9999').localeCompare(b.eventDate || '9999') || String(a.name).localeCompare(String(b.name))).map(c => {
     const sched = c.schedule || [];
     const total = c.total != null ? c.total : sched.reduce((t, s) => t + (s.cents || 0), 0);
-    const deposit = sched.filter(s => s.deposit).reduce((t, s) => t + (s.cents || 0), 0);
+    // The deposit is its own schedule row when there is one; a booking paid in a single payment only lists it as an invoice line item.
+    const itemDeposit = (items => { let sum = 0; (function walk(list) { (list || []).forEach(li => { if (/security deposit/i.test(li.title || '') && li.price && li.price.amount > 0) sum += li.price.amount * (li.quantity || 1); walk(li.children); }); })(items); return sum; })(c.payments && c.payments.line_items);
+    const deposit = sched.filter(s => s.deposit).reduce((t, s) => t + (s.cents || 0), 0) || itemDeposit;
     const paid = c.paid || 0;
     const balance = c.balance != null ? c.balance : Math.max(0, total - paid);
+    const depositPaid = deposit ? (balance <= 0 ? deposit : Math.min(deposit, Math.max(0, paid - Math.max(0, total - deposit)))) : 0;
     const next = (c.duePayments || [])[0];
     const contact = (c.contacts || [])[0] || {};
     const people = []; (c.contacts || []).forEach(p => { if (p.full_name && !people.some(x => x.name.toLowerCase() === String(p.full_name).trim().toLowerCase())) people.push({ name: String(p.full_name).trim(), email: p.email || '' }); });
-    return { c, total, deposit, paid, balance, status: bookingStatus(c, today), closed: closeOut(c, bookingStatus(c, today)), next, phone: contact.phone_number || '', who: people.length ? people.map(p => p.name).join(' & ') : (contact.full_name || ''), people, email: c.email || contact.email || '', when: c.isPast ? 'Past' : 'Upcoming' };
+    return { c, total, deposit, depositPaid, paid, balance, status: bookingStatus(c, today), closed: closeOut(c, bookingStatus(c, today)), next, phone: contact.phone_number || '', who: people.length ? people.map(p => p.name).join(' & ') : (contact.full_name || ''), people, email: c.email || contact.email || '', when: c.isPast ? 'Past' : 'Upcoming' };
   });
 }
 const dollars = cents => Math.round(cents || 0) / 100;
@@ -906,8 +909,8 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
   const stamp = today;
   function exportBookings() {
     downloadCsv('NSH-event-bookings-' + stamp + '.xlsx',
-      ['Event', 'Event Date', 'Type', 'Upcoming/Past', 'Client Name', 'Client Email', 'Client Phone', 'Payment Status', 'Closed Out', 'Invoice Total', 'Refundable Deposit', 'Invoice Total Without Deposit', 'Amount Paid', 'Balance Due', 'Next Payment Due', 'Next Payment Amount'],
-      rows.map(r => [r.c.name, day(r.c.eventDate), r.c.type, r.when, r.who, r.email, r.phone, r.status, r.closed, dollars(r.total), dollars(r.deposit), dollars(Math.max(0, r.total - r.deposit)), dollars(r.paid), dollars(r.balance), r.next ? day(r.next.due) : '', r.next ? dollars(r.next.cents) : '']));
+      ['Event', 'Event Date', 'Type', 'Upcoming/Past', 'Client Name', 'Client Email', 'Client Phone', 'Payment Status', 'Closed Out', 'Invoice Total', 'Refundable Deposit', 'Refundable Deposit Paid', 'Invoice Total Without Deposit', 'Amount Paid', 'Balance Due', 'Next Payment Due', 'Next Payment Amount'],
+      rows.map(r => [r.c.name, day(r.c.eventDate), r.c.type, r.when, r.who, r.email, r.phone, r.status, r.closed, dollars(r.total), dollars(r.deposit), dollars(r.depositPaid), dollars(Math.max(0, r.total - r.deposit)), dollars(r.paid), dollars(r.balance), r.next ? day(r.next.due) : '', r.next ? dollars(r.next.cents) : '']));
   }
   function exportPayments() {
     const lines = [];
