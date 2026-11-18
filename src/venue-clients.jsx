@@ -885,13 +885,14 @@ function bookingRows(clients, today) {
     return { c, total, deposit, paid, balance, status: bookingStatus(c, today), closed: closeOut(c, bookingStatus(c, today)), next, phone: contact.phone_number || '', who: people.length ? people.map(p => p.name).join(' & ') : (contact.full_name || ''), people, email: c.email || contact.email || '', when: c.isPast ? 'Past' : 'Upcoming' };
   });
 }
-const csvCell = v => { const s = String(v == null ? '' : v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-const dollars = cents => ((cents || 0) / 100).toFixed(2);
+const dollars = cents => Math.round(cents || 0) / 100;
+// Real Excel workbook (not CSV): columns sized to fit, dates and phone numbers kept as text, money as numbers QuickBooks can import.
 function downloadCsv(filename, header, lines) {
-  const body = [header].concat(lines).map(r => r.map(csvCell).join(',')).join('\r\n');
-  const blob = new Blob(['﻿' + body], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  const X = window.XLSX; if (!X) { alert('The spreadsheet tool has not loaded. Please refresh and try again.'); return; }
+  const aoa = [header].concat(lines.map(r => r.map(x => x == null ? '' : x)));
+  const ws = X.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = header.map((h, i) => ({ wch: Math.min(42, Math.max(String(h).length, ...lines.map(r => String(r[i] == null ? '' : r[i]).length)) + 2) }));
+  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Sheet1'); X.writeFile(wb, filename.replace(/.csv$/, '.xlsx'));
 }
 export function BookingsExport({ clients, onClose, onOpen, inline }) {
   const today = venueDateKey();
@@ -904,14 +905,14 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
   const day = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[2] + '/' + m[3] + '/' + m[1] : ''; };
   const stamp = today;
   function exportBookings() {
-    downloadCsv('NSH-event-bookings-' + stamp + '.csv',
+    downloadCsv('NSH-event-bookings-' + stamp + '.xlsx',
       ['Event', 'Event Date', 'Type', 'Upcoming/Past', 'Client Name', 'Client Email', 'Client Phone', 'Payment Status', 'Closed Out', 'Invoice Total', 'Refundable Deposit', 'Invoice Total Without Deposit', 'Amount Paid', 'Balance Due', 'Next Payment Due', 'Next Payment Amount'],
       rows.map(r => [r.c.name, day(r.c.eventDate), r.c.type, r.when, r.who, r.email, r.phone, r.status, r.closed, dollars(r.total), dollars(r.deposit), dollars(Math.max(0, r.total - r.deposit)), dollars(r.paid), dollars(r.balance), r.next ? day(r.next.due) : '', r.next ? dollars(r.next.cents) : '']));
   }
   function exportPayments() {
     const lines = [];
     rows.forEach(r => (r.c.schedule || []).forEach(s => lines.push([r.c.name, day(r.c.eventDate), r.c.type, r.who, r.email, s.label, day(s.due), dollars(s.cents), s.paid ? 'Paid' : 'Unpaid', s.deposit ? 'Yes' : 'No', s.manual ? 'Logged by hand' : ''])));
-    downloadCsv('NSH-event-payments-' + stamp + '.csv', ['Event', 'Event Date', 'Type', 'Client Name', 'Client Email', 'Payment', 'Due Date', 'Amount', 'Status', 'Refundable Deposit', 'Note'], lines);
+    downloadCsv('NSH-event-payments-' + stamp + '.xlsx', ['Event', 'Event Date', 'Type', 'Client Name', 'Client Email', 'Payment', 'Due Date', 'Amount', 'Status', 'Refundable Deposit', 'Note'], lines);
   }
   function printList() {
     const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -923,11 +924,11 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
   const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
   const sel = { border: '1px solid #ded7cb', background: '#fff', borderRadius: 7, padding: '8px 10px', fontFamily: SANS, fontSize: 12 };
   const btn = (primary) => ({ background: primary ? '#886c44' : '#fff', color: primary ? '#fff' : '#886c44', border: '1px solid #886c44', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, fontFamily: SANS, cursor: 'pointer' });
-  const th = { textAlign: 'left', fontSize: 10, color: '#877b68', textTransform: 'uppercase', letterSpacing: .5, padding: '6px 8px', borderBottom: '1px solid #e6dfd3', whiteSpace: 'nowrap' };
+  const th = { textAlign: 'left', fontSize: 10, color: '#877b68', textTransform: 'uppercase', letterSpacing: .5, padding: '6px 8px', borderBottom: '1px solid #e6dfd3' };
   const td = { padding: '8px', borderBottom: '1px solid #f0ebe0', verticalAlign: 'top' };
   const tone = s => s === 'Paid in full' ? { background: '#edf4ed', color: '#426b4a' } : s.indexOf('past due') !== -1 ? { background: '#f9eae7', color: '#a64f3c' } : s === 'No invoice on file' ? { background: '#eee', color: '#555' } : { background: '#faf0e6', color: '#9a5d22' };
-  const outer = inline ? { fontFamily: SANS } : { position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 };
-  const innerBox = inline ? { fontFamily: SANS, background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: 18 } : { fontFamily: SANS, background: '#fff', borderRadius: 14, maxWidth: 1100, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 };
+  const outer = inline ? { fontFamily: SANS } : { position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 };
+  const innerBox = inline ? { fontFamily: SANS, background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: 18 } : { fontFamily: SANS, background: '#fff', borderRadius: 14, maxWidth: 'none', width: '100%', maxHeight: '96vh', overflowY: 'auto', padding: 22 };
   return <div onClick={e => { if (!inline && e.target === e.currentTarget) onClose(); }} style={outer}>
     <div role={inline ? undefined : 'dialog'} aria-label="Bookings and payments" style={innerBox}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
@@ -948,18 +949,18 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
       <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 13, marginBottom: 10 }}>
         <span><b>{rows.length}</b> events</span><span>Invoiced <b>{money(sum(r => r.total))}</b></span><span>Paid <b style={{ color: '#426b4a' }}>{money(sum(r => r.paid))}</b></span><span>Still owed <b style={{ color: '#9a5d22' }}>{money(sum(r => r.balance))}</b></span>
       </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+      <div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, tableLayout: 'auto' }}>
           <thead><tr><th style={th}>Event date</th><th style={th}>Event</th><th style={th}>Type</th><th style={th}>Client</th><th style={th}>Status</th><th style={th}>Closed out</th><th style={{ ...th, textAlign: 'right' }}>Invoice</th><th style={{ ...th, textAlign: 'right' }}>Paid</th><th style={{ ...th, textAlign: 'right' }}>Balance</th><th style={{ ...th, borderLeft: '2px solid #d8cdb8' }}>Next payment</th></tr></thead>
           <tbody>{rows.length === 0 ? <tr><td style={td} colSpan={10}>No bookings match.</td></tr> : rows.map(r => <tr key={r.c.id} onClick={() => onOpen(r.c)} style={{ cursor: 'pointer' }}>
             <td style={{ ...td, whiteSpace: 'nowrap', fontWeight: 600, color: '#886c44' }}>{day(r.c.eventDate) || 'TBD'}</td>
             <td style={{ ...td, fontWeight: 600 }}>{r.c.name}</td>
             <td style={td}>{r.c.type}</td>
             <td style={td}>{r.people.length ? r.people.map((p, i) => <div key={i}>{p.name}{p.email && <div style={{ color: '#888', fontSize: 11 }}>{p.email}</div>}</div>) : <div>{r.who}<div style={{ color: '#888', fontSize: 11 }}>{r.email}</div></div>}</td>
-            <td style={td}><span style={{ ...tone(r.status), padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{r.status}</span></td>
+            <td style={td}><span style={{ ...tone(r.status), padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600 }}>{r.status}</span></td>
             <td style={td}><span style={{ ...(r.closed === 'Closed out' ? { background: '#edf4ed', color: '#426b4a' } : r.closed === 'Not yet held' ? { background: '#eee', color: '#555' } : { background: '#faf0e6', color: '#9a5d22' }), padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600 }}>{r.closed === 'Closed out' ? '✓ Closed out' : r.closed}</span></td>
             <td style={{ ...td, textAlign: 'right' }}>{money(r.total)}</td><td style={{ ...td, textAlign: 'right' }}>{money(r.paid)}</td><td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(r.balance)}</td>
-            <td style={{ ...td, whiteSpace: 'nowrap', borderLeft: '2px solid #d8cdb8' }}>{r.next ? <span><b>{r.next.due ? day(r.next.due) : 'No date'}</b> · {money(r.next.cents)}</span> : ''}</td>
+            <td style={{ ...td, borderLeft: '2px solid #d8cdb8' }}>{r.next ? <span><b>{r.next.due ? day(r.next.due) : 'No date'}</b> · {money(r.next.cents)}</span> : ''}</td>
           </tr>)}</tbody>
         </table>
       </div>
