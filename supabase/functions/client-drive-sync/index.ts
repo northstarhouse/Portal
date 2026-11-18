@@ -217,13 +217,9 @@ async function invoiceData(pb: any, inq: any, name: string, date: string): Promi
       return { label: p.__nativeLabel || (dep ? "Refundable Security Deposit" : i === 0 ? "Booking payment" : "Scheduled payment " + (i + 1)), due: p.due_date ? String(p.due_date).slice(0, 10) : null, cents, paid: !!p.paid, paidAt: p.paid_at || null, deposit: dep };
     });
     // charges added after the HoneyBook invoice (e.g. a rehearsal added from the client page)
-    for (const c of extras) {
-      lines.push({ item: c.label || "Additional charge", desc: "", qty: 1, unit: c.cents, amount: c.cents });
-      schedule.push({ label: c.label || "Additional charge", due: c.due || null, cents: c.cents, paid: false });
-    }
     const itemTotal = lines.reduce((t, l) => t + l.amount, 0);
     total = lines.length ? itemTotal : (P.total?.amount || 0);
-    if (!extras.length && P.total?.amount != null) total = P.total.amount;
+    if (P.total?.amount != null) total = P.total.amount;
     paidAmt = P.amount_paid?.amount || 0;
   } else if (inq?.id) {
     const rows = await rest("venue_payment_schedule?select=sequence,kind,label,amount_cents,amount_paid_cents,due_date,status&inquiry_id=eq." + inq.id + "&order=sequence.asc");
@@ -250,8 +246,10 @@ async function invoiceData(pb: any, inq: any, name: string, date: string): Promi
     for (const [n, e, ph] of [[a["7fnabd0i"], a.c9u1sxb4, a["163otrai"]], [a.evp_name, a.evp_email, a.evp_phone]]) if (n) { people.push({ name: String(n).trim(), email: String(e || ""), phone: String(ph || "") }); break; }
   }
   const evType = a.__event_type ? String(a.__event_type) : /wedding/i.test(String(hb?.project?.name || inq?.event_type || "")) ? "Wedding" : "Private Event";
-  const compact = date.replace(/-/g, "");
-  return { number: "NSH-" + (compact || String(pb.id).slice(0, 6).toUpperCase()), issued, eventName: name, eventDate: date || null, eventType: evType, clients: people, lines, total, paid: paidAmt, balance: Math.max(0, total - paidAmt), payments: schedule };
+  // the client's venue code is the event date, like NOV-14-2026
+  const dm = String(date || "").match(/^(d{4})-(d{2})-(d{2})/);
+  const code = dm ? ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][+dm[2] - 1] + "-" + dm[3] + "-" + dm[1] : String(pb.id).slice(0, 6).toUpperCase();
+  return { number: code, issued, eventName: name, eventDate: date || null, eventType: evType, clients: people, lines, total, paid: paidAmt, balance: Math.max(0, total - paidAmt), payments: schedule };
 }
 
 async function syncClient(pbId: string) {
@@ -337,14 +335,13 @@ async function syncClient(pbId: string) {
     }
   }
 
-  // 6. invoice: branded PDF of what was ordered, what is paid and what is due. Payments change, so it is refreshed on every sync.
+  // 6. invoice: the branded invoice as it was agreed (items, prices, payment schedule). Written once, never refreshed, so it does not change as payments come in.
   try {
-    const inv = await invoiceData(pb, inq, name, date);
-    if (inv && (inv.lines.length || inv.payments.length)) {
+    let inv: InvoiceData | null = null;
+    if (!has("Invoice") && (inv = await invoiceData(pb, inq, name, date)) && (inv.lines.length || inv.payments.length)) {
       const bytes = await invoicePdf(inv);
-      const existingInvoice = have.find((f) => f.name.toLowerCase() === "invoice.pdf");
-      if (existingInvoice) await replaceFileContent(existingInvoice.id, "application/pdf", bytes); else await uploadFile("Invoice.pdf", folderId, "application/pdf", bytes);
-      done.push(existingInvoice ? "Invoice (updated)" : "Invoice");
+      await uploadFile("Invoice.pdf", folderId, "application/pdf", bytes);
+      done.push("Invoice");
     }
   } catch (e: any) { done.push("Invoice failed: " + (e?.message || e)); }
 

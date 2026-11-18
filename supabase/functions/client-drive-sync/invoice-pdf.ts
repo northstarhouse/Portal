@@ -4,6 +4,7 @@ import { PDFDocument, rgb, type PDFFont } from "npm:pdf-lib@1.17.1";
 import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
 
 const FONT_BASE = "https://raw.githubusercontent.com/notofonts/noto-fonts/c971829a87e7920f960e7277c3dafd9bedd3c601/hinted/ttf/NotoSerif/NotoSerif-";
+const HOUSE_URL = "https://northstarhouse.github.io/Portal/assets/invoice-house.png";
 const LOGO_URL = "https://northstarhouse.github.io/Portal/assets/logo.png";
 let fontsPromise: Promise<ArrayBuffer[]> | null = null;
 function loadFonts(): Promise<ArrayBuffer[]> {
@@ -19,7 +20,7 @@ function loadFonts(): Promise<ArrayBuffer[]> {
 
 type RGB = [number, number, number];
 const INK: RGB = [0.165, 0.141, 0.125];   // #2a2420 (text)
-const BAND: RGB = [0.357, 0.31, 0.271];   // #5b4f45 dark brown-gray (header band and balance bar)
+const BAND: RGB = [0.463, 0.412, 0.361];   // #76695c brown-gray (header band and total bar)
 const GOLD: RGB = [0.533, 0.424, 0.267];  // #886c44
 const MUTED: RGB = [0.42, 0.373, 0.31];   // #6b5f4f
 const RULE: RGB = [0.902, 0.875, 0.827];  // #e6dfd3
@@ -53,6 +54,9 @@ export async function invoicePdf(inv: InvoiceData): Promise<Uint8Array> {
   let logo: any = null;
   try { const r = await fetch(LOGO_URL); if (r.ok) logo = await pdf.embedPng(new Uint8Array(await r.arrayBuffer())); } catch (_e) { /* falls back to a text wordmark */ }
 
+  let house: any = null;
+  try { const r = await fetch(HOUSE_URL); if (r.ok) house = await pdf.embedPng(new Uint8Array(await r.arrayBuffer())); } catch (_e) { /* the icon is optional */ }
+
   let page: any, y = 0;
   const w = (f: PDFFont, t: string, s: number) => f.widthOfTextAtSize(t, s);
   const text = (t: string, x: number, yy: number, size: number, f: PDFFont = reg, c: RGB = INK) => page.drawText(t, { x, y: yy, size, font: f, color: rgb(...c) });
@@ -73,15 +77,18 @@ export async function invoicePdf(inv: InvoiceData): Promise<Uint8Array> {
   const newPage = (first: boolean) => {
     page = pdf.addPage([PAGE_W, PAGE_H]);
     if (first) {
-      page.drawRectangle({ x: 0, y: PAGE_H - 96, width: PAGE_W, height: 96, color: rgb(...BAND) });
-      page.drawRectangle({ x: 0, y: PAGE_H - 99, width: PAGE_W, height: 3, color: rgb(...GOLD) });
-      if (logo) { const lw = 190, lh = lw * logo.height / logo.width; page.drawImage(logo, { x: LEFT, y: PAGE_H - 48 - lh / 2, width: lw, height: lh }); }
-      else spaced("NORTH STAR HOUSE", LEFT, PAGE_H - 52, 16, 2.5, bold, [1, 1, 1]);
-      right("INVOICE", RIGHT, PAGE_H - 44, 22, reg, [1, 1, 1]);
-      right(`No. ${inv.number}`, RIGHT, PAGE_H - 62, 9.5, reg, [0.86, 0.82, 0.74]);
-      y = PAGE_H - 132;
+      // dark brown-gray header band: the white North Star House logo on the left, INVOICE with the venue code and date on the right
+      const BH = 124;
+      page.drawRectangle({ x: 0, y: PAGE_H - BH, width: PAGE_W, height: BH, color: rgb(...BAND) });
+      page.drawRectangle({ x: 0, y: PAGE_H - BH - 3, width: PAGE_W, height: 3, color: rgb(...GOLD) });
+      if (logo) { const lw = 205, lh = lw * logo.height / logo.width; page.drawImage(logo, { x: LEFT, y: PAGE_H - BH / 2 - lh / 2, width: lw, height: lh }); }
+      else spaced("NORTH STAR HOUSE", LEFT, PAGE_H - 66, 16, 2.5, bold, [1, 1, 1]);
+      right("INVOICE", RIGHT, PAGE_H - 56, 30, reg, [1, 1, 1]);
+      right("VENUE CODE  " + inv.number, RIGHT, PAGE_H - 80, 9.5, bold, [0.9, 0.86, 0.78]);
+      right("DATE ISSUED  " + longDate(inv.issued), RIGHT, PAGE_H - 95, 9.5, reg, [0.9, 0.86, 0.78]);
+      y = PAGE_H - 162;
     } else {
-      text("North Star House · Invoice " + inv.number, LEFT, PAGE_H - 44, 9, ital, MUTED);
+      text("North Star House · Invoice · " + inv.number, LEFT, PAGE_H - 44, 9, ital, MUTED);
       y = PAGE_H - 70;
     }
   };
@@ -93,7 +100,7 @@ export async function invoicePdf(inv: InvoiceData): Promise<Uint8Array> {
   const colB = 318;
   spaced("FROM", LEFT, y, 8, 1.8, bold, GOLD); spaced("BILLED TO", colB, y, 8, 1.8, bold, GOLD);
   y -= 15;
-  const fromLines = ["North Star Historic Conservancy", "North Star House", "12075 Auburn Rd.", "Grass Valley, CA 95949"];
+  const fromLines = ["North Star Historic Conservancy", "PO Box 1538", "Grass Valley, CA 95945"];
   const toLines: string[] = [];
   for (const c of inv.clients) { toLines.push(c.name); if (c.email) toLines.push(c.email); if (c.phone) toLines.push(c.phone); }
   if (!toLines.length) toLines.push(inv.eventName);
@@ -110,7 +117,7 @@ export async function invoicePdf(inv: InvoiceData): Promise<Uint8Array> {
   const cell = (label: string, value: string, x: number) => { spaced(label, x, y - 15, 7.5, 1.5, bold, GOLD); text(value, x, y - 33, 10.5, bold, INK); };
   cell("EVENT", inv.eventName.length > 34 ? inv.eventName.slice(0, 33) + "…" : inv.eventName, LEFT + 14);
   cell("EVENT DATE", longDate(inv.eventDate), 292);
-  cell("DATE ISSUED", longDate(inv.issued), 438);
+  cell("EVENT TYPE", inv.eventType, 438);
   y -= 74;
 
   // ---- what was ordered ----
@@ -138,12 +145,11 @@ export async function invoicePdf(inv: InvoiceData): Promise<Uint8Array> {
   const tl = 372;
   const trow = (label: string, value: string, f: PDFFont = reg, c: RGB = INK, size = 10.5) => { text(label, tl, y, size, f, c); right(value, X_AMT, y, size, f, c); y -= 17; };
   y -= 2;
-  trow("Invoice total", usd(inv.total), bold);
-  trow(inv.balance <= 0 ? "Paid to date (paid in full)" : "Paid to date", usd(inv.paid), reg, GREEN);
-  y -= 12;
+  // the invoice as agreed: no paid / balance, those live in the Portal
+  y -= 6;
   page.drawRectangle({ x: tl - 10, y: y - 8, width: RIGHT - tl + 10, height: 28, color: rgb(...BAND) });
-  text("BALANCE DUE", tl, y + 2, 10.5, bold, [1, 1, 1]);
-  right(usd(Math.max(0, inv.balance)), X_AMT, y + 2, 13, bold, [1, 1, 1]);
+  text("INVOICE TOTAL", tl, y + 2, 10.5, bold, [1, 1, 1]);
+  right(usd(inv.total), X_AMT - 12, y + 2, 13, bold, [1, 1, 1]);
   y -= 40;
 
   // ---- payment schedule ----
@@ -153,8 +159,8 @@ export async function invoicePdf(inv: InvoiceData): Promise<Uint8Array> {
     for (const p of inv.payments) {
       ensure(22);
       text(p.label + (p.deposit ? " (refundable)" : ""), LEFT, y, 10, reg);
-      text(p.paid ? (p.paidAt ? "Paid " + longDate(p.paidAt) : "Paid") : (p.due ? "Due " + longDate(p.due) : "Due date to be confirmed"), 300, y, 9.5, p.paid ? bold : reg, p.paid ? GREEN : MUTED);
-      right(usd(p.cents), X_AMT, y, 10, p.paid ? reg : bold);
+      text(p.due ? "Due " + longDate(p.due) : "Due date to be confirmed", 300, y, 9.5, reg, MUTED);
+      right(usd(p.cents), X_AMT, y, 10, bold);
       y -= 18;
     }
   }
@@ -166,9 +172,10 @@ export async function invoicePdf(inv: InvoiceData): Promise<Uint8Array> {
   const pages = pdf.getPages();
   pages.forEach((p, i) => {
     p.drawLine({ start: { x: LEFT, y: 54 }, end: { x: RIGHT, y: 54 }, thickness: 0.7, color: rgb(...RULE) });
-    const t = `North Star Historic Conservancy · 12075 Auburn Rd., Grass Valley, CA 95949 · thenorthstarhouse.org`;
+    const t = `North Star Historic Conservancy · PO Box 1538, Grass Valley, CA 95945 · thenorthstarhouse.org`;
     p.drawText(t, { x: (PAGE_W - w(reg, t, 7.5)) / 2, y: 40, size: 7.5, font: reg, color: rgb(...MUTED) });
-    if (pages.length > 1) p.drawText(`${i + 1} / ${pages.length}`, { x: RIGHT - 20, y: 28, size: 7.5, font: reg, color: rgb(...MUTED) });
+    if (pages.length > 1) p.drawText(`${i + 1} / ${pages.length}`, { x: LEFT, y: 28, size: 7.5, font: reg, color: rgb(...MUTED) });
+    if (house) { const hw = 66, hh = hw * house.height / house.width; p.drawImage(house, { x: RIGHT - hw, y: 8, width: hw, height: hh }); }
   });
   return await pdf.save();
 }
