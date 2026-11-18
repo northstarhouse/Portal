@@ -6,6 +6,7 @@
 // It is called by database triggers whenever one of those things is submitted, and can be run for every client with `backfill`.
 import { contractPdf } from "./contract-pdf.ts";
 import { formPdf, type FormItem } from "./form-pdf.ts";
+import { invoicePdf, type InvoiceData, type InvoiceLine, type InvoicePayment } from "./invoice-pdf.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -185,6 +186,74 @@ async function clientFolder(pbId: string, a: Record<string, any>, inq: any) {
   return { folderId, folderUrl: rec.folder_url as string, folderName, name, date };
 }
 
+// The invoice for a client: the HoneyBook invoice's items and schedule when there is one (the latest invoice file),
+// otherwise the Portal's own payment schedule. Payments logged by hand are applied to the unpaid scheduled payments in date order.
+async function invoiceData(pb: any, inq: any, name: string, date: string): Promise<InvoiceData | null> {
+  const a = pb.answers || {}, hb = a.__honeybook;
+  const stripHtml = (h: unknown) => String(h || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+  const files: any[] = hb?.files || [];
+  const stamp = (id: string) => files.find((x) => x.id === id)?.updated_at || "";
+  const invoice = (hb?.file_responses || []).filter((r: any) => r.responses?.payments && typeof r.responses.payments === "object").sort((x: any, y: any) => String(stamp(y.id)).localeCompare(String(stamp(x.id))))[0];
+  const P = invoice?.responses?.payments;
+  const lines: InvoiceLine[] = [];
+  let schedule: InvoicePayment[] = [];
+  let total = 0, paidAmt = 0;
+  let issued = String(pb.created_at || "").slice(0, 10);
+  const extras = (Array.isArray(a.__venue_checklist?.extra_charges) ? a.__venue_checklist.extra_charges : []).filter((c: any) => c?.cents > 0);
+  if (P) {
+    issued = String(stamp(invoice.id) || issued).slice(0, 10);
+    const add = (li: any, child: boolean) => {
+      const qty = li.quantity == null ? 1 : li.quantity, unit = li.price?.amount || 0;
+      if (!(unit > 0) && !(qty > 0)) return;
+      lines.push({ item: li.title || "Item", desc: stripHtml(li.description), qty, unit, amount: unit * qty, child, deposit: /security deposit/i.test(li.title || "") });
+    };
+    for (const li of P.line_items || []) { add(li, false); for (const k of li.children || []) add(k, true); }
+    if (P.discount?.amount > 0) lines.push({ item: "Discount", desc: "", qty: 1, unit: -P.discount.amount, amount: -P.discount.amount });
+    if (P.tax?.amount > 0) lines.push({ item: "Tax", desc: "", qty: 1, unit: P.tax.amount, amount: P.tax.amount });
+    const raw: any[] = P.schedule || [];
+    schedule = raw.map((p, i) => {
+      const cents = p.amount?.amount || 0;
+      const dep = /security deposit/i.test(p.__nativeLabel || "") || (!p.__nativeLabel && raw.length > 1 && i === raw.length - 1 && cents === 80000);
+      return { label: p.__nativeLabel || (dep ? "Refundable Security Deposit" : i === 0 ? "Booking payment" : "Scheduled payment " + (i + 1)), due: p.due_date ? String(p.due_date).slice(0, 10) : null, cents, paid: !!p.paid, paidAt: p.paid_at || null, deposit: dep };
+    });
+    // charges added after the HoneyBook invoice (e.g. a rehearsal added from the client page)
+    for (const c of extras) {
+      lines.push({ item: c.label || "Additional charge", desc: "", qty: 1, unit: c.cents, amount: c.cents });
+      schedule.push({ label: c.label || "Additional charge", due: c.due || null, cents: c.cents, paid: false });
+    }
+    const itemTotal = lines.reduce((t, l) => t + l.amount, 0);
+    total = lines.length ? itemTotal : (P.total?.amount || 0);
+    if (!extras.length && P.total?.amount != null) total = P.total.amount;
+    paidAmt = P.amount_paid?.amount || 0;
+  } else if (inq?.id) {
+    const rows = await rest("venue_payment_schedule?select=sequence,kind,label,amount_cents,amount_paid_cents,due_date,status&inquiry_id=eq." + inq.id + "&order=sequence.asc");
+    if (!Array.isArray(rows) || !rows.length) return null;
+    for (const r of rows) {
+      const dep = /security/i.test(String(r.kind || "") + " " + String(r.label || ""));
+      lines.push({ item: r.label || "Payment", desc: "", qty: 1, unit: r.amount_cents || 0, amount: r.amount_cents || 0, deposit: dep });
+      schedule.push({ label: r.label || "Payment", due: r.due_date ? String(r.due_date).slice(0, 10) : null, cents: r.amount_cents || 0, paid: r.status === "paid", deposit: dep });
+    }
+    total = rows.reduce((t: number, r: any) => t + (r.amount_cents || 0), 0);
+    paidAmt = rows.reduce((t: number, r: any) => t + (r.amount_paid_cents || 0), 0);
+  } else return null;
+  // hand-logged payments settle the unpaid scheduled payments in date order
+  const manual = (Array.isArray(a.__venue_checklist?.manual_payments) ? a.__venue_checklist.manual_payments : []).filter((m: any) => m?.cents > 0);
+  let left = manual.reduce((t: number, m: any) => t + m.cents, 0);
+  paidAmt += left;
+  schedule = schedule.sort((x, y) => (x.deposit ? 1 : 0) - (y.deposit ? 1 : 0) || String(x.due || "9999").localeCompare(String(y.due || "9999")));
+  for (const p of schedule) if (!p.paid && p.cents > 0 && left >= p.cents) { left -= p.cents; p.paid = true; }
+  const people: { name: string; email?: string; phone?: string }[] = [];
+  for (const c of (hb?.contacts || []).filter((c: any) => c.kind === "client")) {
+    if (c.full_name && !people.some((p) => p.name.toLowerCase() === String(c.full_name).trim().toLowerCase())) people.push({ name: String(c.full_name).trim(), email: c.email || "", phone: c.phone_number || "" });
+  }
+  if (!people.length) {
+    for (const [n, e, ph] of [[a["7fnabd0i"], a.c9u1sxb4, a["163otrai"]], [a.evp_name, a.evp_email, a.evp_phone]]) if (n) { people.push({ name: String(n).trim(), email: String(e || ""), phone: String(ph || "") }); break; }
+  }
+  const evType = a.__event_type ? String(a.__event_type) : /wedding/i.test(String(hb?.project?.name || inq?.event_type || "")) ? "Wedding" : "Private Event";
+  const compact = date.replace(/-/g, "");
+  return { number: "NSH-" + (compact || String(pb.id).slice(0, 6).toUpperCase()), issued, eventName: name, eventDate: date || null, eventType: evType, clients: people, lines, total, paid: paidAmt, balance: Math.max(0, total - paidAmt), payments: schedule };
+}
+
 async function syncClient(pbId: string) {
   const pb = (await rest(`nsh_form_responses?select=id,form_id,answers,created_at&id=eq.${pbId}`))?.[0];
   if (!pb) return { skipped: "no such response" };
@@ -267,6 +336,17 @@ async function syncClient(pbId: string) {
       }
     }
   }
+
+  // 6. invoice: branded PDF of what was ordered, what is paid and what is due. Payments change, so it is refreshed on every sync.
+  try {
+    const inv = await invoiceData(pb, inq, name, date);
+    if (inv && (inv.lines.length || inv.payments.length)) {
+      const bytes = await invoicePdf(inv);
+      const existingInvoice = have.find((f) => f.name.toLowerCase() === "invoice.pdf");
+      if (existingInvoice) await replaceFileContent(existingInvoice.id, "application/pdf", bytes); else await uploadFile("Invoice.pdf", folderId, "application/pdf", bytes);
+      done.push(existingInvoice ? "Invoice (updated)" : "Invoice");
+    }
+  } catch (e: any) { done.push("Invoice failed: " + (e?.message || e)); }
 
   return { folder: folderName, url: folderUrl, added: done };
 }
