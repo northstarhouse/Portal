@@ -6630,7 +6630,7 @@ function BoardFilterTabs({ items, value, onChange }) {
         var on = value === t.id, c = on ? '#5c4526' : '#6b5a3e';
         return (
           <button key={t.id} type="button" onClick={function() { onChange(t.id); }}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, border: '1.5px solid ' + (on ? '#8a6c44' : '#e6dccb'), background: on ? '#efe4d0' : '#fbf8f2', color: c, fontSize: 14, fontWeight: on ? 700 : 500, cursor: 'pointer' }}>
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, border: '1.5px solid ' + (on ? gold : '#e6dccb'), background: '#fbf8f2', color: c, fontSize: 14, fontWeight: on ? 700 : 500, cursor: 'pointer' }}>
             {icon(t.id, c)}{t.label} ({count(t.id)})
           </button>
         );
