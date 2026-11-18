@@ -2,6 +2,7 @@ import { ContractManager, SigBlock, contractPreviewStyle } from './venue-contrac
 import { ClientNotes } from './client-notes.jsx';
 import { RequestDetailsButton, missingPrebookingItems } from './request-details.jsx';
 import { EmailHistory } from './email-history.jsx';
+import { InquiryFlagNotes } from './flag-notes.jsx';
 import { BrickReminderButton } from './brick-reminder.jsx';
 import { openSitePacket, openSamplePacket } from './site-packet.js';
 // Client dashboard: reads the imported source snapshot without changing signed
@@ -817,6 +818,9 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
           <div style={{textAlign:'right',fontSize:12,color:st.late?'#c0392b':st.done?'#2e7d32':'#888'}}>{st.when}</div>
           <span aria-hidden="true" style={{color:'#886c44',fontSize:13,width:14,textAlign:'center'}}>{st.body ? (openStep===st.key ? '▾' : '▸') : ''}</span>
         </div>{st.body && openStep===st.key && <div style={{padding:'4px 0 16px 30px'}}>{st.body}</div>}</div>)}
+      </div>
+      <div className="vc-modal-section">
+        <InquiryFlagNotes who={client.email || ('id-' + client.id)} />
       </div>
       <div className="vc-modal-section">
         <div className="vc-modal-section-title">Email history</div>
