@@ -16490,7 +16490,7 @@ function PersonActivityView() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', padding: '10px 16px', borderTop: head ? 'none' : '1px solid #f2ece2', alignItems: 'baseline' }}>
                 <div style={{ flex: '0 0 150px', fontSize: 12, color: '#888' }}>{when(it.at)}</div>
                 <div style={{ flex: '1 1 260px', minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: '#2a2420' }}><span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, color: '#fff', background: pillColor[it.kind], borderRadius: 4, padding: '1px 6px', marginRight: 8, verticalAlign: 1 }}>{it.pill || PA_KINDS[it.kind]}</span>{it.text}</div>
+                  <div style={{ fontSize: 13, color: '#2a2420' }}><span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, color: '#fff', background: pillColor[it.kind], borderRadius: 4, padding: '1px 6px', marginRight: 8, verticalAlign: 1 }}>{it.pill || PA_KINDS[it.kind]}</span>{(function() { var m = /^([^:\n]{2,45}:)([\s\S]*)$/.exec(it.text || ''); return m ? <span><strong>{m[1]}</strong>{m[2]}</span> : it.text; })()}</div>
                   {it.note && <div style={{ fontSize: 12, color: '#888', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{it.note}</div>}
                   {it.tourId && <button type="button" style={linkBtn} onClick={function() { setOpenTours(function(o) { var n = Object.assign({}, o); n[it.ref] = !n[it.ref]; return n; }); }}>{openTours[it.ref] ? '▾ Hide tour details' : '▸ Tour details & status changes'}</button>}
                   {it.tourId && openTours[it.ref] && <TourDetails tourId={it.tourId} />}
