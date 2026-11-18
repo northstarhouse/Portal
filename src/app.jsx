@@ -16172,7 +16172,118 @@ function paDescribe(r) {
   return { text: verb + ' ' + paTableLabel(r.table_name) + (label ? ': ' + label : ''), note: r.op === 'update' ? fieldNote : '' };
 }
 
+// Opened from a tour line in the person activity log: who the tour was with, its current status, which emails went out,
+// and every recorded change to the tour (who changed it and when).
+var TOUR_FIELD_LABELS = {
+  status: 'status', date: 'date', start_time: 'time', guide_name: 'guide', category: 'tour type', visitor_name: 'visitor name', visitor_email: 'email',
+  visitor_phone: 'phone', staff_notes: 'staff notes', request_status: 'request outcome', request_handled: 'request handled', request_handled_by: 'handled by',
+  made_contact_at: 'contact made', confirmed_at: 'visitor confirmed', prebooking_form_sent_at: 'pre-booking email sent', reminder_24h_sent_at: '24-hour reminder sent',
+  reminder_1h_sent_at: '1-hour reminder sent', gcal_event_id: 'calendar entry', duration_min: 'length', venue_inquiry_id: 'linked inquiry', requested_slots: 'requested times'
+};
+var TOUR_STATUS_TEXT = { booked: 'Booked', completed: 'Toured', requested: 'Requested', cancelled: 'Cancelled', no_show: "Didn't show up", open: 'Open slot', blocked: 'Blocked' };
+function TourDetails({ tourId }) {
+  var [data, setData] = useState(null);
+  useEffect(function() {
+    var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    var g = function(p) { return fetch(SUPABASE_URL + '/rest/v1/' + p, { headers: H }).then(function(r) { return r.ok ? r.json() : []; }).then(function(d) { return Array.isArray(d) ? d : []; }).catch(function() { return []; }); };
+    Promise.all([
+      g('estate_tours?select=*&id=eq.' + encodeURIComponent(tourId)),
+      g('portal_activity?select=created_at,actor_name,op,changed&table_name=eq.estate_tours&row_id=eq.' + encodeURIComponent(tourId) + '&order=created_at.asc&limit=200')
+    ]).then(function(res) { setData({ tour: res[0][0] || null, log: res[1] }); });
+  }, [tourId]);
+  if (!data) return <div style={{ fontSize: 12, color: '#999', marginTop: 6 }}>Loading…</div>;
+  var t = data.tour;
+  if (!t) return <div style={{ fontSize: 12, color: '#999', marginTop: 6 }}>This tour is no longer on file.</div>;
+  var fmt = function(iso) { var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }); };
+  var tourDay = t.date ? new Date(t.date + 'T' + (t.start_time || '12:00')) : null;
+  var past = tourDay && tourDay < new Date();
+  var status = t.status === 'booked' && past ? 'Toured' : (TOUR_STATUS_TEXT[t.status] || t.status);
+  var row = function(k, v) { return v ? <div style={{ display: 'flex', gap: 8, fontSize: 12, marginTop: 2 }}><span style={{ flex: '0 0 130px', color: '#999' }}>{k}</span><span style={{ color: '#3a3226', wordBreak: 'break-word' }}>{v}</span></div> : null; };
+  var history = [];
+  if (t.created_at) history.push({ at: t.created_at, text: 'Tour booked or requested' });
+  data.log.forEach(function(l) {
+    var what = (l.changed || []).map(function(c) { return TOUR_FIELD_LABELS[c] || c.replace(/_/g, ' '); });
+    history.push({ at: l.created_at, text: (l.actor_name || 'Someone') + (l.op === 'insert' ? ' added the tour' : l.op === 'delete' ? ' deleted the tour' : ' changed ' + (what.length ? what.join(', ') : 'the tour')) });
+  });
+  history.sort(function(a, b) { return String(a.at).localeCompare(String(b.at)); });
+  return (
+    <div style={{ marginTop: 8, padding: '8px 12px', background: '#faf6ef', border: '0.5px solid #eee4d6', borderRadius: 8 }}>
+      {row('Visitor', t.visitor_name)}
+      {row('Email', t.visitor_email)}
+      {row('Phone', t.visitor_phone)}
+      {row('Tour type', t.category)}
+      {row('Guide', t.guide_name)}
+      {row('Tour time', tourDay ? tourDay.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + tourDay.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '')}
+      {row('Status now', status)}
+      {row('Visitor confirmed', t.confirmed_at ? fmt(t.confirmed_at) : '')}
+      {row('24-hour reminder', t.reminder_24h_sent_at ? 'Sent ' + fmt(t.reminder_24h_sent_at) : '')}
+      {row('1-hour reminder', t.reminder_1h_sent_at ? 'Sent ' + fmt(t.reminder_1h_sent_at) : '')}
+      {row('Pre-booking email', t.prebooking_form_sent_at ? 'Sent ' + fmt(t.prebooking_form_sent_at) : (t.status === 'booked' ? 'Not sent yet' : ''))}
+      {row('Staff notes', t.staff_notes)}
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#8a7a62', textTransform: 'uppercase', letterSpacing: 0.8, margin: '10px 0 4px' }}>Changes</div>
+      {history.map(function(h, i) { return <div key={i} style={{ fontSize: 12, color: '#555', marginTop: 2 }}><span style={{ color: '#999' }}>{fmt(h.at)}</span> · {h.text}</div>; })}
+      <div style={{ fontSize: 11, color: '#aaa', marginTop: 6 }}>Changes are listed from when the Portal started recording them; earlier or automatic changes (reminders, cancel links) may not appear.</div>
+    </div>
+  );
+}
+
+// Emails the Portal sent to one person (found by email address), newest first: inquiry replies and follow-ups, tour
+// reminders, the pre-booking email, proposal, questionnaire and feedback requests. Emails only.
+function InquiryEmailTimeline({ email }) {
+  var [rows, setRows] = useState(null);
+  useEffect(function() {
+    var em = String(email || '').trim().toLowerCase();
+    setRows(null);
+    if (!em) { setRows([]); return; }
+    var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    var g = function(p) { return fetch(SUPABASE_URL + '/rest/v1/' + p, { headers: H }).then(function(r) { return r.ok ? r.json() : []; }).then(function(d) { return Array.isArray(d) ? d : []; }).catch(function() { return []; }); };
+    var like = encodeURIComponent(em.replace(/[\\%_*]/g, '\\$&'));
+    Promise.all([
+      g('venue_inquiries?select=initial_sent_at,follow_up_sent_at,final_follow_up_sent_at,proposal_sent_at,questionnaire_sent_at,questionnaire_reminder_2_sent_at,feedback_sent_at&email=ilike.' + like),
+      g('estate_tours?select=date,start_time,status,reminder_24h_sent_at,reminder_1h_sent_at,prebooking_form_sent_at&visitor_email=ilike.' + like),
+      g('inquiry_followups?select=sent_at&email=ilike.' + like),
+      g('prebooking_manual_sends?select=sent_at,sent_by&email=ilike.' + like)
+    ]).then(function(res) {
+      var out = [];
+      var add = function(at, what, by) { if (at) out.push({ at: at, what: what, by: by || '' }); };
+      res[0].forEach(function(q) {
+        add(q.initial_sent_at, 'Inquiry reply');
+        add(q.follow_up_sent_at, 'Follow-up (48 hours)');
+        add(q.final_follow_up_sent_at, 'Final follow-up');
+        add(q.proposal_sent_at, 'Proposal');
+        add(q.questionnaire_sent_at, 'Event questionnaire');
+        add(q.questionnaire_reminder_2_sent_at, 'Event questionnaire reminder');
+        add(q.feedback_sent_at, 'Post-event feedback request');
+      });
+      res[1].forEach(function(t) {
+        var d = t.date ? new Date(t.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+        add(t.reminder_24h_sent_at, '24-hour tour reminder' + (d ? ' (tour ' + d + ')' : ''));
+        add(t.reminder_1h_sent_at, '1-hour tour reminder' + (d ? ' (tour ' + d + ')' : ''));
+        add(t.prebooking_form_sent_at, 'Pre-booking form email' + (d ? ' (tour ' + d + ')' : ''));
+      });
+      res[2].forEach(function(f) { add(f.sent_at, 'Inquiry follow-up'); });
+      res[3].forEach(function(s) { add(s.sent_at, 'Pre-booking form (sent by hand)', s.sent_by); });
+      out.sort(function(a, b) { return String(b.at).localeCompare(String(a.at)); });
+      setRows(out);
+    });
+  }, [email]);
+  if (rows === null) return null;
+  var fmt = function(iso) { var d = new Date(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }); };
+  return (
+    <details style={{ marginBottom: 12, background: '#faf6ef', border: '0.5px solid #eee4d6', borderRadius: 8, padding: '8px 12px' }}>
+      <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#8a7a62', textTransform: 'uppercase', letterSpacing: 0.8 }}>Emails sent ({rows.length})</summary>
+      {!rows.length ? <div style={{ fontSize: 12, color: '#999', marginTop: 6 }}>No emails recorded for this address yet.</div> : rows.map(function(r, i) {
+        return <div key={i} style={{ borderLeft: '3px solid #c9ad7a', background: '#fff', borderRadius: 6, padding: '6px 10px', marginTop: 6, fontSize: 12 }}>
+          <span style={{ fontWeight: 600, color: '#3a3226' }}>{r.what}</span>{r.by ? <span style={{ color: '#999' }}> · by {r.by}</span> : null}
+          <div style={{ color: '#999' }}>{fmt(r.at)}</div>
+        </div>;
+      })}
+    </details>
+  );
+}
+
 function PersonActivityView() {
+  var [openTours, setOpenTours] = useState({});
   var [people, setPeople] = useState([]);
   var [person, setPerson] = useState('');
   var [items, setItems] = useState(null);
@@ -16254,7 +16365,7 @@ function PersonActivityView() {
       get('portal_activity?select=*&actor_name=eq.' + encodeURIComponent(person) + '&order=created_at.desc&limit=2000').then(function(rows) {
         rows.forEach(function(r) {
           var d = paDescribe(r);
-          if (d) add(d.kind || 'portal', r.created_at, d.text, d.note || '', d.pill || '');
+          if (d) add(d.kind || 'portal', r.created_at, d.text, d.note || '', d.pill || '', r.table_name === 'estate_tours' && r.row_id ? { tourId: r.row_id } : null);
         });
       }),
       get('venue_messages?select=id,event_uid,subject,from_name,body,handled_at,handled_note,handled_note_by,handled_note_at&handled_by=ilike.' + like + '&order=handled_at.desc&limit=1000').then(function(rows) {
@@ -16282,7 +16393,7 @@ function PersonActivityView() {
         rows.forEach(function(t) {
           if (!(t.date && new Date(tourWhen(t)) < now)) return;
           var label = t.status === 'cancelled' ? 'Cancelled tour: ' : t.status === 'no_show' ? 'No-show: ' : 'Guided a tour: ';
-          add('tours', tourWhen(t), label + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''));
+          add('tours', tourWhen(t), label + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), '', '', { tourId: t.id });
         });
       }),
       get('estate_tours?select=id,visitor_name,category,made_contact_at,created_at,request_status&request_handled_by=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
@@ -16290,7 +16401,7 @@ function PersonActivityView() {
         var outcome = { made_contact: 'Contacted', not_interested: 'Not interested' };
         rows.forEach(function(t) {
           var pill = outcome[t.request_status] || (t.request_status ? String(t.request_status).replace(/_/g, ' ').replace(/^\w/, function(c) { return c.toUpperCase(); }) : '');
-          add('tours', t.made_contact_at || t.created_at, 'Handled tour request: ' + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), '', pill);
+          add('tours', t.made_contact_at || t.created_at, 'Handled tour request: ' + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), '', pill, { tourId: t.id });
         });
       }),
       get('activity_log?select=id,description,created_at,resolved_at&handled_by=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
@@ -16366,6 +16477,8 @@ function PersonActivityView() {
                 <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                   <div style={{ fontSize: 13, color: '#2a2420' }}><span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, color: '#fff', background: pillColor[it.kind], borderRadius: 4, padding: '1px 6px', marginRight: 8, verticalAlign: 1 }}>{it.pill || PA_KINDS[it.kind]}</span>{it.text}</div>
                   {it.note && <div style={{ fontSize: 12, color: '#888', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{it.note}</div>}
+                  {it.tourId && <button type="button" style={linkBtn} onClick={function() { setOpenTours(function(o) { var n = Object.assign({}, o); n[it.ref] = !n[it.ref]; return n; }); }}>{openTours[it.ref] ? '▾ Hide tour details' : '▸ Tour details & status changes'}</button>}
+                  {it.tourId && openTours[it.ref] && <TourDetails tourId={it.tourId} />}
                   {it.msgId && (it.hNote || (editing && editing.key === 'msg:' + it.msgId)) && (editing && editing.key === 'msg:' + it.msgId ? editBox() :
                     <NoteCard body={it.hNote} author={it.hNoteBy} at={it.hNoteAt}
                       onEdit={function() { setEditing({ key: 'msg:' + it.msgId, text: it.hNote || '' }); }}
@@ -22184,6 +22297,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                   </div>
                 );
               })()}
+              <InquiryEmailTimeline email={inquiryPreviewFields(selected).email} />
               {pendingTourEmails && !inquiryFollowUpAllowed(selected, pendingTourEmails) && (
                 <div style={{ fontSize: 12, color: '#a15c00', marginBottom: 12 }}>Follow-up paused while different tour times await coordination.</div>
               )}
