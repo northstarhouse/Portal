@@ -22137,8 +22137,8 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
                         <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>Inquired {fmtTs(sub.created_at)}</div>
                         {p.email && p.email !== preview && <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{p.email}</div>}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                          {tour && (function() { var st = TOUR_STATES[tourStateKey(sub)]; return (
-                            <span title={st.label + ': ' + fmtTourWhen(tour)} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, color: st.color, background: st.bg }}>{st.label}</span>
+                          {tour && (function() { var stk = tourStateKey(sub); var st = TOUR_STATES[stk]; var tdate = (stk === 'completed' && tour.date) ? new Date(tour.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''; return (
+                            <span title={st.label + ': ' + fmtTourWhen(tour)} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, color: st.color, background: st.bg }}>{tdate ? 'Toured on ' + tdate : st.label}</span>
                           ); })()}
                           {!sub.tourOnly && isBookedInquiry(sub) && <span title={isBookedInquiry(sub) === 'paid' ? 'Booked: first payment received' : 'Soft hold: pre-booking form submitted, no payment yet'} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, color: isBookedInquiry(sub) === 'paid' ? '#fff' : '#886c44', background: isBookedInquiry(sub) === 'paid' ? '#886c44' : '#f3ead9' }}>{isBookedInquiry(sub) === 'paid' ? 'Booked' : 'Soft hold'}</span>}
                           {tour && tour.confirmed_at && <span title={'Confirmed from the reminder email: ' + tourConfirmedText(tour)} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, color: '#1b5e20', background: '#e3f4e3' }}>✓ Confirmed</span>}
