@@ -1,8 +1,16 @@
-var CACHE = 'nsh-v1794963614044';
+<<<<<<< HEAD
+var CACHE = 'nsh-v1794983904481';
 var STATIC = [
   '/Portal/',
   '/Portal/index.html',
-  '/Portal/assets/app.js?v=1794963614044',
+  '/Portal/assets/app.js?v=1794983904481',
+=======
+var CACHE = 'nsh-v1794983664755';
+var STATIC = [
+  '/Portal/',
+  '/Portal/index.html',
+  '/Portal/assets/app.js?v=1794983664755',
+>>>>>>> caea248 (Board Communication & Voting: item type drop-down (vote, question, flag, discussion, FYI) with open-ended responses; red flags box matches Emails sent; tour time as 12-hour)
   '/Portal/assets/logo.png',
   '/Portal/favicon.svg',
   'https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js',

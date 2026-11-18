@@ -878,7 +878,7 @@ const modules = [
   { id: "volunteers", label: "Volunteers" },
   { id: "donors", label: "Donations" },
   { id: "sponsors", label: "Sponsors" },
-  { id: "board", label: "Board Voting" },
+  { id: "board", label: "Board Communication & Voting" },
   { id: "meeting-reports", label: "Meeting & Board Reports" },
   { id: "strategy", label: "Strategic Goal Progress", hidden: true },
   { id: "venue", label: "Venue Rentals" },
@@ -6566,7 +6566,20 @@ function RichEditor({ value, onChange, placeholder }) {
 }
 
 var BOARD_MEMBERS = ['Ken', 'Rick', 'Wyn', 'Paula', 'Jeff', 'Rich'];
-var VOTE_COLORS = { 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#f3f0ff', color: '#7c3aed' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' }, 'Notes or Request Changes in Place of Vote': { bg: '#fff8e1', color: '#8a6200' } };
+// What a board item is. Only 'Vote' gets Yes/No/Abstain; every other type is open-ended and members just write a response.
+var BOARD_ITEM_TYPES = [
+  { id: 'Vote', label: 'Vote', hint: 'Board members vote Yes / No / Abstain.', bg: '#fff3e0', color: '#e65100', verb: 'vote', respondTitle: 'Cast your vote' },
+  { id: 'Question', label: 'Question', hint: 'Ask the board something; members write an answer.', bg: '#e3f2fd', color: '#1565c0', verb: 'response', respondTitle: 'Your answer' },
+  { id: 'Flag', label: 'Flag / Heads-up', hint: 'Raise a concern or something to watch; members can reply.', bg: '#ffebee', color: '#c62828', verb: 'response', respondTitle: 'Your reply' },
+  { id: 'Discussion', label: 'Discussion', hint: 'An open topic for everyone to weigh in on.', bg: '#f3f0ff', color: '#7c3aed', verb: 'response', respondTitle: 'Add your thoughts' },
+  { id: 'FYI', label: 'FYI / Update', hint: 'Information for the board; replies optional.', bg: '#e8f5e9', color: '#2e7d32', verb: 'response', respondTitle: 'Add a comment (optional)' }
+];
+function boardItemType(item) {
+  var id = (item && item.item_type) || 'Vote';
+  return BOARD_ITEM_TYPES.filter(function(t) { return t.id === id; })[0] || BOARD_ITEM_TYPES[0];
+}
+function boardIsVote(item) { return boardItemType(item).id === 'Vote'; }
+var VOTE_COLORS = { 'Response': { bg: '#e3f2fd', color: '#1565c0' }, 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#f3f0ff', color: '#7c3aed' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' }, 'Notes or Request Changes in Place of Vote': { bg: '#fff8e1', color: '#8a6200' } };
 
 function BoardView() {
   var isMobile = React.useContext(MobileCtx);
@@ -6576,7 +6589,7 @@ function BoardView() {
   const [showAdd, setShowAdd] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState(null);
-  const [topicForm, setTopicForm] = React.useState({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '', allow_notes_vote: false });
+  const [topicForm, setTopicForm] = React.useState({ item_type: 'Vote', title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '', allow_notes_vote: false });
   const [voteForm, setVoteForm] = React.useState({ voter: '', choice: '', note: '' });
   const [showPostMeeting, setShowPostMeeting] = React.useState(false);
   const [voteSaving, setVoteSaving] = React.useState(false);
@@ -6637,15 +6650,19 @@ function BoardView() {
       setVoteNotifResult({ ok: false, text: 'No board member emails on file yet — add them above first.', forRowId: item.row_id });
       return;
     }
-    var subject = 'Board Vote: ' + item.title;
+    var isVoteItem = boardIsVote(item);
+    var typeLabel = boardItemType(item).label;
+    var subject = 'Board ' + typeLabel + ': ' + item.title;
+    var subtextLine = isVoteItem ? 'A new item is up for a board vote. Please review the materials and submit your vote inside the portal.' : 'A new ' + typeLabel.toLowerCase() + ' has been posted for the board. Please take a look and respond inside the portal.';
+    var buttonLine = isVoteItem ? 'Click Here to Review Materials & Cast Vote' : 'Click Here to View & Respond';
     var html = buildBoardNotificationEmailHtml({
       headline: item.title,
-      subtext: 'A new item is up for a board vote. Please review the materials and submit your vote inside the portal.',
-      buttonText: 'Click Here to Review Materials & Cast Vote',
+      subtext: subtextLine,
+      buttonText: buttonLine,
       buttonUrl: PORTAL_URL + '#board',
       note: 'Sign in with your Volunteer Hub email and password'
     });
-    var text = item.title + '\n\nA new item is up for a board vote. Please review the materials and submit your vote inside the portal.\n\nClick Here to Review Materials & Cast Vote: ' + PORTAL_URL + '#board\n\nSign in with your Volunteer Hub email and password';
+    var text = item.title + '\n\n' + subtextLine + '\n\n' + buttonLine + ': ' + PORTAL_URL + '#board\n\nSign in with your Volunteer Hub email and password';
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
@@ -6737,6 +6754,7 @@ function BoardView() {
 
   function isRevealed(item) {
     if (item.status === 'Closed') return true;
+    if (!boardIsVote(item)) return false; // open-ended items stay open until closed by hand; responses are always visible
     var iv = itemVotes(item);
     var allVoted = BOARD_MEMBERS.every(function(m) { return iv.some(function(v) { return v.voter === m; }); });
     var pastDue = item.due_date && item.due_date <= new Date().toISOString().slice(0, 10);
@@ -6796,18 +6814,19 @@ function BoardView() {
 
   function handleVoteSubmit(e) {
     if (e && e.preventDefault) e.preventDefault();
-    if (!voteForm.voter || !voteForm.choice) return;
+    var isVoteItem = boardIsVote(selected);
+    if (!voteForm.voter || (isVoteItem ? !voteForm.choice : !String(voteForm.note || '').trim())) return;
     setVoteSaving(true);
     var existing = votes.find(function(v) { return v.topicId === selected.title && v.voter === voteForm.voter; });
     var today = new Date().toDateString();
     var isInMeeting = selected.meeting_date && new Date(selected.meeting_date + 'T12:00:00').toDateString() === today;
-    var payload = { topicId: selected.title, voter: voteForm.voter, choice: voteForm.choice, note: voteForm.note || null };
+    var payload = { topicId: selected.title, voter: voteForm.voter, choice: isVoteItem ? voteForm.choice : 'Response', note: voteForm.note || null };
     if (existing) {
       var fullPayload = Object.assign({}, payload, { changed_in_meeting: isInMeeting ? true : (existing.changed_in_meeting || false) });
       sbPatchById('Board-Votes', existing.id, fullPayload).then(function() {
         setVoteSaving(false);
         setVoteForm({ voter: '', choice: '', note: '' });
-        logActivity(voteForm.voter + ' changed their vote on "' + selected.title + '"', 'board_vote_changed');
+        logActivity(voteForm.voter + (isVoteItem ? ' changed their vote on "' : ' updated their response on "') + selected.title + '"', 'board_vote_changed');
         refreshVotes();
       });
     } else {
@@ -6815,7 +6834,7 @@ function BoardView() {
         if (rows && rows.message) { alert('Error saving vote: ' + rows.message); setVoteSaving(false); return; }
         setVoteSaving(false);
         setVoteForm({ voter: '', choice: '', note: '' });
-        logActivity(voteForm.voter + ' cast their vote on "' + selected.title + '"', 'board_vote_cast');
+        logActivity(voteForm.voter + (isVoteItem ? ' cast their vote on "' : ' responded to "') + selected.title + '"', 'board_vote_cast');
         refreshVotes();
       }).catch(function(err) { alert('Error: ' + err); setVoteSaving(false); });
     }
@@ -6825,21 +6844,21 @@ function BoardView() {
     e.preventDefault();
     if (!topicForm.title) return;
     setTopicSaving(true);
-    sbInsert('Board Voting Items', {
+    sbInsert('Board Voting Items', Object.assign({}, topicForm.item_type && topicForm.item_type !== 'Vote' ? { item_type: topicForm.item_type } : {}, {
       title: topicForm.title,
       description: topicForm.description || null,
       attachment_url: topicForm.attachment_url || null,
       submitted_by: topicForm.submitted_by || null,
       due_date: topicForm.due_date || null,
       meeting_date: topicForm.meeting_date || null,
-      allow_notes_vote: topicForm.allow_notes_vote,
+      allow_notes_vote: boardIsVote(topicForm) ? topicForm.allow_notes_vote : false,
       status: 'Open'
-    }).then(function(rows) {
-      if (rows && rows.message) { alert('Error: ' + rows.message); setTopicSaving(false); return; }
+    })).then(function(rows) {
+      if (rows && rows.message) { alert('Error: ' + rows.message + (/item_type/.test(rows.message) ? '\n\nThe item-type column has not been added to the database yet.' : '')); setTopicSaving(false); return; }
       setTopicSaving(false);
-      logActivity('New board vote opened: ' + topicForm.title + (topicForm.submitted_by ? ' (by ' + topicForm.submitted_by + ')' : ''), 'board_vote_opened');
+      logActivity('New board ' + boardItemType(topicForm).label.toLowerCase() + ' opened: ' + topicForm.title + (topicForm.submitted_by ? ' (by ' + topicForm.submitted_by + ')' : ''), 'board_vote_opened');
       setShowAdd(false);
-      setTopicForm({ title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '', allow_notes_vote: false });
+      setTopicForm({ item_type: 'Vote', title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '', allow_notes_vote: false });
       setAttachFileName(''); setAttachUploading(false);
       clearCache('Board Voting Items');
       load();
@@ -6959,7 +6978,10 @@ function BoardView() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>{item.title}</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>
+                    {!boardIsVote(item) && <span style={{ background: boardItemType(item).bg, color: boardItemType(item).color, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, padding: '2px 8px', borderRadius: 20, marginRight: 8, verticalAlign: 'middle' }}>{boardItemType(item).label}</span>}
+                    {item.title}
+                  </div>
                   <div style={{ fontSize: 12, color: '#777' }}>
                     {item.submitted_by ? <span>Submitted by {item.submitted_by}{item.created_at ? ' on ' + fmtFullDate(item.created_at) : ''}{item.due_date ? ' · ' : ''}</span> : null}
                     {item.due_date ? <span>Due {fmtDate(item.due_date)}</span> : null}
@@ -6969,7 +6991,7 @@ function BoardView() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                   {item.created_at && <span style={{ fontSize: 11, color: '#aaa' }}>Submitted {fmtSubmitted(item.created_at)}</span>}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 12, color: '#777' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                    <span style={{ fontSize: 12, color: '#777' }}>{boardIsVote(item) ? iv.length + '/' + BOARD_MEMBERS.length + ' voted' : iv.length + ' response' + (iv.length === 1 ? '' : 's')}</span>
                     {revealed
                       ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Closed</span>
                       : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Open</span>
@@ -6977,7 +6999,7 @@ function BoardView() {
                   </div>
                 </div>
               </div>
-              {revealed && (
+              {revealed && boardIsVote(item) && (
                 <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
                   {[['Yes', t.yes, '#2e7d32'], ['No', t.no, '#c62828'], ['Abstain', t.abstain, '#7c3aed']].map(function(entry) {
                     return <div key={entry[0]} style={{ fontSize: 12, color: entry[2], fontWeight: 600 }}>{entry[1]} {entry[0]}</div>;
@@ -7007,6 +7029,7 @@ function BoardView() {
           <div style={{ padding: isMobile ? '14px 16px' : '24px 28px', flex: 1 }}>
             <div style={{ background: '#fff', borderRadius: 0 }}>
             <div style={{ marginBottom: 24 }}>
+              {!boardIsVote(selected) && <span style={{ display: 'inline-block', background: boardItemType(selected).bg, color: boardItemType(selected).color, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, padding: '3px 10px', borderRadius: 20, marginBottom: 8 }}>{boardItemType(selected).label}</span>}
               <div style={{ fontSize: 22, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
                 <div style={{ fontSize: 12, color: '#777' }}>
                   {selected.created_at ? <span>Submitted {fmtSubmitted(selected.created_at)}</span> : null}
@@ -7027,7 +7050,48 @@ function BoardView() {
               </div>
             )}
 
-            {isRevealed(selected) ? (
+            {!boardIsVote(selected) ? (
+              <div>
+                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10 }}>
+                  Responses · {itemVotes(selected).length}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                  {itemVotes(selected).length === 0 && <div style={{ fontSize: 12, color: '#999', padding: '8px 2px' }}>No responses yet.</div>}
+                  {itemVotes(selected).map(function(rv) {
+                    return (
+                      <div key={rv.id} style={{ padding: '10px 14px', background: '#fafafa', borderLeft: '3px solid ' + boardItemType(selected).color, borderRadius: 4 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{rv.voter}{rv.timestamp ? <span style={{ fontWeight: 400, color: '#aaa' }}> · {fmtSubmitted(rv.timestamp)}</span> : null}</div>
+                        <div style={{ fontSize: 13, color: '#444', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{rv.note}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {selected.status !== 'Closed' && (
+                  <div style={{ background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '18px 20px', marginBottom: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 14 }}>{boardItemType(selected).respondTitle}</div>
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={bLbl}>Your name</label>
+                      <select value={voteForm.voter} onChange={function(e) {
+                        var nm = e.target.value;
+                        var prev = votes.find(function(v) { return v.topicId === selected.title && v.voter === nm; });
+                        setVoteForm({ voter: nm, choice: '', note: prev && prev.note ? prev.note : '' });
+                      }} style={bInp}>
+                        <option value="">Select name…</option>
+                        {BOARD_MEMBERS.map(function(m) {
+                          var has = itemVotes(selected).some(function(v) { return v.voter === m; });
+                          return <option key={m} value={m}>{m}{has ? ' (edit my response)' : ''}</option>;
+                        })}
+                      </select>
+                    </div>
+                    <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={4} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 12 })} placeholder="Write your response…" />
+                    <button onClick={handleVoteSubmit} disabled={voteSaving || !voteForm.voter || !String(voteForm.note || '').trim()}
+                      style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (voteSaving || !voteForm.voter || !String(voteForm.note || '').trim()) ? 0.5 : 1 }}>
+                      {voteSaving ? 'Saving…' : 'Post Response'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : isRevealed(selected) ? (
               <div>
                 <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 12 }}>Results</div>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: 10, marginBottom: 20 }}>
@@ -7194,7 +7258,7 @@ function BoardView() {
                         {openItems.map(function(item) {
                           var t = tally(item);
                           var iv = itemVotes(item);
-                          var won = isWon(item);
+                          var won = boardIsVote(item) && isWon(item);
                           var isClosing = closingId === item.row_id;
                           return (
                             <div key={item.id} style={{ background: won ? '#f0faf0' : '#faf8f5', border: '0.5px solid ' + (won ? '#a5d6a7' : '#e8e0d5'), borderRadius: 10, padding: '14px 16px' }}>
@@ -7205,10 +7269,12 @@ function BoardView() {
                                     {won && <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', padding: '2px 8px', borderRadius: 20 }}>Majority Yes</span>}
                                   </div>
                                   <div style={{ display: 'flex', gap: 14, fontSize: 12, marginBottom: 8 }}>
-                                    <span style={{ color: '#2e7d32', fontWeight: 600 }}>{t.yes} Yes</span>
-                                    <span style={{ color: '#c62828', fontWeight: 600 }}>{t.no} No</span>
-                                    <span style={{ color: '#7c3aed', fontWeight: 600 }}>{t.abstain + t.absent} Abstain</span>
-                                    <span style={{ color: '#888' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                                    {boardIsVote(item) ? [
+                                      <span key="y" style={{ color: '#2e7d32', fontWeight: 600 }}>{t.yes} Yes</span>,
+                                      <span key="n" style={{ color: '#c62828', fontWeight: 600 }}>{t.no} No</span>,
+                                      <span key="a" style={{ color: '#7c3aed', fontWeight: 600 }}>{t.abstain + t.absent} Abstain</span>,
+                                      <span key="v" style={{ color: '#888' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                                    ] : <span style={{ color: boardItemType(item).color, fontWeight: 600 }}>{boardItemType(item).label} · {iv.length} response{iv.length === 1 ? '' : 's'}</span>}
                                   </div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
                                     {BOARD_MEMBERS.map(function(m) {
@@ -7262,7 +7328,8 @@ function BoardView() {
                               {closedItems.map(function(item) {
                                 var t = tally(item);
                                 var iv = itemVotes(item);
-                                var passed = isWon(item);
+                                var passed = boardIsVote(item) && isWon(item);
+                                var isVoteRow = boardIsVote(item);
                                 var expanded = adminExpandedClosedId === item.row_id;
                                 return (
                                   <div key={item.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '12px 16px' }}>
@@ -7275,16 +7342,20 @@ function BoardView() {
                                           <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{item.title}</div>
                                           {passed
                                             ? <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', padding: '2px 8px', borderRadius: 20 }}>Passed</span>
+                                            : !isVoteRow
+                                              ? <span style={{ fontSize: 10, fontWeight: 700, background: boardItemType(item).bg, color: boardItemType(item).color, padding: '2px 8px', borderRadius: 20 }}>{boardItemType(item).label}</span>
                                             : t.no > t.yes
                                               ? <span style={{ fontSize: 10, fontWeight: 700, background: '#ffebee', color: '#c62828', padding: '2px 8px', borderRadius: 20 }}>Failed</span>
                                               : <span style={{ fontSize: 10, fontWeight: 700, background: '#f5f0ea', color: '#888', padding: '2px 8px', borderRadius: 20 }}>Tied</span>
                                           }
                                         </div>
                                         <div style={{ display: 'flex', gap: 14, fontSize: 12 }}>
-                                          <span style={{ color: '#2e7d32', fontWeight: 600 }}>{t.yes} Yes</span>
-                                          <span style={{ color: '#c62828', fontWeight: 600 }}>{t.no} No</span>
-                                          <span style={{ color: '#7c3aed', fontWeight: 600 }}>{t.abstain + t.absent} Abstain</span>
-                                          <span style={{ color: '#888' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                                          {isVoteRow ? [
+                                            <span key="y" style={{ color: '#2e7d32', fontWeight: 600 }}>{t.yes} Yes</span>,
+                                            <span key="n" style={{ color: '#c62828', fontWeight: 600 }}>{t.no} No</span>,
+                                            <span key="a" style={{ color: '#7c3aed', fontWeight: 600 }}>{t.abstain + t.absent} Abstain</span>,
+                                            <span key="v" style={{ color: '#888' }}>{iv.length}/{BOARD_MEMBERS.length} voted</span>
+                                          ] : <span style={{ color: '#888' }}>{iv.length} response{iv.length === 1 ? '' : 's'}</span>}
                                         </div>
                                       </div>
                                       <button
@@ -7340,13 +7411,20 @@ function BoardView() {
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 4, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 20 }}>
               <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>New Item</div>
-              <button type="button" onClick={function() { setTopicForm(function(f) { return Object.assign({}, f, { allow_notes_vote: !f.allow_notes_vote }); }); }}
+              {boardIsVote(topicForm) && <button type="button" onClick={function() { setTopicForm(function(f) { return Object.assign({}, f, { allow_notes_vote: !f.allow_notes_vote }); }); }}
                 title="Let voters submit notes/requested changes instead of a Yes/No/Abstain vote on this item"
                 style={{ padding: '5px 10px', borderRadius: 20, border: '1.5px solid ' + (topicForm.allow_notes_vote ? '#8a6200' : '#e0d8cc'), background: topicForm.allow_notes_vote ? '#fff8e1' : '#fff', color: topicForm.allow_notes_vote ? '#8a6200' : '#888', fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
                 {topicForm.allow_notes_vote ? '✓ Notes Option On' : 'Allow Notes Option'}
-              </button>
+              </button>}
             </div>
             <form onSubmit={handleTopicSubmit}>
+              <div style={bGrp}>
+                <label style={bLbl}>What are you submitting?</label>
+                <select value={topicForm.item_type || 'Vote'} onChange={function(e) { var v = e.target.value; setTopicForm(function(f) { return Object.assign({}, f, { item_type: v }); }); }} style={bInp}>
+                  {BOARD_ITEM_TYPES.map(function(t) { return <option key={t.id} value={t.id}>{t.label}</option>; })}
+                </select>
+                <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>{boardItemType(topicForm).hint}</div>
+              </div>
               <div style={bGrp}><label style={bLbl}>Title *</label><input required value={topicForm.title} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { title: e.target.value }); }); }} style={bInp} placeholder="Item title…" /></div>
               <div style={bGrp}><label style={bLbl}>Description</label><RichEditor value={topicForm.description} onChange={function(html) { setTopicForm(function(f) { return Object.assign({}, f, { description: html }); }); }} placeholder="Background, details, context…" /></div>
               <div style={bGrp}>
@@ -21973,7 +22051,9 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
     }
     var d;
     try { d = new Date(t.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (e) { d = t.date; }
-    return t.start_time ? d + ' at ' + t.start_time : d;
+    var tm = String(t.start_time || '').match(/^(\d{1,2}):(\d{2})/);
+    var tmText = tm ? ((+tm[1] % 12) || 12) + ':' + tm[2] + ' ' + (+tm[1] >= 12 ? 'PM' : 'AM') : t.start_time;
+    return t.start_time ? d + ' at ' + tmText : d;
   }
   useEffect(function() {
     setNotesDraft(selected ? (selected.internal_notes || '') : '');
@@ -24673,7 +24753,7 @@ function MeetingBoardReportsView({ navigate }) {
             return (
               <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
                 <div style={{ padding: '10px 14px', background: BOARD_VOTING_CARD_COLOR.bg, borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: BOARD_VOTING_CARD_COLOR.color, fontFamily: "'Cardo', serif" }}>Board Voting</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: BOARD_VOTING_CARD_COLOR.color, fontFamily: "'Cardo', serif" }}>Board Communication & Voting</div>
                   <button onClick={function() { navigate('board'); }} style={{ background: '#fff', color: BOARD_VOTING_CARD_COLOR.color, border: '1px solid ' + BOARD_VOTING_CARD_COLOR.color, borderRadius: 20, padding: '4px 11px', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
                     Open
                   </button>

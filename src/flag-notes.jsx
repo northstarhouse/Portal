@@ -51,7 +51,7 @@ export function InquiryFlagNotes({ who, inline, preloaded }) {
   var flag = <svg width="16" height="16" viewBox="0 0 24 24" fill="#d9534f" stroke="#d9534f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22V4"/><path d="M4 4h13l-2.5 4.5L17 13H4z"/></svg>;
   var pill = { display: "inline-block", maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "middle", background: "#fdecea", color: "#b3261e", border: "1px solid #f1c9c5", borderRadius: 999, padding: "3px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer" };
   return (
-    <div style={{ marginBottom: inline ? 0 : 12 }}>
+    <div style={inline ? { marginBottom: 0 } : { marginBottom: 12, background: '#faf6ef', border: '0.5px solid #eee4d6', borderRadius: 8, padding: '8px 12px' }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
         <button type="button" onClick={function() { setOpen(!open); }} title="Red flags from tours" aria-expanded={open} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: open ? "#fdecea" : "#fff", border: "1px solid #f1c9c5", borderRadius: 999, padding: "4px 10px", cursor: "pointer" }}>
           {flag}{notes.length > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: "#b3261e" }}>{notes.length}</span>}
