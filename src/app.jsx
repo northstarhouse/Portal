@@ -6566,19 +6566,30 @@ function RichEditor({ value, onChange, placeholder }) {
 }
 
 var BOARD_MEMBERS = ['Ken', 'Rick', 'Wyn', 'Paula', 'Jeff', 'Rich'];
-// What a board item is. Only 'Vote' gets Yes/No/Abstain; every other type is open-ended and members just write a response.
+// What a board item is. Only 'Vote' gets Yes/No/Abstain; every other type is open-ended and members write in a thread.
 var BOARD_ITEM_TYPES = [
-  { id: 'Vote', label: 'Vote', hint: 'Board members vote Yes / No / Abstain.', bg: '#fff3e0', color: '#e65100', verb: 'vote', respondTitle: 'Cast your vote' },
-  { id: 'Question', label: 'Question', hint: 'Ask the board something; members write an answer.', bg: '#e3f2fd', color: '#1565c0', verb: 'response', respondTitle: 'Your answer' },
-  { id: 'Flag', label: 'Flag / Heads-up', hint: 'Raise a concern or something to watch; members can reply.', bg: '#ffebee', color: '#c62828', verb: 'response', respondTitle: 'Your reply' },
-  { id: 'Discussion', label: 'Discussion', hint: 'An open topic for everyone to weigh in on.', bg: '#f3f0ff', color: '#7c3aed', verb: 'response', respondTitle: 'Add your thoughts' },
-  { id: 'FYI', label: 'FYI / Update', hint: 'Information for the board; replies optional.', bg: '#e8f5e9', color: '#2e7d32', verb: 'response', respondTitle: 'Add a comment (optional)' }
+  { id: 'Vote', label: 'Vote', hint: 'Board members vote Yes / No / Abstain (anonymous until closed).', bg: '#e4f0dc', color: '#3f6b2a', edge: '#6f9a52', respondTitle: 'Cast your vote' },
+  { id: 'Question', label: 'Question', hint: 'Ask the board something; members answer and reply to each other.', bg: '#fbefd9', color: '#8a5a12', edge: '#e0b878', respondTitle: 'Your answer' },
+  { id: 'Discussion', label: 'Discussion', hint: 'An open topic for everyone to weigh in on.', bg: '#efe6fa', color: '#5b3a9e', edge: '#7a4fc0', respondTitle: 'Add your thoughts' },
+  { id: 'Update', label: 'Update', hint: 'Information for the board; comments welcome.', bg: '#e3eefb', color: '#1f5a96', edge: '#5a9ad6', respondTitle: 'Add a comment' }
 ];
 function boardItemType(item) {
   var id = (item && item.item_type) || 'Vote';
+  if (id === 'FYI') id = 'Update';
+  if (id === 'Flag') id = 'Discussion';
   return BOARD_ITEM_TYPES.filter(function(t) { return t.id === id; })[0] || BOARD_ITEM_TYPES[0];
 }
 function boardIsVote(item) { return boardItemType(item).id === 'Vote'; }
+// Pill with an icon, shown above the title of every board item.
+function BoardTypePill({ item, size }) {
+  var t = boardItemType(item), sm = size === 'sm', c = t.color, w = sm ? 13 : 15;
+  var p = { width: w, height: w, viewBox: '0 0 24 24', fill: 'none', stroke: c, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  var icon = t.id === 'Vote' ? <svg {...p}><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/></svg>
+    : t.id === 'Question' ? <svg {...p}><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7"/><circle cx="12" cy="17" r=".6" fill={c}/></svg>
+    : t.id === 'Discussion' ? <svg {...p}><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 5.2a3 3 0 0 1 0 5.6M18 14.8c1.8.7 3 2.3 3 5.2"/></svg>
+    : <svg {...p}><path d="M3 11v3a1 1 0 0 0 1 1h2l8 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M18 9a4 4 0 0 1 0 6"/></svg>;
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: t.bg, color: c, fontSize: sm ? 13 : 15, fontWeight: 700, fontFamily: "'Cardo', serif", padding: sm ? '3px 12px 3px 9px' : '5px 16px 5px 12px', borderRadius: 9 }}>{icon}{t.label}</span>;
+}
 var VOTE_COLORS = { 'Response': { bg: '#e3f2fd', color: '#1565c0' }, 'Yes': { bg: '#e8f5e9', color: '#2e7d32' }, 'No': { bg: '#ffebee', color: '#c62828' }, 'Abstain': { bg: '#f3f0ff', color: '#7c3aed' }, 'Not in attendance': { bg: '#f5f5f5', color: '#888' }, 'Notes or Request Changes in Place of Vote': { bg: '#fff8e1', color: '#8a6200' } };
 
 function BoardView() {
@@ -6608,6 +6619,41 @@ function BoardView() {
   const [voteNotifResult, setVoteNotifResult] = React.useState(null);
   const [adminExpandedClosedId, setAdminExpandedClosedId] = React.useState(null);
   const [voteNotifConfirmItem, setVoteNotifConfirmItem] = React.useState(null);
+  const [replyTo, setReplyTo] = React.useState(null);
+  const [myName, setMyName] = React.useState('');
+
+  // Who is signed in: a board member by login email, otherwise the first name on their volunteer record.
+  React.useEffect(function() {
+    var email = '';
+    try { email = (localStorage.getItem('nsh-app-email') || '').trim().toLowerCase(); } catch (e) {}
+    var bm = boardMembers.filter(function(m) { return m.email && String(m.email).trim().toLowerCase() === email; })[0];
+    if (bm) { setMyName(bm.name); return; }
+    whoIsSignedIn().then(function(n) { if (n) setMyName(n); });
+  }, [boardMembers]);
+
+  function postComment(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    var who = myName || voteForm.voter, text = String(voteForm.note || '').trim();
+    if (!who || !text || voteSaving) return;
+    setVoteSaving(true);
+    var row = { topicId: selected.title, voter: who, choice: 'Response', note: text, changed_in_meeting: false };
+    if (replyTo) row.reply_to = replyTo.id;
+    sbInsert('Board-Votes', row).then(function(rows) {
+      setVoteSaving(false);
+      if (rows && rows.message) { alert('Error posting: ' + rows.message + (/reply_to/.test(rows.message) ? '\n\nThe replies column has not been added to the database yet.' : '')); return; }
+      setVoteForm(function(f) { return Object.assign({}, f, { note: '' }); });
+      var was = replyTo; setReplyTo(null);
+      logActivity(who + (was ? ' replied to ' + was.voter + ' on "' : ' posted on "') + selected.title + '"', 'board_vote_cast');
+      refreshVotes();
+    }).catch(function(err) { alert('Error: ' + err); setVoteSaving(false); });
+  }
+
+  function deleteComment(c) {
+    if (!window.confirm('Delete this comment' + (votes.some(function(v) { return v.reply_to === c.id; }) ? ' (replies to it will stay)' : '') + '?')) return;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Board-Votes') + '?id=eq.' + c.id, { method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { if (!r.ok) throw new Error(); setVotes(function(p) { return p.filter(function(v) { return v.id !== c.id; }); }); clearCache('Board-Votes'); })
+      .catch(function() { alert('Could not delete — please try again.'); });
+  }
 
   function loadBoardMembers() {
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('board_members') + '?select=*&order=sort_order.asc', {
@@ -6971,15 +7017,15 @@ function BoardView() {
               )}
             <div
               key={item.id}
-              onClick={function() { setSelected(item); setVoteForm({ voter: '', choice: '', note: '' }); }}
-              style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '16px 20px', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
+              onClick={function() { setSelected(item); setReplyTo(null); setVoteForm({ voter: BOARD_MEMBERS.indexOf(myName) !== -1 ? myName : '', choice: '', note: '' }); }}
+              style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderLeft: '4px solid ' + boardItemType(item).edge, borderRadius: 10, padding: '16px 20px', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
               onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.07)'; }}
               onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#2a2a2a', marginBottom: 4 }}>
-                    {!boardIsVote(item) && <span style={{ background: boardItemType(item).bg, color: boardItemType(item).color, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, padding: '2px 8px', borderRadius: 20, marginRight: 8, verticalAlign: 'middle' }}>{boardItemType(item).label}</span>}
+                    <div style={{ marginBottom: 8 }}><BoardTypePill item={item} /></div>
                     {item.title}
                   </div>
                   <div style={{ fontSize: 12, color: '#777' }}>
@@ -7029,7 +7075,7 @@ function BoardView() {
           <div style={{ padding: isMobile ? '14px 16px' : '24px 28px', flex: 1 }}>
             <div style={{ background: '#fff', borderRadius: 0 }}>
             <div style={{ marginBottom: 24 }}>
-              {!boardIsVote(selected) && <span style={{ display: 'inline-block', background: boardItemType(selected).bg, color: boardItemType(selected).color, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, padding: '3px 10px', borderRadius: 20, marginBottom: 8 }}>{boardItemType(selected).label}</span>}
+              <div style={{ marginBottom: 10 }}><BoardTypePill item={selected} /></div>
               <div style={{ fontSize: 22, fontWeight: 600, color: '#2a2a2a', marginBottom: 6 }}>{selected.title}</div>
                 <div style={{ fontSize: 12, color: '#777' }}>
                   {selected.created_at ? <span>Submitted {fmtSubmitted(selected.created_at)}</span> : null}
@@ -7053,40 +7099,64 @@ function BoardView() {
             {!boardIsVote(selected) ? (
               <div>
                 <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10 }}>
-                  Responses · {itemVotes(selected).length}
+                  Conversation · {itemVotes(selected).length}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-                  {itemVotes(selected).length === 0 && <div style={{ fontSize: 12, color: '#999', padding: '8px 2px' }}>No responses yet.</div>}
-                  {itemVotes(selected).map(function(rv) {
+                {(function() {
+                  var all = itemVotes(selected).slice().sort(function(x, y) { return new Date(x.timestamp || 0) - new Date(y.timestamp || 0); });
+                  var byId = {};
+                  all.forEach(function(c) { byId[c.id] = c; });
+                  var topOf = function(c) { var g = 0; while (c && c.reply_to && byId[c.reply_to] && g++ < 20) c = byId[c.reply_to]; return c; };
+                  var tops = all.filter(function(c) { return !c.reply_to || !byId[c.reply_to]; });
+                  var canPost = selected.status !== 'Closed';
+                  var renderComment = function(c, isReply) {
+                    var parent = c.reply_to ? byId[c.reply_to] : null;
+                    var mine = myName && c.voter === myName;
                     return (
-                      <div key={rv.id} style={{ padding: '10px 14px', background: '#fafafa', borderLeft: '3px solid ' + boardItemType(selected).color, borderRadius: 4 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{rv.voter}{rv.timestamp ? <span style={{ fontWeight: 400, color: '#aaa' }}> · {fmtSubmitted(rv.timestamp)}</span> : null}</div>
-                        <div style={{ fontSize: 13, color: '#444', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{rv.note}</div>
+                      <div key={c.id} style={{ padding: '10px 14px', background: isReply ? '#fff' : '#fafafa', border: isReply ? '0.5px solid #eee4d6' : 'none', borderLeft: '3px solid ' + boardItemType(selected).color, borderRadius: 4, marginTop: isReply ? 8 : 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{c.voter}{c.timestamp ? <span style={{ fontWeight: 400, color: '#aaa' }}> · {fmtSubmitted(c.timestamp)}</span> : null}{parent && isReply && topOf(c) !== parent ? <span style={{ fontWeight: 400, color: '#aaa' }}> · replying to {parent.voter}</span> : null}</div>
+                        <div style={{ fontSize: 13, color: '#444', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{c.note}</div>
+                        <div style={{ marginTop: 5, display: 'flex', gap: 12 }}>
+                          {canPost && <button type="button" onClick={function() { setReplyTo(c); }} style={{ background: 'none', border: 'none', padding: 0, color: gold, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Reply</button>}
+                          {mine && <button type="button" onClick={function() { deleteComment(c); }} style={{ background: 'none', border: 'none', padding: 0, color: '#b3261e', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>}
+                        </div>
                       </div>
                     );
-                  })}
-                </div>
+                  };
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                      {all.length === 0 && <div style={{ fontSize: 12, color: '#999', padding: '8px 2px' }}>Nobody has said anything yet.</div>}
+                      {tops.map(function(t) {
+                        var thread = all.filter(function(c) { return c.id !== t.id && topOf(c) === t; });
+                        return (
+                          <div key={t.id}>
+                            {renderComment(t, false)}
+                            {thread.length > 0 && <div style={{ marginLeft: 22 }}>{thread.map(function(c) { return renderComment(c, true); })}</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
                 {selected.status !== 'Closed' && (
                   <div style={{ background: '#faf8f5', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '18px 20px', marginBottom: 20 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 14 }}>{boardItemType(selected).respondTitle}</div>
-                    <div style={{ marginBottom: 12 }}>
-                      <label style={bLbl}>Your name</label>
-                      <select value={voteForm.voter} onChange={function(e) {
-                        var nm = e.target.value;
-                        var prev = votes.find(function(v) { return v.topicId === selected.title && v.voter === nm; });
-                        setVoteForm({ voter: nm, choice: '', note: prev && prev.note ? prev.note : '' });
-                      }} style={bInp}>
-                        <option value="">Select name…</option>
-                        {BOARD_MEMBERS.map(function(m) {
-                          var has = itemVotes(selected).some(function(v) { return v.voter === m; });
-                          return <option key={m} value={m}>{m}{has ? ' (edit my response)' : ''}</option>;
-                        })}
-                      </select>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 12 }}>
+                      {replyTo ? 'Reply to ' + replyTo.voter : boardItemType(selected).respondTitle}
+                      {replyTo && <button type="button" onClick={function() { setReplyTo(null); }} style={{ background: 'none', border: 'none', color: '#888', fontSize: 11, cursor: 'pointer', marginLeft: 10 }}>cancel reply</button>}
                     </div>
-                    <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={4} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 12 })} placeholder="Write your response…" />
-                    <button onClick={handleVoteSubmit} disabled={voteSaving || !voteForm.voter || !String(voteForm.note || '').trim()}
-                      style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (voteSaving || !voteForm.voter || !String(voteForm.note || '').trim()) ? 0.5 : 1 }}>
-                      {voteSaving ? 'Saving…' : 'Post Response'}
+                    {replyTo && <div style={{ fontSize: 12, color: '#888', borderLeft: '3px solid #e0d8cc', paddingLeft: 8, marginBottom: 10, maxHeight: 48, overflow: 'hidden' }}>{replyTo.note}</div>}
+                    {myName
+                      ? <div style={{ fontSize: 12, color: '#777', marginBottom: 10 }}>Posting as <strong style={{ color: '#2a2a2a' }}>{myName}</strong> (signed in). Everyone can see who wrote this.</div>
+                      : <div style={{ marginBottom: 12 }}>
+                          <label style={bLbl}>Your name</label>
+                          <select value={voteForm.voter} onChange={function(e) { var nm = e.target.value; setVoteForm(function(f) { return Object.assign({}, f, { voter: nm }); }); }} style={bInp}>
+                            <option value="">Select name…</option>
+                            {BOARD_MEMBERS.map(function(m) { return <option key={m} value={m}>{m}</option>; })}
+                          </select>
+                        </div>}
+                    <textarea value={voteForm.note} onChange={function(e) { setVoteForm(function(f) { return Object.assign({}, f, { note: e.target.value }); }); }} rows={replyTo ? 3 : 4} style={Object.assign({}, bInp, { resize: 'vertical', marginBottom: 12 })} placeholder={replyTo ? 'Write your reply…' : 'Write your response…'} />
+                    <button onClick={postComment} disabled={voteSaving || !(myName || voteForm.voter) || !String(voteForm.note || '').trim()}
+                      style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (voteSaving || !(myName || voteForm.voter) || !String(voteForm.note || '').trim()) ? 0.5 : 1 }}>
+                      {voteSaving ? 'Posting…' : (replyTo ? 'Post Reply' : 'Post')}
                     </button>
                   </div>
                 )}
