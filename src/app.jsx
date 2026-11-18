@@ -21378,13 +21378,14 @@ function VenueRentalsView({ navigate, initialTab }) {
                         ? 'Venue Pre-Booking Form sent ' + new Date(detailEntry.raw.prebooking_form_sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                         : 'Venue Pre-Booking Form has not been sent yet'}
                     </div>
-                    <button onClick={togglePrebookingSent} disabled={detailSaving} style={{ flexShrink: 0, padding: '6px 10px', background: '#fff', border: '1px solid ' + (detailEntry.raw.prebooking_form_sent_at ? '#cfe8cf' : '#f0dba6'), borderRadius: 6, fontSize: 11, fontWeight: 600, color: detailEntry.raw.prebooking_form_sent_at ? '#2d6a2d' : '#8a6d1d', cursor: 'pointer' }}>
-                      {detailEntry.raw.prebooking_form_sent_at ? 'Mark unsent' : 'Mark as sent'}
+                    <button onClick={togglePrebookingSent} disabled={detailSaving} title={detailEntry.raw.prebooking_form_sent_at ? 'Click to mark as not sent' : 'Record that the pre-booking form was sent'} style={{ flexShrink: 0, padding: '6px 10px', background: '#fff', border: '1px solid ' + (detailEntry.raw.prebooking_form_sent_at ? '#cfe8cf' : '#f0dba6'), borderRadius: 6, fontSize: 11, fontWeight: 600, color: detailEntry.raw.prebooking_form_sent_at ? '#2d6a2d' : '#8a6d1d', cursor: 'pointer' }}>
+                      {detailEntry.raw.prebooking_form_sent_at ? '✓ Sent' : 'Mark as sent'}
                     </button>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Notes</div>
+                    {detailEntry.raw.visitor_email && <div style={{ marginBottom: -6 }}><InquiryFlagNotes who={detailEntry.raw.visitor_email} /></div>}
                     {editingNote ? (
                       <React.Fragment>
                         <textarea
