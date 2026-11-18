@@ -10892,9 +10892,9 @@ function SponsorsView() {
         <button onClick={function() { setAddForm(Object.assign({}, emptyAddForm, { sponsor_status: tab === 'current' ? null : tab })); setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Add New Sponsor</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: (selected && !isMobile) ? 'minmax(260px, 320px) 1fr' : '1fr', gap: 16 }}>
+      <div style={{ display: 'block' }}>
         <div style={{ minWidth: 0 }}>
-          {sponsors === null && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>Loading…</div>}
+          {sponsors === null &&<div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>Loading…</div>}
           {sponsors !== null && visibleSponsors.length === 0 && <div style={{ color: '#aaa', fontSize: 13, padding: 20, textAlign: 'center' }}>No {tab} sponsors yet.</div>}
           {sponsors !== null && visibleSponsors.map(function(s) {
             var isSelected = selected && selected.id === s.id;
@@ -10930,7 +10930,12 @@ function SponsorsView() {
         </div>
 
         {selected && (
-          <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '20px 22px', alignSelf: 'start', position: 'sticky', top: 20, minWidth: 0 }}>
+          <React.Fragment>
+          {isMobile && <div onClick={function() { setSelected(null); setEditing(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1010 }} />}
+          <div style={isMobile
+            ? { position: 'fixed', left: 0, right: 0, bottom: 0, height: '88vh', background: '#fff', zIndex: 1011, boxShadow: '0 -4px 32px rgba(0,0,0,0.14)', overflowY: 'auto', borderRadius: '16px 16px 0 0', padding: '20px 18px', boxSizing: 'border-box', minWidth: 0 }
+            : { position: 'fixed', top: 0, right: 0, bottom: 0, width: 520, maxWidth: '100vw', background: '#fff', zIndex: 1011, boxShadow: '-4px 0 32px rgba(0,0,0,0.12)', overflowY: 'auto', padding: '24px 28px', boxSizing: 'border-box', minWidth: 0 }
+          }>
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div style={{ flex: 1, paddingRight: 8 }}>
@@ -11192,6 +11197,7 @@ function SponsorsView() {
               ))}
             </div>
           </div>
+          </React.Fragment>
         )}
       </div>
 
