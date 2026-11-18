@@ -3,6 +3,7 @@
 // Data: venue_resources (one row per entry) and venue_resource_history (written by a database trigger on every change,
 // with the signed-in person). See supabase/migrations_manual/venue_resources.sql.
 import { sampleKindFor, openTemplateSample, TemplateSampleModal } from './template-samples.jsx';
+import { printPricingGuide } from './pricing-guide.js';
 const RV_URL = 'https://uvzwhhwzelaelfhfkvdb.supabase.co', RV_KEY = 'sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do';
 const GOLD = '#886c44';
 const H = { apikey: RV_KEY, Authorization: 'Bearer ' + RV_KEY, 'Content-Type': 'application/json' };
@@ -364,7 +365,8 @@ export function VenuePoliciesView() {
         style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1px solid #ded7cb', borderRadius: 10, fontSize: 14, marginBottom: 12, background: '#fff' }} />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
         {TABS.map(([k, label]) => <button key={k} type="button" onClick={() => { setTab(k); setQ(''); }} style={{ background: tab === k && !needle ? GOLD : '#fff', color: tab === k && !needle ? '#fff' : GOLD, border: '0.5px solid ' + GOLD, borderRadius: 8, padding: '6px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}</button>)}
-        <label style={{ marginLeft: 'auto', fontSize: 12, color: '#777', display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} /> Show archived</label>
+        <button type="button" onClick={printPricingGuide} title="Opens the 2027 pricing guide and the non-profit guide as a printable handout" style={{ marginLeft: 'auto', background: '#fff', color: GOLD, border: '1px solid ' + GOLD, borderRadius: 8, padding: '6px 13px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 Print pricing guide</button>
+        <label style={{ fontSize: 12, color: '#777', display: 'flex', alignItems: 'center', gap: 6 }}><input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} /> Show archived</label>
       </div>
       {err && <div style={{ color: '#b3261e', fontSize: 13, marginBottom: 10 }}>{err}</div>}
       {rows === null ? <div style={{ color: '#aaa' }}>Loading…</div> : needle ? (
