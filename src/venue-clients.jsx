@@ -864,6 +864,19 @@ function bookingStatus(c, today) {
   if (paid > 0) return late ? 'Partially paid - past due' : 'Partially paid';
   return late ? 'Unpaid - past due' : 'Unpaid';
 }
+// The invoice itself: what was ordered, at what price. From the HoneyBook invoice's line items (a package's add-ons, like the
+// refundable security deposit, are listed under it); bookings on the Portal's own schedule list their payment lines instead.
+function invoiceLines(c) {
+  const out = [], P = c.payments, items = P && Array.isArray(P.line_items) ? P.line_items : null;
+  if (items) {
+    const add = (li, child) => { const qty = li.quantity == null ? 1 : li.quantity, unit = (li.price && li.price.amount) || 0; if (!(unit > 0) && !(qty > 0)) return; out.push({ item: li.title || 'Item', desc: text(li.description), qty, unit, amount: unit * qty, child, deposit: /security deposit/i.test(li.title || '') }); };
+    items.forEach(li => { add(li, false); (li.children || []).forEach(k => add(k, true)); });
+    if (P.discount && P.discount.amount > 0) out.push({ item: 'Discount', desc: '', qty: 1, unit: -P.discount.amount, amount: -P.discount.amount, child: false });
+    if (P.tax && P.tax.amount > 0) out.push({ item: 'Tax', desc: '', qty: 1, unit: P.tax.amount, amount: P.tax.amount, child: false });
+    (c.schedule || []).filter(s => s.extra).forEach(s => out.push({ item: s.label || 'Additional charge', desc: '', qty: 1, unit: s.cents, amount: s.cents, child: false }));
+  } else (c.schedule || []).forEach(s => out.push({ item: s.label || 'Payment', desc: '', qty: 1, unit: s.cents, amount: s.cents, child: false, deposit: s.deposit }));
+  return out;
+}
 // Officially closed out = the event has happened, the final site manager paperwork is filed, and nothing is still owed.
 function closeOut(c, status) {
   if (!c.isPast) return 'Not yet held';
@@ -899,7 +912,7 @@ function downloadCsv(filename, header, lines) {
 }
 export function BookingsExport({ clients, onClose, onOpen, inline }) {
   const today = venueDateKey();
-  const [when, setWhen] = React.useState('all'), [pay, setPay] = React.useState('all'), [q, setQ] = React.useState(''), [closedF, setClosedF] = React.useState('all');
+  const [when, setWhen] = React.useState('all'), [pay, setPay] = React.useState('all'), [q, setQ] = React.useState(''), [closedF, setClosedF] = React.useState('all'), [openId, setOpenId] = React.useState(null);
   // Left out until they are real bookings: nobody who has neither signed nor paid anything yet.
   const all = bookingRows(clients.filter(c => c.clientsSigned || (c.paid || 0) > 0), today);
   const rows = all.filter(r => (when === 'all' || (when === 'upcoming') === !r.c.isPast) && (pay === 'all' || (pay === 'paid' ? r.status === 'Paid in full' : pay === 'unpaid' ? r.status !== 'Paid in full' : r.status.indexOf('past due') !== -1)) && (closedF === 'all' || (closedF === 'closed') === (r.closed === 'Closed out')) && (!q || (r.c.name + ' ' + r.email + ' ' + r.who + ' ' + r.c.eventDate).toLowerCase().includes(q.toLowerCase())));
@@ -911,6 +924,11 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
     downloadCsv('NSH-event-bookings-' + stamp + '.xlsx',
       ['Event', 'Event Date', 'Type', 'Upcoming/Past', 'Client Name', 'Client Email', 'Client Phone', 'Payment Status', 'Closed Out', 'Invoice Total', 'Refundable Deposit', 'Refundable Deposit Paid', 'Invoice Total Without Deposit', 'Amount Paid', 'Balance Due', 'Next Payment Due', 'Next Payment Amount'],
       rows.map(r => [r.c.name, day(r.c.eventDate), r.c.type, r.when, r.who, r.email, r.phone, r.status, r.closed, dollars(r.total), dollars(r.deposit), dollars(r.depositPaid), dollars(Math.max(0, r.total - r.deposit)), dollars(r.paid), dollars(r.balance), r.next ? day(r.next.due) : '', r.next ? dollars(r.next.cents) : '']));
+  }
+  function exportInvoices() {
+    const lines = [];
+    rows.forEach(r => invoiceLines(r.c).forEach(l => lines.push([r.c.name, day(r.c.eventDate), r.c.type, r.who, r.email, l.item, l.desc, l.qty, dollars(l.unit), dollars(l.amount), l.deposit ? 'Yes' : 'No', r.status, dollars(r.total), dollars(r.paid), dollars(r.balance)])));
+    downloadCsv('NSH-event-invoices-' + stamp + '.xlsx', ['Event', 'Event Date', 'Type', 'Client Name', 'Client Email', 'Item', 'Description', 'Qty', 'Price', 'Amount', 'Refundable Deposit', 'Payment Status', 'Invoice Total', 'Amount Paid', 'Balance Due'], lines);
   }
   function exportPayments() {
     const lines = [];
@@ -946,6 +964,7 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name, email, date…" style={{ ...sel, flex: 1, minWidth: 140, maxWidth: 260 }} />
         <span style={{ flex: 1 }} />
         <button type="button" style={btn(true)} onClick={exportBookings} disabled={!rows.length}>⬇ Download for QuickBooks</button>
+        <button type="button" style={btn(false)} onClick={exportInvoices} disabled={!rows.length} title="One row per invoice line: what was ordered, at what price">⬇ Invoice items</button>
         <button type="button" style={btn(false)} onClick={exportPayments} disabled={!rows.length} title="One row per scheduled payment (deposit, installments, security deposit)">⬇ Payment lines</button>
         <button type="button" style={btn(false)} onClick={printList} disabled={!rows.length}>🖨 Print list</button>
       </div>
@@ -955,8 +974,8 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
       <div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, tableLayout: 'auto' }}>
           <thead><tr><th style={th}>Event date</th><th style={th}>Event</th><th style={th}>Type</th><th style={th}>Client</th><th style={th}>Status</th><th style={th}>Closed out</th><th style={{ ...th, textAlign: 'right' }}>Invoice</th><th style={{ ...th, textAlign: 'right' }}>Paid</th><th style={{ ...th, textAlign: 'right' }}>Balance</th><th style={{ ...th, borderLeft: '2px solid #d8cdb8' }}>Next payment</th></tr></thead>
-          <tbody>{rows.length === 0 ? <tr><td style={td} colSpan={10}>No bookings match.</td></tr> : rows.map(r => <tr key={r.c.id} onClick={() => onOpen(r.c)} style={{ cursor: 'pointer' }}>
-            <td style={{ ...td, whiteSpace: 'nowrap', fontWeight: 600, color: '#886c44' }}>{day(r.c.eventDate) || 'TBD'}</td>
+          <tbody>{rows.length === 0 ? <tr><td style={td} colSpan={10}>No bookings match.</td></tr> : rows.map(r => <React.Fragment key={r.c.id}><tr onClick={() => setOpenId(openId === r.c.id ? null : r.c.id)} style={{ cursor: 'pointer', background: openId === r.c.id ? '#fbf8f2' : undefined }}>
+            <td style={{ ...td, whiteSpace: 'nowrap', fontWeight: 600, color: '#886c44' }}>{openId === r.c.id ? '▾ ' : '▸ '}{day(r.c.eventDate) || 'TBD'}</td>
             <td style={{ ...td, fontWeight: 600 }}>{r.c.name}</td>
             <td style={td}>{r.c.type}</td>
             <td style={td}>{r.people.length ? r.people.map((p, i) => <div key={i}>{p.name}{p.email && <div style={{ color: '#888', fontSize: 11 }}>{p.email}</div>}</div>) : <div>{r.who}<div style={{ color: '#888', fontSize: 11 }}>{r.email}</div></div>}</td>
@@ -964,10 +983,19 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
             <td style={td}><span style={{ ...(r.closed === 'Closed out' ? { background: '#edf4ed', color: '#426b4a' } : r.closed === 'Not yet held' ? { background: '#eee', color: '#555' } : { background: '#faf0e6', color: '#9a5d22' }), padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600 }}>{r.closed === 'Closed out' ? '✓ Closed out' : r.closed}</span></td>
             <td style={{ ...td, textAlign: 'right' }}>{money(r.total)}</td><td style={{ ...td, textAlign: 'right' }}>{money(r.paid)}</td><td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(r.balance)}</td>
             <td style={{ ...td, borderLeft: '2px solid #d8cdb8' }}>{r.next ? <span><b>{r.next.due ? day(r.next.due) : 'No date'}</b> · {money(r.next.cents)}</span> : ''}</td>
-          </tr>)}</tbody>
+          </tr>{openId === r.c.id && <tr><td colSpan={10} style={{ padding: '4px 8px 16px 28px', background: '#fbf8f2', borderBottom: '1px solid #e6dfd3' }}>
+            {(() => { const L = invoiceLines(r.c); const sub = L.reduce((t, l) => t + l.amount, 0); return L.length === 0 ? <div className="vc-muted">No invoice on file for this booking yet.</div> : <table style={{ width: '100%', maxWidth: 820, borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead><tr><th style={th}>Item</th><th style={th}>Description</th><th style={{ ...th, textAlign: 'right' }}>Qty</th><th style={{ ...th, textAlign: 'right' }}>Price</th><th style={{ ...th, textAlign: 'right' }}>Amount</th></tr></thead>
+              <tbody>{L.map((l, i) => <tr key={i}><td style={{ ...td, paddingLeft: l.child ? 24 : 8, fontWeight: l.child ? 400 : 600 }}>{l.child ? '↳ ' : ''}{l.item}{l.deposit ? ' (refundable)' : ''}</td><td style={{ ...td, color: '#666' }}>{l.desc}</td><td style={{ ...td, textAlign: 'right' }}>{l.qty}</td><td style={{ ...td, textAlign: 'right' }}>{money(l.unit)}</td><td style={{ ...td, textAlign: 'right' }}>{money(l.amount)}</td></tr>)}
+                <tr><td style={{ ...td, fontWeight: 700 }} colSpan={4}>Invoice total</td><td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{money(r.total)}</td></tr>
+                <tr><td style={td} colSpan={4}>Paid</td><td style={{ ...td, textAlign: 'right', color: '#426b4a' }}>{money(r.paid)}</td></tr>
+                <tr><td style={{ ...td, fontWeight: 700 }} colSpan={4}>Balance due</td><td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{money(r.balance)}</td></tr></tbody>
+            </table>; })()}
+            <button type="button" style={{ ...btn(false), marginTop: 10 }} onClick={() => onOpen(r.c)}>Open booking →</button>
+          </td></tr>}</React.Fragment>)}</tbody>
         </table>
       </div>
-      <div className="vc-muted" style={{ marginTop: 12 }}>"Invoice" includes the refundable security deposit; the download also lists the total without it. Click a row to open that booking.</div>
+      <div className="vc-muted" style={{ marginTop: 12 }}>"Invoice" includes the refundable security deposit; the download also lists the total without it. Click a row to see its invoice: what was ordered, at what price.</div>
     </div>
   </div>;
 }
