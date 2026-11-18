@@ -6621,6 +6621,20 @@ function BoardView() {
   const [voteNotifConfirmItem, setVoteNotifConfirmItem] = React.useState(null);
   const [replyTo, setReplyTo] = React.useState(null);
   const [myName, setMyName] = React.useState('');
+  const [photos, setPhotos] = React.useState({});
+  // Round profile photos by first name, from the volunteer records.
+  React.useEffect(function() {
+    cachedSbFetch('2026 Volunteers', ['First Name', 'Picture URL', 'Status']).then(function(rows) {
+      var m = {};
+      (rows || []).forEach(function(v) { var n = String(v['First Name'] || '').trim(); if (n && v['Picture URL'] && (!m[n] || v.Status === 'Active')) m[n] = v['Picture URL']; });
+      setPhotos(m);
+    }).catch(function() {});
+  }, []);
+  function boardAvatar(name, px) {
+    var url = photos[name], base = { width: px, height: px, borderRadius: '50%', flexShrink: 0 };
+    if (url) return <img src={driveImg(url)} alt={name} style={Object.assign({ objectFit: 'cover' }, base)} />;
+    return <div style={Object.assign({ background: '#e8e0d5', color: '#8a7a62', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(px * 0.42), fontWeight: 700 }, base)}>{String(name || '?').charAt(0).toUpperCase()}</div>;
+  }
 
   // Who is signed in: a board member by login email, otherwise the first name on their volunteer record.
   React.useEffect(function() {
@@ -7113,11 +7127,16 @@ function BoardView() {
                     var mine = myName && c.voter === myName;
                     return (
                       <div key={c.id} style={{ padding: '10px 14px', background: isReply ? '#fff' : '#fafafa', border: isReply ? '0.5px solid #eee4d6' : 'none', borderLeft: '3px solid ' + boardItemType(selected).color, borderRadius: 4, marginTop: isReply ? 8 : 0 }}>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                        {boardAvatar(c.voter, isReply ? 30 : 36)}
+                        <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{c.voter}{c.timestamp ? <span style={{ fontWeight: 400, color: '#aaa' }}> · {fmtSubmitted(c.timestamp)}</span> : null}{parent && isReply && topOf(c) !== parent ? <span style={{ fontWeight: 400, color: '#aaa' }}> · replying to {parent.voter}</span> : null}</div>
                         <div style={{ fontSize: 13, color: '#444', marginTop: 3, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{c.note}</div>
                         <div style={{ marginTop: 5, display: 'flex', gap: 12 }}>
                           {canPost && <button type="button" onClick={function() { setReplyTo(c); }} style={{ background: 'none', border: 'none', padding: 0, color: gold, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Reply</button>}
                           {mine && <button type="button" onClick={function() { deleteComment(c); }} style={{ background: 'none', border: 'none', padding: 0, color: '#b3261e', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>}
+                        </div>
+                        </div>
                         </div>
                       </div>
                     );
@@ -7145,7 +7164,7 @@ function BoardView() {
                     </div>
                     {replyTo && <div style={{ fontSize: 12, color: '#888', borderLeft: '3px solid #e0d8cc', paddingLeft: 8, marginBottom: 10, maxHeight: 48, overflow: 'hidden' }}>{replyTo.note}</div>}
                     {myName
-                      ? <div style={{ fontSize: 12, color: '#777', marginBottom: 10 }}>Posting as <strong style={{ color: '#2a2a2a' }}>{myName}</strong> (signed in). Everyone can see who wrote this.</div>
+                      ? <div style={{ fontSize: 12, color: '#777', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>{boardAvatar(myName, 26)}<span>Posting as <strong style={{ color: '#2a2a2a' }}>{myName}</strong> (signed in). Everyone can see who wrote this.</span></div>
                       : <div style={{ marginBottom: 12 }}>
                           <label style={bLbl}>Your name</label>
                           <select value={voteForm.voter} onChange={function(e) { var nm = e.target.value; setVoteForm(function(f) { return Object.assign({}, f, { voter: nm }); }); }} style={bInp}>

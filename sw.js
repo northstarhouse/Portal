@@ -1,9 +1,9 @@
 <<<<<<< HEAD
-var CACHE = 'nsh-v1794984363053';
+var CACHE = 'nsh-v1794984542937';
 var STATIC = [
   '/Portal/',
   '/Portal/index.html',
-  '/Portal/assets/app.js?v=1794984363053',
+  '/Portal/assets/app.js?v=1794984542937',
 =======
 var CACHE = 'nsh-v1794983664755';
 var STATIC = [
