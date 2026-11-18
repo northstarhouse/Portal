@@ -2,7 +2,9 @@
 const SUPABASE_URL = 'https://uvzwhhwzelaelfhfkvdb.supabase.co', SUPABASE_KEY = 'sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do';
 // Red flags the couple raised during venue tours, written by the coordinator. Stored in portal_notes (about_person
 // "inquiry:<email>", item_ref "redflag") so they follow the couple across inquiries; the author is stamped by the database.
-export function InquiryFlagNotes({ who }) {
+// inline: no space below (sits on a line next to "+ Note" in Activity by Person). preloaded: this couple's flags,
+// already fetched by the caller (the activity log loads every red flag once instead of one request per line).
+export function InquiryFlagNotes({ who, inline, preloaded }) {
   var [notes, setNotes] = React.useState(null);
   var [text, setText] = React.useState('');
   var [editing, setEditing] = React.useState(null); // { id, text }
@@ -14,6 +16,7 @@ export function InquiryFlagNotes({ who }) {
   React.useEffect(function() {
     setNotes(null); setText(''); setEditing(null);
     if (!who) { setNotes([]); return; }
+    if (Array.isArray(preloaded)) { setNotes(preloaded); return; }
     fetch(SUPABASE_URL + '/rest/v1/portal_notes?select=*&about_person=eq.' + encodeURIComponent(key) + '&item_ref=eq.redflag&order=created_at.asc', { headers: H })
       .then(function(r) { return r.ok ? r.json() : []; }).then(function(d) { setNotes(Array.isArray(d) ? d : []); }).catch(function() { setNotes([]); });
   }, [key]);
@@ -48,7 +51,7 @@ export function InquiryFlagNotes({ who }) {
   var flag = <svg width="16" height="16" viewBox="0 0 24 24" fill="#d9534f" stroke="#d9534f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22V4"/><path d="M4 4h13l-2.5 4.5L17 13H4z"/></svg>;
   var pill = { display: "inline-block", maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "middle", background: "#fdecea", color: "#b3261e", border: "1px solid #f1c9c5", borderRadius: 999, padding: "3px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer" };
   return (
-    <div style={{ marginBottom: 12 }}>
+    <div style={{ marginBottom: inline ? 0 : 12 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
         <button type="button" onClick={function() { setOpen(!open); }} title="Red flags from tours" aria-expanded={open} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: open ? "#fdecea" : "#fff", border: "1px solid #f1c9c5", borderRadius: 999, padding: "4px 10px", cursor: "pointer" }}>
           {flag}{notes.length > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: "#b3261e" }}>{notes.length}</span>}

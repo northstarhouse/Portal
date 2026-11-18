@@ -16167,7 +16167,10 @@ function paDescribe(r) {
     return out.length === 1 ? out[0] : { text: out.map(function(o) { return o.text; }).join(' · '), pill: out[0].pill, note: fieldNote };
   }
   if (r.table_name === 'estate_tours') {
-    return { kind: 'tours', text: (r.op === 'insert' ? 'Added tour' : r.op === 'delete' ? 'Deleted tour' : 'Updated tour') + (label ? ': ' + label : ''), note: r.op === 'update' ? fieldNote : '' };
+    // plain-English field names ("pre-booking email sent", not "prebooking form sent at")
+    var tf = changed.map(function(c) { return TOUR_FIELD_LABELS[c] || c.replace(/_/g, ' '); });
+    var tourNote = tf.length ? 'Changed: ' + tf.slice(0, 8).join(', ') + (tf.length > 8 ? ' and ' + (tf.length - 8) + ' more' : '') : '';
+    return { kind: 'tours', text: (r.op === 'insert' ? 'Added tour' : r.op === 'delete' ? 'Deleted tour' : 'Updated tour') + (label ? ': ' + label : ''), note: r.op === 'update' ? tourNote : '' };
   }
   var verb = r.op === 'insert' ? 'Added' : r.op === 'delete' ? 'Deleted' : 'Updated';
   return { text: verb + ' ' + paTableLabel(r.table_name) + (label ? ': ' + label : ''), note: r.op === 'update' ? fieldNote : '' };
@@ -16326,6 +16329,14 @@ function PersonActivityView() {
     });
   }, []);
 
+  // Every couple's tour red flags, loaded once ({ 'inquiry:<email>': [notes] }) for the 🚩 next to + Note on tour lines.
+  var [redFlags, setRedFlags] = useState(null);
+  useEffect(function() {
+    get('portal_notes?select=*&item_ref=eq.redflag&about_person=like.inquiry:*&order=created_at.asc&limit=5000').then(function(rows) {
+      var m = {}; rows.forEach(function(n) { (m[n.about_person] = m[n.about_person] || []).push(n); }); setRedFlags(m);
+    });
+  }, []);
+
   useEffect(function() {
     if (!person) return;
     setNotes([]); setEditing(null);
@@ -16379,8 +16390,10 @@ function PersonActivityView() {
     Promise.all([
       get('portal_activity?select=*&actor_name=eq.' + encodeURIComponent(person) + '&order=created_at.desc&limit=2000').then(function(rows) {
         // "Added tour" lines just show the tour's date and time (no details drop-down), so look those tours up
-        var addedIds = rows.filter(function(r) { return r.table_name === 'estate_tours' && r.op === 'insert' && r.row_id; }).map(function(r) { return r.row_id; });
-        var lookup = addedIds.length ? get('estate_tours?select=id,date,start_time,visitor_name&id=in.(' + addedIds.slice(0, 300).join(',') + ')') : Promise.resolve([]);
+        // ("Updated tour" lines are looked up too, to say whose tour it was; the email ties the line to the couple's red flags.)
+        var addedIds = rows.filter(function(r) { return r.table_name === 'estate_tours' && (r.op === 'insert' || r.op === 'update') && r.row_id; }).map(function(r) { return r.row_id; })
+          .filter(function(v, i, a) { return a.indexOf(v) === i; });
+        var lookup = addedIds.length ? get('estate_tours?select=id,date,start_time,visitor_name,visitor_email&id=in.(' + addedIds.slice(0, 300).join(',') + ')') : Promise.resolve([]);
         return lookup.then(function(found) {
           var byId = {}; found.forEach(function(t) { byId[t.id] = t; });
           rows.forEach(function(r) {
@@ -16391,7 +16404,13 @@ function PersonActivityView() {
               var when = t && t.date ? new Date(t.date + 'T' + (t.start_time || '12:00')).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' + (t.start_time ? new Date('2000-01-01T' + t.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '') : '';
               // an empty schedule slot is not worth a line: only tours added with a person show
               if (!t || !t.visitor_name) return;
-              add('tours', r.created_at, 'Added tour: ' + t.visitor_name + (when ? ' (' + when + ')' : ''), '', '');
+              add('tours', r.created_at, 'Added tour: ' + t.visitor_name + (when ? ' (' + when + ')' : ''), '', '', { tourEmail: t.visitor_email || '' });
+              return;
+            }
+            var ut = r.table_name === 'estate_tours' && r.op === 'update' ? byId[r.row_id] : null;
+            if (ut && ut.visitor_name) {
+              var uwhen = ut.date ? new Date(ut.date + 'T' + (ut.start_time || '12:00')).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + (ut.start_time ? ' · ' + new Date('2000-01-01T' + ut.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '') : '';
+              add('tours', r.created_at, 'Updated tour: ' + ut.visitor_name + (uwhen ? ' (' + uwhen + ')' : ''), d.note || '', '', { tourId: r.row_id, tourEmail: ut.visitor_email || '' });
               return;
             }
             add(d.kind || 'portal', r.created_at, d.text, d.note || '', d.pill || '', r.table_name === 'estate_tours' && r.row_id ? { tourId: r.row_id } : null);
@@ -16418,20 +16437,20 @@ function PersonActivityView() {
       }),
       // What happened on the day of each of their tours: guided it, it was cancelled, or the visitor didn't show. Shown on
       // the tour's own date and time, once that has passed. When a visitor booked the tour is not shown.
-      get('estate_tours?select=id,date,start_time,visitor_name,category,status,created_at&guide_name=ilike.' + like + '&status=in.(booked,cancelled,no_show)&order=date.desc&limit=2000').then(function(rows) {
+      get('estate_tours?select=id,date,start_time,visitor_name,visitor_email,category,status,created_at&guide_name=ilike.' + like + '&status=in.(booked,cancelled,no_show)&order=date.desc&limit=2000').then(function(rows) {
         var now = new Date();
         rows.forEach(function(t) {
           if (!(t.date && new Date(tourWhen(t)) < now)) return;
           var label = t.status === 'cancelled' ? 'Cancelled tour: ' : t.status === 'no_show' ? 'No-show: ' : 'Guided a tour: ';
-          add('tours', tourWhen(t), label + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), '', '', { tourId: t.id });
+          add('tours', tourWhen(t), label + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), '', '', { tourId: t.id, tourEmail: t.visitor_email || '' });
         });
       }),
-      get('estate_tours?select=id,visitor_name,category,made_contact_at,created_at,request_status&request_handled_by=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
+      get('estate_tours?select=id,visitor_name,visitor_email,category,made_contact_at,created_at,request_status&request_handled_by=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
         // the request's outcome is the pill (Contacted / Not interested) instead of a status line
         var outcome = { made_contact: 'Contacted', not_interested: 'Not interested' };
         rows.forEach(function(t) {
           var pill = outcome[t.request_status] || (t.request_status ? String(t.request_status).replace(/_/g, ' ').replace(/^\w/, function(c) { return c.toUpperCase(); }) : '');
-          add('tours', t.made_contact_at || t.created_at, 'Handled tour request: ' + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), '', pill, { tourId: t.id });
+          add('tours', t.made_contact_at || t.created_at, 'Handled tour request: ' + (t.visitor_name || 'visitor') + (t.category ? ' (' + t.category + ')' : ''), '', pill, { tourId: t.id, tourEmail: t.visitor_email || '' });
         });
       }),
       get('activity_log?select=id,description,created_at,resolved_at&handled_by=ilike.' + like + '&order=created_at.desc&limit=1000').then(function(rows) {
@@ -16545,7 +16564,13 @@ function PersonActivityView() {
                         onEdit={function() { setEditing({ key: key, text: n.body }); }} onDelete={function() { deleteNote(n); }} />;
                   })}
                   {editing && editing.key === 'new:' + it.ref ? editBox()
-                    : <button type="button" style={addNoteLink} onClick={function() { setEditing({ key: 'new:' + it.ref, text: '' }); }}>+ Note</button>}
+                    : it.kind === 'tours' && it.tourEmail && redFlags
+                      // Tour lines: the couple's red flags (the same list as their Inquiry and Client pages) next to + Note.
+                      ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-start', marginTop: 6 }}>
+                          <button type="button" style={Object.assign({}, addNoteLink, { marginTop: 5 })} onClick={function() { setEditing({ key: 'new:' + it.ref, text: '' }); }}>+ Note</button>
+                          <InquiryFlagNotes inline who={it.tourEmail} preloaded={redFlags['inquiry:' + String(it.tourEmail).trim().toLowerCase()] || []} />
+                        </div>
+                      : <button type="button" style={addNoteLink} onClick={function() { setEditing({ key: 'new:' + it.ref, text: '' }); }}>+ Note</button>}
                 </div>
               </div>
             </React.Fragment>;
