@@ -864,6 +864,14 @@ function bookingStatus(c, today) {
   if (paid > 0) return late ? 'Partially paid - past due' : 'Partially paid';
   return late ? 'Unpaid - past due' : 'Unpaid';
 }
+// Officially closed out = the event has happened, the final site manager paperwork is filed, and nothing is still owed.
+function closeOut(c, status) {
+  if (!c.isPast) return 'Not yet held';
+  const missing = [];
+  if (c.needsPaperwork) missing.push('final paperwork');
+  if (status !== 'Paid in full') missing.push('payment');
+  return missing.length ? 'Open: needs ' + missing.join(' + ') : 'Closed out';
+}
 function bookingRows(clients, today) {
   return clients.slice().sort((a, b) => (a.eventDate || '9999').localeCompare(b.eventDate || '9999') || String(a.name).localeCompare(String(b.name))).map(c => {
     const sched = c.schedule || [];
@@ -873,7 +881,7 @@ function bookingRows(clients, today) {
     const balance = c.balance != null ? c.balance : Math.max(0, total - paid);
     const next = (c.duePayments || [])[0];
     const contact = (c.contacts || [])[0] || {};
-    return { c, total, deposit, paid, balance, status: bookingStatus(c, today), next, phone: contact.phone_number || '', who: contact.full_name || '', email: c.email || contact.email || '', when: c.isPast ? 'Past' : 'Upcoming' };
+    return { c, total, deposit, paid, balance, status: bookingStatus(c, today), closed: closeOut(c, bookingStatus(c, today)), next, phone: contact.phone_number || '', who: contact.full_name || '', email: c.email || contact.email || '', when: c.isPast ? 'Past' : 'Upcoming' };
   });
 }
 const csvCell = v => { const s = String(v == null ? '' : v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
@@ -886,17 +894,17 @@ function downloadCsv(filename, header, lines) {
 }
 export function BookingsExport({ clients, onClose, onOpen, inline }) {
   const today = venueDateKey();
-  const [when, setWhen] = React.useState('all'), [pay, setPay] = React.useState('all'), [q, setQ] = React.useState('');
+  const [when, setWhen] = React.useState('all'), [pay, setPay] = React.useState('all'), [q, setQ] = React.useState(''), [closedF, setClosedF] = React.useState('all');
   const all = bookingRows(clients, today);
-  const rows = all.filter(r => (when === 'all' || (when === 'upcoming') === !r.c.isPast) && (pay === 'all' || (pay === 'paid' ? r.status === 'Paid in full' : pay === 'unpaid' ? r.status !== 'Paid in full' : r.status.indexOf('past due') !== -1)) && (!q || (r.c.name + ' ' + r.email + ' ' + r.who + ' ' + r.c.eventDate).toLowerCase().includes(q.toLowerCase())));
+  const rows = all.filter(r => (when === 'all' || (when === 'upcoming') === !r.c.isPast) && (pay === 'all' || (pay === 'paid' ? r.status === 'Paid in full' : pay === 'unpaid' ? r.status !== 'Paid in full' : r.status.indexOf('past due') !== -1)) && (closedF === 'all' || (closedF === 'closed') === (r.closed === 'Closed out')) && (!q || (r.c.name + ' ' + r.email + ' ' + r.who + ' ' + r.c.eventDate).toLowerCase().includes(q.toLowerCase())));
   const sum = f => rows.reduce((t, r) => t + f(r), 0);
   const money = c => amount(c, 'USD');
   const day = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[2] + '/' + m[3] + '/' + m[1] : ''; };
   const stamp = today;
   function exportBookings() {
     downloadCsv('NSH-event-bookings-' + stamp + '.csv',
-      ['Event', 'Event Date', 'Type', 'Upcoming/Past', 'Client Name', 'Client Email', 'Client Phone', 'Payment Status', 'Invoice Total', 'Refundable Deposit', 'Invoice Total Without Deposit', 'Amount Paid', 'Balance Due', 'Next Payment Due', 'Next Payment Amount'],
-      rows.map(r => [r.c.name, day(r.c.eventDate), r.c.type, r.when, r.who, r.email, r.phone, r.status, dollars(r.total), dollars(r.deposit), dollars(Math.max(0, r.total - r.deposit)), dollars(r.paid), dollars(r.balance), r.next ? day(r.next.due) : '', r.next ? dollars(r.next.cents) : '']));
+      ['Event', 'Event Date', 'Type', 'Upcoming/Past', 'Client Name', 'Client Email', 'Client Phone', 'Payment Status', 'Closed Out', 'Invoice Total', 'Refundable Deposit', 'Invoice Total Without Deposit', 'Amount Paid', 'Balance Due', 'Next Payment Due', 'Next Payment Amount'],
+      rows.map(r => [r.c.name, day(r.c.eventDate), r.c.type, r.when, r.who, r.email, r.phone, r.status, r.closed, dollars(r.total), dollars(r.deposit), dollars(Math.max(0, r.total - r.deposit)), dollars(r.paid), dollars(r.balance), r.next ? day(r.next.due) : '', r.next ? dollars(r.next.cents) : '']));
   }
   function exportPayments() {
     const lines = [];
@@ -906,8 +914,8 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
   function printList() {
     const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const w = window.open('', '_blank'); if (!w) { alert('Allow pop-ups to print this list.'); return; }
-    w.document.write('<!doctype html><title>Event bookings</title><style>body{font:12px system-ui,sans-serif;margin:24px;color:#222}h1{font:700 20px Georgia,serif;margin:0 0 4px}td,th{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left}th{font-size:10px;text-transform:uppercase;color:#777}.r{text-align:right}table{border-collapse:collapse;width:100%}</style><h1>North Star House event bookings</h1><div style="color:#777;margin-bottom:12px">As of ' + esc(day(today)) + ' · ' + rows.length + ' events · Invoiced ' + esc(money(sum(r => r.total))) + ' · Paid ' + esc(money(sum(r => r.paid))) + ' · Owed ' + esc(money(sum(r => r.balance))) + '</div><table><thead><tr><th>Date</th><th>Event</th><th>Type</th><th>Client</th><th>Status</th><th class="r">Invoice</th><th class="r">Paid</th><th class="r">Balance</th></tr></thead><tbody>' +
-      rows.map(r => '<tr><td>' + esc(day(r.c.eventDate)) + '</td><td>' + esc(r.c.name) + '</td><td>' + esc(r.c.type) + '</td><td>' + esc(r.who) + '</td><td>' + esc(r.status) + '</td><td class="r">' + esc(money(r.total)) + '</td><td class="r">' + esc(money(r.paid)) + '</td><td class="r">' + esc(money(r.balance)) + '</td></tr>').join('') + '</tbody></table>');
+    w.document.write('<!doctype html><title>Event bookings</title><style>body{font:12px system-ui,sans-serif;margin:24px;color:#222}h1{font:700 20px Georgia,serif;margin:0 0 4px}td,th{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left}th{font-size:10px;text-transform:uppercase;color:#777}.r{text-align:right}table{border-collapse:collapse;width:100%}</style><h1>North Star House event bookings</h1><div style="color:#777;margin-bottom:12px">As of ' + esc(day(today)) + ' · ' + rows.length + ' events · Invoiced ' + esc(money(sum(r => r.total))) + ' · Paid ' + esc(money(sum(r => r.paid))) + ' · Owed ' + esc(money(sum(r => r.balance))) + '</div><table><thead><tr><th>Date</th><th>Event</th><th>Type</th><th>Client</th><th>Status</th><th>Closed out</th><th class="r">Invoice</th><th class="r">Paid</th><th class="r">Balance</th></tr></thead><tbody>' +
+      rows.map(r => '<tr><td>' + esc(day(r.c.eventDate)) + '</td><td>' + esc(r.c.name) + '</td><td>' + esc(r.c.type) + '</td><td>' + esc(r.who) + '</td><td>' + esc(r.status) + '</td><td>' + esc(r.closed) + '</td><td class="r">' + esc(money(r.total)) + '</td><td class="r">' + esc(money(r.paid)) + '</td><td class="r">' + esc(money(r.balance)) + '</td></tr>').join('') + '</tbody></table>');
     w.document.close(); setTimeout(() => w.print(), 300);
   }
   const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
@@ -928,6 +936,7 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
         <select value={when} onChange={e => setWhen(e.target.value)} style={sel}><option value="all">Upcoming and past</option><option value="upcoming">Upcoming only</option><option value="past">Past only</option></select>
         <select value={pay} onChange={e => setPay(e.target.value)} style={sel}><option value="all">Paid and unpaid</option><option value="paid">Paid in full</option><option value="unpaid">Not fully paid</option><option value="late">Past due</option></select>
+        <select value={closedF} onChange={e => setClosedF(e.target.value)} style={sel}><option value="all">Closed and open</option><option value="closed">Closed out</option><option value="open">Not closed out</option></select>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name, email, date…" style={{ ...sel, flex: 1, minWidth: 140, maxWidth: 260 }} />
         <span style={{ flex: 1 }} />
         <button type="button" style={btn(true)} onClick={exportBookings} disabled={!rows.length}>⬇ Download for QuickBooks</button>
@@ -939,13 +948,14 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-          <thead><tr><th style={th}>Date</th><th style={th}>Event</th><th style={th}>Type</th><th style={th}>Client</th><th style={th}>Status</th><th style={{ ...th, textAlign: 'right' }}>Invoice</th><th style={{ ...th, textAlign: 'right' }}>Paid</th><th style={{ ...th, textAlign: 'right' }}>Balance</th></tr></thead>
-          <tbody>{rows.length === 0 ? <tr><td style={td} colSpan={8}>No bookings match.</td></tr> : rows.map(r => <tr key={r.c.id} onClick={() => onOpen(r.c)} style={{ cursor: 'pointer' }}>
+          <thead><tr><th style={th}>Date</th><th style={th}>Event</th><th style={th}>Type</th><th style={th}>Client</th><th style={th}>Status</th><th style={th}>Closed out</th><th style={{ ...th, textAlign: 'right' }}>Invoice</th><th style={{ ...th, textAlign: 'right' }}>Paid</th><th style={{ ...th, textAlign: 'right' }}>Balance</th></tr></thead>
+          <tbody>{rows.length === 0 ? <tr><td style={td} colSpan={9}>No bookings match.</td></tr> : rows.map(r => <tr key={r.c.id} onClick={() => onOpen(r.c)} style={{ cursor: 'pointer' }}>
             <td style={{ ...td, whiteSpace: 'nowrap', fontWeight: 600, color: '#886c44' }}>{day(r.c.eventDate) || 'TBD'}</td>
             <td style={{ ...td, fontWeight: 600 }}>{r.c.name}</td>
             <td style={td}>{r.c.type}</td>
             <td style={td}>{r.who}<div style={{ color: '#888', fontSize: 11 }}>{r.email}</div></td>
             <td style={td}><span style={{ ...tone(r.status), padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{r.status}</span></td>
+            <td style={td}><span style={{ ...(r.closed === 'Closed out' ? { background: '#edf4ed', color: '#426b4a' } : r.closed === 'Not yet held' ? { background: '#eee', color: '#555' } : { background: '#faf0e6', color: '#9a5d22' }), padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600 }}>{r.closed === 'Closed out' ? '✓ Closed out' : r.closed}</span></td>
             <td style={{ ...td, textAlign: 'right' }}>{money(r.total)}</td><td style={{ ...td, textAlign: 'right' }}>{money(r.paid)}</td><td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(r.balance)}</td>
           </tr>)}</tbody>
         </table>
