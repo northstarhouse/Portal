@@ -7144,13 +7144,33 @@ function BoardView() {
                   </div>
                 </div>
               </div>
-              {revealed && boardIsVote(item) && (
-                <div style={{ display: 'flex', gap: 14, marginTop: 10 }}>
-                  {[['Yes', t.yes, '#2e7d32'], ['No', t.no, '#c62828'], ['Abstain', t.abstain, '#7c3aed']].map(function(entry) {
-                    return <div key={entry[0]} style={{ fontSize: 12, color: entry[2], fontWeight: 600 }}>{entry[1]} {entry[0]}</div>;
-                  })}
-                </div>
-              )}
+              {(function() {
+                // Who took part: always shown on conversations; on votes only once the vote is complete (votes are anonymous until then).
+                var people = [];
+                if (!boardIsVote(item) || revealed) {
+                  iv.forEach(function(v) { if (v.choice !== 'Not in attendance' && v.voter && people.indexOf(v.voter) === -1) people.push(v.voter); });
+                }
+                var showTally = revealed && boardIsVote(item);
+                if (!showTally && !people.length) return null;
+                var maxShow = 6, shownPeople = people.slice(0, maxShow);
+                return (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 14, marginTop: 10 }}>
+                    <div style={{ display: 'flex', gap: 14 }}>
+                      {showTally && [['Yes', t.yes, '#2e7d32'], ['No', t.no, '#c62828'], ['Abstain', t.abstain, '#7c3aed']].map(function(entry) {
+                        return <div key={entry[0]} style={{ fontSize: 12, color: entry[2], fontWeight: 600 }}>{entry[1]} {entry[0]}</div>;
+                      })}
+                    </div>
+                    {people.length > 0 && (
+                      <div title={'Participated: ' + people.join(', ')} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                        {shownPeople.map(function(n, i) {
+                          return <div key={n} title={n} style={{ marginLeft: i === 0 ? 0 : -8, border: '2px solid #fff', borderRadius: '50%', display: 'flex' }}>{boardAvatar(n, 28)}</div>;
+                        })}
+                        {people.length > maxShow && <div style={{ marginLeft: -8, width: 28, height: 28, borderRadius: '50%', background: '#e8e0d5', color: '#6b5a3e', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', boxSizing: 'content-box' }}>+{people.length - maxShow}</div>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             </React.Fragment>
           );
