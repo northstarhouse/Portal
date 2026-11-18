@@ -878,7 +878,7 @@ const modules = [
   { id: "volunteers", label: "Volunteers" },
   { id: "donors", label: "Donations" },
   { id: "sponsors", label: "Sponsors" },
-  { id: "board", label: "Board Communication & Voting" },
+  { id: "board", label: "Board Communication" },
   { id: "meeting-reports", label: "Meeting & Board Reports" },
   { id: "strategy", label: "Strategic Goal Progress", hidden: true },
   { id: "venue", label: "Venue Rentals" },
@@ -6580,6 +6580,64 @@ function boardItemType(item) {
   return BOARD_ITEM_TYPES.filter(function(t) { return t.id === id; })[0] || BOARD_ITEM_TYPES[0];
 }
 function boardIsVote(item) { return boardItemType(item).id === 'Vote'; }
+// When a reply/vote is wanted (response_timing: asap | next_meeting | date). For next_meeting and date, due_date holds the date.
+var BOARD_RESPONSE_TIMING = [
+  { id: '', label: 'No deadline' },
+  { id: 'asap', label: 'As soon as possible' },
+  { id: 'next_meeting', label: 'Before the next board meeting' },
+  { id: 'date', label: 'By a specific date…' }
+];
+// Board meetings are the third Thursday of each month; the next one on or after today, as YYYY-MM-DD.
+function nextBoardMeetingDate() {
+  var now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  for (var i = 0; i < 3; i++) {
+    var first = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    var d = new Date(first.getFullYear(), first.getMonth(), 1 + ((4 - first.getDay() + 7) % 7) + 14);
+    if (d >= today) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  return null;
+}
+function boardRespondText(item) {
+  if (!item || !item.response_timing) return '';
+  var fd = function(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''; };
+  if (item.response_timing === 'asap') return 'Response needed ASAP';
+  if (item.response_timing === 'next_meeting') return 'Respond before the next board meeting' + (item.due_date ? ' (' + fd(item.due_date) + ')' : '');
+  if (item.response_timing === 'date' && item.due_date) return 'Respond by ' + fd(item.due_date);
+  return '';
+}
+function boardRespondOverdue(item) {
+  if (!item || item.status === 'Closed' || (item.response_timing !== 'date' && item.response_timing !== 'next_meeting')) return false;
+  return !!item.due_date && item.due_date < new Date().toISOString().slice(0, 10);
+}
+// Filter tabs across the top of the board page: All Items, Votes, Questions, Discussions, Updates.
+function BoardFilterTabs({ items, value, onChange }) {
+  var tabs = [
+    { id: 'all', label: 'All Items' }, { id: 'Vote', label: 'Votes' }, { id: 'Question', label: 'Questions' },
+    { id: 'Discussion', label: 'Discussions' }, { id: 'Update', label: 'Updates' }
+  ];
+  var count = function(id) { return id === 'all' ? items.length : items.filter(function(i) { return boardItemType(i).id === id; }).length; };
+  var icon = function(id, c) {
+    var p = { width: 17, height: 17, viewBox: '0 0 24 24', fill: 'none', stroke: c, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+    if (id === 'all') return <svg {...p}><path d="M12 3 3 8l9 5 9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/></svg>;
+    if (id === 'Vote') return <svg {...p}><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>;
+    if (id === 'Question') return <svg {...p}><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>;
+    if (id === 'Discussion') return <svg {...p}><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 5.2a3 3 0 0 1 0 5.6M18 14.8c1.8.7 3 2.3 3 5.2"/></svg>;
+    return <svg {...p}><path d="M3 11v3a1 1 0 0 0 1 1h2l8 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M18 9a4 4 0 0 1 0 6"/></svg>;
+  };
+  return (
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+      {tabs.map(function(t) {
+        var on = value === t.id, c = on ? '#fff' : '#6b5a3e';
+        return (
+          <button key={t.id} type="button" onClick={function() { onChange(t.id); }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 12, border: '1px solid ' + (on ? '#8a6c44' : '#e6dccb'), background: on ? '#8a6c44' : '#fbf8f2', color: c, fontSize: 14, fontWeight: on ? 700 : 500, cursor: 'pointer', boxShadow: on ? '0 2px 6px rgba(138,108,68,0.25)' : 'none' }}>
+            {icon(t.id, c)}{t.label} ({count(t.id)})
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 // Pill with an icon, shown above the title of every board item.
 function BoardTypePill({ item, size }) {
   var t = boardItemType(item), sm = size === 'sm', c = t.color, w = sm ? 13 : 15;
@@ -6600,7 +6658,7 @@ function BoardView() {
   const [showAdd, setShowAdd] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState(null);
-  const [topicForm, setTopicForm] = React.useState({ item_type: 'Vote', title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '', allow_notes_vote: false });
+  const [topicForm, setTopicForm] = React.useState({ item_type: 'Vote', response_timing: '', title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '', allow_notes_vote: false });
   const [voteForm, setVoteForm] = React.useState({ voter: '', choice: '', note: '' });
   const [showPostMeeting, setShowPostMeeting] = React.useState(false);
   const [voteSaving, setVoteSaving] = React.useState(false);
@@ -6620,6 +6678,7 @@ function BoardView() {
   const [adminExpandedClosedId, setAdminExpandedClosedId] = React.useState(null);
   const [voteNotifConfirmItem, setVoteNotifConfirmItem] = React.useState(null);
   const [replyTo, setReplyTo] = React.useState(null);
+  const [typeFilter, setTypeFilter] = React.useState('all');
   const [myName, setMyName] = React.useState('');
   const [photos, setPhotos] = React.useState({});
   // Round profile photos by first name, from the volunteer records.
@@ -6926,14 +6985,14 @@ function BoardView() {
     e.preventDefault();
     if (!topicForm.title) return;
     setTopicSaving(true);
-    sbInsert('Board Voting Items', Object.assign({}, topicForm.item_type && topicForm.item_type !== 'Vote' ? { item_type: topicForm.item_type } : {}, {
+    sbInsert('Board Voting Items', Object.assign({}, topicForm.item_type && topicForm.item_type !== 'Vote' ? { item_type: topicForm.item_type } : {}, topicForm.response_timing ? { response_timing: topicForm.response_timing } : {}, {
       title: topicForm.title,
       description: topicForm.description || null,
       attachment_url: topicForm.attachment_url || null,
       submitted_by: myFullName || myName || null,
       requested_by: String(topicForm.requested_by || '').trim() || null,
-      due_date: topicForm.due_date || null,
-      meeting_date: topicForm.meeting_date || null,
+      due_date: topicForm.response_timing === 'date' ? (topicForm.due_date || null) : (topicForm.response_timing === 'next_meeting' ? nextBoardMeetingDate() : null),
+      meeting_date: nextBoardMeetingDate(),
       allow_notes_vote: boardIsVote(topicForm) ? topicForm.allow_notes_vote : false,
       status: 'Open'
     })).then(function(rows) {
@@ -7022,7 +7081,10 @@ function BoardView() {
         <div style={{ textAlign: 'right', fontSize: 11, color: voteNotifResult.ok ? '#2e6b4f' : '#a04545', marginTop: -12, marginBottom: 12 }}>{voteNotifResult.text}</div>
       )}
 
-      {items.length === 0 && <div style={{ color: '#777', fontSize: 12, textAlign: 'center', padding: 40 }}>No voting items yet.</div>}
+      <BoardFilterTabs items={items} value={typeFilter} onChange={setTypeFilter} />
+
+      {items.length === 0 && <div style={{ color: '#777', fontSize: 12, textAlign: 'center', padding: 40 }}>No board items yet.</div>}
+      {items.length > 0 && typeFilter !== 'all' && !items.some(function(i) { return boardItemType(i).id === typeFilter; }) && <div style={{ color: '#777', fontSize: 12, textAlign: 'center', padding: 40 }}>Nothing in this category yet.</div>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {(function() {
@@ -7032,8 +7094,9 @@ function BoardView() {
             if (db !== da) return db - da;
             return (b.row_id || 0) - (a.row_id || 0);
           };
-          var openItems = items.filter(function(i) { return !isRevealed(i); }).sort(byNewest);
-          var closedItems = items.filter(function(i) { return isRevealed(i); }).sort(byNewest);
+          var shown = items.filter(function(i) { return typeFilter === 'all' || boardItemType(i).id === typeFilter; });
+          var openItems = shown.filter(function(i) { return !isRevealed(i); }).sort(byNewest);
+          var closedItems = shown.filter(function(i) { return isRevealed(i); }).sort(byNewest);
           var allItems = openItems.concat(closedItems);
           return allItems.map(function(item, idx) {
           var iv = itemVotes(item);
@@ -7065,8 +7128,9 @@ function BoardView() {
                   <div style={{ fontSize: 12, color: '#777' }}>
                     {item.submitted_by ? <span>Submitted by {item.submitted_by}{item.created_at ? ' on ' + fmtFullDate(item.created_at) : ''}{item.requested_by || item.due_date ? ' · ' : ''}</span> : null}
                     {item.requested_by ? <span>Requested by {item.requested_by}{item.due_date ? ' · ' : ''}</span> : null}
-                    {item.due_date ? <span>Due {fmtDate(item.due_date)}</span> : null}
-                    {item.meeting_date ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null}
+                    {item.due_date && !item.response_timing ? <span>Due {fmtDate(item.due_date)}</span> : null}
+                    {boardRespondText(item) ? <span style={{ color: boardRespondOverdue(item) ? '#c62828' : '#8a5a12', fontWeight: 600 }}>{boardRespondText(item)}{boardRespondOverdue(item) ? ' — overdue' : ''}</span> : null}
+                    {item.meeting_date && !item.response_timing ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null}
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
@@ -7116,8 +7180,9 @@ function BoardView() {
                   {selected.created_at ? <span>Submitted {fmtSubmitted(selected.created_at)}</span> : null}
                   {selected.submitted_by ? <span> · by {selected.submitted_by}</span> : null}
                   {selected.requested_by ? <span> · requested by {selected.requested_by}</span> : null}
-                  {selected.due_date ? <span> · Due {fmtDate(selected.due_date)}</span> : null}
-                  {selected.meeting_date ? <span> · Meeting {fmtDate(selected.meeting_date)}</span> : null}
+                  {selected.due_date && !selected.response_timing ? <span> · Due {fmtDate(selected.due_date)}</span> : null}
+                  {boardRespondText(selected) ? <span style={{ color: boardRespondOverdue(selected) ? '#c62828' : '#8a5a12', fontWeight: 600 }}> · {boardRespondText(selected)}{boardRespondOverdue(selected) ? ' — overdue' : ''}</span> : null}
+                  {selected.meeting_date && !selected.response_timing ? <span> · Meeting {fmtDate(selected.meeting_date)}</span> : null}
                 </div>
             </div>
 
@@ -7554,9 +7619,13 @@ function BoardView() {
                   <datalist id="board-requested-by-names">{allNames.map(function(n) { return <option key={n} value={n} />; })}</datalist>
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                <div><label style={bLbl}>Due Date</label><input type="date" value={topicForm.due_date} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { due_date: e.target.value }); }); }} style={bInp} /></div>
-                <div><label style={bLbl}>Meeting Date</label><input type="date" value={topicForm.meeting_date} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { meeting_date: e.target.value }); }); }} style={bInp} /></div>
+              <div style={bGrp}>
+                <label style={bLbl}>{boardIsVote(topicForm) ? 'Vote needed' : 'Response needed'}</label>
+                <select value={topicForm.response_timing || ''} onChange={function(e) { var v = e.target.value; setTopicForm(function(f) { return Object.assign({}, f, { response_timing: v }); }); }} style={bInp}>
+                  {BOARD_RESPONSE_TIMING.map(function(o) { return <option key={o.id} value={o.id}>{o.label}</option>; })}
+                </select>
+                {topicForm.response_timing === 'date' && <input type="date" required value={topicForm.due_date} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { due_date: e.target.value }); }); }} style={bInp} />}
+                {topicForm.response_timing === 'next_meeting' && <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>Next board meeting: {(function() { var d = nextBoardMeetingDate(); return d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : ''; })()}</div>}
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                 <button type="submit" disabled={topicSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: topicSaving ? 0.7 : 1 }}>{topicSaving ? 'Saving…' : 'Add Topic'}</button>
@@ -24871,7 +24940,7 @@ function MeetingBoardReportsView({ navigate }) {
             return (
               <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, overflow: 'hidden' }}>
                 <div style={{ padding: '10px 14px', background: BOARD_VOTING_CARD_COLOR.bg, borderBottom: '0.5px solid #f0ece6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: BOARD_VOTING_CARD_COLOR.color, fontFamily: "'Cardo', serif" }}>Board Communication & Voting</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: BOARD_VOTING_CARD_COLOR.color, fontFamily: "'Cardo', serif" }}>Board Communication</div>
                   <button onClick={function() { navigate('board'); }} style={{ background: '#fff', color: BOARD_VOTING_CARD_COLOR.color, border: '1px solid ' + BOARD_VOTING_CARD_COLOR.color, borderRadius: 20, padding: '4px 11px', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
                     Open
                   </button>
