@@ -7,6 +7,7 @@ export function InquiryFlagNotes({ who }) {
   var [text, setText] = React.useState('');
   var [editing, setEditing] = React.useState(null); // { id, text }
   var [busy, setBusy] = React.useState(false);
+  var [open, setOpen] = React.useState(false);
   var key = 'inquiry:' + String(who || '').trim().toLowerCase();
   var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
   var HJ = Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=representation' }, H);
@@ -44,10 +45,18 @@ export function InquiryFlagNotes({ who }) {
   if (notes === null) return null;
   var fmt = function(iso) { var d = new Date(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
   var btnS = { background: 'none', border: 'none', padding: 0, color: '#b3261e', fontSize: 11, fontWeight: 600, cursor: 'pointer' };
+  var flag = <svg width="16" height="16" viewBox="0 0 24 24" fill="#d9534f" stroke="#d9534f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22V4"/><path d="M4 4h13l-2.5 4.5L17 13H4z"/></svg>;
+  var pill = { display: "inline-block", maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "middle", background: "#fdecea", color: "#b3261e", border: "1px solid #f1c9c5", borderRadius: 999, padding: "3px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer" };
   return (
-    <details open={notes.length > 0} style={{ marginBottom: 12, background: '#fdf3f2', border: '1px solid #f1c9c5', borderRadius: 8, padding: '8px 12px' }}>
-      <summary style={{ cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#b3261e', textTransform: 'uppercase', letterSpacing: 0.8 }}>🚩 Red flags from tours ({notes.length})</summary>
-      <div style={{ fontSize: 11, color: '#a77', marginTop: 4 }}>What the couple flagged as a red flag while touring the venue.</div>
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+        <button type="button" onClick={function() { setOpen(!open); }} title="Red flags from tours" aria-expanded={open} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: open ? "#fdecea" : "#fff", border: "1px solid #f1c9c5", borderRadius: 999, padding: "4px 10px", cursor: "pointer" }}>
+          {flag}{notes.length > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: "#b3261e" }}>{notes.length}</span>}
+        </button>
+        {notes.map(function(n) { return <button key={n.id} type="button" title={n.body} onClick={function() { setOpen(true); }} style={pill}>{n.body}</button>; })}
+      </div>
+      {open && <div style={{ marginTop: 8, background: "#fdf3f2", border: "1px solid #f1c9c5", borderRadius: 8, padding: "8px 12px" }}>
+      <div style={{ fontSize: 11, color: "#a77" }}>What the couple flagged as a red flag while touring the venue.</div>
       {notes.map(function(n) {
         return <div key={n.id} style={{ borderLeft: '3px solid #d9534f', background: '#fff', borderRadius: 6, padding: '7px 10px', marginTop: 8 }}>
           {editing && editing.id === n.id ? (
@@ -70,7 +79,8 @@ export function InquiryFlagNotes({ who }) {
         <textarea rows={2} value={text} onChange={function(e) { setText(e.target.value); }} placeholder="Add a red flag the couple raised on their tour…" style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px', border: '1px solid #e8c5c1', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', background: '#fff' }} />
         <button type="button" disabled={busy || !text.trim()} onClick={add} style={{ marginTop: 6, background: text.trim() ? '#b3261e' : '#e6c9c6', color: '#fff', border: 'none', borderRadius: 7, padding: '6px 16px', fontSize: 12, fontWeight: 600, cursor: text.trim() ? 'pointer' : 'default' }}>{busy ? 'Saving…' : 'Add red flag'}</button>
       </div>
-    </details>
+      </div>}
+    </div>
   );
 }
 

@@ -16456,6 +16456,25 @@ function PersonActivityView() {
       var startFrom = PA_START_FROM[first.toLowerCase()];
       if (startFrom) out = out.filter(function(it) { return new Date(it.at) >= new Date(startFrom); });
       out.sort(function(a, b) { return String(b.at).localeCompare(String(a.at)); });
+      // A reply and the "marked handled" that goes with it happen together: show them as one line.
+      //  - the reply's own copy ("Marked handled: Reply from Derek") is dropped;
+      //  - the message that was answered ("Marked handled: <subject>") becomes "Marked handled & replied: <subject>" and carries the reply text.
+      var drop = {};
+      var near = function(a, b) { return Math.abs(new Date(a.at) - new Date(b.at)) <= 120000; };
+      out.forEach(function(r, i) {
+        if (r.kind !== 'messages' || !/^Replied:/.test(r.text)) return;
+        var orig = -1;
+        out.forEach(function(h, j) {
+          if (j === i || drop[j] || h.kind !== 'messages' || !/^Marked handled:/.test(h.text) || !near(r, h)) return;
+          if (/^Marked handled: Reply from /i.test(h.text)) drop[j] = true;
+          else if (orig < 0) orig = j;
+        });
+        if (orig >= 0) {
+          out[orig] = Object.assign({}, out[orig], { text: out[orig].text.replace(/^Marked handled:/, 'Marked handled & replied:'), note: out[orig].note || r.note });
+          drop[i] = true;
+        }
+      });
+      out = out.filter(function(it, k) { return !drop[k]; });
       setItems(out);
     });
   }, [person]);
