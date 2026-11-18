@@ -494,6 +494,18 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
   function toggleChecklistItem(id) {
     onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, done: !t.done } : t) }));
   }
+  // "Sign up" on an open item puts the signed-in person's name on it (same fields the Checklist's assign box writes).
+  const me = useMe();
+  function signUpForItem(id) {
+    if (!me) return;
+    onUpdate(e => ({ ...e, checklist: e.checklist.map(t => t.id === id ? { ...t, assignedIds: [me.id], people: [], assignee: volFullName(me), assigneeId: me.id } : t) }));
+  }
+  // Volunteer roles ("we still need 3 volunteers") with spots left: sign up adds the person to that role.
+  function signUpForNeed(id) {
+    if (!me) return;
+    onUpdate(e => ({ ...e, vendors: e.vendors.map(v => v.id === id ? { ...v, assignedIds: Array.from(new Set([...(v.assignedIds || []), me.id])) } : v) }));
+  }
+  const signUpBtn = (onClick) => <button type="button" className="btn-ghost" title="Put your name on this" onClick={e => { e.stopPropagation(); onClick(); }} style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 11, fontWeight: 600, padding: '3px 10px', whiteSpace: 'nowrap' }}>Sign up</button>;
 
   function handleFlyerUpload(file) {
     if (!file || uploadingFlyer) return;
@@ -585,6 +597,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             <div key={row.v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
               <span style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed var(--border)' }} />
               <span style={{ fontSize: 13 }}>Find: {needTitle(row.v)}{row.v.kind ? <span style={{ fontSize: 11, color: 'var(--muted)' }}> · {NEED_TAG[row.v.kind]}</span> : null}{(() => { const n = whoOn(row.v, volunteers).map(x => x.name).join(', ') || row.v.who || ''; return n ? <span style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 600 }}>  —  {n}</span> : null; })()}</span>
+              {me && ['volunteer', 'activity'].includes(row.v.kind) && !(row.v.assignedIds || []).some(i => String(i) === String(me.id)) && signUpBtn(() => signUpForNeed(row.v.id))}
             </div>
           ) : ((t) => (
             <div key={t.id} onClick={() => toggleChecklistItem(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer' }}>
@@ -595,6 +608,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                 {t.done && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
               </span>
               <span style={{ fontSize: 13, color: t.done ? 'var(--muted)' : 'var(--text)', textDecoration: 'none' }}>{t.text}{t.assignee ? <span style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 600 }}>  —  {t.assignee}</span> : null}</span>
+              {me && isOpenDuty(t) && signUpBtn(() => signUpForItem(t.id))}
             </div>
           ))(row.t))}
           {upcomingDeadlines.length > 0 && (
@@ -1089,7 +1103,16 @@ function dutyPeople(t) {
     phones: t.phones || {},
   };
 }
-function DutyWho({ t, volunteers, onPatch }) {
+// The person signed in right now, for the "Sign up" buttons: the Hub's own volunteer, or (inside the Portal, which has no
+// profile of its own) the volunteer matching the signed-in email.
+function useMe() {
+  const ctx = useVol();
+  const v = ctx.volunteer;
+  return (v && v.id != null) ? v : (ctx.signedInVolunteer || null);
+}
+// A duty nobody has taken yet: not done, and no one named on it.
+const isOpenDuty = (t) => !t.done && !t.assignee && !(t.assignedIds || []).length && !(t.people || []).length;
+function DutyWho({ t, volunteers, onPatch, onSignUp }) {
   const roster = volunteers || [];
   const cur = dutyPeople(t);
   const total = cur.assignedIds.length + cur.people.length;
@@ -1115,7 +1138,9 @@ function DutyWho({ t, volunteers, onPatch }) {
         {!known && <option value={String(primaryId)}>Volunteer no longer on the list</option>}
         {sorted.map(x => <option key={x.id} value={String(x.id)}>{volFullName(x)}</option>)}
       </select>
-      <span style={{ width: 28, flexShrink: 0, fontSize: 11, color: 'var(--gold)', fontWeight: 600 }}>{total > 1 ? '+' + (total - 1) : ''}</span>
+      {total === 0 && onSignUp
+        ? <button type="button" className="btn-ghost" title="Put your name on this" onClick={onSignUp} style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, padding: '4px 9px', whiteSpace: 'nowrap' }}>Sign up</button>
+        : <span style={{ width: 28, flexShrink: 0, fontSize: 11, color: 'var(--gold)', fontWeight: 600 }}>{total > 1 ? '+' + (total - 1) : ''}</span>}
     </div>
   );
 }
@@ -1873,6 +1898,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
 // The event's task checklist: add items with a priority, due date and assignee; click one to edit it, add subtasks,
 // or attach estimated/actual $ and notes.
 function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCloseEmail }) {
+  const me = useMe();
   // The Marketing channel boxes live with the Marketing section; they are shown (and can be ticked) here too.
   const [mkData, setMkData] = useState(null);
   useEffect(() => {
@@ -2389,7 +2415,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
                   <option value="">General</option>
                   {CHECKLIST_CATEGORIES.filter(c => c !== 'General').map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-                <DutyWho t={t} volunteers={volunteers} onPatch={pt => patchDutyPeople(t, pt)} />
+                <DutyWho t={t} volunteers={volunteers} onPatch={pt => patchDutyPeople(t, pt)} onSignUp={me && isOpenDuty(t) ? () => patchDutyPeople(t, { assignedIds: [me.id] }) : null} />
                 {t.done && <span style={{ width: 152, flexShrink: 0, fontSize: 12, fontWeight: 600, color: '#2e7d32', paddingLeft: 8 }}>Done</span>}
                 {!t.done && !((t.timing === 'before' || (!t.timing && t.due)) && t.due) && <select className="input" value={t.timing || (t.due ? 'before' : '')} style={{ width: 152, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}
                   onChange={e => { const v = e.target.value; patchItem(t.id, { timing: v, due: v === 'before' ? (t.timing === 'dayof' ? '' : (t.due || '')) : dueForTiming(v, ev.date) }); }}>
