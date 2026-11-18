@@ -47,7 +47,13 @@ export async function contractPdf(version: any): Promise<Uint8Array> {
     y = TOP;
   };
   const ensure = (h: number) => { if (y - h < BOTTOM) newPage(); };
-  const w = (f: PDFFont, t: string, size: number) => f.widthOfTextAtSize(t, size);
+  // text widths are linear in the font size, so each distinct string is measured once per font (the font engine is the slow part)
+  const widthCache = new WeakMap<PDFFont, Map<string, number>>();
+  const w = (f: PDFFont, t: string, size: number) => {
+    let m = widthCache.get(f); if (!m) { m = new Map(); widthCache.set(f, m); }
+    let unit = m.get(t); if (unit === undefined) { unit = f.widthOfTextAtSize(t, 1); m.set(t, unit); }
+    return unit * size;
+  };
 
   // greedy word wrap over text segments that may use different fonts
   function wrap(segs: Seg[], size: number, width: number): Seg[][] {
@@ -60,9 +66,9 @@ export async function contractPdf(version: any): Promise<Uint8Array> {
       if (isSpace) { if (used > 0) { lines[lines.length - 1].push({ ...tk, t: " " }); used += tw; } continue; }
       if (used + tw > width && used > 0) { lines.push([]); used = 0; }
       if (tw > width) { // a very long unbroken string (a link or hash) is broken where it overflows
-        let chunk = "";
-        for (const ch of tk.t) { if (w(tk.f, chunk + ch, size) > width) { lines[lines.length - 1].push({ ...tk, t: chunk }); lines.push([]); chunk = ""; used = 0; } chunk += ch; }
-        lines[lines.length - 1].push({ ...tk, t: chunk }); used = w(tk.f, chunk, size); continue;
+        let chunk = "", cwid = 0;
+        for (const ch of tk.t) { const wch = w(tk.f, ch, size); if (cwid + wch > width) { lines[lines.length - 1].push({ ...tk, t: chunk }); lines.push([]); chunk = ""; cwid = 0; used = 0; } chunk += ch; cwid += wch; }
+        lines[lines.length - 1].push({ ...tk, t: chunk }); used = cwid; continue;
       }
       lines[lines.length - 1].push(tk); used += tw;
     }

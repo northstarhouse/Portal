@@ -393,6 +393,29 @@ async function syncClient(pbId: string) {
   return { folder: folderName, url: folderUrl, added: done };
 }
 
+// Just the signed contract copy (same rules as step 5 of the full sync), for a client whose full sync is too heavy to finish in one run.
+async function contractOnly(pbId: string) {
+  const pb = (await rest("nsh_form_responses?select=id,form_id,answers,created_at&id=eq." + pbId))?.[0];
+  if (!pb) return { skipped: "no such response" };
+  const inq = (await rest("venue_inquiries?select=*&prebooking_form_response_id=eq." + pbId + "&limit=1"))?.[0] || null;
+  if (!(await hasPayment(pb, inq))) return { skipped: "no payment yet, so no Drive folder" };
+  const { folderId, folderName } = await clientFolder(pbId, pb.answers || {}, inq);
+  const have = await listChildren(folderId);
+  const ver = (await rest("venue_agreement_versions?select=id,version&response_id=eq." + pbId + "&status=eq.completed&order=version.desc&limit=1"))?.[0];
+  const existing = have.find((x) => x.name.toLowerCase().startsWith("signed contract"));
+  if (!ver) return { folder: folderName, skipped: "no signed agreement" };
+  if (existing && existing.name === "Signed Contract.pdf") return { folder: folderName, skipped: "contract already filed" };
+  const rec2 = await rest("rpc/venue_agreement_record", { method: "POST", body: JSON.stringify({ p_id: ver.id }) });
+  if (!rec2) return { folder: folderName, skipped: "no agreement record" };
+  const pdf = await contractPdf({ ...rec2, body: tidyBody(rec2.body) });
+  const bytes = pdf instanceof Uint8Array ? pdf : new Uint8Array(pdf);
+  if (existing) {
+    await replaceFileContent(existing.id, "application/pdf", bytes);
+    await gjson(D + "/" + existing.id + "?supportsAllDrives=true&fields=id", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Signed Contract.pdf" }) });
+  } else await uploadFile("Signed Contract.pdf", folderId, "application/pdf", bytes);
+  return { folder: folderName, added: ["Signed Contract"] };
+}
+
 // Just the invoice, for a client whose full sync is too heavy to finish in one run.
 async function invoiceOnly(pbId: string) {
   const pb = (await rest("nsh_form_responses?select=id,form_id,answers,created_at&id=eq." + pbId))?.[0];
@@ -506,6 +529,13 @@ Deno.serve(async (req) => {
       const pbId = await resolvePrebookingId(id);
       if (!pbId) return json({ ok: true, skipped: "not tied to a client" });
       return json({ ok: true, ...(await syncLocked(pbId)) });
+    }
+    if (body.action === "contract") {
+      const id = String(body.response_id || "");
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "response_id required" }, 400);
+      const pbId = await resolvePrebookingId(id);
+      if (!pbId) return json({ ok: true, skipped: "not tied to a client" });
+      return json({ ok: true, ...(await contractOnly(pbId)) });
     }
     if (body.action === "invoice") {
       const id = String(body.response_id || "");
