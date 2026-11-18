@@ -6645,6 +6645,28 @@ function BoardView() {
     whoIsSignedIn().then(function(n) { if (n) setMyName(n); });
   }, [boardMembers]);
 
+  // New Item form: "Submitted by" is the signed-in person (full name); "Requested by" searches every
+  // name we know (all volunteer records plus board members).
+  const [allNames, setAllNames] = React.useState([]);
+  const [myFullName, setMyFullName] = React.useState('');
+  React.useEffect(function() {
+    var email = '';
+    try { email = (localStorage.getItem('nsh-app-email') || '').trim().toLowerCase(); } catch (e) {}
+    cachedSbFetch('2026 Volunteers', ['First Name', 'Last Name', 'Email']).then(function(rows) {
+      var seen = {}, list = [], mine = '';
+      (rows || []).concat((boardMembers || []).map(function(m) { return { 'First Name': m.name, Email: m.email }; })).forEach(function(v) {
+        var n = (String(v['First Name'] || '').trim() + ' ' + String(v['Last Name'] || '').trim()).trim();
+        if (!n) return;
+        if (!mine && email && String(v.Email || '').trim().toLowerCase() === email) mine = n;
+        var k = n.toLowerCase(); if (seen[k]) return; seen[k] = 1; list.push(n);
+      });
+      list.sort(function(a, b) { return a.localeCompare(b); });
+      setAllNames(list);
+      var bm = (boardMembers || []).filter(function(m) { return m.email && String(m.email).trim().toLowerCase() === email; })[0];
+      setMyFullName(bm && bm.name && /\s/.test(bm.name) ? bm.name : (mine || (bm && bm.name) || ''));
+    }).catch(function() {});
+  }, [boardMembers]);
+
   function postComment(e) {
     if (e && e.preventDefault) e.preventDefault();
     var who = myName || voteForm.voter, text = String(voteForm.note || '').trim();
@@ -6908,7 +6930,8 @@ function BoardView() {
       title: topicForm.title,
       description: topicForm.description || null,
       attachment_url: topicForm.attachment_url || null,
-      submitted_by: topicForm.submitted_by || null,
+      submitted_by: myFullName || myName || null,
+      requested_by: String(topicForm.requested_by || '').trim() || null,
       due_date: topicForm.due_date || null,
       meeting_date: topicForm.meeting_date || null,
       allow_notes_vote: boardIsVote(topicForm) ? topicForm.allow_notes_vote : false,
@@ -6916,9 +6939,10 @@ function BoardView() {
     })).then(function(rows) {
       if (rows && rows.message) { alert('Error: ' + rows.message + (/item_type/.test(rows.message) ? '\n\nThe item-type column has not been added to the database yet.' : '')); setTopicSaving(false); return; }
       setTopicSaving(false);
-      logActivity('New board ' + boardItemType(topicForm).label.toLowerCase() + ' opened: ' + topicForm.title + (topicForm.submitted_by ? ' (by ' + topicForm.submitted_by + ')' : ''), 'board_vote_opened');
+      var subBy = myFullName || myName, reqBy = String(topicForm.requested_by || '').trim();
+      logActivity('New board ' + boardItemType(topicForm).label.toLowerCase() + ' opened: ' + topicForm.title + (subBy ? ' (by ' + subBy + ')' : '') + (reqBy ? ' (requested by ' + reqBy + ')' : ''), 'board_vote_opened');
       setShowAdd(false);
-      setTopicForm({ item_type: 'Vote', title: '', description: '', attachment_url: '', submitted_by: '', due_date: '', meeting_date: '', allow_notes_vote: false });
+      setTopicForm({ item_type: 'Vote', title: '', description: '', attachment_url: '', submitted_by: '', requested_by: '', due_date: '', meeting_date: '', allow_notes_vote: false });
       setAttachFileName(''); setAttachUploading(false);
       clearCache('Board Voting Items');
       load();
@@ -6957,10 +6981,7 @@ function BoardView() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-        <div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Board Items</div>
-          <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{items.length} item{items.length !== 1 ? 's' : ''}</div>
-        </div>
+        <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>+ Add Topic</button>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={function() { setShowAdmin(true); }} style={{ background: '#fff', color: '#555', border: '0.5px solid #e0d8cc', borderRadius: 7, padding: '6px 12px', fontSize: 11, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -6995,7 +7016,6 @@ function BoardView() {
               )}
             </div>
           </div>
-          <button onClick={function() { setShowAdd(true); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>+ Add Item</button>
         </div>
       </div>
       {voteNotifResult && (
@@ -7043,7 +7063,8 @@ function BoardView() {
                     {item.title}
                   </div>
                   <div style={{ fontSize: 12, color: '#777' }}>
-                    {item.submitted_by ? <span>Submitted by {item.submitted_by}{item.created_at ? ' on ' + fmtFullDate(item.created_at) : ''}{item.due_date ? ' · ' : ''}</span> : null}
+                    {item.submitted_by ? <span>Submitted by {item.submitted_by}{item.created_at ? ' on ' + fmtFullDate(item.created_at) : ''}{item.requested_by || item.due_date ? ' · ' : ''}</span> : null}
+                    {item.requested_by ? <span>Requested by {item.requested_by}{item.due_date ? ' · ' : ''}</span> : null}
                     {item.due_date ? <span>Due {fmtDate(item.due_date)}</span> : null}
                     {item.meeting_date ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null}
                   </div>
@@ -7094,6 +7115,7 @@ function BoardView() {
                 <div style={{ fontSize: 12, color: '#777' }}>
                   {selected.created_at ? <span>Submitted {fmtSubmitted(selected.created_at)}</span> : null}
                   {selected.submitted_by ? <span> · by {selected.submitted_by}</span> : null}
+                  {selected.requested_by ? <span> · requested by {selected.requested_by}</span> : null}
                   {selected.due_date ? <span> · Due {fmtDate(selected.due_date)}</span> : null}
                   {selected.meeting_date ? <span> · Meeting {fmtDate(selected.meeting_date)}</span> : null}
                 </div>
@@ -7499,7 +7521,7 @@ function BoardView() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 20 }}>
           <div onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 4, padding: 28, maxWidth: 480, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 20 }}>
-              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>New Item</div>
+              <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>New Topic</div>
               {boardIsVote(topicForm) && <button type="button" onClick={function() { setTopicForm(function(f) { return Object.assign({}, f, { allow_notes_vote: !f.allow_notes_vote }); }); }}
                 title="Let voters submit notes/requested changes instead of a Yes/No/Abstain vote on this item"
                 style={{ padding: '5px 10px', borderRadius: 20, border: '1.5px solid ' + (topicForm.allow_notes_vote ? '#8a6200' : '#e0d8cc'), background: topicForm.allow_notes_vote ? '#fff8e1' : '#fff', color: topicForm.allow_notes_vote ? '#8a6200' : '#888', fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
@@ -7525,13 +7547,19 @@ function BoardView() {
                 </label>
                 {topicForm.attachment_url && !attachUploading && <div style={{ fontSize: 12, color: '#2e7d32', marginTop: 4 }}>✓ Uploaded</div>}
               </div>
-              <div style={bGrp}><label style={bLbl}>Submitted By</label><input value={topicForm.submitted_by} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { submitted_by: e.target.value }); }); }} style={bInp} placeholder="Name…" /></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div><label style={bLbl}>Submitted By</label><div style={Object.assign({}, bInp, { background: '#f7f4ef', color: (myFullName || myName) ? '#2a2a2a' : '#aaa' })}>{myFullName || myName || 'You (signed in)'}</div></div>
+                <div><label style={bLbl}>Requested By</label>
+                  <input list="board-requested-by-names" value={topicForm.requested_by || ''} onChange={function(e) { var v = e.target.value; setTopicForm(function(f) { return Object.assign({}, f, { requested_by: v }); }); }} style={bInp} placeholder="Search names…" autoComplete="off" />
+                  <datalist id="board-requested-by-names">{allNames.map(function(n) { return <option key={n} value={n} />; })}</datalist>
+                </div>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
                 <div><label style={bLbl}>Due Date</label><input type="date" value={topicForm.due_date} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { due_date: e.target.value }); }); }} style={bInp} /></div>
                 <div><label style={bLbl}>Meeting Date</label><input type="date" value={topicForm.meeting_date} onChange={function(e) { setTopicForm(function(f) { return Object.assign({}, f, { meeting_date: e.target.value }); }); }} style={bInp} /></div>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <button type="submit" disabled={topicSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: topicSaving ? 0.7 : 1 }}>{topicSaving ? 'Saving…' : 'Add Item'}</button>
+                <button type="submit" disabled={topicSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: topicSaving ? 0.7 : 1 }}>{topicSaving ? 'Saving…' : 'Add Topic'}</button>
                 <button type="button" onClick={function() { setShowAdd(false); }} style={{ flex: 1, padding: 10, background: '#f5f0ea', border: 'none', borderRadius: 8, fontSize: 12, color: '#666', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
               </div>
             </form>
