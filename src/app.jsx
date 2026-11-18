@@ -1,6 +1,6 @@
 ﻿const { useState, useEffect } = React;
 
-import { VenueClientDashboard, saveVenueInsuranceVerification, saveVenueManualPayments } from './venue-clients.jsx';
+import { VenueClientDashboard, BookingsExport, buildVenueClient, venueDateKey, saveVenueInsuranceVerification, saveVenueManualPayments } from './venue-clients.jsx';
 import { createAgreementApi, AgreementSigningPage } from './venue-contracts.jsx';
 import { VenuePoliciesView } from './venue-policies.jsx';
 import { EventListView } from './event-list.jsx';
@@ -12090,6 +12090,28 @@ function fetchAllPages(url, headers) {
   return go(0, []);
 }
 
+// Financials > Venue Bookings: every client booking with invoiced / paid / owed, plus the QuickBooks download (same list as Venue Rentals > Tools).
+function FinVenueBookings({ navigate }) {
+  var [clients, setClients] = React.useState(null), [err, setErr] = React.useState('');
+  React.useEffect(function() {
+    var off = false;
+    Promise.all([
+      fetchVenueInquiries({ strict: true }),
+      loadVenueClientEvents().catch(function() { return []; }),
+      venueAgreementApi('summary').catch(function() { return []; })
+    ]).then(function(res) {
+      if (off) return;
+      var today = venueDateKey();
+      var subs = (res[0] || []).filter(function(q) { return isVenueClientSubmission(q) && !isTestVenueBooking(q); });
+      setClients(subs.map(function(sub) { return buildVenueClient(sub, res[1].find(function(e) { return e.prebooking_form_response_id === sub.id; }), today, res[2] || []); }));
+    }).catch(function(e) { if (!off) setErr((e && e.message) || 'Could not load bookings.'); });
+    return function() { off = true; };
+  }, []);
+  if (err) return <div style={{ padding: 18, fontSize: 13, color: '#8c4c35' }}>{err}</div>;
+  if (!clients) return <div style={{ textAlign: 'center', padding: 30, color: '#aaa', fontSize: 13 }}>Loading bookings…</div>;
+  return <BookingsExport inline clients={clients} onOpen={function(c) { try { sessionStorage.setItem('nsh-venue-tab', 'clients'); } catch (e) {} window.__nshOpenClient = c.id; navigate('venue'); }} />;
+}
+
 function FinancialOverviewView({ navigate }) {
   var { useState, useEffect, useMemo } = React;
   var thisYear = new Date().getFullYear();
@@ -12324,6 +12346,7 @@ function FinancialOverviewView({ navigate }) {
     { id: 'operational', label: 'Operational Areas' },
     { id: 'events', label: 'Events' },
     { id: 'venue', label: 'Venue Rentals' },
+    { id: 'bookings', label: 'Venue Bookings' },
     { id: 'cashflow', label: 'Office Cash Flow' },
     { id: 'outflow-detail', label: 'Spending Detail' },
   ];
@@ -12391,6 +12414,8 @@ function FinancialOverviewView({ navigate }) {
       downloadXlsxMultiSheet(sheets, 'events-' + year + '.xlsx');
     } else if (activeTab === 'venue') {
       downloadXlsxRows(['Date', 'Client', 'Event', 'Payment', 'Amount', 'PayPal Fee', 'Net', 'Method'], venueRows(), 'venue-rentals-' + year + '.xlsx');
+    } else if (activeTab === 'bookings') {
+      window.alert('Use the Download for QuickBooks button inside the Venue Bookings tab.');
     } else if (activeTab === 'cashflow') {
       var rows = rentals.filter(function(r) { return inYear(r.date); }).map(function(r) {
         return { Date: r.date || '', Source: 'Earning', Category: r.name || 'Other', Direction: 'In', Amount: parseFloat(r.amount) || 0 };
@@ -12700,6 +12725,8 @@ function FinancialOverviewView({ navigate }) {
             </div>
           </div>
           )}
+
+          {activeTab === 'bookings' && <FinVenueBookings navigate={navigate} />}
 
           {activeTab === 'cashflow' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -20285,6 +20312,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   var [featureReqOpen, setFeatureReqOpen] = useState(false);
   var [statsOpen, setStatsOpen] = useState(false);
   var [eventsListOpen, setEventsListOpen] = useState(false);
+  var [bookingsOpen, setBookingsOpen] = useState(false);
   var [sendFormOpen, setSendFormOpen] = useState(false);
   var [movementOpen, setMovementOpen] = useState(false);
   var colorCoding = venueTab === 'clients' ? true : inquiriesColorCoding;
@@ -20857,6 +20885,12 @@ function VenueRentalsView({ navigate, initialTab }) {
                     <div><div style={{ fontWeight: 700 }}>Upcoming Events List</div>
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Every event by name and date, in order</div></div>
                   </button>
+                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVenueTab('clients'); setBookingsOpen(true); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
+                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-list" active size={18} /></span>
+                    <div><div style={{ fontWeight: 700 }}>Bookings &amp; payments (QuickBooks export)</div>
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>All events, invoiced / paid / unpaid; download or print</div></div>
+                  </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVenueTab('clients'); setStatsOpen(true); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
                     <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-stats" active size={18} /></span>
@@ -20978,7 +21012,7 @@ function VenueRentalsView({ navigate, initialTab }) {
           )}
 
           {venueTab === 'clients' && (
-            !inquiriesError && <VenueClientDashboard statsOpen={statsOpen} onCloseStats={function() { setStatsOpen(false); }} listOpen={eventsListOpen} onCloseList={function() { setEventsListOpen(false); }} showSite={siteView} setShowSite={setSiteView} messages={clientMsgs} currentMessages={currentUnhandledMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} savePayments={savePayments} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
+            !inquiriesError && <VenueClientDashboard statsOpen={statsOpen} onCloseStats={function() { setStatsOpen(false); }} listOpen={eventsListOpen} onCloseList={function() { setEventsListOpen(false); }} bookingsOpen={bookingsOpen} onCloseBookings={function() { setBookingsOpen(false); }} showSite={siteView} setShowSite={setSiteView} messages={clientMsgs} currentMessages={currentUnhandledMsgs} onHandleMessage={handleClientMsg} onOpenMessages={function() { setVenueTab('messages'); }} submissions={clientSubmissions} loadEvents={loadVenueClientEvents} saveInsurance={saveInsurance} savePayments={savePayments} agreementApi={venueAgreementApi} filter={clientFilter} setFilter={setClientFilter} query={clientQuery} setQuery={setClientQuery} />
           )}
 
           {venueTab === 'messages' && (

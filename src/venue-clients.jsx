@@ -853,6 +853,108 @@ function UpcomingEventsList({ clients, onOpen, onClose }) {
   </dialog>;
 }
 
+// Tools > Bookings & payments: every booking (upcoming and past) with what was invoiced, paid and is still owed.
+// Download as spreadsheets for QuickBooks (one row per booking, or one row per scheduled payment), or print the list.
+function bookingStatus(c, today) {
+  if (c.total == null && !(c.schedule || []).length) return 'No invoice on file';
+  const total = c.total != null ? c.total : (c.schedule || []).reduce((t, s) => t + (s.cents || 0), 0);
+  const paid = c.paid || 0;
+  if (total > 0 && paid >= total) return 'Paid in full';
+  const late = c.clientsSigned && (c.duePayments || []).some(p => p.due && p.due < today);
+  if (paid > 0) return late ? 'Partially paid - past due' : 'Partially paid';
+  return late ? 'Unpaid - past due' : 'Unpaid';
+}
+function bookingRows(clients, today) {
+  return clients.slice().sort((a, b) => (a.eventDate || '9999').localeCompare(b.eventDate || '9999') || String(a.name).localeCompare(String(b.name))).map(c => {
+    const sched = c.schedule || [];
+    const total = c.total != null ? c.total : sched.reduce((t, s) => t + (s.cents || 0), 0);
+    const deposit = sched.filter(s => s.deposit).reduce((t, s) => t + (s.cents || 0), 0);
+    const paid = c.paid || 0;
+    const balance = c.balance != null ? c.balance : Math.max(0, total - paid);
+    const next = (c.duePayments || [])[0];
+    const contact = (c.contacts || [])[0] || {};
+    return { c, total, deposit, paid, balance, status: bookingStatus(c, today), next, phone: contact.phone_number || '', who: contact.full_name || '', email: c.email || contact.email || '', when: c.isPast ? 'Past' : 'Upcoming' };
+  });
+}
+const csvCell = v => { const s = String(v == null ? '' : v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+const dollars = cents => ((cents || 0) / 100).toFixed(2);
+function downloadCsv(filename, header, lines) {
+  const body = [header].concat(lines).map(r => r.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + body], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+export function BookingsExport({ clients, onClose, onOpen, inline }) {
+  const today = venueDateKey();
+  const [when, setWhen] = React.useState('all'), [pay, setPay] = React.useState('all'), [q, setQ] = React.useState('');
+  const all = bookingRows(clients, today);
+  const rows = all.filter(r => (when === 'all' || (when === 'upcoming') === !r.c.isPast) && (pay === 'all' || (pay === 'paid' ? r.status === 'Paid in full' : pay === 'unpaid' ? r.status !== 'Paid in full' : r.status.indexOf('past due') !== -1)) && (!q || (r.c.name + ' ' + r.email + ' ' + r.who + ' ' + r.c.eventDate).toLowerCase().includes(q.toLowerCase())));
+  const sum = f => rows.reduce((t, r) => t + f(r), 0);
+  const money = c => amount(c, 'USD');
+  const day = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[2] + '/' + m[3] + '/' + m[1] : ''; };
+  const stamp = today;
+  function exportBookings() {
+    downloadCsv('NSH-event-bookings-' + stamp + '.csv',
+      ['Event', 'Event Date', 'Type', 'Upcoming/Past', 'Client Name', 'Client Email', 'Client Phone', 'Payment Status', 'Invoice Total', 'Refundable Deposit', 'Invoice Total Without Deposit', 'Amount Paid', 'Balance Due', 'Next Payment Due', 'Next Payment Amount'],
+      rows.map(r => [r.c.name, day(r.c.eventDate), r.c.type, r.when, r.who, r.email, r.phone, r.status, dollars(r.total), dollars(r.deposit), dollars(Math.max(0, r.total - r.deposit)), dollars(r.paid), dollars(r.balance), r.next ? day(r.next.due) : '', r.next ? dollars(r.next.cents) : '']));
+  }
+  function exportPayments() {
+    const lines = [];
+    rows.forEach(r => (r.c.schedule || []).forEach(s => lines.push([r.c.name, day(r.c.eventDate), r.c.type, r.who, r.email, s.label, day(s.due), dollars(s.cents), s.paid ? 'Paid' : 'Unpaid', s.deposit ? 'Yes' : 'No', s.manual ? 'Logged by hand' : ''])));
+    downloadCsv('NSH-event-payments-' + stamp + '.csv', ['Event', 'Event Date', 'Type', 'Client Name', 'Client Email', 'Payment', 'Due Date', 'Amount', 'Status', 'Refundable Deposit', 'Note'], lines);
+  }
+  function printList() {
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const w = window.open('', '_blank'); if (!w) { alert('Allow pop-ups to print this list.'); return; }
+    w.document.write('<!doctype html><title>Event bookings</title><style>body{font:12px system-ui,sans-serif;margin:24px;color:#222}h1{font:700 20px Georgia,serif;margin:0 0 4px}td,th{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left}th{font-size:10px;text-transform:uppercase;color:#777}.r{text-align:right}table{border-collapse:collapse;width:100%}</style><h1>North Star House event bookings</h1><div style="color:#777;margin-bottom:12px">As of ' + esc(day(today)) + ' · ' + rows.length + ' events · Invoiced ' + esc(money(sum(r => r.total))) + ' · Paid ' + esc(money(sum(r => r.paid))) + ' · Owed ' + esc(money(sum(r => r.balance))) + '</div><table><thead><tr><th>Date</th><th>Event</th><th>Type</th><th>Client</th><th>Status</th><th class="r">Invoice</th><th class="r">Paid</th><th class="r">Balance</th></tr></thead><tbody>' +
+      rows.map(r => '<tr><td>' + esc(day(r.c.eventDate)) + '</td><td>' + esc(r.c.name) + '</td><td>' + esc(r.c.type) + '</td><td>' + esc(r.who) + '</td><td>' + esc(r.status) + '</td><td class="r">' + esc(money(r.total)) + '</td><td class="r">' + esc(money(r.paid)) + '</td><td class="r">' + esc(money(r.balance)) + '</td></tr>').join('') + '</tbody></table>');
+    w.document.close(); setTimeout(() => w.print(), 300);
+  }
+  const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  const sel = { border: '1px solid #ded7cb', background: '#fff', borderRadius: 7, padding: '8px 10px', fontFamily: SANS, fontSize: 12 };
+  const btn = (primary) => ({ background: primary ? '#886c44' : '#fff', color: primary ? '#fff' : '#886c44', border: '1px solid #886c44', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, fontFamily: SANS, cursor: 'pointer' });
+  const th = { textAlign: 'left', fontSize: 10, color: '#877b68', textTransform: 'uppercase', letterSpacing: .5, padding: '6px 8px', borderBottom: '1px solid #e6dfd3', whiteSpace: 'nowrap' };
+  const td = { padding: '8px', borderBottom: '1px solid #f0ebe0', verticalAlign: 'top' };
+  const tone = s => s === 'Paid in full' ? { background: '#edf4ed', color: '#426b4a' } : s.indexOf('past due') !== -1 ? { background: '#f9eae7', color: '#a64f3c' } : s === 'No invoice on file' ? { background: '#eee', color: '#555' } : { background: '#faf0e6', color: '#9a5d22' };
+  const outer = inline ? { fontFamily: SANS } : { position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 };
+  const innerBox = inline ? { fontFamily: SANS, background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: 18 } : { fontFamily: SANS, background: '#fff', borderRadius: 14, maxWidth: 1100, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 };
+  return <div onClick={e => { if (!inline && e.target === e.currentTarget) onClose(); }} style={outer}>
+    <div role={inline ? undefined : 'dialog'} aria-label="Bookings and payments" style={innerBox}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', fontFamily: 'Cardo,serif' }}>Bookings &amp; payments</div>
+        {!inline && <a onClick={onClose} style={{ cursor: 'pointer', color: '#886c44', fontSize: 13, fontWeight: 600 }}>Close ×</a>}
+      </div>
+      <div style={{ fontSize: 13, color: '#888', marginBottom: 14 }}>Every booking with what was invoiced, what is paid and what is still owed. Download it for QuickBooks, or print it.</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <select value={when} onChange={e => setWhen(e.target.value)} style={sel}><option value="all">Upcoming and past</option><option value="upcoming">Upcoming only</option><option value="past">Past only</option></select>
+        <select value={pay} onChange={e => setPay(e.target.value)} style={sel}><option value="all">Paid and unpaid</option><option value="paid">Paid in full</option><option value="unpaid">Not fully paid</option><option value="late">Past due</option></select>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name, email, date…" style={{ ...sel, flex: 1, minWidth: 140, maxWidth: 260 }} />
+        <span style={{ flex: 1 }} />
+        <button type="button" style={btn(true)} onClick={exportBookings} disabled={!rows.length}>⬇ Download for QuickBooks</button>
+        <button type="button" style={btn(false)} onClick={exportPayments} disabled={!rows.length} title="One row per scheduled payment (deposit, installments, security deposit)">⬇ Payment lines</button>
+        <button type="button" style={btn(false)} onClick={printList} disabled={!rows.length}>🖨 Print list</button>
+      </div>
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 13, marginBottom: 10 }}>
+        <span><b>{rows.length}</b> events</span><span>Invoiced <b>{money(sum(r => r.total))}</b></span><span>Paid <b style={{ color: '#426b4a' }}>{money(sum(r => r.paid))}</b></span><span>Still owed <b style={{ color: '#9a5d22' }}>{money(sum(r => r.balance))}</b></span>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+          <thead><tr><th style={th}>Date</th><th style={th}>Event</th><th style={th}>Type</th><th style={th}>Client</th><th style={th}>Status</th><th style={{ ...th, textAlign: 'right' }}>Invoice</th><th style={{ ...th, textAlign: 'right' }}>Paid</th><th style={{ ...th, textAlign: 'right' }}>Balance</th></tr></thead>
+          <tbody>{rows.length === 0 ? <tr><td style={td} colSpan={8}>No bookings match.</td></tr> : rows.map(r => <tr key={r.c.id} onClick={() => onOpen(r.c)} style={{ cursor: 'pointer' }}>
+            <td style={{ ...td, whiteSpace: 'nowrap', fontWeight: 600, color: '#886c44' }}>{day(r.c.eventDate) || 'TBD'}</td>
+            <td style={{ ...td, fontWeight: 600 }}>{r.c.name}</td>
+            <td style={td}>{r.c.type}</td>
+            <td style={td}>{r.who}<div style={{ color: '#888', fontSize: 11 }}>{r.email}</div></td>
+            <td style={td}><span style={{ ...tone(r.status), padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{r.status}</span></td>
+            <td style={{ ...td, textAlign: 'right' }}>{money(r.total)}</td><td style={{ ...td, textAlign: 'right' }}>{money(r.paid)}</td><td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(r.balance)}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+      <div className="vc-muted" style={{ marginTop: 12 }}>"Invoice" includes the refundable security deposit; the download also lists the total without it. Click a row to open that booking.</div>
+    </div>
+  </div>;
+}
+
 function ClientStats({ clients, onClose }) {
   const sum = (arr, f) => arr.reduce((t, x) => t + (f(x) || 0), 0);
   const money = c => amount(c, 'USD');
@@ -958,7 +1060,7 @@ function CardPaperworkUpload({ client, onUpload }) {
   </div>;
 }
 
-export function VenueClientDashboard({ statsOpen, onCloseStats, listOpen, onCloseList, showSite: showSiteProp, setShowSite: setShowSiteProp, submissions, loadEvents, saveInsurance, savePayments, agreementApi, filter, setFilter, query, setQuery, messages, currentMessages, onHandleMessage, onOpenMessages }) {
+export function VenueClientDashboard({ statsOpen, onCloseStats, listOpen, onCloseList, bookingsOpen, onCloseBookings, showSite: showSiteProp, setShowSite: setShowSiteProp, submissions, loadEvents, saveInsurance, savePayments, agreementApi, filter, setFilter, query, setQuery, messages, currentMessages, onHandleMessage, onOpenMessages }) {
   const [events,setEvents] = React.useState([]), [error,setError] = React.useState('');
   const [localSite,setLocalSite] = React.useState(false);
   const showSite = showSiteProp !== undefined ? showSiteProp : localSite;
@@ -1060,6 +1162,7 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, listOpen, onClos
     </aside></div>
     </>}
     {statsOpen&&<ClientStats clients={upcomingClients} onClose={onCloseStats}/>}
+    {bookingsOpen&&<BookingsExport clients={allClients} onClose={onCloseBookings} onOpen={c=>{onCloseBookings();setSelected(c.id);}}/>}
     {listOpen&&<UpcomingEventsList clients={upcomingClients} onClose={onCloseList} onOpen={c=>{onCloseList();setSelected(c.id);}}/>}
     {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onSavePortalEmail={recordPortalEmail} onUploadPaperwork={uploadPaperwork} onAssignSite={assignSite} onSavePayments={recordPayments} onRename={renameClient} onRetype={retypeClient} onDelete={deleteSubmission} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
