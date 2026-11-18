@@ -16378,9 +16378,24 @@ function PersonActivityView() {
     var tourWhen = function(t) { return t.date ? t.date + 'T' + (t.start_time || '12:00') : t.created_at; };
     Promise.all([
       get('portal_activity?select=*&actor_name=eq.' + encodeURIComponent(person) + '&order=created_at.desc&limit=2000').then(function(rows) {
-        rows.forEach(function(r) {
-          var d = paDescribe(r);
-          if (d) add(d.kind || 'portal', r.created_at, d.text, d.note || '', d.pill || '', r.table_name === 'estate_tours' && r.row_id ? { tourId: r.row_id } : null);
+        // "Added tour" lines just show the tour's date and time (no details drop-down), so look those tours up
+        var addedIds = rows.filter(function(r) { return r.table_name === 'estate_tours' && r.op === 'insert' && r.row_id; }).map(function(r) { return r.row_id; });
+        var lookup = addedIds.length ? get('estate_tours?select=id,date,start_time,visitor_name&id=in.(' + addedIds.slice(0, 300).join(',') + ')') : Promise.resolve([]);
+        return lookup.then(function(found) {
+          var byId = {}; found.forEach(function(t) { byId[t.id] = t; });
+          rows.forEach(function(r) {
+            var d = paDescribe(r);
+            if (!d) return;
+            if (r.table_name === 'estate_tours' && r.op === 'insert') {
+              var t = byId[r.row_id];
+              var when = t && t.date ? new Date(t.date + 'T' + (t.start_time || '12:00')).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' + (t.start_time ? new Date('2000-01-01T' + t.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '') : '';
+              // an empty schedule slot is not worth a line: only tours added with a person show
+              if (!t || !t.visitor_name) return;
+              add('tours', r.created_at, 'Added tour: ' + t.visitor_name + (when ? ' (' + when + ')' : ''), '', '');
+              return;
+            }
+            add(d.kind || 'portal', r.created_at, d.text, d.note || '', d.pill || '', r.table_name === 'estate_tours' && r.row_id ? { tourId: r.row_id } : null);
+          });
         });
       }),
       get('venue_messages?select=id,event_uid,subject,from_name,body,handled_at,handled_note,handled_note_by,handled_note_at&handled_by=ilike.' + like + '&order=handled_at.desc&limit=1000').then(function(rows) {
