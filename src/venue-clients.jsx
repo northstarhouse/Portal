@@ -881,7 +881,8 @@ function bookingRows(clients, today) {
     const balance = c.balance != null ? c.balance : Math.max(0, total - paid);
     const next = (c.duePayments || [])[0];
     const contact = (c.contacts || [])[0] || {};
-    return { c, total, deposit, paid, balance, status: bookingStatus(c, today), closed: closeOut(c, bookingStatus(c, today)), next, phone: contact.phone_number || '', who: contact.full_name || '', email: c.email || contact.email || '', when: c.isPast ? 'Past' : 'Upcoming' };
+    const people = []; (c.contacts || []).forEach(p => { if (p.full_name && !people.some(x => x.name.toLowerCase() === String(p.full_name).trim().toLowerCase())) people.push({ name: String(p.full_name).trim(), email: p.email || '' }); });
+    return { c, total, deposit, paid, balance, status: bookingStatus(c, today), closed: closeOut(c, bookingStatus(c, today)), next, phone: contact.phone_number || '', who: people.length ? people.map(p => p.name).join(' & ') : (contact.full_name || ''), people, email: c.email || contact.email || '', when: c.isPast ? 'Past' : 'Upcoming' };
   });
 }
 const csvCell = v => { const s = String(v == null ? '' : v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
@@ -916,7 +917,7 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
     const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const w = window.open('', '_blank'); if (!w) { alert('Allow pop-ups to print this list.'); return; }
     w.document.write('<!doctype html><title>Event bookings</title><style>body{font:12px system-ui,sans-serif;margin:24px;color:#222}h1{font:700 20px Georgia,serif;margin:0 0 4px}td,th{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left}th{font-size:10px;text-transform:uppercase;color:#777}.r{text-align:right}table{border-collapse:collapse;width:100%}</style><h1>North Star House event bookings</h1><div style="color:#777;margin-bottom:12px">As of ' + esc(day(today)) + ' · ' + rows.length + ' events · Invoiced ' + esc(money(sum(r => r.total))) + ' · Paid ' + esc(money(sum(r => r.paid))) + ' · Owed ' + esc(money(sum(r => r.balance))) + '</div><table><thead><tr><th>Event date</th><th>Event</th><th>Type</th><th>Client</th><th>Status</th><th>Closed out</th><th class="r">Invoice</th><th class="r">Paid</th><th class="r">Balance</th><th style="border-left:2px solid #999">Next payment</th></tr></thead><tbody>' +
-      rows.map(r => '<tr><td>' + esc(day(r.c.eventDate)) + '</td><td>' + esc(r.c.name) + '</td><td>' + esc(r.c.type) + '</td><td>' + esc(r.who) + '</td><td>' + esc(r.status) + '</td><td>' + esc(r.closed) + '</td><td class="r">' + esc(money(r.total)) + '</td><td class="r">' + esc(money(r.paid)) + '</td><td class="r">' + esc(money(r.balance)) + '</td><td style="border-left:2px solid #999">' + (r.next ? esc((r.next.due ? day(r.next.due) : 'No date') + ' · ' + money(r.next.cents)) : '') + '</td></tr>').join('') + '</tbody></table>');
+      rows.map(r => '<tr><td>' + esc(day(r.c.eventDate)) + '</td><td>' + esc(r.c.name) + '</td><td>' + esc(r.c.type) + '</td><td>' + (r.people.length ? r.people.map(p => esc(p.name)).join('<br>') : esc(r.who)) + '</td><td>' + esc(r.status) + '</td><td>' + esc(r.closed) + '</td><td class="r">' + esc(money(r.total)) + '</td><td class="r">' + esc(money(r.paid)) + '</td><td class="r">' + esc(money(r.balance)) + '</td><td style="border-left:2px solid #999">' + (r.next ? esc((r.next.due ? day(r.next.due) : 'No date') + ' · ' + money(r.next.cents)) : '') + '</td></tr>').join('') + '</tbody></table>');
     w.document.close(); setTimeout(() => w.print(), 300);
   }
   const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
@@ -954,7 +955,7 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
             <td style={{ ...td, whiteSpace: 'nowrap', fontWeight: 600, color: '#886c44' }}>{day(r.c.eventDate) || 'TBD'}</td>
             <td style={{ ...td, fontWeight: 600 }}>{r.c.name}</td>
             <td style={td}>{r.c.type}</td>
-            <td style={td}>{r.who}<div style={{ color: '#888', fontSize: 11 }}>{r.email}</div></td>
+            <td style={td}>{r.people.length ? r.people.map((p, i) => <div key={i}>{p.name}{p.email && <div style={{ color: '#888', fontSize: 11 }}>{p.email}</div>}</div>) : <div>{r.who}<div style={{ color: '#888', fontSize: 11 }}>{r.email}</div></div>}</td>
             <td style={td}><span style={{ ...tone(r.status), padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{r.status}</span></td>
             <td style={td}><span style={{ ...(r.closed === 'Closed out' ? { background: '#edf4ed', color: '#426b4a' } : r.closed === 'Not yet held' ? { background: '#eee', color: '#555' } : { background: '#faf0e6', color: '#9a5d22' }), padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600 }}>{r.closed === 'Closed out' ? '✓ Closed out' : r.closed}</span></td>
             <td style={{ ...td, textAlign: 'right' }}>{money(r.total)}</td><td style={{ ...td, textAlign: 'right' }}>{money(r.paid)}</td><td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(r.balance)}</td>
