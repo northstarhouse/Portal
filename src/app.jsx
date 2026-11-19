@@ -23142,6 +23142,28 @@ function FeatureRequestModal({ onClose }) {
     fetch(SUPABASE_URL + '/rest/v1/feature_requests?id=eq.' + r.id, { method: 'PATCH', headers: Object.assign({}, H, { Prefer: 'return=minimal' }), body: JSON.stringify({ status: status }) })
       .then(function(x) { if (x.ok) load(); });
   }
+  // A request can be edited (add more information) until it is marked done.
+  var [edit, setEdit] = useState(null); // { id, title, details, priority }
+  var [editBusy, setEditBusy] = useState(false);
+  var [editErr, setEditErr] = useState('');
+  function saveEdit(r) {
+    if (!edit || editBusy) return;
+    if (!edit.title.trim()) { setEditErr('The request needs a short title.'); return; }
+    setEditBusy(true); setEditErr('');
+    var body = { title: edit.title.trim(), details: edit.details.trim() || null, priority: edit.priority };
+    fetch(SUPABASE_URL + '/rest/v1/feature_requests?id=eq.' + r.id + '&status=neq.done', { method: 'PATCH', headers: Object.assign({}, H, { Prefer: 'return=representation' }), body: JSON.stringify(body) })
+      .then(function(x) { return x.ok ? x.json() : Promise.reject(new Error('Could not save. Please try again.')); })
+      .then(function(rows) {
+        if (!rows || !rows.length) throw new Error('This request was just marked done, so it can no longer be edited.');
+        whoIsSignedIn().then(function(name) {
+          var txt = ['A Portal ' + (r.kind === 'bug' ? 'bug report' : 'feature request') + ' was updated' + (name ? ' by ' + name : ''), '', body.title, '', body.details || '(no more detail)', '', 'Where: ' + (r.area || ''), 'From: ' + (r.requested_by || 'someone on the team')].join(String.fromCharCode(10));
+          fetch(SUPABASE_URL + '/functions/v1/send-email', { method: 'POST', headers: H, body: JSON.stringify({ to: ['media@thenorthstarhouse.org'], subject: 'Updated ' + (r.kind === 'bug' ? 'bug report' : 'feature request') + ': ' + body.title, body: txt }) }).catch(function() {});
+        });
+        setEdit(null); load();
+      })
+      .catch(function(err) { setEditErr(err.message || 'Could not save.'); load(); })
+      .finally(function() { setEditBusy(false); });
+  }
   var field = { padding: '8px 10px', border: '0.5px solid #e0d8cc', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', background: '#fff', width: '100%', boxSizing: 'border-box' };
   var label = { fontSize: 12, color: '#888', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 };
   return (
@@ -23197,11 +23219,33 @@ function FeatureRequestModal({ onClose }) {
           {list && list.length === 0 && <div style={{ color: '#999', fontSize: 13 }}>Nothing yet.</div>}
           {(list || []).map(function(r) {
             var done = r.status === 'done';
+            if (edit && edit.id === r.id) {
+              return (
+                <div key={r.id} style={{ padding: '10px 0', borderTop: '0.5px solid #f3eee6' }}>
+                  <input value={edit.title} onChange={function(e) { var v = e.target.value; setEdit(function(o) { return Object.assign({}, o, { title: v }); }); }} style={Object.assign({}, field, { fontWeight: 600, marginBottom: 6 })} aria-label="Request title" />
+                  <textarea autoFocus value={edit.details} onChange={function(e) { var v = e.target.value; setEdit(function(o) { return Object.assign({}, o, { details: v }); }); }} rows={5} placeholder="Add more information…" style={Object.assign({}, field, { resize: 'vertical', marginBottom: 6 })} aria-label="More detail" />
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select value={edit.priority || 'normal'} onChange={function(e) { var v = e.target.value; setEdit(function(o) { return Object.assign({}, o, { priority: v }); }); }} style={Object.assign({}, field, { width: 'auto' })} aria-label="How important">
+                      <option value="low">Nice to have</option>
+                      <option value="normal">Would help</option>
+                      <option value="high">Needed soon</option>
+                    </select>
+                    <span style={{ flex: 1 }} />
+                    <button type="button" onClick={function() { setEdit(null); setEditErr(''); }} disabled={editBusy} style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+                    <button type="button" onClick={function() { saveEdit(r); }} disabled={editBusy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: editBusy ? 0.7 : 1 }}>{editBusy ? 'Saving…' : 'Save changes'}</button>
+                  </div>
+                  {editErr && <div style={{ fontSize: 12, color: '#b3402a', marginTop: 6 }}>{editErr}</div>}
+                </div>
+              );
+            }
             return (
               <div key={r.id} style={{ padding: '8px 0', borderTop: '0.5px solid #f3eee6' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, color: '#2a2a2a' }}>
                   <span style={{ fontWeight: 600, textDecoration: done ? 'line-through' : 'none', opacity: done ? 0.55 : 1 }}>{r.kind === 'bug' && <span style={{ fontSize: 10, fontWeight: 700, color: '#b3402a', border: '1px solid #e3b4a9', borderRadius: 4, padding: '1px 5px', marginRight: 6 }}>BUG</span>}{r.title}</span>
-                  <a onClick={function() { setStatus(r, done ? 'open' : 'done'); }} style={{ cursor: 'pointer', color: gold, fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{done ? 'Reopen' : 'Mark done'}</a>
+                  <span style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
+                    {!done && <a onClick={function() { setEditErr(''); setEdit({ id: r.id, title: r.title || '', details: r.details || '', priority: r.priority || 'normal' }); }} style={{ cursor: 'pointer', color: gold, fontSize: 11, fontWeight: 600 }}>Edit</a>}
+                    <a onClick={function() { setStatus(r, done ? 'open' : 'done'); }} style={{ cursor: 'pointer', color: gold, fontSize: 11, fontWeight: 600 }}>{done ? 'Reopen' : 'Mark done'}</a>
+                  </span>
                 </div>
                 {r.details && <div style={{ fontSize: 12, color: '#666', marginTop: 2, whiteSpace: 'pre-wrap' }}>{r.details}</div>}
                 {Array.isArray(r.attachments) && r.attachments.length > 0 && <div style={{ fontSize: 12, marginTop: 3 }}>{r.attachments.map(function(a, i) { return <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" style={{ color: gold, marginRight: 10 }}>📎 {a.name}</a>; })}</div>}

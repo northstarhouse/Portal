@@ -1000,7 +1000,113 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
   </div>;
 }
 
-function ClientStats({ clients, onClose }) {
+// Bookings vs availability, month by month (Derek's request). "Expected" days = the weekdays we
+// believe we should be able to book every time (default Sat + Sun, adjustable, remembered per
+// browser); "all days" = every day of the month. Booked = distinct days with a booked event
+// (a multi-day event counts each of its days). "Last year by this date" = how many of that month's
+// days last year were already booked on this same calendar date, i.e. are we ahead of pace.
+const AV_DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const AV_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function AvailabilityStats({ clients }) {
+  const today = venueDateKey();
+  const thisYear = Number(today.slice(0, 4));
+  const [expDays, setExpDays] = React.useState(() => { try { const v = JSON.parse(localStorage.getItem('nsh-avail-expected-days') || 'null'); if (Array.isArray(v) && v.length) return v; } catch (e) {} return [0, 6]; });
+  const [onlyWeddings, setOnlyWeddings] = React.useState(false);
+  const [year, setYear] = React.useState(thisYear);
+  const toggleDay = d => setExpDays(cur => { const next = cur.includes(d) ? cur.filter(x => x !== d) : cur.concat([d]).sort(); if (!next.length) return cur; try { localStorage.setItem('nsh-avail-expected-days', JSON.stringify(next)); } catch (e) {} return next; });
+  // Every booked day -> the earliest date it was booked (when the pre-booking came in), or null if unknown.
+  const booked = {};
+  clients.forEach(c => {
+    if (!c.eventDate || c.eventDate < '2000') return;
+    if (onlyWeddings && c.type !== 'Wedding') return;
+    const madeOn = String(c.sub?.created_at || '').slice(0, 10) || null;
+    let d = c.eventDate, guard = 0;
+    const end = c.eventEnd && c.eventEnd >= c.eventDate ? c.eventEnd : c.eventDate;
+    while (d <= end && guard++ < 14) { if (!(d in booked) || (madeOn && (!booked[d] || madeOn < booked[d]))) booked[d] = madeOn; d = shiftDate(d, 1); }
+  });
+  const years = Object.keys(booked).map(d => Number(d.slice(0, 4)));
+  const minYear = Math.min(thisYear - 1, ...years), maxYear = Math.max(thisYear + 1, ...years);
+  const pad = n => String(n).padStart(2, '0');
+  const sameDayLastYear = shiftDate(today, -365);
+  const monthRow = (y, m) => {
+    const days = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    let expected = 0, bookedDays = 0, bookedByNow = 0;
+    for (let i = 1; i <= days; i++) {
+      const key = y + '-' + pad(m + 1) + '-' + pad(i);
+      if (expDays.includes(new Date(key + 'T12:00:00Z').getUTCDay())) expected++;
+      if (key in booked) { bookedDays++; if (booked[key] && booked[key] <= sameDayLastYear) bookedByNow++; }
+    }
+    return { days, expected, bookedDays, bookedByNow };
+  };
+  const rows = AV_MONTHS.map((name, m) => ({ name, m, cur: monthRow(year, m), prev: monthRow(year - 1, m) }));
+  const tot = k => rows.reduce((t, r) => t + r.cur[k], 0);
+  const totPrev = k => rows.reduce((t, r) => t + r.prev[k], 0);
+  const pct = (a, b) => b ? Math.round((a / b) * 100) + '%' : '—';
+  const showPace = year === thisYear || year === thisYear + 1;
+  const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  const th = { textAlign: 'right', fontSize: 11, color: '#888', fontWeight: 600, padding: '4px 0 4px 8px', verticalAlign: 'bottom' };
+  const td = { textAlign: 'right', padding: '7px 0 7px 8px', borderTop: '1px solid #f0ebe0', whiteSpace: 'nowrap' };
+  const tdTot = { ...td, borderTop: '2px solid #e6d9bd', fontWeight: 700 };
+  const bar = (a, b) => { const p = b ? Math.min(100, (a / b) * 100) : 0; return <div style={{ height: 5, background: '#f0ebe0', borderRadius: 3, marginTop: 3 }}><div style={{ width: p + '%', height: 5, borderRadius: 3, background: b && a >= b ? '#2e7d32' : '#b58a3c' }} /></div>; };
+  const chip = on => ({ border: '1px solid ' + (on ? '#886c44' : '#e0d8cc'), background: on ? '#886c44' : '#fff', color: on ? '#fff' : '#886c44', borderRadius: 999, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: SANS });
+  return <div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '6px 0 10px' }}>
+      <button type="button" aria-label="Previous year" onClick={() => setYear(y => Math.max(minYear, y - 1))} disabled={year <= minYear} style={chip(false)}>‹</button>
+      <span style={{ fontWeight: 700, fontSize: 15, color: '#4a3b24', minWidth: 44, textAlign: 'center' }}>{year}</span>
+      <button type="button" aria-label="Next year" onClick={() => setYear(y => Math.min(maxYear, y + 1))} disabled={year >= maxYear} style={chip(false)}>›</button>
+      <span style={{ width: 10 }} />
+      <button type="button" onClick={() => setOnlyWeddings(false)} style={chip(!onlyWeddings)}>Weddings &amp; events</button>
+      <button type="button" onClick={() => setOnlyWeddings(true)} style={chip(onlyWeddings)}>Weddings only</button>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 10, fontSize: 12, color: '#888' }}>
+      Expected days:
+      {[5, 6, 0, 1, 2, 3, 4].map(d => <button key={d} type="button" onClick={() => toggleDay(d)} style={chip(expDays.includes(d))}>{AV_DOW[d]}</button>)}
+    </div>
+    <div style={{ overflowX: 'auto' }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+      <thead><tr>
+        <th style={{ ...th, textAlign: 'left', paddingLeft: 0 }}>Month</th>
+        <th style={th}>Booked<br />days</th>
+        <th style={th}>Expected<br />days</th>
+        <th style={{ ...th, minWidth: 70 }}>Booked vs<br />expected</th>
+        <th style={th}>All<br />days</th>
+        <th style={th}>Booked vs<br />all days</th>
+        <th style={th}>{year - 1}<br />booked</th>
+        {showPace && <th style={th} title={'Days of ' + (year - 1) + ' already booked on ' + longDay(sameDayLastYear)}>{year - 1} by<br />this date</th>}
+      </tr></thead>
+      <tbody>
+        {rows.map(r => <tr key={r.m}>
+          <td style={{ ...td, textAlign: 'left', paddingLeft: 0, fontWeight: 600 }}>{r.name}</td>
+          <td style={{ ...td, fontWeight: 700, color: '#4a3b24' }}>{r.cur.bookedDays}</td>
+          <td style={td}>{r.cur.expected}</td>
+          <td style={td}>{pct(r.cur.bookedDays, r.cur.expected)}{bar(r.cur.bookedDays, r.cur.expected)}</td>
+          <td style={td}>{r.cur.days}</td>
+          <td style={td}>{pct(r.cur.bookedDays, r.cur.days)}</td>
+          <td style={{ ...td, color: '#888' }}>{r.prev.bookedDays}</td>
+          {showPace && <td style={{ ...td, color: '#888' }}>{r.prev.bookedByNow}</td>}
+        </tr>)}
+        <tr>
+          <td style={{ ...tdTot, textAlign: 'left', paddingLeft: 0 }}>Year</td>
+          <td style={{ ...tdTot, color: '#4a3b24' }}>{tot('bookedDays')}</td>
+          <td style={{ ...tdTot, fontWeight: 400 }}>{tot('expected')}</td>
+          <td style={tdTot}>{pct(tot('bookedDays'), tot('expected'))}</td>
+          <td style={{ ...tdTot, fontWeight: 400 }}>{tot('days')}</td>
+          <td style={tdTot}>{pct(tot('bookedDays'), tot('days'))}</td>
+          <td style={{ ...tdTot, color: '#888' }}>{totPrev('bookedDays')}</td>
+          {showPace && <td style={{ ...tdTot, color: '#888' }}>{totPrev('bookedByNow')}</td>}
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <div className="vc-muted" style={{ marginTop: 8, fontSize: 12 }}>
+      Counts days, not bookings: two events on one day count once, and a multi-day event counts each day. Over 100% means more days were booked than expected.
+      {showPace && <> “{year - 1} by this date” is how many of {year - 1}'s days were already booked on {longDay(sameDayLastYear)}, so you can see whether {year} is ahead of last year's pace.</>}
+      {' '}Only bookings in the portal are counted; earlier years kept on paper can be added.
+    </div>
+  </div>;
+}
+
+function ClientStats({ clients, allClients, onClose }) {
   const sum = (arr, f) => arr.reduce((t, x) => t + (f(x) || 0), 0);
   const money = c => amount(c, 'USD');
   const [extra, setExtra] = React.useState(null);
@@ -1044,7 +1150,7 @@ function ClientStats({ clients, onClose }) {
   const th = { textAlign: 'right', fontSize: 11, color: '#888', fontWeight: 600, padding: '4px 0' };
   const td = { textAlign: 'right', padding: '8px 0', borderTop: '1px solid #f0ebe0' };
   return <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-    <div role="dialog" aria-label="Current stats" style={{ fontFamily: SANS, background: '#fff', borderRadius: 14, maxWidth: 620, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
+    <div role="dialog" aria-label="Current stats" style={{ fontFamily: SANS, background: '#fff', borderRadius: 14, maxWidth: 720, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: 'Cardo,serif' }}>Current stats</div>
         <a onClick={onClose} style={{ cursor: 'pointer', color: '#886c44', fontSize: 13, fontWeight: 600 }}>Close ×</a>
@@ -1056,7 +1162,9 @@ function ClientStats({ clients, onClose }) {
         <div style={box}><div style={lab}>Earnings without deposits</div><div style={big}>{money(all.noDeposit)}</div><div className="vc-muted">{money(all.deposit)} in refundable deposits removed</div></div>
         <div style={box}><div style={lab}>Collected so far</div><div style={big}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
       </div>
-      <div style={{ ...lab, marginTop: 18 }}>By type of event</div>
+      <div style={{ ...lab, marginTop: 18 }}>Bookings vs availability</div>
+      <AvailabilityStats clients={allClients || clients} />
+      <div style={{ ...lab, marginTop: 22 }}>By type of event</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>Bookings</th><th style={th}>Without deposits</th><th style={th}>With deposits</th></tr></thead>
         <tbody>{types.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={td}>{t.n}</td><td style={td}>{money(t.noDeposit)}</td><td style={td}>{money(t.total)}</td></tr>)}</tbody>
@@ -1206,7 +1314,7 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, listOpen, onClos
       <section className="vc-side-card priority"><h2 className="vc-side-title">Needs your attention <span className="vc-counter">{submissions===null?'—':urgent.length}</span></h2>{submissions===null?<p className="vc-muted">Loading priorities…</p>:urgent.length===0?<p className="vc-muted">No urgent items recorded.</p>:(allTasks?urgent:urgent.slice(0,6)).map(t=><button className="vc-task" key={t.key} onClick={()=>t.action?t.action():open(t.client)}><div className="vc-task-head">{t.title}</div><div className="vc-task-name">{t.client.name}</div><div className={'vc-task-date '+(t.overdue?'late':'')}>{t.due?(t.overdue?'Past due · ':'Due ')+dateLabel(t.due):t.detail}</div></button>)}{urgent.length>6&&<button className="vc-text-button" onClick={()=>setAllTasks(!allTasks)}>{allTasks?'Show fewer priorities':'See all '+urgent.length+' priorities ↓'}</button>}</section>
     </aside></div>
     </>}
-    {statsOpen&&<ClientStats clients={upcomingClients} onClose={onCloseStats}/>}
+    {statsOpen&&<ClientStats clients={upcomingClients} allClients={allClients} onClose={onCloseStats}/>}
     {bookingsOpen&&<BookingsExport clients={allClients} onClose={onCloseBookings} onOpen={c=>{onCloseBookings();setSelected(c.id);}}/>}
     {listOpen&&<UpcomingEventsList clients={upcomingClients} onClose={onCloseList} onOpen={c=>{onCloseList();setSelected(c.id);}}/>}
     {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onSavePortalEmail={recordPortalEmail} onUploadPaperwork={uploadPaperwork} onAssignSite={assignSite} onSavePayments={recordPayments} onRename={renameClient} onRetype={retypeClient} onDelete={deleteSubmission} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
