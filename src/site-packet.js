@@ -124,6 +124,17 @@ export function buildSitePacketHtml(client) {
     walk(client.payments?.line_items);
     return found;
   })();
+  // Extra hours the couple bought on their client page ("Extra rental hours: 2 hours (on site 11:00 AM to 11:00 PM)")
+  // and their booked time on site, so the site manager knows which hours are already covered and paid for.
+  const extra = (client.schedule || []).filter((p) => /^Extra rental hours/i.test(p.label || ''))
+    .map((p) => ({ hours: +((String(p.label).match(/(\d+) hours?/) || [])[1] || 0), paid: !!p.paid, cents: p.cents || 0 }));
+  const extraHours = extra.reduce((n, x) => n + x.hours, 0);
+  const extraPaid = extra.length > 0 && extra.every((x) => x.paid);
+  const tos = client.timeOnSite;
+  const extraText = extraHours ? extraHours + ' extra hour' + (extraHours === 1 ? '' : 's') + ', ' + (extraPaid ? 'ALREADY PAID' : 'on their invoice, not paid yet') : '';
+  const details = [tos && tos.hours ? tos.hours + ' hours' : '', extraText ? 'includes ' + extraText : ''].filter(Boolean);
+  const booked = tos && tos.start && tos.end ? tos.start + ' to ' + tos.end + (details.length ? ' (' + details.join(', ') + ')' : '')
+    : extraText ? extraText.replace(', ', ' added (') + ')' : '';
   const notes = [
     ['Ceremony', a('ceremony')], ['Dining', a('dining')], ['Other areas', a('areas')], ['Caterer', a('caterer')], ['DJ', a('dj')], ['Photographer', a('photographer')],
     ['Rentals', a('rentals')], ['Other vendors', a('otherVendors')],
@@ -144,6 +155,7 @@ export function buildSitePacketHtml(client) {
     <td><span class="lab">Rectangle Tables:</span> 6'- ${esc(a('rect6'))} &nbsp; 8'- ${esc(a('rect8'))}</td>
     <td><span class="lab">Chairs:</span> ${esc(a('chairs'))}</td>
   </tr></table>
+  ${booked ? `<div class="row"><span class="lab">Booked Time on Site:</span><span class="val">${esc(booked)}</span></div>` : ''}
   <h2>Schedule of Event Activities:</h2>
   <table class="sched"><tr>${schedule.map((s) => `<th>${esc(s[0])}</th>`).join('')}</tr><tr>${schedule.map((s) => `<td>${esc(s[1])}</td>`).join('')}</tr></table>
   ${itinerary ? `<div class="notes"><b>${isWedding ? "Couple's" : "Client's"} itinerary:</b><div class="itin">${esc(itinerary)}</div></div>` : ''}
@@ -159,6 +171,7 @@ export function buildSitePacketHtml(client) {
   <div class="attn">Areas of Immediate Attention/Need:</div>
   <div class="hint">(i.e extra hours added, maintenance needs, event mishaps)</div>
   <div class="gap"></div>
+  ${booked ? `<div class="hint" style="margin-bottom:4px"><b>Booked:</b> ${esc(booked)}. Only hours beyond this are extra.</div>` : ''}
   <div class="inline3"><span>Time In -</span><span>Time Out -</span><span>Total Hours =</span></div>
   <div class="inline3 guestout"><span>Guests' Actual Out Time -</span><small>(when the last guest left; used for billing if different from Time Out)</small></div>
   <div class="inline2"><span>Site Manager - <b>${esc(client.siteManager || '')}</b></span><span>Signature -</span></div>

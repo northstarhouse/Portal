@@ -5,6 +5,7 @@ import { EmailHistory } from './email-history.jsx';
 import { InquiryFlagNotes } from './flag-notes.jsx';
 import { BrickReminderButton } from './brick-reminder.jsx';
 import { LatePaymentReminderButton } from './late-payment-reminder.jsx';
+import { OrderEditor, orderLines } from './venue-order.jsx';
 import { openSitePacket, openSamplePacket } from './site-packet.js';
 // Client dashboard: reads the imported source snapshot without changing signed
 // agreements, invoice schedules, or sending any client communications.
@@ -167,7 +168,7 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   const smPaperwork = Array.isArray(a.__venue_checklist?.site_manager_paperwork) ? a.__venue_checklist.site_manager_paperwork : [];
   const portalEmail = a.__venue_checklist?.portal_email || null;
   const feedbackSentAt = live?.feedback_sent_at || null;
-  return { id:sub.id, sub, clientsSigned, questionnaireSentAt: live?.questionnaire_sent_at || null, isPast, needsPaperwork, maxGuests:String(a.max_guests||'').trim()||null, name, email, contacts, siteManager, questionnaire, hbQa, feedbackSentAt, eventDay, smPaperwork, portalEmail, hb, eventDate, eventEnd, nativeAgreement, legacy, type: a.__event_type ? String(a.__event_type) : sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : evType(live?.event_type), days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount != null ? payments.total.amount + extraTotal : null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount + extraTotal - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
+  return { id:sub.id, sub, clientsSigned, questionnaireSentAt: live?.questionnaire_sent_at || null, isPast, needsPaperwork, maxGuests:String(a.max_guests||'').trim()||null, name, email, contacts, siteManager, questionnaire, hbQa, feedbackSentAt, eventDay, smPaperwork, portalEmail, timeOnSite: a.__venue_checklist?.time_on_site || null, order: a.__venue_checklist?.order || null, hb, eventDate, eventEnd, nativeAgreement, legacy, type: a.__event_type ? String(a.__event_type) : sub.form_id === 'a3a383f7-e1db-4344-9dec-ea879ad3406d' || /wedding/i.test(p.name || live?.event_type || sub.form_name || '') ? 'Wedding' : evType(live?.event_type), days:eventDate ? dayCount(today, eventDate) : null, payments, schedule, duePayments, signatures, unsigned, surveyComplete, surveySent, insuranceVerified, insuranceCheck, insuranceUploadedAt:live?.insurance_uploaded_at || null,insuranceDriveUrl:live?.insurance_drive_url || null, brickLines:Array.isArray(live?.brick_lines) ? live.brick_lines : null, brickSubmittedAt:live?.brick_submitted_at || null, requirementsDue, tasks, urgent:tasks.filter(t => t.urgent), currency, total:payments?.total?.amount != null ? payments.total.amount + extraTotal : null, paid:payments ? (payments.amount_paid?.amount ?? 0) + manualTotal : (manualTotal || null), balance:payments?.balance_due?.amount != null ? Math.max(0, payments.balance_due.amount + extraTotal - manualTotal) : null, manualPayments, sourceUrl:hb?.workspace?.id && p.id ? 'https://app.honeybook.com/app/event/' + encodeURIComponent(p.id) + '/workspace/' + encodeURIComponent(hb.workspace.id) + '/activity' : null };
 }
 
 const css = `
@@ -624,7 +625,7 @@ function OutTimeSelect({ value, onChange, style, label }) {
   </span>;
 }
 
-function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignSite, onSaveEventDay, onSavePortalEmail, onUploadPaperwork, onVerify, onSavePayments, agreementApi, onContractsChange, messages, onHandleMessage }) {
+function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignSite, onSaveEventDay, onSavePortalEmail, onUploadPaperwork, onVerify, onSavePayments, onOrderSaved, agreementApi, onContractsChange, messages, onHandleMessage }) {
   const ref = React.useRef(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [typeEdit, setTypeEdit] = React.useState(false);
@@ -734,6 +735,7 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
   step('Clients signed', clientsSigned, client.legacy ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed before the new system') : clientsSigned ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed') : clientSigs.length ? clientSigs.filter(x => x.signed).length + ' of ' + clientSigs.length + ' signed' : 'Waiting on the agreement', null, false, clientSigs.length ? <div><style>{contractPreviewStyle}</style>{clientSigs.map((x, i) => { const r = (client.nativeAgreement?.recipients || []).find(y => y.role !== 'venue' && y.name === x.signee_name) || {}; return <div key={i} style={{marginBottom:10}}><SigBlock s={{ name: x.signee_name, email: r.email, role: 'client', status: x.signed ? 'signed' : 'pending', signed_at: x.signed_at, signed_name: r.signed_name }}/></div>; })}{!clientsSigned && client.nativeAgreement?.expires_at && <p className="vc-muted" style={{margin:0}}>Sign by {new Date(client.nativeAgreement.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. Reminders are sent from the Agreement step.</p>}</div> : null);
   const venueSigned = client.legacy || (venueSigs.length > 0 && venueSigs.every(x => x.signed));
   step('Venue countersigned', venueSigned, client.legacy ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed before the new system') : venueSigned ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed') : 'Waiting on the clients', null, false, contractBody);
+  step('Order / estimate' + (client.order?.status === 'final' ? ' (final invoice)' : ''), !!client.order, client.order ? (client.order.status === 'final' ? 'Final invoice' : 'Estimate saved') + (client.order.updated_at ? ' ' + dateLabel(String(client.order.updated_at).slice(0, 10)) : '') + (client.order.updated_by ? ' by ' + client.order.updated_by : '') : 'Suggested from the booking, not saved yet', null, false, <OrderEditor key={client.order?.updated_at || 'new'} client={client} onSaved={onOrderSaved}/>);
   (client.schedule || []).forEach((p, i) => {
     // The first payment is due the moment both clients have signed, not on a calendar date.
     if (i === 0 && !client.legacy) {
@@ -753,7 +755,7 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
   step('Site Manager Packet', client.surveyComplete, client.surveyComplete ? (client.siteManager ? 'Ready to print · ' + client.siteManager : 'Ready to print, no site manager assigned yet') : 'Waiting on the questionnaire', null, false, <div style={{display:'flex',gap:16,alignItems:'flex-end',flexWrap:'wrap'}}>{onAssignSite && <SiteManagerPicker client={client} onAssign={onAssignSite} bare/>}<button type="button" onClick={() => openSitePacket(client)} style={{background:'#886c44',color:'#fff',border:0,borderRadius:8,padding:'9px 16px',fontWeight:600}}>{client.surveyComplete ? 'Print Site Manager Packet' : 'Print packet (questionnaire not complete yet)'}</button></div>);
   // Only weddings include an engraved brick (not private events, nonprofits or memorials).
   if (client.type === 'Wedding') step('Wedding brick',!!client.brickSubmittedAt || (client.brickLines || []).length > 0, client.brickSubmittedAt ? dateLabel(client.brickSubmittedAt) : 'Not submitted yet', null, false, brickDone ? <><div style={{fontFamily:'Cardo,Georgia,serif',letterSpacing:2,lineHeight:1.9,background:'#faf8f3',border:'1px solid #eee7dd',borderRadius:7,padding:'10px 14px'}}>{client.brickLines.map((l,i) => <div key={i}>{l || ' '}</div>)}</div></> : <><p className="vc-muted" style={{margin:0}}>The client chooses 3 lines of up to 20 characters on their event page.</p><BrickReminderButton client={client}/></>);
-  if (client.eventDate) step('Event day', client.days !== null && client.days <= 0, dateLabel(client.eventDate));
+  if (client.eventDate) step('Event day', client.days !== null && client.days <= 0, dateLabel(client.eventDate) + (client.timeOnSite?.start ? ' · on site ' + client.timeOnSite.start + ' to ' + client.timeOnSite.end : ''));
   if (client.eventDate) step('Site manager paperwork', client.smPaperwork.length > 0, client.smPaperwork.length ? client.smPaperwork.length + ' file' + (client.smPaperwork.length > 1 ? 's' : '') + ' uploaded' : client.days !== null && client.days <= 0 ? 'Not uploaded yet' : 'After the event', null, false, paperworkBody);
   step('Post-event feedback', !!tl.feedbackAt, tl.feedbackAt ? 'Received ' + dateLabel(String(tl.feedbackAt).slice(0, 10)) : client.feedbackSentAt ? 'Sent ' + dateLabel(String(client.feedbackSentAt).slice(0, 10)) + ', no response yet' : (client.eventEnd || client.eventDate) ? 'Sends about ' + dateLabel(shiftDate(String(client.eventEnd || client.eventDate).slice(0, 10), 8)) : 'After the event', null, false, <PostEventFeedback client={client}/>);
   React.useEffect(() => { const dialog = ref.current; dialog.showModal(); return () => { if (dialog.open) dialog.close(); }; }, []);
@@ -865,19 +867,9 @@ function bookingStatus(c, today) {
   if (paid > 0) return late ? 'Partially paid - past due' : 'Partially paid';
   return late ? 'Unpaid - past due' : 'Unpaid';
 }
-// The invoice itself: what was ordered, at what price. From the HoneyBook invoice's line items (a package's add-ons, like the
-// refundable security deposit, are listed under it); bookings on the Portal's own schedule list their payment lines instead.
-function invoiceLines(c) {
-  const out = [], P = c.payments, items = P && Array.isArray(P.line_items) ? P.line_items : null;
-  if (items) {
-    const add = (li, child) => { const qty = li.quantity == null ? 1 : li.quantity, unit = (li.price && li.price.amount) || 0; if (!(unit > 0) && !(qty > 0)) return; out.push({ item: li.title || 'Item', desc: text(li.description), qty, unit, amount: unit * qty, child, deposit: /security deposit/i.test(li.title || '') }); };
-    items.forEach(li => { add(li, false); (li.children || []).forEach(k => add(k, true)); });
-    if (P.discount && P.discount.amount > 0) out.push({ item: 'Discount', desc: '', qty: 1, unit: -P.discount.amount, amount: -P.discount.amount, child: false });
-    if (P.tax && P.tax.amount > 0) out.push({ item: 'Tax', desc: '', qty: 1, unit: P.tax.amount, amount: P.tax.amount, child: false });
-    (c.schedule || []).filter(s => s.extra).forEach(s => out.push({ item: s.label || 'Additional charge', desc: '', qty: 1, unit: s.cents, amount: s.cents, child: false }));
-  } else (c.schedule || []).forEach(s => out.push({ item: s.label || 'Payment', desc: '', qty: 1, unit: s.cents, amount: s.cents, child: false, deposit: s.deposit }));
-  return out;
-}
+// The invoice itself: what the client ordered, at what price (their saved order / final invoice, or one suggested from the
+// booking: HoneyBook invoice lines, or the Portal booking's rental, deposit and add-ons). See venue-order.jsx.
+function invoiceLines(c) { return orderLines(c); }
 // Officially closed out = the event has happened, the final site manager paperwork is filed, and nothing is still owed.
 function closeOut(c, status) {
   if (!c.isPast) return 'Not yet held';
@@ -928,8 +920,8 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
   }
   function exportInvoices() {
     const lines = [];
-    rows.forEach(r => invoiceLines(r.c).forEach(l => lines.push([r.c.name, day(r.c.eventDate), r.c.type, r.who, r.email, l.item, l.desc, l.qty, dollars(l.unit), dollars(l.amount), l.deposit ? 'Yes' : 'No', r.status, dollars(r.total), dollars(r.paid), dollars(r.balance)])));
-    downloadCsv('NSH-event-invoices-' + stamp + '.xlsx', ['Event', 'Event Date', 'Type', 'Client Name', 'Client Email', 'Item', 'Description', 'Qty', 'Price', 'Amount', 'Refundable Deposit', 'Payment Status', 'Invoice Total', 'Amount Paid', 'Balance Due'], lines);
+    rows.forEach(r => invoiceLines(r.c).forEach(l => lines.push([r.c.name, day(r.c.eventDate), r.c.type, r.who, r.email, l.item, l.desc, l.qty, dollars(l.unit), dollars(l.amount), l.deposit ? 'Yes' : 'No', l.status || 'Estimate', r.status, dollars(r.total), dollars(r.paid), dollars(r.balance)])));
+    downloadCsv('NSH-event-invoices-' + stamp + '.xlsx', ['Event', 'Event Date', 'Type', 'Client Name', 'Client Email', 'Item', 'Description', 'Qty', 'Price', 'Amount', 'Refundable Deposit', 'Estimate or Final', 'Payment Status', 'Invoice Total', 'Amount Paid', 'Balance Due'], lines);
   }
   function exportPayments() {
     const lines = [];
@@ -1318,6 +1310,6 @@ export function VenueClientDashboard({ statsOpen, onCloseStats, listOpen, onClos
     {statsOpen&&<ClientStats clients={upcomingClients} allClients={allClients} onClose={onCloseStats}/>}
     {bookingsOpen&&<BookingsExport clients={allClients} onClose={onCloseBookings} onOpen={c=>{onCloseBookings();setSelected(c.id);}}/>}
     {listOpen&&<UpcomingEventsList clients={upcomingClients} onClose={onCloseList} onOpen={c=>{onCloseList();setSelected(c.id);}}/>}
-    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onSavePortalEmail={recordPortalEmail} onUploadPaperwork={uploadPaperwork} onAssignSite={assignSite} onSavePayments={recordPayments} onRename={renameClient} onRetype={retypeClient} onDelete={deleteSubmission} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
+    {selectedClient&&<ClientDetail key={selectedClient.id} client={selectedClient} messages={(messages||[]).filter(m=>m.event_uid==='client:'+selectedClient.id).slice().reverse()} onHandleMessage={onHandleMessage} onClose={()=>{setSelected(null);if(window.__nshReturnToMessages){window.__nshReturnToMessages=false;if(onOpenMessages)onOpenMessages();}}} onVerify={verifyInsurance} onSaveEventDay={recordEventDay} onSavePortalEmail={recordPortalEmail} onUploadPaperwork={uploadPaperwork} onAssignSite={assignSite} onSavePayments={recordPayments} onOrderSaved={(id,record)=>setSavedResponses(prev=>({...prev,[id]:record}))} onRename={renameClient} onRetype={retypeClient} onDelete={deleteSubmission} agreementApi={agreementApi} onContractsChange={rows=>setNativeVersions(prev=>[...prev.filter(v=>v.response_id!==selectedClient.id),...rows])}/>}
   </div>;
 }
