@@ -4,6 +4,7 @@ import { RequestDetailsButton, missingPrebookingItems } from './request-details.
 import { EmailHistory } from './email-history.jsx';
 import { InquiryFlagNotes } from './flag-notes.jsx';
 import { BrickReminderButton } from './brick-reminder.jsx';
+import { LatePaymentReminderButton } from './late-payment-reminder.jsx';
 import { openSitePacket, openSamplePacket } from './site-packet.js';
 // Client dashboard: reads the imported source snapshot without changing signed
 // agreements, invoice schedules, or sending any client communications.
@@ -740,7 +741,7 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
       return;
     }
     const late = !p.paid && p.due && p.due < today && client.clientsSigned;
-    step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : !client.clientsSigned && p.due && p.due < today ? 'Due once the clients sign' : p.due ? (late ? 'Past due · ' : 'Due ') + dateLabel(p.due) : 'Awaiting payment', null, late, paymentBody(p));
+    step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : !client.clientsSigned && p.due && p.due < today ? 'Due once the clients sign' : p.due ? (late ? 'Past due · ' : 'Due ') + dateLabel(p.due) : 'Awaiting payment', null, late, late ? <><LatePaymentReminderButton client={client} payment={p}/>{paymentBody(p)}</> : paymentBody(p));
   });
   step('Insurance verified', client.insuranceVerified, client.insuranceVerified ? 'Verified' : client.insuranceUploadedAt ? 'Uploaded ' + dateLabel(client.insuranceUploadedAt) + ', needs checking' : 'Not uploaded yet', null, false, <InsuranceVerification client={client} onVerify={onVerify}/>);
   const qSend = client.eventDate ? shiftDate(client.eventDate, -60) : null;
