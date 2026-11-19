@@ -168,8 +168,10 @@ export function BlogEditorView({ navigate, supabaseUrl, supabaseKey }) {
       slug: d.slug ? slugify(d.slug) : p.slug,
       seo_title: d.seo_title || p.seo_title,
       seo_description: d.seo_description || p.seo_description,
-      excerpt: p.excerpt || d.seo_description || '',
+      excerpt: d.excerpt || p.excerpt || d.seo_description || '',
       focus_keyword: d.focus_keyword || p.focus_keyword,
+      // Suggested alt text for the main photo; kept if one was already written.
+      hero_image_alt: p.hero_image_alt || d.image_alt || '',
       _cats: d.category || p._cats,
       _tags: d.tags || p._tags,
       body_html: html || p.body_html,

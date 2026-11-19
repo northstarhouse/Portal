@@ -132,9 +132,9 @@ Return the finished blog package using this exact format:
 
 TITLE: [Reader-facing blog title]
 
-SEO_TITLE: [SEO title that accurately describes the article]
+SEO_TITLE: [SEO title that accurately describes the article, 50-60 characters, includes the focus keyword]
 
-META_DESCRIPTION: [Compelling description of approximately 150-160 characters]
+META_DESCRIPTION: [Compelling description of approximately 150-160 characters, includes the focus keyword]
 
 SLUG: [Short, lowercase, hyphenated URL slug]
 
@@ -143,6 +143,10 @@ CATEGORY: [Most appropriate category]
 TAGS: [Comma-separated tags]
 
 FOCUS_KEYWORD: [Primary target keyword]
+
+EXCERPT: [One or two sentences, under 200 characters, summarizing the article for the blog listing. Different wording from the meta description]
+
+IMAGE_ALT_TEXT: [Alt text for the article's main photo, under 125 characters. Describe a photo of North Star House that fits the topic, and include the focus keyword naturally]
 
 BODY:
 [Complete publish-ready article]
@@ -267,6 +271,7 @@ export function parseBlogPackage(text) {
   }
   return {
     title: field('TITLE'), seo_title: field('SEO_TITLE'), seo_description: field('META_DESCRIPTION'), slug: field('SLUG'),
-    category: field('CATEGORY'), tags: field('TAGS'), focus_keyword: field('FOCUS_KEYWORD'), body_md: body,
+    category: field('CATEGORY'), tags: field('TAGS'), focus_keyword: field('FOCUS_KEYWORD'),
+    excerpt: field('EXCERPT'), image_alt: field('IMAGE_ALT(?:_TEXT)?'), body_md: body,
   };
 }
