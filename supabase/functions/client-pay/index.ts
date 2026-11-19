@@ -161,7 +161,57 @@ function view(date: string, inq: any) {
     questionnaire_done: !!inq.questionnaire_form_response_id,
     brick_lines: Array.isArray(inq.brick_lines) ? inq.brick_lines : ['', '', ''],
     brick_done: Array.isArray(inq.brick_lines) && inq.brick_lines.some((l: string) => String(l).trim()),
+    extra_hours: extraHoursInfo(date, inq, sched),
   };
+}
+
+// ── Extra rental hours ("Add extra hours to your rental day") ──
+// $150 an hour for every event type. The rental day can only run between 10 AM and 11 PM, so the most a couple can add
+// is that 13-hour window minus the hours their package includes (and any extra hours they already added). They give
+// their new expected arrival and departure times, which must fit the window and match the hours they are paying for.
+const EXTRA_HOUR_CENTS = 15000;
+const DAY_OPEN = 10 * 60, DAY_CLOSE = 23 * 60; // minutes after midnight: 10:00 AM and 11:00 PM
+const EXTRA_LABEL = /^Extra rental hours: (\d+) hours?/i;
+function includedHoursFor(type: unknown) {
+  const t = String(type || '');
+  if (/wedding/i.test(t)) return 10;
+  if (/memorial|celebration of life|non.?profit/i.test(t)) return 4;
+  return 6;
+}
+const clock = (min: number) => { const h = Math.floor(min / 60), m = min % 60; return (h % 12 || 12) + ':' + String(m).padStart(2, '0') + (h < 12 ? ' AM' : ' PM'); };
+const toMin = (v: unknown) => { const m = String(v || '').match(/^(\d{1,2}):(\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : null; };
+function extraHoursInfo(date: string, inq: any, sched: any[]) {
+  const included = includedHoursFor(inq.event_type);
+  const added = (sched || []).reduce((n: number, r: any) => { const m = String(r.label || '').match(EXTRA_LABEL); return n + (m ? +m[1] : 0); }, 0);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
+  const max_more = Math.max(0, (DAY_CLOSE - DAY_OPEN) / 60 - included - added);
+  return { included, added, max_more, rate_cents: EXTRA_HOUR_CENTS, open: '10:00', close: '23:00', available: (sched || []).length > 0 && date > today && max_more > 0 && !/archive|cancel/i.test(inq.status || '') };
+}
+
+// Adds the charge to the booking's invoice as its own payment, the same way a rehearsal is added: a schedule row for
+// Portal bookings, an extra charge on the record for HoneyBook bookings. Due 30 days before the event (or now).
+async function addExtraHoursCharge(inq: any, label: string, cents: number) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
+  const due = (() => { const d = new Date(inq.event_date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - 30); const s = d.toISOString().slice(0, 10); return s < today ? today : s; })();
+  const sched = await rest(`venue_payment_schedule?select=id,sequence&inquiry_id=eq.${inq.id}`);
+  if ((sched || []).length) {
+    const seq = Math.max(...sched.map((r: any) => r.sequence || 0)) + 1;
+    await rest('venue_payment_schedule', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ inquiry_id: inq.id, kind: 'extra_hours', sequence: seq, label, amount_cents: cents, amount_paid_cents: 0, due_date: due, status: 'due', non_refundable: false }) });
+    return;
+  }
+  const rows = await rest(`nsh_form_responses?select=answers&id=eq.${inq.prebooking_form_response_id}`);
+  const a = rows?.[0]?.answers || {};
+  const list: any[] = Array.isArray(a.__venue_checklist?.extra_charges) ? a.__venue_checklist.extra_charges : [];
+  const answers = { ...a, __venue_checklist: { ...a.__venue_checklist, extra_charges: [...list, { id: 'extra-hours-' + Date.now(), label, cents, due, added_at: new Date().toISOString() }] } };
+  await rest(`nsh_form_responses?id=eq.${inq.prebooking_form_response_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ answers }) });
+}
+
+// Keeps the couple's latest expected time on site on their record, for the venue team and the site manager.
+async function saveTimeOnSite(inq: any, start: number, end: number) {
+  const rows = await rest(`nsh_form_responses?select=answers&id=eq.${inq.prebooking_form_response_id}`);
+  const a = rows?.[0]?.answers || {};
+  const answers = { ...a, __venue_checklist: { ...a.__venue_checklist, time_on_site: { start: clock(start), end: clock(end), hours: (end - start) / 60, updated_at: new Date().toISOString(), source: 'client page (extra hours)' } } };
+  await rest(`nsh_form_responses?id=eq.${inq.prebooking_form_response_id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ answers }) });
 }
 
 // The couple's second walk-through, if they've booked one (estate_tours row
@@ -371,6 +421,41 @@ Deno.serve(async req => {
       let shown = fresh;
       if (!(shown.venue_payment_schedule || []).length) { const old = await legacySchedule(shown); if (old.length) shown = { ...shown, venue_payment_schedule: old }; }
       return json({ added: true, rehearsal: await rehearsalFor(inq), ...view(date, shown) });
+    }
+
+    // "Add extra hours to your rental day": number of hours plus the new expected arrival and departure times, with the
+    // couple's confirmation of the charge and of the 10 AM to 11 PM window. Added to the invoice right away.
+    if (action === 'extra_hours_add') {
+      const current = (inq.venue_payment_schedule || []).length ? inq.venue_payment_schedule : await legacySchedule(inq);
+      const info = extraHoursInfo(date, inq, current);
+      if (!info.available) throw new Fail('Extra hours can\'t be added to this booking online. Please message our venue team.', 409);
+      const hours = Number(body.hours);
+      if (!Number.isInteger(hours) || hours < 1 || hours > info.max_more) throw new Fail(`Choose between 1 and ${info.max_more} extra hour${info.max_more === 1 ? '' : 's'}.`);
+      const start = toMin(body.start), end = toMin(body.end);
+      if (start === null || end === null) throw new Fail('Enter your expected arrival and departure times.');
+      if (start < DAY_OPEN || end > DAY_CLOSE) throw new Fail('Your time on site has to be between 10:00 AM and 11:00 PM.');
+      const total = info.included + info.added + hours;
+      if (end - start !== total * 60) throw new Fail(`${clock(start)} to ${clock(Math.max(start, end))} is ${Math.max(0, (end - start) / 60)} hours. With ${hours} extra hour${hours === 1 ? '' : 's'} your day is ${total} hours, so please pick times ${total} hours apart.`);
+      if (body.agree !== true || body.understand !== true) throw new Fail('Please check both boxes to confirm.');
+      const cents = hours * EXTRA_HOUR_CENTS;
+      const label = `Extra rental hours: ${hours} hour${hours === 1 ? '' : 's'} (on site ${clock(start)} to ${clock(end)})`;
+      try { await addExtraHoursCharge(inq, label, cents); }
+      catch (e) { console.error('client-pay: extra hours charge failed', (e as Error).message); throw new Fail('Something went wrong adding the hours. Nothing was charged. Please try again or message our venue team.', 500); }
+      await saveTimeOnSite(inq, start, end).catch((e) => console.error('client-pay: time on site not saved', (e as Error).message));
+      const couple = await coupleOf(rest, inq);
+      const when = `${clock(start)} to ${clock(end)}`;
+      const mailTo = (to: string[], subject: string, title: string, html: string, text: string) => fetch(`${URL_}/functions/v1/send-email`, { method: 'POST', headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ to: to.length === 1 ? to[0] : to, subject, body: text, html: brandedEmail(title, html, { text: 'View Your Client Portal', url: PAGE_URL }), sender: 'Venue Team', fromEmail: 'venue@northstarhouse.org' }) }).catch(() => {});
+      if (couple.emails.length) await mailTo(couple.emails, 'Extra Hours Added to Your Rental Day', 'Extra Hours Added',
+        `<p style="margin:0 0 16px;">Hi ${esc(couple.firsts.join(' & ') || 'there')}!</p><p style="margin:0 0 16px;">We've added <b>${hours} extra hour${hours === 1 ? '' : 's'}</b> to your rental day on ${esc(longDate(inq.event_date))}. Your expected time on site is now <b>${esc(when)}</b>.</p><p style="margin:0;">${esc(money(cents))} has been added to your invoice as its own payment. You'll see the updated balance on your client portal.</p>`,
+        `We've added ${hours} extra hour(s) to your rental day on ${longDate(inq.event_date)}. Your expected time on site is now ${when}. ${money(cents)} has been added to your invoice; see your client portal for the updated balance.`);
+      await mailTo(['venue@thenorthstarhouse.org'], `Extra hours added: ${inq.name} (${longDate(inq.event_date)})`, 'Extra Hours Added',
+        `<p style="margin:0 0 16px;"><b>${esc(inq.name)}</b> added <b>${hours} extra hour${hours === 1 ? '' : 's'}</b> (${esc(money(cents))}) from the client portal.</p><p style="margin:0;">New expected time on site: <b>${esc(when)}</b> (${total} hours). It was added to their invoice. Please update the venue calendar and let the site manager know.</p>`,
+        `${inq.name} added ${hours} extra hour(s) (${money(cents)}). New expected time on site: ${when} (${total} hours). Added to their invoice. Update the venue calendar and tell the site manager.`);
+      await rest('activity_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ action: 'extra_hours_added', tag: 'Venue', description: `Extra hours added by ${inq.name}: ${hours} hour(s), ${money(cents)}, on site ${when}` }) }).catch(() => {});
+      const fresh = (await rest(`venue_inquiries?select=${INQUIRY_SELECT}&id=eq.${inq.id}`))[0];
+      let shown = fresh;
+      if (!(shown.venue_payment_schedule || []).length) { const old = await legacySchedule(shown); if (old.length) shown = { ...shown, venue_payment_schedule: old }; }
+      return json({ hours_added: { hours, when, cents }, ...view(date, shown) });
     }
 
     if (action === 'create_order') {
