@@ -28,7 +28,7 @@ export const ORDER_PRESETS = [
   { item: 'Weekday Memorial', unit: 50000 },
   { item: 'Outdoor public event (6 hours)', unit: 180000 },
   { item: 'Public event extra hour', unit: 20000 },
-  { item: 'Brick (included with weddings)', unit: 0 },
+  { item: 'Complimentary brick included', unit: 0 },
   { item: 'Discount', unit: 0 },
   { item: 'Custom item', unit: 0 },
 ];
@@ -61,7 +61,7 @@ export function suggestedOrder(c) {
     else if (/rehearsal/i.test(s.label || '') && (s.extra || !lines)) items.push({ id: uid(), item: 'Rehearsal', desc: String(s.label || '').replace(/^.*?\((.*)\)\s*$/, '$1'), qty: 1, unit: s.cents || 0, paid: !!s.paid });
     else if (s.extra && lines) items.push({ id: uid(), item: s.label || 'Additional charge', desc: '', qty: 1, unit: s.cents || 0, paid: !!s.paid });
   });
-  if (c.type === 'Wedding' && !items.some(i => /brick/i.test(i.item))) items.push({ id: uid(), item: 'Brick (included with weddings)', desc: (c.brickLines || []).filter(l => String(l).trim()).join(' / '), qty: 1, unit: 0 });
+  if (c.type === 'Wedding' && !items.some(i => /brick/i.test(i.item))) items.push({ id: uid(), item: 'Complimentary brick included', desc: (c.brickLines || []).filter(l => String(l).trim()).join(' / '), qty: 1, unit: 0 });
   return { status: 'estimate', items, suggested: true };
 }
 
