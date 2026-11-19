@@ -5,7 +5,7 @@ import { EmailHistory } from './email-history.jsx';
 import { InquiryFlagNotes } from './flag-notes.jsx';
 import { BrickReminderButton } from './brick-reminder.jsx';
 import { LatePaymentReminderButton } from './late-payment-reminder.jsx';
-import { OrderEditor, orderLines } from './venue-order.jsx';
+import { OrderEditor, orderLines, orderFor, orderTotals } from './venue-order.jsx';
 import { openSitePacket, openSamplePacket } from './site-packet.js';
 // Client dashboard: reads the imported source snapshot without changing signed
 // agreements, invoice schedules, or sending any client communications.
@@ -880,18 +880,17 @@ function closeOut(c, status) {
 }
 function bookingRows(clients, today) {
   return clients.slice().sort((a, b) => (a.eventDate || '9999').localeCompare(b.eventDate || '9999') || String(a.name).localeCompare(String(b.name))).map(c => {
-    const sched = c.schedule || [];
-    const total = c.total != null ? c.total : sched.reduce((t, s) => t + (s.cents || 0), 0);
-    // The deposit is its own schedule row when there is one; a booking paid in a single payment only lists it as an invoice line item.
-    const itemDeposit = (items => { let sum = 0; (function walk(list) { (list || []).forEach(li => { if (/security deposit/i.test(li.title || '') && li.price && li.price.amount > 0) sum += li.price.amount * (li.quantity || 1); walk(li.children); }); })(items); return sum; })(c.payments && c.payments.line_items);
-    const deposit = sched.filter(s => s.deposit).reduce((t, s) => t + (s.cents || 0), 0) || itemDeposit;
+    // Invoice amounts come from what the client ordered (their saved order, or the one suggested from the booking), not
+    // from the payment schedule (Wyn: estimates are built from the order and become the invoice when the event closes).
+    const order = orderFor(c), ot = orderTotals(order.items);
+    const total = ot.total, deposit = ot.deposit;
     const paid = c.paid || 0;
-    const balance = c.balance != null ? c.balance : Math.max(0, total - paid);
+    const balance = Math.max(0, total - paid);
     const depositPaid = deposit ? (balance <= 0 ? deposit : Math.min(deposit, Math.max(0, paid - Math.max(0, total - deposit)))) : 0;
     const next = (c.duePayments || [])[0];
     const contact = (c.contacts || [])[0] || {};
     const people = []; (c.contacts || []).forEach(p => { if (p.full_name && !people.some(x => x.name.toLowerCase() === String(p.full_name).trim().toLowerCase())) people.push({ name: String(p.full_name).trim(), email: p.email || '' }); });
-    return { c, total, deposit, depositPaid, paid, balance, status: bookingStatus(c, today), closed: closeOut(c, bookingStatus(c, today)), next, phone: contact.phone_number || '', who: people.length ? people.map(p => p.name).join(' & ') : (contact.full_name || ''), people, email: c.email || contact.email || '', when: c.isPast ? 'Past' : 'Upcoming' };
+    return { c, order, total, deposit, depositPaid, paid, balance, status: bookingStatus(c, today), closed: closeOut(c, bookingStatus(c, today)), next, phone: contact.phone_number || '', who: people.length ? people.map(p => p.name).join(' & ') : (contact.full_name || ''), people, email: c.email || contact.email || '', when: c.isPast ? 'Past' : 'Upcoming' };
   });
 }
 const dollars = cents => Math.round(cents || 0) / 100;
@@ -918,10 +917,19 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
       ['Event', 'Event Date', 'Type', 'Upcoming/Past', 'Client Name', 'Client Email', 'Client Phone', 'Payment Status', 'Closed Out', 'Invoice Total', 'Refundable Deposit', 'Refundable Deposit Paid', 'Invoice Total Without Deposit', 'Amount Paid', 'Balance Due', 'Next Payment Due', 'Next Payment Amount'],
       rows.map(r => [r.c.name, day(r.c.eventDate), r.c.type, r.when, r.who, r.email, r.phone, r.status, r.closed, dollars(r.total), dollars(r.deposit), dollars(r.depositPaid), dollars(Math.max(0, r.total - r.deposit)), dollars(r.paid), dollars(r.balance), r.next ? day(r.next.due) : '', r.next ? dollars(r.next.cents) : '']));
   }
+  // Estimates for QuickBooks (Wyn): one estimate per event, numbered by its venue code, one line per thing ordered
+  // (e.g. SAT Wedding, Security Deposit, Extra Hours, Rehearsal, Brick). Payments are posted against it, and when the
+  // event closes it is marked final in the client's Order step and becomes the invoice.
   function exportInvoices() {
+    const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    const code = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? MON[+m[2] - 1] + '-' + m[3] + '-' + m[1] : ''; };
     const lines = [];
-    rows.forEach(r => invoiceLines(r.c).forEach(l => lines.push([r.c.name, day(r.c.eventDate), r.c.type, r.who, r.email, l.item, l.desc, l.qty, dollars(l.unit), dollars(l.amount), l.deposit ? 'Yes' : 'No', l.status || 'Estimate', r.status, dollars(r.total), dollars(r.paid), dollars(r.balance)])));
-    downloadCsv('NSH-event-invoices-' + stamp + '.xlsx', ['Event', 'Event Date', 'Type', 'Client Name', 'Client Email', 'Item', 'Description', 'Qty', 'Price', 'Amount', 'Refundable Deposit', 'Estimate or Final', 'Payment Status', 'Invoice Total', 'Amount Paid', 'Balance Due'], lines);
+    rows.forEach(r => {
+      const est = r.order.status === 'final' ? 'Invoice' : 'Estimate';
+      const made = day(String(r.order.updated_at || r.c.sub?.created_at || today).slice(0, 10));
+      invoiceLines(r.c).forEach(l => lines.push([code(r.c.eventDate), est, r.who || r.c.name, r.email, made, day(r.c.eventDate), r.c.name, l.item, l.desc, l.qty, dollars(l.unit), dollars(l.amount), l.deposit ? 'Yes' : 'No', dollars(r.total), dollars(r.paid), dollars(r.balance), r.order.suggested ? 'Suggested from the booking, not checked yet' : '']));
+    });
+    downloadCsv('NSH-estimates-' + stamp + '.xlsx', ['Estimate No', 'Estimate or Invoice', 'Customer', 'Customer Email', 'Estimate Date', 'Event Date', 'Event', 'Product/Service', 'Description', 'Qty', 'Rate', 'Amount', 'Refundable Deposit', 'Total', 'Paid So Far', 'Balance', 'Note'], lines);
   }
   function exportPayments() {
     const lines = [];
@@ -956,8 +964,8 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
         <select value={closedF} onChange={e => setClosedF(e.target.value)} style={sel}><option value="all">Closed and open</option><option value="closed">Closed out</option><option value="open">Not closed out</option></select>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name, email, date…" style={{ ...sel, flex: 1, minWidth: 140, maxWidth: 260 }} />
         <span style={{ flex: 1 }} />
-        <button type="button" style={btn(true)} onClick={exportBookings} disabled={!rows.length}>⬇ Download for QuickBooks</button>
-        <button type="button" style={btn(false)} onClick={exportInvoices} disabled={!rows.length} title="One row per invoice line: what was ordered, at what price">⬇ Invoice items</button>
+        <button type="button" style={btn(true)} onClick={exportInvoices} disabled={!rows.length} title="One estimate per event, one line per thing ordered (SAT Wedding, security deposit, extra hours, rehearsal, brick), with what is paid and owed">⬇ Estimates for QuickBooks</button>
+        <button type="button" style={btn(false)} onClick={exportBookings} disabled={!rows.length} title="One row per event: totals, paid, balance, next payment">⬇ Bookings summary</button>
         <button type="button" style={btn(false)} onClick={exportPayments} disabled={!rows.length} title="One row per scheduled payment (deposit, installments, security deposit)">⬇ Payment lines</button>
         <button type="button" style={btn(false)} onClick={printList} disabled={!rows.length}>🖨 Print list</button>
       </div>
@@ -988,7 +996,7 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
           </td></tr>}</React.Fragment>)}</tbody>
         </table>
       </div>
-      <div className="vc-muted" style={{ marginTop: 12 }}>"Invoice" includes the refundable security deposit; the download also lists the total without it. Click a row to see its invoice: what was ordered, at what price.</div>
+      <div className="vc-muted" style={{ marginTop: 12 }}>"Invoice" is what the client ordered, including the refundable security deposit. Click a row to see the items; edit them in the client's Order step, and mark it final when the event closes.</div>
     </div>
   </div>;
 }

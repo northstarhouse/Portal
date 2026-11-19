@@ -6,25 +6,29 @@
 const SB_URL = 'https://uvzwhhwzelaelfhfkvdb.supabase.co', SB_KEY = 'sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do';
 const HDR = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
 const usd = cents => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((cents || 0) / 100);
+// SAT, SUN, MON... for the rental line ("SAT Wedding"), as the venue team writes it.
+const dow3 = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][new Date(+m[1], +m[2] - 1, +m[3]).getDay()] : ''; };
 const dayName = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : ''; };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const EXTRA_HOUR = 15000;
 
 // Items staff can add, from the pricing guide (unit prices in cents; edit the price on the line if a booking differs).
 export const ORDER_PRESETS = [
-  { item: 'Wedding rental', unit: 500000 },
-  { item: 'Refundable security deposit', unit: 80000, deposit: true },
-  { item: 'Wedding rehearsal (Thu/Fri, 5 hours)', unit: 100000 },
-  { item: 'Extra rental hour', unit: EXTRA_HOUR, desc: 'All time on site between 10 AM and 11 PM' },
-  { item: 'Private event: Saturday (6 hours)', unit: 120000 },
-  { item: 'Private event: Sunday (6 hours)', unit: 100000 },
-  { item: 'Private event: weekday (6 hours)', unit: 80000 },
-  { item: 'Memorial: Saturday', unit: 80000 },
-  { item: 'Memorial: Sunday', unit: 60000 },
-  { item: 'Memorial: weekday', unit: 50000 },
+  { item: 'SAT Wedding', unit: 500000 },
+  { item: 'SUN Wedding', unit: 500000 },
+  { item: 'Weekday Wedding', unit: 500000 },
+  { item: 'Security Deposit (refundable)', unit: 80000, deposit: true },
+  { item: 'Rehearsal', unit: 100000, desc: 'Thu/Fri, 5 hours on site (5 PM to 10 PM)' },
+  { item: 'Extra Hours', unit: EXTRA_HOUR, desc: 'All time on site between 10 AM and 11 PM' },
+  { item: 'SAT Private Event (6 hours)', unit: 120000 },
+  { item: 'SUN Private Event (6 hours)', unit: 100000 },
+  { item: 'Weekday Private Event (6 hours)', unit: 80000 },
+  { item: 'SAT Memorial', unit: 80000 },
+  { item: 'SUN Memorial', unit: 60000 },
+  { item: 'Weekday Memorial', unit: 50000 },
   { item: 'Outdoor public event (6 hours)', unit: 180000 },
   { item: 'Public event extra hour', unit: 20000 },
-  { item: 'Commemorative brick (included with weddings)', unit: 0 },
+  { item: 'Brick (included with weddings)', unit: 0 },
   { item: 'Discount', unit: 0 },
   { item: 'Custom item', unit: 0 },
 ];
@@ -46,18 +50,18 @@ export function suggestedOrder(c) {
   // Portal bookings: the rental is everything on the schedule that isn't the deposit or an add-on.
   if (!lines) {
     const rental = sched.filter(s => !isDepositLabel(s.label) && !s.deposit && !s.extra && !/rehearsal/i.test(s.label || '') && !extraHoursOf(s.label)).reduce((t, s) => t + (s.cents || 0), 0);
-    if (rental) items.push({ id: uid(), item: (c.type || 'Event') + ' rental', desc: dayName(c.eventDate), qty: 1, unit: rental });
+    if (rental) items.push({ id: uid(), item: [dow3(c.eventDate), c.type || 'Event'].filter(Boolean).join(' '), desc: dayName(c.eventDate) + (c.timeOnSite?.start ? ', on site ' + c.timeOnSite.start + ' to ' + c.timeOnSite.end : ''), qty: 1, unit: rental });
     const dep = sched.filter(s => s.deposit || isDepositLabel(s.label)).reduce((t, s) => t + (s.cents || 0), 0);
-    if (dep) items.push({ id: uid(), item: 'Refundable security deposit', desc: '', qty: 1, unit: dep, deposit: true });
+    if (dep) items.push({ id: uid(), item: 'Security Deposit (refundable)', desc: '', qty: 1, unit: dep, deposit: true });
   }
   // Add-ons from the client page, with whether they're already paid.
   sched.forEach(s => {
     const xh = extraHoursOf(s.label);
-    if (xh) items.push({ id: uid(), item: 'Extra rental hour', desc: (xh.when ? 'On site ' + xh.when + '. ' : '') + 'Added on the client page', qty: xh.hours, unit: Math.round((s.cents || 0) / (xh.hours || 1)), paid: !!s.paid });
-    else if (/rehearsal/i.test(s.label || '') && (s.extra || !lines)) items.push({ id: uid(), item: s.label, desc: '', qty: 1, unit: s.cents || 0, paid: !!s.paid });
+    if (xh) items.push({ id: uid(), item: 'Extra Hours', desc: (xh.when ? 'On site ' + xh.when + '. ' : '') + 'Added on the client page', qty: xh.hours, unit: Math.round((s.cents || 0) / (xh.hours || 1)), paid: !!s.paid });
+    else if (/rehearsal/i.test(s.label || '') && (s.extra || !lines)) items.push({ id: uid(), item: 'Rehearsal', desc: String(s.label || '').replace(/^.*?\((.*)\)\s*$/, '$1'), qty: 1, unit: s.cents || 0, paid: !!s.paid });
     else if (s.extra && lines) items.push({ id: uid(), item: s.label || 'Additional charge', desc: '', qty: 1, unit: s.cents || 0, paid: !!s.paid });
   });
-  if (c.type === 'Wedding' && !items.some(i => /brick/i.test(i.item))) items.push({ id: uid(), item: 'Commemorative brick (included with weddings)', desc: (c.brickLines || []).filter(l => String(l).trim()).join(' / '), qty: 1, unit: 0 });
+  if (c.type === 'Wedding' && !items.some(i => /brick/i.test(i.item))) items.push({ id: uid(), item: 'Brick (included with weddings)', desc: (c.brickLines || []).filter(l => String(l).trim()).join(' / '), qty: 1, unit: 0 });
   return { status: 'estimate', items, suggested: true };
 }
 
