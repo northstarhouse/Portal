@@ -86,7 +86,6 @@ function buildPlanEmail({ rows, votes, note }) {
     + '<span style="font-size:12px;color:#888888;margin-left:10px;vertical-align:middle;">' + items.length + (items.length === 1 ? ' event' : ' events') + '</span></td></tr>'
     + items.map(eventRow).join('') + '</table>').join('');
   const movingN = sorted.filter((r) => r.final_decision === 'Moving Forward').length;
-  const finalN = sorted.filter((r) => r.finalized_event_id).length;
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const html = '<style>@media only screen and (max-width:540px){.pe-pad{padding-left:18px!important;padding-right:18px!important}}</style>'
     + '<div style="background:#e6ded0;padding:28px 12px;font-family:Helvetica,Arial,sans-serif;"><div style="max-width:680px;margin:0 auto;background:#fdfbf7;">'
@@ -96,7 +95,7 @@ function buildPlanEmail({ rows, votes, note }) {
     + '<div style="font-size:13px;color:#777777;">As of ' + esc(today) + '</div>'
     + '<div style="border-top:1px solid #e5ddcf;width:60%;margin:20px auto 0;"></div></div>'
     + (note && note.trim() ? '<div class="pe-pad" style="padding:18px 36px 0;font-size:15px;line-height:1.6;color:#444444;">' + esc(note.trim()).replace(/\n/g, '<br>') + '</div>' : '')
-    + '<div class="pe-pad" style="padding:6px 36px 6px;"><div style="font-size:13px;color:#888888;padding-top:14px;">' + sorted.length + ' events on the plan  ·  ' + movingN + ' moving forward  ·  ' + finalN + ' finalized</div>' + groupsHtml + '</div>'
+    + '<div class="pe-pad" style="padding:6px 36px 6px;"><div style="font-size:13px;color:#888888;padding-top:14px;">' + sorted.length + ' events on the plan  ·  ' + movingN + ' moving forward</div>' + groupsHtml + '</div>'
     + '<div class="pe-pad" style="padding:24px 36px 34px;text-align:center;"><a href="https://volunteerhub.northstarhouse.org/#/events-committee-planning" style="display:inline-block;background:' + GOLD + ';color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:15px 30px;">Open in the Volunteer Hub</a></div>'
     + '<div style="background:#f7f4f1;padding:14px 36px;text-align:center;font-size:11px;color:#999999;">North Star House</div></div></div>';
   return html.replace(/style="/g, 'style="font-family:Helvetica,Arial,sans-serif;');
