@@ -63,7 +63,10 @@ function buildPlanEmail({ rows, votes, note }) {
   const GOLD = '#a28b75'; const TITLE = '#8c6d36';
   const daysOf = (r) => (Array.isArray(r.days) ? r.days : []);
   const esc = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const ICON = 'https://northstarhouse.github.io/Portal/assets/icons/cat-event.png';
+  // the calendar icon in each section's own color (green, red, yellow, purple; gold when there is no decision yet)
+  const ICON_BASE = 'https://northstarhouse.github.io/Portal/assets/icons/';
+  const ICON_FILE = { 'Moving Forward': 'cat-event-green.png', 'Not Moving Forward': 'cat-event-red.png', 'Needs Further Discussion': 'cat-event-yellow.png', 'Merging with Another Event': 'cat-event-purple.png' };
+  const iconFor = (g) => ICON_BASE + (ICON_FILE[g] || 'cat-event.png');
   const sorted = sortPlan(rows || []);
   const detailLine = (r) => [
     r.multi_day ? `${daysOf(r).length || 'Multi'}-day: ` + (daysOf(r).filter((d) => d.date).map((d) => fmtShort(d.date)).join(', ') || 'dates to set') : '',
@@ -92,7 +95,7 @@ function buildPlanEmail({ rows, votes, note }) {
   const groups = GROUP_ORDER.map((g) => ({ g, items: sorted.filter((r) => decisionGroup(r) === g) })).filter((x) => x.items.length);
   const groupsHtml = groups.map(({ g, items }) =>
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border:1px solid #ece3d7;border-collapse:separate;">'
-    + '<tr><td bgcolor="' + (DECISION_TONE[g] ? DECISION_TONE[g].bg : '#f7f4f1') + '" style="background:' + (DECISION_TONE[g] ? DECISION_TONE[g].bg : '#f7f4f1') + ';padding:12px 16px;border:1px solid ' + (DECISION_TONE[g] ? DECISION_TONE[g].color : '#ae9a86') + ';"><img src="' + ICON + '" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">'
+    + '<tr><td bgcolor="' + (DECISION_TONE[g] ? DECISION_TONE[g].bg : '#f7f4f1') + '" style="background:' + (DECISION_TONE[g] ? DECISION_TONE[g].bg : '#f7f4f1') + ';padding:12px 16px;border:1px solid ' + (DECISION_TONE[g] ? DECISION_TONE[g].color : '#ae9a86') + ';"><img src="' + iconFor(g) + '" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">'
     + '<span style="font-family:Cardo,Georgia,serif;font-size:14px;font-weight:bold;color:' + (DECISION_TONE[g] ? DECISION_TONE[g].color : TITLE) + ';vertical-align:middle;">' + esc(g) + '</span>'
     + '<span style="font-size:12px;color:#888888;margin-left:10px;vertical-align:middle;">' + items.length + (items.length === 1 ? ' event' : ' events') + '</span></td></tr>'
     + items.map(eventRow).join('') + '</table>').join('');
