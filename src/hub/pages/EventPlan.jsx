@@ -93,7 +93,7 @@ function buildPlanEmail({ rows, votes, note }) {
       + '</div>'
       + (hold ? '' : sub.length
         ? '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#666666;line-height:1.55;">' + sub.map((x) => '<li style="margin:0 0 2px;">' + esc(x) + '</li>').join('') + '</ul>'
-        : (decisionGroup(r) === 'Not Moving Forward' ? '' : '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#999999;line-height:1.55;"><li style="font-style:italic;">No details yet</li></ul>'))
+        : '')
       + '<div style="margin-top:9px;border-left:3px solid ' + edge + ';background:#faf7f2;padding:8px 12px;">'
       + '<div style="font-size:11px;font-weight:bold;color:#8c6d36;margin-bottom:3px;">Committee Decisions' + (r.decisions_updated_at ? ' · as of ' + esc(fmtStamp(r.decisions_updated_at)) : '') + '</div>'
       + (bulletLines(r.decisions).length
@@ -344,7 +344,7 @@ export default function EventPlan({ session, volunteer, onFinalized }) {
                   <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{r.name}{vr && <span title={'Committee vote · ' + vr.title} style={{ fontSize: 11, fontWeight: 700, background: vr.tone.bg, color: vr.tone.color, borderRadius: 10, padding: '2px 9px' }}>{vr.label} {vr.count}/{vr.total}</span>}</div>
                     <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                      {[r.multi_day ? `${daysOf(r).length || 'Multi'}-day: ` + (daysOf(r).filter((d) => d.date).map((d) => fmtShort(d.date)).join(', ') || 'dates to set') : '', !r.multi_day && r.date ? fmtDay(r.date) : '', !r.multi_day && r.start_time ? `${fmtTime(r.start_time)}${r.end_time ? '–' + fmtTime(r.end_time) : ''}` : '', r.pricing ? `Pricing: ${priceText(r.pricing)}` : '', r.budget ? `Budget: ${r.budget}` : ''].filter(Boolean).join(' · ') || 'No details yet'}
+                      {detailParts(r).join(' · ')}
                     </div>
                   </div>
                   <select value={r.final_decision || ''} onChange={e => setDecision(r, e.target.value)} aria-label={'Final decision for ' + r.name}

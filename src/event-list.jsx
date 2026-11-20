@@ -39,6 +39,18 @@ const DECISION_RANK = { 'Moving Forward': 0, 'Merging with Another Event': 1, 'N
 const rankOf = (d) => (d in DECISION_RANK ? DECISION_RANK[d] : 2);
 const sortPlan = (rows) => rows.slice().sort((a, b) => rankOf(a.final_decision) - rankOf(b.final_decision) || a.sort_order - b.sort_order);
 const daysOf = (r) => (Array.isArray(r.days) ? r.days : []);
+// The summary line under an event: date, time, pricing, budget. A Moving Forward event always lists its date, time and pricing;
+// anything not set yet reads Undecided.
+const detailParts = (r) => {
+  const moving = r.final_decision === 'Moving Forward';
+  return [
+    r.multi_day ? (daysOf(r).length || 'Multi') + '-day: ' + (daysOf(r).filter(d => d.date).map(d => fmtShort(d.date)).join(', ') || 'dates to set') : '',
+    !r.multi_day ? (r.date ? fmtDay(r.date) : (moving ? 'Date: Undecided' : '')) : '',
+    !r.multi_day ? (r.start_time ? fmtTime(r.start_time) + (r.end_time ? '–' + fmtTime(r.end_time) : '') : (moving ? 'Time: Undecided' : '')) : '',
+    r.pricing ? 'Pricing: ' + priceText(r.pricing) : (moving ? 'Pricing: Undecided' : ''),
+    r.budget ? 'Budget: ' + r.budget : '',
+  ].filter(Boolean);
+};
 const has = (v) => !!String(v || '').trim();
 function reqs(r) {
   const base = [['pricing', 'Pricing', has(r.pricing)], ['budget', 'Budget', has(r.budget)]];
@@ -206,7 +218,7 @@ export function EventListView({ navigate }) {
                     {vr && <span title={'Committee vote · ' + vr.title} style={{ fontSize: 11, fontWeight: 700, background: vr.tone.bg, color: vr.tone.color, borderRadius: 10, padding: '2px 9px' }}>{vr.label} {vr.count}/{vr.total}</span>}
                   </div>
                   <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
-                    {[r.multi_day ? (daysOf(r).length || 'Multi') + '-day: ' + (daysOf(r).filter(d => d.date).map(d => fmtShort(d.date)).join(', ') || 'dates to set') : '', !r.multi_day && r.date ? fmtDay(r.date) : '', !r.multi_day && r.start_time ? fmtTime(r.start_time) + (r.end_time ? '–' + fmtTime(r.end_time) : '') : '', r.pricing ? 'Pricing: ' + priceText(r.pricing) : '', r.budget ? 'Budget: ' + r.budget : ''].filter(Boolean).join(' · ') || 'No details yet'}
+                    {detailParts(r).join(' · ')}
                   </div>
                 </div>
                 <select value={r.final_decision || ''} onChange={e => setDecision(r, e.target.value)} aria-label={'Final decision for ' + r.name}
