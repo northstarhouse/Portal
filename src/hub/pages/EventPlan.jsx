@@ -67,7 +67,7 @@ function buildPlanEmail({ rows, votes, note }) {
     const sub = detailLine(r);
     return '<tr><td bgcolor="#ffffff" style="background:#ffffff;padding:13px 18px;border-bottom:1px solid #ede8df;">'
       + '<div style="font-size:15px;font-weight:bold;color:#2a2a2a;line-height:1.35;">' + esc(r.name)
-      + (r.finalized_event_id ? ' <span style="font-size:11px;font-weight:bold;color:#2e7d32;">&#10003; Finalized</span>' : '') + '</div>'
+      + '</div>'
       + (sub.length
         ? '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#666666;line-height:1.55;">' + sub.map((x) => '<li style="margin:0 0 2px;">' + esc(x) + '</li>').join('') + '</ul>'
         : '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#999999;line-height:1.55;"><li style="font-style:italic;">No details yet</li></ul>')
