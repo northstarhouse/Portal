@@ -41,7 +41,7 @@ export function suggestedOrder(c) {
   const items = [];
   const P = c.payments, lines = P && Array.isArray(P.line_items) ? P.line_items : null;
   if (lines) {
-    const add = li => { const qty = li.quantity == null ? 1 : li.quantity, unit = (li.price && li.price.amount) || 0; if (!(unit > 0) && !(qty > 0)) return; items.push({ id: uid(), item: li.title || 'Item', desc: String(li.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300), qty, unit, deposit: isDepositLabel(li.title) }); };
+    const add = li => { const qty = li.quantity == null ? 1 : li.quantity, unit = (li.price && li.price.amount) || 0; if (!(unit > 0) && !(qty > 0)) return; items.push({ id: uid(), item: li.title || 'Item', desc: String(li.description || '').replace(/<[^>]+>/g, ' ').replace(/\s*Two Private Dressing Rooms for use during your event\.?/gi, '').replace(/\s*Includes (?:\d+|one|two|three|four) planning sessions? with (?:the )?Venue Coordinator\.?/gi, '').replace(/\s+/g, ' ').trim().slice(0, 300), qty, unit, deposit: isDepositLabel(li.title) }); };
     lines.forEach(li => { add(li); (li.children || []).forEach(add); });
     if (P.discount && P.discount.amount > 0) items.push({ id: uid(), item: 'Discount', desc: '', qty: 1, unit: -P.discount.amount });
     if (P.tax && P.tax.amount > 0) items.push({ id: uid(), item: 'Tax', desc: '', qty: 1, unit: P.tax.amount });

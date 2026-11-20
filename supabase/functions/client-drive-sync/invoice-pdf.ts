@@ -128,7 +128,7 @@ export async function invoicePdf(inv: InvoiceData): Promise<Uint8Array> {
   if (!inv.lines.length) { text("No itemized invoice is on file for this booking yet.", LEFT, y, 10, ital, MUTED); y -= 20; }
   for (const l of inv.lines) {
     const indent = l.child ? 14 : 0;
-    const titleLines = wrapText(l.item + (l.deposit ? " (refundable)" : ""), l.child ? reg : bold, 10.5, X_QTY - 36 - LEFT - indent);
+    const titleLines = wrapText(l.item + (l.deposit && !/refundable/i.test(l.item + " " + l.desc) ? " (refundable)" : ""), l.child ? reg : bold, 10.5, X_QTY - 36 - LEFT - indent);
     const descLines = l.desc ? wrapText(l.desc, ital, 9, X_QTY - 36 - LEFT - indent) : [];
     const need = (titleLines.length * 14) + (descLines.length * 12) + 10;
     if (y - need < BOTTOM + 150) { newPage(false); head(); }
@@ -158,7 +158,7 @@ export async function invoicePdf(inv: InvoiceData): Promise<Uint8Array> {
     spaced("PAYMENT SCHEDULE", LEFT, y, 8, 1.8, bold, GOLD); y -= 8; rule(y); y -= 16;
     for (const p of inv.payments) {
       ensure(22);
-      text(p.label + (p.deposit ? " (refundable)" : ""), LEFT, y, 10, reg);
+      text(p.label + (p.deposit && !/refundable/i.test(p.label) ? " (refundable)" : ""), LEFT, y, 10, reg);
       text(p.due ? "Due " + longDate(p.due) : "Due date to be confirmed", 300, y, 9.5, reg, MUTED);
       right(usd(p.cents), X_AMT, y, 10, bold);
       y -= 18;
@@ -166,8 +166,8 @@ export async function invoicePdf(inv: InvoiceData): Promise<Uint8Array> {
   }
 
   // ---- note ----
-  ensure(70); y -= 8;
-  for (const t of wrapText("The security deposit is fully refundable after the event, provided the venue is left in the condition it was found. Thank you for choosing North Star House.", ital, 9, WIDTH)) { text(t, LEFT, y, 9, ital, MUTED); y -= 12; }
+  ensure(46); y -= 8;
+  for (const t of wrapText("The security deposit is returned after the event, provided the venue is left in the condition it was found. Thank you for choosing North Star House.", ital, 9, WIDTH)) { text(t, LEFT, y, 9, ital, MUTED); y -= 12; }
 
   const pages = pdf.getPages();
   pages.forEach((p, i) => {

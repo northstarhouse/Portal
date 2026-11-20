@@ -48,6 +48,16 @@ const isZeroPrice = (t) => /^\s*\$?\s*0+(?:\.0+)?\s*$/.test(String(t == null ? '
 const priceText = (t) => (isZeroPrice(t) ? 'Free' : t);
 const bulletLines = (t) => String(t || '').split(/\r?\n/).map((l) => l.replace(/^\s*(?:[-*\u2022]|\d+[.)])\s*/, '').trim()).filter(Boolean);
 const decisionGroup = (r) => (r.final_decision && DECISIONS.includes(r.final_decision) ? r.final_decision : 'No Decision Yet');
+// Events that are being merged or still need discussion keep their details out of the emailed update until the event is
+// filled out (date, start and end time, pricing; every day of a multi-day event). Not Moving Forward events show theirs.
+const holdDetails = (r) => {
+  const g = decisionGroup(r);
+  if (g !== 'Merging with Another Event' && g !== 'Needs Further Discussion') return false;
+  const has = (v) => !!String(v || '').trim();
+  const days = Array.isArray(r.days) ? r.days : [];
+  const timed = r.multi_day ? days.length >= 2 && days.every((d) => has(d.date) && has(d.start_time) && has(d.end_time)) : has(r.date) && has(r.start_time) && has(r.end_time);
+  return !(timed && has(r.pricing));
+};
 const GROUP_ORDER = ['Moving Forward', 'Merging with Another Event', 'No Decision Yet', 'Needs Further Discussion', 'Not Moving Forward'];
 function buildPlanEmail({ rows, votes, note }) {
   const GOLD = '#a28b75'; const TITLE = '#8c6d36';
@@ -64,11 +74,12 @@ function buildPlanEmail({ rows, votes, note }) {
   const eventRow = (r) => {
     const dt = DECISION_TONE[r.final_decision];
     const edge = dt ? dt.color : '#e0a800';
-    const sub = detailLine(r);
+    const hold = holdDetails(r);
+    const sub = hold ? [] : detailLine(r);
     return '<tr><td bgcolor="#ffffff" style="background:#ffffff;padding:13px 18px;border-bottom:1px solid #ede8df;">'
       + '<div style="font-size:15px;font-weight:bold;color:#2a2a2a;line-height:1.35;">' + esc(r.name)
       + '</div>'
-      + (sub.length
+      + (hold ? '' : sub.length
         ? '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#666666;line-height:1.55;">' + sub.map((x) => '<li style="margin:0 0 2px;">' + esc(x) + '</li>').join('') + '</ul>'
         : '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#999999;line-height:1.55;"><li style="font-style:italic;">No details yet</li></ul>')
       + '<div style="margin-top:9px;border-left:3px solid ' + edge + ';background:#faf7f2;padding:8px 12px;">'
@@ -81,8 +92,8 @@ function buildPlanEmail({ rows, votes, note }) {
   const groups = GROUP_ORDER.map((g) => ({ g, items: sorted.filter((r) => decisionGroup(r) === g) })).filter((x) => x.items.length);
   const groupsHtml = groups.map(({ g, items }) =>
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;border:1px solid #ece3d7;border-collapse:separate;">'
-    + '<tr><td bgcolor="#f7f4f1" style="background:#f7f4f1;padding:12px 16px;border:1px solid #ae9a86;"><img src="' + ICON + '" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">'
-    + '<span style="font-family:Cardo,Georgia,serif;font-size:14px;font-weight:bold;color:' + TITLE + ';vertical-align:middle;">' + esc(g) + '</span>'
+    + '<tr><td bgcolor="' + (DECISION_TONE[g] ? DECISION_TONE[g].bg : '#f7f4f1') + '" style="background:' + (DECISION_TONE[g] ? DECISION_TONE[g].bg : '#f7f4f1') + ';padding:12px 16px;border:1px solid ' + (DECISION_TONE[g] ? DECISION_TONE[g].color : '#ae9a86') + ';"><img src="' + ICON + '" width="20" height="20" alt="" style="vertical-align:middle;margin-right:8px;border:0;">'
+    + '<span style="font-family:Cardo,Georgia,serif;font-size:14px;font-weight:bold;color:' + (DECISION_TONE[g] ? DECISION_TONE[g].color : TITLE) + ';vertical-align:middle;">' + esc(g) + '</span>'
     + '<span style="font-size:12px;color:#888888;margin-left:10px;vertical-align:middle;">' + items.length + (items.length === 1 ? ' event' : ' events') + '</span></td></tr>'
     + items.map(eventRow).join('') + '</table>').join('');
   const movingN = sorted.filter((r) => r.final_decision === 'Moving Forward').length;
@@ -105,7 +116,7 @@ function buildPlanText({ rows, note }) {
   if (note && note.trim()) lines.push(note.trim(), '');
   sortPlan(rows || []).forEach((r) => {
     lines.push(`${r.name} (${decisionGroup(r)})`);
-    [r.date ? fmtDay(r.date) : '', r.pricing ? `Pricing: ${isZeroPrice(r.pricing) ? 'Free' : dollars(r.pricing)}` : '', r.budget ? `Budget: ${dollars(r.budget)}` : ''].filter(Boolean).forEach((x) => lines.push('  - ' + x));
+    (holdDetails(r) ? [] : [r.date ? fmtDay(r.date) : '', r.pricing ? `Pricing: ${isZeroPrice(r.pricing) ? 'Free' : dollars(r.pricing)}` : '', r.budget ? `Budget: ${dollars(r.budget)}` : '']).filter(Boolean).forEach((x) => lines.push('  - ' + x));
     bulletLines(r.decisions).forEach((x) => lines.push('  - ' + x));
     lines.push('');
   });

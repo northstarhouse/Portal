@@ -7,6 +7,7 @@
 import { contractPdf } from "./contract-pdf.ts";
 import { formPdf, type FormItem } from "./form-pdf.ts";
 import { invoicePdf, type InvoiceData, type InvoiceLine, type InvoicePayment } from "./invoice-pdf.ts";
+import { orderLinesFor, venueCode, isLaterAddOnRow } from "./invoice-lines.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -190,47 +191,35 @@ async function clientFolder(pbId: string, a: Record<string, any>, inq: any) {
 // otherwise the Portal's own payment schedule. Payments logged by hand are applied to the unpaid scheduled payments in date order.
 async function invoiceData(pb: any, inq: any, name: string, date: string): Promise<InvoiceData | null> {
   const a = pb.answers || {}, hb = a.__honeybook;
-  const stripHtml = (h: unknown) => String(h || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
   const files: any[] = hb?.files || [];
   const stamp = (id: string) => files.find((x) => x.id === id)?.updated_at || "";
   const invoice = (hb?.file_responses || []).filter((r: any) => r.responses?.payments && typeof r.responses.payments === "object").sort((x: any, y: any) => String(stamp(y.id)).localeCompare(String(stamp(x.id))))[0];
   const P = invoice?.responses?.payments;
-  const lines: InvoiceLine[] = [];
+  let lines: InvoiceLine[] = [];
   let schedule: InvoicePayment[] = [];
   let total = 0, paidAmt = 0;
+  let nativeRows: any[] | null = null;
   let issued = String(pb.created_at || "").slice(0, 10);
-  const extras = (Array.isArray(a.__venue_checklist?.extra_charges) ? a.__venue_checklist.extra_charges : []).filter((c: any) => c?.cents > 0);
   if (P) {
     issued = String(stamp(invoice.id) || issued).slice(0, 10);
-    const add = (li: any, child: boolean) => {
-      const qty = li.quantity == null ? 1 : li.quantity, unit = li.price?.amount || 0;
-      if (!(unit > 0) && !(qty > 0)) return;
-      lines.push({ item: li.title || "Item", desc: stripHtml(li.description), qty, unit, amount: unit * qty, child, deposit: /security deposit/i.test(li.title || "") });
-    };
-    for (const li of P.line_items || []) { add(li, false); for (const k of li.children || []) add(k, true); }
-    if (P.discount?.amount > 0) lines.push({ item: "Discount", desc: "", qty: 1, unit: -P.discount.amount, amount: -P.discount.amount });
-    if (P.tax?.amount > 0) lines.push({ item: "Tax", desc: "", qty: 1, unit: P.tax.amount, amount: P.tax.amount });
     const raw: any[] = P.schedule || [];
     schedule = raw.map((p, i) => {
       const cents = p.amount?.amount || 0;
       const dep = /security deposit/i.test(p.__nativeLabel || "") || (!p.__nativeLabel && raw.length > 1 && i === raw.length - 1 && cents === 80000);
       return { label: p.__nativeLabel || (dep ? "Refundable Security Deposit" : i === 0 ? "Booking payment" : "Scheduled payment " + (i + 1)), due: p.due_date ? String(p.due_date).slice(0, 10) : null, cents, paid: !!p.paid, paidAt: p.paid_at || null, deposit: dep };
     });
-    // charges added after the HoneyBook invoice (e.g. a rehearsal added from the client page)
-    const itemTotal = lines.reduce((t, l) => t + l.amount, 0);
-    total = lines.length ? itemTotal : (P.total?.amount || 0);
-    if (P.total?.amount != null) total = P.total.amount;
+    total = P.total?.amount != null ? P.total.amount : 0;
     paidAmt = P.amount_paid?.amount || 0;
   } else if (inq?.id) {
     const rows = await rest("venue_payment_schedule?select=sequence,kind,label,amount_cents,amount_paid_cents,due_date,status&inquiry_id=eq." + inq.id + "&order=sequence.asc");
     if (!Array.isArray(rows) || !rows.length) return null;
-    for (const r of rows) {
+    nativeRows = rows.filter((r: any) => !isLaterAddOnRow(r));
+    for (const r of nativeRows) {
       const dep = /security/i.test(String(r.kind || "") + " " + String(r.label || ""));
-      lines.push({ item: r.label || "Payment", desc: "", qty: 1, unit: r.amount_cents || 0, amount: r.amount_cents || 0, deposit: dep });
       schedule.push({ label: r.label || "Payment", due: r.due_date ? String(r.due_date).slice(0, 10) : null, cents: r.amount_cents || 0, paid: r.status === "paid", deposit: dep });
     }
-    total = rows.reduce((t: number, r: any) => t + (r.amount_cents || 0), 0);
-    paidAmt = rows.reduce((t: number, r: any) => t + (r.amount_paid_cents || 0), 0);
+    total = nativeRows.reduce((t: number, r: any) => t + (r.amount_cents || 0), 0);
+    paidAmt = nativeRows.reduce((t: number, r: any) => t + (r.amount_paid_cents || 0), 0);
   } else return null;
   // hand-logged payments settle the unpaid scheduled payments in date order
   const manual = (Array.isArray(a.__venue_checklist?.manual_payments) ? a.__venue_checklist.manual_payments : []).filter((m: any) => m?.cents > 0);
@@ -246,9 +235,12 @@ async function invoiceData(pb: any, inq: any, name: string, date: string): Promi
     for (const [n, e, ph] of [[a["7fnabd0i"], a.c9u1sxb4, a["163otrai"]], [a.evp_name, a.evp_email, a.evp_phone]]) if (n) { people.push({ name: String(n).trim(), email: String(e || ""), phone: String(ph || "") }); break; }
   }
   const evType = a.__event_type ? String(a.__event_type) : /wedding/i.test(String(hb?.project?.name || inq?.event_type || "")) ? "Wedding" : "Private Event";
+  // what was ordered, named the venue team's way: a saved order when there is one, else worked out from the booking
+  const savedOrder = a.__venue_checklist?.order && Array.isArray(a.__venue_checklist.order.items) && a.__venue_checklist.order.items.length ? a.__venue_checklist.order : null;
+  lines = orderLinesFor({ order: savedOrder, honeybook: P || null, nativeRows, eventDate: date, eventType: evType, brickLines: Array.isArray(inq?.brick_lines) ? inq.brick_lines : [], timeOnSite: a.__venue_checklist?.time_on_site || null });
+  if (savedOrder || !P) total = lines.reduce((t, l) => t + l.amount, 0);
   // the client's venue code is the event date, like NOV-14-2026
-  const dm = String(date || "").match(/^(d{4})-(d{2})-(d{2})/);
-  const code = dm ? ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][+dm[2] - 1] + "-" + dm[3] + "-" + dm[1] : String(pb.id).slice(0, 6).toUpperCase();
+  const code = venueCode(date) || String(pb.id).slice(0, 6).toUpperCase();
   return { number: code, issued, eventName: name, eventDate: date || null, eventType: evType, clients: people, lines, total, paid: paidAmt, balance: Math.max(0, total - paidAmt), payments: schedule };
 }
 
@@ -417,7 +409,7 @@ async function contractOnly(pbId: string) {
 }
 
 // Just the invoice, for a client whose full sync is too heavy to finish in one run.
-async function invoiceOnly(pbId: string) {
+async function invoiceOnly(pbId: string, replace = false) {
   const pb = (await rest("nsh_form_responses?select=id,form_id,answers,created_at&id=eq." + pbId))?.[0];
   if (!pb) return { skipped: "no such response" };
   const a = pb.answers || {};
@@ -425,10 +417,13 @@ async function invoiceOnly(pbId: string) {
   if (!(await hasPayment(pb, inq))) return { skipped: "no payment yet, so no Drive folder" };
   const { folderId, folderName, name, date } = await clientFolder(pbId, a, inq);
   const have = await listChildren(folderId);
-  if (have.some((f) => f.name.toLowerCase().startsWith("invoice"))) return { folder: folderName, skipped: "invoice already filed" };
+  const existingInvoice = have.find((f) => f.name.toLowerCase() === "invoice.pdf");
+  if (!replace && have.some((f) => f.name.toLowerCase().startsWith("invoice"))) return { folder: folderName, skipped: "invoice already filed" };
   const inv = await invoiceData(pb, inq, name, date);
   if (!inv || !(inv.lines.length || inv.payments.length)) return { folder: folderName, skipped: "no invoice on record" };
-  await uploadFile("Invoice.pdf", folderId, "application/pdf", await invoicePdf(inv));
+  const bytes = await invoicePdf(inv);
+  if (existingInvoice) { await replaceFileContent(existingInvoice.id, "application/pdf", bytes); return { folder: folderName, added: ["Invoice (redone)"] }; }
+  await uploadFile("Invoice.pdf", folderId, "application/pdf", bytes);
   return { folder: folderName, added: ["Invoice"] };
 }
 
@@ -542,7 +537,7 @@ Deno.serve(async (req) => {
       if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "response_id required" }, 400);
       const pbId = await resolvePrebookingId(id);
       if (!pbId) return json({ ok: true, skipped: "not tied to a client" });
-      return json({ ok: true, ...(await invoiceOnly(pbId)) });
+      return json({ ok: true, ...(await invoiceOnly(pbId, body.replace === true)) });
     }
     if (body.action === "upload_site_manager") {
       const id = String(body.response_id || "");
