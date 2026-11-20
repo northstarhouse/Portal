@@ -719,8 +719,13 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
 }
 
 // Round tick circle used on the checklist lines.
-function CheckCircle({ checked, onChange, size }) {
+function CheckCircle({ checked, onChange, size, half }) {
   const d = size || 18;
+  // half: in progress (the task has updates but isn't done yet) -- left half filled
+  if (!checked && half) return (
+    <button type="button" role="checkbox" aria-checked="mixed" title="In progress" onClick={onChange}
+      style={{ width: d, height: d, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: '1.5px solid var(--gold)', background: 'linear-gradient(90deg, var(--gold) 50%, transparent 50%)' }} />
+  );
   return (
     <button type="button" role="checkbox" aria-checked={checked} onClick={onChange}
       style={{ width: d, height: d, borderRadius: '50%', flexShrink: 0, padding: 0, cursor: 'pointer', border: checked ? 'none' : '1.5px solid var(--border)', background: checked ? 'var(--gold)' : 'transparent', color: '#fff', fontSize: Math.round(d * 0.62), lineHeight: d + 'px', textAlign: 'center' }}>{checked ? '✓' : ''}</button>
@@ -1962,6 +1967,15 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
   }
   const [itemForm, setItemForm] = useState({ text: '', due: '', assignee: '', assigneeId: null, priority: '' });
   const [expandedId, setExpandedId] = useState(null);
+  const [updateFor, setUpdateFor] = useState(null); // task id whose Update box is open
+  const [updateText, setUpdateText] = useState('');
+  function saveUpdate(t) {
+    const text = updateText.trim();
+    if (!text) return;
+    const by = me ? (me.name || [me['First Name'], me['Last Name']].filter(Boolean).join(' ') || '') : '';
+    patchItem(t.id, { updates: [...(t.updates || []), { text, at: new Date().toISOString(), ...(by ? { by } : {}) }] });
+    setUpdateFor(null); setUpdateText('');
+  }
   const [expandForm, setExpandForm] = useState({ text: '', due: '', assignee: '', assigneeId: null, priority: '', estimated: '', actual: '', notes: '' });
   const [subtaskInput, setSubtaskInput] = useState('');
   const sectionTitle = SECTION_HEAD;
@@ -2405,7 +2419,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
           return (
             <div key={t.id}>
               <ItemRow done={t.done} onDelete={() => deleteItem(t.id)} accent={t.priority ? TASK_PRIORITY[t.priority].color : null} onAccent={() => cycleItemPriority(t.id)} accentTitle={(t.priority ? TASK_PRIORITY[t.priority].label : 'No priority') + ' — click this left edge to change (none, medium, high)'}>
-                <CheckCircle checked={!!(t.done)} onChange={() => toggleItem(t.id)} />
+                <CheckCircle checked={!!(t.done)} half={(t.updates || []).length > 0} onChange={() => toggleItem(t.id)} />
                 <button onClick={() => startExpand(t)} title="Edit item"
                   style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
                   <span style={{ fontSize: 13, textDecoration: 'none', color: 'var(--text)' }}>{t.text}</span>
@@ -2416,7 +2430,14 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
                       {hasMoney ? `Est. ${money(t.estimated)}` : ''}{hasMoney && hasNotes ? ' · ' : ''}{hasNotes ? 'notes' : ''}
                     </span>
                   )}
+                  {(t.updates || []).length > 0 && (() => { const u = t.updates[t.updates.length - 1]; return (
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginTop: 2, lineHeight: 1.35 }}>
+                      <span style={{ fontWeight: 700, color: 'var(--gold)' }}>Update</span>{' · '}{new Date(u.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{u.by ? ' · ' + u.by : ''}: {u.text}{t.updates.length > 1 ? ` (+${t.updates.length - 1} earlier)` : ''}
+                    </span>
+                  ); })()}
                 </button>
+                {!t.done && <button type="button" title="Add a progress update" onClick={() => { setUpdateFor(updateFor === t.id ? null : t.id); setUpdateText(''); }}
+                  style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '4px 10px', whiteSpace: 'nowrap', background: updateFor === t.id ? 'var(--gold)' : '#fff', color: updateFor === t.id ? '#fff' : 'var(--gold)', border: '1px solid var(--gold)', borderRadius: 999, cursor: 'pointer' }}>Update</button>}
                 <select className="input" value={t.category || ''} onChange={e => patchItem(t.id, { category: e.target.value, ...(e.target.value === 'Marketing' && !t.assignee ? mkWho('Marketing') : {}) })} title="Category" style={{ width: 118, flexShrink: 0, fontSize: 12, padding: '5px 8px', appearance: 'auto' }}>
                   <option value="">General</option>
                   {CHECKLIST_CATEGORIES.filter(c => c !== 'General').map(c => <option key={c} value={c}>{c}</option>)}
@@ -2436,6 +2457,17 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
                 </select>}
                 {!t.done && (t.timing || (t.due ? 'before' : '')) === 'before' && <input className="input" type="date" value={t.due || ''} title="Clear the date to pick a different timing" onChange={e => patchItem(t.id, { due: e.target.value })} style={{ width: 152, flexShrink: 0, fontSize: 12, padding: '5px 8px' }} />}
               </ItemRow>
+              {updateFor === t.id && (
+                <div style={{ padding: '8px 0 12px 43px', display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                  <textarea className="input" autoFocus rows={2} value={updateText} onChange={e => setUpdateText(e.target.value)} placeholder="Where does this stand? (e.g. Called Jeff, waiting to hear back)"
+                    onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveUpdate(t); }} style={{ flex: 1, minWidth: 220, fontSize: 13, resize: 'vertical' }} />
+                  <button type="button" className="btn-gold" disabled={!updateText.trim()} onClick={() => saveUpdate(t)} style={{ fontSize: 12, padding: '7px 14px' }}>Save update</button>
+                  <button type="button" className="btn-ghost" onClick={() => { setUpdateFor(null); setUpdateText(''); }} style={{ fontSize: 12, padding: '7px 12px' }}>Cancel</button>
+                  {(t.updates || []).length > 1 && <div style={{ flexBasis: '100%', fontSize: 11, color: 'var(--muted)' }}>
+                    {t.updates.slice(0, -1).reverse().map((u, i) => <div key={i} style={{ marginTop: 3 }}>{new Date(u.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{u.by ? ' · ' + u.by : ''}: {u.text}</div>)}
+                  </div>}
+                </div>
+              )}
               {isOpen && (
                 <div style={{ padding: '10px 0 14px 33px' }}>
                   <div className="label">Item</div>
