@@ -6582,6 +6582,35 @@ function boardItemType(item) {
   return BOARD_ITEM_TYPES.filter(function(t) { return t.id === id; })[0] || BOARD_ITEM_TYPES[0];
 }
 function boardIsVote(item) { return boardItemType(item).id === 'Vote'; }
+// A decision entered from the board meeting minutes rather than voted on here: only the outcome is kept
+// (item.decision, e.g. "Approved", and item.decision_detail, e.g. "5 in favor, 1 abstention"). No individual votes.
+function boardIsRecorded(item) { return !!(item && item.decision); }
+function boardDecisionStyle(item) {
+  var d = String((item && item.decision) || '').toLowerCase();
+  if (/approved|passed|elected|accepted/.test(d)) return { bg: '#e8f5e9', color: '#2e7d32', border: '#a5d6a7' };
+  if (/denied|declined|rejected|failed|not approved/.test(d)) return { bg: '#ffebee', color: '#c62828', border: '#ef9a9a' };
+  return { bg: '#f5f0ea', color: '#6b5a3e', border: '#e0d8cc' };
+}
+// Where each item belongs in the list (newest first): its created_at if it has one, the meeting date for a decision entered
+// from the minutes, otherwise the time of its first vote. An item with none of those takes the date of the item added just
+// before it, so older items without dates keep their place.
+function boardItemTimes(items, votes) {
+  var firstVote = {};
+  (votes || []).forEach(function(v) {
+    var ms = v.timestamp ? Date.parse(v.timestamp) : NaN;
+    if (!isNaN(ms) && (firstVote[v.topicId] === undefined || ms < firstVote[v.topicId])) firstVote[v.topicId] = ms;
+  });
+  var out = {}, last = 0;
+  (items || []).slice().sort(function(a, b) { return (a.row_id || 0) - (b.row_id || 0); }).forEach(function(i) {
+    var t = 0;
+    if (i.created_at) t = Date.parse(i.created_at) || 0;
+    if (!t && i.decision && i.meeting_date) t = Date.parse(i.meeting_date + 'T12:00:00') || 0;
+    if (!t && firstVote[i.title] !== undefined) t = firstVote[i.title];
+    if (t) last = t; else t = last;
+    out[i.row_id] = t;
+  });
+  return out;
+}
 // When a reply/vote is wanted (response_timing: asap | next_meeting | date). For next_meeting and date, due_date holds the date.
 var BOARD_RESPONSE_TIMING = [
   { id: '', label: 'No deadline' },
@@ -7090,10 +7119,10 @@ function BoardView() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {(function() {
+          var times = boardItemTimes(items, votes);
           var byNewest = function(a, b) {
-            var da = a.created_at ? new Date(a.created_at).getTime() : 0;
-            var db = b.created_at ? new Date(b.created_at).getTime() : 0;
-            if (db !== da) return db - da;
+            var d = (times[b.row_id] || 0) - (times[a.row_id] || 0);
+            if (d) return d;
             return (b.row_id || 0) - (a.row_id || 0);
           };
           var shown = items.filter(function(i) { return typeFilter === 'all' || boardItemType(i).id === typeFilter; });
@@ -7132,14 +7161,16 @@ function BoardView() {
                     {item.requested_by ? <span>Requested by {item.requested_by}{item.due_date ? ' · ' : ''}</span> : null}
                     {item.due_date && !item.response_timing ? <span>Due {fmtDate(item.due_date)}</span> : null}
                     {boardRespondText(item) ? <span style={{ color: boardRespondOverdue(item) ? '#c62828' : '#8a5a12', fontWeight: 600 }}>{boardRespondText(item)}{boardRespondOverdue(item) ? ' — overdue' : ''}</span> : null}
-                    {item.meeting_date && !item.response_timing ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null}
+                    {boardIsRecorded(item) ? (item.meeting_date ? <span>Decided {fmtDate(item.meeting_date)}</span> : null) : (item.meeting_date && !item.response_timing ? <span> · Meeting {fmtDate(item.meeting_date)}</span> : null)}
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                   {item.created_at && <span style={{ fontSize: 11, color: '#aaa' }}>Submitted {fmtSubmitted(item.created_at)}</span>}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 12, color: '#777' }}>{boardIsVote(item) ? iv.length + '/' + BOARD_MEMBERS.length + ' voted' : iv.length + ' response' + (iv.length === 1 ? '' : 's')}</span>
-                    {revealed
+                    <span style={{ fontSize: 12, color: '#777' }}>{boardIsRecorded(item) ? (item.decision_detail || '') : boardIsVote(item) ? iv.length + '/' + BOARD_MEMBERS.length + ' voted' : iv.length + ' response' + (iv.length === 1 ? '' : 's')}</span>
+                    {boardIsRecorded(item)
+                      ? <span style={{ background: boardDecisionStyle(item).bg, color: boardDecisionStyle(item).color, fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>{item.decision}</span>
+                      : revealed
                       ? <span style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Closed</span>
                       : <span style={{ background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 4 }}>Open</span>
                     }
@@ -7152,7 +7183,7 @@ function BoardView() {
                 if (!boardIsVote(item) || revealed) {
                   iv.forEach(function(v) { if (v.choice !== 'Not in attendance' && v.voter && people.indexOf(v.voter) === -1) people.push(v.voter); });
                 }
-                var showTally = revealed && boardIsVote(item);
+                var showTally = revealed && boardIsVote(item) && !boardIsRecorded(item);
                 if (!showTally && !people.length) return null;
                 var maxShow = 6, shownPeople = people.slice(0, maxShow);
                 return (
@@ -7204,7 +7235,7 @@ function BoardView() {
                   {selected.requested_by ? <span> · requested by {selected.requested_by}</span> : null}
                   {selected.due_date && !selected.response_timing ? <span> · Due {fmtDate(selected.due_date)}</span> : null}
                   {boardRespondText(selected) ? <span style={{ color: boardRespondOverdue(selected) ? '#c62828' : '#8a5a12', fontWeight: 600 }}> · {boardRespondText(selected)}{boardRespondOverdue(selected) ? ' — overdue' : ''}</span> : null}
-                  {selected.meeting_date && !selected.response_timing ? <span> · Meeting {fmtDate(selected.meeting_date)}</span> : null}
+                  {boardIsRecorded(selected) ? (selected.meeting_date ? <span>Decided {fmtDate(selected.meeting_date)}</span> : null) : (selected.meeting_date && !selected.response_timing ? <span> · Meeting {fmtDate(selected.meeting_date)}</span> : null)}
                 </div>
             </div>
 
@@ -7219,7 +7250,16 @@ function BoardView() {
               </div>
             )}
 
-            {!boardIsVote(selected) ? (
+            {boardIsRecorded(selected) ? (
+              <div>
+                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10 }}>Decision</div>
+                <div style={{ background: boardDecisionStyle(selected).bg, border: '1px solid ' + boardDecisionStyle(selected).border, borderRadius: 10, padding: '18px 20px', marginBottom: 14 }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: boardDecisionStyle(selected).color, lineHeight: 1.2 }}>{selected.decision}</div>
+                  {selected.decision_detail && <div style={{ fontSize: 14, color: '#555', marginTop: 6 }}>{selected.decision_detail}</div>}
+                </div>
+                <div style={{ fontSize: 12, color: '#999', lineHeight: 1.5 }}>Recorded from the board meeting minutes. Individual votes are not shown for this decision.</div>
+              </div>
+            ) : !boardIsVote(selected) ? (
               <div>
                 <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10 }}>
                   Conversation · {itemVotes(selected).length}
@@ -7447,7 +7487,7 @@ function BoardView() {
               {items.length === 0
                 ? <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: 32 }}>No voting items.</div>
                 : (function() {
-                    var byNewest = function(a, b) { var da = a.created_at ? new Date(a.created_at).getTime() : 0; var db = b.created_at ? new Date(b.created_at).getTime() : 0; if (db !== da) return db - da; return (b.row_id || 0) - (a.row_id || 0); };
+                    var times = boardItemTimes(items, votes); var byNewest = function(a, b) { var d = (times[b.row_id] || 0) - (times[a.row_id] || 0); if (d) return d; return (b.row_id || 0) - (a.row_id || 0); };
                     var openItems = items.filter(function(i) { return !isRevealed(i); }).sort(byNewest);
                     var closedItems = items.filter(function(i) { return isRevealed(i); }).sort(byNewest);
                     return (
@@ -7538,7 +7578,9 @@ function BoardView() {
                                       <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                                           <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{item.title}</div>
-                                          {passed
+                                          {boardIsRecorded(item)
+                                            ? <span style={{ fontSize: 10, fontWeight: 700, background: boardDecisionStyle(item).bg, color: boardDecisionStyle(item).color, padding: '2px 8px', borderRadius: 20 }}>{item.decision}</span>
+                                            : passed
                                             ? <span style={{ fontSize: 10, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', padding: '2px 8px', borderRadius: 20 }}>Passed</span>
                                             : !isVoteRow
                                               ? <span style={{ fontSize: 10, fontWeight: 700, background: boardItemType(item).bg, color: boardItemType(item).color, padding: '2px 8px', borderRadius: 20 }}>{boardItemType(item).label}</span>
@@ -7548,7 +7590,7 @@ function BoardView() {
                                           }
                                         </div>
                                         <div style={{ display: 'flex', gap: 14, fontSize: 12 }}>
-                                          {isVoteRow ? [
+                                          {boardIsRecorded(item) ? <span style={{ color: '#888' }}>{item.decision_detail || 'Recorded from the minutes'}</span> : isVoteRow ? [
                                             <span key="y" style={{ color: '#2e7d32', fontWeight: 600 }}>{t.yes} Yes</span>,
                                             <span key="n" style={{ color: '#c62828', fontWeight: 600 }}>{t.no} No</span>,
                                             <span key="a" style={{ color: '#7c3aed', fontWeight: 600 }}>{t.abstain + t.absent} Abstain</span>,
@@ -7564,7 +7606,7 @@ function BoardView() {
                                       </button>
                                       <span style={{ fontSize: 11, color: '#aaa', flexShrink: 0 }}>{expanded ? '▲' : '▼'}</span>
                                     </div>
-                                    {expanded && (
+                                    {expanded && !boardIsRecorded(item) && (
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 10, paddingTop: 10, borderTop: '0.5px solid #f0ece6' }}>
                                         {BOARD_MEMBERS.map(function(m) {
                                           var mv = iv.find(function(v) { return v.voter === m; });
@@ -25063,7 +25105,7 @@ function MeetingBoardReportsView({ navigate }) {
                       <div key={v.item.row_id} style={{ background: '#faf8f4', borderRadius: 8, padding: '7px 10px' }}>
                         <div style={{ fontSize: 12, color: '#2a2a2a', fontWeight: 600 }}>{v.item.title}</div>
                         <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
-                          {v.item.status || 'Open'} &nbsp;·&nbsp; Yes {v.tally.yes} · No {v.tally.no} · Abstain {v.tally.abstain}
+                          {v.item.decision ? v.item.decision + (v.item.decision_detail ? '  ·  ' + v.item.decision_detail : '') : <React.Fragment>{v.item.status || 'Open'} &nbsp;·&nbsp; Yes {v.tally.yes} · No {v.tally.no} · Abstain {v.tally.abstain}</React.Fragment>}
                         </div>
                       </div>
                     );
