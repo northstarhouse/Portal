@@ -9,6 +9,9 @@ const elApi = (path, init = {}) => fetch(EL_URL + '/rest/v1/' + path, { ...init,
 
 const PLAN_YEAR = 2027;
 const GOLD = '#886c44';
+// A pricing of 0 ($0, 0.00) is shown as Free.
+const isZeroPrice = (t) => /^\s*\$?\s*0+(?:\.0+)?\s*$/.test(String(t == null ? '' : t));
+const priceText = (t) => (isZeroPrice(t) ? 'Free' : t);
 const HUB_URL = 'https://northstarhouse.github.io/volunteerhub/';
 const fmtDay = (iso) => iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : '';
 const fmtShort = (iso) => iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
@@ -203,7 +206,7 @@ export function EventListView({ navigate }) {
                     {vr && <span title={'Committee vote · ' + vr.title} style={{ fontSize: 11, fontWeight: 700, background: vr.tone.bg, color: vr.tone.color, borderRadius: 10, padding: '2px 9px' }}>{vr.label} {vr.count}/{vr.total}</span>}
                   </div>
                   <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
-                    {[r.multi_day ? (daysOf(r).length || 'Multi') + '-day: ' + (daysOf(r).filter(d => d.date).map(d => fmtShort(d.date)).join(', ') || 'dates to set') : '', !r.multi_day && r.date ? fmtDay(r.date) : '', !r.multi_day && r.start_time ? fmtTime(r.start_time) + (r.end_time ? '–' + fmtTime(r.end_time) : '') : '', r.pricing ? 'Pricing: ' + r.pricing : '', r.budget ? 'Budget: ' + r.budget : ''].filter(Boolean).join(' · ') || 'No details yet'}
+                    {[r.multi_day ? (daysOf(r).length || 'Multi') + '-day: ' + (daysOf(r).filter(d => d.date).map(d => fmtShort(d.date)).join(', ') || 'dates to set') : '', !r.multi_day && r.date ? fmtDay(r.date) : '', !r.multi_day && r.start_time ? fmtTime(r.start_time) + (r.end_time ? '–' + fmtTime(r.end_time) : '') : '', r.pricing ? 'Pricing: ' + priceText(r.pricing) : '', r.budget ? 'Budget: ' + r.budget : ''].filter(Boolean).join(' · ') || 'No details yet'}
                   </div>
                 </div>
                 <select value={r.final_decision || ''} onChange={e => setDecision(r, e.target.value)} aria-label={'Final decision for ' + r.name}

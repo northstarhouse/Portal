@@ -43,6 +43,9 @@ const volName = (v) => v ? `${v['First Name'] || ''} ${v['Last Name'] || ''}`.tr
 // A branded, read-only copy of the plan: each event with its details, the vote result and the committee's decisions, grouped by
 // the final decision. Same look as the checklist email (taupe headers, one body font); titles are never all caps.
 const dollars = (t) => String(t || '').replace(/(^|[^$\d.,])(\d[\d,]*(?:\.\d+)?)/g, (m, a, n) => a + '$' + n);
+// A pricing of 0 ($0, 0.00) is shown as Free.
+const isZeroPrice = (t) => /^\s*\$?\s*0+(?:\.0+)?\s*$/.test(String(t == null ? '' : t));
+const priceText = (t) => (isZeroPrice(t) ? 'Free' : t);
 const bulletLines = (t) => String(t || '').split(/\r?\n/).map((l) => l.replace(/^\s*(?:[-*\u2022]|\d+[.)])\s*/, '').trim()).filter(Boolean);
 const decisionGroup = (r) => (r.final_decision && DECISIONS.includes(r.final_decision) ? r.final_decision : 'No Decision Yet');
 const GROUP_ORDER = ['Moving Forward', 'Merging with Another Event', 'No Decision Yet', 'Needs Further Discussion', 'Not Moving Forward'];
@@ -56,7 +59,7 @@ function buildPlanEmail({ rows, votes, note }) {
     r.multi_day ? `${daysOf(r).length || 'Multi'}-day: ` + (daysOf(r).filter((d) => d.date).map((d) => fmtShort(d.date)).join(', ') || 'dates to set') : '',
     !r.multi_day && r.date ? fmtDay(r.date) : '',
     !r.multi_day && r.start_time ? `${fmtTime(r.start_time)}${r.end_time ? ' – ' + fmtTime(r.end_time) : ''}` : '',
-    r.pricing ? `Pricing: ${dollars(r.pricing)}` : '', r.budget ? `Budget: ${dollars(r.budget)}` : '',
+    r.pricing ? `Pricing: ${isZeroPrice(r.pricing) ? 'Free' : dollars(r.pricing)}` : '', r.budget ? `Budget: ${dollars(r.budget)}` : '',
   ].filter(Boolean);
   const eventRow = (r) => {
     const dt = DECISION_TONE[r.final_decision];
@@ -64,7 +67,7 @@ function buildPlanEmail({ rows, votes, note }) {
     const sub = detailLine(r);
     return '<tr><td bgcolor="#ffffff" style="background:#ffffff;padding:13px 18px;border-bottom:1px solid #ede8df;">'
       + '<div style="font-size:15px;font-weight:bold;color:#2a2a2a;line-height:1.35;">' + esc(r.name)
-      + (r.finalized_event_id ? ' <span style="font-size:11px;font-weight:bold;color:#2e7d32;">&#10003; Finalized' + (r.finalized_at ? ' ' + esc(fmtStamp(r.finalized_at)) : '') + '</span>' : '') + '</div>'
+      + (r.finalized_event_id ? ' <span style="font-size:11px;font-weight:bold;color:#2e7d32;">&#10003; Finalized</span>' : '') + '</div>'
       + (sub.length
         ? '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#666666;line-height:1.55;">' + sub.map((x) => '<li style="margin:0 0 2px;">' + esc(x) + '</li>').join('') + '</ul>'
         : '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#999999;line-height:1.55;"><li style="font-style:italic;">No details yet</li></ul>')
@@ -103,7 +106,7 @@ function buildPlanText({ rows, note }) {
   if (note && note.trim()) lines.push(note.trim(), '');
   sortPlan(rows || []).forEach((r) => {
     lines.push(`${r.name} (${decisionGroup(r)})`);
-    [r.date ? fmtDay(r.date) : '', r.pricing ? `Pricing: ${dollars(r.pricing)}` : '', r.budget ? `Budget: ${dollars(r.budget)}` : ''].filter(Boolean).forEach((x) => lines.push('  - ' + x));
+    [r.date ? fmtDay(r.date) : '', r.pricing ? `Pricing: ${isZeroPrice(r.pricing) ? 'Free' : dollars(r.pricing)}` : '', r.budget ? `Budget: ${dollars(r.budget)}` : ''].filter(Boolean).forEach((x) => lines.push('  - ' + x));
     bulletLines(r.decisions).forEach((x) => lines.push('  - ' + x));
     lines.push('');
   });
@@ -319,7 +322,7 @@ export default function EventPlan({ session, volunteer, onFinalized }) {
                   <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{r.name}{vr && <span title={'Committee vote · ' + vr.title} style={{ fontSize: 11, fontWeight: 700, background: vr.tone.bg, color: vr.tone.color, borderRadius: 10, padding: '2px 9px' }}>{vr.label} {vr.count}/{vr.total}</span>}</div>
                     <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                      {[r.multi_day ? `${daysOf(r).length || 'Multi'}-day: ` + (daysOf(r).filter((d) => d.date).map((d) => fmtShort(d.date)).join(', ') || 'dates to set') : '', !r.multi_day && r.date ? fmtDay(r.date) : '', !r.multi_day && r.start_time ? `${fmtTime(r.start_time)}${r.end_time ? '–' + fmtTime(r.end_time) : ''}` : '', r.pricing ? `Pricing: ${r.pricing}` : '', r.budget ? `Budget: ${r.budget}` : ''].filter(Boolean).join(' · ') || 'No details yet'}
+                      {[r.multi_day ? `${daysOf(r).length || 'Multi'}-day: ` + (daysOf(r).filter((d) => d.date).map((d) => fmtShort(d.date)).join(', ') || 'dates to set') : '', !r.multi_day && r.date ? fmtDay(r.date) : '', !r.multi_day && r.start_time ? `${fmtTime(r.start_time)}${r.end_time ? '–' + fmtTime(r.end_time) : ''}` : '', r.pricing ? `Pricing: ${priceText(r.pricing)}` : '', r.budget ? `Budget: ${r.budget}` : ''].filter(Boolean).join(' · ') || 'No details yet'}
                     </div>
                   </div>
                   <select value={r.final_decision || ''} onChange={e => setDecision(r, e.target.value)} aria-label={'Final decision for ' + r.name}

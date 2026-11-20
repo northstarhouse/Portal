@@ -647,7 +647,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               ['Event lead', ev.eventLead],
               ['Expected guests', ev.expectedAttendance || (ev.guestCount.invited ? String(ev.guestCount.invited) : '')],
               ...ticketRows,
-              ['Pricing', ev.pricing],
+              ['Pricing', priceText(ev.pricing)],
               ['Volunteers needed', volNeed ? String(volNeed) : ''],
               ['Website', ev.siteEventId ? 'Live on the website' : 'Not on the website yet'],
             ];
@@ -860,6 +860,9 @@ function VendorsView({ ev }) {
 const SPLIT_PRESETS = [['50', '50 / 50  (vendor 50%, North Star 50%)'], ['60', '60 / 40  (vendor 60%, North Star 40%)'], ['70', '70 / 30  (vendor 70%, North Star 30%)'], ['40', '40 / 60  (vendor 40%, North Star 60%)'], ['30', '30 / 70  (vendor 30%, North Star 70%)']];
 const costLabel = (v) => (v.costType === 'flat' && Number(v.cost) > 0 ? '$' + Number(v.cost).toLocaleString() + ' flat' : v.costType === 'split' && Number(v.splitPct) > 0 ? Number(v.splitPct) + '% of ticket sales' : '');
 const NEED_KINDS = { vendor: 'Vendor', contact: 'Contact', volunteer: 'Volunteer', activity: 'Activity', sponsor: 'Sponsor' };
+// A pricing of 0 ($0, 0.00) is shown as Free.
+const isZeroPrice = (t) => /^\s*\$?\s*0+(?:\.0+)?\s*$/.test(String(t == null ? '' : t));
+const priceText = (t) => (isZeroPrice(t) ? 'Free' : t);
 const volFullName = (v) => `${v['First Name'] || ''} ${v['Last Name'] || ''}`.trim() || 'Unnamed';
 
 // Assign volunteers to a need: type to search the roster, or type any name that isn't on it.
@@ -1616,7 +1619,7 @@ function EventBasicsView({ f, ev, rsvp }) {
       {row('Event type', f.purpose)}
       {row('Event lead', f.eventLead)}
       {row('Expected attendance', f.expectedAttendance)}
-      {row('Pricing note', f.pricing)}
+      {row('Pricing note', priceText(f.pricing))}
     </div>
   );
 }
@@ -2186,7 +2189,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
     const detailRows = [
       ['Date', dateTxt], ['Time', timeTxt], ['Event type', ev.purpose], ['Event lead', ev.eventLead],
       ['Expected guests', ev.expectedAttendance || (ev.guestCount && ev.guestCount.invited ? String(ev.guestCount.invited) : '')],
-      ...ticketRows, ['Pricing', ev.pricing],
+      ...ticketRows, ['Pricing', priceText(ev.pricing)],
     ].filter(r => r[1]);
     const detailsBox = box('Event Details', detailRows.length
       ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + detailRows.map(r => '<tr><td width="128" style="vertical-align:baseline;padding:7px 8px 7px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:bold;line-height:1.4;color:#2a2a2a;">' + esc(r[0]) + ':</td><td style="vertical-align:baseline;padding:8px 0;border-bottom:1px solid #f3ecdf;font-family:Helvetica,Arial,sans-serif;font-size:12.5px;line-height:1.45;color:#888888;">' + esc(r[1]) + '</td></tr>').join('') + '</table>'
