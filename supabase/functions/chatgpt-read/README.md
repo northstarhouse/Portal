@@ -1,4 +1,4 @@
-# chatgpt-read: read-only data for ChatGPT
+# chatgpt-read: read-only data for ChatGPT and Claude
 
 A small read-only web link that a ChatGPT custom GPT ("Action") can call. GET only. Every request needs the key in an
 `x-api-key` header; the key is the project secret `CHATGPT_READ_KEY` (not stored in this repo).
@@ -22,7 +22,26 @@ volunteers or paid guest artists by name.
 3. Authentication > API Key > Auth Type "Custom", Custom Header Name `x-api-key`, paste the key.
 4. Save. Ask it a question, e.g. "Which weddings still have a balance due?"
 
-## Rotate or revoke the key
+## Connect it in Claude (browser or desktop app)
+The same four datasets are offered as an MCP server (tools: get_venue_bookings, get_events, get_financials, get_board_items).
+Link: `https://uvzwhhwzelaelfhfkvdb.supabase.co/functions/v1/chatgpt-read/mcp`
+1. Claude > Settings > Connectors > Add custom connector (Team or Enterprise: an owner adds it for the organization).
+2. Name it "North Star Portal" and paste the link.
+3. Authentication: No sign-in. Under Request headers add one header: name `x-api-key`, value = the CLAUDE_MCP_KEY secret.
+4. Add it, turn it on in a chat from the tools menu, then ask a question.
+
+## Claude connector that can also make changes (separate)
+Link: `https://uvzwhhwzelaelfhfkvdb.supabase.co/functions/v1/chatgpt-read/mcp-rw`, header `x-api-key` = the CLAUDE_WRITE_KEY secret.
+Same four read tools, plus: add_event_task_update, mark_event_task_done, add_event_expense, add_board_item, record_booking_payment.
+Safeguards: add-only (nothing is deleted or un-done), amounts and dates sanity-checked, duplicates skipped, payments cannot
+exceed the balance, 30 changes per hour maximum, every change is written to the Activity Log as "Claude: ..." (which also sends
+the phone notification), and each tool accepts `dry_run: true` to preview. Keep this connector off in chats that don't need it.
+Replace its key with `supabase secrets set CLAUDE_WRITE_KEY=<new value> --project-ref uvzwhhwzelaelfhfkvdb`.
+
+To replace the Claude read-only key: `supabase secrets set CLAUDE_MCP_KEY=<a new long random value> --project-ref uvzwhhwzelaelfhfkvdb`
+(the old key stops working at once; update the header in Claude). It is separate from the ChatGPT key.
+
+## Rotate or revoke the ChatGPT key
 `supabase secrets set CHATGPT_READ_KEY=<a new long random value> --project-ref uvzwhhwzelaelfhfkvdb`
 (the old key stops working at once; update the key in the GPT's action). To turn the link off completely, delete the
 function: `supabase functions delete chatgpt-read --project-ref uvzwhhwzelaelfhfkvdb`.
