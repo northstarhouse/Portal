@@ -42,7 +42,8 @@ const volName = (v) => v ? `${v['First Name'] || ''} ${v['Last Name'] || ''}`.tr
 // ── Email update to the committee ────────────────────────────────────────────────────────────────────────────────────────
 // A branded, read-only copy of the plan: each event with its details, the vote result and the committee's decisions, grouped by
 // the final decision. Same look as the checklist email (taupe headers, one body font); titles are never all caps.
-const dollars = (t) => String(t || '').replace(/(^|[^$\d.,])(\d[\d,]*(?:\.\d+)?)/g, (m, a, n) => a + '$' + n);
+// A plain number gets a dollar sign (5 -> $5); pricing written out in words ("$30 per person, about 50 seats") is left as typed.
+const dollars = (t) => /[a-z]/i.test(String(t || '')) ? String(t) : String(t || '').replace(/(^|[^$\d.,])(\d[\d,]*(?:\.\d+)?)/g, (m, a, n) => a + '$' + n);
 // A pricing of 0 ($0, 0.00) is shown as Free.
 const isZeroPrice = (t) => /^\s*\$?\s*0+(?:\.0+)?\s*$/.test(String(t == null ? '' : t));
 const priceText = (t) => (isZeroPrice(t) ? 'Free' : t);
@@ -59,6 +60,19 @@ const holdDetails = (r) => {
   return !(timed && has(r.pricing));
 };
 const GROUP_ORDER = ['Moving Forward', 'Merging with Another Event', 'No Decision Yet', 'Needs Further Discussion', 'Not Moving Forward'];
+// The date, time, pricing and budget lines of an event in the emailed update. A Moving Forward event always lists its
+// date, time and pricing; anything not set yet reads Undecided.
+function detailParts(r) {
+  const moving = r.final_decision === 'Moving Forward';
+  const days = Array.isArray(r.days) ? r.days : [];
+  return [
+    r.multi_day ? `${days.length || 'Multi'}-day: ` + (days.filter((d) => d.date).map((d) => fmtShort(d.date)).join(', ') || 'dates to set') : '',
+    !r.multi_day ? (r.date ? fmtDay(r.date) : (moving ? 'Date: Undecided' : '')) : '',
+    !r.multi_day ? (r.start_time ? `${fmtTime(r.start_time)}${r.end_time ? ' – ' + fmtTime(r.end_time) : ''}` : (moving ? 'Time: Undecided' : '')) : '',
+    r.pricing ? `Pricing: ${isZeroPrice(r.pricing) ? 'Free' : dollars(r.pricing)}` : (moving ? 'Pricing: Undecided' : ''),
+    r.budget ? `Budget: ${dollars(r.budget)}` : '',
+  ].filter(Boolean);
+}
 function buildPlanEmail({ rows, votes, note }) {
   const GOLD = '#a28b75'; const TITLE = '#8c6d36';
   const daysOf = (r) => (Array.isArray(r.days) ? r.days : []);
@@ -68,12 +82,7 @@ function buildPlanEmail({ rows, votes, note }) {
   const ICON_FILE = { 'Moving Forward': 'cat-event-green.png', 'Not Moving Forward': 'cat-event-red.png', 'Needs Further Discussion': 'cat-event-yellow.png', 'Merging with Another Event': 'cat-event-purple.png' };
   const iconFor = (g) => ICON_BASE + (ICON_FILE[g] || 'cat-event.png');
   const sorted = sortPlan(rows || []);
-  const detailLine = (r) => [
-    r.multi_day ? `${daysOf(r).length || 'Multi'}-day: ` + (daysOf(r).filter((d) => d.date).map((d) => fmtShort(d.date)).join(', ') || 'dates to set') : '',
-    !r.multi_day && r.date ? fmtDay(r.date) : '',
-    !r.multi_day && r.start_time ? `${fmtTime(r.start_time)}${r.end_time ? ' – ' + fmtTime(r.end_time) : ''}` : '',
-    r.pricing ? `Pricing: ${isZeroPrice(r.pricing) ? 'Free' : dollars(r.pricing)}` : '', r.budget ? `Budget: ${dollars(r.budget)}` : '',
-  ].filter(Boolean);
+  const detailLine = detailParts;
   const eventRow = (r) => {
     const dt = DECISION_TONE[r.final_decision];
     const edge = dt ? dt.color : '#e0a800';
@@ -84,7 +93,7 @@ function buildPlanEmail({ rows, votes, note }) {
       + '</div>'
       + (hold ? '' : sub.length
         ? '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#666666;line-height:1.55;">' + sub.map((x) => '<li style="margin:0 0 2px;">' + esc(x) + '</li>').join('') + '</ul>'
-        : '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#999999;line-height:1.55;"><li style="font-style:italic;">No details yet</li></ul>')
+        : (decisionGroup(r) === 'Not Moving Forward' ? '' : '<ul style="margin:5px 0 0;padding-left:20px;font-size:12.5px;color:#999999;line-height:1.55;"><li style="font-style:italic;">No details yet</li></ul>'))
       + '<div style="margin-top:9px;border-left:3px solid ' + edge + ';background:#faf7f2;padding:8px 12px;">'
       + '<div style="font-size:11px;font-weight:bold;color:#8c6d36;margin-bottom:3px;">Committee Decisions' + (r.decisions_updated_at ? ' · as of ' + esc(fmtStamp(r.decisions_updated_at)) : '') + '</div>'
       + (bulletLines(r.decisions).length
@@ -119,7 +128,7 @@ function buildPlanText({ rows, note }) {
   if (note && note.trim()) lines.push(note.trim(), '');
   sortPlan(rows || []).forEach((r) => {
     lines.push(`${r.name} (${decisionGroup(r)})`);
-    (holdDetails(r) ? [] : [r.date ? fmtDay(r.date) : '', r.pricing ? `Pricing: ${isZeroPrice(r.pricing) ? 'Free' : dollars(r.pricing)}` : '', r.budget ? `Budget: ${dollars(r.budget)}` : '']).filter(Boolean).forEach((x) => lines.push('  - ' + x));
+    (holdDetails(r) ? [] : detailParts(r)).forEach((x) => lines.push('  - ' + x));
     bulletLines(r.decisions).forEach((x) => lines.push('  - ' + x));
     lines.push('');
   });
