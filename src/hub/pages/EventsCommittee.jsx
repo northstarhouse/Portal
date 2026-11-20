@@ -505,7 +505,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
     if (!me) return;
     onUpdate(e => ({ ...e, vendors: e.vendors.map(v => v.id === id ? { ...v, assignedIds: Array.from(new Set([...(v.assignedIds || []), me.id])) } : v) }));
   }
-  const signUpBtn = (onClick) => <button type="button" className="btn-ghost" title="Put your name on this" onClick={e => { e.stopPropagation(); onClick(); }} style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 11, fontWeight: 600, padding: '3px 10px', whiteSpace: 'nowrap' }}>Sign up</button>;
+  const signUpBtn = (onClick) => <button type="button" title="Put your name on this" onClick={e => { e.stopPropagation(); onClick(); }} style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '4px 12px', whiteSpace: 'nowrap', background: '#e07b2a', color: '#fff', border: 'none', borderRadius: 999, cursor: 'pointer' }}>Sign up</button>;
 
   function handleFlyerUpload(file) {
     if (!file || uploadingFlyer) return;
@@ -611,6 +611,12 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               {me && isOpenDuty(t) && signUpBtn(() => signUpForItem(t.id))}
             </div>
           ))(row.t))}
+          {(ev.checklist.length + openNeeds.length) > 0 && (
+            <button type="button" onClick={() => { setExpandedSection('checklist'); setTimeout(() => { const el = document.getElementById('ec-sec-checklist'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60); }}
+              style={{ marginTop: 10, background: 'none', border: 'none', padding: 0, color: 'var(--gold)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+              View full checklist{ev.checklist.length + openNeeds.length > cardRows.length ? ' (' + (ev.checklist.length + openNeeds.length) + ' items)' : ''} &rsaquo;
+            </button>
+          )}
           {upcomingDeadlines.length > 0 && (
             <>
               <div style={{ fontSize: 13, fontWeight: 700, marginTop: 14, marginBottom: 6, paddingTop: 12, borderTop: '0.5px solid var(--border-light)' }}>Upcoming deadlines</div>
@@ -664,7 +670,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
         {PLANNING_SECTIONS.map((s, i) => {
           const isOpen = expandedSection === s.key;
           return (
-            <div key={s.key} style={{ borderBottom: i < PLANNING_SECTIONS.length - 1 || isOpen ? '0.5px solid var(--border-light)' : 'none' }}>
+            <div key={s.key} id={'ec-sec-' + s.key} style={{ scrollMarginTop: 80, borderBottom: i < PLANNING_SECTIONS.length - 1 || isOpen ? '0.5px solid var(--border-light)' : 'none' }}>
               <div onClick={() => setExpandedSection(isOpen ? null : s.key)}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer' }}>
                 <span style={{ color: 'var(--gold)', flexShrink: 0 }}>{PLANNING_SECTION_ICONS[s.key]}</span>
@@ -1139,7 +1145,7 @@ function DutyWho({ t, volunteers, onPatch, onSignUp }) {
         {sorted.map(x => <option key={x.id} value={String(x.id)}>{volFullName(x)}</option>)}
       </select>
       {total === 0 && onSignUp
-        ? <button type="button" className="btn-ghost" title="Put your name on this" onClick={onSignUp} style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, padding: '4px 9px', whiteSpace: 'nowrap' }}>Sign up</button>
+        ? <button type="button" title="Put your name on this" onClick={onSignUp} style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '4px 12px', whiteSpace: 'nowrap', background: '#e07b2a', color: '#fff', border: 'none', borderRadius: 999, cursor: 'pointer' }}>Sign up</button>
         : <span style={{ width: 28, flexShrink: 0, fontSize: 11, color: 'var(--gold)', fontWeight: 600 }}>{total > 1 ? '+' + (total - 1) : ''}</span>}
     </div>
   );
