@@ -1961,6 +1961,29 @@ function EventsView({ navigate, initialTab }) {
               : <span style={{ color: '#5a8a5a', fontWeight: 600 }}>{fmt(c.earnings + c.ticketRevenue)}</span>}
             <span style={{ color: '#c07040', fontWeight: 600 }}>-{fmt(c.costs)}</span>
           </div>
+          {(function() {
+            // The event's expenses, one line each. A cost that is a share of ticket sales shows its percentage as a tag.
+            var rows = (c.expenseRows || []).filter(function(b) { return (parseFloat(b.amount) || 0) !== 0; });
+            if (!rows.length) return null;
+            var shown = rows.slice(0, 6);
+            return (
+              <div style={{ marginTop: 8, paddingTop: 7, borderTop: '0.5px solid #f0ebe2' }}>
+                {shown.map(function(b, i) {
+                  var d = String(b.description || 'Expense');
+                  var m = d.match(/\((\d+(?:\.\d+)?)% of ticket sales\)/);
+                  var label = d.replace(/^Vendor fee\s*[\u2014-]\s*/, '').replace(/\s*\((?:\d+(?:\.\d+)?% of ticket sales|flat fee)\)\s*$/, '').trim() || d;
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '2px 0' }}>
+                      <span title={d} style={{ flex: 1, minWidth: 0, color: '#6b6b6b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+                      {m && <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, background: '#f0ebe2', color: gold, padding: '1px 7px', borderRadius: 20, whiteSpace: 'nowrap' }}>{m[1]}% split</span>}
+                      <span style={{ flexShrink: 0, color: '#c07040', fontWeight: 600 }}>{fmt(b.amount)}</span>
+                    </div>
+                  );
+                })}
+                {rows.length > shown.length && <div style={{ fontSize: 10, color: '#aaa', marginTop: 2 }}>+ {rows.length - shown.length} more</div>}
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
