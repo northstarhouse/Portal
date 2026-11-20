@@ -2,25 +2,51 @@
   "openapi": "3.1.0",
   "info": {
     "title": "North Star House Portal (read-only)",
-    "description": "Read-only data from the North Star House Portal: venue bookings and payments, events and their finances, financials, and board items. Client and donor personal details are not included; bookings are identified by venue code (the event date). Amounts are in dollars.",
+    "description": "Read-only data from the North Star House Portal: venue bookings and payments, events and their finances, financials, and board items. No client or donor personal details; bookings are identified by venue code (the event date). Amounts are in dollars.",
     "version": "1.0.0"
   },
-  "servers": [{ "url": "https://uvzwhhwzelaelfhfkvdb.supabase.co/functions/v1/chatgpt-read" }],
+  "servers": [
+    {
+      "url": "https://uvzwhhwzelaelfhfkvdb.supabase.co/functions/v1/chatgpt-read"
+    }
+  ],
   "paths": {
     "/bookings": {
       "get": {
         "operationId": "getVenueBookings",
         "summary": "Venue bookings and payments",
-        "description": "Every signed or paid venue booking (weddings, private events, memorials and so on): event type and date, the items ordered with prices (for example Saturday Wedding, Security Deposit (refundable), Rehearsal, Extra Hours), invoice total, paid so far, balance due, payment status, whether anything is past due, the next payment, and the payment schedule.",
-        "responses": { "200": { "description": "Bookings", "content": { "application/json": { "schema": { "type": "object" } } } } }
+        "description": "Signed or paid venue bookings (weddings, private events, memorials): type, date, items ordered with prices (e.g. Saturday Wedding, Security Deposit, Rehearsal), invoice total, paid, balance, status, past due, next payment, payment schedule.",
+        "responses": {
+          "200": {
+            "description": "Bookings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/events": {
       "get": {
         "operationId": "getEvents",
         "summary": "Events, the 2027 event plan, and event finances",
-        "description": "The 2027 event plan (date, time, pricing, budget, committee decision and decision notes), the Events Committee's events (status, ticket tiers, planning checklist), and per-event finances: expense list (with split percentage of ticket sales where a vendor is paid a share), other earnings, tickets sold, ticket sales and net.",
-        "responses": { "200": { "description": "Events", "content": { "application/json": { "schema": { "type": "object" } } } } }
+        "description": "The 2027 event plan (date, time, pricing, decision, notes), Events Committee events (ticket tiers, checklist), and per-event finances: expense list with split percentages, other earnings, tickets sold, net.",
+        "responses": {
+          "200": {
+            "description": "Events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/financials": {
@@ -28,7 +54,18 @@
         "operationId": "getFinancials",
         "summary": "Financials",
         "description": "Operating budget spending by area, earnings, the cash log, donations summed by month and type (no donor names), sponsors (businesses) and their in-kind contributions.",
-        "responses": { "200": { "description": "Financials", "content": { "application/json": { "schema": { "type": "object" } } } } }
+        "responses": {
+          "200": {
+            "description": "Financials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/board": {
@@ -36,7 +73,18 @@
         "operationId": "getBoardItems",
         "summary": "Board Communication items",
         "description": "Board items (votes, questions, discussions, updates): title, status, meeting date, decision, and response needed. Individual votes, who voted or submitted, and the free-text descriptions are never included.",
-        "responses": { "200": { "description": "Board items", "content": { "application/json": { "schema": { "type": "object" } } } } }
+        "responses": {
+          "200": {
+            "description": "Board items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
