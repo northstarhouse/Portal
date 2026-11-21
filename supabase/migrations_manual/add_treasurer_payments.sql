@@ -45,7 +45,7 @@ returns table (
 language sql security definer set search_path = public as $$
   select * from (
     -- Donations, memberships, sponsorships, bricks recorded in the Portal
-    select 'don:' || d.id::text, d.date, 'Donations & Memberships'::text, coalesce(d.type, 'Donation'),
+    select 'don:' || d.id::text, d.date, (case when d.type ilike '%brick%' then 'Bricks' else 'Donations & Memberships' end)::text, coalesce(d.type, 'Donation'),
            coalesce(dn.formal_name, 'Unknown donor'),
            nullif(concat_ws(' · ', d.event_name, d.sponsorship_level, d.membership_level, d.donation_notes), ''),
            coalesce(d.amount, 0)::numeric, coalesce(d.paypal_fee, o.paypal_fee), coalesce(d.net_amount, o.net_amount),
@@ -58,7 +58,7 @@ language sql security definer set search_path = public as $$
 
     union all
     -- Website PayPal orders (tickets, and donations/memberships/bricks not already in `donations`)
-    select 'ord:' || o.id::text, (o.created_at at time zone 'America/Los_Angeles')::date, 'Website'::text,
+    select 'ord:' || o.id::text, (o.created_at at time zone 'America/Los_Angeles')::date, (case when o.kind = 'brick' then 'Bricks' else 'Website' end)::text,
            case o.kind when 'paid' then 'Tickets' when 'donation' then 'Donation' when 'membership' then 'Membership' when 'brick' then 'Brick' else initcap(o.kind) end,
            coalesce(nullif(o.paypal_payer_name, ''), o.buyer_name, 'Unknown'),
            nullif(concat_ws(' · ', o.event_title, o.event_date), ''),
