@@ -49,7 +49,7 @@ language sql security definer set search_path = public as $$
            coalesce(dn.formal_name, 'Unknown donor'),
            nullif(concat_ws(' · ', d.event_name, d.sponsorship_level, d.membership_level, d.donation_notes), ''),
            coalesce(d.amount, 0)::numeric, coalesce(d.paypal_fee, o.paypal_fee), coalesce(d.net_amount, o.net_amount),
-           coalesce(d.payment_type, 'Unknown'),
+           (case when d.check_drive_url is not null or d.payment_type ilike 'check%' then 'Check' else coalesce(d.payment_type, 'Unknown') end),
            coalesce(d.check_number, d.paypal_transaction_id, o.paypal_capture_id), false
     from donations d
     left join donors dn on dn.id = d.donor_id
