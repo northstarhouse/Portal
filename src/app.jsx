@@ -25736,7 +25736,7 @@ var NSH_UPDATE_AREAS = ['General', 'Construction', 'Grounds', 'Interiors', 'Doce
 // entered by hand), with totals, filters, CSV export, and the Google Sheet backup.
 // Relies on the app's globals (React hooks, SUPABASE_URL/KEY, gold, whoIsSignedIn) like the other views in app.jsx.
 
-var TR_SOURCES = ['Venue Rental', 'Website', 'Donations & Memberships', 'Bricks', 'Other'];
+var TR_SOURCES = ['Venue Rental', 'Event Tickets', 'Website', 'Donations & Memberships', 'Bricks', 'Other'];
 var TR_METHODS = ['Check', 'Cash', 'PayPal', 'Other'];
 var TR_SHEET = 'https://docs.google.com/spreadsheets/d/1jnZXxpyAusrTAJSMxFQpdT5seb-d7mFVjEnBp3VrxLQ/edit';
 
