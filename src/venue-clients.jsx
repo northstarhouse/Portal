@@ -156,7 +156,13 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   for (const payment of duePayments) task('payment-' + schedule.indexOf(payment), 'Collect ' + amount(payment.cents, payment.currency), payment.due, payment.label, 'payment');
   if (nativeAgreement && nativeAgreement.status === 'expired') task('contract-revision','Soft hold expired: release the date',null,'Not signed within 7 days. Release the hold, or send a revised agreement if they still want the date','booking');
   else if (nativeAgreement && nativeAgreement.status === 'declined') task('contract-revision','Prepare revised agreement',null,'Previous request declined','booking');
-  else for (const [index, s] of unsigned.entries()) if (s.signee_type !== 'vendor' || clientsSigned) task((s.signee_type === 'vendor' ? 'countersign-' : 'signature-') + index, s.signee_type === 'vendor' ? 'Venue countersignature' : 'Client signature', null, (s.signee_name || 'Required signer') + (s.signee_type !== 'vendor' && nativeAgreement?.expires_at ? ' · sign by ' + new Date(nativeAgreement.expires_at).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' or the soft hold is released' : ''), 'signature');
+  else {
+    // One task per event, not one per signer: every client still to sign is listed in the one line, and the venue's countersignature is one more.
+    const names = list => list.map(x => x.signee_name || 'Required signer').filter((n, i, arr) => arr.indexOf(n) === i).join(' & ');
+    const clientsLeft = unsigned.filter(x => x.signee_type !== 'vendor'), venueLeft = unsigned.filter(x => x.signee_type === 'vendor');
+    if (clientsLeft.length) task('signature-0', 'Client signature', null, names(clientsLeft) + (nativeAgreement?.expires_at ? ' · sign by ' + new Date(nativeAgreement.expires_at).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' or the soft hold is released' : ''), 'signature');
+    if (venueLeft.length && clientsSigned) task('countersign-0', 'Venue countersignature', null, names(venueLeft), 'signature');
+  }
   if (!hb && !nativeAgreement && !legacy) task('booking', 'New pre-booking submission', null, (eventDate ? 'Event ' + longDay(eventDate) + ' · ' : '') + 'Review it and prepare the agreement', 'booking');
   if (needsPaperwork) task('sm-paperwork', 'Site manager paperwork needed', null, 'Event was ' + longDay(eventDate) + ' · upload the FINAL paperwork', 'paperwork');
   if (!isPast && !surveyComplete) task('survey', surveySent ? 'Complete event questionnaire' : 'Event questionnaire', requirementsDue, surveySent ? 'Sent; awaiting required answers' : 'Not yet on file', 'survey');
