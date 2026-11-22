@@ -7,7 +7,7 @@ import {
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
-import AreasTab, { PLANNING_PROMPTS, NSH_SPACES, MARKETING_CHANNELS } from './eventsCommitteeAreas.jsx';
+import AreasTab, { PLANNING_PROMPTS, NSH_SPACES, MARKETING_CHANNELS, channelLabel } from './eventsCommitteeAreas.jsx';
 import EventOverviews from './EventOverviews.jsx';
 import RsvpPanel from './RsvpPanel.jsx';
 import EventPlan from './EventPlan.jsx';
@@ -2155,7 +2155,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
       return d;
     };
     const itemRow = (it) => {
-      if (it.mk) return row(true, esc(it.c), '', null);
+      if (it.mk) return row(true, esc(channelLabel(it.c)), '', null);
       if (it.tl) {
         const t = it.t; const who = whoOn(t, volunteers); const tg = Number(t.target) || 0;
         const sub = t.noAssign ? '' : (tg ? who.length + ' of ' + tg + ' assigned' : who.length ? who.length + ' assigned' : 'No one assigned yet') + (who.length ? ': ' + esc(who.map(w => w.name).join(', ')) : '');
@@ -2251,7 +2251,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
     catGroups.forEach(g => {
       lines.push(g.cat.toUpperCase());
       g.items.forEach(it => {
-        const label = it.mk ? it.c : it.tl ? fmtTime12(it.t.time) + ' ' + it.t.activity : it.need ? (it.v.who || !it.v.role ? it.v.name : it.v.role + ': ' + it.v.name) : it.t.text;
+        const label = it.mk ? channelLabel(it.c) : it.tl ? fmtTime12(it.t.time) + ' ' + it.t.activity : it.need ? (it.v.who || !it.v.role ? it.v.name : it.v.role + ': ' + it.v.name) : it.t.text;
         lines.push((isDone(it) ? '[x] ' : '[ ] ') + label);
       });
       lines.push('');
@@ -2433,7 +2433,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
             return (
               <ItemRow key={'mk-' + it.c} done={done}>
                 <CheckCircle checked={!!(done)} onChange={() => toggleChannel(it.c)} />
-                <span style={{ flex: 1, fontSize: 13, textDecoration: 'none', color: 'var(--text)' }}>{it.c}</span>
+                <span style={{ flex: 1, fontSize: 13, textDecoration: 'none', color: 'var(--text)' }}>{channelLabel(it.c)}</span>
               </ItemRow>
             );
           }

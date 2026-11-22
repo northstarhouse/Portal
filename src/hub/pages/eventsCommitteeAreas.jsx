@@ -32,6 +32,8 @@ export const PLANNING_PROMPTS = [
 // The spaces at North Star House (from the site manager walk-through) for "Spaces used".
 export const NSH_SPACES = ['Living Room', 'Dining Room', 'Library', 'Julia Morgan Room', 'Mudroom & Study', 'Kitchen', 'Restrooms & Foyer', 'Terrace & West Lawn', 'Courtyard & East Lawn', 'Garden', 'Parking Lot'];
 
+// Shown name for a channel. The stored key stays as is (events already have it checked off under that key).
+export const channelLabel = (c) => (c === 'Go Nevada County Calendar - Community Blast' ? 'Community Calendar' : c);
 export const MARKETING_CHANNELS = [
   'Website', 'Blog', 'Make Flyer', 'Create Press Release', 'Send Email Blast', 'YubaNet (Press Release Only)', 'Go Nevada County Calendar - Community Blast',
   'Arts Council Calendar', 'Grass Valley Chamber Newsletter', 'KVMR Calendar', 'Facebook Event Page', 'NSH Facebook Page',
@@ -278,7 +280,7 @@ function Field({ field, value, onChange, volunteers, readOnly }) {
           return (
             <label key={c} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
               <input type="checkbox" checked={!!row.done} onChange={e => onChange({ ...m, [c]: { ...row, done: e.target.checked } })} style={{ accentColor: 'var(--gold)' }} />
-              {c}
+              {channelLabel(c)}
             </label>
           );
         })}
