@@ -363,9 +363,19 @@ export function OrgGuideView() {
     onMouseEnter={e => { e.currentTarget.style.background = '#f6f1e8'; }} onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}>
     <span style={{ flex: 1 }}>{s.title}</span>{q && <span style={{ fontSize: 11, color: GOLD, fontWeight: 700 }}>{hits(s)}</span>}
   </button>;
-  const card = (s) => <section key={s.id} id={'og-' + s.id} style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 12, padding: '22px 26px 12px', marginBottom: 18, fontFamily: SERIF }}>
-    <h2 style={{ margin: '0 0 14px', fontFamily: SERIF, fontSize: 26, fontWeight: 700, color: GOLD, textAlign: 'center' }}><Hl text={s.title} q={q} /></h2>
-    {s.blocks.map((b, i) => <Block key={i} b={b} q={q} />)}
+  // Timeline layout: a gold pill with the section number, a slim gold line running down through the pills, a dotted gold
+  // line out to the section's title and text.
+  const card = (s, n, list) => <section key={s.id} id={'og-' + s.id} style={{ display: 'flex', gap: 0, fontFamily: SERIF, position: 'relative' }}>
+    <div style={{ width: 92, flexShrink: 0, position: 'relative' }}>
+      {n < list.length - 1 && <div style={{ position: 'absolute', left: 34, top: 40, bottom: -2, borderLeft: '1px solid ' + GOLD, opacity: .55 }} />}
+      <div style={{ position: 'relative', zIndex: 1, width: 68, height: 38, borderRadius: 19, background: GOLD, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, marginTop: 4 }}>{n + 1}</div>
+      <div style={{ position: 'absolute', left: 68, right: 8, top: 23, borderTop: '1px dotted ' + GOLD }} />
+      <div style={{ position: 'absolute', right: 3, top: 20, width: 7, height: 7, borderRadius: '50%', background: GOLD }} />
+    </div>
+    <div style={{ flex: 1, minWidth: 0, padding: '0 0 30px 6px' }}>
+      <h2 style={{ margin: '4px 0 10px', fontFamily: SERIF, fontSize: 24, fontWeight: 700, color: GOLD }}><Hl text={s.title} q={q} /></h2>
+      {s.blocks.map((b, i) => <Block key={i} b={b} q={q} />)}
+    </div>
   </section>;
   const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '11px 38px 11px 14px', border: '1px solid #ded7cb', borderRadius: 10, fontSize: 14, background: '#fff', fontFamily: 'inherit' };
   return (
@@ -388,10 +398,10 @@ export function OrgGuideView() {
           </select>}
           <div ref={scrollRef} style={{ position: 'relative', height: 'calc(100vh - 210px)', minHeight: 380, overflowY: 'auto', paddingRight: 4 }}>
             {shown.length === 0 ? <div style={{ padding: 30, textAlign: 'center', color: '#888', fontSize: 14 }}>Nothing in the guide matches. Try a shorter word.</div> : <>
-              {guideShown.map(card)}
+              {guideShown.map((s, n) => card(s, n, guideShown))}
               {formShown.length > 0 && <div style={{ fontFamily: SERIF, fontSize: 30, color: GOLD, textAlign: 'center', margin: '26px 0 6px', borderTop: '1px solid #cfc6b8', borderBottom: '1px solid #cfc6b8', padding: '14px 0' }}>Forms</div>}
               {formShown.length > 0 && <div style={{ fontSize: 12.5, color: '#888', textAlign: 'center', marginBottom: 18 }}>Fill-in copies to print are in Admin → Printable Forms.</div>}
-              {formShown.map(card)}
+              {formShown.map((s, n) => card(s, n, formShown))}
             </>}
           </div>
         </div>

@@ -607,7 +607,13 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
               }}>
                 {t.done && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
               </span>
-              <span style={{ fontSize: 13, color: t.done ? 'var(--muted)' : 'var(--text)', textDecoration: 'none' }}>{t.text}{t.assignee ? <span style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 600 }}>  —  {t.assignee}</span> : null}</span>
+              <span style={{ fontSize: 13, color: t.done ? 'var(--muted)' : 'var(--text)', textDecoration: 'none' }}>{t.text}{t.assignee ? <span style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 600 }}>  —  {t.assignee}</span> : null}
+                {(t.updates || []).length > 0 && (() => { const u = t.updates[t.updates.length - 1]; return (
+                  <span style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginTop: 2, lineHeight: 1.35 }}>
+                    <span style={{ fontWeight: 700, color: 'var(--gold)' }}>Update</span>{' · '}{new Date(u.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: {u.text}{t.updates.length > 1 ? ` (+${t.updates.length - 1} earlier)` : ''}
+                  </span>
+                ); })()}
+              </span>
               {me && isOpenDuty(t) && signUpBtn(() => signUpForItem(t.id))}
             </div>
           ))(row.t))}
