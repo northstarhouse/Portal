@@ -11676,6 +11676,42 @@ function QuarterWorkspaceView({ navigate }) {
 }
 
 function ReviewsView({ navigate }) {
+  var [remindBusy, setRemindBusy] = useState('');
+  var [reminded, setReminded] = useState({});
+  var [sentLog, setSentLog] = useState([]); // reminder emails already sent: { at, area, quarter, lead, to }
+  useEffect(function() {
+    fetch(SUPABASE_URL + '/rest/v1/activity_log?action=eq.quarterly_reminder_sent&select=created_at,detail&order=created_at.desc&limit=500', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(rows) { setSentLog((Array.isArray(rows) ? rows : []).filter(function(r) { return r.detail && r.detail.area && r.detail.quarter; }).map(function(r) { return { at: r.created_at, area: r.detail.area, quarter: r.detail.quarter, year: r.detail.year, lead: r.detail.lead || '', to: r.detail.to || '' }; })); })
+      .catch(function() {});
+  }, []);
+  function sentFor(area, q) { return sentLog.filter(function(x) { return x.area === area && x.quarter === q && Number(x.year) === year; }); }
+  function reminderDay(iso) { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }); }
+  // Emails the area's lead about a quarterly update that is past due and not in yet. Always asks first; the admin gets a copy.
+  function sendUpdateReminder(area, q) {
+    var def = AREA_DEFAULTS[area] || {};
+    if (!def.leadEmail) { alert('No lead email on file for ' + area + '. Add one in Admin → Operational Budgets, then try again.'); return; }
+    var due = quarterDueDate(q, year).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    if (!window.confirm('Send a reminder to ' + (def.lead || 'the ' + area + ' lead') + ' (' + def.leadEmail + ') about the ' + q + ' ' + year + ' quarterly update for ' + area + ' (due ' + due + ')?')) return;
+    var key = area + ':' + q;
+    setRemindBusy(key);
+    var first = String(def.lead || '').split(' ')[0] || 'there';
+    var subject = 'Reminder: ' + area + ' ' + q + ' ' + year + ' quarterly update';
+    var text = 'Hi ' + first + ',\n\nThis is a friendly reminder that the ' + area + ' quarterly update for ' + q + ' ' + year + ' was due ' + due + ' and we have not received it yet.\n\nPlease submit it in the North Star House Portal (Quarterly Updates) when you can. If you need help or are stuck, just reply to this email and let us know.\n\nThank you for all you do for North Star House.';
+    var html = '<div style="font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#444;max-width:560px">' + text.split('\n\n').map(function(p) { return '<p style="margin:0 0 16px">' + p.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</p>'; }).join('') + '</div>';
+    fetch(SUPABASE_URL + '/functions/v1/send-email', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: def.leadEmail, bcc: [ADMIN_NOTIFY_BCC], subject: subject, body: text, html: html })
+    }).then(function(r) {
+      setRemindBusy('');
+      if (!r.ok) { alert('The reminder did not send. Please try again.'); return; }
+      setReminded(function(prev) { var n = Object.assign({}, prev); n[key] = true; return n; });
+      var nowIso = new Date().toISOString();
+      setSentLog(function(prev) { return [{ at: nowIso, area: area, quarter: q, year: year, lead: def.lead || '', to: def.leadEmail }].concat(prev); });
+      fetch(SUPABASE_URL + '/rest/v1/activity_log', { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ action: 'quarterly_reminder_sent', description: 'Sent a quarterly update reminder to ' + (def.lead || area + ' lead') + ' (' + area + ' ' + q + ' ' + year + ')', detail: { area: area, quarter: q, year: year, lead: def.lead || '', to: def.leadEmail } }) }).catch(function() {});
+    }).catch(function() { setRemindBusy(''); alert('The reminder did not send. Please check your connection and try again.'); });
+  }
   var { useState, useEffect } = React;
   var year = new Date().getFullYear();
   var quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
@@ -11965,6 +12001,9 @@ function ReviewsView({ navigate }) {
                           ) : (
                             <div title="Not yet submitted" style={{ width: 22, height: 22, borderRadius: '50%', border: '1.5px solid #e0d8cc', background: '#faf8f5' }} />
                           )}
+                          {!hasReflection && !hasReview && submitted !== null && quarterDueDate(q, year) < new Date(new Date().setHours(0, 0, 0, 0)) && (
+                            <button type="button" disabled={remindBusy === key} onClick={function() { sendUpdateReminder(area, q); }} title={sentFor(area, q).length ? 'Reminder sent ' + sentFor(area, q).map(function(x) { return reminderDay(x.at) + (x.lead ? ' to ' + x.lead : ''); }).join(', ') + '. Click to send another.' : 'This update is past due. Email the area lead a reminder.'} style={{ position: 'absolute', left: 32, whiteSpace: 'nowrap', fontSize: 11, fontWeight: 600, color: sentFor(area, q).length ? '#2e7d32' : '#b3261e', background: '#fff', border: '0.5px solid ' + (sentFor(area, q).length ? '#b7dcb9' : '#e6b8b3'), borderRadius: 12, padding: '2px 9px', cursor: remindBusy === key ? 'default' : 'pointer', fontFamily: 'inherit' }}>{remindBusy === key ? 'Sending…' : sentFor(area, q).length ? 'Reminded ' + reminderDay(sentFor(area, q)[0].at) + (sentFor(area, q).length > 1 ? ' (x' + sentFor(area, q).length + ')' : '') + ' ✓' : 'Send reminder'}</button>
+                          )}
                           {needsSupport && (
                             <div title={'Needs support: ' + submission.support_needed.join(', ')} style={{ position: 'absolute', top: -4, right: -6, width: 10, height: 10, borderRadius: '50%', background: '#ef4444', border: '1.5px solid #fff', flexShrink: 0 }} />
                           )}
@@ -11982,6 +12021,18 @@ function ReviewsView({ navigate }) {
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ color: gold, fontSize: 14, lineHeight: 1 }}>★</span>Board review done</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />Red dot: the lead asked for support (hover or open it to see what they need)</span>
           </div>
+          {sentLog.filter(function(x) { return Number(x.year) === year; }).length > 0 && (
+            <div style={{ borderTop: '0.5px solid #f0ece6', margin: '10px 0 6px', padding: '12px 0 4px' }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 8 }}>Reminders sent</div>
+              {sentLog.filter(function(x) { return Number(x.year) === year; }).map(function(x, i) {
+                return <div key={i} style={{ display: 'flex', gap: 12, fontSize: 12.5, padding: '4px 0', color: '#555', flexWrap: 'wrap' }}>
+                  <span style={{ minWidth: 64, color: '#8a7e6b' }}>{reminderDay(x.at)}</span>
+                  <span style={{ minWidth: 130, fontWeight: 600 }}>{x.area} {x.quarter}</span>
+                  <span>to {x.lead || 'the area lead'}{x.to ? ' (' + x.to + ')' : ''}</span>
+                </div>;
+              })}
+            </div>
+          )}
         </div>
         </div>
       </div>
