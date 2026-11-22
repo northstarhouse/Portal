@@ -11702,7 +11702,7 @@ function ReviewsView({ navigate }) {
       // plain-text copy of the email gets the same list; the HTML email shows it in a box
       text = parts.slice(0, 2).concat([['Goals that need review:'].concat(goals.map(function(g, i) { return (i + 1) + '. ' + g; })).join(NL)], parts.slice(2)).join(NL + NL);
       var esc = function(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
-      goalsBox = '<div style="margin:4px 0 6px;background:#fefdfb;border:1px solid #efe9dd;border-radius:8px;padding:14px 18px;text-align:left;font-family:Helvetica,Arial,sans-serif">' +
+      goalsBox = '<div style="margin:4px 0 6px;background:#ffffff;border:1px solid #efe9dd;border-radius:8px;padding:14px 18px;text-align:left;font-family:Helvetica,Arial,sans-serif">' +
         '<div style="font-weight:600;color:#6b5d4a;font-size:14px;margin-bottom:8px">Goals that need review:</div>' +
         '<ol style="margin:0;padding-left:22px;font-size:15px;line-height:1.5;color:#886c44">' + goals.map(function(g, i) { return '<li style="margin:0;padding:9px 0;color:#886c44;font-weight:400;' + (i ? 'border-top:1px solid #f3eee4;' : '') + '">' + esc(g) + '</li>'; }).join('') + '</ol></div>';
     }
