@@ -11916,7 +11916,7 @@ function ReviewsView({ navigate }) {
 
       <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', marginBottom: 24, overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #f0ece6', background: '#fdfcfb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600 }}>Quarterly Updates — {year}</div>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600 }}>Quarterly Updates — {year}{(function() { var n = nextUpcomingDue(); return <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 600, color: gold, marginLeft: 12 }}>Next due: {n.q} · {n.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>; })()}</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={function() { navigate('quarter-workspace'); }} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#555', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontWeight: 500 }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -11933,7 +11933,8 @@ function ReviewsView({ navigate }) {
           <div style={{ display: 'grid', gridTemplateColumns: '160px repeat(4, 1fr)', borderBottom: '0.5px solid #f0ece6', padding: '10px 0' }}>
             <div />
             {quarters.map(function(q) {
-              return <div key={q} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#aaa', textTransform: 'uppercase', letterSpacing: 1 }}>{q}</div>;
+              var due = quarterDueDate(q, year);
+              return <div key={q} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#aaa', textTransform: 'uppercase', letterSpacing: 1 }}>{q}<div style={{ fontSize: 11, fontWeight: 500, textTransform: 'none', letterSpacing: 0, color: '#8a7e6b', marginTop: 2 }}>Due {due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div></div>;
             })}
           </div>
           {submitted === null
