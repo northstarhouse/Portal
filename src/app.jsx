@@ -26694,10 +26694,8 @@ function EventsHubView({ navigate }) {
   }
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-        <button onClick={function() { setClassic(true); }} style={linkBtn}>Classic view</button>
-      </div>
-      <HubEventsCommittee navigate={navigate} />
+      <style>{'@media (min-width: 769px) { .nsh-evhub .ec-page > div:first-child { margin: -24px -28px 0 !important; padding: 22px 32px 16px !important; } }'}</style>
+      <div className="nsh-evhub"><HubEventsCommittee navigate={navigate} /></div>
     </div>
   );
 }
@@ -27486,7 +27484,7 @@ function Dashboard() {
           </div>
         </div>
         <div style={{ flex: 1, padding: isMobile ? "16px 14px" : "28px 32px", paddingBottom: isMobile ? 64 : 96 }}>
-          <div style={{ maxWidth: 900 }}>
+          <div style={{ maxWidth: (active === 'events' || active === 'event-overviews') ? 'none' : 900 }}>
             <View navigate={navigate} opArea={opArea} navigateOp={function(a) { setOpArea(a); navigate('operational'); }} quarterlyArea={quarterlyArea} navigateToQuarterly={function(a) { setQuarterlyArea(a); navigate('quarterly'); }} />
           </div>
         </div>

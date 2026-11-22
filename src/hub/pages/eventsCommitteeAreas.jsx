@@ -79,10 +79,12 @@ export function ChamberDraftButton({ ev }) {
 
 // Shown name for a channel. The stored key stays as is (events already have it checked off under that key).
 export const channelLabel = (c) => (c === 'Go Nevada County Calendar - Community Blast' ? 'Community Calendar' : c);
+// Listed in column order (the checklist fills the left column first): the calendars together at the top left, the extras and the Chamber at the end.
 export const MARKETING_CHANNELS = [
-  'Website', 'Send Email Blast', 'NSH Newsletter', 'Blog', 'Make Flyer', 'Create Press Release', 'YubaNet (Press Release Only)', 'YubaNet Calendar', 'Go Nevada County Calendar - Community Blast',
-  'Arts Council Calendar', 'Grass Valley Chamber Newsletter', 'KVMR Calendar', 'Facebook Event Page', 'NSH Facebook Page',
-  'NSH Instagram Page', 'Nevada County Peeps', 'Grass Valley Peeps', 'Lake Wildwood Page', 'Next Door', 'Union Event Calendar',
+  'Go Nevada County Calendar - Community Blast', 'YubaNet Calendar', 'Arts Council Calendar', 'KVMR Calendar', 'Union Event Calendar',
+  'Website', 'Send Email Blast', 'NSH Newsletter', 'Blog', 'Make Flyer',
+  'Create Press Release', 'YubaNet (Press Release Only)', 'Facebook Event Page', 'NSH Facebook Page', 'NSH Instagram Page', 'Next Door',
+  'Nevada County Peeps', 'Grass Valley Peeps', 'Lake Wildwood Page', 'Grass Valley Chamber Newsletter',
 ];
 const EXPENSE_CATEGORIES = ['Food & Beverage', 'Entertainment / Speakers', 'Supplies / Decor', 'Marketing / Printing', 'Permits / Licenses / Insurance', 'Cleaning / Security', 'Other'];
 const INCOME_SOURCES = ['Ticket Sales', 'Alcohol or food sales', 'House Merch', 'Donations', 'Other'];
@@ -319,7 +321,7 @@ function Field({ field, value, onChange, volunteers, readOnly }) {
   if (field.type === 'channelChecklist') {
     const m = v || {};
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoFlow: 'column', gridTemplateRows: 'repeat(' + Math.ceil(MARKETING_CHANNELS.length / 2) + ', auto)', gap: 6 }}>
         {MARKETING_CHANNELS.map(c => {
           const row = m[c] || { done: false, date: '' };
           return (
