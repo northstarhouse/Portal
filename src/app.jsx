@@ -11690,26 +11690,36 @@ function ReviewsView({ navigate }) {
   function sentFor(area, q) { return sentLog.filter(function(x) { return x.area === area && x.quarter === q && Number(x.year) === year; }); }
   function reminderDay(iso) { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }); }
   // Emails the area's lead about a quarterly update that is past due and not in yet. Always asks first; the admin gets a copy.
-  function buildReminder(area, q) {
+  function buildReminder(area, q, goals) {
     var def = AREA_DEFAULTS[area] || {};
     var due = quarterDueDate(q, year).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     var first = String(def.lead || '').split(' ')[0] || 'there';
     var subject = 'Reminder: ' + area + ' ' + q + ' ' + year + ' quarterly update';
     var text = 'Hi ' + first + ',\n\nThis is a friendly reminder that the ' + area + ' quarterly update for ' + q + ' ' + year + ' was due ' + due + ' and we have not received it yet.\n\nPlease submit it in the North Star House Portal (Quarterly Updates) when you can. If you need help or are stuck, just reply to this email and let us know.\n\nThank you for all you do for North Star House.';
+    if (goals && goals.length) {
+      var NL = String.fromCharCode(10), parts = text.split(NL + NL);
+      parts.splice(2, 0, ['**Goals that need review:**'].concat(goals.map(function(g, i) { return (i + 1) + '. ' + g; })).join(NL));
+      text = parts.join(NL + NL);
+    }
     var html = buildBoardNotificationEmailHtml({ headline: 'Quarterly Update Reminder', subtext: text, buttonText: 'Open The Portal →', buttonUrl: PORTAL_URL, footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS });
     return { def: def, due: due, subject: subject, text: text, html: html };
   }
   function openReminder(area, q) {
     var def = AREA_DEFAULTS[area] || {};
     if (!def.leadEmail) { alert('No lead email on file for ' + area + '. Add one in Admin → Operational Budgets, then try again.'); return; }
-    setRemindDraft({ area: area, q: q });
+    setRemindDraft({ area: area, q: q, goals: null });
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Quarter Goals') + '?area=eq.' + encodeURIComponent(area) + '&quarter=eq.' + encodeURIComponent(q) + '&year=eq.' + year + '&select=*&order=created_at.desc&limit=1', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(rows) { return goalEntries(Array.isArray(rows) ? rows[0] : null, {}).map(function(g) { return g.text; }); })
+      .catch(function() { return []; })
+      .then(function(list) { setRemindDraft(function(d) { return d && d.area === area && d.q === q ? { area: area, q: q, goals: list } : d; }); });
   }
-  function sendUpdateReminder(area, q) {
+  function sendUpdateReminder(area, q, goals) {
     var def = AREA_DEFAULTS[area] || {};
     if (!def.leadEmail) { alert('No lead email on file for ' + area + '. Add one in Admin → Operational Budgets, then try again.'); return; }
     var key = area + ':' + q;
     setRemindBusy(key);
-    var b = buildReminder(area, q);
+    var b = buildReminder(area, q, goals);
     var subject = b.subject, text = b.text, html = b.html;
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
@@ -12051,7 +12061,8 @@ function ReviewsView({ navigate }) {
       </div>
 
       {remindDraft && (function() {
-        var d = buildReminder(remindDraft.area, remindDraft.q);
+        var d = buildReminder(remindDraft.area, remindDraft.q, remindDraft.goals);
+        var loadingGoals = remindDraft.goals === null;
         var past = sentLog.filter(function(x) { return x.area === remindDraft.area; });
         var sending = remindBusy === remindDraft.area + ':' + remindDraft.q;
         return (
@@ -12066,7 +12077,7 @@ function ReviewsView({ navigate }) {
                 </div>
                 <iframe title="Email preview" srcDoc={d.html} style={{ width: '100%', height: 480, border: '0.5px solid #e8e0d5', borderRadius: 10, background: '#fff' }} />
                 <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
-                  <button type="button" disabled={sending} onClick={function() { sendUpdateReminder(remindDraft.area, remindDraft.q); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: sending ? 'default' : 'pointer', opacity: sending ? 0.7 : 1 }}>{sending ? 'Sending…' : 'Send reminder'}</button>
+                  <button type="button" disabled={sending || loadingGoals} onClick={function() { sendUpdateReminder(remindDraft.area, remindDraft.q, remindDraft.goals); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: sending ? 'default' : 'pointer', opacity: (sending || loadingGoals) ? 0.7 : 1 }}>{sending ? 'Sending…' : loadingGoals ? 'Loading goals…' : 'Send reminder'}</button>
                   <button type="button" disabled={sending} onClick={function() { setRemindDraft(null); }} style={{ background: '#fff', color: '#555', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '9px 18px', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
                 </div>
               </div>
@@ -23326,6 +23337,33 @@ function FeatureRequestModal({ onClose }) {
     fetch(SUPABASE_URL + '/rest/v1/feature_requests?id=eq.' + r.id, { method: 'PATCH', headers: Object.assign({}, H, { Prefer: 'return=minimal' }), body: JSON.stringify({ status: status }) })
       .then(function(x) { if (x.ok) load(); });
   }
+  // Anyone signed in can respond to a request (also after it is done). The reply is added to the request's list of responses.
+  var [reply, setReply] = useState(null); // { id, text }
+  var [replyBusy, setReplyBusy] = useState(false);
+  var [replyErr, setReplyErr] = useState('');
+  var smallBtn = { background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, padding: '3px 11px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
+  function saveReply(r) {
+    if (!reply || replyBusy) return;
+    var text = reply.text.trim();
+    if (!text) { setReplyErr('Write your response first.'); return; }
+    setReplyBusy(true); setReplyErr('');
+    var by = '';
+    whoIsSignedIn().then(function(name) {
+      by = name || 'Staff';
+      return fetch(SUPABASE_URL + '/rest/v1/feature_requests?id=eq.' + r.id + '&select=responses', { headers: H });
+    }).then(function(x) { return x.ok ? x.json() : Promise.reject(new Error('Could not save. Please try again.')); })
+      .then(function(rows) {
+        var cur = rows && rows[0] && Array.isArray(rows[0].responses) ? rows[0].responses : [];
+        return fetch(SUPABASE_URL + '/rest/v1/feature_requests?id=eq.' + r.id, { method: 'PATCH', headers: Object.assign({}, H, { Prefer: 'return=minimal' }), body: JSON.stringify({ responses: cur.concat([{ text: text, by: by, at: new Date().toISOString() }]) }) });
+      })
+      .then(function(x) {
+        if (!x.ok) throw new Error('Could not save. Please try again.');
+        logActivity('Responded to ' + (r.kind === 'bug' ? 'bug report' : 'feature request') + ': ' + (r.title || ''), 'feature_request_response');
+        setReply(null); load();
+      })
+      .catch(function(err) { setReplyErr(err.message || 'Could not save.'); })
+      .finally(function() { setReplyBusy(false); });
+  }
   // A request can be edited (add more information) until it is marked done.
   var [edit, setEdit] = useState(null); // { id, title, details, priority }
   var [editBusy, setEditBusy] = useState(false);
@@ -23427,11 +23465,26 @@ function FeatureRequestModal({ onClose }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, color: '#2a2a2a' }}>
                   <span style={{ fontWeight: 600, textDecoration: done ? 'line-through' : 'none', opacity: done ? 0.55 : 1 }}>{r.kind === 'bug' && <span style={{ fontSize: 10, fontWeight: 700, color: '#b3402a', border: '1px solid #e3b4a9', borderRadius: 4, padding: '1px 5px', marginRight: 6 }}>BUG</span>}{r.title}</span>
                   <span style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
-                    {!done && <a onClick={function() { setEditErr(''); setEdit({ id: r.id, title: r.title || '', details: r.details || '', priority: r.priority || 'normal' }); }} style={{ cursor: 'pointer', color: gold, fontSize: 11, fontWeight: 600 }}>Edit</a>}
+                    {!done && <button type="button" onClick={function() { setEditErr(''); setEdit({ id: r.id, title: r.title || '', details: r.details || '', priority: r.priority || 'normal' }); }} style={smallBtn}>Edit</button>}
+                    <button type="button" onClick={function() { setReplyErr(''); setReply(reply && reply.id === r.id ? null : { id: r.id, text: '' }); }} style={smallBtn}>Respond</button>
                     <a onClick={function() { setStatus(r, done ? 'open' : 'done'); }} style={{ cursor: 'pointer', color: gold, fontSize: 11, fontWeight: 600 }}>{done ? 'Reopen' : 'Mark done'}</a>
                   </span>
                 </div>
                 {r.details && <div style={{ fontSize: 12, color: '#666', marginTop: 2, whiteSpace: 'pre-wrap' }}>{r.details}</div>}
+                {Array.isArray(r.responses) && r.responses.length > 0 && <div style={{ marginTop: 6 }}>{r.responses.map(function(x, i) {
+                  return <div key={i} style={{ borderLeft: '3px solid #d9c9a3', background: '#faf6ec', borderRadius: 4, padding: '6px 10px', marginTop: 4, fontSize: 12.5, color: '#444' }}>
+                    <div style={{ fontSize: 11, color: '#8a7e6b', marginBottom: 2 }}><b>{x.by || 'Staff'}</b> responded {x.at ? new Date(x.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</div>
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{x.text}</div>
+                  </div>;
+                })}</div>}
+                {reply && reply.id === r.id && <div style={{ marginTop: 8 }}>
+                  <textarea autoFocus value={reply.text} onChange={function(e) { var v = e.target.value; setReply(function(o) { return Object.assign({}, o, { text: v }); }); }} rows={3} placeholder="Write your response…" style={Object.assign({}, field, { resize: 'vertical' })} aria-label="Response" />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                    {replyErr && <span style={{ fontSize: 12, color: '#b3402a', marginRight: 'auto' }}>{replyErr}</span>}
+                    <button type="button" onClick={function() { setReply(null); setReplyErr(''); }} disabled={replyBusy} style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+                    <button type="button" onClick={function() { saveReply(r); }} disabled={replyBusy} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: replyBusy ? 0.7 : 1 }}>{replyBusy ? 'Saving…' : 'Send response'}</button>
+                  </div>
+                </div>}
                 {Array.isArray(r.attachments) && r.attachments.length > 0 && <div style={{ fontSize: 12, marginTop: 3 }}>{r.attachments.map(function(a, i) { return <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" style={{ color: gold, marginRight: 10 }}>📎 {a.name}</a>; })}</div>}
                 <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{[r.area, r.priority === 'high' ? 'Needed soon' : r.priority === 'low' ? 'Nice to have' : null, r.requested_by, new Date(r.created_at).toLocaleDateString()].filter(Boolean).join(' · ')}</div>
               </div>
