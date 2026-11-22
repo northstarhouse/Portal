@@ -78,13 +78,14 @@ export function ChamberDraftButton({ ev }) {
 }
 
 // Shown name for a channel. The stored key stays as is (events already have it checked off under that key).
-export const channelLabel = (c) => (c === 'Go Nevada County Calendar - Community Blast' ? 'Community Calendar' : c);
-// Listed in column order (the checklist fills the left column first): the calendars together at the top left, the extras and the Chamber at the end.
+const CHANNEL_LABELS = { 'Go Nevada County Calendar - Community Blast': 'Community Calendar', 'Facebook Event Page': 'Facebook Event Listing', 'NSH Facebook Page': 'Facebook Page', 'NSH Instagram Page': 'Instagram Page', 'NSH Newsletter': 'Newsletter', 'Send Email Blast': 'Event Email Blast', 'YubaNet (Press Release Only)': 'YubaNet - Send Press Release' };
+export const channelLabel = (c) => CHANNEL_LABELS[c] || c;
+// Listed in column order (the checklist fills the left column first): the calendars and social pages on the left, email/blog/flyer at the top of the right, the extras and the Chamber at the end.
 export const MARKETING_CHANNELS = [
-  'Go Nevada County Calendar - Community Blast', 'YubaNet Calendar', 'Arts Council Calendar', 'KVMR Calendar', 'Union Event Calendar',
-  'Website', 'Send Email Blast', 'NSH Newsletter', 'Blog', 'Make Flyer',
-  'Create Press Release', 'YubaNet (Press Release Only)', 'Facebook Event Page', 'NSH Facebook Page', 'NSH Instagram Page', 'Next Door',
-  'Nevada County Peeps', 'Grass Valley Peeps', 'Lake Wildwood Page', 'Grass Valley Chamber Newsletter',
+  'Website', 'Go Nevada County Calendar - Community Blast', 'YubaNet Calendar', 'Arts Council Calendar', 'KVMR Calendar', 'Union Event Calendar',
+  'Facebook Event Page', 'NSH Facebook Page', 'NSH Instagram Page', 'Next Door',
+  'Make Flyer', 'Create Press Release', 'Blog', 'NSH Newsletter', 'Send Email Blast',
+  'Nevada County Peeps', 'Grass Valley Peeps', 'Lake Wildwood Page', 'YubaNet (Press Release Only)', 'Grass Valley Chamber Newsletter',
 ];
 const EXPENSE_CATEGORIES = ['Food & Beverage', 'Entertainment / Speakers', 'Supplies / Decor', 'Marketing / Printing', 'Permits / Licenses / Insurance', 'Cleaning / Security', 'Other'];
 const INCOME_SOURCES = ['Ticket Sales', 'Alcohol or food sales', 'House Merch', 'Donations', 'Other'];

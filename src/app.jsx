@@ -1604,6 +1604,7 @@ function EventsView({ navigate, initialTab }) {
   var [editFeedbackForm, setEditFeedbackForm] = useState(null);
   var [savingFeedbackEdit, setSavingFeedbackEdit] = useState(false);
   var [expandedEventGroups, setExpandedEventGroups] = useState({});
+  var [expandedFeedback, setExpandedFeedback] = useState({});
   var [showBulkFeedback, setShowBulkFeedback] = useState(false);
   var [bulkPasteText, setBulkPasteText] = useState('');
   var [bulkParsed, setBulkParsed] = useState(null);
@@ -2559,24 +2560,26 @@ function EventsView({ navigate, initialTab }) {
                   </div>
                 );
               }
+              var fbOpen = !!expandedFeedback[f.id];
+              var fbDate = f.date ? new Date(f.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
               return (
-                <div key={f.id} style={{ padding: '12px 16px', borderBottom: fi < g.items.length - 1 ? '0.5px solid #f5f0e8' : 'none' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{f.name || 'Anonymous'}{f.role ? ' - ' + f.role : ''}</span>
-                        {f.source && <span style={{ fontSize: 11, color: '#aaa' }}>{f.source}</span>}
-                        {f.date && <span style={{ fontSize: 11, color: '#ccc' }}>{new Date(f.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
-                      </div>
-                      <div style={{ fontSize: 13, color: '#555', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginTop: 6 }}>{f.feedback}</div>
-                    </div>
+                <div key={f.id} style={{ margin: '8px 12px', border: '0.5px solid #e0d8cc', borderRadius: 10, background: fbOpen ? '#fff' : '#fcfaf6', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px 0 0' }}>
+                    <button onClick={function() { setExpandedFeedback(function(prev) { var n = Object.assign({}, prev); n[f.id] = !n[f.id]; return n; }); }}
+                      style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '11px 14px', fontFamily: 'inherit' }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{f.name || 'Anonymous'}{f.role ? ' - ' + f.role : ''}</span>
+                      {f.source && <span style={{ fontSize: 11, color: '#aaa' }}>{f.source}</span>}
+                      {fbDate && <span style={{ fontSize: 11, color: '#bbb' }}>{fbDate}</span>}
+                      <span style={{ marginLeft: 'auto', fontSize: 12, color: '#ccc' }}>{fbOpen ? '▲' : '▼'}</span>
+                    </button>
                     <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                       <button onClick={function() { startEditFeedback(f); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '2px', display: 'flex', alignItems: 'center' }}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       </button>
-                      <button onClick={function() { deleteFeedback(f.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '0 2px' }}>×</button>
+                      <button onClick={function() { deleteFeedback(f.id); }} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ddd', fontSize: 14, padding: '0 2px' }}>×</button>
                     </div>
                   </div>
+                  {fbOpen && <div style={{ fontSize: 13, color: '#555', lineHeight: 1.5, whiteSpace: 'pre-wrap', padding: '0 16px 14px', borderTop: '0.5px solid #f0ece6', paddingTop: 12 }}>{f.feedback}</div>}
                 </div>
               );
                     })}
