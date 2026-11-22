@@ -11975,6 +11975,12 @@ function ReviewsView({ navigate }) {
               );
             })
           }
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 18px', padding: '14px 0 4px', fontSize: 11.5, color: '#8a7e6b', alignItems: 'center' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid #e0d8cc', background: '#faf8f5', display: 'inline-block' }} />Not submitted yet</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: '50%', background: '#e8f5e9', color: '#2e7d32', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 }}>✓</span>Area lead's reflection received</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ color: gold, fontSize: 14, lineHeight: 1 }}>★</span>Board review done</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />Red dot: the lead asked for support (hover or open it to see what they need)</span>
+          </div>
         </div>
         </div>
       </div>

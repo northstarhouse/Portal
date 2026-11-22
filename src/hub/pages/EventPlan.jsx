@@ -296,36 +296,10 @@ export default function EventPlan({ session, volunteer, onFinalized }) {
   const lab = { fontSize: 11, fontWeight: 600, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 4 };
   return (
     <div className="card" style={{ padding: 0, marginBottom: 16, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 16 }}>
-      <button type="button" onClick={() => setCollapsed(!collapsed)} style={{ flex: '1 1 260px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-        <span style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif", color: 'var(--gold)' }}>{PLAN_YEAR} Event Plan</span>
+      <button type="button" onClick={() => setCollapsed(!collapsed)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+        <span style={{ fontSize: 16, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif", color: 'var(--gold)' }}>{PLAN_YEAR} Event Plan</span>
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>{rows ? `${done} of ${rows.length} finalized` : ''} {collapsed ? '▸' : '▾'}</span>
       </button>
-      <button type="button" className="btn-gold" style={{ fontSize: 12, padding: '8px 14px' }} onClick={() => { setEmailOpen(o => !o); setEmailMsg(null); }}>✉ Email update to committee</button>
-      </div>
-      {emailOpen && (
-        <div style={{ margin: '0 16px 16px', border: '0.5px solid var(--border-light)', borderRadius: 10, padding: '14px 16px', background: '#faf8f4' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>Email the {PLAN_YEAR} Event Plan to the committee</div>
-            <button type="button" className="btn-ghost" style={{ fontSize: 12, padding: '4px 12px' }} onClick={() => setEmailOpen(false)}>Close</button>
-          </div>
-          <div className="label">Subject</div>
-          <input className="input" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} style={{ marginBottom: 10 }} />
-          <div className="label">Your note (shown at the top of the email)</div>
-          <textarea className="input" rows={4} value={emailNote} onChange={e => setEmailNote(e.target.value)} placeholder="For example: here is where the plan stands after our notes. Please read through each event and add anything I missed before the next meeting." style={{ resize: 'vertical', marginBottom: 10 }} />
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
-            Goes to {committeeWithEmail.length} committee member{committeeWithEmail.length === 1 ? '' : 's'} (the Events team): {committeeWithEmail.map(volName).join(', ') || 'none found'}.
-            {committee.length > committeeWithEmail.length && ' No email on file for: ' + committee.filter(v => !committeeWithEmail.includes(v)).map(volName).join(', ') + '.'}
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <button type="button" className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setEmailPreview(p => !p)}>{emailPreview ? 'Hide preview' : 'Preview'}</button>
-            <button type="button" className="btn-ghost" style={{ fontSize: 12 }} disabled={emailBusy || !(volunteer && volunteer.Email)} onClick={() => sendPlanEmail([volunteer.Email], 'me')} title={volunteer && volunteer.Email ? 'Sends only to ' + volunteer.Email : 'No email on your volunteer record'}>Send a test to me</button>
-            <button type="button" className="btn-gold" style={{ fontSize: 12 }} disabled={emailBusy || !committeeWithEmail.length || !rows} onClick={() => sendPlanEmail(committeeWithEmail.map(v => v.Email), 'committee')}>{emailBusy ? 'Sending…' : 'Email update to committee'}</button>
-            {emailMsg && <span style={{ fontSize: 12, color: emailMsg.ok ? '#2e7d32' : '#b3261e' }}>{emailMsg.text}</span>}
-          </div>
-          {emailPreview && <iframe title="Email preview" srcDoc={buildPlanEmail({ rows, votes, note: emailNote })} style={{ width: '100%', height: 620, border: '0.5px solid var(--border)', borderRadius: 8, marginTop: 12, background: '#fff' }} />}
-        </div>
-      )}
       {!collapsed && (
         <div style={{ borderTop: '0.5px solid var(--border-light)' }}>
           <div style={{ fontSize: 12, color: 'var(--muted)', padding: '10px 16px 4px' }}>The committee's confirmed events for {PLAN_YEAR}. Once an event has a date, start and end times and pricing, finalize it to add it to the events below.</div>
