@@ -11679,6 +11679,7 @@ function ReviewsView({ navigate }) {
   var { useState, useEffect } = React;
   var [remindBusy, setRemindBusy] = useState('');
   var [reminded, setReminded] = useState({});
+  var [remindDraft, setRemindDraft] = useState(null); // {area, q}: the reminder shown in the preview before it is sent
   var [sentLog, setSentLog] = useState([]); // reminder emails already sent: { at, area, quarter, lead, to }
   useEffect(function() {
     fetch(SUPABASE_URL + '/rest/v1/activity_log?action=eq.quarterly_reminder_sent&select=created_at,detail&order=created_at.desc&limit=500', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
@@ -11689,11 +11690,23 @@ function ReviewsView({ navigate }) {
   function sentFor(area, q) { return sentLog.filter(function(x) { return x.area === area && x.quarter === q && Number(x.year) === year; }); }
   function reminderDay(iso) { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }); }
   // Emails the area's lead about a quarterly update that is past due and not in yet. Always asks first; the admin gets a copy.
+  function buildReminder(area, q) {
+    var def = AREA_DEFAULTS[area] || {};
+    var due = quarterDueDate(q, year).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    var first = String(def.lead || '').split(' ')[0] || 'there';
+    var subject = 'Reminder: ' + area + ' ' + q + ' ' + year + ' quarterly update';
+    var text = 'Hi ' + first + ',\n\nThis is a friendly reminder that the ' + area + ' quarterly update for ' + q + ' ' + year + ' was due ' + due + ' and we have not received it yet.\n\nPlease submit it in the North Star House Portal (Quarterly Updates) when you can. If you need help or are stuck, just reply to this email and let us know.\n\nThank you for all you do for North Star House.';
+    return { def: def, due: due, subject: subject, text: text };
+  }
+  function openReminder(area, q) {
+    var def = AREA_DEFAULTS[area] || {};
+    if (!def.leadEmail) { alert('No lead email on file for ' + area + '. Add one in Admin → Operational Budgets, then try again.'); return; }
+    setRemindDraft({ area: area, q: q });
+  }
   function sendUpdateReminder(area, q) {
     var def = AREA_DEFAULTS[area] || {};
     if (!def.leadEmail) { alert('No lead email on file for ' + area + '. Add one in Admin → Operational Budgets, then try again.'); return; }
     var due = quarterDueDate(q, year).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    if (!window.confirm('Send a reminder to ' + (def.lead || 'the ' + area + ' lead') + ' (' + def.leadEmail + ') about the ' + q + ' ' + year + ' quarterly update for ' + area + ' (due ' + due + ')?')) return;
     var key = area + ':' + q;
     setRemindBusy(key);
     var first = String(def.lead || '').split(' ')[0] || 'there';
@@ -11708,6 +11721,7 @@ function ReviewsView({ navigate }) {
       setRemindBusy('');
       if (!r.ok) { alert('The reminder did not send. Please try again.'); return; }
       setReminded(function(prev) { var n = Object.assign({}, prev); n[key] = true; return n; });
+      setRemindDraft(null);
       var nowIso = new Date().toISOString();
       setSentLog(function(prev) { return [{ at: nowIso, area: area, quarter: q, year: year, lead: def.lead || '', to: def.leadEmail }].concat(prev); });
       fetch(SUPABASE_URL + '/rest/v1/activity_log', { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ action: 'quarterly_reminder_sent', description: 'Sent a quarterly update reminder to ' + (def.lead || area + ' lead') + ' (' + area + ' ' + q + ' ' + year + ')', detail: { area: area, quarter: q, year: year, lead: def.lead || '', to: def.leadEmail } }) }).catch(function() {});
@@ -12003,7 +12017,7 @@ function ReviewsView({ navigate }) {
                             <div title="Not yet submitted" style={{ width: 22, height: 22, borderRadius: '50%', border: '1.5px solid #e0d8cc', background: '#faf8f5' }} />
                           )}
                           {!hasReflection && !hasReview && submitted !== null && quarterDueDate(q, year) < new Date(new Date().setHours(0, 0, 0, 0)) && (
-                            <button type="button" disabled={remindBusy === key} onClick={function() { sendUpdateReminder(area, q); }} title={sentFor(area, q).length ? 'Reminder sent ' + sentFor(area, q).map(function(x) { return reminderDay(x.at) + (x.lead ? ' to ' + x.lead : ''); }).join(', ') + '. Click to send another.' : 'This update is past due. Email the area lead a reminder.'} style={{ position: 'absolute', left: 32, whiteSpace: 'nowrap', fontSize: 11, fontWeight: 600, color: sentFor(area, q).length ? '#2e7d32' : '#b3261e', background: '#fff', border: '0.5px solid ' + (sentFor(area, q).length ? '#b7dcb9' : '#e6b8b3'), borderRadius: 12, padding: '2px 9px', cursor: remindBusy === key ? 'default' : 'pointer', fontFamily: 'inherit' }}>{remindBusy === key ? 'Sending…' : sentFor(area, q).length ? 'Reminded ' + reminderDay(sentFor(area, q)[0].at) + (sentFor(area, q).length > 1 ? ' (x' + sentFor(area, q).length + ')' : '') + ' ✓' : 'Send reminder'}</button>
+                            <button type="button" disabled={remindBusy === key} onClick={function() { openReminder(area, q); }} title={sentFor(area, q).length ? 'Reminder sent ' + sentFor(area, q).map(function(x) { return reminderDay(x.at) + (x.lead ? ' to ' + x.lead : ''); }).join(', ') + '. Click to send another.' : 'This update is past due. Email the area lead a reminder.'} style={{ position: 'absolute', left: 32, whiteSpace: 'nowrap', fontSize: 11, fontWeight: 600, color: sentFor(area, q).length ? '#2e7d32' : '#b3261e', background: '#fff', border: '0.5px solid ' + (sentFor(area, q).length ? '#b7dcb9' : '#e6b8b3'), borderRadius: 12, padding: '2px 9px', cursor: remindBusy === key ? 'default' : 'pointer', fontFamily: 'inherit' }}>{remindBusy === key ? 'Sending…' : sentFor(area, q).length ? 'Reminded ' + reminderDay(sentFor(area, q)[0].at) + (sentFor(area, q).length > 1 ? ' (x' + sentFor(area, q).length + ')' : '') + ' ✓' : 'Send reminder'}</button>
                           )}
                           {needsSupport && (
                             <div title={'Needs support: ' + submission.support_needed.join(', ')} style={{ position: 'absolute', top: -4, right: -6, width: 10, height: 10, borderRadius: '50%', background: '#ef4444', border: '1.5px solid #fff', flexShrink: 0 }} />
@@ -12037,6 +12051,43 @@ function ReviewsView({ navigate }) {
         </div>
         </div>
       </div>
+
+      {remindDraft && (function() {
+        var d = buildReminder(remindDraft.area, remindDraft.q);
+        var para = d.text.split(String.fromCharCode(10) + String.fromCharCode(10));
+        var past = sentLog.filter(function(x) { return x.area === remindDraft.area; });
+        var sending = remindBusy === remindDraft.area + ':' + remindDraft.q;
+        return (
+          <div onClick={function() { if (!sending) setRemindDraft(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010, padding: 16 }}>
+            <div role="dialog" aria-label="Reminder preview" onClick={function(e) { e.stopPropagation(); }} style={{ background: '#fff', borderRadius: 14, maxWidth: 860, width: '100%', maxHeight: '90vh', overflow: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.2)', display: 'flex', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 420px', padding: 24, minWidth: 0 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#2a2a2a', fontFamily: "'Cardo', serif", marginBottom: 14 }}>Preview: {remindDraft.area} {remindDraft.q} reminder</div>
+                <div style={{ fontSize: 12, color: '#8a7e6b', lineHeight: 1.7, marginBottom: 12 }}>
+                  <div><b>To:</b> {d.def.lead || 'Area lead'} ({d.def.leadEmail})</div>
+                  <div><b>Copy to:</b> {ADMIN_NOTIFY_BCC}</div>
+                  <div><b>Subject:</b> {d.subject}</div>
+                </div>
+                <div style={{ border: '0.5px solid #e8e0d5', borderRadius: 10, background: '#fdfcfb', padding: '16px 18px', fontSize: 14, lineHeight: 1.6, color: '#444' }}>
+                  {para.map(function(p, i) { return <p key={i} style={{ margin: '0 0 14px' }}>{p}</p>; })}
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+                  <button type="button" disabled={sending} onClick={function() { sendUpdateReminder(remindDraft.area, remindDraft.q); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: sending ? 'default' : 'pointer', opacity: sending ? 0.7 : 1 }}>{sending ? 'Sending…' : 'Send reminder'}</button>
+                  <button type="button" disabled={sending} onClick={function() { setRemindDraft(null); }} style={{ background: '#fff', color: '#555', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '9px 18px', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+              <aside style={{ flex: '0 1 250px', minWidth: 220, padding: 24, background: '#faf8f4', borderLeft: '0.5px solid #ece5d8' }}>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10 }}>Already sent: {remindDraft.area}</div>
+                {past.length === 0 ? <div style={{ fontSize: 12.5, color: '#8a7e6b' }}>No reminders have been sent for {remindDraft.area} yet.</div> : past.map(function(x, i) {
+                  return <div key={i} style={{ padding: '8px 0', borderTop: i ? '0.5px solid #ece5d8' : 'none', fontSize: 12.5, color: '#555' }}>
+                    <div style={{ fontWeight: 600 }}>{reminderDay(x.at)} · {x.quarter} {x.year}</div>
+                    <div style={{ color: '#8a7e6b' }}>to {x.lead || 'the area lead'}</div>
+                  </div>;
+                })}
+              </aside>
+            </div>
+          </div>
+        );
+      })()}
 
       {printQ && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1010 }}>
