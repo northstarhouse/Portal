@@ -80,7 +80,7 @@ export function ChamberDraftButton({ ev }) {
 // Shown name for a channel. The stored key stays as is (events already have it checked off under that key).
 export const channelLabel = (c) => (c === 'Go Nevada County Calendar - Community Blast' ? 'Community Calendar' : c);
 export const MARKETING_CHANNELS = [
-  'Website', 'Blog', 'Make Flyer', 'Create Press Release', 'Send Email Blast', 'YubaNet (Press Release Only)', 'YubaNet Calendar', 'Go Nevada County Calendar - Community Blast',
+  'Website', 'Send Email Blast', 'NSH Newsletter', 'Blog', 'Make Flyer', 'Create Press Release', 'YubaNet (Press Release Only)', 'YubaNet Calendar', 'Go Nevada County Calendar - Community Blast',
   'Arts Council Calendar', 'Grass Valley Chamber Newsletter', 'KVMR Calendar', 'Facebook Event Page', 'NSH Facebook Page',
   'NSH Instagram Page', 'Nevada County Peeps', 'Grass Valley Peeps', 'Lake Wildwood Page', 'Next Door', 'Union Event Calendar',
 ];
@@ -325,7 +325,7 @@ function Field({ field, value, onChange, volunteers, readOnly }) {
           return (
             <label key={c} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
               <input type="checkbox" checked={!!row.done} onChange={e => onChange({ ...m, [c]: { ...row, done: e.target.checked } })} style={{ accentColor: 'var(--gold)' }} />
-              {channelLabel(c)}
+              {channelLabel(c)}{c === CHAMBER_CHANNEL && <ChamberDraftButton ev={areaEvent} />}
             </label>
           );
         })}
@@ -522,6 +522,7 @@ function AreaFormSection({ fields, data, onFieldChange, volunteers, readOnly }) 
 // editing / embedded: when a parent owns the Edit button (Volunteers, Staffing & Vendors share one), it passes editing and
 // this tab hides its own tabs and buttons.
 export default function AreasTab({ event, session, volunteer, initialArea, editing: editingProp, embedded, alwaysEdit }) {
+  areaEvent = event;
   const [rows, setRows] = useState(null);
   const [volunteersDir, setVolunteersDir] = useState([]);
   const [activeArea, setActiveArea] = useState(initialArea || 'logistics');
