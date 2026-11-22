@@ -1187,6 +1187,7 @@ function ClientStats({ clients, allClients, onClose }) {
         <div style={box}><div style={big}>{tourCount(t => t.status === 'no_show')}</div><div className="vc-muted">Didn't show up</div></div>
         <div style={box}><div style={big}>{tourCount(t => t.status === 'cancelled')}</div><div className="vc-muted">Cancelled</div></div>
         <div style={box}><div style={big}>{tourCount(t => t.status === 'requested')}</div><div className="vc-muted">Requests waiting</div></div>
+        <div style={box}><div style={big}>{all.n}</div><div className="vc-muted">Events booked</div></div>
       </div>}
       <div style={{ ...lab, marginTop: 22 }}>Inquiries</div>
       {!extra ? <div className="vc-muted">Loading…</div> : <>
