@@ -84,11 +84,21 @@ export function copyText(text, done) {
 // The event being edited in AreasTab, so the Chamber button inside the channel list can reach its details.
 let areaEvent = null;
 export const CHAMBER_CHANNEL = 'Grass Valley Chamber Newsletter';
+// The newsletter runs about two weeks before an event, so it is sent in on the Monday two Mondays before the event.
+export function chamberSendInDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso + 'T12:00:00');
+  if (isNaN(d)) return null;
+  const dow = d.getDay(); // 0 = Sunday
+  d.setDate(d.getDate() - (dow === 1 ? 7 : (dow + 6) % 7) - 7);
+  return d;
+}
 export function ChamberDraftButton({ ev }) {
   const [copied, setCopied] = useState(false);
   if (!ev) return null;
-  return <button type="button" title="Copy a draft email to the Chamber with this event's details" onClick={e => { e.preventDefault(); e.stopPropagation(); copyText(chamberDraftText(ev), () => { setCopied(true); setTimeout(() => setCopied(false), 1800); }); }}
-    style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, padding: '2px 10px', border: '1px solid var(--gold)', background: '#fff', color: 'var(--gold)', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap' }}>{copied ? 'Copied ✓' : 'Draft email'}</button>;
+  const sendBy = chamberSendInDate(ev.date);
+  return <><button type="button" title="Copy a draft email to the Chamber with this event's details" onClick={e => { e.preventDefault(); e.stopPropagation(); copyText(chamberDraftText(ev), () => { setCopied(true); setTimeout(() => setCopied(false), 1800); }); }}
+    style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, padding: '2px 10px', border: '1px solid var(--gold)', background: '#fff', color: 'var(--gold)', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap' }}>{copied ? 'Copied ✓' : 'Draft email'}</button>{sendBy && <span title="The newsletter runs about two weeks before the event, so send it in on the Monday two Mondays before." style={{ marginLeft: 8, fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>Send in by {sendBy.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>}</>;
 }
 
 // Shown name for a channel. The stored key stays as is (events already have it checked off under that key).
