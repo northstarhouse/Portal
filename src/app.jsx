@@ -11676,6 +11676,7 @@ function QuarterWorkspaceView({ navigate }) {
 }
 
 function ReviewsView({ navigate }) {
+  var { useState, useEffect } = React;
   var [remindBusy, setRemindBusy] = useState('');
   var [reminded, setReminded] = useState({});
   var [sentLog, setSentLog] = useState([]); // reminder emails already sent: { at, area, quarter, lead, to }
