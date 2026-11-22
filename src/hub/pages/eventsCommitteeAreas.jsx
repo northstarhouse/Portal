@@ -82,7 +82,7 @@ export const channelLabel = (c) => (c === 'Go Nevada County Calendar - Community
 export const MARKETING_CHANNELS = [
   'Website', 'Blog', 'Make Flyer', 'Create Press Release', 'Send Email Blast', 'YubaNet (Press Release Only)', 'YubaNet Calendar', 'Go Nevada County Calendar - Community Blast',
   'Arts Council Calendar', 'Grass Valley Chamber Newsletter', 'KVMR Calendar', 'Facebook Event Page', 'NSH Facebook Page',
-  'NSH Instagram Page', 'Nevada County Peeps', 'Grass Valley Peeps', 'Lake Wildwood Page', 'Next Door', 'Union Event Calendar', 'Union Advertisement ($270)',
+  'NSH Instagram Page', 'Nevada County Peeps', 'Grass Valley Peeps', 'Lake Wildwood Page', 'Next Door', 'Union Event Calendar',
 ];
 const EXPENSE_CATEGORIES = ['Food & Beverage', 'Entertainment / Speakers', 'Supplies / Decor', 'Marketing / Printing', 'Permits / Licenses / Insurance', 'Cleaning / Security', 'Other'];
 const INCOME_SOURCES = ['Ticket Sales', 'Alcohol or food sales', 'House Merch', 'Donations', 'Other'];
