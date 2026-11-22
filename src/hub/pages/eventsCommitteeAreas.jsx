@@ -32,10 +32,55 @@ export const PLANNING_PROMPTS = [
 // The spaces at North Star House (from the site manager walk-through) for "Spaces used".
 export const NSH_SPACES = ['Living Room', 'Dining Room', 'Library', 'Julia Morgan Room', 'Mudroom & Study', 'Kitchen', 'Restrooms & Foyer', 'Terrace & West Lawn', 'Courtyard & East Lawn', 'Garden', 'Parking Lot'];
 
+
+// Plain-text event details (shared by "Copy event details" and the Chamber newsletter draft).
+const fmtLongDate = (iso) => iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Date to be announced';
+const fmtClock = (hhmm) => {
+  if (!hhmm) return '';
+  const [h, m] = String(hhmm).split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+};
+export function eventDetailsText(ev, rsvpOnly = false) {
+  const tiers = (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim());
+  const time = [fmtClock(ev.startTime), fmtClock(ev.endTime)].filter(Boolean).join(' – ');
+  return [
+    ev.name,
+    [fmtLongDate(ev.date), time].filter(Boolean).join(' · '),
+    ev.location ? 'Where: ' + ev.location : '',
+    ev.purpose ? 'Type: ' + ev.purpose : '',
+    ev.description ? '\n' + ev.description : '',
+    !rsvpOnly && tiers.length ? '\nTickets:\n' + tiers.map(t => '  ' + t.name + (Number(t.price) > 0 ? ': $' + t.price : ': free')).join('\n') : (ev.pricing ? '\nPricing: ' + ev.pricing : ''),
+    rsvpOnly ? '\nRSVP only (no ticket sales)' : '',
+    ev.expectedAttendance ? 'Expected attendance: ' + ev.expectedAttendance : '',
+    ev.eventLead ? 'Event lead: ' + ev.eventLead : '',
+  ].filter(Boolean).join('\n');
+}
+// A ready-to-paste email to the Grass Valley Chamber about the newsletter submission.
+export function chamberDraftText(ev) {
+  return 'Subject: Newsletter submission: ' + (ev.name || 'North Star House event') + '\n\n'
+    + 'Hello,\n\nWe would like to submit the following event for the Grass Valley Chamber Newsletter. The details are below. Please let us know if you need anything else from us, such as images, a shorter description, or a different format.\n\n'
+    + '----------\n' + eventDetailsText(ev) + '\n----------\n\n'
+    + 'Thank you so much for including us.\n\nNorth Star House\nnorthstarhouse.org';
+}
+export function copyText(text, done) {
+  const fail = () => alert('Could not copy. Select and copy this instead:\n\n' + text);
+  try { navigator.clipboard.writeText(text).then(() => done && done(), fail); } catch (_e) { fail(); }
+}
+// The event being edited in AreasTab, so the Chamber button inside the channel list can reach its details.
+let areaEvent = null;
+export const CHAMBER_CHANNEL = 'Grass Valley Chamber Newsletter';
+export function ChamberDraftButton({ ev }) {
+  const [copied, setCopied] = useState(false);
+  if (!ev) return null;
+  return <button type="button" title="Copy a draft email to the Chamber with this event's details" onClick={e => { e.preventDefault(); e.stopPropagation(); copyText(chamberDraftText(ev), () => { setCopied(true); setTimeout(() => setCopied(false), 1800); }); }}
+    style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, padding: '2px 10px', border: '1px solid var(--gold)', background: '#fff', color: 'var(--gold)', borderRadius: 999, cursor: 'pointer', whiteSpace: 'nowrap' }}>{copied ? 'Copied ✓' : 'Draft email'}</button>;
+}
+
 // Shown name for a channel. The stored key stays as is (events already have it checked off under that key).
 export const channelLabel = (c) => (c === 'Go Nevada County Calendar - Community Blast' ? 'Community Calendar' : c);
 export const MARKETING_CHANNELS = [
-  'Website', 'Blog', 'Make Flyer', 'Create Press Release', 'Send Email Blast', 'YubaNet (Press Release Only)', 'Go Nevada County Calendar - Community Blast',
+  'Website', 'Blog', 'Make Flyer', 'Create Press Release', 'Send Email Blast', 'YubaNet (Press Release Only)', 'YubaNet Calendar', 'Go Nevada County Calendar - Community Blast',
   'Arts Council Calendar', 'Grass Valley Chamber Newsletter', 'KVMR Calendar', 'Facebook Event Page', 'NSH Facebook Page',
   'NSH Instagram Page', 'Nevada County Peeps', 'Grass Valley Peeps', 'Lake Wildwood Page', 'Next Door', 'Union Event Calendar', 'Union Advertisement ($270)',
 ];

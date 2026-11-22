@@ -7,7 +7,7 @@ import {
   fetchAllActiveVolunteers, syncInHouseEvent, logActivity, fetchEventMarketingNA, setEventMarketingNA, fetchHiddenCommitteeEvents, syncOverviewCardsFromCommittee,
   fetchEventFeedback, insertEventFeedback, updateEventFeedback, deleteEventFeedback,
 } from '../lib/db.js';
-import AreasTab, { PLANNING_PROMPTS, NSH_SPACES, MARKETING_CHANNELS, channelLabel } from './eventsCommitteeAreas.jsx';
+import AreasTab, { PLANNING_PROMPTS, NSH_SPACES, MARKETING_CHANNELS, channelLabel, eventDetailsText, copyText, ChamberDraftButton, CHAMBER_CHANNEL } from './eventsCommitteeAreas.jsx';
 import EventOverviews from './EventOverviews.jsx';
 import RsvpPanel from './RsvpPanel.jsx';
 import EventPlan from './EventPlan.jsx';
@@ -510,24 +510,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
   // "Copy event details": the basics as plain text, ready to paste into an email, message or post.
   const [copiedDetails, setCopiedDetails] = useState(false);
   function copyEventDetails() {
-    const tiers = (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim());
-    const time = [fmtTime12(ev.startTime), fmtTime12(ev.endTime)].filter(Boolean).join(' – ');
-    const lines = [
-      ev.name,
-      [fmtDate(ev.date), time].filter(Boolean).join(' · '),
-      ev.location ? 'Where: ' + ev.location : '',
-      ev.purpose ? 'Type: ' + ev.purpose : '',
-      ev.description ? '\n' + ev.description : '',
-      !rsvpOnly && tiers.length ? '\nTickets:\n' + tiers.map(t => '  ' + t.name + (Number(t.price) > 0 ? ': $' + t.price : ': free')).join('\n') : (ev.pricing ? '\nPricing: ' + ev.pricing : ''),
-      rsvpOnly ? '\nRSVP only (no ticket sales)' : '',
-      ev.expectedAttendance ? 'Expected attendance: ' + ev.expectedAttendance : '',
-      ev.eventLead ? 'Event lead: ' + ev.eventLead : '',
-    ].filter(Boolean);
-    const text = lines.join('\n');
-    const done = () => { setCopiedDetails(true); setTimeout(() => setCopiedDetails(false), 1800); };
-    try {
-      navigator.clipboard.writeText(text).then(done, () => alert('Could not copy. Select and copy this instead:\n\n' + text));
-    } catch (_e) { alert('Could not copy. Select and copy this instead:\n\n' + text); }
+    copyText(eventDetailsText(ev, rsvpOnly), () => { setCopiedDetails(true); setTimeout(() => setCopiedDetails(false), 1800); });
   }
 
   function handleFlyerUpload(file) {
@@ -2434,6 +2417,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
               <ItemRow key={'mk-' + it.c} done={done}>
                 <CheckCircle checked={!!(done)} onChange={() => toggleChannel(it.c)} />
                 <span style={{ flex: 1, fontSize: 13, textDecoration: 'none', color: 'var(--text)' }}>{channelLabel(it.c)}</span>
+                {it.c === CHAMBER_CHANNEL && <ChamberDraftButton ev={ev} />}
               </ItemRow>
             );
           }
