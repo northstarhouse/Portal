@@ -1016,15 +1016,12 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
 // browser); "all days" = every day of the month. Booked = distinct days with a booked event
 // (a multi-day event counts each of its days). "Last year by this date" = how many of that month's
 // days last year were already booked on this same calendar date, i.e. are we ahead of pace.
-const AV_DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const AV_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 function AvailabilityStats({ clients }) {
   const today = venueDateKey();
   const thisYear = Number(today.slice(0, 4));
-  const [expDays, setExpDays] = React.useState(() => { try { const v = JSON.parse(localStorage.getItem('nsh-avail-expected-days') || 'null'); if (Array.isArray(v) && v.length) return v; } catch (e) {} return [0, 6]; });
   const [onlyWeddings, setOnlyWeddings] = React.useState(false);
   const [year, setYear] = React.useState(thisYear);
-  const toggleDay = d => setExpDays(cur => { const next = cur.includes(d) ? cur.filter(x => x !== d) : cur.concat([d]).sort(); if (!next.length) return cur; try { localStorage.setItem('nsh-avail-expected-days', JSON.stringify(next)); } catch (e) {} return next; });
   // Every booked day -> the earliest date it was booked (when the pre-booking came in), or null if unknown.
   const booked = {};
   clients.forEach(c => {
@@ -1041,13 +1038,12 @@ function AvailabilityStats({ clients }) {
   const sameDayLastYear = shiftDate(today, -365);
   const monthRow = (y, m) => {
     const days = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-    let expected = 0, bookedDays = 0, bookedByNow = 0;
+    let bookedDays = 0, bookedByNow = 0;
     for (let i = 1; i <= days; i++) {
       const key = y + '-' + pad(m + 1) + '-' + pad(i);
-      if (expDays.includes(new Date(key + 'T12:00:00Z').getUTCDay())) expected++;
       if (key in booked) { bookedDays++; if (booked[key] && booked[key] <= sameDayLastYear) bookedByNow++; }
     }
-    return { days, expected, bookedDays, bookedByNow };
+    return { days, bookedDays, bookedByNow };
   };
   const rows = AV_MONTHS.map((name, m) => ({ name, m, cur: monthRow(year, m), prev: monthRow(year - 1, m) }));
   const tot = k => rows.reduce((t, r) => t + r.cur[k], 0);
@@ -1069,17 +1065,11 @@ function AvailabilityStats({ clients }) {
       <button type="button" onClick={() => setOnlyWeddings(false)} style={chip(!onlyWeddings)}>Weddings &amp; events</button>
       <button type="button" onClick={() => setOnlyWeddings(true)} style={chip(onlyWeddings)}>Weddings only</button>
     </div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 10, fontSize: 12, color: '#888' }}>
-      Expected days:
-      {[5, 6, 0, 1, 2, 3, 4].map(d => <button key={d} type="button" onClick={() => toggleDay(d)} style={chip(expDays.includes(d))}>{AV_DOW[d]}</button>)}
-    </div>
     <div style={{ overflowX: 'auto' }}>
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
       <thead><tr>
         <th style={{ ...th, textAlign: 'left', paddingLeft: 0 }}>Month</th>
         <th style={th}>Booked<br />days</th>
-        <th style={th}>Expected<br />days</th>
-        <th style={{ ...th, minWidth: 70 }}>Booked vs<br />expected</th>
         <th style={th}>All<br />days</th>
         <th style={th}>Booked vs<br />all days</th>
         <th style={th}>{year - 1}<br />booked</th>
@@ -1089,8 +1079,6 @@ function AvailabilityStats({ clients }) {
         {rows.map(r => <tr key={r.m}>
           <td style={{ ...td, textAlign: 'left', paddingLeft: 0, fontWeight: 600 }}>{r.name}</td>
           <td style={{ ...td, fontWeight: 700, color: '#4a3b24' }}>{r.cur.bookedDays}</td>
-          <td style={td}>{r.cur.expected}</td>
-          <td style={td}>{pct(r.cur.bookedDays, r.cur.expected)}{bar(r.cur.bookedDays, r.cur.expected)}</td>
           <td style={td}>{r.cur.days}</td>
           <td style={td}>{pct(r.cur.bookedDays, r.cur.days)}</td>
           <td style={{ ...td, color: '#888' }}>{r.prev.bookedDays}</td>
@@ -1099,8 +1087,6 @@ function AvailabilityStats({ clients }) {
         <tr>
           <td style={{ ...tdTot, textAlign: 'left', paddingLeft: 0 }}>Year</td>
           <td style={{ ...tdTot, color: '#4a3b24' }}>{tot('bookedDays')}</td>
-          <td style={{ ...tdTot, fontWeight: 400 }}>{tot('expected')}</td>
-          <td style={tdTot}>{pct(tot('bookedDays'), tot('expected'))}</td>
           <td style={{ ...tdTot, fontWeight: 400 }}>{tot('days')}</td>
           <td style={tdTot}>{pct(tot('bookedDays'), tot('days'))}</td>
           <td style={{ ...tdTot, color: '#888' }}>{totPrev('bookedDays')}</td>
@@ -1110,12 +1096,21 @@ function AvailabilityStats({ clients }) {
     </table>
     </div>
     <div className="vc-muted" style={{ marginTop: 8, fontSize: 12 }}>
-      Counts days, not bookings: two events on one day count once, and a multi-day event counts each day. Over 100% means more days were booked than expected.
+      Counts days, not bookings: two events on one day count once, and a multi-day event counts each day.
       {showPace && <> “{year - 1} by this date” is how many of {year - 1}'s days were already booked on {longDay(sameDayLastYear)}, so you can see whether {year} is ahead of last year's pace.</>}
       {' '}Only bookings in the portal are counted; earlier years kept on paper can be added.
     </div>
   </div>;
 }
+
+// Booked events by the month the event is held, for past years. Supplied by the venue team (the Portal only holds 2026 events from
+// September on), so these are fixed. Twelve numbers, January to December. To add 2025 later, add a line: 2025: [Jan, Feb, ... Dec].
+const BOOKED_FIXED = { 2026: [1, 2, 0, 4, 8, 9, 1, 1, 5, 4, 2, 0] };
+const BOOKED_GOAL_YEAR = 2026; // each month's goal for the live year is that month's number here: meet it or go over it
+const BOOKED_LIVE_YEAR = 2027; // counted live from the Portal's booked events
+const BOOKED_SINCE = '2026-09-01'; // the "Events booked" count starts here: when the Portal replaced HoneyBook
+const bookedOn = c => String((c.hb && c.hb.project && c.hb.project.created_at) || (c.sub && c.sub.created_at) || '').slice(0, 10);
+const BOOKED_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function ClientStats({ clients, allClients, onClose }) {
   const sum = (arr, f) => arr.reduce((t, x) => t + (f(x) || 0), 0);
@@ -1180,6 +1175,30 @@ function ClientStats({ clients, allClients, onClose }) {
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>Bookings</th><th style={th}>Without deposits</th><th style={th}>With deposits</th></tr></thead>
         <tbody>{types.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={td}>{t.n}</td><td style={td}>{money(t.noDeposit)}</td><td style={td}>{money(t.total)}</td></tr>)}</tbody>
       </table>
+      <div style={{ ...lab, marginTop: 22 }}>Booked events by month: {BOOKED_LIVE_YEAR} vs {BOOKED_GOAL_YEAR}</div>
+      {(() => {
+        const live = new Array(12).fill(0);
+        (allClients || clients).forEach(c => { if (c.eventDate && c.eventDate.slice(0, 4) === String(BOOKED_LIVE_YEAR)) live[Number(c.eventDate.slice(5, 7)) - 1]++; });
+        const fixedYears = Object.keys(BOOKED_FIXED).map(Number).sort();
+        const goal = BOOKED_FIXED[BOOKED_GOAL_YEAR] || new Array(12).fill(0);
+        const sumYear = arr => arr.reduce((t, x) => t + x, 0);
+        const liveTotal = sumYear(live), goalTotal = sumYear(goal);
+        const status = (n, g) => n >= g ? (g === 0 && n === 0 ? { t: '—', c: '#999' } : { t: n > g ? '+' + (n - g) + ' over goal' : 'Goal met', c: '#2e7d32' }) : { t: (g - n) + ' to go', c: '#9a5d22' };
+        return <>
+          <div className="vc-muted" style={{ marginBottom: 8 }}>The goal for each month is to meet or beat what we booked that month in {BOOKED_GOAL_YEAR}. {BOOKED_LIVE_YEAR} counts update by themselves from booked events.</div>
+          <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead><tr><th style={{ ...th, textAlign: 'left' }}>Event month</th>{fixedYears.map(y => <th key={y} style={th}>{y}{y === BOOKED_GOAL_YEAR ? ' (goal)' : ''}</th>)}<th style={th}>{BOOKED_LIVE_YEAR} booked</th><th style={{ ...th, textAlign: 'left', paddingLeft: 14 }}>Progress</th></tr></thead>
+            <tbody>{BOOKED_MONTHS.map((m, i) => { const st = status(live[i], goal[i]); const p = goal[i] ? Math.min(100, live[i] / goal[i] * 100) : (live[i] ? 100 : 0); return <tr key={m}>
+              <td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{m}</td>
+              {fixedYears.map(y => <td key={y} style={td}>{(BOOKED_FIXED[y] || [])[i] ?? '—'}</td>)}
+              <td style={{ ...td, fontWeight: 700 }}>{live[i]}</td>
+              <td style={{ ...td, textAlign: 'left', paddingLeft: 14, minWidth: 130 }}><div style={{ fontSize: 11.5, fontWeight: 600, color: st.c }}>{st.t}</div><div style={{ height: 5, background: '#f0ebe0', borderRadius: 3, marginTop: 3 }}><div style={{ width: p + '%', height: 5, borderRadius: 3, background: live[i] >= goal[i] && (live[i] > 0 || goal[i] > 0) ? '#2e7d32' : '#b58a3c' }} /></div></td>
+            </tr>; })}
+              <tr><td style={{ ...td, textAlign: 'left', fontWeight: 700, borderTop: '2px solid #e6d9bd' }}>Total</td>{fixedYears.map(y => <td key={y} style={{ ...td, fontWeight: 700, borderTop: '2px solid #e6d9bd' }}>{sumYear(BOOKED_FIXED[y] || [])}</td>)}<td style={{ ...td, fontWeight: 700, borderTop: '2px solid #e6d9bd' }}>{liveTotal}</td><td style={{ ...td, textAlign: 'left', paddingLeft: 14, fontWeight: 700, borderTop: '2px solid #e6d9bd', color: status(liveTotal, goalTotal).c }}>{status(liveTotal, goalTotal).t}</td></tr>
+            </tbody>
+          </table></div>
+        </>;
+      })()}
       <div style={{ ...lab, marginTop: 22 }}>Tours</div>
       {!extra ? <div className="vc-muted">Loading…</div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10 }}>
         <div style={box}><div style={big}>{tourCount(t => t.status === 'booked' && t.date >= todayKey)}</div><div className="vc-muted">Upcoming booked</div></div>
@@ -1187,7 +1206,7 @@ function ClientStats({ clients, allClients, onClose }) {
         <div style={box}><div style={big}>{tourCount(t => t.status === 'no_show')}</div><div className="vc-muted">Didn't show up</div></div>
         <div style={box}><div style={big}>{tourCount(t => t.status === 'cancelled')}</div><div className="vc-muted">Cancelled</div></div>
         <div style={box}><div style={big}>{tourCount(t => t.status === 'requested')}</div><div className="vc-muted">Requests waiting</div></div>
-        <div style={box}><div style={big}>{all.n}</div><div className="vc-muted">Events booked</div></div>
+        <div style={box}><div style={big}>{(allClients || clients).filter(c => bookedOn(c) >= BOOKED_SINCE).length}</div><div className="vc-muted">Events booked</div><div className="vc-muted" style={{ fontSize: 11 }}>since Sept 2026</div></div>
       </div>}
       <div style={{ ...lab, marginTop: 22 }}>Inquiries</div>
       {!extra ? <div className="vc-muted">Loading…</div> : <>
