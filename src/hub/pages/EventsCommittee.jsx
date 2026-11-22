@@ -611,8 +611,9 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             <div key={t.id} onClick={() => toggleChecklistItem(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer' }}>
               <span style={{
                 width: 20, height: 20, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: t.done ? 'var(--text)' : 'transparent', border: t.done ? 'none' : '1.5px solid var(--border)',
-              }}>
+                background: t.done ? 'var(--text)' : (t.updates || []).length > 0 ? 'linear-gradient(90deg, var(--gold) 50%, transparent 50%)' : 'transparent',
+                border: t.done ? 'none' : (t.updates || []).length > 0 ? '1.5px solid var(--gold)' : '1.5px solid var(--border)',
+              }} title={!t.done && (t.updates || []).length > 0 ? 'In progress' : undefined}>
                 {t.done && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
               </span>
               <span style={{ fontSize: 13, color: t.done ? 'var(--muted)' : 'var(--text)', textDecoration: 'none' }}>{t.text}{t.assignee ? <span style={{ fontSize: 12, color: 'var(--gold)', fontWeight: 600 }}>  —  {t.assignee}</span> : null}
