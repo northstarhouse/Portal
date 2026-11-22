@@ -11696,7 +11696,8 @@ function ReviewsView({ navigate }) {
     var first = String(def.lead || '').split(' ')[0] || 'there';
     var subject = 'Reminder: ' + area + ' ' + q + ' ' + year + ' quarterly update';
     var text = 'Hi ' + first + ',\n\nThis is a friendly reminder that the ' + area + ' quarterly update for ' + q + ' ' + year + ' was due ' + due + ' and we have not received it yet.\n\nPlease submit it in the North Star House Portal (Quarterly Updates) when you can. If you need help or are stuck, just reply to this email and let us know.\n\nThank you for all you do for North Star House.';
-    return { def: def, due: due, subject: subject, text: text };
+    var html = buildBoardNotificationEmailHtml({ headline: 'Quarterly Update Reminder', subtext: text, buttonText: 'Open The Portal →', buttonUrl: PORTAL_URL, footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS });
+    return { def: def, due: due, subject: subject, text: text, html: html };
   }
   function openReminder(area, q) {
     var def = AREA_DEFAULTS[area] || {};
@@ -11706,13 +11707,10 @@ function ReviewsView({ navigate }) {
   function sendUpdateReminder(area, q) {
     var def = AREA_DEFAULTS[area] || {};
     if (!def.leadEmail) { alert('No lead email on file for ' + area + '. Add one in Admin → Operational Budgets, then try again.'); return; }
-    var due = quarterDueDate(q, year).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     var key = area + ':' + q;
     setRemindBusy(key);
-    var first = String(def.lead || '').split(' ')[0] || 'there';
-    var subject = 'Reminder: ' + area + ' ' + q + ' ' + year + ' quarterly update';
-    var text = 'Hi ' + first + ',\n\nThis is a friendly reminder that the ' + area + ' quarterly update for ' + q + ' ' + year + ' was due ' + due + ' and we have not received it yet.\n\nPlease submit it in the North Star House Portal (Quarterly Updates) when you can. If you need help or are stuck, just reply to this email and let us know.\n\nThank you for all you do for North Star House.';
-    var html = '<div style="font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#444;max-width:560px">' + text.split('\n\n').map(function(p) { return '<p style="margin:0 0 16px">' + p.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</p>'; }).join('') + '</div>';
+    var b = buildReminder(area, q);
+    var subject = b.subject, text = b.text, html = b.html;
     fetch(SUPABASE_URL + '/functions/v1/send-email', {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
@@ -12054,7 +12052,6 @@ function ReviewsView({ navigate }) {
 
       {remindDraft && (function() {
         var d = buildReminder(remindDraft.area, remindDraft.q);
-        var para = d.text.split(String.fromCharCode(10) + String.fromCharCode(10));
         var past = sentLog.filter(function(x) { return x.area === remindDraft.area; });
         var sending = remindBusy === remindDraft.area + ':' + remindDraft.q;
         return (
@@ -12067,9 +12064,7 @@ function ReviewsView({ navigate }) {
                   <div><b>Copy to:</b> {ADMIN_NOTIFY_BCC}</div>
                   <div><b>Subject:</b> {d.subject}</div>
                 </div>
-                <div style={{ border: '0.5px solid #e8e0d5', borderRadius: 10, background: '#fdfcfb', padding: '16px 18px', fontSize: 14, lineHeight: 1.6, color: '#444' }}>
-                  {para.map(function(p, i) { return <p key={i} style={{ margin: '0 0 14px' }}>{p}</p>; })}
-                </div>
+                <iframe title="Email preview" srcDoc={d.html} style={{ width: '100%', height: 480, border: '0.5px solid #e8e0d5', borderRadius: 10, background: '#fff' }} />
                 <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
                   <button type="button" disabled={sending} onClick={function() { sendUpdateReminder(remindDraft.area, remindDraft.q); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: sending ? 'default' : 'pointer', opacity: sending ? 0.7 : 1 }}>{sending ? 'Sending…' : 'Send reminder'}</button>
                   <button type="button" disabled={sending} onClick={function() { setRemindDraft(null); }} style={{ background: '#fff', color: '#555', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '9px 18px', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
