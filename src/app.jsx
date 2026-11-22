@@ -11696,12 +11696,17 @@ function ReviewsView({ navigate }) {
     var first = String(def.lead || '').split(' ')[0] || 'there';
     var subject = 'Reminder: ' + area + ' ' + q + ' ' + year + ' quarterly update';
     var text = 'Hi ' + first + ',\n\nThis is a friendly reminder that the ' + area + ' quarterly update for ' + q + ' ' + year + ' was due ' + due + ' and we have not received it yet.\n\nPlease submit it in the North Star House Portal (Quarterly Updates) when you can. If you need help or are stuck, just reply to this email and let us know.\n\nThank you for all you do for North Star House.';
+    var NL = String.fromCharCode(10), parts = text.split(NL + NL);
+    var intro = parts.slice(0, 2).join(NL + NL), rest = parts.slice(2).join(NL + NL), goalsBox = '';
     if (goals && goals.length) {
-      var NL = String.fromCharCode(10), parts = text.split(NL + NL);
-      parts.splice(2, 0, ['**Goals that need review:**'].concat(goals.map(function(g, i) { return (i + 1) + '. ' + g; })).join(NL));
-      text = parts.join(NL + NL);
+      // plain-text copy of the email gets the same list; the HTML email shows it in a box
+      text = parts.slice(0, 2).concat([['Goals that need review:'].concat(goals.map(function(g, i) { return (i + 1) + '. ' + g; })).join(NL)], parts.slice(2)).join(NL + NL);
+      var esc = function(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+      goalsBox = '<div style="margin:4px 0 6px;background:#faf5e8;border:1px solid #e8dab0;border-radius:8px;padding:16px 18px;text-align:left;font-family:Helvetica,Arial,sans-serif">' +
+        '<div style="font-weight:700;color:#2a2420;font-size:15px;margin-bottom:10px">Goals that need review:</div>' +
+        '<ol style="margin:0;padding-left:22px;font-size:15px;line-height:1.5;color:#886c44">' + goals.map(function(g, i) { return '<li style="margin:0;padding:9px 0;color:#886c44;font-weight:600;' + (i ? 'border-top:1px solid #eadfc4;' : '') + '">' + esc(g) + '</li>'; }).join('') + '</ol></div>';
     }
-    var html = buildBoardNotificationEmailHtml({ headline: 'Quarterly Update Reminder', subtext: text, buttonText: 'Open The Portal →', buttonUrl: PORTAL_URL, footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS });
+    var html = buildBoardNotificationEmailHtml({ headline: 'Quarterly Update Reminder', subtext: goalsBox ? intro + NL + goalsBox : intro, closing: rest, buttonText: 'Open The Portal →', buttonUrl: PORTAL_URL, footerLinks: TEMPLATE_EMAIL_FOOTER_LINKS });
     return { def: def, due: due, subject: subject, text: text, html: html };
   }
   function openReminder(area, q) {
