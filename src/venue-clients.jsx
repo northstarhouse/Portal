@@ -1045,11 +1045,9 @@ function AvailabilityStats({ clients }) {
     }
     return { days, bookedDays, bookedByNow };
   };
-  const rows = AV_MONTHS.map((name, m) => ({ name, m, cur: monthRow(year, m), prev: monthRow(year - 1, m) }));
+  const rows = AV_MONTHS.map((name, m) => ({ name, m, cur: monthRow(year, m), }));
   const tot = k => rows.reduce((t, r) => t + r.cur[k], 0);
-  const totPrev = k => rows.reduce((t, r) => t + r.prev[k], 0);
   const pct = (a, b) => b ? Math.round((a / b) * 100) + '%' : '—';
-  const showPace = year === thisYear || year === thisYear + 1;
   const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
   const th = { textAlign: 'right', fontSize: 11, color: '#888', fontWeight: 600, padding: '4px 0 4px 8px', verticalAlign: 'bottom' };
   const td = { textAlign: 'right', padding: '7px 0 7px 8px', borderTop: '1px solid #f0ebe0', whiteSpace: 'nowrap' };
@@ -1065,47 +1063,47 @@ function AvailabilityStats({ clients }) {
       <button type="button" onClick={() => setOnlyWeddings(false)} style={chip(!onlyWeddings)}>Weddings &amp; events</button>
       <button type="button" onClick={() => setOnlyWeddings(true)} style={chip(onlyWeddings)}>Weddings only</button>
     </div>
-    <div style={{ overflowX: 'auto' }}>
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-      <thead><tr>
-        <th style={{ ...th, textAlign: 'left', paddingLeft: 0 }}>Month</th>
-        <th style={th}>Booked<br />days</th>
-        <th style={th}>All<br />days</th>
-        <th style={th}>Booked vs<br />all days</th>
-        <th style={th}>{year - 1}<br />booked</th>
-        {showPace && <th style={th} title={'Days of ' + (year - 1) + ' already booked on ' + longDay(sameDayLastYear)}>{year - 1} by<br />this date</th>}
-      </tr></thead>
-      <tbody>
-        {rows.map(r => <tr key={r.m}>
-          <td style={{ ...td, textAlign: 'left', paddingLeft: 0, fontWeight: 600 }}>{r.name}</td>
-          <td style={{ ...td, fontWeight: 700, color: '#4a3b24' }}>{r.cur.bookedDays}</td>
-          <td style={td}>{r.cur.days}</td>
-          <td style={td}>{pct(r.cur.bookedDays, r.cur.days)}</td>
-          <td style={{ ...td, color: '#888' }}>{r.prev.bookedDays}</td>
-          {showPace && <td style={{ ...td, color: '#888' }}>{r.prev.bookedByNow}</td>}
-        </tr>)}
-        <tr>
-          <td style={{ ...tdTot, textAlign: 'left', paddingLeft: 0 }}>Year</td>
-          <td style={{ ...tdTot, color: '#4a3b24' }}>{tot('bookedDays')}</td>
-          <td style={{ ...tdTot, fontWeight: 400 }}>{tot('days')}</td>
-          <td style={tdTot}>{pct(tot('bookedDays'), tot('days'))}</td>
-          <td style={{ ...tdTot, color: '#888' }}>{totPrev('bookedDays')}</td>
-          {showPace && <td style={{ ...tdTot, color: '#888' }}>{totPrev('bookedByNow')}</td>}
-        </tr>
-      </tbody>
-    </table>
-    </div>
+    {(() => {
+      // The two earlier years come from the venue team's yearly numbers when we have them (BOOKED_FIXED), otherwise from the portal's bookings.
+      const prevVal = (y, r) => BOOKED_FIXED[y] ? BOOKED_FIXED[y][r.m] : monthRow(y, r.m).bookedDays;
+      const prevTot = y => rows.reduce((t, r) => t + prevVal(y, r), 0);
+      return <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead><tr>
+          <th style={{ ...th, textAlign: 'left', paddingLeft: 0 }}>Month</th>
+          <th style={{ ...th, color: '#999' }}>{year - 2}<br />booked</th>
+          <th style={{ ...th, color: '#999' }}>{year - 1}<br />booked</th>
+          <th style={th}>{year}<br />booked</th>
+          <th style={th}>{year} booked vs<br />all days</th>
+        </tr></thead>
+        <tbody>
+          {rows.map(r => <tr key={r.m}>
+            <td style={{ ...td, textAlign: 'left', paddingLeft: 0, fontWeight: 600 }}>{r.name}</td>
+            <td style={{ ...td, color: '#888' }}>{prevVal(year - 2, r)}</td>
+            <td style={{ ...td, color: '#888' }}>{prevVal(year - 1, r)}</td>
+            <td style={{ ...td, fontWeight: 700, color: '#4a3b24' }}>{r.cur.bookedDays}</td>
+            <td style={td}>{pct(r.cur.bookedDays, r.cur.days)}</td>
+          </tr>)}
+          <tr>
+            <td style={{ ...tdTot, textAlign: 'left', paddingLeft: 0 }}>Year</td>
+            <td style={{ ...tdTot, color: '#888' }}>{prevTot(year - 2)}</td>
+            <td style={{ ...tdTot, color: '#888' }}>{prevTot(year - 1)}</td>
+            <td style={{ ...tdTot, color: '#4a3b24' }}>{tot('bookedDays')}</td>
+            <td style={tdTot}>{pct(tot('bookedDays'), tot('days'))}</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>;
+    })()}
     <div className="vc-muted" style={{ marginTop: 8, fontSize: 12 }}>
-      Counts days, not bookings: two events on one day count once, and a multi-day event counts each day.
-      {showPace && <> “{year - 1} by this date” is how many of {year - 1}'s days were already booked on {longDay(sameDayLastYear)}, so you can see whether {year} is ahead of last year's pace.</>}
-      {' '}Only bookings in the portal are counted; earlier years kept on paper can be added.
+      {year} counts booked days in the portal, live: two events on one day count once, and a multi-day event counts each day. Earlier years are the venue team's booked-event numbers by event month.
     </div>
   </div>;
 }
 
 // Booked events by the month the event is held, for past years. Supplied by the venue team (the Portal only holds 2026 events from
-// September on), so these are fixed. Twelve numbers, January to December. To add 2025 later, add a line: 2025: [Jan, Feb, ... Dec].
-const BOOKED_FIXED = { 2026: [1, 2, 0, 4, 8, 9, 1, 1, 5, 4, 2, 0] };
+// September on), so these are fixed. Twelve numbers, January to December. To add another year, add a line: 2024: [Jan, Feb, ... Dec].
+const BOOKED_FIXED = { 2025: [0, 0, 0, 1, 9, 9, 4, 2, 7, 4, 1, 1], 2026: [1, 2, 0, 4, 8, 9, 1, 1, 5, 4, 2, 0] };
 const BOOKED_GOAL_YEAR = 2026; // each month's goal for the live year is that month's number here: meet it or go over it
 const BOOKED_LIVE_YEAR = 2027; // counted live from the Portal's booked events
 const BOOKED_SINCE = '2026-09-01'; // the "Events booked" count starts here: when the Portal replaced HoneyBook
