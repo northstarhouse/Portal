@@ -542,6 +542,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                 <option value="cancelled">Cancelled</option>
               </select>
               <button className="btn-ghost" title="Copy event details" aria-label="Copy event details" style={{ fontSize: 12, padding: '6px 9px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }} onClick={copyEventDetails}>{copiedDetails ? <span style={{ fontSize: 12, fontWeight: 700 }}>Copied ✓</span> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>}</button>
+              {ev.website && ev.website.page_url && <a className="btn-ghost" href={/^https?:\/\//i.test(ev.website.page_url) ? ev.website.page_url : 'https://' + ev.website.page_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' }}>View on Website</a>}
               <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setBasicsOpen(v => !v)}>{basicsOpen ? 'Close' : 'Edit'}</button>
               {onDelete && basicsOpen && <button className="btn-ghost" style={{ fontSize: 12, color: '#a04545' }} onClick={onDelete}>Delete</button>}
             </div>
@@ -649,19 +650,15 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             // Everything here comes from Event Basics.
             const w = ev.website || {};
             const when = w.date_tbd ? 'To be announced' : [ev.date ? fmtDate(ev.date) : '', ev.startTime ? fmtTime12(ev.startTime) + (ev.endTime ? ' – ' + fmtTime12(ev.endTime) : '') : ''].filter(Boolean).join('  ·  ');
-            const where = [w.location_name || ev.location, (w.spaces || []).length ? (w.spaces || []).join(', ') : ''].filter(Boolean).join(' — ');
             const tiers = (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim());
             const ticketRows = rsvpOnly ? [['Tickets', 'RSVP only (no ticket sales)']] : (w.sells_tickets && tiers.length ? tiers.map(t => [t.name, Number(t.price) > 0 ? '$' + t.price : 'free']) : [['Tickets', '']]);
-            const volNeed = ev.vendors.filter(v => ['volunteer', 'activity'].includes(v.kind)).reduce((n, v) => n + (Number(v.target) || 0), 0) || (ev.volunteersNeeded === '' || ev.volunteersNeeded == null ? 0 : Number(ev.volunteersNeeded));
             const rows = [
               ['Date and time', when, true],
               ['Event type', ev.purpose],
-              ['Location', where],
               ['Event lead', ev.eventLead],
               ['Expected guests', ev.expectedAttendance || (ev.guestCount.invited ? String(ev.guestCount.invited) : '')],
               ...ticketRows,
               ['Pricing', priceText(ev.pricing)],
-              ['Volunteers needed', volNeed ? String(volNeed) : ''],
               ['Website', ev.siteEventId ? 'Live on the website' : 'Not on the website yet'],
             ];
             return (
@@ -1633,6 +1630,7 @@ function EventBasicsView({ f, ev, rsvp }) {
       {row('Event lead', f.eventLead)}
       {row('Expected attendance', f.expectedAttendance)}
       {row('Pricing note', priceText(f.pricing))}
+      {ev && ev.website && ev.website.page_url ? row('Website link', ev.website.page_url) : null}
     </div>
   );
 }
@@ -1704,7 +1702,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
   // While typing a web address, keep a trailing dash so a dash can be added; it is trimmed when you leave the box.
   const slugTyping = v => String(v || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 80);
   const initial = () => ({
-    title: w.title || ev.name || '', slug: w.slug || '', slugTouched: !!w.slug, short: w.short_description || '', desc: ev.description || '',
+    pageUrl: w.page_url || '', title: w.title || ev.name || '', slug: w.slug || '', slugTouched: !!w.slug, short: w.short_description || '', desc: ev.description || '',
     imageUrl: w.image_url || '', imageAlt: w.image_alt || '', dateTbd: w.date_tbd === true, date: ev.date || '',
     startTime: ev.startTime || '18:00', endTime: ev.endTime || '',
     spaces: Array.isArray(w.spaces) ? w.spaces : [],
@@ -1754,7 +1752,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
     ticketTiers: form.sells ? form.tiers.filter(t => String(t.name || '').trim()) : (base.ticketTiers || []),
     website: {
       ...(base.website || {}),
-      title: form.title.trim() !== (base.name || '') ? form.title.trim() : '', slug: form.slug, short_description: form.short.trim(), image_url: form.imageUrl, image_alt: form.imageAlt.trim(),
+      page_url: (form.pageUrl || '').trim(), title: form.title.trim() !== (base.name || '') ? form.title.trim() : '', slug: form.slug, short_description: form.short.trim(), image_url: form.imageUrl, image_alt: form.imageAlt.trim(),
       date_tbd: form.dateTbd, location_name: form.locName.trim(), location_address: form.locAddr.trim(), sells_tickets: form.sells, spaces: form.spaces || [],
     },
   });
@@ -1906,6 +1904,7 @@ function WebsiteEventPanel({ ev, onUpdate, onRsvpChange, autoEdit, onClose }) {
             <label style={{ ...lab, flex: '1 1 140px' }}>Expected attendance<input style={inp} value={f.expectedAttendance} onChange={e => set('expectedAttendance', e.target.value)} placeholder="e.g. 75" /></label>
           </div>
           <label style={lab}>Pricing note<input style={inp} value={f.pricing} onChange={e => set('pricing', e.target.value)} placeholder="e.g. Free, or $25 adults / kids free" /></label>
+          <label style={lab}>Link to the event on the website<input style={inp} value={f.pageUrl || ''} onChange={e => set('pageUrl', e.target.value)} placeholder="https://northstarhouse.org/…  (used by View on Website and the Chamber email)" /></label>
 
           </fieldset>
 

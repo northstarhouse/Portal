@@ -56,11 +56,25 @@ export function eventDetailsText(ev, rsvpOnly = false) {
     ev.eventLead ? 'Event lead: ' + ev.eventLead : '',
   ].filter(Boolean).join('\n');
 }
+// The event as the Chamber newsletter wants it: name, date and time, the description, tickets on one line, and the link.
+function chamberEventBlock(ev) {
+  const time = [fmtClock(ev.startTime), fmtClock(ev.endTime)].filter(Boolean).join(' – ');
+  const tiers = (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim());
+  const tickets = tiers.length ? tiers.map(t => t.name + ': ' + (Number(t.price) > 0 ? '$' + t.price : 'free')).join(' | ') : (ev.pricing || '');
+  const link = String((ev.website && ev.website.page_url) || '').trim();
+  return [
+    ev.name,
+    [fmtLongDate(ev.date), time].filter(Boolean).join(' · '),
+    ev.description ? '\n' + ev.description : '',
+    tickets ? '\nTickets: ' + tickets : '',
+    link ? (tickets ? '' : '\n') + 'Link: ' + link : '',
+  ].filter(x => x !== '').join('\n');
+}
 // A ready-to-paste email to the Grass Valley Chamber about the newsletter submission.
 export function chamberDraftText(ev) {
   return 'Subject: Newsletter submission: ' + (ev.name || 'North Star House event') + '\n\n'
-    + 'Hello,\n\nWe would like to submit the following event for the Grass Valley Chamber Newsletter. The details are below. Please let us know if you need anything else from us, such as images, a shorter description, or a different format.\n\n'
-    + '----------\n' + eventDetailsText(ev) + '\n----------\n\n'
+    + 'Hello,\n\nWe would like to submit the following event for the Grass Valley Chamber Newsletter. The details are below:\n\n'
+    + chamberEventBlock(ev) + '\n\n'
     + 'Thank you so much for including us.\n\nNorth Star House\nnorthstarhouse.org';
 }
 export function copyText(text, done) {
