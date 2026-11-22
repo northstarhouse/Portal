@@ -507,6 +507,29 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
   }
   const signUpBtn = (onClick) => <button type="button" title="Put your name on this" onClick={e => { e.stopPropagation(); onClick(); }} style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '4px 12px', whiteSpace: 'nowrap', background: '#e07b2a', color: '#fff', border: 'none', borderRadius: 999, cursor: 'pointer' }}>Sign up</button>;
 
+  // "Copy event details": the basics as plain text, ready to paste into an email, message or post.
+  const [copiedDetails, setCopiedDetails] = useState(false);
+  function copyEventDetails() {
+    const tiers = (ev.ticketTiers || []).filter(t => t && String(t.name || '').trim());
+    const time = [fmtTime12(ev.startTime), fmtTime12(ev.endTime)].filter(Boolean).join(' – ');
+    const lines = [
+      ev.name,
+      [fmtDate(ev.date), time].filter(Boolean).join(' · '),
+      ev.location ? 'Where: ' + ev.location : '',
+      ev.purpose ? 'Type: ' + ev.purpose : '',
+      ev.description ? '\n' + ev.description : '',
+      !rsvpOnly && tiers.length ? '\nTickets:\n' + tiers.map(t => '  ' + t.name + (Number(t.price) > 0 ? ': $' + t.price : ': free')).join('\n') : (ev.pricing ? '\nPricing: ' + ev.pricing : ''),
+      rsvpOnly ? '\nRSVP only (no ticket sales)' : '',
+      ev.expectedAttendance ? 'Expected attendance: ' + ev.expectedAttendance : '',
+      ev.eventLead ? 'Event lead: ' + ev.eventLead : '',
+    ].filter(Boolean);
+    const text = lines.join('\n');
+    const done = () => { setCopiedDetails(true); setTimeout(() => setCopiedDetails(false), 1800); };
+    try {
+      navigator.clipboard.writeText(text).then(done, () => alert('Could not copy. Select and copy this instead:\n\n' + text));
+    } catch (_e) { alert('Could not copy. Select and copy this instead:\n\n' + text); }
+  }
+
   function handleFlyerUpload(file) {
     if (!file || uploadingFlyer) return;
     setUploadingFlyer(true);
@@ -535,6 +558,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
+              <button className="btn-ghost" style={{ fontSize: 12 }} onClick={copyEventDetails}>{copiedDetails ? 'Copied ✓' : 'Copy event details'}</button>
               <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setBasicsOpen(v => !v)}>{basicsOpen ? 'Close' : 'Edit'}</button>
               {onDelete && basicsOpen && <button className="btn-ghost" style={{ fontSize: 12, color: '#a04545' }} onClick={onDelete}>Delete</button>}
             </div>
