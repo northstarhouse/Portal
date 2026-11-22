@@ -618,10 +618,11 @@ export default function AreasTab({ event, session, volunteer, initialArea, editi
 
       {embedded ? (editing && <div style={{ fontSize: 12, color: saved && !saving ? '#2e7d32' : 'var(--muted)', marginBottom: 8 }}>{saving ? 'Saving…' : saved ? 'All changes saved ✓' : 'Changes save automatically'}</div>) : (
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-        <div style={{ display: 'flex', gap: 22, borderBottom: '1px solid var(--border-light)' }}>
+        {/* The Pre-Event / Post-Event tabs only show for areas that have a post-event section. */}
+        {schema.post && schema.post.length > 0 ? <div style={{ display: 'flex', gap: 22, borderBottom: '1px solid var(--border-light)' }}>
           <button onClick={() => setPhase('pre')} style={tab(phase === 'pre')}>Pre-Event</button>
-          {schema.post && schema.post.length > 0 && <button onClick={() => setPhase('post')} style={tab(phase === 'post')}>Post-Event</button>}
-        </div>
+          <button onClick={() => setPhase('post')} style={tab(phase === 'post')}>Post-Event</button>
+        </div> : <span />}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {editing && <span style={{ fontSize: 12, color: saved && !saving ? '#2e7d32' : 'var(--muted)' }}>{saving ? 'Saving…' : saved ? 'All changes saved ✓' : 'Changes save automatically'}</span>}
           {alwaysEdit ? null : (editing ? <button className="btn-gold" disabled={saving} onClick={done}>Done</button> : <button className="btn-ghost" onClick={() => setEditing(true)}>Edit</button>)}

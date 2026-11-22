@@ -541,7 +541,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
-              <button className="btn-ghost" style={{ fontSize: 12 }} onClick={copyEventDetails}>{copiedDetails ? 'Copied ✓' : 'Copy event details'}</button>
+              <button className="btn-ghost" title="Copy event details" aria-label="Copy event details" style={{ fontSize: 12, padding: '6px 9px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }} onClick={copyEventDetails}>{copiedDetails ? <span style={{ fontSize: 12, fontWeight: 700 }}>Copied ✓</span> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>}</button>
               <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setBasicsOpen(v => !v)}>{basicsOpen ? 'Close' : 'Edit'}</button>
               {onDelete && basicsOpen && <button className="btn-ghost" style={{ fontSize: 12, color: '#a04545' }} onClick={onDelete}>Delete</button>}
             </div>
@@ -709,16 +709,16 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
                       <ReviewsTab ev={ev} />
                     </div>
                   )}
+                  {s.key === 'marketing' && marketingNA ? (
+                    <div style={{ fontSize: 13, color: 'var(--muted)' }}>Marked not applicable. Untick the box below to plan marketing for this event.</div>
+                  ) : (s.key === 'marketing') && (
+                    <AreasTab event={ev} session={session} volunteer={volunteer} initialArea={s.area} alwaysEdit />
+                  )}
                   {s.key === 'marketing' && (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, margin: '8px 0 12px', cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, fontSize: 13, margin: '14px 0 4px', cursor: 'pointer' }}>
                       <input type="checkbox" checked={marketingNA} onChange={e => toggleMarketingNA(e.target.checked)} style={{ accentColor: 'var(--gold)', width: 16, height: 16 }} />
                       Marketing is not applicable for this event
                     </label>
-                  )}
-                  {s.key === 'marketing' && marketingNA ? (
-                    <div style={{ fontSize: 13, color: 'var(--muted)' }}>Marked not applicable. Untick the box above to plan marketing for this event.</div>
-                  ) : (s.key === 'marketing') && (
-                    <AreasTab event={ev} session={session} volunteer={volunteer} initialArea={s.area} alwaysEdit />
                   )}
                   {s.key === 'volunteers' && <NeedsList ev={ev} onUpdate={onUpdate} volunteers={volunteers} />}
                 </div>
