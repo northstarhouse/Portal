@@ -1038,12 +1038,14 @@ function AvailabilityStats({ clients }) {
   const sameDayLastYear = shiftDate(today, -365);
   const monthRow = (y, m) => {
     const days = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-    let bookedDays = 0, bookedByNow = 0;
+    let bookedDays = 0, bookedByNow = 0, avail = 0, bookedAvail = 0; // avail = the month's Fridays, Saturdays and Sundays
     for (let i = 1; i <= days; i++) {
       const key = y + '-' + pad(m + 1) + '-' + pad(i);
-      if (key in booked) { bookedDays++; if (booked[key] && booked[key] <= sameDayLastYear) bookedByNow++; }
+      const dow = new Date(key + 'T12:00:00Z').getUTCDay(), isFSS = dow === 5 || dow === 6 || dow === 0;
+      if (isFSS) avail++;
+      if (key in booked) { bookedDays++; if (isFSS) bookedAvail++; if (booked[key] && booked[key] <= sameDayLastYear) bookedByNow++; }
     }
-    return { days, bookedDays, bookedByNow };
+    return { days, bookedDays, bookedByNow, avail, bookedAvail };
   };
   const rows = AV_MONTHS.map((name, m) => ({ name, m, cur: monthRow(year, m), }));
   const tot = k => rows.reduce((t, r) => t + r.cur[k], 0);
@@ -1074,7 +1076,7 @@ function AvailabilityStats({ clients }) {
           <th style={{ ...th, color: '#999' }}>{year - 2}<br />booked</th>
           <th style={{ ...th, color: '#999' }}>{year - 1}<br />booked</th>
           <th style={th}>{year}<br />booked</th>
-          <th style={th}>{year} booked vs<br />all days</th>
+          <th style={th}>{year} Fri–Sun booked<br />vs available</th>
         </tr></thead>
         <tbody>
           {rows.map(r => <tr key={r.m}>
@@ -1082,21 +1084,21 @@ function AvailabilityStats({ clients }) {
             <td style={{ ...td, color: '#888' }}>{prevVal(year - 2, r)}</td>
             <td style={{ ...td, color: '#888' }}>{prevVal(year - 1, r)}</td>
             <td style={{ ...td, fontWeight: 700, color: '#4a3b24' }}>{r.cur.bookedDays}</td>
-            <td style={td}>{pct(r.cur.bookedDays, r.cur.days)}</td>
+            <td style={td}>{r.cur.bookedAvail} of {r.cur.avail} · {pct(r.cur.bookedAvail, r.cur.avail)}</td>
           </tr>)}
           <tr>
             <td style={{ ...tdTot, textAlign: 'left', paddingLeft: 0 }}>Year</td>
             <td style={{ ...tdTot, color: '#888' }}>{prevTot(year - 2)}</td>
             <td style={{ ...tdTot, color: '#888' }}>{prevTot(year - 1)}</td>
             <td style={{ ...tdTot, color: '#4a3b24' }}>{tot('bookedDays')}</td>
-            <td style={tdTot}>{pct(tot('bookedDays'), tot('days'))}</td>
+            <td style={tdTot}>{tot('bookedAvail')} of {tot('avail')} · {pct(tot('bookedAvail'), tot('avail'))}</td>
           </tr>
         </tbody>
       </table>
       </div>;
     })()}
     <div className="vc-muted" style={{ marginTop: 8, fontSize: 12 }}>
-      {year} counts booked days in the portal, live: two events on one day count once, and a multi-day event counts each day. Earlier years are the venue team's booked-event numbers by event month.
+      {year} counts booked days in the portal, live. The last column compares booked Fridays, Saturdays and Sundays with every Friday, Saturday and Sunday in the month: two events on one day count once, and a multi-day event counts each day. Earlier years are the venue team's booked-event numbers by event month.
     </div>
   </div>;
 }
