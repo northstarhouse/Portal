@@ -9,6 +9,7 @@ import { BrickOrdersView } from './brick-orders.jsx';
 import { VolunteerHoursView } from './volunteer-hours.jsx';
 import { ConstantContactView } from './constant-contact.jsx';
 import { PersonalViewsView } from './personal-views.jsx';
+import { HumanResourcesView } from './human-resources.jsx';
 import { printForm } from './print-form.js';
 import { VenueFollowingView } from './venue-following.jsx';
 import { InquiryFlagNotes } from './flag-notes.jsx';
@@ -862,6 +863,7 @@ var NAV_ICONS = {
   'venue-policies': '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="7" x2="16" y2="7"/><line x1="9" y1="11" x2="14" y2="11"/>',
   'mail-checks': '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/><polyline points="15 17 17 19 21 15"/>',
   'org-guide': '<path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>',
+  'human-resources': '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   'personal-views': '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
   'constant-contact': '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/>',
   'volunteer-hours': '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
@@ -18165,6 +18167,7 @@ function AdminView({ navigate }) {
       { label: 'Submit Maintenance Request', view: 'maintenance-request', icon: wrenchIcon },
       { label: 'Mail & Checks', view: 'mail-checks', icon: emailIcon },
       { label: 'Voicemail Log', view: 'voicemail-log', icon: ic('voicemail-log') },
+      { label: 'Human Resources', view: 'human-resources', icon: guestIcon },
     ] },
     { title: 'Communications & Website', items: [
       { label: 'North Star House Updates', view: 'nsh-updates', icon: ic('nsh-updates') },
@@ -27051,6 +27054,7 @@ const views = {
   'volunteer-hours': VolunteerHoursView,
   'constant-contact': ConstantContactView,
   'personal-views': PersonalViewsView,
+  'human-resources': HumanResourcesView,
   'venue-following': VenueFollowingView,
   'acknowledgment-templates': AcknowledgmentTemplatesView,
   'acknowledgments-queue': AcknowledgmentsQueueView,
@@ -27545,7 +27549,7 @@ function buildBoardEmailRequest(g, toOverride) {
     // Area leads just get an FYI, same as any other operational-area activity — no action implied.
     subject = 'New ' + g.items[0].area + ' Item' + (n > 1 ? 's' : '') + ' Submitted';
     subtext = 'The following item' + (n > 1 ? 's have' : ' has') + ' been submitted for reimbursement from the ' + g.items[0].area + ' budget:<br/><br/>' + itemListHtml;
-    buttonUrl = PORTAL_URL + '#operational';
+    buttonUrl = PORTAL_URL + '#operational/' + encodeURIComponent(g.items[0].area);
     textBody = itemLines;
   }
   buttonText = 'Click Here to View in Portal';
@@ -27563,6 +27567,7 @@ function buildBoardEmailRequest(g, toOverride) {
 var validModuleIds = Object.keys(views);
 function hashToModule() {
   var h = window.location.hash.replace(/^#/, '');
+  if (h.indexOf('operational/') === 0) return 'operational';
   if (h.indexOf('event-plan/') === 0) return 'event-plan';
   if (h.indexOf('planning/edit/') === 0) return 'planning';
   if (h.indexOf('event-overviews/') === 0) return 'event-overviews';
@@ -27572,7 +27577,10 @@ function hashToModule() {
 function Dashboard() {
   const [active, setActive] = useState(hashToModule);
   const [opOpen, setOpOpen] = useState(false);
-  const [opArea, setOpArea] = useState(null);
+  const [opArea, setOpArea] = useState(function() {
+    var m = window.location.hash.replace(/^#/, '').match(/^operational\/(.+)$/);
+    return m ? decodeURIComponent(m[1]) : null;
+  });
   const [quarterlyArea, setQuarterlyArea] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -27643,7 +27651,11 @@ function Dashboard() {
   }
 
   React.useEffect(function() {
-    function onHashChange() { setActive(hashToModule()); }
+    function onHashChange() {
+      setActive(hashToModule());
+      var m = window.location.hash.replace(/^#/, '').match(/^operational\/(.+)$/);
+      if (m) setOpArea(decodeURIComponent(m[1]));
+    }
     window.addEventListener('hashchange', onHashChange);
     return function() { window.removeEventListener('hashchange', onHashChange); };
   }, []);
@@ -27860,7 +27872,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: gold }}>
               <NavIcon id={active} active={true} size={20} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "person-activity" ? "Activity by Person" : active === "mail-checks" ? "Mail & Checks" : active === "venue-policies" ? "Venue Policies & Resources" : active === "org-guide" ? "Organization Guide" : active === "volunteer-hours" ? "Volunteer Hours" : active === "constant-contact" ? "Constant Contact" : active === "personal-views" ? "Personalized Views" : active === "brick-orders" ? "Brick Orders Wording" : active === "event-list" ? "2027 Event List" : active === "venue-following" ? "Following" : active === "office-cash-flow" ? "Office Cash" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "person-activity" ? "Activity by Person" : active === "mail-checks" ? "Mail & Checks" : active === "venue-policies" ? "Venue Policies & Resources" : active === "org-guide" ? "Organization Guide" : active === "volunteer-hours" ? "Volunteer Hours" : active === "constant-contact" ? "Constant Contact" : active === "personal-views" ? "Personalized Views" : active === "human-resources" ? "Human Resources" : active === "brick-orders" ? "Brick Orders Wording" : active === "event-list" ? "2027 Event List" : active === "venue-following" ? "Following" : active === "office-cash-flow" ? "Office Cash" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
