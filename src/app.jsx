@@ -8,6 +8,7 @@ import { OrgGuideView } from './org-guide.jsx';
 import { BrickOrdersView } from './brick-orders.jsx';
 import { VolunteerHoursView } from './volunteer-hours.jsx';
 import { ConstantContactView } from './constant-contact.jsx';
+import { PersonalViewsView } from './personal-views.jsx';
 import { printForm } from './print-form.js';
 import { VenueFollowingView } from './venue-following.jsx';
 import { InquiryFlagNotes } from './flag-notes.jsx';
@@ -861,6 +862,7 @@ var NAV_ICONS = {
   'venue-policies': '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="7" x2="16" y2="7"/><line x1="9" y1="11" x2="14" y2="11"/>',
   'mail-checks': '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/><polyline points="15 17 17 19 21 15"/>',
   'org-guide': '<path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>',
+  'personal-views': '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
   'constant-contact': '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/>',
   'volunteer-hours': '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
   'brick-orders': '<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"1\"/><line x1=\"3\" y1=\"10\" x2=\"21\" y2=\"10\"/><line x1=\"3\" y1=\"15\" x2=\"21\" y2=\"15\"/><line x1=\"9\" y1=\"4\" x2=\"9\" y2=\"10\"/><line x1=\"15\" y1=\"10\" x2=\"15\" y2=\"15\"/><line x1=\"9\" y1=\"15\" x2=\"9\" y2=\"20\"/>',
@@ -879,6 +881,24 @@ function NavIcon({ id, active, size }) {
     style: { flexShrink: 0, opacity: active ? 1 : 0.7 },
     dangerouslySetInnerHTML: { __html: NAV_ICONS[id] || '' }
   });
+}
+
+// Personalized views: sections a signed-in person does not see (rules in portal_view_rules, set under Admin > Personalized Views).
+var NSH_HIDDEN = {};
+function nshHides(id) { return !!NSH_HIDDEN[id]; }
+function nshSetHidden(sections) {
+  var m = {};
+  (sections || []).forEach(function(sec) {
+    m[sec] = true;
+    var extra = {
+      donors: ['acknowledgments-queue', 'acknowledgment-templates'],
+      volunteers: ['volunteer-hours', 'vol-email-lists', 'birthdays'],
+      admin: ['financial-overview', 'treasurer', 'website-payments', 'financials', 'office-cash-flow', 'operational-budgets', 'volunteer-hours', 'vol-email-lists', 'constant-contact', 'brick-orders', 'brick-submission', 'form-builder', 'personal-views', 'activity-log'],
+    }[sec] || [];
+    extra.forEach(function(x) { m[x] = true; });
+    if (sec === 'venue') Object.keys(views).forEach(function(k) { if (k.indexOf('venue') === 0) m[k] = true; });
+  });
+  NSH_HIDDEN = m;
 }
 
 const modules = [
@@ -1332,12 +1352,12 @@ const typeColors = {
       })()}
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
-        <div onClick={function() { navigate('donors'); }} style={{ cursor: 'pointer' }}><StatCard label="Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /></div>
-        <div onClick={function() { navigate('volunteers'); }} style={{ cursor: 'pointer' }}><StatCard label="Active Volunteers" value={activeVols === null ? '...' : activeVols} /></div>
-<div onClick={function() { navigate('sponsors'); }} style={{ cursor: 'pointer' }}><StatCard label="Sponsors" value={sponsors === null ? '...' : sponsors.length} /></div>
-        <StatCard label="Vol. Hours This Month" value={volHoursMonth === null ? '...' : volHoursMonth.toLocaleString('en-US', { maximumFractionDigits: 1 })} />
-        <StatCard label="Vol. Hours This Year" value={volHoursYear === null ? '...' : volHoursYear.toLocaleString('en-US', { maximumFractionDigits: 1 })} />
-        <StatCard label="Board Volunteer Hours This Year" value={boardHours === null ? '...' : boardHours.year.toLocaleString('en-US', { maximumFractionDigits: 1 })} sub={boardHours === null ? '' : boardHours.month.toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' this month · ' + boardHours.people + ' board members logged'} />
+        <div onClick={function() { navigate('donors'); }} style={{ cursor: 'pointer', display: nshHides('donors') ? 'none' : undefined }}><StatCard label="Donations" value={donationTotal === null ? '...' : '$' + donationTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /></div>
+        <div onClick={function() { navigate('volunteers'); }} style={{ cursor: 'pointer', display: nshHides('volunteers') ? 'none' : undefined }}><StatCard label="Active Volunteers" value={activeVols === null ? '...' : activeVols} /></div>
+<div onClick={function() { navigate('sponsors'); }} style={{ cursor: 'pointer', display: nshHides('sponsors') ? 'none' : undefined }}><StatCard label="Sponsors" value={sponsors === null ? '...' : sponsors.length} /></div>
+        <div style={{ display: nshHides('volunteers') ? 'none' : undefined }}><StatCard label="Vol. Hours This Month" value={volHoursMonth === null ? '...' : volHoursMonth.toLocaleString('en-US', { maximumFractionDigits: 1 })} /></div>
+        <div style={{ display: nshHides('volunteers') ? 'none' : undefined }}><StatCard label="Vol. Hours This Year" value={volHoursYear === null ? '...' : volHoursYear.toLocaleString('en-US', { maximumFractionDigits: 1 })} /></div>
+        <div style={{ display: nshHides('volunteers') ? 'none' : undefined }}><StatCard label="Board Volunteer Hours This Year" value={boardHours === null ? '...' : boardHours.year.toLocaleString('en-US', { maximumFractionDigits: 1 })} sub={boardHours === null ? '' : boardHours.month.toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' this month · ' + boardHours.people + ' board members logged'} /></div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 16, marginBottom: 16 }}>
@@ -1404,7 +1424,7 @@ const typeColors = {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
+        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px", display: (nshHides('donors') || nshHides('volunteers') || nshHides('admin')) ? 'none' : undefined }}>
           <div onClick={function() { navigate('activity-log'); }} style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
             onMouseEnter={function(e) { e.currentTarget.style.textDecoration = 'underline'; }}
             onMouseLeave={function(e) { e.currentTarget.style.textDecoration = 'none'; }}>
@@ -1447,7 +1467,7 @@ const typeColors = {
             );
           })}
         </div>
-        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
+        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px", display: nshHides('volunteers') ? 'none' : undefined }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={function() { navigate('birthdays'); }}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             Upcoming Birthdays
@@ -18164,6 +18184,7 @@ function AdminView({ navigate }) {
     ] },
     { title: 'Planning & Reference', items: [
       { label: 'Organization Guide', view: 'org-guide', icon: ic('org-guide') },
+      { label: 'Personalized Views', view: 'personal-views', icon: planIcon },
       { label: 'Planning', view: 'planning', icon: planIcon },
       { label: 'Strategic Goal Progress', view: 'strategy', icon: targetIcon },
       { label: 'Printable Forms', url: formItem('Printable Forms').url, icon: docIcon },
@@ -27031,6 +27052,7 @@ const views = {
   'brick-orders': BrickOrdersView,
   'volunteer-hours': VolunteerHoursView,
   'constant-contact': ConstantContactView,
+  'personal-views': PersonalViewsView,
   'venue-following': VenueFollowingView,
   'acknowledgment-templates': AcknowledgmentTemplatesView,
   'acknowledgments-queue': AcknowledgmentsQueueView,
@@ -27556,8 +27578,19 @@ function Dashboard() {
   const [quarterlyArea, setQuarterlyArea] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const View = views[active];
+  const [viewRuleTick, setViewRuleTick] = useState(0);
+  React.useEffect(function() {
+    var email = '';
+    try { email = (localStorage.getItem('nsh-app-email') || '').trim().toLowerCase(); } catch (e) {}
+    if (!email) return;
+    fetch(SUPABASE_URL + '/rest/v1/portal_view_rules?email=eq.' + encodeURIComponent(email) + '&select=hidden', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(rows) { if (Array.isArray(rows) && rows[0]) { nshSetHidden(rows[0].hidden || []); setViewRuleTick(function(t) { return t + 1; }); } })
+      .catch(function() {});
+  }, []);
+  const View = nshHides(active) ? views.home : views[active];
   const mod = modules.find(m => m.id === active);
+  React.useEffect(function() { if (nshHides(active)) { window.location.hash = 'home'; setActive('home'); } }, [active, viewRuleTick]);
 
   function navigate(id) {
     window.location.hash = id;
@@ -27587,7 +27620,7 @@ function Dashboard() {
           </div>
           <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "0 0 8px" }} />
           <nav style={{ flex: 1, padding: "0 8px" }}>
-            {modules.filter(m => !m.hidden).map(m => (
+            {modules.filter(m => !m.hidden && !nshHides(m.id)).map(m => (
               <button key={m.id} onClick={() => { navigate(m.id); setOpOpen(false); }} style={{
                 display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px",
                 background: active === m.id ? "rgba(181,161,133,0.15)" : "transparent",
@@ -27707,7 +27740,7 @@ function Dashboard() {
                 <button onClick={function() { setMobileMenuOpen(false); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
               </div>
               <nav style={{ flex: 1, padding: '8px 8px' }}>
-                {modules.filter(function(m) { return !m.hidden; }).map(function(m) {
+                {modules.filter(function(m) { return !m.hidden && !nshHides(m.id); }).map(function(m) {
                   return (
                     <button key={m.id} onClick={function() { navigate(m.id); setOpOpen(false); setMobileMenuOpen(false); }} style={{
                       display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 12px',
@@ -27753,7 +27786,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: gold }}>
               <NavIcon id={active} active={true} size={20} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "person-activity" ? "Activity by Person" : active === "mail-checks" ? "Mail & Checks" : active === "venue-policies" ? "Venue Policies & Resources" : active === "org-guide" ? "Organization Guide" : active === "volunteer-hours" ? "Volunteer Hours" : active === "constant-contact" ? "Constant Contact" : active === "brick-orders" ? "Brick Orders Wording" : active === "event-list" ? "2027 Event List" : active === "venue-following" ? "Following" : active === "office-cash-flow" ? "Office Cash" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "person-activity" ? "Activity by Person" : active === "mail-checks" ? "Mail & Checks" : active === "venue-policies" ? "Venue Policies & Resources" : active === "org-guide" ? "Organization Guide" : active === "volunteer-hours" ? "Volunteer Hours" : active === "constant-contact" ? "Constant Contact" : active === "personal-views" ? "Personalized Views" : active === "brick-orders" ? "Brick Orders Wording" : active === "event-list" ? "2027 Event List" : active === "venue-following" ? "Following" : active === "office-cash-flow" ? "Office Cash" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
