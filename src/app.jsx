@@ -1063,7 +1063,26 @@ const typeColors = {
   Volunteer: { bg: "#e8f5e9", color: "#2e7d32" },
   Board: { bg: "#e8eaf6", color: "#3949ab" },
   Event: { bg: "#fff8e1", color: "#8a6200" },
-};function HomeView({ navigate }) {
+};// A card on the Overview's right-hand side: folded until you click its header.
+function SideCard({ title, icon, onSeeAll, actions, style, forceOpen, children }) {
+  var [userOpen, setUserOpen] = useState(false);
+  var open = userOpen || !!forceOpen;
+  return (
+    <div style={Object.assign({ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px" }, style || {})}>
+      <div onClick={function() { setUserOpen(function(o) { return !o; }); }} style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: open ? 14 : 0, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
+        {icon}{title}
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+          {actions && <span onClick={function(e) { e.stopPropagation(); }}>{actions}</span>}
+          {onSeeAll && open && <span onClick={function(e) { e.stopPropagation(); onSeeAll(); }} style={{ fontSize: 11, opacity: 0.7, textDecoration: 'underline' }}>See all →</span>}
+          <span style={{ fontSize: 10, opacity: 0.6 }}>{open ? '▲' : '▼'}</span>
+        </span>
+      </div>
+      {open && children}
+    </div>
+  );
+}
+
+function HomeView({ navigate }) {
   const [donationTotal, setDonationTotal] = useState(null);
   const [activeVols, setActiveVols] = useState(null);
   const [calEvents, setCalEvents] = useState(null);
@@ -1424,13 +1443,7 @@ const typeColors = {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px", display: (nshHides('donors') || nshHides('volunteers') || nshHides('admin')) ? 'none' : undefined }}>
-          <div onClick={function() { navigate('activity-log'); }} style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
-            onMouseEnter={function(e) { e.currentTarget.style.textDecoration = 'underline'; }}
-            onMouseLeave={function(e) { e.currentTarget.style.textDecoration = 'none'; }}>
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
-            Recent Activity
-          </div>
+        <SideCard title="Recent Activity" onSeeAll={function() { navigate('activity-log'); }} style={{ display: (nshHides('donors') || nshHides('volunteers') || nshHides('admin')) ? 'none' : undefined }} icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>}>
           {activity === null && <div style={{ fontSize: 12, color: '#aaa' }}>Loading…</div>}
           {activity !== null && activity.length === 0 && <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No recent activity from the Volunteer Hub.</div>}
           {activity !== null && activity.map(function(a, i) {
@@ -1466,13 +1479,8 @@ const typeColors = {
               </div>
             );
           })}
-        </div>
-        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px", display: nshHides('volunteers') ? 'none' : undefined }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={function() { navigate('birthdays'); }}>
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            Upcoming Birthdays
-            <span style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.6 }}>See all →</span>
-          </div>
+        </SideCard>
+        <SideCard title="Upcoming Birthdays" onSeeAll={function() { navigate('birthdays'); }} style={{ display: nshHides('volunteers') ? 'none' : undefined }} icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}>
           {birthdays === null && <div style={{ fontSize: 12, color: '#aaa' }}>Loading…</div>}
           {birthdays !== null && birthdays.length === 0 && <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No birthdays in the next 30 days.</div>}
           {birthdays !== null && birthdays.map(function(v, i) {
@@ -1494,14 +1502,10 @@ const typeColors = {
               </div>
             );
           })}
-        </div>
+        </SideCard>
 
         {/* Out of Town */}
-        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            Out of Town
-          </div>
+        <SideCard title="Out of Town" icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>}>
           {ootNotices === null && <div style={{ fontSize: 12, color: '#aaa' }}>Loading…</div>}
           {ootNotices !== null && ootNotices.length === 0 && <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No one out of town in the next 60 days.</div>}
           {ootNotices !== null && ootNotices.map(function(entry, i) {
@@ -1524,17 +1528,10 @@ const typeColors = {
               </div>
             );
           })}
-        </div>
+        </SideCard>
 
         {/* In-House Events */}
-        <div style={{ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "16px 18px" }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 500, color: gold, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              In-House Events
-            </div>
-            <button onClick={function() { setIheAdding(true); setIheForm({ name: '', date: '', cost: '' }); }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 600 }}>+ Add</button>
-          </div>
+        <SideCard title="In-House Events" forceOpen={iheAdding} icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>} actions={<button onClick={function() { setIheAdding(true); setIheForm({ name: '', date: '', cost: '' }); }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 600 }}>+ Add</button>}>
 
           {iheAdding && (
             <div style={{ background: '#faf8f4', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '12px', marginBottom: 12 }}>
@@ -1597,7 +1594,7 @@ const typeColors = {
               </div>
             );
           })}
-        </div>
+        </SideCard>
         </div>
 
       </div>
