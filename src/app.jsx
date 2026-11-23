@@ -23018,15 +23018,15 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
+        {!clientsOnly ? <button type="button" onClick={function() { setManualOpen(!manualOpen); setManualMsg(null); }}
+          style={{ background: gold, color: '#fff', border: '1px solid ' + gold, borderRadius: 7, padding: '9px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{manualOpen ? 'Close' : 'Send Pre-Booking Form'}</button> : <span />}
         <button type="button" onClick={function() { navigate('venue'); }} style={{ padding: '9px 16px', background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>← Venue Rentals</button>
       </div>
       {clientsOnly && <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>Official pre-booking form submissions — check off once handled.</div>}
 
       {!clientsOnly && (
         <div style={{ marginBottom: 14 }}>
-          <button type="button" onClick={function() { setManualOpen(!manualOpen); setManualMsg(null); }}
-            style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '9px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{manualOpen ? 'Close' : 'Send Pre-Booking Form'}</button>
           {manualOpen && (
             <form onSubmit={function(e) { sendManual(e, false); }} style={{ marginTop: 10, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, padding: 16, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#888', flex: '2 1 220px' }}>Email address
