@@ -14,17 +14,11 @@ export const PACKET_SECTIONS = [
   ] },
   { id: 'physician', title: 'Designation of Personal Physician (DWC 9783)', intro: 'If you are injured at work, you may choose to be treated by your personal physician. Name them here, or choose that you have none.', fields: [
     { k: 'phys_none', label: 'I do not have a personal physician to designate', type: 'check' },
-    { k: 'phys_name', label: 'Physician name', type: 'text' },
-    { k: 'phys_addr', label: 'Address', type: 'text' },
-    { k: 'phys_phone', label: 'Phone', type: 'tel' },
-    { k: 'phys_init', label: 'I have read the physician designation form (initial)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/physician-designation.pdf', req: true },
+    { k: 'phys_form', label: 'Fill out the Designation of Personal Physician form', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/physician-designation.pdf', fill: true },
   ] },
   { id: 'chiro', title: 'Designation of Personal Chiropractor or Acupuncturist (DWC 9783.1)', intro: 'The same choice for a chiropractor or acupuncturist.', fields: [
     { k: 'chiro_none', label: 'I do not have a personal chiropractor or acupuncturist to designate', type: 'check' },
-    { k: 'chiro_name', label: 'Name', type: 'text' },
-    { k: 'chiro_addr', label: 'Address', type: 'text' },
-    { k: 'chiro_phone', label: 'Phone', type: 'tel' },
-    { k: 'chiro_init', label: 'I have read the chiropractor or acupuncturist designation form (initial)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/chiropractor-designation.pdf', req: true },
+    { k: 'chiro_form', label: 'Fill out the Designation of Personal Chiropractor or Acupuncturist form', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/chiropractor-designation.pdf', fill: true },
   ] },
   { id: 'deposit', title: 'Direct Deposit Authorization', intro: 'Your paycheck is deposited into this account. Only HR can see these details.', fields: [
     { k: 'dd_name', label: 'Name on the account', type: 'text', req: true },
@@ -34,11 +28,11 @@ export const PACKET_SECTIONS = [
     { k: 'dd_account', label: 'Account number', type: 'text', req: true },
     { k: 'dd_auth', label: 'I authorize North Star House to deposit my pay into this account and to correct any errors.', type: 'check', req: true },
   ] },
-  { id: 'returned', title: 'Forms to Return', intro: 'Complete each form with HR using the official link, then initial it here. Social Security numbers are never entered in this packet.', fields: [
-    { k: 'ret_i9', label: 'I-9, Employment Eligibility Verification', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/i-9.pdf', req: true },
-    { k: 'ret_wage', label: 'Wage Theft Prevention Act notice (Labor Code 2810.5)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/wage-notice.pdf', req: true },
-    { k: 'ret_w4', label: 'W-4, Federal Withholding', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/w-4.pdf', req: true },
-    { k: 'ret_de4', label: 'DE 4, California Withholding', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-4.pdf', req: true },
+  { id: 'returned', title: 'Forms to Return', intro: 'Fill out each form right here on the page. Your answers are saved to your packet. Only HR can see them.', fields: [
+    { k: 'ret_i9', label: 'I-9, Employment Eligibility Verification', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/i-9.pdf', fill: true, req: true },
+    { k: 'ret_wage', label: 'Wage Theft Prevention Act notice (Labor Code 2810.5)', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/wage-notice.pdf', fill: true, req: true },
+    { k: 'ret_w4', label: 'W-4, Federal Withholding', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/w-4.pdf', fill: true, req: true },
+    { k: 'ret_de4', label: 'DE 4, California Withholding', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-4.pdf', fill: true, req: true },
   ] },
   { id: 'received', title: 'Notices Received', intro: 'Read each notice, then initial to confirm you received it.', fields: [
     { k: 'rec_wchire', label: 'Workers’ Compensation Time of Hire notice', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/workers-comp-time-of-hire.pdf', req: true },
@@ -61,17 +55,16 @@ export const PACKET_SECTIONS = [
   ] },
 ];
 
+// Filled-in official PDFs are saved separately; the packet remembers which ones are done as data['doc_<field key>'].
 export function missingRequired(data) {
   const out = [];
   PACKET_SECTIONS.forEach(s => s.fields.forEach(f => {
     if (!f.req) return;
-    if (s.id === 'physician' && f.k !== 'phys_init') return;
+    if (f.type === 'form') { if (!data['doc_' + f.k]) out.push('Fill out and save: ' + f.label); return; }
     const v = data[f.k];
     if (f.type === 'check' ? !v : !String(v || '').trim()) out.push(f.label);
   }));
-  const needPhys = !data.phys_none && !String(data.phys_name || '').trim();
-  const needChiro = !data.chiro_none && !String(data.chiro_name || '').trim();
-  if (needPhys) out.push('Physician name (or check that you have none)');
-  if (needChiro) out.push('Chiropractor or acupuncturist name (or check that you have none)');
+  if (!data.phys_none && !data.doc_phys_form) out.push('Physician designation form (or check that you have none)');
+  if (!data.chiro_none && !data.doc_chiro_form) out.push('Chiropractor or acupuncturist designation form (or check that you have none)');
   return out;
 }

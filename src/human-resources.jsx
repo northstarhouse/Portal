@@ -19,6 +19,7 @@ const card = { background: '#fff', border: '0.5px solid #e6dfd3', borderRadius: 
 const label = { fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8 };
 
 function answerText(f, data) {
+  if (f.type === 'form') return data['doc_' + f.k] ? 'Filled out (see Filled forms)' : '\u2014';
   const v = data[f.k];
   if (f.type === 'check') return v ? 'Yes' : 'No';
   if (f.k === 'dd_account' && v) return v;
@@ -50,6 +51,7 @@ function emailHtml(first) {
 
 function PreviewField({ f, value, onChange }) {
   const box = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #e0d8cc', borderRadius: 8, fontSize: 14, background: '#fff' };
+  if (f.type === 'form') return <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '12px 0', flexWrap: 'wrap' }}><div style={{ flex: '1 1 240px', fontSize: 13, color: '#2c2418' }}>{f.label}<div style={{ fontSize: 12, color: '#8a7e6b', marginTop: 2 }}>They fill this official form out on the page in a pop-out.</div></div><a href={f.link} target="_blank" rel="noreferrer" style={{ background: GOLD, color: '#fff', textDecoration: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600 }}>Open blank form</a></div>;
   if (f.type === 'check') return <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: '#2c2418', margin: '10px 0', cursor: 'pointer' }}><input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked)} style={{ marginTop: 2, width: 17, height: 17 }} /><span>{f.label}</span></label>;
   if (f.type === 'initials') return <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '10px 0', flexWrap: 'wrap' }}>
     <div style={{ flex: '1 1 240px', fontSize: 13, color: '#2c2418' }}>{f.label}{f.link ? <span> {'·'} <a href={f.link} target="_blank" rel="noreferrer" style={{ color: GOLD }}>Read document</a></span> : null}</div>
@@ -96,6 +98,56 @@ function PreviewModal({ name, first, onClose, onSend, busy }) {
   </div>;
 }
 
+function b64ToBlobUrl(b64) {
+  const bin = atob(b64), out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
+}
+
+// The official PDFs the person filled in on the Hub (I-9, W-4, DE 4, Wage Notice, designation forms).
+function FilledForms({ p }) {
+  const forms = [];
+  PACKET_SECTIONS.forEach(s => s.fields.forEach(f => { if (f.type === 'form' && (p.data || {})['doc_' + f.k]) forms.push(f); }));
+  const [view, setView] = React.useState(null);
+  const [busy, setBusy] = React.useState('');
+  const [err, setErr] = React.useState('');
+  React.useEffect(() => () => { if (view) URL.revokeObjectURL(view.url); }, [view]);
+  if (!forms.length) return null;
+  const load = async f => {
+    const rows = await hrReq('onboarding_docs?select=pdf_base64&packet_id=eq.' + p.id + '&doc_key=eq.' + encodeURIComponent(f.k) + '&limit=1');
+    if (!rows || !rows[0]) throw new Error('That form was not found.');
+    return b64ToBlobUrl(rows[0].pdf_base64);
+  };
+  const open = async f => { setBusy(f.k); setErr(''); try { const url = await load(f); setView({ url, title: f.label, name: f.k }); } catch (e) { setErr(e.message); } setBusy(''); };
+  const download = async f => {
+    setBusy(f.k); setErr('');
+    try { const url = await load(f); const a = document.createElement('a'); a.href = url; a.download = (p.person_name + ' - ' + f.label).replace(/[^A-Za-z0-9 \-]/g, '').trim() + '.pdf'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 4000); } catch (e) { setErr(e.message); }
+    setBusy('');
+  };
+  const btn = { background: '#f0ece6', color: '#5a4d36', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' };
+  return <div style={card}>
+    <div style={label}>Filled forms</div>
+    <div style={{ fontSize: 12, color: '#8a7e6b', marginBottom: 8 }}>The official PDFs as {p.person_name} filled them in. Only you and Wyn can open these.</div>
+    {forms.map(f => <div key={f.k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 13 }}>
+      <div style={{ color: '#2c2418' }}>{f.label}</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button disabled={!!busy} onClick={() => open(f)} style={btn}>{busy === f.k ? 'Opening\u2026' : 'Open'}</button>
+        <button disabled={!!busy} onClick={() => download(f)} style={btn}>Download</button>
+      </div>
+    </div>)}
+    {err && <div style={{ fontSize: 12, color: '#c0392b', marginTop: 8 }}>{err}</div>}
+    {view && <div style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setView(null)}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 900, height: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e6dfd3', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#2c2418' }}>{view.title}</div>
+          <button onClick={() => setView(null)} style={btn}>Close</button>
+        </div>
+        <iframe src={view.url} title={view.title} style={{ flex: 1, border: 'none', width: '100%' }} />
+      </div>
+    </div>}
+  </div>;
+}
+
 function PacketDetail({ p, onBack, onChanged }) {
   const d = p.data || {};
   const [busy, setBusy] = React.useState(false);
@@ -119,6 +171,7 @@ function PacketDetail({ p, onBack, onChanged }) {
       </div>
     </div>
     {p.status !== 'submitted' && <div style={{ ...card, color: '#8a7e6b', fontSize: 14 }}>{p.person_name} has not submitted this packet yet.</div>}
+    {p.status === 'submitted' && <FilledForms p={p} />}
     {p.status === 'submitted' && PACKET_SECTIONS.map(s => <div key={s.id} style={card}>
       <div style={label}>{s.title}</div>
       {s.fields.map(f => <div key={f.k} style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 13 }}>
