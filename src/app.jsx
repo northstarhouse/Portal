@@ -6771,6 +6771,18 @@ function BoardView() {
   const [items, setItems] = React.useState([]);
   const [votes, setVotes] = React.useState([]);
   const [selected, setSelected] = React.useState(null);
+  const [meetingDocs, setMeetingDocs] = React.useState([]); // board packet documents for the month a recorded decision was made
+  React.useEffect(function() {
+    setMeetingDocs([]);
+    var md = selected && selected.decision && selected.meeting_date ? String(selected.meeting_date).slice(0, 10) : '';
+    if (!md) return;
+    var y = parseInt(md.slice(0, 4), 10), m = parseInt(md.slice(5, 7), 10);
+    var from = md.slice(0, 7) + '-01', to = (m === 12 ? (y + 1) + '-01' : y + '-' + String(m + 1).padStart(2, '0')) + '-01';
+    var off = false;
+    fetch(SUPABASE_URL + '/rest/v1/meeting_board_reports?select=id,title,url,category&meeting_date=gte.' + from + '&meeting_date=lt.' + to + '&order=category,title', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); }).then(function(rows) { if (!off && Array.isArray(rows)) setMeetingDocs(rows); }).catch(function() {});
+    return function() { off = true; };
+  }, [selected && selected.id, selected && selected.meeting_date]);
   const [showAdd, setShowAdd] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState(null);
@@ -7336,14 +7348,51 @@ function BoardView() {
             )}
 
             {boardIsRecorded(selected) ? (
-              <div>
-                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10 }}>Decision</div>
-                <div style={{ background: boardDecisionStyle(selected).bg, border: '1px solid ' + boardDecisionStyle(selected).border, borderRadius: 10, padding: '18px 20px', marginBottom: 14 }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: boardDecisionStyle(selected).color, lineHeight: 1.2 }}>{selected.decision}</div>
-                  {selected.decision_detail && <div style={{ fontSize: 14, color: '#555', marginTop: 6 }}>{selected.decision_detail}</div>}
-                </div>
-                <div style={{ fontSize: 12, color: '#999', lineHeight: 1.5 }}>Recorded from the board meeting minutes. Individual votes are not shown for this decision.</div>
-              </div>
+              (function() {
+                var ds = boardDecisionStyle(selected);
+                var md = selected.meeting_date ? new Date(String(selected.meeting_date).slice(0, 10) + 'T12:00:00') : null;
+                var longDate = md && !isNaN(md) ? md.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '';
+                var monthLabel = md && !isNaN(md) ? md.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '';
+                var row = function(label, value) {
+                  return value ? <div style={{ display: 'flex', gap: 14, padding: '10px 0', borderTop: '0.5px solid #f0ece6', alignItems: 'baseline' }}>
+                    <div style={{ width: 112, flexShrink: 0, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#999', fontWeight: 600 }}>{label}</div>
+                    <div style={{ flex: 1, fontSize: 13.5, color: '#2a2a2a', lineHeight: 1.5 }}>{value}</div>
+                  </div> : null;
+                };
+                return (
+                  <div>
+                    <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10 }}>Decision details</div>
+                    <div style={{ border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '4px 18px 6px', background: '#fffdf9' }}>
+                      <div style={{ display: 'flex', gap: 14, padding: '12px 0 10px', alignItems: 'center' }}>
+                        <div style={{ width: 112, flexShrink: 0, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#999', fontWeight: 600 }}>Outcome</div>
+                        <span style={{ background: ds.bg, color: ds.color, border: '1px solid ' + ds.border, fontSize: 12.5, fontWeight: 700, padding: '3px 12px', borderRadius: 999 }}>{selected.decision}</span>
+                      </div>
+                      {row('Decided', longDate)}
+                      {row('Board meeting', monthLabel ? monthLabel + ' board meeting' : '')}
+                      {row('Details', selected.decision_detail)}
+                      {row('Type', 'Board vote')}
+                      {row('Recorded from', 'Board meeting minutes')}
+                    </div>
+                    {meetingDocs.length > 0 && (
+                      <div style={{ marginTop: 22 }}>
+                        <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10 }}>Board packet · {monthLabel}</div>
+                        <div style={{ border: '0.5px solid #e8e0d5', borderRadius: 10, overflow: 'hidden' }}>
+                          {meetingDocs.map(function(d, i) {
+                            return (
+                              <a key={d.id || i} href={d.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderTop: i ? '0.5px solid #f0ece6' : 'none', textDecoration: 'none', color: '#2a2a2a', fontSize: 13 }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: gold, background: '#f6f1e7', borderRadius: 999, padding: '2px 8px', flexShrink: 0, textTransform: 'uppercase', letterSpacing: 0.6 }}>{d.category || 'Report'}</span>
+                                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</span>
+                                <span style={{ color: gold, fontSize: 12, flexShrink: 0 }}>Open →</span>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ fontSize: 12, color: '#a09580', lineHeight: 1.5, marginTop: 16 }}>Individual votes are not shown for this decision.</div>
+                  </div>
+                );
+              })()
             ) : !boardIsVote(selected) ? (
               <div>
                 <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.2, color: '#888', fontWeight: 600, marginBottom: 10 }}>
