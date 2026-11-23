@@ -5699,11 +5699,6 @@ function DonorsView({ navigate }) {
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
                 <thead>
                   <tr style={{borderBottom:'0.5px solid #e0d8cc',background:'#faf8f4'}}>
-                    <th style={{width:36,paddingLeft:14,paddingRight:6,paddingTop:10,paddingBottom:10}}>
-                      <input type="checkbox" checked={allChecked}
-                        ref={function(el){if(el)el.indeterminate=someChecked&&!allChecked;}}
-                        onChange={toggleAll} style={{accentColor:gold,cursor:'pointer'}} />
-                    </th>
                     {[
                       {label:'Donor',k:'formal_name',align:'left'},
                       {label:'Tier',k:'tier',align:'left'},
@@ -5723,18 +5718,13 @@ function DonorsView({ navigate }) {
                 </thead>
                 <tbody>
                   {sortedDonors.length===0 ? (
-                    <tr><td colSpan={7} style={{textAlign:'center',padding:40,color:'#aaa',fontSize:12}}>No donors match your filters.</td></tr>
+                    <tr><td colSpan={5} style={{textAlign:'center',padding:40,color:'#aaa',fontSize:12}}>No donors match your filters.</td></tr>
                   ) : sortedDonors.map(function(d){
                     var tierInfo=nshGetTier(d.membership_year_total);
                     var isSelected=selected&&selected.id===d.id;
-                    var isChecked=!!selectedIds[d.id];
-                    return (
+                                    return (
                       <tr key={d.id} onClick={function(){setSelected(d);setEditDon(null);}}
-                        style={{borderBottom:'0.5px solid #f0ebe2',cursor:'pointer',background:isChecked?'#fef9ec':(isSelected?'#faf4e8':'#fff'),transition:'background 0.1s',opacity:d.deceased?0.55:1}}>
-                        <td style={{paddingLeft:14,paddingRight:6,paddingTop:10,paddingBottom:10}}
-                          onClick={function(e){e.stopPropagation();toggleOne(d.id);}}>
-                          <input type="checkbox" checked={isChecked} onChange={function(){toggleOne(d.id);}} onClick={function(e){e.stopPropagation();}} style={{accentColor:gold,cursor:'pointer'}} />
-                        </td>
+                        style={{borderBottom:'0.5px solid #f0ebe2',cursor:'pointer',background:isSelected?'#faf4e8':'#fff',transition:'background 0.1s',opacity:d.deceased?0.55:1}}>
                         <td style={{padding:'10px 14px'}}>
                           <div style={{display:'flex',alignItems:'center',gap:6}}>
                             <div>
