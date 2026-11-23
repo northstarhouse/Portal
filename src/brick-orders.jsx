@@ -80,7 +80,7 @@ export function BrickOrdersView() {
   const nDone = (rows || []).filter(isDone).length;
   const counts = { all: (rows || []).length, 'Website order': (rows || []).filter(r => r.source === 'Website order').length, 'Venue rental': (rows || []).filter(r => r.source === 'Venue rental').length, 'Entered by hand': (rows || []).filter(r => r.source === 'Entered by hand').length };
 
-  return <div style={{ padding: '4px 0 40px', maxWidth: 1100 }}>
+  return <div style={{ padding: '4px 0 40px', maxWidth: 'none' }}>
     <p style={{ margin: '0 0 14px', color: '#6b5d4a', fontSize: 13.5 }}>Every brick and its wording, newest first: website brick orders, bricks entered by hand as donations, and the legacy brick each venue rental client submits on their event page. Use Download for the engraver.</p>
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
       <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name or wording" style={{ border: '1px solid #d8cdb8', borderRadius: 8, padding: '8px 12px', fontSize: 13, minWidth: 220, fontFamily: 'inherit' }} />
@@ -93,15 +93,15 @@ export function BrickOrdersView() {
     {err && <div role="alert" style={{ color: '#b3261e', marginBottom: 10 }}>{err}</div>}
     {rows === null ? <div role="status" style={{ color: '#8a7e6b' }}>Loading brick orders…</div> : shown.length === 0 ? <div style={{ color: '#8a7e6b' }}>No bricks match.</div> : <div style={{ overflowX: 'auto', background: '#fff', border: '1px solid #e6dfd3', borderRadius: 10 }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead><tr><th style={th}>Date</th><th style={th}>Name</th><th style={th}>Came in on</th><th style={th}>Brick</th><th style={th}>Wording</th><th style={{ ...th, textAlign: 'right' }}>Paid</th><th style={{ ...th, textAlign: 'center' }}>Fulfilled</th><th style={th} /></tr></thead>
+        <thead><tr><th style={{ ...th, textAlign: 'center' }}>Fulfilled</th><th style={th}>Date</th><th style={th}>Name</th><th style={th}>Came in on</th><th style={th}>Brick</th><th style={th}>Wording</th><th style={{ ...th, textAlign: 'right' }}>Paid</th><th style={th} /></tr></thead>
         <tbody>{shown.map(r => <tr key={r.key} style={{ background: isDone(r) ? '#f4f8f1' : undefined }}>
+          <td style={{ ...td, textAlign: 'center', whiteSpace: 'nowrap' }}><label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: isDone(r) ? '#2e7d32' : '#8a7e6b', fontWeight: isDone(r) ? 600 : 400 }}><input type="checkbox" checked={isDone(r)} onChange={() => toggleDone(r)} style={{ width: 17, height: 17, accentColor: '#2e7d32', cursor: 'pointer' }} />{isDone(r) ? day(fulfilled[r.key]) : 'Mark'}</label></td>
           <td style={{ ...td, whiteSpace: 'nowrap' }}>{day(r.when)}</td>
           <td style={{ ...td, fontWeight: 600 }}>{r.name}<div style={{ fontWeight: 400, fontSize: 11, color: '#8a7e6b' }}>{r.source}</div></td>
           <td style={{ ...td, color: '#6b5d4a', fontSize: 12.5 }}>{r.form}</td>
           <td style={{ ...td, color: '#6b5d4a' }}>{r.detail}</td>
           <td style={{ ...td, fontFamily: "'Courier New', monospace", fontSize: 13, lineHeight: 1.5 }}>{r.lines.length ? r.lines.map((l, i) => <div key={i}>{l}</div>) : <span style={{ color: '#b0a590', fontFamily: 'inherit' }}>No wording on file</span>}</td>
           <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>{r.amount == null ? 'Included' : money(r.amount)}</td>
-          <td style={{ ...td, textAlign: 'center', whiteSpace: 'nowrap' }}><label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: isDone(r) ? '#2e7d32' : '#8a7e6b', fontWeight: isDone(r) ? 600 : 400 }}><input type="checkbox" checked={isDone(r)} onChange={() => toggleDone(r)} style={{ width: 17, height: 17, accentColor: '#2e7d32', cursor: 'pointer' }} />{isDone(r) ? day(fulfilled[r.key]) : 'Mark'}</label></td>
           <td style={td}>{r.lines.length > 0 && <button type="button" onClick={() => copy(r)} style={{ border: '1px solid #d8cdb8', background: '#fff', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{copied === r.key ? 'Copied ✓' : 'Copy'}</button>}</td>
         </tr>)}</tbody>
       </table>
