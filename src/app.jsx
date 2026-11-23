@@ -7,6 +7,7 @@ import { EventListView } from './event-list.jsx';
 import { OrgGuideView } from './org-guide.jsx';
 import { BrickOrdersView } from './brick-orders.jsx';
 import { VolunteerHoursView } from './volunteer-hours.jsx';
+import { ConstantContactView } from './constant-contact.jsx';
 import { printForm } from './print-form.js';
 import { VenueFollowingView } from './venue-following.jsx';
 import { InquiryFlagNotes } from './flag-notes.jsx';
@@ -860,6 +861,7 @@ var NAV_ICONS = {
   'venue-policies': '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="7" x2="16" y2="7"/><line x1="9" y1="11" x2="14" y2="11"/>',
   'mail-checks': '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/><polyline points="15 17 17 19 21 15"/>',
   'org-guide': '<path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>',
+  'constant-contact': '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/>',
   'volunteer-hours': '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
   'brick-orders': '<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"1\"/><line x1=\"3\" y1=\"10\" x2=\"21\" y2=\"10\"/><line x1=\"3\" y1=\"15\" x2=\"21\" y2=\"15\"/><line x1=\"9\" y1=\"4\" x2=\"9\" y2=\"10\"/><line x1=\"15\" y1=\"10\" x2=\"15\" y2=\"15\"/><line x1=\"9\" y1=\"15\" x2=\"9\" y2=\"20\"/>',
   'event-list': '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polygon points="12 12.5 13.2 15 15.8 15.3 13.9 17 14.4 19.5 12 18.3 9.6 19.5 10.1 17 8.2 15.3 10.8 15"/>',
@@ -15466,7 +15468,7 @@ function SuFormPanel({ form, defaultCategory, templates, onSaved, onCancel }) {
 }
 
 // A form as respondents see it, read-only (nothing here can be submitted).
-function SuFormPreview({ form }) {
+function SuFormPreview({ form, onPrint }) {
   var field = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', border: '1px solid #e0d8cc', borderRadius: 6, fontSize: 14, fontFamily: 'inherit', background: '#fff', color: '#aaa' };
   function control(q) {
     var opts = q.options || [];
@@ -15492,7 +15494,10 @@ function SuFormPreview({ form }) {
   var groups = suGroupFieldsBySection(form.fields || []);
   return (
     <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, padding: '24px 28px', marginBottom: 22 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>How the form looks</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 1.2 }}>How the form looks</div>
+        {onPrint && <button onClick={onPrint} title="Print a blank, on-brand copy of this form" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #c9b48c', color: '#7a5f38', borderRadius: 8, padding: '6px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>🖨 Print</button>}
+      </div>
       <div style={{ fontFamily: "'Cardo', Georgia, serif", fontSize: 26, fontWeight: 700, color: '#2c2418', marginBottom: form.description ? 8 : 18 }}>{form.title}</div>
       {form.description && <div style={{ fontSize: 14, color: '#6b6152', lineHeight: 1.55, marginBottom: 20, whiteSpace: 'pre-wrap' }}>{form.description}</div>}
       {groups.map(function(g, gi) {
@@ -15521,7 +15526,7 @@ function SuFormPreview({ form }) {
 
 var SU_BUILDER_TABS = [
   { key: 'forms', label: 'Forms' },
-  { key: 'events', label: 'Events' },
+  { key: 'events', label: 'Event sign-ups' },
   { key: 'polls', label: 'Polls' },
   { key: 'templates', label: 'Templates' },
 ];
@@ -15542,6 +15547,9 @@ function FormBuilderView({ navigate }) {
   // The form / event / poll being looked at: its preview (forms) and its responses, with an Edit button. Edit opens the editor.
   var [viewing, setViewing] = useState(null);
   var [copiedId, setCopiedId] = useState(null);
+  var [search, setSearch] = useState('');
+  var [formView, setFormView] = useState('visible');
+  var [menuOpen, setMenuOpen] = useState(null);
 
   function fetchAll() {
     setLoading(true);
@@ -15639,7 +15647,6 @@ function FormBuilderView({ navigate }) {
           <div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
               <button onClick={function() { setEditing({ type: viewing.type, id: viewing.id }); }} style={SU_BTN_PRIMARY}>{'Edit ' + noun}</button>
-              {viewing.type === 'forms' && <button onClick={function() { printForm(item); }} style={SU_BTN_GHOST}>🖨 Print form</button>}
               {viewing.type === 'forms' && <button onClick={function() { handleCopyLink('form', item.id, item.title); }} style={SU_BTN_GHOST}>{copiedId === 'form' + item.id ? 'Link copied' : 'Copy link'}</button>}
               {viewing.type === 'forms' && <a href={suPublicLink('form', item.id, item.title)} target="_blank" rel="noreferrer" style={Object.assign({}, SU_BTN_GHOST, { textDecoration: 'none', display: 'inline-block' })}>Open live form ↗</a>}
               {viewing.type === 'events' && <button onClick={function() { handleCopyLink('event', item.id, item.title, item.slug); }} style={SU_BTN_GHOST}>{copiedId === 'event' + item.id ? 'Link copied' : 'Copy link'}</button>}
@@ -15647,7 +15654,7 @@ function FormBuilderView({ navigate }) {
               {viewing.type === 'polls' && <button onClick={function() { handleCopyLink('poll', item.id, item.question); }} style={SU_BTN_GHOST}>{copiedId === 'poll' + item.id ? 'Link copied' : 'Copy link'}</button>}
             </div>
             {emailEvent && <EventEmailModal ev={emailEvent} onClose={function() { setEmailEvent(null); }} />}
-            {viewing.type === 'forms' && <SuFormPreview form={item} />}
+            {viewing.type === 'forms' && <SuFormPreview form={item} onPrint={function() { printForm(item); }} />}
             {viewing.type === 'forms' && <div style={{ fontSize: 11, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 }}>Responses</div>}
             {viewing.type === 'forms' && <SuFormResponses form={item} />}
             {viewing.type === 'events' && <SuEventResponses event={item} />}
@@ -15658,78 +15665,137 @@ function FormBuilderView({ navigate }) {
     );
   }
 
+  var GOLD_GRAD = 'linear-gradient(180deg, #9a7b4e 0%, #7d6039 100%)';
+  var TAB_LABELS = { forms: 'Forms', events: 'Event sign-ups', polls: 'Polls', templates: 'Templates' };
+  var NEW_LABELS = { forms: '+ New form', events: '+ New event sign-up', polls: '+ New poll', templates: '+ New template' };
+  var pillStyle = { display: 'inline-block', background: '#f1e9db', color: '#7a5f38', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 600 };
+  var thSt = { textAlign: 'left', padding: '10px 14px', fontSize: 12.5, fontWeight: 600, color: '#6b5d4a', borderBottom: '0.5px solid #ece4d6' };
+  var tdSt = { padding: '14px', fontSize: 13.5, color: '#3a3226', borderBottom: '0.5px solid #f1ebdf', verticalAlign: 'middle' };
+  var q = (search || '').trim().toLowerCase();
+  var rows = [];
+  var headers = [];
+  var emptyText = '';
+  if (tab === 'forms') {
+    headers = ['Form name', 'Category', 'Responses'];
+    var inHidden = formView === 'hidden';
+    var pool = (inHidden ? hiddenForms : visibleForms).filter(function(fm) { return formCategory === 'All' || fm.category === formCategory; });
+    emptyText = inHidden ? 'Nothing hidden.' : 'No forms match.';
+    rows = pool.filter(function(fm) { return !q || (fm.title || '').toLowerCase().indexOf(q) !== -1; }).map(function(fm) {
+      var responses = fm.nsh_form_responses || [];
+      var menu = [
+        { label: '🖨  Print blank form', onClick: function() { printForm(fm); } },
+        { label: copiedId === 'form' + fm.id ? '✓  Link copied' : 'Copy link', onClick: function() { handleCopyLink('form', fm.id, fm.title); } },
+        { label: fm.portal_hidden ? 'Show again' : 'Hide from list', onClick: function() { toggleHidden(fm); } },
+        { divider: 'Move to category' },
+        { label: (!fm.category ? '✓  ' : '') + 'No category', onClick: function() { moveBucket(fm, ''); } }
+      ].concat(bucketNames.map(function(c) { return { label: (fm.category === c ? '✓  ' : '') + c, onClick: function() { moveBucket(fm, c); } }; }))
+       .concat([{ label: 'New category…', onClick: function() { moveBucket(fm, '__new__'); } }, { divider: '' }, { label: 'Delete form', danger: true, onClick: function() { handleDelete('form', fm.id, 'nsh_forms'); } }]);
+      return {
+        key: fm.id, name: fm.title, sub: fm.internal_note, unread: countUnreadResponses(responses, fm.id, seenMap),
+        cells: [fm.category ? <span style={pillStyle}>{fm.category}</span> : <span style={{ color: '#b5a99a' }}>—</span>,
+          <span style={{ fontWeight: 600 }}>{responses.length}</span>],
+        onView: function() { openForm(fm); }, menu: menu
+      };
+    });
+  } else if (tab === 'events') {
+    headers = ['Event sign-up', 'Type', 'Date', 'Responses'];
+    emptyText = 'No event sign-ups match.';
+    rows = events.filter(function(ev) { return !q || (ev.title || '').toLowerCase().indexOf(q) !== -1; }).map(function(ev) {
+      var count = ev.event_type === 'shift' ? (((ev.vol_shift_slots && ev.vol_shift_slots[0] && ev.vol_shift_slots[0].count) || 0) + ' slots') : (((ev.vol_event_responses && ev.vol_event_responses[0] && ev.vol_event_responses[0].count) || 0) + ' RSVPs');
+      var menu = [{ label: copiedId === 'event' + ev.id ? '✓  Link copied' : 'Copy link', onClick: function() { handleCopyLink('event', ev.id, ev.title, ev.slug); } }];
+      if (ev.slug) menu.push({ label: 'Send email', onClick: function() { setEmailEvent(ev); } });
+      menu.push({ divider: '' }, { label: 'Delete', danger: true, onClick: function() { handleDelete('event', ev.id, 'vol_events'); } });
+      return { key: ev.id, name: ev.title, cells: [<span style={pillStyle}>{ev.event_type === 'shift' ? 'Shift sign-up' : 'RSVP'}</span>, ev.date ? suFmtDate(ev.date) : '—', <span style={{ fontWeight: 600 }}>{count}</span>], onView: function() { setViewing({ type: 'events', id: ev.id }); }, menu: menu };
+    });
+  } else if (tab === 'polls') {
+    headers = ['Poll', '', '', 'Votes'];
+    emptyText = 'No polls match.';
+    rows = polls.filter(function(pl) { return !q || (pl.question || '').toLowerCase().indexOf(q) !== -1; }).map(function(pl) {
+      var votes = (pl.vol_poll_votes && pl.vol_poll_votes[0] && pl.vol_poll_votes[0].count) || 0;
+      return { key: pl.id, name: pl.question, cells: ['', '', <span style={{ fontWeight: 600 }}>{votes}</span>], onView: function() { setViewing({ type: 'polls', id: pl.id }); },
+        menu: [{ label: copiedId === 'poll' + pl.id ? '✓  Link copied' : 'Copy link', onClick: function() { handleCopyLink('poll', pl.id, pl.question); } }, { divider: '' }, { label: 'Delete', danger: true, onClick: function() { handleDelete('poll', pl.id, 'vol_polls'); } }] };
+    });
+  } else {
+    headers = ['Template', '', '', 'Questions'];
+    emptyText = 'No templates match.';
+    rows = templates.filter(function(tp) { return !q || (tp.name || '').toLowerCase().indexOf(q) !== -1; }).map(function(tp) {
+      return { key: tp.id, name: tp.name, cells: ['', '', <span style={{ fontWeight: 600 }}>{(tp.questions && tp.questions.length) || 0}</span>], onView: function() { setEditing({ type: 'templates', id: tp.id }); },
+        menu: [{ label: 'Delete', danger: true, onClick: function() { handleDelete('template', tp.id, 'nsh_templates'); } }] };
+    });
+  }
+
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 1000 }}>
       {emailEvent && <EventEmailModal ev={emailEvent} onClose={function() { setEmailEvent(null); }} />}
-      <div style={{ fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Forms</div>
-      <div style={{ fontSize: 13, color: '#999', marginBottom: 20 }}>Forms, sign-up events, polls and question templates. Click one to see it and its responses; Edit changes it.</div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+      {menuOpen && <div onClick={function() { setMenuOpen(null); }} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 34, fontWeight: 700, color: '#2c2418', fontFamily: "'Cardo', Georgia, serif", lineHeight: 1.1 }}>Forms</div>
+        <button onClick={function() { setEditing({ type: tab, id: null }); }} style={{ background: GOLD_GRAD, color: '#fff', border: 'none', borderRadius: 10, padding: '12px 22px', fontSize: 14, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 6px rgba(125,96,57,0.25)' }}>{NEW_LABELS[tab]}</button>
+      </div>
+      <div style={{ display: 'flex', gap: 28, borderBottom: '0.5px solid #e6dfd3', marginBottom: 18 }}>
         {SU_BUILDER_TABS.map(function(t) {
-          return <button key={t.key} onClick={function() { setTab(t.key); }} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: tab === t.key ? gold : '#fff', color: tab === t.key ? '#fff' : '#888', border: '0.5px solid ' + (tab === t.key ? gold : '#e0d8cc') }}>{t.label}</button>;
+          var on = tab === t.key;
+          return <button key={t.key} onClick={function() { setTab(t.key); setSearch(''); }} style={{ background: 'none', border: 'none', borderBottom: '2px solid ' + (on ? gold : 'transparent'), marginBottom: -1, padding: '10px 2px', fontSize: 14, fontWeight: on ? 700 : 500, color: on ? '#2c2418' : '#8a7e6b', cursor: 'pointer' }}>{TAB_LABELS[t.key]}</button>;
         })}
       </div>
-      <div style={{ background: '#fff', border: '0.5px solid #e8e0d5', borderRadius: 14, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: (tab === 'forms') ? 'none' : '0.5px solid #f0ece6' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a' }}>{SU_BUILDER_TABS.find(function(t) { return t.key === tab; }).label}</div>
-          <button onClick={function() { setEditing({ type: tab, id: null }); }} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ New</button>
-        </div>
-        {tab === 'forms' && (
-          <div style={{ display: 'flex', gap: 4, padding: '0 18px 14px', borderBottom: '0.5px solid #f0ece6', flexWrap: 'wrap' }}>
-            {formTabs.map(function(c) {
-              var active = formCategory === c;
-              return <button key={c} onClick={function() { setFormCategory(c); }} style={{ padding: '4px 11px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: active ? '#f0ece6' : 'transparent', color: active ? '#2a2a2a' : '#999', border: 'none' }}>{c}</button>;
-            })}
-            {hiddenForms.length > 0 && <button onClick={function() { setFormCategory('__hidden__'); }} style={{ marginLeft: 'auto', padding: '4px 11px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: formCategory === '__hidden__' ? '#f0ece6' : 'transparent', color: formCategory === '__hidden__' ? '#2a2a2a' : '#999', border: '0.5px dashed #d8d0c4' }}>{'Hidden (' + hiddenForms.length + ')'}</button>}
+      <div style={{ background: '#fff', border: '0.5px solid #e6dfd3', borderRadius: 16, padding: '18px 20px 8px', boxShadow: '0 1px 4px rgba(60,45,20,0.05)' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+          <div style={{ flex: '1 1 240px', display: 'flex', alignItems: 'center', gap: 8, border: '1px solid #e3dccd', borderRadius: 10, padding: '9px 12px', background: '#fffefc' }}>
+            <span style={{ color: '#a09580', fontSize: 14 }}>🔍</span>
+            <input value={search} onChange={function(e) { setSearch(e.target.value); }} placeholder={'Search ' + TAB_LABELS[tab].toLowerCase() + '…'} style={{ border: 'none', outline: 'none', background: 'transparent', flex: 1, fontSize: 13.5, fontFamily: 'inherit', minWidth: 0 }} />
           </div>
-        )}
-        {loading ? <div style={{ color: '#ccc', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div> : (
-          <div>
-            {tab === 'events' && (events.length === 0 ? <SuEmpty text="No events yet." /> : events.map(function(ev) {
-              var subtitle = (ev.date ? suFmtDate(ev.date) : '') + (ev.event_type === 'shift' ? ' · Shift sign-up' : ' · RSVP');
-              var meta = ev.event_type === 'shift' ? (((ev.vol_shift_slots && ev.vol_shift_slots[0] && ev.vol_shift_slots[0].count) || 0) + ' slots') : (((ev.vol_event_responses && ev.vol_event_responses[0] && ev.vol_event_responses[0].count) || 0) + ' RSVPs');
-              return <SuListRow key={ev.id} title={ev.title} subtitle={subtitle} meta={meta}
-                onClick={function() { setViewing({ type: 'events', id: ev.id }); }}
-                onCopyLink={function() { handleCopyLink('event', ev.id, ev.title, ev.slug); }} copied={copiedId === 'event' + ev.id}
-                onSendEmail={ev.slug ? function() { setEmailEvent(ev); } : null}
-                onDelete={function() { handleDelete('event', ev.id, 'vol_events'); }} />;
-            }))}
-            {tab === 'polls' && (polls.length === 0 ? <SuEmpty text="No polls yet." /> : polls.map(function(pl) {
-              var meta = ((pl.vol_poll_votes && pl.vol_poll_votes[0] && pl.vol_poll_votes[0].count) || 0) + ' votes';
-              return <SuListRow key={pl.id} title={pl.question} meta={meta}
-                onClick={function() { setViewing({ type: 'polls', id: pl.id }); }}
-                onCopyLink={function() { handleCopyLink('poll', pl.id, pl.question); }} copied={copiedId === 'poll' + pl.id}
-                onDelete={function() { handleDelete('poll', pl.id, 'vol_polls'); }} />;
-            }))}
-            {tab === 'forms' && (function() {
-              var inHidden = formCategory === '__hidden__';
-              var visible = inHidden ? hiddenForms : (formCategory === 'All' ? visibleForms : visibleForms.filter(function(fm) { return fm.category === formCategory; }));
-              if (visible.length === 0) return <SuEmpty text={inHidden ? 'Nothing hidden.' : (formCategory === 'All' ? 'No forms yet.' : 'No ' + formCategory + ' forms yet.')} />;
-              return visible.map(function(fm) {
-                var responses = fm.nsh_form_responses || [];
-                var meta = responses.length + ' responses' + (fm.category ? ' · ' + fm.category : '') + (fm.show_responses === false ? ' · private' : '');
-                var unread = countUnreadResponses(responses, fm.id, seenMap);
-                var bucket = (
-                  <select value={fm.category || ''} onChange={function(e) { moveBucket(fm, e.target.value); }} aria-label={'Bucket for ' + (fm.title || 'form')}
-                    style={{ fontSize: 11, color: '#888', background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '4px 6px', maxWidth: 110, flexShrink: 0 }}>
-                    <option value="">No bucket</option>
-                    {bucketNames.map(function(c) { return <option key={c} value={c}>{c}</option>; })}
-                    <option value="__new__">New bucket…</option>
-                  </select>
-                );
-                return <SuListRow key={fm.id} title={fm.title} subtitle={fm.internal_note} meta={meta} unread={unread}
-                  onClick={function() { openForm(fm); }} bucketControl={bucket}
-                  onToggleHidden={function() { toggleHidden(fm); }} hiddenNow={!!fm.portal_hidden}
-                  onPrint={function() { printForm(fm); }}
-                  onCopyLink={function() { handleCopyLink('form', fm.id, fm.title); }} copied={copiedId === 'form' + fm.id}
-                  onDelete={function() { handleDelete('form', fm.id, 'nsh_forms'); }} />;
-              });
-            })()}
-            {tab === 'templates' && (templates.length === 0 ? <SuEmpty text="No templates yet." /> : templates.map(function(tp) {
-              var meta = ((tp.questions && tp.questions.length) || 0) + ' questions';
-              return <SuListRow key={tp.id} title={tp.name} meta={meta}
-                onClick={function() { setEditing({ type: 'templates', id: tp.id }); }}
-                onDelete={function() { handleDelete('template', tp.id, 'nsh_templates'); }} />;
-            }))}
+          {tab === 'forms' && (
+            <select value={formCategory} onChange={function(e) { setFormCategory(e.target.value); }} style={{ border: '1px solid #e3dccd', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, background: '#fffefc', color: '#3a3226', fontFamily: 'inherit' }}>
+              <option value="All">All categories</option>
+              {bucketNames.map(function(c) { return <option key={c} value={c}>{c}</option>; })}
+            </select>
+          )}
+          {tab === 'forms' && (
+            <div style={{ display: 'inline-flex', border: '1px solid #e3dccd', borderRadius: 10, overflow: 'hidden', marginLeft: 'auto' }}>
+              {[['visible', 'Visible'], ['hidden', 'Hidden (' + hiddenForms.length + ')']].map(function(p) {
+                var on = formView === p[0];
+                return <button key={p[0]} onClick={function() { setFormView(p[0]); }} style={{ border: 'none', padding: '10px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', background: on ? GOLD_GRAD : '#fffefc', color: on ? '#fff' : '#5a4d38' }}>{p[1]}</button>;
+              })}
+            </div>
+          )}
+        </div>
+        {loading ? <div style={{ color: '#b5a99a', fontSize: 13, textAlign: 'center', padding: '30px 0' }}>Loading…</div> : rows.length === 0 ? <SuEmpty text={emptyText} /> : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+              <thead><tr>
+                {headers.map(function(h, i) { return <th key={i} style={Object.assign({}, thSt, i === 0 ? { width: '38%' } : null)}>{h}</th>; })}
+                <th style={Object.assign({}, thSt, { width: 150 })}>Actions</th>
+              </tr></thead>
+              <tbody>
+                {rows.map(function(r) {
+                  return (
+                    <tr key={r.key}>
+                      <td style={tdSt}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span onClick={r.onView} style={{ fontSize: 15, fontWeight: 700, color: '#2c2418', cursor: 'pointer' }}>{r.name || '(untitled)'}</span>
+                          {!!r.unread && <span style={{ background: '#c0392b', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 20, padding: '1px 7px' }}>{'+' + r.unread}</span>}
+                        </div>
+                        {r.sub && <div style={{ fontSize: 12, color: '#a09580', marginTop: 2 }}>{r.sub}</div>}
+                      </td>
+                      {r.cells.map(function(c, i) { return <td key={i} style={tdSt}>{c}</td>; })}
+                      <td style={Object.assign({}, tdSt, { position: 'relative', whiteSpace: 'nowrap' })}>
+                        <button onClick={r.onView} style={{ background: '#fff', border: '1px solid #c9b48c', color: '#7a5f38', borderRadius: 8, padding: '6px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>View</button>
+                        <button onClick={function() { setMenuOpen(menuOpen === r.key ? null : r.key); }} aria-label="More actions" style={{ background: 'none', border: 'none', fontSize: 20, color: '#5a4d38', cursor: 'pointer', marginLeft: 8, padding: '0 6px', lineHeight: 1 }}>•••</button>
+                        {menuOpen === r.key && (
+                          <div style={{ position: 'absolute', right: 10, top: 'calc(100% - 8px)', zIndex: 50, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, boxShadow: '0 8px 24px rgba(60,45,20,0.16)', padding: '6px 0', minWidth: 210, maxHeight: 340, overflowY: 'auto', textAlign: 'left' }}>
+                            {r.menu.map(function(m, i) {
+                              if (m.divider !== undefined) return <div key={i} style={{ borderTop: '0.5px solid #eee6d8', margin: '6px 0 4px', padding: m.divider ? '6px 14px 2px' : 0, fontSize: 10.5, fontWeight: 700, color: '#a09580', textTransform: 'uppercase', letterSpacing: 1 }}>{m.divider}</div>;
+                              return <div key={i} onClick={function() { setMenuOpen(null); m.onClick(); }} style={{ padding: '8px 14px', fontSize: 13, cursor: 'pointer', color: m.danger ? '#b3261e' : '#3a3226' }}
+                                onMouseEnter={function(e) { e.currentTarget.style.background = '#faf6ec'; }} onMouseLeave={function(e) { e.currentTarget.style.background = 'transparent'; }}>{m.label}</div>;
+                            })}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -17742,7 +17808,7 @@ function AdminView({ navigate }) {
       { label: '2027 Event List', view: 'event-list', icon: ic('event-list') },
       { label: 'Event Overviews', view: 'event-overviews', icon: gridIcon },
       SHOW_VENUE_RENTALS ? { label: 'Venue Rentals', view: 'venue', icon: houseIcon } : null,
-      { label: 'Create Website Event', view: 'new-site-event', icon: suClipboardIcon },
+      { label: 'Event Email Notices', view: 'email-notices', icon: sendIcon },
     ] },
     { title: 'Volunteers & Visitors', items: [
       { label: 'Volunteer Hours', view: 'volunteer-hours', icon: ic('volunteer-hours') },
@@ -17758,10 +17824,11 @@ function AdminView({ navigate }) {
     { title: 'Communications & Website', items: [
       { label: 'North Star House Updates', view: 'nsh-updates', icon: ic('nsh-updates') },
       { label: 'Announcements', view: 'announcements', icon: megaIcon },
-      { label: 'Event Email Notices', view: 'email-notices', icon: sendIcon },
       { label: 'Blog Editor', view: 'blog-editor', icon: suClipboardIcon },
       { label: 'Media Library', view: 'site-media', icon: suClipboardIcon },
       { label: 'Website Forms', view: 'form-builder', icon: suCalendarIcon, badge: formsUnread > 0 ? '+' + formsUnread : '' },
+      { label: 'Create Website Event', view: 'new-site-event', icon: suClipboardIcon },
+      { label: 'Constant Contact', view: 'constant-contact', icon: emailIcon },
     ] },
     { title: 'Finance', items: [
       { label: 'Financial Overview', view: 'financial-overview', icon: trendIcon },
@@ -26644,6 +26711,7 @@ const views = {
   'org-guide': OrgGuideView,
   'brick-orders': BrickOrdersView,
   'volunteer-hours': VolunteerHoursView,
+  'constant-contact': ConstantContactView,
   'venue-following': VenueFollowingView,
   'acknowledgment-templates': AcknowledgmentTemplatesView,
   'acknowledgments-queue': AcknowledgmentsQueueView,
@@ -27366,7 +27434,7 @@ function Dashboard() {
             <div style={{ width: 38, height: 38, borderRadius: 9, background: "rgba(136,108,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: gold }}>
               <NavIcon id={active} active={true} size={20} />
             </div>
-            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "person-activity" ? "Activity by Person" : active === "mail-checks" ? "Mail & Checks" : active === "venue-policies" ? "Venue Policies & Resources" : active === "org-guide" ? "Organization Guide" : active === "volunteer-hours" ? "Volunteer Hours" : active === "brick-orders" ? "Brick Orders Wording" : active === "event-list" ? "2027 Event List" : active === "venue-following" ? "Following" : active === "office-cash-flow" ? "Office Cash" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
+            <h1 style={{ margin: 0, fontSize: isMobile ? 20 : 26, fontWeight: 700, color: gold, fontFamily: "'Cardo', serif", textShadow: "1px 2px 0px rgba(136,108,68,0.2)" }}>{active === "financials" ? "Reimbursements" : active === "financial-overview" ? "Financial Overview" : active === "reviews" ? "Reviews" : active === "admin" ? "Admin" : active === "dev-log" ? "Dev Log" : active === "activity-log" ? "Activity Log" : active === "person-activity" ? "Activity by Person" : active === "mail-checks" ? "Mail & Checks" : active === "venue-policies" ? "Venue Policies & Resources" : active === "org-guide" ? "Organization Guide" : active === "volunteer-hours" ? "Volunteer Hours" : active === "constant-contact" ? "Constant Contact" : active === "brick-orders" ? "Brick Orders Wording" : active === "event-list" ? "2027 Event List" : active === "venue-following" ? "Following" : active === "office-cash-flow" ? "Office Cash" : active === "maintenance-request" ? "Maintenance Request" : active === "website-payments" ? "Website Payments" : active === "nsh-updates" ? "North Star House Updates" : active === "treasurer" ? "Treasurer: All Payments" : active === "voicemail-log" ? "Voicemail Log" : active === "new-site-event" ? "New Event" : active === "blog-editor" ? "Blog Editor" : active === "site-media" ? "Media Library" : active === "venue-inquiries" ? "Inquiries" : active === "venue-messages" ? "Messages" : (active === "events" || active === "event-overviews") ? "Event Overviews" : (mod && mod.label)}</h1>
             {active === "operational" && opArea && (
               <button onClick={function() { setQuarterlyArea(opArea); navigate("quarterly"); }} style={{ marginLeft: "auto", background: "transparent", color: gold, border: "1.5px solid " + gold, borderRadius: 9, padding: isMobile ? "7px 12px" : "9px 20px", fontSize: isMobile ? 11 : 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                 {isMobile ? "Quarterly ↗" : "Submit Quarterly Update"}
