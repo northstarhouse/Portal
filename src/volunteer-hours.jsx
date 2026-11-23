@@ -74,6 +74,13 @@ export function VolunteerHoursView() {
     .sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'recent' ? ((b.last || 0) - (a.last || 0)) : b.total - a.total);
   const totalHours = shown.reduce((s, p) => s + p.total, 0), totalShifts = shown.reduce((s, p) => s + p.count, 0);
   const monthTotals = MONTHS.map((_, i) => shown.reduce((s, p) => s + p.months[i], 0));
+  const [view, setView] = React.useState('volunteer');
+  // Per month: hours, shifts and how many different volunteers came in.
+  const byMonth = MONTHS.map((label, i) => {
+    const who = shown.filter(p => p.months[i] > 0);
+    return { label, hours: monthTotals[i], volunteers: who.length, shifts: who.reduce((s, p) => s + p.shifts.filter(x => x.start.getMonth() === i).length, 0) };
+  });
+  const maxMonth = Math.max(1, ...byMonth.map(m => m.hours));
 
   function download() {
     const X = window.XLSX; if (!X) { alert('The spreadsheet tool has not loaded. Please refresh and try again.'); return; }
@@ -96,6 +103,9 @@ export function VolunteerHoursView() {
       <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search a name" style={{ border: '1px solid #d8cdb8', borderRadius: 8, padding: '8px 12px', fontSize: 13, minWidth: 200, fontFamily: 'inherit' }} />
       <button type="button" style={pill(!board)} onClick={() => setBoard(false)}>Everyone</button>
       <button type="button" style={pill(board)} onClick={() => setBoard(true)}>Board members</button>
+      <span style={{ width: 1, height: 22, background: '#e0d6c3', margin: '0 4px' }} />
+      <button type="button" style={pill(view === 'volunteer')} onClick={() => setView('volunteer')}>By volunteer</button>
+      <button type="button" style={pill(view === 'month')} onClick={() => setView('month')}>By month</button>
       <span style={{ flex: 1 }} />
       <select value={sort} onChange={e => setSort(e.target.value)} style={{ border: '1px solid #d8cdb8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
         <option value="total">Most hours first</option><option value="name">Name A to Z</option><option value="recent">Most recent shift</option>
@@ -106,7 +116,21 @@ export function VolunteerHoursView() {
       {stat('Hours', hrs(totalHours))}{stat('Volunteers', shown.length)}{stat('Shifts', totalShifts)}
     </div>}
     {err && <div role="alert" style={{ color: '#b3261e', marginBottom: 10 }}>{err}</div>}
-    {people === null ? <div role="status" style={{ color: '#8a7e6b' }}>Loading volunteer hours…</div> : shown.length === 0 ? <div style={{ color: '#8a7e6b' }}>No hours found.</div> : <div style={{ overflowX: 'auto', background: '#fff', border: '1px solid #e6dfd3', borderRadius: 10 }}>
+    {people === null ? <div role="status" style={{ color: '#8a7e6b' }}>Loading volunteer hours…</div> : shown.length === 0 ? <div style={{ color: '#8a7e6b' }}>No hours found.</div> : view === 'month' ? <div style={{ overflowX: 'auto', background: '#fff', border: '1px solid #e6dfd3', borderRadius: 10 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr><th style={{ ...th, textAlign: 'left' }}>Month</th><th style={{ ...th, textAlign: 'left', width: '40%' }} /><th style={{ ...th, color: GOLD }}>Hours</th><th style={th}>Volunteers</th><th style={th}>Shifts</th></tr></thead>
+        <tbody>
+          {byMonth.map(m => <tr key={m.label}>
+            <td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{m.label} {year}</td>
+            <td style={{ ...td, textAlign: 'left' }}><div style={{ height: 8, background: '#f3eee4', borderRadius: 4, overflow: 'hidden' }}><div style={{ height: '100%', width: (m.hours / maxMonth * 100) + '%', background: GOLD, borderRadius: 4 }} /></div></td>
+            <td style={{ ...td, fontWeight: 700, color: m.hours ? GOLD : '#d4cbb8' }}>{m.hours ? hrs(m.hours) : '·'}</td>
+            <td style={{ ...td, color: m.volunteers ? '#33302b' : '#d4cbb8' }}>{m.volunteers || '·'}</td>
+            <td style={{ ...td, color: m.shifts ? '#33302b' : '#d4cbb8' }}>{m.shifts || '·'}</td>
+          </tr>)}
+          <tr><td style={{ ...td, textAlign: 'left', fontWeight: 700, borderBottom: 'none' }}>Year total</td><td style={{ ...td, borderBottom: 'none' }} /><td style={{ ...td, fontWeight: 700, color: GOLD, borderBottom: 'none' }}>{hrs(totalHours)}</td><td style={{ ...td, fontWeight: 700, borderBottom: 'none' }}>{shown.length}</td><td style={{ ...td, fontWeight: 700, borderBottom: 'none' }}>{totalShifts}</td></tr>
+        </tbody>
+      </table>
+    </div> : <div style={{ overflowX: 'auto', background: '#fff', border: '1px solid #e6dfd3', borderRadius: 10 }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>
           <th style={{ ...th, textAlign: 'left' }}>Volunteer</th>
