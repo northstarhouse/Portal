@@ -3556,6 +3556,39 @@ function VolunteersView({ navigate }) {
     'Picture URL': '', 'Emergency Contact': '', 'Month': '', 'Day': ''
   };
   const [form, setForm] = useState(emptyForm);
+  // Photo: the volunteer's own, or the photo on the donor record they are linked to. Adding one here fills both.
+  const [donorPic, setDonorPic] = useState(null);
+  const [uploadingVPhoto, setUploadingVPhoto] = useState(false);
+  const vPhotoRef = React.useRef(null);
+  useEffect(function() {
+    setDonorPic(null);
+    if (!selected || !selected.donor_id || selected['Picture URL']) return;
+    var off = false;
+    fetch(SUPABASE_URL + '/rest/v1/donors?id=eq.' + selected.donor_id + '&select=avatar_url', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); }).then(function(rows) { if (!off && Array.isArray(rows) && rows[0] && rows[0].avatar_url) setDonorPic(rows[0].avatar_url); }).catch(function() {});
+    return function() { off = true; };
+  }, [selected && selected.id, selected && selected['Picture URL']]);
+  function uploadVolunteerPhoto(file) {
+    if (!file || !selected) return;
+    setUploadingVPhoto(true);
+    var ext = (file.name.split('.').pop() || 'png').toLowerCase();
+    var path = 'volunteer-' + selected.id + '/photo.' + ext;
+    var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+    fetch(SUPABASE_URL + '/storage/v1/object/donor-avatars/' + path, { method: 'POST', headers: Object.assign({ 'Content-Type': file.type || 'image/png', 'x-upsert': 'true' }, H), body: file })
+      .then(function(r) {
+        if (!r.ok) return r.json().then(function(e) { throw new Error(e.message || e.error || ('Upload failed (' + r.status + ')')); });
+        var url = SUPABASE_URL + '/storage/v1/object/public/donor-avatars/' + path + '?t=' + Date.now();
+        return fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?id=eq.' + selected.id, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=representation' }, H), body: JSON.stringify({ 'Picture URL': url }) })
+          .then(function(pr) { if (!pr.ok) throw new Error('Could not save the photo (' + pr.status + ')'); return pr.json(); })
+          .then(function() {
+            if (selected.donor_id) fetch(SUPABASE_URL + '/rest/v1/donors?id=eq.' + selected.donor_id, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, H), body: JSON.stringify({ avatar_url: url }) }).catch(function() {});
+            clearCache('2026 Volunteers');
+            var updated = Object.assign({}, selected, { 'Picture URL': url });
+            setSelected(updated);
+            setVolunteers(function(prev) { return prev.map(function(v) { return v.id === selected.id ? updated : v; }); });
+          });
+      }).catch(function(e) { alert('Photo upload failed: ' + e.message); }).then(function() { setUploadingVPhoto(false); });
+  }
 
   useEffect(function() {
     cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','Team','Event Tags','Status','Email','Phone Number','Preferred Contact','Address','Birthday','Volunteer Anniversary','CC','Nametag','Overview Notes','Background Notes','Notes','Mid-Year Notes 2026','What they want to see at NSH','Favorite Quote','NSH Future Vision','Allergies','Special Considerations','Picture URL','Emergency Contact','Month','Day','donor_id','auth_user_id'])
@@ -4080,11 +4113,16 @@ function VolunteersView({ navigate }) {
             {/* Header band */}
             <div style={{ background: 'linear-gradient(135deg, #f8f4ec 0%, #f0e8dc 100%)', padding: '28px 28px 20px', borderBottom: '0.5px solid #e8dece', position: 'relative' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                {selected['Picture URL'] ? (
-                  <img src={driveImg(selected['Picture URL'])} alt={selected['First Name']} style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '3px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', flexShrink: 0 }} />
-                ) : (
-                  <div style={{ width: 72, height: 72, borderRadius: '50%', background: gold, color: '#fff', fontSize: 24, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', flexShrink: 0 }}>{initials(selected)}</div>
-                )}
+                <div onClick={function() { if (!uploadingVPhoto && vPhotoRef.current) vPhotoRef.current.click(); }} title="Click to add or change the photo" style={{ position: 'relative', width: 72, height: 72, flexShrink: 0, cursor: 'pointer' }}
+                  onMouseEnter={function(e) { e.currentTarget.lastChild.style.opacity = '1'; }} onMouseLeave={function(e) { e.currentTarget.lastChild.style.opacity = '0'; }}>
+                  {(selected['Picture URL'] || donorPic) ? (
+                    <img src={driveImg(selected['Picture URL'] || donorPic)} alt={selected['First Name']} style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '3px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }} />
+                  ) : (
+                    <div style={{ width: 72, height: 72, borderRadius: '50%', background: gold, color: '#fff', fontSize: 24, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>{initials(selected)}</div>
+                  )}
+                  <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: uploadingVPhoto ? 1 : 0, transition: 'opacity 0.15s', textAlign: 'center' }}>{uploadingVPhoto ? 'Saving…' : 'Add photo'}</div>
+                </div>
+                <input ref={vPhotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={function(e) { var fl = e.target.files && e.target.files[0]; if (fl) uploadVolunteerPhoto(fl); e.target.value = ''; }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 19, fontWeight: 600, color: '#1e1a16', marginBottom: 3, lineHeight: 1.2 }}>{selected['First Name']} {selected['Last Name']}</div>
                   {selected['Team'] && <div style={{ fontSize: 12, color: '#9a7f5a', marginBottom: 6, fontWeight: 500 }}>{selected['Team']}</div>}
@@ -4664,6 +4702,13 @@ function downloadXlsxMultiSheet(sheets, filename) {
   XLSX.writeFile(workbook, filename);
 }
 
+function donorMailingText(d, sep) {
+  if (!d) return '';
+  var cityLine = [d.mailing_city, [d.mailing_state, d.mailing_zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  var parts = [d.mailing_address_line1, d.mailing_address_line2, cityLine].filter(function(x) { return x && String(x).trim(); });
+  return parts.length ? parts.join(sep == null ? ', ' : sep) : String(d.address || '').trim();
+}
+
 function parseAddressBlock(text) {
   if (!text || !text.trim()) return null;
   var lines = text.split('\n').map(function(l){return l.trim();}).filter(Boolean);
@@ -4886,7 +4931,7 @@ function DonorsView({ navigate }) {
         if(match)setSelected(match);
       }
     }).catch(function(err){setError(err.message);setLoading(false);});
-    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','donor_id']).then(function(data){
+    cachedSbFetch('2026 Volunteers', ['id','First Name','Last Name','donor_id','Picture URL']).then(function(data){
       if(Array.isArray(data))setVolunteerOptions(data);
     });
   }, []);
@@ -4899,8 +4944,8 @@ function DonorsView({ navigate }) {
     if(filters.search){var s=filters.search.toLowerCase();if(!(d.formal_name||'').toLowerCase().includes(s)&&!(d.email||'').toLowerCase().includes(s))return false;}
     if(filters.status!=='all'&&d.status!==filters.status)return false;
     if(filters.tier!=='all'&&d.tier!==filters.tier)return false;
-    if(filters.hasAddress==='yes'&&!(d.address||'').trim())return false;
-    if(filters.hasAddress==='no'&&(d.address||'').trim())return false;
+    if(filters.hasAddress==='yes'&&!donorMailingText(d))return false;
+    if(filters.hasAddress==='no'&&donorMailingText(d))return false;
     if(filters.donationType!=='all'||filters.year!=='all'){
       var hasDon=(d.donations||[]).some(function(don){
         var tm=filters.donationType==='all'||don.type===filters.donationType;
@@ -4947,8 +4992,8 @@ function DonorsView({ navigate }) {
   function fmtDate(d){if(!d)return '—';return new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
 
   function exportCSV(){
-    var headers=['Name','Status','Tier','This Year','Lifetime','Last Gift','Email','Phone','Address'];
-    var rows=sortedDonors.map(function(d){return [d.formal_name,d.status,d.tier,d.current_year_total,d.lifetime_total,d.last_gift_date||'',d.email||'',d.phone||'','"'+(d.address||'').replace(/"/g,"'")+'"'].join(',');});
+    var headers=['Name','Status','Tier','This Year','Lifetime','Last Gift','Email','Phone','Mailing Address'];
+    var rows=sortedDonors.map(function(d){return [d.formal_name,d.status,d.tier,d.current_year_total,d.lifetime_total,d.last_gift_date||'',d.email||'',d.phone||'','"'+donorMailingText(d).replace(/"/g,"'")+'"'].join(',');});
     var csv=[headers.join(',')].concat(rows).join('\n');
     var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='donors.csv';a.click();URL.revokeObjectURL(url);
   }
@@ -5069,7 +5114,7 @@ function DonorsView({ navigate }) {
 
   function saveDonorFields(e){
     e.preventDefault();setSavingDonorFields(true);
-    var patch={address:(donorFieldsForm.address||'').trim()||null,preferred_letter_greeting:donorFieldsForm.preferred_letter_greeting||null,joint_donor_name:donorFieldsForm.joint_donor_name||null,
+    var patch={preferred_letter_greeting:donorFieldsForm.preferred_letter_greeting||null,joint_donor_name:donorFieldsForm.joint_donor_name||null,
       mailing_address_line1:donorFieldsForm.mailing_address_line1||null,mailing_address_line2:donorFieldsForm.mailing_address_line2||null,
       mailing_city:donorFieldsForm.mailing_city||null,mailing_state:donorFieldsForm.mailing_state||null,mailing_zip:donorFieldsForm.mailing_zip||null};
     fetch(SUPABASE_URL+'/rest/v1/donors?id=eq.'+selected.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(patch)})
@@ -5318,7 +5363,7 @@ function DonorsView({ navigate }) {
       .then(function(r){return r.json();}).then(function(existing){
         if(Array.isArray(existing)&&existing.length>0)return existing[0].id;
         return fetch(SUPABASE_URL+'/rest/v1/donors',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},
-          body:JSON.stringify({formal_name:addForm.formal_name,informal_first_name:addForm.informal_first_name||null,account_type:addForm.account_type||null,email:addForm.email||null,phone:addForm.phone||null,address:addForm.address||null,historical_lifetime_giving:0,historical_donation_count:0})})
+          body:JSON.stringify({formal_name:addForm.formal_name,informal_first_name:addForm.informal_first_name||null,account_type:addForm.account_type||null,email:addForm.email||null,phone:addForm.phone||null,mailing_address_line1:(parseAddressBlock(addForm.address)||{}).line1||null,mailing_address_line2:(parseAddressBlock(addForm.address)||{}).line2||null,mailing_city:(parseAddressBlock(addForm.address)||{}).city||null,mailing_state:(parseAddressBlock(addForm.address)||{}).state||null,mailing_zip:(parseAddressBlock(addForm.address)||{}).zip||null,historical_lifetime_giving:0,historical_donation_count:0})})
           .then(function(r){return r.json();}).then(function(rows){return rows[0].id;});
       }).then(function(donorId){
         return fetch(SUPABASE_URL+'/rest/v1/donations',{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},
@@ -5597,7 +5642,14 @@ function DonorsView({ navigate }) {
     fetch(SUPABASE_URL+'/storage/v1/object/donor-avatars/'+path,{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':file.type||'image/png','x-upsert':'true'},body:file})
       .then(function(r){
         if(!r.ok)return r.json().then(function(e){throw new Error(e.message||e.error||('Upload failed ('+r.status+')'));});
-        return patchDonor({avatar_url:SUPABASE_URL+'/storage/v1/object/public/donor-avatars/'+path+'?t='+Date.now()});
+        var url=SUPABASE_URL+'/storage/v1/object/public/donor-avatars/'+path+'?t='+Date.now();
+        return patchDonor({avatar_url:url}).then(function(ok){
+          var lv=volunteerOptions.find(function(x){return x.donor_id===selected.id;});
+          if(ok&&lv){
+            fetch(SUPABASE_URL+'/rest/v1/'+encodeURIComponent('2026 Volunteers')+'?id=eq.'+lv.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({'Picture URL':url})})
+              .then(function(){clearCache('2026 Volunteers');setVolunteerOptions(function(prev){return prev.map(function(x){return x.id===lv.id?Object.assign({},x,{'Picture URL':url}):x;});});}).catch(function(){});
+          }
+        });
       }).catch(function(e){alert('Photo upload failed: '+e.message);}).then(function(){setUploadingAvatar(false);});
   }
   // Merge the open donor INTO another donor: gifts, tags and volunteer links move over, blank profile fields are
@@ -5678,6 +5730,13 @@ function DonorsView({ navigate }) {
     );
   }
 
+  // A donor's photo: their own, or the picture on the volunteer profile they are linked to.
+  function donorPhoto(d){
+    if(!d)return null;
+    if(d.avatar_url)return d.avatar_url;
+    var v=volunteerOptions.find(function(x){return x.donor_id===d.id&&x['Picture URL'];});
+    return v?driveImg(v['Picture URL']):null;
+  }
   function getDonsByYear(dons){
     var byY={};
     (dons||[]).forEach(function(d){var yr=d.date?d.date.slice(0,4):'?';if(!byY[yr])byY[yr]=[];byY[yr].push(d);});
@@ -5783,7 +5842,6 @@ function DonorsView({ navigate }) {
           {/* Donor tools in one menu. */}
           <PortalToolsMenu items={[
             navigate && { label: 'Acknowledgments to Process', onClick: function() { navigate('acknowledgments-queue'); } },
-            { label: bulkFilling ? 'Filling addresses…' : 'Bulk-Fill Addresses', onClick: bulkFillAddresses, disabled: bulkFilling, title: "Fill blank structured mailing address fields from each donor's existing Address field" },
             { label: 'Download CSV', onClick: exportCSV },
             { label: 'Members + Sponsors CSV (mail merge)', onClick: exportMembersAndSponsors, title: 'One file for this year: donors who gave $50 or more (not counting brick purchases or in-kind gifts) plus current sponsors' },
             { label: 'Import Donations', onClick: function() { setImportText(''); setImportRows(null); setImportStatus(''); setShowImport(true); } },
@@ -5895,8 +5953,8 @@ function DonorsView({ navigate }) {
                         onMouseEnter={function(e){if(!isSelected)e.currentTarget.style.background='#fdfaf4';}} onMouseLeave={function(e){e.currentTarget.style.background=isSelected?'#faf4e8':'#fff';}}>
                         <td style={{padding:'14px 18px'}}>
                           <div style={{display:'flex',alignItems:'center',gap:12}}>
-                            {d.avatar_url
-                              ? <img src={d.avatar_url} alt="" style={{width:32,height:32,borderRadius:'50%',objectFit:'cover',flexShrink:0,border:'1px solid #eadfcd'}} />
+                            {donorPhoto(d)
+                              ? <img src={donorPhoto(d)} alt="" style={{width:32,height:32,borderRadius:'50%',objectFit:'cover',flexShrink:0,border:'1px solid #eadfcd'}} />
                               : null}
                             <div>
                               <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
@@ -5943,10 +6001,10 @@ function DonorsView({ navigate }) {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10}}>
               <div style={{display:'flex',gap:16,alignItems:'flex-start',minWidth:0,flex:1}}>
                 <div onClick={function(){if(!uploadingAvatar&&avatarInputRef.current)avatarInputRef.current.click();}} title="Click to add or change the photo"
-                  style={{width:76,height:76,borderRadius:'50%',background:selected.avatar_url?'#fff':'#e7e2d9',flexShrink:0,position:'relative',overflow:'hidden',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid #eadfcd'}}
+                  style={{width:76,height:76,borderRadius:'50%',background:donorPhoto(selected)?'#fff':'#e7e2d9',flexShrink:0,position:'relative',overflow:'hidden',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid #eadfcd'}}
                   onMouseEnter={function(e){e.currentTarget.lastChild.style.opacity='1';}} onMouseLeave={function(e){e.currentTarget.lastChild.style.opacity='0';}}>
-                  {selected.avatar_url
-                    ? <img src={selected.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                  {donorPhoto(selected)
+                    ? <img src={donorPhoto(selected)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
                     : <span style={{fontSize:30,fontWeight:600,color:'#8a7e6b',userSelect:'none'}}>{(selected.formal_name||'?').charAt(0).toUpperCase()}</span>}
                   <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.45)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:600,opacity:uploadingAvatar?1:0,transition:'opacity 0.15s',textAlign:'center'}}>{uploadingAvatar?'Saving…':'Add photo'}</div>
                 </div>
@@ -6006,7 +6064,7 @@ function DonorsView({ navigate }) {
               {selected.email && <div><span style={{color:'#777'}}>Email </span><a href={'mailto:'+selected.email} style={{color:gold,textDecoration:'none'}}>{selected.email}</a></div>}
               {selected.phone && <div><span style={{color:'#777'}}>Phone </span>{selected.phone}</div>}
               {selected.employer && <div><span style={{color:'#777'}}>Employer </span>{selected.employer}</div>}
-              {selected.address && <div><span style={{color:'#777'}}>Address </span><span style={{whiteSpace:'pre-line'}}>{selected.address}</span></div>}
+              {donorMailingText(selected) && <div><span style={{color:'#777'}}>Mailing address </span><span style={{whiteSpace:'pre-line'}}>{donorMailingText(selected,'\n')}</span></div>}
             </div>
 
             {/* Letter greeting + structured mailing address, used for acknowledgment generation */}
@@ -6016,16 +6074,6 @@ function DonorsView({ navigate }) {
             </div>
             {donorFieldsForm ? (
               <form onSubmit={saveDonorFields} style={{background:'#faf8f4',borderRadius:8,padding:'12px 14px',border:'0.5px solid #e0d8cc',marginBottom:10}}>
-                <div style={{marginBottom:10}}><label style={lStyle}>Address <span style={{fontWeight:400,color:'#aaa'}}>(the full address shown under Contact)</span></label>
-                  <textarea value={donorFieldsForm.address} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{address:e.target.value});});}} rows={3} style={Object.assign({},iStyle,{resize:'vertical'})} />
-                </div>
-                {donorFieldsForm.address && (
-                  <button type="button" onClick={function(){
-                    var parsed=parseAddressBlock(donorFieldsForm.address);
-                    if(!parsed)return;
-                    setDonorFieldsForm(function(f){return Object.assign({},f,{mailing_address_line1:parsed.line1,mailing_address_line2:parsed.line2,mailing_city:parsed.city,mailing_state:parsed.state,mailing_zip:parsed.zip});});
-                  }} style={{width:'100%',marginBottom:10,padding:'6px 10px',background:'#fff',border:'0.5px dashed #b5a185',borderRadius:6,fontSize:11,color:'#8a6200',cursor:'pointer'}}>↓ Auto-fill from existing Address field</button>
-                )}
                 <div style={{marginBottom:2}}><label style={lStyle}>Preferred Letter Greeting <span style={{fontWeight:400,color:'#aaa'}}>(optional — only if you want to override the automatic one)</span></label>
                   <input value={donorFieldsForm.preferred_letter_greeting} onChange={function(e){setDonorFieldsForm(function(f){return Object.assign({},f,{preferred_letter_greeting:e.target.value});});}} placeholder={'Leave blank to auto-use: "' + computeDefaultGreeting(Object.assign({},selected,donorFieldsForm)) + '"'} style={iStyle} />
                 </div>
@@ -6365,7 +6413,7 @@ function DonorsView({ navigate }) {
                 <span style={sec}>Contact</span>
                 <div style={{marginBottom:14}}><label style={lStyle}>Email</label><input type="email" value={addForm.email} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{email:e.target.value});});}} style={iStyle} /></div>
                 <div style={{marginBottom:14}}><label style={lStyle}>Phone</label><input value={addForm.phone} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{phone:e.target.value});});}} style={iStyle} /></div>
-                <div style={{marginBottom:14}}><label style={lStyle}>Address</label><textarea value={addForm.address} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{address:e.target.value});});}} rows={3} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
+                <div style={{marginBottom:14}}><label style={lStyle}>Mailing address</label><textarea value={addForm.address} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{address:e.target.value});});}} rows={3} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
                 <span style={sec}>Donation</span>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
                   <div><label style={lStyle}>{addForm.type==='In-Kind Gift'?'Estimated Value *':'Amount *'}</label><input required value={addForm.amount} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{amount:e.target.value});});}} style={iStyle} placeholder="$0.00" /></div>
