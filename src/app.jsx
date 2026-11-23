@@ -1068,11 +1068,12 @@ const typeColors = {
   Board: { bg: "#e8eaf6", color: "#3949ab" },
   Event: { bg: "#fff8e1", color: "#8a6200" },
 };// A card on the Overview's right-hand side: folded until you click its header.
-function SideCard({ title, icon, onSeeAll, actions, style, forceOpen, children }) {
+function SideCard({ title, icon, onSeeAll, actions, style, forceOpen, hide, children }) {
   var [userOpen, setUserOpen] = useState(false);
   var open = userOpen || !!forceOpen;
+  if (hide) return null;
   return (
-    <div style={Object.assign({ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px" }, style || {})}>
+    <div className="nsh-sidecard" style={Object.assign({ background: "#fff", border: "0.5px solid #e0d8cc", borderRadius: 10, padding: "14px 18px" }, style || {})}>
       <div onClick={function() { setUserOpen(function(o) { return !o; }); }} style={{ fontSize: 12, fontWeight: 500, color: gold, marginBottom: open ? 14 : 0, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
         {icon}{title}
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1446,8 +1447,9 @@ function HomeView({ navigate }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <SideCard title="Recent Activity" onSeeAll={function() { navigate('activity-log'); }} style={{ display: (nshHides('donors') || nshHides('volunteers') || nshHides('admin')) ? 'none' : undefined }} icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>}>
+        <div className="nsh-stack" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <style>{".nsh-stack > .nsh-sidecard { border-radius: 0 !important; margin-top: -0.5px; } .nsh-stack > .nsh-sidecard:first-of-type { border-radius: 10px 10px 0 0 !important; margin-top: 0; } .nsh-stack > .nsh-sidecard:last-of-type { border-radius: 0 0 10px 10px !important; } .nsh-stack > .nsh-sidecard:only-of-type { border-radius: 10px !important; }"}</style>
+        <SideCard title="Recent Activity" onSeeAll={function() { navigate('activity-log'); }} hide={nshHides('donors') || nshHides('volunteers') || nshHides('admin')} icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>}>
           {activity === null && <div style={{ fontSize: 12, color: '#aaa' }}>Loading…</div>}
           {activity !== null && activity.length === 0 && <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No recent activity from the Volunteer Hub.</div>}
           {activity !== null && activity.map(function(a, i) {
@@ -1484,7 +1486,7 @@ function HomeView({ navigate }) {
             );
           })}
         </SideCard>
-        <SideCard title="Upcoming Birthdays" onSeeAll={function() { navigate('birthdays'); }} style={{ display: nshHides('volunteers') ? 'none' : undefined }} icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}>
+        <SideCard title="Upcoming Birthdays" onSeeAll={function() { navigate('birthdays'); }} hide={nshHides('volunteers')} icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}>
           {birthdays === null && <div style={{ fontSize: 12, color: '#aaa' }}>Loading…</div>}
           {birthdays !== null && birthdays.length === 0 && <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic' }}>No birthdays in the next 30 days.</div>}
           {birthdays !== null && birthdays.map(function(v, i) {
@@ -26399,24 +26401,24 @@ function TreasurerView({ navigate }) {
 
       <div style={Object.assign({}, card, { padding: 0, overflowX: 'auto' })}>
         {rows === null ? <div style={{ padding: 20, color: '#888', fontSize: 13 }}>Loading…</div> : list.length === 0 ? <div style={{ padding: 20, color: '#888', fontSize: 13 }}>No payments match.</div> : (
-          <table style={{ width: '100%', minWidth: 1050, borderCollapse: 'collapse', fontSize: 13.5 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                {['Date', 'From', 'For', 'Source', 'Method', 'Gross', 'Fees', 'Net', ''].map(function(h, i) { return <th key={i} style={{ padding: '10px 12px', borderBottom: '0.5px solid #e0d8cc', textAlign: (h === 'Gross' || h === 'Fees' || h === 'Net') ? 'right' : 'left' }}>{h}</th>; })}
+                {['Date', 'From', 'For', 'Source', 'Method', 'Gross', 'Fees', 'Net', ''].map(function(h, i) { return <th key={i} style={{ padding: '10px 9px', borderBottom: '0.5px solid #e0d8cc', textAlign: (h === 'Gross' || h === 'Fees' || h === 'Net') ? 'right' : 'left' }}>{h}</th>; })}
               </tr>
             </thead>
             <tbody>
               {list.map(function(p) {
                 return <tr key={p.payment_key} style={{ borderBottom: '0.5px solid #f0ebe2' }}>
-                  <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>{nice(p.paid_on)}</td>
-                  <td style={{ padding: '12px 14px', fontWeight: 600, color: '#2a2420', minWidth: 170, maxWidth: 260 }}>{p.payer}</td>
-                  <td style={{ padding: '12px 14px', color: '#6b5d4a', minWidth: 240, maxWidth: 400 }}>{p.category}{p.detail ? <div title={p.detail} style={{ fontSize: 12, color: '#999', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word', marginTop: 2 }}>{p.detail}</div> : null}</td>
-                  <td style={{ padding: '12px 14px', color: '#6b5d4a', whiteSpace: 'nowrap' }}>{p.source}</td>
-                  <td style={{ padding: '12px 14px', color: '#6b5d4a', minWidth: 170, maxWidth: 300 }}>{p.method}{p.reference ? <div title={p.reference} style={{ fontSize: 11.5, color: '#aaa', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word', marginTop: 2 }}>{p.reference}</div> : null}</td>
-                  <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(p.amount)}</td>
-                  <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap', color: Number(p.fee) > 0 ? '#b3402a' : '#bbb' }}>{Number(p.fee) > 0 ? money(p.fee) : '—'}{Number(p.fee) > 0 && p.fee_estimated ? <div style={{ fontSize: 11, color: '#aaa' }}>(est.)</div> : null}</td>
-                  <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(netOf(p))}</td>
-                  <td style={{ padding: '12px 14px' }}>{p.payment_key.indexOf('man:') === 0 ? <a onClick={function() { removeEntry(p); }} style={{ fontSize: 12, color: '#b3402a', cursor: 'pointer' }}>Delete</a> : null}</td>
+                  <td style={{ padding: '10px 9px', whiteSpace: 'nowrap' }}>{nice(p.paid_on)}</td>
+                  <td style={{ padding: '10px 9px', fontWeight: 600, color: '#2a2420', maxWidth: 190 }}>{p.payer}</td>
+                  <td style={{ padding: '10px 9px', color: '#6b5d4a', minWidth: 170, maxWidth: 300 }}>{p.category}{p.detail ? <div title={p.detail} style={{ fontSize: 12, color: '#999', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word', marginTop: 2 }}>{p.detail}</div> : null}</td>
+                  <td style={{ padding: '10px 9px', color: '#6b5d4a', whiteSpace: 'nowrap' }}>{p.source}</td>
+                  <td style={{ padding: '10px 9px', color: '#6b5d4a', minWidth: 120, maxWidth: 210 }}>{p.method}{p.reference ? <div title={p.reference} style={{ fontSize: 11.5, color: '#aaa', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word', marginTop: 2 }}>{p.reference}</div> : null}</td>
+                  <td style={{ padding: '10px 9px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(p.amount)}</td>
+                  <td style={{ padding: '10px 9px', textAlign: 'right', whiteSpace: 'nowrap', color: Number(p.fee) > 0 ? '#b3402a' : '#bbb' }}>{Number(p.fee) > 0 ? money(p.fee) : '—'}{Number(p.fee) > 0 && p.fee_estimated ? <div style={{ fontSize: 11, color: '#aaa' }}>(est.)</div> : null}</td>
+                  <td style={{ padding: '10px 9px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(netOf(p))}</td>
+                  <td style={{ padding: '10px 9px' }}>{p.payment_key.indexOf('man:') === 0 ? <a onClick={function() { removeEntry(p); }} style={{ fontSize: 12, color: '#b3402a', cursor: 'pointer' }}>Delete</a> : null}</td>
                 </tr>;
               })}
             </tbody>
