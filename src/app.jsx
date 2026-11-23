@@ -4754,6 +4754,7 @@ function DonorsView({ navigate }) {
   const [saving, setSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState({});
   const [filters, setFilters] = useState({search:'',status:'current',tier:'all',donationType:'all',year:String(THIS_YEAR),hasAddress:'all'});
+  const [viewMode, setViewMode] = useState('donors'); // 'donors' = one row per donor, 'gifts' = every donation
   const [sortKey, setSortKey] = useState('last_gift_date');
   const [sortDir, setSortDir] = useState('desc');
   const [editDon, setEditDon] = useState(null);
@@ -4851,7 +4852,7 @@ function DonorsView({ navigate }) {
   useEffect(function() {
     Promise.all([
       fetch(SUPABASE_URL+'/rest/v1/donors?select=*&order=formal_name',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
-      fetch(SUPABASE_URL+'/rest/v1/donations?select=*',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
+      fetchAllPages(SUPABASE_URL+'/rest/v1/donations?select=*&order=id',{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}),
       fetch(SUPABASE_URL+'/rest/v1/donor_tags?select=donor_id,tags(*)',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}),
       fetch(SUPABASE_URL+'/rest/v1/tags?select=*&order=name',{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();})
     ]).then(function(results) {
@@ -5564,6 +5565,10 @@ function DonorsView({ navigate }) {
     <div style={{position:'relative'}}>
       {/* Filter bar */}
       <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8,marginBottom:14}}>
+        <div style={{display:'inline-flex',border:'0.5px solid #e0d8cc',borderRadius:8,overflow:'hidden',flexShrink:0}}>
+          <button onClick={function(){setViewMode('donors');}} style={{padding:'7px 12px',fontSize:12,fontWeight:600,border:'none',cursor:'pointer',background:viewMode==='donors'?gold:'#fff',color:viewMode==='donors'?'#fff':'#888'}}>By donor</button>
+          <button onClick={function(){setViewMode('gifts');setFilters(function(f){return Object.assign({},f,{status:'all',year:'all'});});}} style={{padding:'7px 12px',fontSize:12,fontWeight:600,border:'none',cursor:'pointer',background:viewMode==='gifts'?gold:'#fff',color:viewMode==='gifts'?'#fff':'#888'}}>Every donation</button>
+        </div>
         <div style={{position:'relative',flex:'1 1 160px',minWidth:160}}>
           <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'#aaa',pointerEvents:'none',display:'flex'}}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -5637,6 +5642,53 @@ function DonorsView({ navigate }) {
         <div style={{flex:1,minWidth:0,background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:10,overflow:'hidden',marginRight:selected?428:0,transition:'margin-right 0.2s'}}>
           {loading ? (
             <div style={{textAlign:'center',padding:40,color:'#777',fontSize:12}}>Loading donors...</div>
+          ) : viewMode==='gifts' ? (
+            (function(){
+              var rows=[];
+              filteredDonors.forEach(function(d){(d.donations||[]).forEach(function(don){
+                var tm=filters.donationType==='all'||don.type===filters.donationType;
+                var ym=filters.year==='all'||(don.date||'').startsWith(filters.year);
+                if(tm&&ym)rows.push({don:don,donor:d});
+              });});
+              rows.sort(function(a,b){var x=a.don.date||'',y=b.don.date||'';return y>x?1:y<x?-1:0;});
+              var groups=[];
+              rows.forEach(function(r){
+                var y=(r.don.date||'').slice(0,4)||'?';
+                var g=groups[groups.length-1];
+                if(!g||g.year!==y){g={year:y,rows:[],total:0};groups.push(g);}
+                g.rows.push(r);g.total+=r.don.amount||0;
+              });
+              if(!rows.length)return <div style={{textAlign:'center',padding:40,color:'#777',fontSize:12}}>No donations match these filters.</div>;
+              var th={textAlign:'left',padding:'9px 12px',fontSize:11,color:'#888',fontWeight:600};
+              return (
+                <div style={{overflowX:'auto'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                    <thead><tr style={{borderBottom:'0.5px solid #e0d8cc',background:'#faf8f4'}}>
+                      <th style={th}>Date</th><th style={th}>Donor</th><th style={th}>Type</th><th style={Object.assign({},th,{textAlign:'right'})}>Amount</th><th style={th}>Notes</th>
+                    </tr></thead>
+                    <tbody>
+                      {groups.map(function(g){
+                        return [
+                          <tr key={'h'+g.year} style={{background:'#f6f1e7'}}>
+                            <td colSpan={5} style={{padding:'9px 12px',fontSize:13,fontWeight:700,color:gold}}>{g.year} <span style={{fontWeight:500,color:'#8a7e6b',fontSize:12}}> · {g.rows.length} gift{g.rows.length===1?'':'s'} · {fmtAmtFull(g.total)}</span></td>
+                          </tr>
+                        ].concat(g.rows.map(function(r){
+                          return (
+                            <tr key={r.don.id} onClick={function(){setSelected(r.donor);}} style={{borderBottom:'0.5px solid #f3eee4',cursor:'pointer'}}>
+                              <td style={{padding:'8px 12px',whiteSpace:'nowrap',color:'#555'}}>{fmtDate(r.don.date)}</td>
+                              <td style={{padding:'8px 12px',fontWeight:600,color:'#2a2a2a'}}>{r.donor.formal_name}</td>
+                              <td style={{padding:'8px 12px',color:'#666'}}>{r.don.type||'—'}</td>
+                              <td style={{padding:'8px 12px',textAlign:'right',fontWeight:600,whiteSpace:'nowrap'}}>{fmtAmtFull(r.don.amount)}</td>
+                              <td style={{padding:'8px 12px',color:'#999',maxWidth:260,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{(r.don.donation_notes||'').replace('From Salesforce export: ','')}</td>
+                            </tr>
+                          );
+                        }));
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()
           ) : (
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
