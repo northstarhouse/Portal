@@ -889,7 +889,9 @@ var NSH_HIDDEN = {};
 var NSH_ME_NAME = '';
 var NSH_FINANCE_ONLY = { 'website-payments': true, 'operational-budgets': true };
 function nshFinanceOK() { return !NSH_ME_NAME || NSH_ME_NAME === 'haley wright' || NSH_ME_NAME === 'wyn spiller'; }
-function nshHides(id) { return !!NSH_HIDDEN[id] || (!!NSH_FINANCE_ONLY[id] && !nshFinanceOK()); }
+var NSH_HALEY_ONLY = { 'personal-views': true };
+function nshIsHaley() { return !NSH_ME_NAME || NSH_ME_NAME === 'haley wright'; }
+function nshHides(id) { return !!NSH_HIDDEN[id] || (!!NSH_FINANCE_ONLY[id] && !nshFinanceOK()) || (!!NSH_HALEY_ONLY[id] && !nshIsHaley()); }
 function nshSetHidden(sections) {
   var m = {};
   (sections || []).forEach(function(sec) {
@@ -1537,7 +1539,7 @@ function HomeView({ navigate }) {
         </SideCard>
 
         {/* In-House Events */}
-        <SideCard title="In-House Events" forceOpen={iheAdding} icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>} actions={<button onClick={function() { setIheAdding(true); setIheForm({ name: '', date: '', cost: '' }); }} style={{ fontSize: 11, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontWeight: 600 }}>+ Add</button>}>
+        <SideCard title="In-House Events" forceOpen={iheAdding} icon={<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}>
 
           {iheAdding && (
             <div style={{ background: '#faf8f4', border: '0.5px solid #e0d8cc', borderRadius: 8, padding: '12px', marginBottom: 12 }}>
@@ -18187,7 +18189,7 @@ function AdminView({ navigate }) {
     ] },
     { title: 'Planning & Reference', items: [
       { label: 'Organization Guide', view: 'org-guide', icon: ic('org-guide') },
-      { label: 'Personalized Views', view: 'personal-views', icon: planIcon },
+      { label: 'Personalized Views', view: 'personal-views', icon: planIcon, haleyOnly: true },
       { label: 'Planning', view: 'planning', icon: planIcon },
       { label: 'Strategic Goal Progress', view: 'strategy', icon: targetIcon },
       { label: 'Printable Forms', url: formItem('Printable Forms').url, icon: docIcon },
@@ -18201,7 +18203,7 @@ function AdminView({ navigate }) {
           <div key={sec.title}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>{sec.title}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 28 }}>
-              {sec.items.filter(Boolean).filter(function(t) { return !(t.financeOnly && !nshFinanceOK()); }).map(function(tool) {
+              {sec.items.filter(Boolean).filter(function(t) { return !(t.financeOnly && !nshFinanceOK()) && !(t.haleyOnly && !nshIsHaley()); }).map(function(tool) {
                 return <AdminToolCard key={tool.label} tool={tool} icon={tool.icon} navigate={navigate} />;
               })}
             </div>
