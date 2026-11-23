@@ -36,6 +36,7 @@ export const PACKET_SECTIONS = [
   ] },
   { id: 'returned', title: 'Forms to Return', intro: 'Complete each form with HR using the official link, then initial it here. Social Security numbers are never entered in this packet.', fields: [
     { k: 'ret_i9', label: 'I-9, Employment Eligibility Verification', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/i-9.pdf', req: true },
+    { k: 'ret_wage', label: 'Wage Theft Prevention Act notice (Labor Code 2810.5)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/wage-notice.pdf', req: true },
     { k: 'ret_w4', label: 'W-4, Federal Withholding', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/w-4.pdf', req: true },
     { k: 'ret_de4', label: 'DE 4, California Withholding', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-4.pdf', req: true },
   ] },
@@ -44,7 +45,6 @@ export const PACKET_SECTIONS = [
     { k: 'rec_wc', label: 'Workers’ Compensation employee fact sheet', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/workers-comp-fact-sheet.pdf', req: true },
     { k: 'rec_de2320', label: 'DE 2320, For Your Benefit (Disability Insurance, Paid Family Leave and Unemployment)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-2320.pdf', req: true },
     { k: 'rec_de2511', label: 'DE 2511, Paid Family Leave', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-2511.pdf', req: true },
-    { k: 'rec_wage', label: 'Wage Theft Prevention Act notice (Labor Code 2810.5)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/wage-notice.pdf', req: true },
     { k: 'rec_conduct', label: 'Code of Conduct', type: 'initials', req: true },
   ] },
   { id: 'policies', title: 'Policies Read', intro: 'Initial each policy to confirm you have read it.', fields: [
