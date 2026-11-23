@@ -5811,7 +5811,7 @@ function DonorsView({ navigate }) {
 
       {/* Table + panel layout */}
       <div style={{display:'flex',gap:0,position:'relative'}}>
-        <div style={{flex:1,minWidth:0,background:'#fff',border:'0.5px solid #e6dfd3',borderRadius:16,overflow:'hidden',boxShadow:'0 1px 4px rgba(60,45,20,0.05)',marginRight:selected?428:0,transition:'margin-right 0.2s'}}>
+        <div style={{flex:1,minWidth:0,background:'#fff',border:'0.5px solid #e6dfd3',borderRadius:16,overflow:'hidden',boxShadow:'0 1px 4px rgba(60,45,20,0.05)',marginRight:selected?668:0,transition:'margin-right 0.2s'}}>
           {loading ? (
             <div style={{textAlign:'center',padding:40,color:'#777',fontSize:12}}>Loading donors...</div>
           ) : viewMode==='gifts' ? (
@@ -5868,7 +5868,6 @@ function DonorsView({ navigate }) {
                   <tr style={{borderBottom:'0.5px solid #ece4d6'}}>
                     {[
                       {label:'Donor',k:'formal_name',align:'left'},
-                      {label:'Status',k:'status',align:'left'},
                       {label:'Tier',k:'tier',align:'left'},
                       {label:'This Year',k:'current_year_total',align:'right'},
                       {label:'Lifetime',k:'lifetime_total',align:'right'},
@@ -5877,8 +5876,8 @@ function DonorsView({ navigate }) {
                       var active=sortKey===h.k;
                       return (
                         <th key={h.k} onClick={function(){handleSort(h.k);}}
-                          style={{padding:'18px 20px 14px',textAlign:h.align,fontSize:12,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:active?'#6b5d4a':'#a8a095',cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>
-                          {h.label}<span style={{marginLeft:6,fontSize:11,opacity:active?1:0.6}}>{active?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
+                          style={{padding:'16px 18px 12px',textAlign:h.align,fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:0.9,color:active?'#6b5d4a':'#a8a095',cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>
+                          {h.label}<span style={{marginLeft:5,fontSize:10,opacity:active?1:0.6}}>{active?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
                         </th>
                       );
                     })}
@@ -5886,7 +5885,7 @@ function DonorsView({ navigate }) {
                 </thead>
                 <tbody>
                   {sortedDonors.length===0 ? (
-                    <tr><td colSpan={6} style={{textAlign:'center',padding:40,color:'#aaa',fontSize:13}}>No donors match your filters.</td></tr>
+                    <tr><td colSpan={5} style={{textAlign:'center',padding:40,color:'#aaa',fontSize:12}}>No donors match your filters.</td></tr>
                   ) : sortedDonors.map(function(d){
                     var tierInfo=nshGetTier(d.membership_year_total);
                     var isSelected=selected&&selected.id===d.id;
@@ -5894,14 +5893,14 @@ function DonorsView({ navigate }) {
                       <tr key={d.id} onClick={function(){setSelected(d);setEditDon(null);}}
                         style={{borderBottom:'0.5px solid #f3eee4',cursor:'pointer',background:isSelected?'#faf4e8':'#fff',transition:'background 0.12s',opacity:d.deceased?0.55:1}}
                         onMouseEnter={function(e){if(!isSelected)e.currentTarget.style.background='#fdfaf4';}} onMouseLeave={function(e){e.currentTarget.style.background=isSelected?'#faf4e8':'#fff';}}>
-                        <td style={{padding:'18px 20px'}}>
+                        <td style={{padding:'14px 18px'}}>
                           <div style={{display:'flex',alignItems:'center',gap:12}}>
                             {d.avatar_url
-                              ? <img src={d.avatar_url} alt="" style={{width:34,height:34,borderRadius:'50%',objectFit:'cover',flexShrink:0,border:'1px solid #eadfcd'}} />
+                              ? <img src={d.avatar_url} alt="" style={{width:32,height:32,borderRadius:'50%',objectFit:'cover',flexShrink:0,border:'1px solid #eadfcd'}} />
                               : null}
                             <div>
                               <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                                <span style={{fontWeight:600,fontSize:15,color:'#2a2a2a'}}>{d.formal_name}</span>
+                                <span style={{fontWeight:600,fontSize:14.5,color:'#2a2a2a'}}>{d.formal_name}</span>
                                 {d.starred && <span style={{color:'#b5a185',fontSize:13}}>★</span>}
                                 {d.deceased && <span style={{fontSize:10,fontWeight:600,padding:'2px 7px',borderRadius:20,background:'#e5e7eb',color:'#6b7280'}}>Deceased</span>}
                               </div>
@@ -5909,21 +5908,18 @@ function DonorsView({ navigate }) {
                             </div>
                           </div>
                         </td>
-                        <td style={{padding:'18px 20px'}}>
-                          <span style={Object.assign({display:'inline-block',fontSize:13,fontWeight:600,borderRadius:20,padding:'4px 12px'},NSH_STATUS_PILLS[d.status]||{background:'#f3f4f6',color:'#6b7280'})}>{NSH_STATUS_LABELS[d.status]||d.status}</span>
-                        </td>
-                        <td style={{padding:'18px 20px'}}>
+                        <td style={{padding:'14px 18px'}}>
                           {d.tier==='none'
                             ? <span style={{color:'#ccc',fontSize:13}}>—</span>
-                            : <span style={{display:'inline-flex',justifyContent:'center',boxSizing:'border-box',width:176,whiteSpace:'nowrap',padding:'4px 10px',borderRadius:20,fontSize:13,fontWeight:600,background:tierInfo.bg,color:tierInfo.color,border:'1px solid '+tierInfo.border}}>{tierInfo.label}</span>}
+                            : <span style={{display:'inline-flex',justifyContent:'center',boxSizing:'border-box',width:168,whiteSpace:'nowrap',padding:'3px 10px',borderRadius:20,fontSize:12.5,fontWeight:600,background:tierInfo.bg,color:tierInfo.color,border:'1px solid '+tierInfo.border}}>{tierInfo.label}</span>}
                         </td>
-                        <td style={{padding:'18px 20px',textAlign:'right',fontWeight:600,fontSize:15,color:'#2a2a2a'}}>
+                        <td style={{padding:'14px 18px',textAlign:'right',fontWeight:600,fontSize:14.5,color:'#2a2a2a'}}>
                           {d.current_year_total>0?fmtAmt(d.current_year_total):<span style={{color:'#ccc'}}>—</span>}
                         </td>
-                        <td style={{padding:'18px 20px',textAlign:'right',fontSize:15,color:'#555'}}>
+                        <td style={{padding:'14px 18px',textAlign:'right',fontSize:14.5,color:'#555'}}>
                           {fmtAmt(d.lifetime_total)}
                         </td>
-                        <td style={{padding:'18px 20px',textAlign:'right',color:'#8a8478',fontSize:13,whiteSpace:'nowrap'}}>
+                        <td style={{padding:'14px 18px',textAlign:'right',color:'#8a8478',fontSize:12.5,whiteSpace:'nowrap'}}>
                           {fmtDate(d.last_gift_date)}
                         </td>
                       </tr>
@@ -5941,7 +5937,7 @@ function DonorsView({ navigate }) {
 
       {/* Right-side slide panel */}
       {selected && (
-        <div style={{position:'fixed',top:0,right:0,width:420,height:'100vh',background:'#fff',boxShadow:'-4px 0 24px rgba(0,0,0,0.12)',zIndex:500,display:'flex',flexDirection:'column',overflowY:'hidden'}}>
+        <div style={{position:'fixed',top:0,right:0,width:'min(660px,100vw)',height:'100vh',background:'#fff',boxShadow:'-4px 0 24px rgba(0,0,0,0.12)',zIndex:500,display:'flex',flexDirection:'column',overflowY:'hidden'}}>
           {/* Panel header */}
           <div style={{background:'#fff',padding:'22px 24px 18px',borderBottom:'0.5px solid #ece4d6',flexShrink:0}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10}}>
