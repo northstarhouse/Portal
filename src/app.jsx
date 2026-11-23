@@ -26330,7 +26330,7 @@ function TreasurerView({ navigate }) {
   var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '4px 0 40px' }}>
+    <div style={{ maxWidth: 1700, margin: '0 auto', padding: '4px 0 40px' }}>
       <div style={Object.assign({}, card, { display: 'flex', flexWrap: 'wrap', gap: 10 })}>
         <select value={year} onChange={function(e) { setYear(e.target.value); }} style={field}>
           <option value="all">All years</option>
@@ -26368,21 +26368,7 @@ function TreasurerView({ navigate }) {
         })}
       </div>
 
-      <form onSubmit={addEntry} style={card}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2420', marginBottom: 10 }}>Add a cash or check payment</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <input type="date" value={form.paid_on} onChange={function(e) { set('paid_on', e.target.value); }} style={field} />
-          <input value={form.payer} onChange={function(e) { set('payer', e.target.value); }} placeholder="From" style={Object.assign({}, field, { flex: 1, minWidth: 150 })} />
-          <input value={form.amount} onChange={function(e) { set('amount', e.target.value); }} placeholder="Amount" inputMode="decimal" style={Object.assign({}, field, { width: 110 })} />
-          <select value={form.method} onChange={function(e) { set('method', e.target.value); }} style={field}>{TR_METHODS.map(function(m) { return <option key={m}>{m}</option>; })}</select>
-          {form.method === 'PayPal' ? <input value={form.fee} onChange={function(e) { set('fee', e.target.value); }} placeholder={'PayPal fee ' + (estFee(form.amount) ? '$' + estFee(form.amount).toFixed(2) + ' (est.)' : '')} inputMode="decimal" style={Object.assign({}, field, { width: 150 })} /> : <input value={form.check_number} onChange={function(e) { set('check_number', e.target.value); }} placeholder="Check #" style={Object.assign({}, field, { width: 100 })} />}
-          <select value={form.source} onChange={function(e) { set('source', e.target.value); }} style={field}>{TR_SOURCES.map(function(s) { return <option key={s}>{s}</option>; })}</select>
-          <input value={form.note} onChange={function(e) { set('note', e.target.value); }} placeholder="What it is for" style={Object.assign({}, field, { flex: 2, minWidth: 180 })} />
-          <button type="submit" disabled={saving} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{saving ? 'Saving…' : 'Add'}</button>
-        </div>
-        {form.method === 'PayPal' && estFee(form.amount) ? <div style={{ fontSize: 12, color: '#6b5d4a', marginTop: 8 }}>Estimated PayPal fee {money(String(form.fee).trim() !== '' ? parseFloat(form.fee) || 0 : estFee(form.amount))}, so about {money(parseFloat(String(form.amount).replace(/[$,]/g, '')) - (String(form.fee).trim() !== '' ? parseFloat(form.fee) || 0 : estFee(form.amount)))} reaches the bank. Leave the fee blank to use the estimate; PayPal's exact fee replaces it once the payment shows up in PayPal.</div> : null}
-        {err ? <div style={{ color: '#b3402a', fontSize: 13, marginTop: 8 }}>{err}</div> : null}
-      </form>
+      {err ? <div style={{ color: '#b3402a', fontSize: 13 }}>{err}</div> : null}
 
       {unmatched.length > 0 ? (
         <div style={Object.assign({}, card, { background: '#fffaf0', borderColor: '#e8d9b8' })}>
@@ -26413,7 +26399,7 @@ function TreasurerView({ navigate }) {
 
       <div style={Object.assign({}, card, { padding: 0, overflowX: 'auto' })}>
         {rows === null ? <div style={{ padding: 20, color: '#888', fontSize: 13 }}>Loading…</div> : list.length === 0 ? <div style={{ padding: 20, color: '#888', fontSize: 13 }}>No payments match.</div> : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table style={{ width: '100%', minWidth: 1050, borderCollapse: 'collapse', fontSize: 13.5 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>
                 {['Date', 'From', 'For', 'Source', 'Method', 'Gross', 'Fees', 'Net', ''].map(function(h, i) { return <th key={i} style={{ padding: '10px 12px', borderBottom: '0.5px solid #e0d8cc', textAlign: (h === 'Gross' || h === 'Fees' || h === 'Net') ? 'right' : 'left' }}>{h}</th>; })}
@@ -26422,15 +26408,15 @@ function TreasurerView({ navigate }) {
             <tbody>
               {list.map(function(p) {
                 return <tr key={p.payment_key} style={{ borderBottom: '0.5px solid #f0ebe2' }}>
-                  <td style={{ padding: '9px 12px', whiteSpace: 'nowrap' }}>{nice(p.paid_on)}</td>
-                  <td style={{ padding: '9px 12px', fontWeight: 600, color: '#2a2420' }}>{p.payer}</td>
-                  <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{p.category}{p.detail ? <div style={{ fontSize: 12, color: '#999' }}>{p.detail}</div> : null}</td>
-                  <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{p.source}</td>
-                  <td style={{ padding: '9px 12px', color: '#6b5d4a' }}>{p.method}{p.reference ? <div style={{ fontSize: 11, color: '#aaa' }}>{p.reference}</div> : null}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(p.amount)}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', whiteSpace: 'nowrap', color: Number(p.fee) > 0 ? '#b3402a' : '#bbb' }}>{Number(p.fee) > 0 ? money(p.fee) : '—'}{Number(p.fee) > 0 && p.fee_estimated ? <div style={{ fontSize: 11, color: '#aaa' }}>(est.)</div> : null}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(netOf(p))}</td>
-                  <td style={{ padding: '9px 12px' }}>{p.payment_key.indexOf('man:') === 0 ? <a onClick={function() { removeEntry(p); }} style={{ fontSize: 12, color: '#b3402a', cursor: 'pointer' }}>Delete</a> : null}</td>
+                  <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>{nice(p.paid_on)}</td>
+                  <td style={{ padding: '12px 14px', fontWeight: 600, color: '#2a2420', minWidth: 170, maxWidth: 260 }}>{p.payer}</td>
+                  <td style={{ padding: '12px 14px', color: '#6b5d4a', minWidth: 240, maxWidth: 400 }}>{p.category}{p.detail ? <div title={p.detail} style={{ fontSize: 12, color: '#999', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word', marginTop: 2 }}>{p.detail}</div> : null}</td>
+                  <td style={{ padding: '12px 14px', color: '#6b5d4a', whiteSpace: 'nowrap' }}>{p.source}</td>
+                  <td style={{ padding: '12px 14px', color: '#6b5d4a', minWidth: 170, maxWidth: 300 }}>{p.method}{p.reference ? <div title={p.reference} style={{ fontSize: 11.5, color: '#aaa', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word', marginTop: 2 }}>{p.reference}</div> : null}</td>
+                  <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(p.amount)}</td>
+                  <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap', color: Number(p.fee) > 0 ? '#b3402a' : '#bbb' }}>{Number(p.fee) > 0 ? money(p.fee) : '—'}{Number(p.fee) > 0 && p.fee_estimated ? <div style={{ fontSize: 11, color: '#aaa' }}>(est.)</div> : null}</td>
+                  <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(netOf(p))}</td>
+                  <td style={{ padding: '12px 14px' }}>{p.payment_key.indexOf('man:') === 0 ? <a onClick={function() { removeEntry(p); }} style={{ fontSize: 12, color: '#b3402a', cursor: 'pointer' }}>Delete</a> : null}</td>
                 </tr>;
               })}
             </tbody>
