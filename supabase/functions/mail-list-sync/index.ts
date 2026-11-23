@@ -87,13 +87,51 @@ async function addPerson(conn: any, formId: string, responseId: string | null, a
   if (!p.email || !/^\S+@\S+\.\S+$/.test(p.email)) { await logSync(responseId, p.source, p.email, 'skipped', 'No valid email address'); return 'skipped' }
   const chosen: { id: string; name: string }[] = Array.isArray(conn[p.listKey]) ? conn[p.listKey] : []
   if (!chosen.length) { await logSync(responseId, p.source, p.email, 'skipped', 'No Constant Contact list chosen for this form yet'); return 'skipped' }
-  const body: Record<string, unknown> = { email_address: p.email, list_memberships: chosen.map((l) => l.id), create_source: 'Account' }
-  if (p.first) body.first_name = p.first
-  if (p.last) body.last_name = p.last
-  if (p.phone) body.phone_number = p.phone
-  const r = await cc('/contacts/sign_up_form', { method: 'POST', body: JSON.stringify(body) })
-  if (r.ok) { await logSync(responseId, p.source, p.email, 'added', 'Added to ' + chosen.map((l) => l.name).join(' + ')); return 'added' }
-  await logSync(responseId, p.source, p.email, 'failed', `Constant Contact said ${r.status}: ${typeof r.body === 'string' ? r.body : JSON.stringify(r.body)}`)
+  return await upsertContact(p, chosen, responseId)
+}
+
+type Person = { email: string; first: string; last: string; phone: string; source: string }
+// Adds the person as Subscribed on the chosen lists, or updates them if they are already in Constant Contact.
+async function upsertContact(p: Person, chosen: { id: string; name: string }[], responseId: string | null) {
+  const ids = chosen.map((l) => l.id)
+  const listNames = chosen.map((l) => l.name).join(' + ')
+  // Is this person already in Constant Contact?
+  const found = await cc('/contacts?email=' + encodeURIComponent(p.email) + '&status=all&include=list_memberships,phone_numbers,street_addresses,custom_fields')
+  if (!found.ok) { await logSync(responseId, p.source, p.email, 'failed', 'Could not look up the contact: Constant Contact said ' + found.status); return 'failed' }
+  const existing = found.body && Array.isArray(found.body.contacts) ? found.body.contacts[0] : null
+
+  if (!existing) {
+    // New person: created as Subscribed (explicit permission), since they signed up themselves.
+    const body: Record<string, unknown> = { email_address: { address: p.email, permission_to_send: 'explicit' }, list_memberships: ids, create_source: 'Account' }
+    if (p.first) body.first_name = p.first
+    if (p.last) body.last_name = p.last
+    if (p.phone) body.phone_numbers = [{ phone_number: p.phone, kind: 'other' }]
+    const r = await cc('/contacts', { method: 'POST', body: JSON.stringify(body) })
+    if (r.ok) { await logSync(responseId, p.source, p.email, 'added', 'Added as Subscribed to ' + listNames); return 'added' }
+    await logSync(responseId, p.source, p.email, 'failed', 'Constant Contact said ' + r.status + ': ' + (typeof r.body === 'string' ? r.body : JSON.stringify(r.body)))
+    return 'failed'
+  }
+
+  // Already there: never re-subscribe someone who unsubscribed.
+  const perm = existing.email_address && existing.email_address.permission_to_send
+  if (perm === 'unsubscribed') { await logSync(responseId, p.source, p.email, 'skipped', 'Unsubscribed in Constant Contact, left as is'); return 'skipped' }
+  const memberships = Array.from(new Set([...(existing.list_memberships || []), ...ids]))
+  const body: Record<string, unknown> = {
+    email_address: { address: p.email, permission_to_send: 'explicit' },
+    first_name: existing.first_name || p.first || undefined,
+    last_name: existing.last_name || p.last || undefined,
+    job_title: existing.job_title || undefined,
+    company_name: existing.company_name || undefined,
+    list_memberships: memberships,
+    update_source: 'Account',
+  }
+  if (Array.isArray(existing.phone_numbers) && existing.phone_numbers.length) body.phone_numbers = existing.phone_numbers.map((x: any) => ({ phone_number: x.phone_number, kind: x.kind || 'other' }))
+  else if (p.phone) body.phone_numbers = [{ phone_number: p.phone, kind: 'other' }]
+  if (Array.isArray(existing.street_addresses) && existing.street_addresses.length) body.street_addresses = existing.street_addresses.map((x: any) => ({ kind: x.kind, street: x.street, city: x.city, state: x.state, postal_code: x.postal_code, country: x.country }))
+  if (Array.isArray(existing.custom_fields) && existing.custom_fields.length) body.custom_fields = existing.custom_fields.map((x: any) => ({ custom_field_id: x.custom_field_id, value: x.value }))
+  const r = await cc('/contacts/' + existing.contact_id, { method: 'PUT', body: JSON.stringify(body) })
+  if (r.ok) { await logSync(responseId, p.source, p.email, 'added', 'Updated, Subscribed, on ' + listNames); return 'added' }
+  await logSync(responseId, p.source, p.email, 'failed', 'Constant Contact said ' + r.status + ': ' + (typeof r.body === 'string' ? r.body : JSON.stringify(r.body)))
   return 'failed'
 }
 
@@ -147,6 +185,27 @@ Deno.serve(async (req) => {
       const c = await getConn()
       if (!c || !c.refresh_token) { await logSync(rows[0].id, 'sync', '', 'skipped', 'Constant Contact is not connected yet'); return json({ status: 'skipped' }) }
       return json({ status: await addPerson(c, rows[0].form_id, rows[0].id, rows[0].answers) })
+    }
+    if (action === 'import') {
+      // A pasted list: { people: [{ email, first, last }], lists: [{ id, name }] }. The Portal sends small batches.
+      const c = await getConn()
+      if (!c || !c.refresh_token) return json({ error: 'Constant Contact is not connected yet' }, 400)
+      const lists = Array.isArray(body.lists) ? body.lists.filter((l: any) => l && l.id) : []
+      if (!lists.length) return json({ error: 'Choose at least one list' }, 400)
+      const people = Array.isArray(body.people) ? body.people.slice(0, 40) : []
+      const out: { email: string; status: string; detail: string }[] = []
+      for (const x of people) {
+        const email = clean(x.email).toLowerCase()
+        if (!email || !/^\S+@\S+\.\S+$/.test(email)) { out.push({ email, status: 'skipped', detail: 'Not a valid email address' }); continue }
+        const before = await sb('/rest/v1/cc_sync_log?select=id&order=id.desc&limit=1')
+        const lastId = ((await before.json()) as any[])[0]?.id || 0
+        const status = await upsertContact({ email, first: clean(x.first), last: clean(x.last), phone: '', source: 'Pasted list' }, lists, null)
+        const after = await sb('/rest/v1/cc_sync_log?select=detail&id=gt.' + lastId + '&order=id.desc&limit=1')
+        const detail = ((await after.json()) as any[])[0]?.detail || ''
+        out.push({ email, status, detail })
+        await new Promise((r) => setTimeout(r, 450)) // Constant Contact allows about 4 calls per second
+      }
+      return json({ results: out })
     }
     if (action === 'backfill') {
       const formId = body.form === 'volunteer' ? VOLUNTEER_FORM : NEWSLETTER_FORM
