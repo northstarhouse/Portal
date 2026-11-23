@@ -4753,7 +4753,7 @@ function DonorsView({ navigate }) {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState({});
-  const [filters, setFilters] = useState({search:'',status:'current',tier:'all',donationType:'all',year:String(THIS_YEAR),hasAddress:'all'});
+  const [filters, setFilters] = useState({search:'',status:'all',tier:'all',donationType:'all',year:String(THIS_YEAR),hasAddress:'all'});
   const [viewMode, setViewMode] = useState('donors'); // 'donors' = one row per donor, 'gifts' = every donation
   const [sortKey, setSortKey] = useState('last_gift_date');
   const [sortDir, setSortDir] = useState('desc');
@@ -5745,7 +5745,7 @@ function DonorsView({ navigate }) {
                         <td style={{padding:'10px 14px'}}>
                           {d.tier==='none'
                             ? <span style={{color:'#ccc',fontSize:11}}>—</span>
-                            : <span style={{display:'inline-flex',padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,background:tierInfo.bg,color:tierInfo.color,border:'1px solid '+tierInfo.border}}>{tierInfo.label}</span>}
+                            : <span style={{display:'inline-flex',justifyContent:'center',boxSizing:'border-box',width:164,whiteSpace:'nowrap',padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,background:tierInfo.bg,color:tierInfo.color,border:'1px solid '+tierInfo.border}}>{tierInfo.label}</span>}
                         </td>
                         <td style={{padding:'10px 14px',textAlign:'right',fontWeight:500,color:'#2a2a2a'}}>
                           {d.current_year_total>0?fmtAmt(d.current_year_total):<span style={{color:'#ccc'}}>—</span>}
