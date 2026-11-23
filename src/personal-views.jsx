@@ -34,13 +34,14 @@ export function PersonalViewsView() {
     const out = [], seen = {};
     vols.forEach(v => {
       const team = String(v.Team || ''), email = String(v.Email).trim().toLowerCase();
-      const board = /board member/i.test(team), lead = /team lead/i.test(team);
-      if (!(board || lead)) return;
+      const board = /board member/i.test(team), lead = /team lead/i.test(team), staff = /staff/i.test(team);
+      if (!(board || lead || staff)) return;
       seen[email] = true;
-      out.push({ email, name: (String(v['First Name'] || '').trim() + ' ' + String(v['Last Name'] || '').trim()).trim(), role: board ? 'Board member' : 'Team leader', hidden: (byEmail[email] || {}).hidden || [], saved: !!byEmail[email] });
+      out.push({ email, name: (String(v['First Name'] || '').trim() + ' ' + String(v['Last Name'] || '').trim()).trim(), role: board ? 'Board member' : lead ? 'Team leader' : 'Staff', hidden: (byEmail[email] || {}).hidden || [], saved: !!byEmail[email] });
     });
     (rules || []).forEach(r => { if (!seen[r.email]) out.push({ email: r.email, name: r.note || r.email, role: '', hidden: r.hidden || [], saved: true }); });
-    out.sort((a, b) => (a.role === 'Board member' ? 0 : a.role ? 1 : 2) - (b.role === 'Board member' ? 0 : b.role ? 1 : 2) || a.name.localeCompare(b.name));
+    const rk = r => r === 'Board member' ? 0 : r === 'Team leader' ? 1 : r === 'Staff' ? 2 : 3;
+    out.sort((a, b) => rk(a.role) - rk(b.role) || a.name.localeCompare(b.name));
     return out;
   }, [rules, vols]);
   const nameFor = email => { const v = vols.find(x => String(x.Email).trim().toLowerCase() === email); return v ? (v['First Name'] + ' ' + (v['Last Name'] || '')).trim() : ''; };
@@ -79,12 +80,12 @@ export function PersonalViewsView() {
     <div style={{ borderBottom: '1.5px solid ' + GOLD, paddingBottom: 14, marginBottom: 20 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase', letterSpacing: 2 }}>Portal access</div>
       <div style={{ fontSize: 26, fontWeight: 700, color: '#2c2418', fontFamily: "'Cardo', Georgia, serif", marginTop: 2 }}>Personalized Views</div>
-      <div style={{ fontSize: 13, color: '#8a7e6b', marginTop: 4 }}>Every board member and team leader is listed. Tick what each person should <b>not</b> see; those sections disappear from their menu and Overview page.</div>
+      <div style={{ fontSize: 13, color: '#8a7e6b', marginTop: 4 }}>Every board member, team leader and staff member is listed. Tick what each person should <b>not</b> see; those sections disappear from their menu and Overview page.</div>
     </div>
     {err && <div role="alert" style={{ color: '#b3261e', background: '#fce4e4', borderRadius: 9, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>{err}</div>}
     {saved && <div style={{ color: '#2e7d32', background: '#eef7ee', borderRadius: 9, padding: '10px 12px', fontSize: 13, marginBottom: 14 }}>{saved}</div>}
     {rules === null ? <div style={{ color: '#8a7e6b' }}>Loading…</div> : <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {people.length === 0 && <div style={{ ...card, color: '#a09580', fontSize: 13 }}>No board members or leaders found.</div>}
+      {people.length === 0 && <div style={{ ...card, color: '#a09580', fontSize: 13 }}>No board members, leaders or staff found.</div>}
       {people.map(r => <div key={r.email} style={card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>

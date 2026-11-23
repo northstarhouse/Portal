@@ -893,7 +893,7 @@ function nshSetHidden(sections) {
     var extra = {
       donors: ['acknowledgments-queue', 'acknowledgment-templates'],
       volunteers: ['volunteer-hours', 'vol-email-lists', 'birthdays'],
-      admin: ['financial-overview', 'treasurer', 'website-payments', 'financials', 'office-cash-flow', 'operational-budgets', 'volunteer-hours', 'vol-email-lists', 'constant-contact', 'brick-orders', 'brick-submission', 'form-builder', 'personal-views', 'activity-log'],
+      admin: ['reviews', 'financial-overview', 'treasurer', 'website-payments', 'financials', 'office-cash-flow', 'operational-budgets', 'volunteer-hours', 'vol-email-lists', 'constant-contact', 'brick-orders', 'brick-submission', 'form-builder', 'personal-views', 'activity-log'],
     }[sec] || [];
     extra.forEach(function(x) { m[x] = true; });
     if (sec === 'venue') Object.keys(views).forEach(function(k) { if (k.indexOf('venue') === 0) m[k] = true; });
@@ -27595,6 +27595,16 @@ function Dashboard() {
   const [viewAs, setViewAs] = useState(function() { try { return JSON.parse(sessionStorage.getItem('nsh-view-as') || 'null'); } catch (e) { return null; } });
   const [viewAsChoices, setViewAsChoices] = useState(null);
   const [viewAsOpen, setViewAsOpen] = useState(false);
+  const [canViewAs, setCanViewAs] = useState(false); // View as is for Haley only
+  React.useEffect(function() {
+    var email = '';
+    try { email = (localStorage.getItem('nsh-app-email') || '').trim().toLowerCase(); } catch (e) {}
+    if (!email) return;
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?select=' + encodeURIComponent('First Name,Last Name') + '&Email=ilike.' + encodeURIComponent(email) + '&limit=1', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(rows) { var v = Array.isArray(rows) && rows[0]; setCanViewAs(!!v && String(v['First Name'] || '').trim().toLowerCase() === 'haley' && String(v['Last Name'] || '').trim().toLowerCase() === 'wright'); })
+      .catch(function() {});
+  }, []);
   function startViewAs(p) { try { sessionStorage.setItem('nsh-view-as', JSON.stringify(p)); } catch (e) {} setViewAs(p); setViewAsOpen(false); window.location.hash = 'home'; setActive('home'); }
   function stopViewAs() { try { sessionStorage.removeItem('nsh-view-as'); } catch (e) {} setViewAs(null); }
   function openViewAs() {
@@ -27610,14 +27620,15 @@ function Dashboard() {
         var out = [], seen = {};
         vols.forEach(function(v) {
           var team = String(v.Team || ''), email = String(v.Email || '').trim().toLowerCase();
-          var board = /board member/i.test(team), lead = /team lead/i.test(team);
-          if (!email || !(board || lead)) return;
+          var board = /board member/i.test(team), lead = /team lead/i.test(team), staff = /staff/i.test(team);
+          if (!email || !(board || lead || staff)) return;
           seen[email] = true;
           var rule = byEmail[email];
-          out.push({ email: email, name: (String(v['First Name'] || '').trim() + ' ' + String(v['Last Name'] || '').trim()).trim(), role: board ? 'Board member' : 'Team leader', hidden: rule ? (rule.hidden || []) : [] });
+          out.push({ email: email, name: (String(v['First Name'] || '').trim() + ' ' + String(v['Last Name'] || '').trim()).trim(), role: board ? 'Board member' : lead ? 'Team leader' : 'Staff', hidden: rule ? (rule.hidden || []) : [] });
         });
         rules.forEach(function(r) { var e = String(r.email).toLowerCase(); if (!seen[e]) out.push({ email: e, name: r.note || e, role: '', hidden: r.hidden || [] }); });
-        out.sort(function(a, b) { return (a.role === 'Board member' ? 0 : a.role ? 1 : 2) - (b.role === 'Board member' ? 0 : b.role ? 1 : 2) || a.name.localeCompare(b.name); });
+        var rk = function(r) { return r === 'Board member' ? 0 : r === 'Team leader' ? 1 : r === 'Staff' ? 2 : 3; };
+        out.sort(function(a, b) { return rk(a.role) - rk(b.role) || a.name.localeCompare(b.name); });
         setViewAsChoices(out);
       }).catch(function() { setViewAsChoices([]); });
     }
@@ -27711,12 +27722,12 @@ function Dashboard() {
                   background: active === "admin" ? "rgba(181,161,133,0.15)" : "transparent", border: "0.5px solid rgba(255,255,255,0.1)",
                   color: active === "admin" ? "#f0ebe3" : "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 500
                 }}>Admin</button>
-                <button onClick={openViewAs} style={{
+                {canViewAs && <button onClick={openViewAs} style={{
                   width: "100%", padding: "7px 12px", borderRadius: 7, cursor: "pointer", textAlign: "left",
                   background: viewAsOpen ? "rgba(181,161,133,0.15)" : "transparent", border: "0.5px solid rgba(255,255,255,0.1)",
                   color: viewAsOpen ? "#f0ebe3" : "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 500, display: "flex", alignItems: "center"
-                }}>View as…<span style={{ marginLeft: "auto", fontSize: 9, opacity: 0.6 }}>{viewAsOpen ? "▲" : "▼"}</span></button>
-                {viewAsOpen && (
+                }}>View as…<span style={{ marginLeft: "auto", fontSize: 9, opacity: 0.6 }}>{viewAsOpen ? "▲" : "▼"}</span></button>}
+                {canViewAs && viewAsOpen && (
                   <div style={{ background: "#222226", border: "0.5px solid rgba(255,255,255,0.12)", borderRadius: 8, overflow: "hidden", maxHeight: 360, overflowY: "auto" }}>
                     {viewAsChoices === null && <div style={{ padding: "9px 12px", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Loading…</div>}
                     {viewAsChoices !== null && viewAsChoices.length === 0 && <div style={{ padding: "9px 12px", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>No board members or leaders found.</div>}
@@ -27756,7 +27767,7 @@ function Dashboard() {
             <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.08)", margin: "10px 16px 8px" }} />
             <button onClick={function() { navigate("financials"); }}
               style={{
-                display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 16px",
+                display: nshHides("financials") ? "none" : "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 16px",
                 background: active === "financials" ? "rgba(181,161,133,0.15)" : "transparent",
                 border: "none", cursor: "pointer", textAlign: "left",
                 color: active === "financials" ? "#b5a185" : "rgba(255,255,255,0.45)",
@@ -27767,7 +27778,7 @@ function Dashboard() {
             </button>
             <button onClick={function() { navigate("financial-overview"); }}
               style={{
-                display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 16px",
+                display: nshHides("financial-overview") ? "none" : "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 16px",
                 background: active === "financial-overview" ? "rgba(181,161,133,0.15)" : "transparent",
                 border: "none", cursor: "pointer", textAlign: "left",
                 color: active === "financial-overview" ? "#b5a185" : "rgba(255,255,255,0.45)",
@@ -27778,7 +27789,7 @@ function Dashboard() {
             </button>
             <button onClick={function() { navigate("reviews"); }}
               style={{
-                display: "block", width: "100%", padding: "9px 16px",
+                display: nshHides("reviews") ? "none" : "block", width: "100%", padding: "9px 16px",
                 background: active === "reviews" ? "rgba(181,161,133,0.15)" : "transparent",
                 border: "none", cursor: "pointer", textAlign: "left",
                 color: active === "reviews" ? "#b5a185" : "rgba(255,255,255,0.45)",
@@ -27789,7 +27800,7 @@ function Dashboard() {
             </button>
             <button onClick={function() { navigate("admin"); }}
               style={{
-                display: "block", width: "100%", padding: "9px 16px",
+                display: nshHides("admin") ? "none" : "block", width: "100%", padding: "9px 16px",
                 background: active === "admin" ? "rgba(181,161,133,0.15)" : "transparent",
                 border: "none", cursor: "pointer", textAlign: "left",
                 color: active === "admin" ? "#b5a185" : "rgba(255,255,255,0.45)",
@@ -27840,10 +27851,10 @@ function Dashboard() {
                   );
                 })}
                 <div style={{ borderTop: '0.5px solid rgba(255,255,255,0.08)', margin: '8px 4px' }} />
-                <button onClick={function() { navigate('financials'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'financials' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financials' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financials' ? 600 : 400, marginBottom: 2 }}>Reimbursements</button>
-                <button onClick={function() { navigate('financial-overview'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'financial-overview' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financial-overview' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financial-overview' ? 600 : 400, marginBottom: 2 }}>Financial Overview</button>
-                <button onClick={function() { navigate('reviews'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'reviews' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'reviews' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'reviews' ? 600 : 400, marginBottom: 2 }}>Reviews</button>
-                <button onClick={function() { navigate('admin'); setMobileMenuOpen(false); }} style={{ display: 'block', width: '100%', padding: '9px 12px', background: active === 'admin' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'admin' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'admin' ? 600 : 400, marginBottom: 2 }}>Admin</button>
+                <button onClick={function() { navigate('financials'); setMobileMenuOpen(false); }} style={{ display: nshHides('financials') ? 'none' : 'block', width: '100%', padding: '9px 12px', background: active === 'financials' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financials' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financials' ? 600 : 400, marginBottom: 2 }}>Reimbursements</button>
+                <button onClick={function() { navigate('financial-overview'); setMobileMenuOpen(false); }} style={{ display: nshHides('financial-overview') ? 'none' : 'block', width: '100%', padding: '9px 12px', background: active === 'financial-overview' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'financial-overview' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'financial-overview' ? 600 : 400, marginBottom: 2 }}>Financial Overview</button>
+                <button onClick={function() { navigate('reviews'); setMobileMenuOpen(false); }} style={{ display: nshHides('reviews') ? 'none' : 'block', width: '100%', padding: '9px 12px', background: active === 'reviews' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'reviews' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'reviews' ? 600 : 400, marginBottom: 2 }}>Reviews</button>
+                <button onClick={function() { navigate('admin'); setMobileMenuOpen(false); }} style={{ display: nshHides('admin') ? 'none' : 'block', width: '100%', padding: '9px 12px', background: active === 'admin' ? 'rgba(181,161,133,0.15)' : 'transparent', border: 'none', borderRadius: 7, cursor: 'pointer', textAlign: 'left', color: active === 'admin' ? '#b5a185' : 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: active === 'admin' ? 600 : 400, marginBottom: 2 }}>Admin</button>
               </div>
             </div>
           </div>
