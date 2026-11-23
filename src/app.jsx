@@ -23021,7 +23021,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
         <button type="button" onClick={function() { navigate('venue'); }} style={{ padding: '9px 16px', background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>← Venue Rentals</button>
       </div>
-      <div style={{ fontSize: 12, color: '#aaa', marginBottom: clientsOnly ? 20 : 6 }}>{clientsOnly ? 'Official pre-booking form submissions — check off once handled.' : 'Wedding and Event Inquiry submissions — tours remain inquiries until an official pre-booking form is submitted.'}</div>
+      {clientsOnly && <div style={{ fontSize: 12, color: '#aaa', marginBottom: 20 }}>Official pre-booking form submissions — check off once handled.</div>}
       {!clientsOnly && toursMonth !== null && (
         <div style={{ fontSize: 12, color: '#666', marginBottom: 20 }}>
           <strong style={{ color: '#2a2a2a' }}>{toursMonth}</strong> {toursMonth === 1 ? 'tour' : 'tours'} booked in {new Date().toLocaleDateString('en-US', { month: 'long' })}
