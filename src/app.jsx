@@ -25640,10 +25640,22 @@ function MeetingBoardReportsView({ navigate }) {
   // lands in it -- keeps every upcoming month's quick-upload buttons ready
   // ahead of time, and it grows on its own each month with no editing.
   var currentMonthKey = new Date().toISOString().slice(0, 7);
+  // The cards run through the NEXT UPCOMING meeting, not just the current month: once this month's meeting (third Thursday)
+  // has passed, next month's upload cards are already there, so there is always somewhere to upload for the next meeting.
+  var upcomingMonthKey = (function() {
+    var key = currentMonthKey;
+    for (var guard = 0; guard < 3; guard++) {
+      if (new Date() <= thirdThursday(key)) return key;
+      var p = key.split('-'), yy = parseInt(p[0], 10), mm = parseInt(p[1], 10) + 1;
+      if (mm > 12) { mm = 1; yy += 1; }
+      key = yy + '-' + (mm < 10 ? '0' + mm : mm);
+    }
+    return key;
+  })();
   var monthMap = {};
   (function() {
     var cursor = MEETING_REPORTS_START_MONTH;
-    while (cursor <= currentMonthKey) {
+    while (cursor <= upcomingMonthKey) {
       monthMap[cursor] = [];
       var parts = cursor.split('-');
       var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
