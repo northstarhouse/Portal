@@ -338,7 +338,9 @@ function installmentNote(sched: any[], cents: number) {
     hit.push(r); if (left < room) partial = true; left -= Math.min(room, left);
   }
   if (!hit.length || !rows.length) return null;
-  const n = hit.length === 1 ? String(hit[0].sequence) : hit[0].sequence + '-' + hit[hit.length - 1].sequence;
+  // Number by position in the order payments are taken (the refundable deposit is last), counting from 1 -- not by the stored sequence, which starts at 0.
+  const pos = (r: any) => rows.indexOf(r) + 1;
+  const n = hit.length === 1 ? String(pos(hit[0])) : pos(hit[0]) + '-' + pos(hit[hit.length - 1]);
   const what = hit.length === 1 && hit[0].label ? ' - ' + hit[0].label : '';
   return (partial ? 'Part of payment ' : hit.length > 1 ? 'Payments ' : 'Payment ') + n + ' of ' + rows.length + what;
 }

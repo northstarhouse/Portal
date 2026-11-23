@@ -12991,9 +12991,15 @@ function FinancialOverviewView({ navigate }) {
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 13, color: '#888' }}>Combined view across donations, in-kind sponsorships, operational budgets, and office cash flow.</div>
-        <select value={year} onChange={function(e) { setYear(parseInt(e.target.value)); }} style={{ padding: '7px 12px', borderRadius: 8, border: '0.5px solid #e0d8cc', fontSize: 13, background: '#fff' }}>
-          {yearOptions.map(function(y) { return <option key={y} value={y}>{y}</option>; })}
-        </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <select value={activeTab} onChange={function(e) { setActiveTab(e.target.value); }} aria-label="Section" style={{ padding: '7px 12px', borderRadius: 8, border: '0.5px solid #e0d8cc', fontSize: 13, fontWeight: 600, color: '#886c44', background: '#fff', cursor: 'pointer' }}>
+            {TABS.map(function(t) { return <option key={t.id} value={t.id}>{t.label}</option>; })}
+          </select>
+          <select value={year} onChange={function(e) { setYear(parseInt(e.target.value)); }} style={{ padding: '7px 12px', borderRadius: 8, border: '0.5px solid #e0d8cc', fontSize: 13, background: '#fff' }}>
+            {yearOptions.map(function(y) { return <option key={y} value={y}>{y}</option>; })}
+          </select>
+          <button onClick={exportActiveTab} style={{ padding: '7px 12px', fontSize: 12, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>↓ Export Excel</button>
+        </div>
       </div>
 
       {loading ? (
@@ -13008,18 +13014,6 @@ function FinancialOverviewView({ navigate }) {
             <div style={card}><div style={cardLabel}>In-Kind Total</div><div style={{ ...cardValue, color: '#886c44' }}>{money(stats.totalInKind + stats.sponsorInKind)}</div></div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderBottom: '0.5px solid #e8e0d5' }}>
-            {TABS.map(function(t) {
-              var isActive = activeTab === t.id;
-              return (
-                <button key={t.id} onClick={function() { setActiveTab(t.id); }}
-                  style={{ padding: '9px 16px', fontSize: 12, fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: isActive ? gold : '#888', borderBottom: '2px solid ' + (isActive ? gold : 'transparent'), marginBottom: -1 }}>
-                  {t.label}
-                </button>
-              );
-            })}
-            <button onClick={exportActiveTab} style={{ marginLeft: 'auto', marginBottom: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>↓ Export Excel</button>
-          </div>
 
           {activeTab === 'donations' && (
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
