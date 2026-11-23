@@ -9814,7 +9814,8 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
                 );
               }
               var leadName = areaInfo && areaInfo.lead ? areaInfo.lead : defaultLead;
-              var leadPic = areaDefaults.pic || '';
+              var leadVol = (vols || []).find(function(v) { return (v['First Name'] + ' ' + v['Last Name']).trim().toLowerCase() === String(leadName || '').trim().toLowerCase(); });
+              var leadPic = (leadVol && leadVol['Picture URL']) || areaDefaults.pic || '';
               if (editLead) {
                 return (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
