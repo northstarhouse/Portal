@@ -488,7 +488,7 @@ export const AREA_DEFAULTS = {
   'Interiors':    { lead: 'Bec Freeman',     budget: 2500,  pic: '' },
   'Docents':      { lead: 'Rich Hill',       budget: 1000,  pic: '' },
   'Fundraising':  { lead: 'Kaelen Jennings', budget: null,  pic: '' },
-  'Events':       { lead: 'Barb Kusha',      budget: 7500,  pic: '' },
+  'Events':       { lead: 'Ken Underwood',   budget: 7500,  pic: '' },
   'Marketing':    { lead: 'Haley Wright',    budget: 1000,  pic: '' },
   'Venue':        { lead: 'Staff',           budget: null,  pic: '' },
 };

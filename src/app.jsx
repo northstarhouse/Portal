@@ -27064,7 +27064,7 @@ var AREA_DEFAULTS = {
   'Interiors':     { lead: 'Bec Freeman',      budget: 2500,  pic: 'https://drive.google.com/file/d/1PsjDfGQLqDF9BVc5wuBd-Qx9D5E0Hvf4/view?usp=drive_link', leadEmail: '', volunteerMessage: '' },
   'Docents':       { lead: 'Rich Hill',        budget: 1000,  pic: 'https://drive.google.com/file/d/1gBzqnzekKkTLn8mnn2mxt-PqAeeMZSJs/view?usp=drive_link', leadEmail: '', volunteerMessage: '' },
   'Fundraising':   { lead: 'Kaelen Jennings',  budget: null,  pic: '', leadEmail: '', volunteerMessage: '' },
-  'Events':        { lead: 'Barb Kusha',       budget: 7500,  pic: '', leadEmail: '', volunteerMessage: '' },
+  'Events':        { lead: 'Ken Underwood',    budget: 7500,  pic: '', leadEmail: '', volunteerMessage: '' },
   'Marketing':     { lead: 'Haley Wright',     budget: 1000,  pic: 'https://drive.google.com/file/d/17Tse_3jiKZwmkVTTKMtt64zDghfZ8WrV/view?usp=drive_link', leadEmail: '', volunteerMessage: '' },
   'Venue':         { lead: 'Staff',            budget: null,  pic: '', leadEmail: '', volunteerMessage: '' },
 };
