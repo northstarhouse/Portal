@@ -12667,6 +12667,7 @@ function FinancialOverviewView({ navigate }) {
   var thisYear = new Date().getFullYear();
   var [year, setYear] = useState(thisYear);
   var [activeTab, setActiveTab] = useState('donations');
+  var [cashDir, setCashDir] = useState('all'); // Office Cash Flow list: 'all' | 'In' | 'Out'
   var [expandedArea, setExpandedArea] = useState(null);
   var [expandedEvent, setExpandedEvent] = useState(null);
   var [expandedMonth, setExpandedMonth] = useState(null);
@@ -13326,16 +13327,23 @@ function FinancialOverviewView({ navigate }) {
                 )}
                 <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', overflow: 'hidden' }}>
                   <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 700, color: '#2a2a2a', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                    <span>Cash Log — {year} (everything, in &amp; out)</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, display: 'flex', gap: 12 }}>
-                      <span style={{ color: '#2e7d32' }}>In {money(yearIn)}</span>
-                      <span style={{ color: '#c07040' }}>Out {money(yearOut)}</span>
-                      <span style={{ color: '#888' }}>Net {money(yearIn - yearOut)}</span>
+                    <span>Cash Log — {year} ({cashDir === 'In' ? 'money in only' : cashDir === 'Out' ? 'money out only' : 'everything, in & out'})</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {[['In', 'In ' + money(yearIn), '#2e7d32', '#eaf4ea'], ['Out', 'Out ' + money(yearOut), '#c07040', '#fdf0e6']].map(function(t) {
+                        var on = cashDir === t[0];
+                        return <span key={t[0]} role="button" tabIndex={0} title={on ? 'Click to show everything again' : 'Click to show only money ' + t[0].toLowerCase()} onClick={function() { setCashDir(on ? 'all' : t[0]); }}
+                          onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCashDir(on ? 'all' : t[0]); } }}
+                          style={{ color: t[2], cursor: 'pointer', padding: '3px 10px', borderRadius: 20, background: on ? t[3] : 'transparent', border: '1px solid ' + (on ? t[2] : 'transparent'), userSelect: 'none' }}>{t[1]}</span>;
+                      })}
+                      <span onClick={function() { setCashDir('all'); }} title="Show everything" style={{ color: '#888', cursor: cashDir === 'all' ? 'default' : 'pointer', padding: '3px 6px' }}>Net {money(yearIn - yearOut)}</span>
                     </span>
                   </div>
-                  {yearCashRows.length === 0 ? (
-                    <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>No cash log entries for {year}.</div>
-                  ) : yearCashRows.map(function(c, i) { return cashLogRow(c, i, yearCashRows.length); })}
+                  {(function() {
+                    var shownCash = cashDir === 'all' ? yearCashRows : yearCashRows.filter(function(c) { return c.direction === cashDir; });
+                    return shownCash.length === 0 ? (
+                      <div style={{ padding: '18px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>No {cashDir === 'all' ? '' : 'money ' + cashDir.toLowerCase() + ' '}cash log entries for {year}.</div>
+                    ) : shownCash.map(function(c, i) { return cashLogRow(c, i, shownCash.length); });
+                  })()}
                 </div>
               </div>
             );
