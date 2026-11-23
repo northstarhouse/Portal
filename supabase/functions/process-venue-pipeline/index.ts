@@ -258,7 +258,7 @@ Deno.serve(async (req) => {
   const now = new Date();
   const nowIso = now.toISOString();
   const templates = await getTemplates();
-  const result: Record<string, number> = { expiredRequests: 0, initial: 0, followUp48h: 0, finalFollowUp30d: 0, archived: 0, tourConfirmation: 0, reminder24h: 0, reminder1h: 0, touredDocs: 0, estateTourPrebooking: 0, questionnaireReminder: 0, completed: 0, feedbackRequested: 0, feedbackArchived: 0, errors: 0 };
+  const result: Record<string, number> = { expiredRequests: 0, initial: 0, followUp48h: 0, finalFollowUp30d: 0, archived: 0, tourConfirmation: 0, reminder24h: 0, reminder1h: 0, touredDocs: 0, estateTourPrebooking: 0, questionnaireReminder: 0, agreementExpiryReminder: 0, completed: 0, feedbackRequested: 0, feedbackArchived: 0, errors: 0 };
 
   // The existing 15-minute schedule also clears unbooked requests once ALL
   // preferred dates are past in Grass Valley. Today's dates remain available.
@@ -451,6 +451,44 @@ Deno.serve(async (req) => {
       } catch (e) { console.error('estate tour prebooking email failed for', tour.id, e); result.errors++; }
     }
   } catch (e) { console.error('step8b query failed', e); }
+
+  // ── Step 8d: 2 days before a pending rental agreement's signing deadline -> remind each client who has not signed ──
+  // The deadline (expires_at) is what keeps the date on a soft hold; after it the hold is released. Sent once per agreement.
+  try {
+    const in2Days = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    const versions = await rest(`venue_agreement_versions?select=id,response_id,title,expires_at&status=eq.pending&expires_at=gt.${encodeURIComponent(nowIso)}&expires_at=lte.${encodeURIComponent(in2Days)}&expiry_reminder_sent_at=is.null`);
+    for (const v of versions || []) {
+      try {
+        const signers = await rest(`venue_agreement_signers?select=name,email,role,status&version_id=eq.${v.id}`);
+        const unsigned = (signers || []).filter((x: any) => x.role !== 'venue' && x.status !== 'signed' && x.email);
+        if (unsigned.length && templates.agreement_expiry_reminder) {
+          const inq = (await rest(`venue_inquiries?select=event_date&limit=1&prebooking_form_response_id=eq.${v.response_id}`))?.[0];
+          const code = venueCode(inq?.event_date);
+          const expires = fmtDate(v.expires_at);
+          const expiresShort = new Date(v.expires_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: TZ });
+          const sentTo: string[] = [];
+          for (const c of unsigned) {
+            const first = String(c.name || '').trim().split(/\s+/)[0] || 'there';
+            try {
+              await sendTemplated(templates.agreement_expiry_reminder, c.email,
+                { name: first, expires, expires_short: expiresShort, venue_code: code, event_page_link: CLIENT_PAGE_URL },
+                { name: escapeHtml(first), expires: escapeHtml(expires), expires_short: escapeHtml(expiresShort), venue_code: escapeHtml(code), event_page_link: CLIENT_PAGE_URL });
+              sentTo.push(c.name || c.email);
+            } catch (e) { console.error('agreement expiry reminder email failed for', v.id, c.email, e); result.errors++; }
+          }
+          if (!sentTo.length) continue; // nothing was delivered: leave it unmarked so the next hourly run retries
+          try {
+            await rest('activity_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+              description: `Signing reminder sent to ${sentTo.join(' and ')} (agreement expires ${expiresShort})`,
+              action: 'contract_expiry_reminder_sent', tag: 'Venue', detail: { version_id: v.id, title: v.title },
+            }) });
+          } catch (_e) { /* the emails already went out */ }
+        }
+        await rest(`venue_agreement_versions?id=eq.${v.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ expiry_reminder_sent_at: nowIso }) });
+        result.agreementExpiryReminder++;
+      } catch (e) { console.error('agreement expiry reminder failed for', v.id, e); result.errors++; }
+    }
+  } catch (e) { console.error('step8d query failed', e); }
 
   // ── Step 9: 60 days before event_date -> questionnaire + insurance + brick reminder ──
   try {
