@@ -5965,7 +5965,7 @@ function DonorsView({ navigate }) {
                         <td style={{padding:'14px 18px'}}>
                           {d.tier==='none'
                             ? <span style={{color:'#ccc',fontSize:13}}>—</span>
-                            : <span style={{display:'inline-flex',justifyContent:'center',boxSizing:'border-box',width:168,whiteSpace:'nowrap',padding:'3px 10px',borderRadius:20,fontSize:12.5,fontWeight:600,background:tierInfo.bg,color:tierInfo.color,border:'1px solid '+tierInfo.border}}>{tierInfo.label}</span>}
+                            : <span style={{display:'inline-flex',justifyContent:'flex-start',boxSizing:'border-box',width:168,whiteSpace:'nowrap',padding:'3px 14px',borderRadius:20,fontSize:12.5,fontWeight:600,background:tierInfo.bg,color:tierInfo.color,border:'1px solid '+tierInfo.border}}>{tierInfo.label}</span>}
                         </td>
                         <td style={{padding:'14px 18px',textAlign:'left',fontWeight:600,fontSize:14.5,color:'#2a2a2a'}}>
                           {d.current_year_total>0?fmtAmt(d.current_year_total):<span style={{color:'#ccc'}}>—</span>}
