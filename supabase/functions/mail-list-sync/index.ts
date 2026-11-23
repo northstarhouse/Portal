@@ -19,7 +19,7 @@ const NEWSLETTER_FORM = 'ee7add8b-277c-4309-8c45-60b13b3befd3'
 const VOLUNTEER_FORM = '11342c74-d0f0-4cb3-9b9e-57f30b4ae3a7'
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-app-token',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
