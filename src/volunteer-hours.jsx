@@ -96,6 +96,10 @@ export function VolunteerHoursView() {
 
   return <div style={{ padding: '4px 0 40px', maxWidth: 1180 }}>
     <p style={{ margin: '0 0 14px', color: '#6b5d4a', fontSize: 13.5 }}>Hours logged at the kiosk, plus missed hours volunteers add themselves. Each check-in is paired with the next check-out. Click a name to see their shifts.</p>
+    <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <button type="button" style={pill(view === 'volunteer')} onClick={() => setView('volunteer')}>By volunteer</button>
+      <button type="button" style={pill(view === 'month')} onClick={() => setView('month')}>By month</button>
+    </div>
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
       <select value={year} onChange={e => setYear(Number(e.target.value))} style={{ border: '1px solid #d8cdb8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
         {Array.from({ length: thisYear - 2023 + 1 }, (_, i) => thisYear - i).map(y => <option key={y} value={y}>{y}</option>)}
@@ -103,9 +107,6 @@ export function VolunteerHoursView() {
       <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search a name" style={{ border: '1px solid #d8cdb8', borderRadius: 8, padding: '8px 12px', fontSize: 13, minWidth: 200, fontFamily: 'inherit' }} />
       <button type="button" style={pill(!board)} onClick={() => setBoard(false)}>Everyone</button>
       <button type="button" style={pill(board)} onClick={() => setBoard(true)}>Board members</button>
-      <span style={{ width: 1, height: 22, background: '#e0d6c3', margin: '0 4px' }} />
-      <button type="button" style={pill(view === 'volunteer')} onClick={() => setView('volunteer')}>By volunteer</button>
-      <button type="button" style={pill(view === 'month')} onClick={() => setView('month')}>By month</button>
       <span style={{ flex: 1 }} />
       <select value={sort} onChange={e => setSort(e.target.value)} style={{ border: '1px solid #d8cdb8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
         <option value="total">Most hours first</option><option value="name">Name A to Z</option><option value="recent">Most recent shift</option>

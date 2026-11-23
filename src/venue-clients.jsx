@@ -1069,6 +1069,8 @@ function AvailabilityStats({ clients }) {
       // The two earlier years come from the venue team's yearly numbers when we have them (BOOKED_FIXED), otherwise from the portal's bookings.
       const prevVal = (y, r) => BOOKED_FIXED[y] ? BOOKED_FIXED[y][r.m] : monthRow(y, r.m).bookedDays;
       const prevTot = y => rows.reduce((t, r) => t + prevVal(y, r), 0);
+      const curVal = r => BOOKED_FIXED[year] ? BOOKED_FIXED[year][r.m] : r.cur.bookedDays;
+      const curTot = rows.reduce((t, r) => t + curVal(r), 0);
       const deltaText = d => d > 0 ? '+' + d : d < 0 ? String(d).replace('-', '−') : '0';
       const deltaColor = d => d > 0 ? '#2e7d32' : d < 0 ? '#b3261e' : '#999';
       return <div style={{ overflowX: 'auto' }}>
@@ -1085,22 +1087,22 @@ function AvailabilityStats({ clients }) {
             <td style={{ ...td, textAlign: 'left', paddingLeft: 0, fontWeight: 600 }}>{r.name}</td>
             <td style={{ ...td, color: '#888' }}>{prevVal(year - 2, r)}</td>
             <td style={{ ...td, color: '#888' }}>{prevVal(year - 1, r)}</td>
-            <td style={{ ...td, fontWeight: 700, color: '#4a3b24' }}>{r.cur.bookedDays}</td>
-            <td style={{ ...td, fontWeight: 600, color: deltaColor(r.cur.bookedDays - prevVal(year - 1, r)) }}>{deltaText(r.cur.bookedDays - prevVal(year - 1, r))}</td>
+            <td style={{ ...td, fontWeight: 700, color: '#4a3b24' }}>{curVal(r)}</td>
+            <td style={{ ...td, fontWeight: 600, color: deltaColor(curVal(r) - prevVal(year - 1, r)) }}>{deltaText(curVal(r) - prevVal(year - 1, r))}</td>
           </tr>)}
           <tr>
             <td style={{ ...tdTot, textAlign: 'left', paddingLeft: 0 }}>Year</td>
             <td style={{ ...tdTot, color: '#888' }}>{prevTot(year - 2)}</td>
             <td style={{ ...tdTot, color: '#888' }}>{prevTot(year - 1)}</td>
-            <td style={{ ...tdTot, color: '#4a3b24' }}>{tot('bookedDays')}</td>
-            <td style={{ ...tdTot, color: deltaColor(tot('bookedDays') - prevTot(year - 1)) }}>{deltaText(tot('bookedDays') - prevTot(year - 1))}</td>
+            <td style={{ ...tdTot, color: '#4a3b24' }}>{curTot}</td>
+            <td style={{ ...tdTot, color: deltaColor(curTot - prevTot(year - 1)) }}>{deltaText(curTot - prevTot(year - 1))}</td>
           </tr>
         </tbody>
       </table>
       </div>;
     })()}
     <div className="vc-muted" style={{ marginTop: 8, fontSize: 12 }}>
-      {year} counts booked days in the portal, live: two events on one day count once, and a multi-day event counts each day. Earlier years are the venue team's booked-event numbers by event month. The last column shows how far ahead (+) or behind (−) each month is compared with the same month of {year - 1}.
+      Years with venue-team numbers (2025, 2026) use those booked-event counts by event month; other years count booked days in the portal, live (two events on one day count once, a multi-day event counts each day). The venue team's booked-event numbers by event month. The last column shows how far ahead (+) or behind (−) each month is compared with the same month of {year - 1}.
     </div>
   </div>;
 }
