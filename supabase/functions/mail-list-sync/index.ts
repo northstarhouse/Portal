@@ -207,6 +207,29 @@ Deno.serve(async (req) => {
       }
       return json({ results: out })
     }
+    if (action === 'remove-contact') {
+      // A donor was marked deceased: take them off every Constant Contact list (their contact record stays, nothing is deleted).
+      const email = clean(body.email).toLowerCase()
+      if (!email) return json({ status: 'skipped' })
+      const c = await getConn()
+      if (!c || !c.refresh_token) { await logSync(null, 'Marked deceased', email, 'skipped', 'Constant Contact is not connected'); return json({ status: 'skipped' }) }
+      const found = await cc('/contacts?email=' + encodeURIComponent(email) + '&status=all&include=list_memberships,phone_numbers,street_addresses,custom_fields')
+      const existing = found.ok && found.body && Array.isArray(found.body.contacts) ? found.body.contacts[0] : null
+      if (!existing) { await logSync(null, 'Marked deceased', email, 'skipped', 'Not in Constant Contact'); return json({ status: 'not-found' }) }
+      if (!(existing.list_memberships || []).length) { await logSync(null, 'Marked deceased', email, 'skipped', 'Already on no lists'); return json({ status: 'already' }) }
+      const upd: Record<string, unknown> = {
+        email_address: { address: email, permission_to_send: (existing.email_address && existing.email_address.permission_to_send) || 'explicit' },
+        first_name: existing.first_name || undefined, last_name: existing.last_name || undefined,
+        job_title: existing.job_title || undefined, company_name: existing.company_name || undefined,
+        list_memberships: [], update_source: 'Account',
+      }
+      if (Array.isArray(existing.phone_numbers) && existing.phone_numbers.length) upd.phone_numbers = existing.phone_numbers.map((x: any) => ({ phone_number: x.phone_number, kind: x.kind || 'other' }))
+      if (Array.isArray(existing.street_addresses) && existing.street_addresses.length) upd.street_addresses = existing.street_addresses.map((x: any) => ({ kind: x.kind, street: x.street, city: x.city, state: x.state, postal_code: x.postal_code, country: x.country }))
+      if (Array.isArray(existing.custom_fields) && existing.custom_fields.length) upd.custom_fields = existing.custom_fields.map((x: any) => ({ custom_field_id: x.custom_field_id, value: x.value }))
+      const r = await cc('/contacts/' + existing.contact_id, { method: 'PUT', body: JSON.stringify(upd) })
+      await logSync(null, 'Marked deceased', email, r.ok ? 'removed' : 'failed', r.ok ? 'Removed from all Constant Contact lists' : 'Constant Contact said ' + r.status)
+      return json({ status: r.ok ? 'removed' : 'failed' })
+    }
     if (action === 'backfill') {
       const formId = body.form === 'volunteer' ? VOLUNTEER_FORM : NEWSLETTER_FORM
       const c = await getConn()

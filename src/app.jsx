@@ -4753,6 +4753,15 @@ function DonorsView({ navigate }) {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState({});
+  const [inlineField, setInlineField] = useState(null); // donor field being edited in place (Profile section)
+  const [inlineValue, setInlineValue] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [showMerge, setShowMerge] = useState(false);
+  const [mergeQuery, setMergeQuery] = useState('');
+  const [mergeTarget, setMergeTarget] = useState(null);
+  const [merging, setMerging] = useState(false);
+  const [mergeError, setMergeError] = useState('');
+  const avatarInputRef = React.useRef(null);
   const [filters, setFilters] = useState({search:'',status:'all',tier:'all',donationType:'all',year:String(THIS_YEAR),hasAddress:'all'});
   const [viewMode, setViewMode] = useState('donors'); // 'donors' = one row per donor, 'gifts' = every donation
   const [sortKey, setSortKey] = useState('last_gift_date');
@@ -5048,7 +5057,7 @@ function DonorsView({ navigate }) {
   // Members + Sponsors mail-merge export.
   function toggleDeceased(){
     var next=!selected.deceased;
-    if(!window.confirm(next?('Mark '+(selected.formal_name||'this donor')+' as deceased? They will be left out of mailings.'):('Mark '+(selected.formal_name||'this donor')+' as living again?')))return;
+    if(!window.confirm(next?('Mark '+(selected.formal_name||'this donor')+' as deceased? They will be removed from your Constant Contact lists and left out of mailings.'):('Mark '+(selected.formal_name||'this donor')+' as living again?')))return;
     fetch(SUPABASE_URL+'/rest/v1/donors?id=eq.'+selected.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({deceased:next})})
       .then(function(r){return r.json();}).then(function(rows){
         var updated=Array.isArray(rows)?rows[0]:null;
@@ -5560,6 +5569,115 @@ function DonorsView({ navigate }) {
     });
   }
 
+  // Save one donor field and refresh the list and the open panel.
+  function patchDonor(patch){
+    return fetch(SUPABASE_URL+'/rest/v1/donors?id=eq.'+selected.id,{method:'PATCH',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(patch)})
+      .then(function(r){return r.json();}).then(function(rows){
+        var updated=Array.isArray(rows)?rows[0]:null;
+        if(!updated){alert('Could not save. Please try again.');return false;}
+        setDonors(function(prev){return prev.map(function(d){return d.id===selected.id?Object.assign({},d,patch):d;});});
+        setSelected(function(prev){return prev?Object.assign({},prev,patch):prev;});
+        return true;
+      }).catch(function(){alert('Could not save. Please try again.');return false;});
+  }
+  function saveInline(field){
+    var v=(inlineValue||'').trim()||null;
+    var patch={};patch[field]=v;
+    patchDonor(patch).then(function(ok){if(ok)setInlineField(null);});
+  }
+  function toggleStar(){
+    patchDonor(selected.starred?{starred:false,star_note:null}:{starred:true});
+  }
+  // Photo: same place the donors app keeps it (donor-avatars bucket, donors.avatar_url).
+  function uploadAvatar(file){
+    if(!file||!selected)return;
+    setUploadingAvatar(true);
+    var ext=(file.name.split('.').pop()||'png').toLowerCase();
+    var path=selected.id+'/avatar.'+ext;
+    fetch(SUPABASE_URL+'/storage/v1/object/donor-avatars/'+path,{method:'POST',headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':file.type||'image/png','x-upsert':'true'},body:file})
+      .then(function(r){
+        if(!r.ok)return r.json().then(function(e){throw new Error(e.message||e.error||('Upload failed ('+r.status+')'));});
+        return patchDonor({avatar_url:SUPABASE_URL+'/storage/v1/object/public/donor-avatars/'+path+'?t='+Date.now()});
+      }).catch(function(e){alert('Photo upload failed: '+e.message);}).then(function(){setUploadingAvatar(false);});
+  }
+  // Merge the open donor INTO another donor: gifts, tags and volunteer links move over, blank profile fields are
+  // filled from this record, then this record is deleted.
+  async function doMerge(){
+    if(!selected||!mergeTarget)return;
+    var src=selected, tgt=donors.find(function(d){return d.id===mergeTarget.id;});
+    if(!tgt){setMergeError('That donor could not be found.');return;}
+    setMerging(true);setMergeError('');
+    var H={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'};
+    var base=SUPABASE_URL+'/rest/v1/';
+    var step=function(label,p){return p.then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error(label+' failed: '+t.slice(0,160));});return r;});};
+    try{
+      await step('Moving gifts',fetch(base+'donations?donor_id=eq.'+src.id,{method:'PATCH',headers:H,body:JSON.stringify({donor_id:tgt.id})}));
+      // tags: move the ones the target does not already have, drop the rest
+      var srcTags=await (await fetch(base+'donor_tags?donor_id=eq.'+src.id+'&select=tag_id',{headers:H})).json();
+      var tgtTags=await (await fetch(base+'donor_tags?donor_id=eq.'+tgt.id+'&select=tag_id',{headers:H})).json();
+      var have={};(Array.isArray(tgtTags)?tgtTags:[]).forEach(function(t){have[t.tag_id]=true;});
+      for(var i=0;i<(Array.isArray(srcTags)?srcTags:[]).length;i++){
+        var tid=srcTags[i].tag_id;
+        if(!have[tid])await step('Moving tags',fetch(base+'donor_tags?donor_id=eq.'+src.id+'&tag_id=eq.'+tid,{method:'PATCH',headers:H,body:JSON.stringify({donor_id:tgt.id})}));
+      }
+      await fetch(base+'donor_tags?donor_id=eq.'+src.id,{method:'DELETE',headers:H});
+      await fetch(base+encodeURIComponent('2026 Volunteers')+'?donor_id=eq.'+src.id,{method:'PATCH',headers:H,body:JSON.stringify({donor_id:tgt.id})});
+      // fill blanks on the target from the donor being merged away
+      var fill={};
+      ['email','phone','address','mailing_address_line1','mailing_address_line2','mailing_city','mailing_state','mailing_zip','background','first_connected','nsh_contact','also_supports','avatar_url','employer','joint_donor_name'].forEach(function(k){
+        if((!tgt[k]||String(tgt[k]).trim()==='')&&src[k])fill[k]=src[k];
+      });
+      if(src.donor_notes)fill.donor_notes=(tgt.donor_notes?tgt.donor_notes+'\n\n':'')+'From '+src.formal_name+': '+src.donor_notes;
+      var hl=(tgt.historical_lifetime_giving||0)+(src.historical_lifetime_giving||0), hc=(tgt.historical_donation_count||0)+(src.historical_donation_count||0);
+      fill.historical_lifetime_giving=hl;fill.historical_donation_count=hc;
+      await step('Updating the donor',fetch(base+'donors?id=eq.'+tgt.id,{method:'PATCH',headers:H,body:JSON.stringify(fill)}));
+      await step('Deleting the old record',fetch(base+'donors?id=eq.'+src.id,{method:'DELETE',headers:H}));
+      var moved=(src.donations||[]).map(function(d){return Object.assign({},d,{donor_id:tgt.id});});
+      var merged=buildDonor(Object.assign({},tgt,fill),(tgt.donations||[]).concat(moved));
+      merged.tags=tgt.tags||[];
+      setDonors(function(prev){return prev.filter(function(d){return d.id!==src.id;}).map(function(d){return d.id===tgt.id?merged:d;});});
+      setSelected(merged);
+      setShowMerge(false);setMergeTarget(null);setMergeQuery('');setMerging(false);
+    }catch(e){setMergeError(e.message||'Merge failed');setMerging(false);}
+  }
+  var NSH_CONTACTS=['Kaelen','Haley','Derek','Phred'];
+  // One click-to-edit field. heading=true gives it a section-sized title (notes, also supports).
+  function inlineRow(field,label,kind,placeholder,heading){
+    var cur=selected[field]||'';
+    var editing=inlineField===field;
+    var title=heading
+      ? <div style={{fontSize:12,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#a8a095',margin:'22px 0 6px'}}>{label}</div>
+      : <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:0.6,color:'#a8a095',marginBottom:2}}>{label}</div>;
+    if(editing){
+      var opts=NSH_CONTACTS.indexOf(inlineValue)===-1&&inlineValue?NSH_CONTACTS.concat([inlineValue]):NSH_CONTACTS;
+      return (
+        <div key={field} style={{marginBottom:heading?0:14}}>
+          {title}
+          <div style={{display:'flex',gap:6,alignItems:'flex-start'}}>
+            {kind==='select'
+              ? <select autoFocus value={inlineValue} onChange={function(e){setInlineValue(e.target.value);}} style={{flex:1,padding:'6px 8px',border:'1px solid #e0d8cc',borderRadius:8,fontSize:13,background:'#fff'}}><option value="">— unassigned —</option>{opts.map(function(o){return <option key={o} value={o}>{o}</option>;})}</select>
+              : kind==='line'
+              ? <input autoFocus value={inlineValue} onChange={function(e){setInlineValue(e.target.value);}} onKeyDown={function(e){if(e.key==='Enter')saveInline(field);if(e.key==='Escape')setInlineField(null);}} style={{flex:1,padding:'6px 8px',border:'1px solid #e0d8cc',borderRadius:8,fontSize:13}} />
+              : <textarea autoFocus value={inlineValue} onChange={function(e){setInlineValue(e.target.value);}} rows={heading?4:3} style={{flex:1,padding:'6px 8px',border:'1px solid #e0d8cc',borderRadius:8,fontSize:13,resize:'vertical',fontFamily:'inherit'}} />}
+            <div style={{display:'flex',flexDirection:'column',gap:4}}>
+              <button onClick={function(){saveInline(field);}} style={{background:gold,color:'#fff',border:'none',borderRadius:8,padding:'5px 12px',fontSize:12,fontWeight:600,cursor:'pointer'}}>Save</button>
+              <button onClick={function(){setInlineField(null);}} style={{background:'#f3efe8',color:'#777',border:'none',borderRadius:8,padding:'5px 12px',fontSize:12,cursor:'pointer'}}>✕</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div key={field} style={{marginBottom:heading?0:14}}>
+        {title}
+        <div onClick={function(){setInlineValue(cur);setInlineField(field);}} title="Click to edit" style={{cursor:'pointer',fontSize:13.5,color:'#333',lineHeight:1.5,whiteSpace:'pre-wrap',minHeight:24,padding:'2px 4px',margin:'0 -4px',borderRadius:6}}
+          onMouseEnter={function(e){e.currentTarget.style.background='#faf8f4';}} onMouseLeave={function(e){e.currentTarget.style.background='transparent';}}>
+          {cur?cur:<span style={{color:'#c9c2b6',fontStyle:heading?'italic':'normal',fontSize:heading?13:14}}>{heading?(placeholder||'—'):'—'}</span>}
+        </div>
+      </div>
+    );
+  }
+
   function getDonsByYear(dons){
     var byY={};
     (dons||[]).forEach(function(d){var yr=d.date?d.date.slice(0,4):'?';if(!byY[yr])byY[yr]=[];byY[yr].push(d);});
@@ -5568,6 +5686,55 @@ function DonorsView({ navigate }) {
 
   return (
     <div style={{position:'relative'}}>
+      {showMerge&&selected&&(function(){
+        var q=mergeQuery.trim().toLowerCase();
+        var results=q?donors.filter(function(d){return d.id!==selected.id&&((d.formal_name||'').toLowerCase().indexOf(q)!==-1||(d.informal_first_name||'').toLowerCase().indexOf(q)!==-1);}).slice(0,8):[];
+        return (
+          <div style={{position:'fixed',inset:0,zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+            <div onClick={function(){if(!merging)setShowMerge(false);}} style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.4)'}} />
+            <div style={{position:'relative',background:'#fff',borderRadius:16,boxShadow:'0 20px 60px rgba(0,0,0,0.25)',width:'100%',maxWidth:460}}>
+              <div style={{padding:'16px 20px',borderBottom:'0.5px solid #f0ebe2',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div style={{fontSize:16,fontWeight:700,color:'#2c2418',fontFamily:"'Cardo', Georgia, serif"}}>Merge donor</div>
+                <button onClick={function(){if(!merging)setShowMerge(false);}} style={{background:'none',border:'none',fontSize:22,color:'#9a9184',cursor:'pointer',lineHeight:1}}>×</button>
+              </div>
+              <div style={{padding:'16px 20px'}}>
+                <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#a8a095',marginBottom:6}}>Merging</div>
+                <div style={{padding:'9px 12px',background:'#fdf2f2',border:'0.5px solid #f3c9c9',borderRadius:10,fontSize:14,fontWeight:600,color:'#3a3226'}}>{selected.formal_name} <span style={{fontWeight:400,fontSize:12,color:'#a09580',marginLeft:6}}>will be deleted</span></div>
+                <div style={{textAlign:'center',color:'#c9c2b6',fontSize:20,margin:'8px 0'}}>↓</div>
+                <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#a8a095',marginBottom:6}}>Into</div>
+                {mergeTarget ? (
+                  <div style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',background:'#eef7ee',border:'0.5px solid #b7dfb9',borderRadius:10}}>
+                    <span style={{flex:1,fontSize:14,fontWeight:600,color:'#3a3226'}}>{mergeTarget.formal_name}</span>
+                    <button onClick={function(){setMergeTarget(null);}} style={{background:'none',border:'none',color:'#9a9184',cursor:'pointer',fontSize:16}}>×</button>
+                  </div>
+                ) : (
+                  <div>
+                    <input autoFocus value={mergeQuery} onChange={function(e){setMergeQuery(e.target.value);}} placeholder="Search donor name…" style={{width:'100%',boxSizing:'border-box',padding:'9px 12px',border:'1px solid #e0d8cc',borderRadius:10,fontSize:14}} />
+                    {results.length>0&&<div style={{marginTop:6,border:'0.5px solid #e0d8cc',borderRadius:10,overflow:'hidden'}}>
+                      {results.map(function(r){return (
+                        <div key={r.id} onClick={function(){setMergeTarget(r);setMergeQuery('');}} style={{padding:'9px 12px',fontSize:14,cursor:'pointer',borderBottom:'0.5px solid #f3eee4'}}
+                          onMouseEnter={function(e){e.currentTarget.style.background='#faf6ec';}} onMouseLeave={function(e){e.currentTarget.style.background='#fff';}}>
+                          <span style={{fontWeight:600,color:'#3a3226'}}>{r.formal_name}</span>{r.informal_first_name&&<span style={{color:'#a09580',fontSize:12,marginLeft:8}}>{r.informal_first_name}</span>}
+                        </div>
+                      );})}
+                    </div>}
+                    {q&&results.length===0&&<div style={{fontSize:12,color:'#a09580',marginTop:6}}>No other donor matches that name.</div>}
+                  </div>
+                )}
+                {mergeTarget&&<div style={{marginTop:14,padding:'10px 12px',background:'#fff8e6',border:'0.5px solid #f0d98c',borderRadius:10,fontSize:12.5,color:'#7a5a12',lineHeight:1.5}}>
+                  All gifts, tags and history from <b>{selected.formal_name}</b> move to <b>{mergeTarget.formal_name}</b>. Anything blank on <b>{mergeTarget.formal_name}</b> (email, phone, address, notes) is filled in from this record.
+                  <b style={{display:'block',marginTop:4}}>{selected.formal_name} will be permanently deleted.</b>
+                </div>}
+                {mergeError&&<div style={{marginTop:10,fontSize:13,color:'#c0392b'}}>{mergeError}</div>}
+              </div>
+              <div style={{padding:'12px 20px',borderTop:'0.5px solid #f0ebe2',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <button onClick={function(){if(!merging)setShowMerge(false);}} style={{background:'none',border:'none',color:'#888',fontSize:14,cursor:'pointer',padding:'8px 4px'}}>Cancel</button>
+                <button onClick={doMerge} disabled={!mergeTarget||merging} style={{background:gold,color:'#fff',border:'none',borderRadius:10,padding:'9px 18px',fontSize:14,fontWeight:600,cursor:(!mergeTarget||merging)?'default':'pointer',opacity:(!mergeTarget||merging)?0.45:1}}>{merging?'Merging…':'Merge & Delete'}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {/* Filter bar */}
       <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',gap:8,marginBottom:14}}>
         <div style={{display:'inline-flex',border:'0.5px solid #e0d8cc',borderRadius:8,overflow:'hidden',flexShrink:0}}>
@@ -5644,7 +5811,7 @@ function DonorsView({ navigate }) {
 
       {/* Table + panel layout */}
       <div style={{display:'flex',gap:0,position:'relative'}}>
-        <div style={{flex:1,minWidth:0,background:'#fff',border:'0.5px solid #e0d8cc',borderRadius:10,overflow:'hidden',marginRight:selected?428:0,transition:'margin-right 0.2s'}}>
+        <div style={{flex:1,minWidth:0,background:'#fff',border:'0.5px solid #e6dfd3',borderRadius:16,overflow:'hidden',boxShadow:'0 1px 4px rgba(60,45,20,0.05)',marginRight:selected?428:0,transition:'margin-right 0.2s'}}>
           {loading ? (
             <div style={{textAlign:'center',padding:40,color:'#777',fontSize:12}}>Loading donors...</div>
           ) : viewMode==='gifts' ? (
@@ -5696,11 +5863,12 @@ function DonorsView({ navigate }) {
             })()
           ) : (
             <div style={{overflowX:'auto'}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
                 <thead>
-                  <tr style={{borderBottom:'0.5px solid #e0d8cc',background:'#faf8f4'}}>
+                  <tr style={{borderBottom:'0.5px solid #ece4d6'}}>
                     {[
                       {label:'Donor',k:'formal_name',align:'left'},
+                      {label:'Status',k:'status',align:'left'},
                       {label:'Tier',k:'tier',align:'left'},
                       {label:'This Year',k:'current_year_total',align:'right'},
                       {label:'Lifetime',k:'lifetime_total',align:'right'},
@@ -5709,8 +5877,8 @@ function DonorsView({ navigate }) {
                       var active=sortKey===h.k;
                       return (
                         <th key={h.k} onClick={function(){handleSort(h.k);}}
-                          style={{padding:'10px 14px',textAlign:h.align,fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:0.8,color:active?'#555':'#999',cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>
-                          {h.label}{active?(sortDir==='asc'?' ↑':' ↓'):' ⇅'}
+                          style={{padding:'18px 20px 14px',textAlign:h.align,fontSize:12,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:active?'#6b5d4a':'#a8a095',cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}}>
+                          {h.label}<span style={{marginLeft:6,fontSize:11,opacity:active?1:0.6}}>{active?(sortDir==='asc'?'↑':'↓'):'⇅'}</span>
                         </th>
                       );
                     })}
@@ -5718,37 +5886,44 @@ function DonorsView({ navigate }) {
                 </thead>
                 <tbody>
                   {sortedDonors.length===0 ? (
-                    <tr><td colSpan={5} style={{textAlign:'center',padding:40,color:'#aaa',fontSize:12}}>No donors match your filters.</td></tr>
+                    <tr><td colSpan={6} style={{textAlign:'center',padding:40,color:'#aaa',fontSize:13}}>No donors match your filters.</td></tr>
                   ) : sortedDonors.map(function(d){
                     var tierInfo=nshGetTier(d.membership_year_total);
                     var isSelected=selected&&selected.id===d.id;
                                     return (
                       <tr key={d.id} onClick={function(){setSelected(d);setEditDon(null);}}
-                        style={{borderBottom:'0.5px solid #f0ebe2',cursor:'pointer',background:isSelected?'#faf4e8':'#fff',transition:'background 0.1s',opacity:d.deceased?0.55:1}}>
-                        <td style={{padding:'10px 14px'}}>
-                          <div style={{display:'flex',alignItems:'center',gap:6}}>
+                        style={{borderBottom:'0.5px solid #f3eee4',cursor:'pointer',background:isSelected?'#faf4e8':'#fff',transition:'background 0.12s',opacity:d.deceased?0.55:1}}
+                        onMouseEnter={function(e){if(!isSelected)e.currentTarget.style.background='#fdfaf4';}} onMouseLeave={function(e){e.currentTarget.style.background=isSelected?'#faf4e8':'#fff';}}>
+                        <td style={{padding:'18px 20px'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:12}}>
+                            {d.avatar_url
+                              ? <img src={d.avatar_url} alt="" style={{width:34,height:34,borderRadius:'50%',objectFit:'cover',flexShrink:0,border:'1px solid #eadfcd'}} />
+                              : null}
                             <div>
-                              <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
-                                <span style={{fontWeight:500,color:'#2a2a2a'}}>{d.formal_name}</span>
-                                {d.starred && <span style={{color:'#b5a185',fontSize:12}}>★</span>}
-                                {d.deceased && <span style={{fontSize:9,fontWeight:600,padding:'1px 5px',borderRadius:20,background:'#e5e7eb',color:'#6b7280'}}>Deceased</span>}
+                              <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                                <span style={{fontWeight:600,fontSize:15,color:'#2a2a2a'}}>{d.formal_name}</span>
+                                {d.starred && <span style={{color:'#b5a185',fontSize:13}}>★</span>}
+                                {d.deceased && <span style={{fontSize:10,fontWeight:600,padding:'2px 7px',borderRadius:20,background:'#e5e7eb',color:'#6b7280'}}>Deceased</span>}
                               </div>
-                              {d.informal_first_name && <div style={{fontSize:11,color:'#999',marginTop:1}}>{d.informal_first_name}</div>}
+                              {d.informal_first_name && <div style={{fontSize:12,color:'#a09580',marginTop:2}}>{d.informal_first_name}</div>}
                             </div>
                           </div>
                         </td>
-                        <td style={{padding:'10px 14px'}}>
-                          {d.tier==='none'
-                            ? <span style={{color:'#ccc',fontSize:11}}>—</span>
-                            : <span style={{display:'inline-flex',justifyContent:'center',boxSizing:'border-box',width:164,whiteSpace:'nowrap',padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,background:tierInfo.bg,color:tierInfo.color,border:'1px solid '+tierInfo.border}}>{tierInfo.label}</span>}
+                        <td style={{padding:'18px 20px'}}>
+                          <span style={Object.assign({display:'inline-block',fontSize:13,fontWeight:600,borderRadius:20,padding:'4px 12px'},NSH_STATUS_PILLS[d.status]||{background:'#f3f4f6',color:'#6b7280'})}>{NSH_STATUS_LABELS[d.status]||d.status}</span>
                         </td>
-                        <td style={{padding:'10px 14px',textAlign:'right',fontWeight:500,color:'#2a2a2a'}}>
+                        <td style={{padding:'18px 20px'}}>
+                          {d.tier==='none'
+                            ? <span style={{color:'#ccc',fontSize:13}}>—</span>
+                            : <span style={{display:'inline-flex',justifyContent:'center',boxSizing:'border-box',width:176,whiteSpace:'nowrap',padding:'4px 10px',borderRadius:20,fontSize:13,fontWeight:600,background:tierInfo.bg,color:tierInfo.color,border:'1px solid '+tierInfo.border}}>{tierInfo.label}</span>}
+                        </td>
+                        <td style={{padding:'18px 20px',textAlign:'right',fontWeight:600,fontSize:15,color:'#2a2a2a'}}>
                           {d.current_year_total>0?fmtAmt(d.current_year_total):<span style={{color:'#ccc'}}>—</span>}
                         </td>
-                        <td style={{padding:'10px 14px',textAlign:'right',color:'#555'}}>
+                        <td style={{padding:'18px 20px',textAlign:'right',fontSize:15,color:'#555'}}>
                           {fmtAmt(d.lifetime_total)}
                         </td>
-                        <td style={{padding:'10px 14px',textAlign:'right',color:'#888',fontSize:11}}>
+                        <td style={{padding:'18px 20px',textAlign:'right',color:'#8a8478',fontSize:13,whiteSpace:'nowrap'}}>
                           {fmtDate(d.last_gift_date)}
                         </td>
                       </tr>
@@ -5756,7 +5931,7 @@ function DonorsView({ navigate }) {
                   })}
                 </tbody>
               </table>
-              <div style={{padding:'10px 14px',fontSize:11,color:'#aaa',borderTop:'0.5px solid #f0ebe2'}}>
+              <div style={{padding:'14px 20px',fontSize:12,color:'#a09580',borderTop:'0.5px solid #f3eee4'}}>
                 {sortedDonors.length} donor{sortedDonors.length!==1?'s':''}
               </div>
             </div>
@@ -5768,36 +5943,60 @@ function DonorsView({ navigate }) {
       {selected && (
         <div style={{position:'fixed',top:0,right:0,width:420,height:'100vh',background:'#fff',boxShadow:'-4px 0 24px rgba(0,0,0,0.12)',zIndex:500,display:'flex',flexDirection:'column',overflowY:'hidden'}}>
           {/* Panel header */}
-          <div style={{background:'linear-gradient(135deg,#f8f4ec 0%,#f0e8dc 100%)',padding:'20px 24px 16px',borderBottom:'0.5px solid #e8dece',flexShrink:0}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:16,fontWeight:600,color:'#1e1a16',marginBottom:2,lineHeight:1.3}}>{selected.formal_name}</div>
-                {selected.informal_first_name && <div style={{fontSize:11,color:'#888',marginBottom:4}}>Goes by {selected.informal_first_name}</div>}
+          <div style={{background:'#fff',padding:'22px 24px 18px',borderBottom:'0.5px solid #ece4d6',flexShrink:0}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10}}>
+              <div style={{display:'flex',gap:16,alignItems:'flex-start',minWidth:0,flex:1}}>
+                <div onClick={function(){if(!uploadingAvatar&&avatarInputRef.current)avatarInputRef.current.click();}} title="Click to add or change the photo"
+                  style={{width:76,height:76,borderRadius:'50%',background:selected.avatar_url?'#fff':'#e7e2d9',flexShrink:0,position:'relative',overflow:'hidden',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid #eadfcd'}}
+                  onMouseEnter={function(e){e.currentTarget.lastChild.style.opacity='1';}} onMouseLeave={function(e){e.currentTarget.lastChild.style.opacity='0';}}>
+                  {selected.avatar_url
+                    ? <img src={selected.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                    : <span style={{fontSize:30,fontWeight:600,color:'#8a7e6b',userSelect:'none'}}>{(selected.formal_name||'?').charAt(0).toUpperCase()}</span>}
+                  <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.45)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:600,opacity:uploadingAvatar?1:0,transition:'opacity 0.15s',textAlign:'center'}}>{uploadingAvatar?'Saving…':'Add photo'}</div>
+                </div>
+                <input ref={avatarInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={function(e){var fl=e.target.files&&e.target.files[0];if(fl)uploadAvatar(fl);e.target.value='';}} />
+                <div style={{minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <div style={{fontFamily:"'Cardo', Georgia, serif",fontSize:26,fontWeight:700,color:'#2c2418',lineHeight:1.15}}>{selected.formal_name}</div>
+                    {selected.starred && <span title="Starred donor" style={{color:'#b5a185',fontSize:18}}>★</span>}
+                  </div>
+                  {selected.informal_first_name && <div style={{fontSize:12,color:'#8a7e6b',marginTop:2}}>Goes by {selected.informal_first_name}</div>}
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginTop:10}}>
+                    {(function(){var ti=nshGetTier(selected.membership_year_total);return ti.tier!=='none'?<span style={{fontSize:13,fontWeight:600,color:ti.color,background:ti.bg,border:'1px solid '+ti.border,borderRadius:20,padding:'3px 12px'}}>✦ {ti.label}</span>:null;})()}
+                    <span style={Object.assign({fontSize:13,borderRadius:20,padding:'3px 12px',fontWeight:600},NSH_STATUS_PILLS[selected.status]||{background:'#f3f4f6',color:'#6b7280'})}>{NSH_STATUS_LABELS[selected.status]||selected.status}</span>
+                    {(selected.tags||[]).map(function(tag){return <span key={tag.id} style={{display:'inline-flex',alignItems:'center',padding:'3px 10px',borderRadius:20,fontSize:12,fontWeight:500,background:tag.color+'22',color:tag.color}}>{tag.name}</span>;})}
+                  </div>
+                </div>
               </div>
-              <button onClick={function(){setSelected(null);setEditDon(null);}}
-                style={{background:'rgba(0,0,0,0.06)',border:'none',borderRadius:'50%',width:28,height:28,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:16,color:'#666',flexShrink:0,marginLeft:8}}>×</button>
+              <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+                <button onClick={function(){setMergeQuery('');setMergeTarget(null);setMergeError('');setShowMerge(true);}} title="Merge this donor into another donor"
+                  style={{display:'inline-flex',alignItems:'center',gap:6,background:'none',border:'none',cursor:'pointer',fontSize:14,color:'#8a8478',padding:'4px 8px',borderRadius:8}}
+                  onMouseEnter={function(e){e.currentTarget.style.background='#f6f1e7';}} onMouseLeave={function(e){e.currentTarget.style.background='none';}}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Merge
+                </button>
+                <button onClick={function(){setSelected(null);setEditDon(null);setInlineField(null);}} aria-label="Close"
+                  style={{background:'none',border:'none',fontSize:26,color:'#9a9184',cursor:'pointer',lineHeight:1,padding:'0 2px'}}>×</button>
+              </div>
             </div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
-              {(function(){var ti=nshGetTier(selected.membership_year_total);return ti.tier!=='none'?<span style={{fontSize:11,fontWeight:600,color:ti.color,background:ti.bg,border:'1px solid '+ti.border,borderRadius:20,padding:'2px 10px'}}>✦ {ti.label}</span>:null;})()}
-              <span style={{fontSize:11,borderRadius:20,padding:'2px 8px',fontWeight:500,...(NSH_STATUS_PILLS[selected.status]||{background:'#f3f4f6',color:'#6b7280'})}}>
-                {NSH_STATUS_LABELS[selected.status]||selected.status}
-              </span>
+            <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap',marginTop:16}}>
               <button type="button" onClick={toggleDeceased} title={selected.deceased?'Click to mark as living again':'Mark this donor as deceased (left out of mailings)'}
-                style={{fontSize:11,borderRadius:20,padding:'2px 10px',fontWeight:600,cursor:'pointer',border:selected.deceased?'1px solid #6b7280':'1px solid #d1d5db',background:selected.deceased?'#e5e7eb':'#fff',color:selected.deceased?'#374151':'#6b7280'}}>
-                {selected.deceased?'✓ Deceased (undo)':'Mark deceased'}
+                aria-pressed={!!selected.deceased} style={{display:'inline-flex',alignItems:'center',fontSize:14,fontWeight:selected.deceased?700:500,cursor:'pointer',padding:'8px 20px',borderRadius:10,border:'1px solid '+(selected.deceased?'#4b5563':'#e0d8cc'),background:selected.deceased?'#4b5563':'#fff',color:selected.deceased?'#fff':'#8a8478'}}>
+                Deceased
               </button>
-              {(selected.tags||[]).map(function(tag){return <span key={tag.id} style={{display:'inline-flex',alignItems:'center',gap:3,padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:500,background:tag.color+'22',color:tag.color}}>{tag.name}</span>;})}
+              <button type="button" onClick={toggleStar} style={{display:'inline-flex',alignItems:'center',gap:6,background:'none',border:'none',cursor:'pointer',fontSize:14,color:selected.starred?'#8a6a2f':'#8a8478',padding:'8px 4px'}}>
+                <span style={{fontSize:16,color:selected.starred?'#b5a185':'#a8a095'}}>{selected.starred?'★':'☆'}</span>{selected.starred?'Starred donor':'Star this donor'}
+              </button>
             </div>
             {/* Giving summary */}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginTop:14}}>
               {[
                 {label:'This Year',val:fmtAmt(selected.current_year_total)},
                 {label:'Lifetime',val:fmtAmt(selected.lifetime_total)},
                 {label:'Gifts',val:(selected.donations||[]).length},
-              ].map(function(s){return (
-                <div key={s.label} style={{background:'rgba(255,255,255,0.6)',borderRadius:8,padding:'7px 10px',textAlign:'center'}}>
-                  <div style={{fontSize:13,fontWeight:600,color:'#2a2a2a'}}>{s.val}</div>
-                  <div style={{fontSize:10,color:'#888',marginTop:1}}>{s.label}</div>
+              ].map(function(st){return (
+                <div key={st.label} style={{background:'#faf8f4',border:'0.5px solid #ece4d6',borderRadius:12,padding:'12px 10px',textAlign:'center'}}>
+                  <div style={{fontSize:13,color:'#8a7e6b',marginBottom:4}}>{st.label}</div>
+                  <div style={{fontSize:24,fontWeight:700,color:'#2a2a2a',lineHeight:1.1}}>{st.val}</div>
                 </div>
               );})}
             </div>
@@ -5862,33 +6061,17 @@ function DonorsView({ navigate }) {
               </div>
             )}
 
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <span style={sec}>Profile</span>
-              {!profileForm && <button onClick={function(){setProfileForm({background:selected.background||'',first_connected:selected.first_connected||'',nsh_contact:selected.nsh_contact||'',donor_notes:selected.donor_notes||'',also_supports:selected.also_supports||'',email:selected.email||''});}} style={{fontSize:11,color:'#888',background:'none',border:'0.5px solid #e0d8cc',borderRadius:6,padding:'2px 10px',cursor:'pointer'}}>Edit</button>}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:6,marginBottom:12}}>
+              <span style={{fontSize:13,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#a8a095'}}>Profile</span>
+              <span style={{fontSize:11,fontStyle:'italic',color:'#c9c2b6'}}>Click any field to edit</span>
             </div>
-            {profileForm ? (
-              <form onSubmit={saveProfileFields} style={{background:'#faf8f4',borderRadius:8,padding:'12px 14px',border:'0.5px solid #e0d8cc',marginBottom:10}}>
-                <div style={{marginBottom:8}}><label style={lStyle}>Email</label><input type="email" value={profileForm.email} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{email:e.target.value});});}} placeholder="name@example.com" style={iStyle} /></div>
-                <div style={{marginBottom:8}}><label style={lStyle}>Background</label><textarea value={profileForm.background} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{background:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
-                <div style={{marginBottom:8}}><label style={lStyle}>What Ties Them to North Star House</label><textarea value={profileForm.first_connected} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{first_connected:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
-                <div style={{marginBottom:8}}><label style={lStyle}>Main NSH Contact</label><input value={profileForm.nsh_contact} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{nsh_contact:e.target.value});});}} style={iStyle} /></div>
-                <div style={{marginBottom:8}}><label style={lStyle}>More Donor Notes</label><textarea value={profileForm.donor_notes} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{donor_notes:e.target.value});});}} rows={2} style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
-                <div style={{marginBottom:10}}><label style={lStyle}>Also Supports</label><textarea value={profileForm.also_supports} onChange={function(e){setProfileForm(function(f){return Object.assign({},f,{also_supports:e.target.value});});}} rows={2} placeholder="Other organizations or causes this donor supports…" style={Object.assign({},iStyle,{resize:'vertical'})} /></div>
-                <div style={{display:'flex',gap:8}}>
-                  <button type="submit" disabled={savingProfile} style={{flex:1,background:gold,color:'#fff',border:'none',borderRadius:6,padding:'7px',fontSize:12,fontWeight:500,cursor:'pointer',opacity:savingProfile?0.7:1}}>{savingProfile?'Saving...':'Save'}</button>
-                  <button type="button" onClick={function(){setProfileForm(null);}} style={{padding:'7px 12px',background:'#f5f0ea',border:'none',borderRadius:6,fontSize:12,color:'#666',cursor:'pointer'}}>Cancel</button>
-                </div>
-              </form>
-            ) : (
-              <div style={{fontSize:12,lineHeight:1.7,marginBottom:10}}>
-                {selected.background && <div style={{marginBottom:8}}><span style={{color:'#777',display:'block'}}>Background</span><div style={{color:'#444'}}>{selected.background}</div></div>}
-                {selected.first_connected && <div style={{marginBottom:8}}><span style={{color:'#777',display:'block'}}>What Ties Them to North Star House</span><div style={{color:'#444'}}>{selected.first_connected}</div></div>}
-                {selected.nsh_contact && <div style={{marginBottom:8}}><span style={{color:'#777',display:'block'}}>Main NSH Contact</span><div style={{color:'#444'}}>{selected.nsh_contact}</div></div>}
-                {selected.donor_notes && <div style={{marginBottom:8}}><span style={{color:'#777',display:'block'}}>More Donor Notes</span><div style={{color:'#444'}}>{selected.donor_notes}</div></div>}
-                {selected.also_supports && <div style={{marginBottom:8}}><span style={{color:'#777',display:'block'}}>Also Supports</span><div style={{color:'#444'}}>{selected.also_supports}</div></div>}
-                {!selected.background&&!selected.first_connected&&!selected.nsh_contact&&!selected.donor_notes&&!selected.also_supports && <div style={{color:'#bbb'}}>Nothing on file yet — click Edit to add.</div>}
-              </div>
-            )}
+            {inlineRow('email','Email','line')}
+            {inlineRow('background','Background','text')}
+            {inlineRow('first_connected','What ties them to North Star House','text')}
+            {inlineRow('nsh_contact','Main NSH contact','select')}
+            {inlineRow('donor_notes','More donor notes','text','Add notes about this donor…',true)}
+            {inlineRow('also_supports','Also supports','text','Other organizations or causes this donor supports…',true)}
+            <div style={{height:14}} />
 
             <div style={{fontSize:11,color:'#777',marginBottom:4}}>Tags</div>
             <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:14,position:'relative'}}>
@@ -5925,15 +6108,15 @@ function DonorsView({ navigate }) {
             {/* Donation history by year */}
             <span style={sec}>Donation History</span>
             {(selected.donations||[]).length===0 && <div style={{fontSize:12,color:'#aaa',marginBottom:10}}>No donations on record.</div>}
-            {getDonsByYear(selected.donations).map(function(grp){
+            {getDonsByYear(selected.donations).map(function(grp,gi){
               var yrTotal=grp.dons.reduce(function(s,d){return s+d.amount;},0);
               return (
-                <div key={grp.year} style={{marginBottom:12}}>
+                <div key={grp.year} style={{padding:'14px 0 12px',borderTop:gi>0?'0.5px solid #c9a96a':'none'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
                     <span style={{fontSize:11,fontWeight:600,color:'#555'}}>{grp.year}</span>
                     <span style={{fontSize:11,color:'#888'}}>{fmtAmtFull(yrTotal)}</span>
                   </div>
-                  <div style={{border:'0.5px solid #e0d8cc',borderRadius:8,overflow:'hidden'}}>
+                  <div>
                     {grp.dons.slice().sort(function(a,b){return b.date>a.date?1:-1;}).map(function(don,i){
                       var tc=NSH_TYPE_COLORS[don.type]||{bg:'#f3f3f3',color:'#555'};
                       var acked=don.acknowledged===true||String(don.acknowledged).toUpperCase()==='TRUE';
