@@ -17744,7 +17744,7 @@ function AdminView({ navigate }) {
       { label: 'Volunteer Hours', view: 'volunteer-hours', icon: ic('volunteer-hours') },
       { label: 'Volunteer Email Lists', view: 'vol-email-lists', icon: emailIcon },
       { label: 'Walk-In Guest List', view: 'walk-in-guests', icon: guestIcon },
-      { label: 'Visitor Kiosk', url: formItem('Kiosk').url, icon: formItem('Kiosk').icon },
+      { label: 'Volunteer Kiosk', url: formItem('Kiosk').url, icon: formItem('Kiosk').icon },
     ] },
     { title: 'House Operations', items: [
       { label: 'Submit Maintenance Request', view: 'maintenance-request', icon: wrenchIcon },
