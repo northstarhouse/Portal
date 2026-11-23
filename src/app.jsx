@@ -7,6 +7,7 @@ import { EventListView } from './event-list.jsx';
 import { OrgGuideView } from './org-guide.jsx';
 import { BrickOrdersView } from './brick-orders.jsx';
 import { VolunteerHoursView } from './volunteer-hours.jsx';
+import { printForm } from './print-form.js';
 import { VenueFollowingView } from './venue-following.jsx';
 import { InquiryFlagNotes } from './flag-notes.jsx';
 import { docentVenueReplyText } from './template-samples.jsx';
@@ -14956,7 +14957,7 @@ function EventEmailModal({ ev, onClose }) {
   );
 }
 
-function SuListRow({ title, subtitle, meta, unread, onClick, onViewResponses, onCopyLink, copied, onDelete, onSendEmail, bucketControl, onToggleHidden, hiddenNow }) {
+function SuListRow({ title, subtitle, meta, unread, onClick, onViewResponses, onPrint, onCopyLink, copied, onDelete, onSendEmail, bucketControl, onToggleHidden, hiddenNow }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '0.5px solid #f0ece6' }}>
       <div onClick={onClick} style={{ flex: 1, minWidth: 0, cursor: onClick ? 'pointer' : 'default' }}>
@@ -14970,6 +14971,7 @@ function SuListRow({ title, subtitle, meta, unread, onClick, onViewResponses, on
       {bucketControl}
       {onToggleHidden && <button onClick={onToggleHidden} title={hiddenNow ? 'Put this form back on the main list' : 'Move this form out of the main list into the Hidden bucket'} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: hiddenNow ? gold : '#888', flexShrink: 0 }}>{hiddenNow ? 'Show again' : 'Hide'}</button>}
       {onViewResponses && <button onClick={onViewResponses} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#888', flexShrink: 0 }}>Responses</button>}
+      {onPrint && <button onClick={onPrint} title="Print a blank, on-brand copy of this form" style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#888', flexShrink: 0 }}>🖨 Print</button>}
       {onCopyLink && <button onClick={onCopyLink} style={{ background: 'none', border: '0.5px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: copied ? '#2e7d32' : '#888', flexShrink: 0 }}>{copied ? '✓ Copied' : 'Copy link'}</button>}
       {onSendEmail && <button onClick={onSendEmail} style={{ background: 'none', border: '0.5px solid ' + gold, borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: gold, flexShrink: 0 }}>Send email</button>}
       {onDelete && <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#c88', cursor: 'pointer', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Delete</button>}
@@ -15637,6 +15639,7 @@ function FormBuilderView({ navigate }) {
           <div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
               <button onClick={function() { setEditing({ type: viewing.type, id: viewing.id }); }} style={SU_BTN_PRIMARY}>{'Edit ' + noun}</button>
+              {viewing.type === 'forms' && <button onClick={function() { printForm(item); }} style={SU_BTN_GHOST}>🖨 Print form</button>}
               {viewing.type === 'forms' && <button onClick={function() { handleCopyLink('form', item.id, item.title); }} style={SU_BTN_GHOST}>{copiedId === 'form' + item.id ? 'Link copied' : 'Copy link'}</button>}
               {viewing.type === 'forms' && <a href={suPublicLink('form', item.id, item.title)} target="_blank" rel="noreferrer" style={Object.assign({}, SU_BTN_GHOST, { textDecoration: 'none', display: 'inline-block' })}>Open live form ↗</a>}
               {viewing.type === 'events' && <button onClick={function() { handleCopyLink('event', item.id, item.title, item.slug); }} style={SU_BTN_GHOST}>{copiedId === 'event' + item.id ? 'Link copied' : 'Copy link'}</button>}
@@ -15716,6 +15719,7 @@ function FormBuilderView({ navigate }) {
                 return <SuListRow key={fm.id} title={fm.title} subtitle={fm.internal_note} meta={meta} unread={unread}
                   onClick={function() { openForm(fm); }} bucketControl={bucket}
                   onToggleHidden={function() { toggleHidden(fm); }} hiddenNow={!!fm.portal_hidden}
+                  onPrint={function() { printForm(fm); }}
                   onCopyLink={function() { handleCopyLink('form', fm.id, fm.title); }} copied={copiedId === 'form' + fm.id}
                   onDelete={function() { handleDelete('form', fm.id, 'nsh_forms'); }} />;
               });
