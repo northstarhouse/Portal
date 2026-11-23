@@ -7,6 +7,7 @@ const HR_URL = 'https://uvzwhhwzelaelfhfkvdb.supabase.co';
 const HR_KEY = 'sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do';
 const HR_H = { apikey: HR_KEY, Authorization: 'Bearer ' + HR_KEY, 'Content-Type': 'application/json' };
 const HUB_URL = 'https://volunteerhub.northstarhouse.org';
+const LETTERHEAD = HUB_URL + '/onboarding/letterhead.jpg';
 const hrReq = async (path, opts) => {
   const r = await fetch(HR_URL + '/rest/v1/' + path, { ...(opts || {}), headers: { ...HR_H, ...((opts && opts.headers) || {}) } });
   const t = await r.text(); let d = null; try { d = t ? JSON.parse(t) : null; } catch (e) { /* not json */ }
@@ -37,7 +38,7 @@ function printPacket(p) {
     "h1{font-size:28px;margin:6px 0 4px;border-bottom:2px solid #886c44;padding-bottom:10px}h3{font-size:16px;color:#886c44;margin:22px 0 6px}" +
     "table{width:100%;border-collapse:collapse;font-family:system-ui,sans-serif;font-size:13px}td{padding:6px 8px;border-bottom:1px solid #eee6d8;vertical-align:top}td.k{width:48%;color:#6b5f4c}" +
     ".meta{font-family:system-ui,sans-serif;font-size:13px;color:#6b5f4c}@media print{body{margin:18px}}</style></head><body>" +
-    '<div class="brand">NORTH STAR HOUSE</div><h1>Staff Onboarding Packet</h1><div class="meta"><b>' + esc(p.person_name) + '</b> &middot; ' + esc(p.person_email) +
+    '<img src="' + LETTERHEAD + '" style="width:100%;display:block;margin-bottom:14px"><h1>Staff Onboarding Packet</h1><div class="meta"><b>' + esc(p.person_name) + '</b> &middot; ' + esc(p.person_email) +
     (p.blank ? '<br>Blank copy' : '<br>Sent ' + esc(fmt(p.sent_at))) + (p.submitted_at ? ' &middot; Submitted ' + esc(fmt(p.submitted_at)) : '') + '</div>' + sections + '</body></html>');
   w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
 }
@@ -80,12 +81,14 @@ function PreviewModal({ name, first, onClose, onSend, busy }) {
         <div style={{ display: 'flex', gap: 8 }}>{tabBtn('packet', 'Packet')}{tabBtn('email', 'Email')}</div>
       </div>
       <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-        {tab === 'email' ? <div dangerouslySetInnerHTML={{ __html: emailHtml(first) }} /> :
-          PACKET_SECTIONS.map(s => <div key={s.id} style={card}>
+        {tab === 'email' ? <div dangerouslySetInnerHTML={{ __html: emailHtml(first) }} /> : <>
+          <img src={LETTERHEAD} alt="North Star Historic Conservancy" style={{ width: '100%', display: 'block', marginBottom: 14 }} />
+          {PACKET_SECTIONS.map(s => <div key={s.id} style={card}>
             <div style={label}>{s.title}</div>
             <div style={{ fontSize: 13, color: '#8a7e6b', marginBottom: 8 }}>{s.intro}</div>
             {s.fields.map(f => <PreviewField key={f.k} f={f} value={vals[f.k]} onChange={v => setVals(o => ({ ...o, [f.k]: v }))} />)}
           </div>)}
+        </>}
       </div>
       <div style={{ padding: '14px 20px', borderTop: '1px solid #e6dfd3', display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
         <button onClick={() => printPacket({ person_name: name, person_email: '', sent_at: new Date().toISOString(), data: {}, blank: true })} style={plain}>Print blank copy</button>
