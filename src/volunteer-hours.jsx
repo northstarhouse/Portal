@@ -74,7 +74,7 @@ export function VolunteerHoursView() {
     .sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'recent' ? ((b.last || 0) - (a.last || 0)) : b.total - a.total);
   const totalHours = shown.reduce((s, p) => s + p.total, 0), totalShifts = shown.reduce((s, p) => s + p.count, 0);
   const monthTotals = MONTHS.map((_, i) => shown.reduce((s, p) => s + p.months[i], 0));
-  const [view, setView] = React.useState('volunteer');
+  const [view, setView] = React.useState('month');
   // Per month: hours, shifts and how many different volunteers came in.
   const byMonth = MONTHS.map((label, i) => {
     const who = shown.filter(p => p.months[i] > 0);
@@ -97,8 +97,8 @@ export function VolunteerHoursView() {
   return <div style={{ padding: '4px 0 40px', maxWidth: 1180 }}>
     <p style={{ margin: '0 0 14px', color: '#6b5d4a', fontSize: 13.5 }}>Hours logged at the kiosk, plus missed hours volunteers add themselves. Each check-in is paired with the next check-out. Click a name to see their shifts.</p>
     <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-      <button type="button" style={pill(view === 'volunteer')} onClick={() => setView('volunteer')}>By volunteer</button>
       <button type="button" style={pill(view === 'month')} onClick={() => setView('month')}>By month</button>
+      <button type="button" style={pill(view === 'volunteer')} onClick={() => setView('volunteer')}>By volunteer</button>
     </div>
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
       <select value={year} onChange={e => setYear(Number(e.target.value))} style={{ border: '1px solid #d8cdb8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', background: '#fff' }}>
