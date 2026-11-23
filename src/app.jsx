@@ -27719,7 +27719,7 @@ function Dashboard() {
                   color: viewAsOpen ? "#f0ebe3" : "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 500, display: "flex", alignItems: "center"
                 }}>View as…<span style={{ marginLeft: "auto", fontSize: 9, opacity: 0.6 }}>{viewAsOpen ? "▲" : "▼"}</span></button>}
                 {canViewAs && viewAsOpen && (
-                  <div style={{ background: "#222226", border: "0.5px solid rgba(255,255,255,0.12)", borderRadius: 8, overflow: "hidden", maxHeight: 360, overflowY: "auto" }}>
+                  <div style={{ background: "#222226", border: "0.5px solid rgba(255,255,255,0.12)", borderRadius: 8, overflow: "hidden", maxHeight: "min(75vh, 700px)", overflowY: "auto" }}>
                     {viewAsChoices === null && <div style={{ padding: "9px 12px", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Loading…</div>}
                     {viewAsChoices !== null && viewAsChoices.length === 0 && <div style={{ padding: "9px 12px", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>No board members or leaders found.</div>}
                     {(viewAsChoices || []).map(function(p) {
