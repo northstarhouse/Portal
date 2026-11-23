@@ -885,7 +885,11 @@ function NavIcon({ id, active, size }) {
 
 // Personalized views: sections a signed-in person does not see (rules in portal_view_rules, set under Admin > Personalized Views).
 var NSH_HIDDEN = {};
-function nshHides(id) { return !!NSH_HIDDEN[id]; }
+// Pages only Haley Wright and Wyn Spiller may open (Website Payments, Operational Budgets). Until the signed-in name is known nothing is hidden.
+var NSH_ME_NAME = '';
+var NSH_FINANCE_ONLY = { 'website-payments': true, 'operational-budgets': true };
+function nshFinanceOK() { return !NSH_ME_NAME || NSH_ME_NAME === 'haley wright' || NSH_ME_NAME === 'wyn spiller'; }
+function nshHides(id) { return !!NSH_HIDDEN[id] || (!!NSH_FINANCE_ONLY[id] && !nshFinanceOK()); }
 function nshSetHidden(sections) {
   var m = {};
   (sections || []).forEach(function(sec) {
@@ -18169,11 +18173,11 @@ function AdminView({ navigate }) {
     { title: 'Finance', items: [
       { label: 'Financial Overview', view: 'financial-overview', icon: trendIcon },
       { label: "Treasurer's Payment Records", view: 'treasurer', icon: dollarIcon },
-      { label: 'Website Payments', view: 'website-payments', icon: cashIcon },
+      { label: 'Website Payments', view: 'website-payments', icon: cashIcon, financeOnly: true },
       { label: 'Reimbursements', view: 'financials', icon: checkIcon },
       { label: 'Office Cash Flow', view: 'office-cash-flow', icon: cashIcon },
-      { label: 'Operational Budgets', view: 'operational-budgets', icon: cashIcon },
-      { label: 'Finance Spreadsheet', url: TR_SHEET, icon: cashIcon },
+      { label: 'Operational Budgets', view: 'operational-budgets', icon: cashIcon, financeOnly: true },
+      { label: 'Finance Spreadsheet', url: TR_SHEET, icon: cashIcon, financeOnly: true },
     ] },
     { title: 'Brick Program', items: [
       { label: 'Submit Brick Order', view: 'brick-submission', icon: brickIcon },
@@ -18195,7 +18199,7 @@ function AdminView({ navigate }) {
           <div key={sec.title}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 }}>{sec.title}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 28 }}>
-              {sec.items.filter(Boolean).map(function(tool) {
+              {sec.items.filter(Boolean).filter(function(t) { return !(t.financeOnly && !nshFinanceOK()); }).map(function(tool) {
                 return <AdminToolCard key={tool.label} tool={tool} icon={tool.icon} navigate={navigate} />;
               })}
             </div>
@@ -27593,13 +27597,14 @@ function Dashboard() {
   const [viewAsChoices, setViewAsChoices] = useState(null);
   const [viewAsOpen, setViewAsOpen] = useState(false);
   const [canViewAs, setCanViewAs] = useState(false); // View as is for Haley only
+  const [myName, setMyName] = useState('');
   React.useEffect(function() {
     var email = '';
     try { email = (localStorage.getItem('nsh-app-email') || '').trim().toLowerCase(); } catch (e) {}
     if (!email) return;
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?select=' + encodeURIComponent('First Name,Last Name') + '&Email=ilike.' + encodeURIComponent(email) + '&limit=1', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
       .then(function(r) { return r.json(); })
-      .then(function(rows) { var v = Array.isArray(rows) && rows[0]; setCanViewAs(!!v && String(v['First Name'] || '').trim().toLowerCase() === 'haley' && String(v['Last Name'] || '').trim().toLowerCase() === 'wright'); })
+      .then(function(rows) { var v = Array.isArray(rows) && rows[0]; setCanViewAs(!!v && String(v['First Name'] || '').trim().toLowerCase() === 'haley' && String(v['Last Name'] || '').trim().toLowerCase() === 'wright'); if (v) setMyName((String(v['First Name'] || '').trim() + ' ' + String(v['Last Name'] || '').trim()).toLowerCase()); })
       .catch(function() {});
   }, []);
   function startViewAs(p) { try { sessionStorage.setItem('nsh-view-as', JSON.stringify(p)); } catch (e) {} setViewAs(p); setViewAsOpen(false); window.location.hash = 'home'; setActive('home'); }
@@ -27639,6 +27644,10 @@ function Dashboard() {
       .then(function(rows) { nshSetHidden(Array.isArray(rows) && rows[0] ? (rows[0].hidden || []) : []); setViewRuleTick(function(t) { return t + 1; }); })
       .catch(function() {});
   }, [viewAs]);
+  React.useEffect(function() {
+    NSH_ME_NAME = ((viewAs && viewAs.name) ? String(viewAs.name).trim().toLowerCase() : myName) || '';
+    setViewRuleTick(function(t) { return t + 1; });
+  }, [myName, viewAs]);
   const View = nshHides(active) ? views.home : views[active];
   const mod = modules.find(m => m.id === active);
   React.useEffect(function() { if (nshHides(active)) { window.location.hash = 'home'; setActive('home'); } }, [active, viewRuleTick]);
