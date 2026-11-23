@@ -40,7 +40,7 @@ as $$
 begin
   if new.form_id in ('ee7add8b-277c-4309-8c45-60b13b3befd3'::uuid, '11342c74-d0f0-4cb3-9b9e-57f30b4ae3a7'::uuid) then
     perform net.http_post(
-      url := 'https://uvzwhhwzelaelfhfkvdb.supabase.co/functions/v1/constant-contact',
+      url := 'https://uvzwhhwzelaelfhfkvdb.supabase.co/functions/v1/mail-list-sync',
       headers := jsonb_build_object('Content-Type', 'application/json', 'apikey', 'sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do', 'Authorization', 'Bearer sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do'),
       body := jsonb_build_object('action', 'sync', 'response_id', new.id),
       timeout_milliseconds := 20000

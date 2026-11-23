@@ -1,6 +1,6 @@
 // Admin > Constant Contact: connect the account once, pick the list each sign-up form feeds, see what was added.
 // New Newsletter Sign Up and Volunteer Sign Up submissions are added to Constant Contact automatically (database trigger -> constant-contact function).
-const CC_FN = 'https://uvzwhhwzelaelfhfkvdb.supabase.co/functions/v1/constant-contact';
+const CC_FN = 'https://uvzwhhwzelaelfhfkvdb.supabase.co/functions/v1/mail-list-sync';
 const CC_KEY = 'sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do';
 const GOLD = '#886c44';
 const ccCall = (body) => fetch(CC_FN, { method: 'POST', headers: { apikey: CC_KEY, Authorization: 'Bearer ' + CC_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
