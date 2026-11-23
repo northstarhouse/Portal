@@ -12,15 +12,18 @@ export function ConstantContactView() {
   const [err, setErr] = React.useState('');
   const [msg, setMsg] = React.useState('');
   const [busy, setBusy] = React.useState('');
-  const [nl, setNl] = React.useState('');
-  const [vl, setVl] = React.useState('');
+  const [nl, setNl] = React.useState([]); // chosen list ids for Newsletter Sign Up
+  const [vl, setVl] = React.useState([]); // chosen list ids for Volunteer Sign Up
 
   const load = React.useCallback(async () => {
     try {
       const s = await ccCall({ action: 'status' });
-      setSt(s); setNl(s.newsletter_list ? s.newsletter_list.id : ''); setVl(s.volunteer_list ? s.volunteer_list.id : '');
+      setSt(s); setNl((s.newsletter_lists || []).map(l => l.id)); setVl((s.volunteer_lists || []).map(l => l.id));
       if (s.connected) { try { setLists((await ccCall({ action: 'lists' })).lists); } catch (e) { setErr(e.message); } }
     } catch (e) { setErr(e.message); setSt({ connected: false, log: [] }); }
+  }, []);
+  React.useEffect(() => {
+    try { const p = new URLSearchParams(window.location.search); if (p.get('cc') === 'connected') setMsg('Connected to Constant Contact. Now choose the list for each form.'); if (p.get('cc_error')) setErr(p.get('cc_error')); } catch (_e) { /* no query */ }
   }, []);
   React.useEffect(() => { load(); const t = () => load(); window.addEventListener('focus', t); return () => window.removeEventListener('focus', t); }, [load]);
 
@@ -32,8 +35,8 @@ export function ConstantContactView() {
   }
   async function save() {
     setErr(''); setMsg(''); setBusy('save');
-    const nameOf = id => ((lists || []).find(l => l.id === id) || {}).name || null;
-    try { await ccCall({ action: 'save-lists', newsletter_list_id: nl || null, newsletter_list_name: nameOf(nl), volunteer_list_id: vl || null, volunteer_list_name: nameOf(vl) }); setMsg('Saved. New sign-ups will go to these lists.'); await load(); }
+    const pick = ids => ids.map(id => ({ id, name: ((lists || []).find(l => l.id === id) || {}).name || '' }));
+    try { await ccCall({ action: 'save-lists', newsletter_lists: pick(nl), volunteer_lists: pick(vl) }); setMsg('Saved. New sign-ups will go to these lists.'); await load(); }
     catch (e) { setErr(e.message); }
     setBusy('');
   }
@@ -75,16 +78,18 @@ export function ConstantContactView() {
       {st.connected && <div style={card}>
         <div style={{ fontSize: 15, fontWeight: 700, color: '#2c2418', fontFamily: "'Cardo', Georgia, serif", marginBottom: 14 }}>Which list does each form feed?</div>
         {!lists ? <div style={{ color: '#8a7e6b', fontSize: 13 }}>Loading your lists…</div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 14 }}>
-          <div>
-            <label style={lbl}>Newsletter Sign Up goes to</label>
-            <select value={nl} onChange={e => setNl(e.target.value)} style={sel}><option value="">Not chosen</option>{lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
-            <button type="button" style={{ ...btn(false, !st.newsletter_list || busy !== ''), marginTop: 8, padding: '6px 12px', fontSize: 12 }} disabled={!st.newsletter_list || busy !== ''} onClick={() => backfill('newsletter')}>{busy === 'bf-newsletter' ? 'Adding…' : 'Add past sign-ups now'}</button>
-          </div>
-          <div>
-            <label style={lbl}>Volunteer Sign Up goes to</label>
-            <select value={vl} onChange={e => setVl(e.target.value)} style={sel}><option value="">Not chosen</option>{lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select>
-            <button type="button" style={{ ...btn(false, !st.volunteer_list || busy !== ''), marginTop: 8, padding: '6px 12px', fontSize: 12 }} disabled={!st.volunteer_list || busy !== ''} onClick={() => backfill('volunteer')}>{busy === 'bf-volunteer' ? 'Adding…' : 'Add past sign-ups now'}</button>
-          </div>
+          {[['newsletter', 'Newsletter Sign Up goes to', nl, setNl, st.newsletter_lists], ['volunteer', 'Volunteer Sign Up goes to', vl, setVl, st.volunteer_lists]].map(([key, title, chosen, setChosen, saved]) => <div key={key}>
+            <label style={lbl}>{title} <span style={{ fontWeight: 400, color: '#a09580' }}>(tick one or more)</span></label>
+            <div style={{ border: '1px solid #e3dccd', borderRadius: 9, background: '#fffefc', maxHeight: 220, overflowY: 'auto', padding: '4px 10px' }}>
+              {lists.map(l => <label key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 13, cursor: 'pointer', borderBottom: '0.5px solid #f3eee4' }}>
+                <input type="checkbox" checked={chosen.includes(l.id)} onChange={() => setChosen(chosen.includes(l.id) ? chosen.filter(x => x !== l.id) : chosen.concat([l.id]))} style={{ accentColor: GOLD, width: 15, height: 15 }} />
+                <span style={{ flex: 1 }}>{l.name}</span>
+                {l.count != null && <span style={{ color: '#b5a99a', fontSize: 11 }}>{l.count}</span>}
+              </label>)}
+            </div>
+            <div style={{ fontSize: 11.5, color: GOLD, marginTop: 6, fontWeight: 600 }}>{chosen.length ? chosen.length + ' list' + (chosen.length === 1 ? '' : 's') + ' ticked' : 'None ticked'}</div>
+            <button type="button" style={{ ...btn(false, !(saved || []).length || busy !== ''), marginTop: 8, padding: '6px 12px', fontSize: 12 }} disabled={!(saved || []).length || busy !== ''} onClick={() => backfill(key)}>{busy === 'bf-' + key ? 'Adding…' : 'Add past sign-ups now'}</button>
+          </div>)}
         </div>}
         <div style={{ marginTop: 16 }}><button type="button" style={btn(true, busy === 'save' || !lists)} disabled={busy === 'save' || !lists} onClick={save}>{busy === 'save' ? 'Saving…' : 'Save lists'}</button></div>
         <div style={{ fontSize: 11.5, color: '#a09580', marginTop: 10 }}>"Add past sign-ups now" becomes available after you save a list. It sends everyone who already signed up through that form.</div>

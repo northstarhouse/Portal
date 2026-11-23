@@ -77,22 +77,22 @@ const clean = (s: unknown) => String(s ?? '').trim()
 // Who a form response is, depending on the form.
 function personFrom(formId: string, a: Record<string, unknown>) {
   if (formId === NEWSLETTER_FORM) {
-    return { email: clean(a.email).toLowerCase(), first: clean(a.first_name || a.name).split(/\s+/)[0] || '', last: '', phone: '', source: 'Newsletter Sign Up', listKey: 'newsletter_list_id' }
+    return { email: clean(a.email).toLowerCase(), first: clean(a.first_name || a.name).split(/\s+/)[0] || '', last: '', phone: '', source: 'Newsletter Sign Up', listKey: 'newsletter_lists' }
   }
-  return { email: clean(a.v_email).toLowerCase(), first: clean(a.v_first), last: clean(a.v_last), phone: clean(a.v_phone), source: 'Volunteer Sign Up', listKey: 'volunteer_list_id' }
+  return { email: clean(a.v_email).toLowerCase(), first: clean(a.v_first), last: clean(a.v_last), phone: clean(a.v_phone), source: 'Volunteer Sign Up', listKey: 'volunteer_lists' }
 }
 
 async function addPerson(conn: any, formId: string, responseId: string | null, answers: Record<string, unknown>) {
   const p = personFrom(formId, answers || {})
   if (!p.email || !/^\S+@\S+\.\S+$/.test(p.email)) { await logSync(responseId, p.source, p.email, 'skipped', 'No valid email address'); return 'skipped' }
-  const listId = conn[p.listKey]
-  if (!listId) { await logSync(responseId, p.source, p.email, 'skipped', 'No Constant Contact list chosen for this form yet'); return 'skipped' }
-  const body: Record<string, unknown> = { email_address: p.email, list_memberships: [listId], create_source: 'Account' }
+  const chosen: { id: string; name: string }[] = Array.isArray(conn[p.listKey]) ? conn[p.listKey] : []
+  if (!chosen.length) { await logSync(responseId, p.source, p.email, 'skipped', 'No Constant Contact list chosen for this form yet'); return 'skipped' }
+  const body: Record<string, unknown> = { email_address: p.email, list_memberships: chosen.map((l) => l.id), create_source: 'Account' }
   if (p.first) body.first_name = p.first
   if (p.last) body.last_name = p.last
   if (p.phone) body.phone_number = p.phone
   const r = await cc('/contacts/sign_up_form', { method: 'POST', body: JSON.stringify(body) })
-  if (r.ok) { await logSync(responseId, p.source, p.email, 'added', 'Added to ' + (conn[p.listKey.replace('_id', '_name')] || 'list')); return 'added' }
+  if (r.ok) { await logSync(responseId, p.source, p.email, 'added', 'Added to ' + chosen.map((l) => l.name).join(' + ')); return 'added' }
   await logSync(responseId, p.source, p.email, 'failed', `Constant Contact said ${r.status}: ${typeof r.body === 'string' ? r.body : JSON.stringify(r.body)}`)
   return 'failed'
 }
@@ -111,8 +111,8 @@ Deno.serve(async (req) => {
         secret_set: !!CLIENT_SECRET,
         connected: !!(c && c.refresh_token),
         connected_at: c?.connected_at || null,
-        newsletter_list: c?.newsletter_list_id ? { id: c.newsletter_list_id, name: c.newsletter_list_name } : null,
-        volunteer_list: c?.volunteer_list_id ? { id: c.volunteer_list_id, name: c.volunteer_list_name } : null,
+        newsletter_lists: c?.newsletter_lists || [],
+        volunteer_lists: c?.volunteer_lists || [],
         log: Array.isArray(log) ? log : [],
       })
     }
@@ -135,8 +135,8 @@ Deno.serve(async (req) => {
     }
     if (action === 'save-lists') {
       await patchConn({
-        newsletter_list_id: body.newsletter_list_id || null, newsletter_list_name: body.newsletter_list_name || null,
-        volunteer_list_id: body.volunteer_list_id || null, volunteer_list_name: body.volunteer_list_name || null,
+        newsletter_lists: Array.isArray(body.newsletter_lists) ? body.newsletter_lists : [],
+        volunteer_lists: Array.isArray(body.volunteer_lists) ? body.volunteer_lists : [],
       })
       return json({ ok: true })
     }

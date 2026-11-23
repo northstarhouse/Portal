@@ -10,14 +10,11 @@ const CLIENT_SECRET = Deno.env.get('CC_CLIENT_SECRET') || ''
 const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/constant-contact-callback`
 const PORTAL = 'https://northstarhouse.github.io/Portal/'
 
-const page = (title: string, message: string, ok: boolean) => new Response(
-  `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>` +
-  `<body style="margin:0;font-family:Georgia,serif;background:#f6f1e7;color:#2c2418;display:flex;min-height:100vh;align-items:center;justify-content:center">` +
-  `<div style="max-width:440px;background:#fff;border:1px solid #e6dfd3;border-top:4px solid #886c44;border-radius:12px;padding:32px;text-align:center">` +
-  `<div style="font-size:13px;letter-spacing:.12em;color:#886c44;font-weight:700">NORTH STAR HOUSE</div>` +
-  `<h1 style="margin:10px 0 8px;font-size:26px">${title}</h1><p style="font-family:system-ui,sans-serif;color:#6b5d4a;line-height:1.5">${message}</p>` +
-  `<a href="${PORTAL}" style="display:inline-block;margin-top:14px;background:#886c44;color:#fff;text-decoration:none;font-family:system-ui,sans-serif;font-weight:600;padding:11px 22px;border-radius:8px">Back to the Portal</a></div></body></html>`,
-  { status: ok ? 200 : 400, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+// Supabase serves HTML from functions as plain text, so send the person back to the Portal instead; the Constant Contact page there shows the result.
+const page = (title: string, message: string, ok: boolean) => new Response(null, {
+  status: 302,
+  headers: { Location: PORTAL + (ok ? '?cc=connected' : '?cc_error=' + encodeURIComponent(title + ': ' + message)) + '#constant-contact' },
+})
 
 async function sb(path: string, init: RequestInit = {}) {
   return fetch(`${SUPABASE_URL}${path}`, { ...init, headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', ...(init.headers || {}) } })
