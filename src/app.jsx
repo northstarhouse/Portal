@@ -12990,7 +12990,7 @@ function FinancialOverviewView({ navigate }) {
       <div style={{ fontSize: 19, fontWeight: 700, color: '#2a2a2a', margin: '0 0 4px' }}>Financial Tracking from Staff</div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 13, color: '#888' }}>Combined view across donations, in-kind sponsorships, operational budgets, and office cash flow.</div>
+        <div />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <select value={activeTab} onChange={function(e) { setActiveTab(e.target.value); }} aria-label="Section" style={{ padding: '7px 12px', borderRadius: 8, border: '0.5px solid #e0d8cc', fontSize: 13, fontWeight: 600, color: '#886c44', background: '#fff', cursor: 'pointer' }}>
             {TABS.map(function(t) { return <option key={t.id} value={t.id}>{t.label}</option>; })}
@@ -13893,8 +13893,8 @@ function FinancialsView({ navigate }) {
     });
   }
 
-  // Board notification: any Op Budget row (reimbursement or not, any area)
-  // that hasn't been notified yet. Persisted server-side via board_notified_at
+  // Board notification: reimbursement requests that haven't been announced to the board yet. (Other purchases are no longer
+  // queued here, so the count matches what is shown on this page.) Persisted server-side via board_notified_at
   // so the queue survives across page navigation and sessions.
   var [notifyItems, setNotifyItems] = useState([]);
   var [notifySending, setNotifySending] = useState(false);
@@ -13909,7 +13909,7 @@ function FinancialsView({ navigate }) {
   }
 
   function loadNotifyQueue() {
-    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?board_notified_at=is.null&select=*&order=id.desc', {
+    fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?board_notified_at=is.null&needs_reimbursement=eq.true&select=*&order=id.desc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) { setNotifyItems(Array.isArray(rows) ? rows : []); });
   }
