@@ -23434,7 +23434,7 @@ function FeatureRequestModal({ onClose }) {
           <div style={{ display: 'flex', gap: 10 }}>
             <label style={Object.assign({}, label, { flex: 1 })}>Where in the Portal
               <select value={f.area} onChange={function(e) { set('area', e.target.value); }} style={field}>
-                {['Venue Rentals', 'Donors', 'Volunteers', 'Events', 'Board', 'Email', 'Reports', 'Something else'].map(function(a) { return <option key={a} value={a}>{a}</option>; })}
+                {['Venue Rentals', 'Donors', 'Volunteers', 'Events', 'Board', 'Email', 'Reports', 'NSH Webpage', 'Something else'].map(function(a) { return <option key={a} value={a}>{a}</option>; })}
               </select>
             </label>
             <label style={Object.assign({}, label, { flex: 1 })}>How important
