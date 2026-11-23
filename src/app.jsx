@@ -1232,7 +1232,7 @@ const typeColors = {
     var vaInterval = setInterval(loadVaRsvps, 30000);
     fetchCalendarEvents().then(function(events) {
       var now = new Date();
-      var windowEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      var windowEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       // occurrencesInRange expands recurring events (RRULE) into their actual
       // upcoming dates — without this, monthly things like "Public Docent
       // Tours" or "Planning Committee" never show since their literal DTSTART
@@ -1368,7 +1368,7 @@ const typeColors = {
           </div>
           {calEvents === null && <div style={{ fontSize: 12, color: "#777" }}>Loading…</div>}
           {calEventsError && <div style={{ fontSize: 12, color: "#c62828", marginBottom: 8 }}>Could not load calendar: {calEventsError}</div>}
-          {calEvents !== null && !calEventsError && calEvents.length === 0 && <div style={{ fontSize: 12, color: "#777" }}>No upcoming events in the next 2 weeks.</div>}
+          {calEvents !== null && !calEventsError && calEvents.length === 0 && <div style={{ fontSize: 12, color: "#777" }}>No upcoming events in the next 7 days.</div>}
           <div>
           {calEvents !== null && calEvents.map(function(ev, i) {
             var start = ev._occStart || parseIcalDate(ev['DTSTART']);
