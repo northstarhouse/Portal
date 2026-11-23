@@ -18149,7 +18149,6 @@ function AdminView({ navigate }) {
   var formItem = function(label) { return ADMIN_FORMS.filter(function(t) { return t.label === label; })[0] || {}; };
   var SECTIONS = [
     { title: 'Events & Rentals', items: [
-      { label: '2027 Event List', view: 'event-list', icon: ic('event-list') },
       { label: 'Event Overviews', view: 'event-overviews', icon: gridIcon },
       SHOW_VENUE_RENTALS ? { label: 'Venue Rentals', view: 'venue', icon: houseIcon } : null,
       { label: 'Event Email Notices', view: 'email-notices', icon: sendIcon },
@@ -26406,7 +26405,7 @@ function TreasurerView({ navigate }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                {['Date', 'From', 'For', 'Source', 'Method', 'Gross', 'Fees', 'Net', ''].map(function(h, i) { return <th key={i} style={{ padding: '10px 9px', borderBottom: '0.5px solid #e0d8cc', textAlign: (h === 'Gross' || h === 'Fees' || h === 'Net') ? 'right' : 'left' }}>{h}</th>; })}
+                {['Date', 'From', 'For', 'Method', 'Gross', 'Fees', 'Net', ''].map(function(h, i) { return <th key={i} style={{ padding: '10px 9px', borderBottom: '0.5px solid #e0d8cc', textAlign: (h === 'Gross' || h === 'Fees' || h === 'Net') ? 'right' : 'left' }}>{h}</th>; })}
               </tr>
             </thead>
             <tbody>
@@ -26415,8 +26414,7 @@ function TreasurerView({ navigate }) {
                   <td style={{ padding: '10px 9px', whiteSpace: 'nowrap' }}>{nice(p.paid_on)}</td>
                   <td style={{ padding: '10px 9px', fontWeight: 600, color: '#2a2420', maxWidth: 190 }}>{p.payer}</td>
                   <td style={{ padding: '10px 9px', color: '#6b5d4a', minWidth: 170, maxWidth: 300 }}>{p.category}{p.detail ? <div title={p.detail} style={{ fontSize: 12, color: '#999', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word', marginTop: 2 }}>{p.detail}</div> : null}</td>
-                  <td style={{ padding: '10px 9px', color: '#6b5d4a', whiteSpace: 'nowrap' }}>{p.source}</td>
-                  <td style={{ padding: '10px 9px', color: '#6b5d4a', minWidth: 120, maxWidth: 210 }}>{p.method}{p.reference ? <div title={p.reference} style={{ fontSize: 11.5, color: '#aaa', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word', marginTop: 2 }}>{p.reference}</div> : null}</td>
+                                    <td style={{ padding: '10px 9px', color: '#6b5d4a', minWidth: 120, maxWidth: 210 }}>{p.method}{p.reference ? <div title={p.reference} style={{ fontSize: 11.5, color: '#aaa', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word', marginTop: 2 }}>{p.reference}</div> : null}</td>
                   <td style={{ padding: '10px 9px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(p.amount)}</td>
                   <td style={{ padding: '10px 9px', textAlign: 'right', whiteSpace: 'nowrap', color: Number(p.fee) > 0 ? '#b3402a' : '#bbb' }}>{Number(p.fee) > 0 ? money(p.fee) : '—'}{Number(p.fee) > 0 && p.fee_estimated ? <div style={{ fontSize: 11, color: '#aaa' }}>(est.)</div> : null}</td>
                   <td style={{ padding: '10px 9px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{money(netOf(p))}</td>

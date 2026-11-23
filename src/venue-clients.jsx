@@ -909,6 +909,7 @@ function downloadCsv(filename, header, lines) {
   const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Sheet1'); X.writeFile(wb, filename.replace(/.csv$/, '.xlsx'));
 }
 export function BookingsExport({ clients, onClose, onOpen, inline }) {
+  const [toolsOpen, setToolsOpen] = React.useState(false);
   const today = venueDateKey();
   const [when, setWhen] = React.useState('all'), [pay, setPay] = React.useState('all'), [q, setQ] = React.useState(''), [closedF, setClosedF] = React.useState('all'), [openId, setOpenId] = React.useState(null);
   // Left out until they are real bookings: nobody who has neither signed nor paid anything yet.
@@ -953,7 +954,7 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
   const sel = { border: '1px solid #ded7cb', background: '#fff', borderRadius: 7, padding: '8px 10px', fontFamily: SANS, fontSize: 12 };
   const btn = (primary) => ({ background: primary ? '#886c44' : '#fff', color: primary ? '#fff' : '#886c44', border: '1px solid #886c44', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 600, fontFamily: SANS, cursor: 'pointer' });
   const th = { textAlign: 'left', fontSize: 10, color: '#877b68', textTransform: 'uppercase', letterSpacing: .5, padding: '6px 8px', borderBottom: '1px solid #e6dfd3' };
-  const td = { padding: '8px', borderBottom: '1px solid #f0ebe0', verticalAlign: 'top' };
+  const td = { padding: '10px 8px', borderBottom: '1px solid #f0ebe0', verticalAlign: 'top' };
   const tone = s => s === 'Paid in full' ? { background: '#edf4ed', color: '#426b4a' } : s.indexOf('past due') !== -1 ? { background: '#f9eae7', color: '#a64f3c' } : s === 'No invoice on file' ? { background: '#eee', color: '#555' } : { background: '#faf0e6', color: '#9a5d22' };
   const outer = inline ? { fontFamily: SANS } : { position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 };
   const innerBox = inline ? { fontFamily: SANS, background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: 18 } : { fontFamily: SANS, background: '#fff', borderRadius: 14, maxWidth: 'none', width: '100%', maxHeight: '96vh', overflowY: 'auto', padding: 22 };
@@ -970,27 +971,35 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
         <select value={closedF} onChange={e => setClosedF(e.target.value)} style={sel}><option value="all">Closed and open</option><option value="closed">Closed out</option><option value="open">Not closed out</option></select>
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name, email, date…" style={{ ...sel, flex: 1, minWidth: 140, maxWidth: 260 }} />
         <span style={{ flex: 1 }} />
-        <button type="button" style={btn(true)} onClick={exportInvoices} disabled={!rows.length} title="One estimate per event, one line per thing ordered (SAT Wedding, security deposit, extra hours, rehearsal, brick), with what is paid and owed">⬇ Estimates for QuickBooks</button>
-        <button type="button" style={btn(false)} onClick={exportBookings} disabled={!rows.length} title="One row per event: totals, paid, balance, next payment">⬇ Bookings summary</button>
-        <button type="button" style={btn(false)} onClick={exportPayments} disabled={!rows.length} title="One row per scheduled payment (deposit, installments, security deposit)">⬇ Payment lines</button>
-        <button type="button" style={btn(false)} onClick={printList} disabled={!rows.length}>🖨 Print list</button>
+        <div style={{ position: 'relative' }}>
+          {toolsOpen && <div onClick={() => setToolsOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />}
+          <button type="button" style={{ ...btn(true), display: 'inline-flex', alignItems: 'center', gap: 8 }} onClick={() => setToolsOpen(o => !o)} aria-haspopup="menu" aria-expanded={toolsOpen}>Tools <span style={{ fontSize: 10, opacity: 0.8 }}>{toolsOpen ? '▲' : '▼'}</span></button>
+          {toolsOpen && <div role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 50, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 10, boxShadow: '0 8px 24px rgba(60,45,20,0.16)', padding: '6px 0', minWidth: 270 }}>
+            {[
+              ['⬇  Estimates for QuickBooks', exportInvoices, 'One estimate per event, one line per thing ordered (SAT Wedding, security deposit, extra hours, rehearsal, brick), with what is paid and owed'],
+              ['⬇  Bookings summary', exportBookings, 'One row per event: totals, paid, balance, next payment'],
+              ['⬇  Payment lines', exportPayments, 'One row per scheduled payment (deposit, installments, security deposit)'],
+              ['🖨  Print list', printList, 'Print this list'],
+            ].map(([label, fn, tip]) => <button key={label} role="menuitem" type="button" title={tip} disabled={!rows.length} onClick={() => { setToolsOpen(false); fn(); }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '9px 16px', fontSize: 13.5, color: rows.length ? '#3a3226' : '#bbb', cursor: rows.length ? 'pointer' : 'default', fontFamily: 'inherit' }}
+              onMouseEnter={e => { if (rows.length) e.currentTarget.style.background = '#faf6ec'; }} onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}>{label}</button>)}
+          </div>}
+        </div>
       </div>
       <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 13, marginBottom: 10 }}>
         <span><b>{rows.length}</b> events</span><span>Invoiced <b>{money(sum(r => r.total))}</b></span><span>Paid <b style={{ color: '#426b4a' }}>{money(sum(r => r.paid))}</b></span><span>Still owed <b style={{ color: '#9a5d22' }}>{money(sum(r => r.balance))}</b></span>
       </div>
-      <div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, tableLayout: 'auto' }}>
-          <thead><tr><th style={th}>Event date</th><th style={th}>Event</th><th style={th}>Type</th><th style={th}>Client</th><th style={th}>Status</th><th style={th}>Closed out</th><th style={{ ...th, textAlign: 'right' }}>Invoice</th><th style={{ ...th, textAlign: 'right' }}>Paid</th><th style={{ ...th, textAlign: 'right' }}>Balance</th><th style={{ ...th, borderLeft: '2px solid #d8cdb8' }}>Next payment</th></tr></thead>
-          <tbody>{rows.length === 0 ? <tr><td style={td} colSpan={10}>No bookings match.</td></tr> : rows.map(r => <React.Fragment key={r.c.id}><tr onClick={() => setOpenId(openId === r.c.id ? null : r.c.id)} style={{ cursor: 'pointer', background: openId === r.c.id ? '#fbf8f2' : undefined }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'auto' }}>
+          <thead><tr><th style={th}>Event date</th><th style={th}>Event</th><th style={th}>Client</th><th style={th}>Status</th><th style={{ ...th, textAlign: 'right' }}>Invoice</th><th style={{ ...th, textAlign: 'right' }}>Paid</th><th style={{ ...th, textAlign: 'right' }}>Balance</th><th style={{ ...th, borderLeft: '2px solid #d8cdb8' }}>Next payment</th></tr></thead>
+          <tbody>{rows.length === 0 ? <tr><td style={td} colSpan={8}>No bookings match.</td></tr> : rows.map(r => <React.Fragment key={r.c.id}><tr onClick={() => setOpenId(openId === r.c.id ? null : r.c.id)} style={{ cursor: 'pointer', background: openId === r.c.id ? '#fbf8f2' : undefined }}>
             <td style={{ ...td, whiteSpace: 'nowrap', fontWeight: 600, color: '#886c44' }}>{openId === r.c.id ? '▾ ' : '▸ '}{day(r.c.eventDate) || 'TBD'}</td>
-            <td style={{ ...td, fontWeight: 600 }}>{r.c.name}</td>
-            <td style={td}>{r.c.type}</td>
-            <td style={td}>{r.people.length ? r.people.map((p, i) => <div key={i}>{p.name}{p.email && <div style={{ color: '#888', fontSize: 11 }}>{p.email}</div>}</div>) : <div>{r.who}<div style={{ color: '#888', fontSize: 11 }}>{r.email}</div></div>}</td>
-            <td style={td}><span style={{ ...tone(r.status), padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600 }}>{r.status}</span></td>
-            <td style={td}><span style={{ ...(r.closed === 'Closed out' ? { background: '#edf4ed', color: '#426b4a' } : r.closed === 'Not yet held' ? { background: '#eee', color: '#555' } : { background: '#faf0e6', color: '#9a5d22' }), padding: '2px 8px', borderRadius: 5, fontSize: 11, fontWeight: 600 }}>{r.closed === 'Closed out' ? '✓ Closed out' : r.closed}</span></td>
-            <td style={{ ...td, textAlign: 'right' }}>{money(r.total)}</td><td style={{ ...td, textAlign: 'right' }}>{money(r.paid)}</td><td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{money(r.balance)}</td>
-            <td style={{ ...td, borderLeft: '2px solid #d8cdb8' }}>{r.next ? <span><b>{r.next.due ? day(r.next.due) : 'No date'}</b> · {money(r.next.cents)}</span> : ''}</td>
-          </tr>{openId === r.c.id && <tr><td colSpan={10} style={{ padding: '4px 8px 16px 28px', background: '#fbf8f2', borderBottom: '1px solid #e6dfd3' }}>
+            <td style={{ ...td, minWidth: 150, maxWidth: 240 }}><div style={{ fontWeight: 600 }}>{r.c.name}</div><div style={{ color: '#888', fontSize: 11.5, marginTop: 1 }}>{r.c.type}</div></td>
+            <td style={{ ...td, minWidth: 150, maxWidth: 230 }}>{r.people.length ? r.people.map((p, i) => <div key={i} style={{ marginBottom: i < r.people.length - 1 ? 4 : 0 }}>{p.name}{p.email && <div style={{ color: '#999', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.email}>{p.email}</div>}</div>) : <div>{r.who}<div style={{ color: '#999', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.email}>{r.email}</div></div>}</td>
+            <td style={{ ...td, whiteSpace: 'nowrap' }}><div><span style={{ ...tone(r.status), display: 'inline-block', padding: '2px 9px', borderRadius: 5, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{r.status}</span></div><div style={{ marginTop: 4 }}><span style={{ ...(r.closed === 'Closed out' ? { background: '#edf4ed', color: '#426b4a' } : r.closed === 'Not yet held' ? { background: '#eee', color: '#555' } : { background: '#faf0e6', color: '#9a5d22' }), display: 'inline-block', padding: '2px 9px', borderRadius: 5, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{r.closed === 'Closed out' ? '✓ Closed out' : r.closed}</span></div></td>
+            <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>{money(r.total)}</td><td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>{money(r.paid)}</td><td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 600 }}>{money(r.balance)}</td>
+            <td style={{ ...td, borderLeft: '2px solid #d8cdb8', whiteSpace: 'nowrap' }}>{r.next ? <span><b>{r.next.due ? day(r.next.due) : 'No date'}</b> · {money(r.next.cents)}</span> : ''}</td>
+          </tr>{openId === r.c.id && <tr><td colSpan={8} style={{ padding: '4px 8px 16px 28px', background: '#fbf8f2', borderBottom: '1px solid #e6dfd3' }}>
             {(() => { const L = invoiceLines(r.c); const sub = L.reduce((t, l) => t + l.amount, 0); return L.length === 0 ? <div className="vc-muted">No invoice on file for this booking yet.</div> : <table style={{ width: '100%', maxWidth: 820, borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead><tr><th style={th}>Item</th><th style={th}>Description</th><th style={{ ...th, textAlign: 'right' }}>Qty</th><th style={{ ...th, textAlign: 'right' }}>Price</th><th style={{ ...th, textAlign: 'right' }}>Amount</th></tr></thead>
               <tbody>{L.map((l, i) => <tr key={i}><td style={{ ...td, paddingLeft: l.child ? 24 : 8, fontWeight: l.child ? 400 : 600 }}>{l.child ? '↳ ' : ''}{l.item}{l.deposit && !/refundable/i.test(l.item + ' ' + (l.desc || '')) ? ' (refundable)' : ''}</td><td style={{ ...td, color: '#666' }}>{l.desc}</td><td style={{ ...td, textAlign: 'right' }}>{l.qty}</td><td style={{ ...td, textAlign: 'right' }}>{money(l.unit)}</td><td style={{ ...td, textAlign: 'right' }}>{money(l.amount)}</td></tr>)}
