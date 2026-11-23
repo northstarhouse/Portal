@@ -17758,7 +17758,7 @@ function AdminView({ navigate }) {
     { title: 'Communications & Website', items: [
       { label: 'North Star House Updates', view: 'nsh-updates', icon: ic('nsh-updates') },
       { label: 'Announcements', view: 'announcements', icon: megaIcon },
-      { label: 'Email Notices', view: 'email-notices', icon: sendIcon },
+      { label: 'Event Email Notices', view: 'email-notices', icon: sendIcon },
       { label: 'Blog Editor', view: 'blog-editor', icon: suClipboardIcon },
       { label: 'Media Library', view: 'site-media', icon: suClipboardIcon },
       { label: 'Website Forms', view: 'form-builder', icon: suCalendarIcon, badge: formsUnread > 0 ? '+' + formsUnread : '' },
@@ -18281,93 +18281,118 @@ function EmailNoticesView({ navigate }) {
     }).finally(function() { setSending(false); });
   }
 
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap', rowGap: 10 }}>
+  var card = { background: '#fff', border: '0.5px solid #e6dfd3', borderRadius: 14, padding: '18px 20px', boxShadow: '0 1px 3px rgba(60,45,20,0.04)' };
+  var lbl = { fontSize: 11, fontWeight: 600, color: '#6b5d4a', display: 'block', marginBottom: 6, letterSpacing: 0.2 };
+  var hint = { fontWeight: 400, color: '#a09580' };
+  var inp = Object.assign({}, inpSt, { border: '1px solid #e3dccd', borderRadius: 9, padding: '10px 12px', background: '#fffefc' });
+  var canSend = !(sending || !selectedCount || !subject.trim() || !headline.trim());
+  function stepHead(n, title, sub) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <div style={{ width: 28, height: 28, borderRadius: '50%', background: gold, color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{n}</div>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2a2a', fontFamily: "'Cardo', serif" }}>Email Notices</div>
-          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Branded announcements to ticket buyers of a specific event — cancellations, updates, offers</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#2c2418', fontFamily: "'Cardo', Georgia, serif" }}>{title}</div>
+          {sub && <div style={{ fontSize: 11.5, color: '#a09580', marginTop: 1 }}>{sub}</div>}
         </div>
       </div>
+    );
+  }
+  return (
+    <div style={{ paddingBottom: 40 }}>
+      <div style={{ borderBottom: '1.5px solid ' + gold, paddingBottom: 14, marginBottom: 22 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: gold, textTransform: 'uppercase', letterSpacing: 2 }}>Ticket buyers</div>
+        <div style={{ fontSize: 26, fontWeight: 700, color: '#2c2418', fontFamily: "'Cardo', Georgia, serif", marginTop: 2 }}>Event Email Notices</div>
+        <div style={{ fontSize: 13, color: '#8a7e6b', marginTop: 4 }}>Send a branded announcement to everyone who bought tickets to an event: cancellations, updates, offers.</div>
+      </div>
 
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 320, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Event</label>
-            <select value={selectedEvent} onChange={function(e) { loadBuyers(e.target.value); }} style={inpSt}>
+      <div style={{ display: 'flex', gap: 22, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 460px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+          <div style={card}>
+            {stepHead(1, 'Choose the event', 'Who should get this notice?')}
+            <label style={lbl}>Event</label>
+            <select value={selectedEvent} onChange={function(e) { loadBuyers(e.target.value); }} style={inp}>
               <option value="">{events === null ? 'Loading events…' : 'Choose an event…'}</option>
               {(events || []).map(function(e) {
                 var d = e.date ? new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
                 return <option key={e.slug} value={e.slug}>{e.title}{d ? ' — ' + d : ''}</option>;
               })}
             </select>
+
+            {selectedEvent && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label style={Object.assign({}, lbl, { marginBottom: 0 })}>Recipients</label>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: gold, background: '#f6f1e7', borderRadius: 20, padding: '2px 10px' }}>{selectedCount} of {(buyers || []).length} selected</span>
+                </div>
+                <input value={search} onChange={function(e) { setSearch(e.target.value); }} placeholder="Search buyers by name or email…" style={Object.assign({}, inp, { marginBottom: 8 })} />
+                <div style={{ background: '#faf8f4', border: '0.5px solid #eee6d8', borderRadius: 10, padding: '6px 12px', maxHeight: 230, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                  {buyers === null ? (
+                    <div style={{ fontSize: 12, color: '#aaa', padding: '10px 4px' }}>Loading buyers…</div>
+                  ) : filteredBuyers.length === 0 ? (
+                    <div style={{ fontSize: 12, color: '#aaa', padding: '10px 4px' }}>No buyers found for this event.</div>
+                  ) : filteredBuyers.map(function(b) {
+                    var checked = !!selected[b.buyer_email];
+                    return (
+                      <label key={b.buyer_email} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 2px', cursor: 'pointer', borderBottom: '0.5px solid #f0ebe0' }}>
+                        <input type="checkbox" checked={checked} onChange={function() { toggleSelected(b.buyer_email); }} style={{ accentColor: gold, flexShrink: 0, width: 15, height: 15 }} />
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#2a2a2a', flexShrink: 0 }}>{b.buyer_name}</span>
+                        <span style={{ fontSize: 11, color: '#a09580', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.buyer_email}</span>
+                        <span style={{ fontSize: 11, color: '#b5a99a', marginLeft: 'auto', flexShrink: 0 }}>{b.totalQty} ticket{b.totalQty === 1 ? '' : 's'}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
-          {selectedEvent && (
-            <div>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>
-                Recipients ({selectedCount} of {(buyers || []).length} selected)
-              </label>
-              <input value={search} onChange={function(e) { setSearch(e.target.value); }} placeholder="Search buyers by name or email…" style={Object.assign({}, inpSt, { marginBottom: 8 })} />
-              <div style={{ background: '#faf8f4', borderRadius: 8, padding: '6px 10px', maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-                {buyers === null ? (
-                  <div style={{ fontSize: 12, color: '#aaa', padding: '10px 4px' }}>Loading buyers…</div>
-                ) : filteredBuyers.length === 0 ? (
-                  <div style={{ fontSize: 12, color: '#aaa', padding: '10px 4px' }}>No buyers found for this event.</div>
-                ) : filteredBuyers.map(function(b) {
-                  var checked = !!selected[b.buyer_email];
-                  return (
-                    <label key={b.buyer_email} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 4px', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={checked} onChange={function() { toggleSelected(b.buyer_email); }} style={{ accentColor: gold, flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, fontWeight: 500, color: '#2a2a2a', flexShrink: 0 }}>{b.buyer_name}</span>
-                      <span style={{ fontSize: 11, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.buyer_email}</span>
-                      <span style={{ fontSize: 11, color: '#bbb', marginLeft: 'auto', flexShrink: 0 }}>{b.totalQty} ticket{b.totalQty === 1 ? '' : 's'}</span>
-                    </label>
-                  );
-                })}
+          <div style={card}>
+            {stepHead(2, 'Write the email', 'Only the subject and headline are required.')}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={lbl}>Subject line</label>
+                <input value={subject} onChange={function(e) { setSubject(e.target.value); }} placeholder="Email subject…" style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Headline</label>
+                <input value={headline} onChange={function(e) { setHeadline(e.target.value); }} placeholder="Big text at the top of the email…" style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Body text <span style={hint}>each line is its own paragraph · **word** for bold</span></label>
+                <textarea value={subtext} onChange={function(e) { setSubtext(e.target.value); }} placeholder="Smaller paragraph below the headline…" rows={5} style={Object.assign({}, inp, { resize: 'vertical' })} />
+              </div>
+              <div style={{ background: '#faf6ec', border: '0.5px solid #ece1c8', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={Object.assign({}, lbl, { marginBottom: 0 })}>Highlight box <span style={hint}>optional</span></label>
+                <textarea value={boxText} onChange={function(e) { setBoxText(e.target.value); }} placeholder="Text inside the tinted box, e.g. an offer description…" rows={2} style={Object.assign({}, inp, { resize: 'vertical' })} />
+                <input value={boxCode} onChange={function(e) { setBoxCode(e.target.value); }} placeholder="Code shown large in the box, e.g. FALLMAGIC" style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Closing text <span style={hint}>optional · shown after the box · **word** for bold</span></label>
+                <textarea value={closing} onChange={function(e) { setClosing(e.target.value); }} placeholder="Any paragraphs that come after the highlight box…" rows={3} style={Object.assign({}, inp, { resize: 'vertical' })} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={lbl}>Button text <span style={hint}>optional</span></label>
+                  <input value={buttonText} onChange={function(e) { setButtonText(e.target.value); }} placeholder="e.g. View Details" style={inp} />
+                </div>
+                <div>
+                  <label style={lbl}>Button link</label>
+                  <input value={buttonUrl} onChange={function(e) { setButtonUrl(e.target.value); }} placeholder="https://…" style={inp} />
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Note <span style={hint}>optional · small italic text</span></label>
+                <input value={note} onChange={function(e) { setNote(e.target.value); }} placeholder="e.g. Questions? Reply to this email." style={inp} />
               </div>
             </div>
-          )}
+          </div>
+        </div>
 
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Subject line</label>
-            <input value={subject} onChange={function(e) { setSubject(e.target.value); }} placeholder="Email subject…" style={inpSt} />
-          </div>
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Headline</label>
-            <input value={headline} onChange={function(e) { setHeadline(e.target.value); }} placeholder="Big text at the top of the email…" style={inpSt} />
-          </div>
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Body text — each line is its own paragraph, **word** for bold</label>
-            <textarea value={subtext} onChange={function(e) { setSubtext(e.target.value); }} placeholder="Smaller paragraph below the headline…" rows={5} style={Object.assign({}, inpSt, { resize: 'vertical' })} />
-          </div>
-          <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 8, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Highlight box (optional)</label>
-            <textarea value={boxText} onChange={function(e) { setBoxText(e.target.value); }} placeholder="Text inside the tinted box, e.g. an offer description…" rows={2} style={Object.assign({}, inpSt, { resize: 'vertical' })} />
-            <input value={boxCode} onChange={function(e) { setBoxCode(e.target.value); }} placeholder="Code shown large in the box, e.g. FALLMAGIC" style={inpSt} />
-          </div>
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Closing text (optional, shown after the box) — **word** for bold</label>
-            <textarea value={closing} onChange={function(e) { setClosing(e.target.value); }} placeholder="Any paragraphs that come after the highlight box…" rows={3} style={Object.assign({}, inpSt, { resize: 'vertical' })} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Button text (optional)</label>
-              <input value={buttonText} onChange={function(e) { setButtonText(e.target.value); }} placeholder="e.g. View Details" style={inpSt} />
-            </div>
-            <div>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Button link</label>
-              <input value={buttonUrl} onChange={function(e) { setButtonUrl(e.target.value); }} placeholder="https://…" style={inpSt} />
-            </div>
-          </div>
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Note (optional, small italic text)</label>
-            <input value={note} onChange={function(e) { setNote(e.target.value); }} placeholder="e.g. Questions? Reply to this email." style={inpSt} />
-          </div>
-
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 5 }}>Preview — exactly what recipients will see</label>
-            <div style={{ border: '0.5px solid #e0d8cc', borderRadius: 8, overflow: 'hidden' }}
+        <div style={{ flex: '1 1 380px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 18, position: 'sticky', top: 16 }}>
+          <div style={card}>
+            {stepHead(3, 'Preview and send', 'Exactly what recipients will see.')}
+            <div style={{ border: '0.5px solid #e3dccd', borderRadius: 10, overflow: 'hidden', maxHeight: 520, overflowY: 'auto' }}
               dangerouslySetInnerHTML={{ __html: buildBoardNotificationEmailHtml({
                 headline: headline || 'Headline',
                 subtext: subtext || 'Body text will appear here…',
@@ -18380,44 +18405,38 @@ function EmailNoticesView({ navigate }) {
                 footerLinks: []
               }) }}
             />
-          </div>
-
-          {sent && <div style={{ fontSize: 12, color: '#2e7d32', background: '#eef7ee', borderRadius: 8, padding: '10px 12px' }}>✓ Sent individually to {sentCount} recipient(s).</div>}
-          {sendError && <div style={{ fontSize: 12, color: '#c0392b', background: '#fce4e4', borderRadius: 8, padding: '8px 12px' }}>{sendError}</div>}
-
-          <div style={{ display: 'flex', gap: 8 }}>
+            {sent && <div style={{ fontSize: 12.5, color: '#2e7d32', background: '#eef7ee', borderRadius: 9, padding: '10px 12px', marginTop: 14 }}>✓ Sent individually to {sentCount} recipient(s).</div>}
+            {sendError && <div style={{ fontSize: 12.5, color: '#c0392b', background: '#fce4e4', borderRadius: 9, padding: '10px 12px', marginTop: 14 }}>{sendError}</div>}
             <button
               onClick={handleSend}
-              disabled={sending || !selectedCount || !subject.trim() || !headline.trim()}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', background: gold, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (sending || !selectedCount || !subject.trim() || !headline.trim()) ? 0.5 : 1 }}
+              disabled={!canSend}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px', marginTop: 14, background: gold, color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, letterSpacing: 0.3, cursor: canSend ? 'pointer' : 'not-allowed', opacity: canSend ? 1 : 0.45 }}
             >
-              {sending ? 'Sending…' : '✉ Send Notice'}
+              {sending ? 'Sending…' : '✉ Send to ' + (selectedCount || 0) + ' ' + (selectedCount === 1 ? 'person' : 'people')}
             </button>
+            <div style={{ fontSize: 11, color: '#b5a99a', textAlign: 'center', marginTop: 8 }}>Each person gets their own email from info@northstarhouse.org. No internal links included.</div>
           </div>
-          <div style={{ fontSize: 10, color: '#ccc', textAlign: 'center' }}>Sends from info@northstarhouse.org · no internal links included</div>
-        </div>
 
-        {logs.length > 0 && (
-          <div style={{ width: 220, flexShrink: 0 }}>
-            <div style={{ background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 12, overflow: 'hidden', position: 'sticky', top: 16 }}>
-              <div style={{ padding: '10px 14px', background: '#fdfcfb', borderBottom: '0.5px solid #f0ece6' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Recent Notices</div>
+          {logs.length > 0 && (
+            <div style={Object.assign({}, card, { padding: 0, overflow: 'hidden' })}>
+              <div style={{ padding: '12px 18px', background: '#faf8f4', borderBottom: '0.5px solid #eee6d8' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: gold, textTransform: 'uppercase', letterSpacing: 1.5 }}>Recent notices</div>
               </div>
               {logs.map(function(log, i) {
                 return (
-                  <div key={i} style={{ padding: '10px 14px', borderBottom: '0.5px solid #f5f1eb' }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#2a2a2a' }}>{log.event_title || log.event_slug}</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.subject}</div>
+                  <div key={i} style={{ padding: '11px 18px', borderBottom: i < logs.length - 1 ? '0.5px solid #f3eee4' : 'none' }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: '#2a2a2a' }}>{log.event_title || log.event_slug}</div>
+                    <div style={{ fontSize: 11.5, color: '#8a7e6b', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.subject}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                      <span style={{ fontSize: 10, color: '#aaa' }}>{log.recipient_count} recipients</span>
-                      <span style={{ fontSize: 10, color: '#ccc' }}>{new Date(log.sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                      <span style={{ fontSize: 10.5, color: '#a09580' }}>{log.recipient_count} recipients</span>
+                      <span style={{ fontSize: 10.5, color: '#b5a99a' }}>{new Date(log.sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                     </div>
                   </div>
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
