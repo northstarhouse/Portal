@@ -52,7 +52,7 @@ function PreviewField({ f, value, onChange }) {
   const box = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #e0d8cc', borderRadius: 8, fontSize: 14, background: '#fff' };
   if (f.type === 'check') return <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: '#2c2418', margin: '10px 0', cursor: 'pointer' }}><input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked)} style={{ marginTop: 2, width: 17, height: 17 }} /><span>{f.label}</span></label>;
   if (f.type === 'initials') return <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '10px 0', flexWrap: 'wrap' }}>
-    <div style={{ flex: '1 1 240px', fontSize: 13, color: '#2c2418' }}>{f.label}{f.link ? <span> {'·'} <a href={f.link} target="_blank" rel="noreferrer" style={{ color: GOLD }}>Open form</a></span> : null}</div>
+    <div style={{ flex: '1 1 240px', fontSize: 13, color: '#2c2418' }}>{f.label}{f.link ? <span> {'·'} <a href={f.link} target="_blank" rel="noreferrer" style={{ color: GOLD }}>Read document</a></span> : null}</div>
     <input value={value || ''} maxLength={4} placeholder="Initials" onChange={e => onChange(e.target.value.toUpperCase())} style={{ ...box, width: 80, textAlign: 'center', fontWeight: 600 }} />
   </div>;
   return <div style={{ margin: '10px 0' }}>

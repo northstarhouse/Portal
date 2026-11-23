@@ -17,14 +17,14 @@ export const PACKET_SECTIONS = [
     { k: 'phys_name', label: 'Physician name', type: 'text' },
     { k: 'phys_addr', label: 'Address', type: 'text' },
     { k: 'phys_phone', label: 'Phone', type: 'tel' },
-    { k: 'phys_init', label: 'Your initials', type: 'initials', req: true },
+    { k: 'phys_init', label: 'I have read the physician designation form (initial)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/physician-designation.pdf', req: true },
   ] },
   { id: 'chiro', title: 'Designation of Personal Chiropractor or Acupuncturist (DWC 9783.1)', intro: 'The same choice for a chiropractor or acupuncturist.', fields: [
     { k: 'chiro_none', label: 'I do not have a personal chiropractor or acupuncturist to designate', type: 'check' },
     { k: 'chiro_name', label: 'Name', type: 'text' },
     { k: 'chiro_addr', label: 'Address', type: 'text' },
     { k: 'chiro_phone', label: 'Phone', type: 'tel' },
-    { k: 'chiro_init', label: 'Your initials', type: 'initials', req: true },
+    { k: 'chiro_init', label: 'I have read the chiropractor or acupuncturist designation form (initial)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/chiropractor-designation.pdf', req: true },
   ] },
   { id: 'deposit', title: 'Direct Deposit Authorization', intro: 'Your paycheck is deposited into this account. Only HR can see these details.', fields: [
     { k: 'dd_name', label: 'Name on the account', type: 'text', req: true },
@@ -46,11 +46,11 @@ export const PACKET_SECTIONS = [
     { k: 'rec_conduct', label: 'Code of Conduct', type: 'initials', req: true },
   ] },
   { id: 'policies', title: 'Policies Read', intro: 'Initial each policy to confirm you have read it.', fields: [
-    { k: 'pol_harass', label: 'Harassment prevention policy', type: 'initials', req: true },
-    { k: 'pol_sexual', label: 'Sexual harassment fact sheet', type: 'initials', req: true },
-    { k: 'pol_lactation', label: 'Lactation accommodation policy', type: 'initials', req: true },
+    { k: 'pol_harass', label: 'Harassment prevention policy', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/harassment-policy.pdf', req: true },
+    { k: 'pol_sexual', label: 'Sexual harassment fact sheet', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/sexual-harassment-fact-sheet.pdf', req: true },
+    { k: 'pol_lactation', label: 'Lactation accommodation policy', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/lactation-policy.pdf', req: true },
     { k: 'pol_leave', label: 'Leave policies', type: 'initials', req: true },
-    { k: 'pol_dv', label: 'Domestic violence rights notice', type: 'initials', req: true },
+    { k: 'pol_dv', label: 'Domestic violence rights notice', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/domestic-violence-leave-notice.pdf', req: true },
   ] },
   { id: 'sign', title: 'Acknowledgment and Signature', intro: 'By typing your full name you sign this packet.', fields: [
     { k: 'ack', label: 'I have received the North Star House policies and notices listed above, and the information I entered is true and complete.', type: 'check', req: true },
