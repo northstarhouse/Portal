@@ -889,7 +889,7 @@ function NavIcon({ id, active, size }) {
 var NSH_HIDDEN = {};
 // Pages only Haley Wright and Wyn Spiller may open (Website Payments, Operational Budgets). Until the signed-in name is known nothing is hidden.
 var NSH_ME_NAME = '';
-var NSH_FINANCE_ONLY = { 'website-payments': true, 'operational-budgets': true };
+var NSH_FINANCE_ONLY = { 'website-payments': true, 'operational-budgets': true, 'human-resources': true };
 function nshFinanceOK() { return !NSH_ME_NAME || NSH_ME_NAME === 'haley wright' || NSH_ME_NAME === 'wyn spiller'; }
 var NSH_HALEY_ONLY = { 'personal-views': true };
 function nshIsHaley() { return !NSH_ME_NAME || NSH_ME_NAME === 'haley wright'; }
@@ -18168,7 +18168,7 @@ function AdminView({ navigate }) {
       { label: 'Submit Maintenance Request', view: 'maintenance-request', icon: wrenchIcon },
       { label: 'Mail & Checks', view: 'mail-checks', icon: emailIcon },
       { label: 'Voicemail Log', view: 'voicemail-log', icon: ic('voicemail-log') },
-      { label: 'Human Resources', view: 'human-resources', icon: guestIcon },
+      { label: 'Human Resources', view: 'human-resources', icon: guestIcon, financeOnly: true },
     ] },
     { title: 'Communications & Website', items: [
       { label: 'North Star House Updates', view: 'nsh-updates', icon: ic('nsh-updates') },
