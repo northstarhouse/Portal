@@ -95,7 +95,6 @@ export function VolunteerHoursView() {
   const stat = (label, value) => <div style={{ background: '#fff', border: '1px solid #e6dfd3', borderRadius: 10, padding: '10px 16px', minWidth: 110 }}><div style={{ fontSize: 22, fontWeight: 700, color: GOLD }}>{value}</div><div style={{ fontSize: 11, color: '#8a7e6b', textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</div></div>;
 
   return <div style={{ padding: '4px 0 40px', maxWidth: 1180 }}>
-    <p style={{ margin: '0 0 14px', color: '#6b5d4a', fontSize: 13.5 }}>Hours logged at the kiosk, plus missed hours volunteers add themselves. Each check-in is paired with the next check-out. Click a name to see their shifts.</p>
     <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
       <button type="button" style={pill(view === 'month')} onClick={() => setView('month')}>By month</button>
       <button type="button" style={pill(view === 'volunteer')} onClick={() => setView('volunteer')}>By volunteer</button>

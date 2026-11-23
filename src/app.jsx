@@ -12307,6 +12307,14 @@ function FinVenueBookings({ navigate }) {
   return <BookingsExport inline clients={clients} onOpen={function(c) { try { sessionStorage.setItem('nsh-venue-tab', 'clients'); } catch (e) {} window.__nshOpenClient = c.id; navigate('venue'); }} />;
 }
 
+var NSH_BILLS = [
+  { name: 'Waste Management (Account 2)', amount: 120.62, amountText: '$120.62', often: 'Monthly', note: 'Consistent in the months checked. September and November were both $120.62.' },
+  { name: 'IONOS WordPress Business', amount: 3, amountText: '$3.00', often: 'Monthly', note: 'Consistent. September, October, and November invoices were $3.00.' },
+  { name: 'Supabase', amount: 25, amountText: '$25.00', often: 'Monthly', note: 'Consistent. September, October, and November invoices showed $25.00.' },
+  { name: 'Nonprofits Insurance Alliance', amount: 11682, amountText: '$11,682.00', often: 'Yearly', note: 'Annual cost.' },
+  { name: 'Microsoft 365 Personal', amount: 99.99, amountText: '$99.99 + tax', often: 'Yearly', note: 'Annual renewal on December 3, 2026. This is the upcoming renewal price, not a verified historical amount.' },
+];
+
 function FinancialOverviewView({ navigate }) {
   var { useState, useEffect, useMemo } = React;
   var thisYear = new Date().getFullYear();
@@ -12544,6 +12552,7 @@ function FinancialOverviewView({ navigate }) {
     { id: 'bookings', label: 'Venue Bookings' },
     { id: 'cashflow', label: 'Office Cash Flow' },
     { id: 'outflow-detail', label: 'Spending Detail' },
+    { id: 'bills', label: 'Bills' },
   ];
   function computeAreaItems(areaName) {
     return budget.filter(function(b) { return inYear(b.date) && (b.area || 'Unassigned') === areaName; })
@@ -12618,6 +12627,8 @@ function FinancialOverviewView({ navigate }) {
         return { Date: c.date || '', Source: 'Cash Log', Category: c.description || '', Direction: c.direction || '', Amount: parseFloat(c.amount) || 0 };
       }));
       downloadXlsxRows(['Date', 'Source', 'Category', 'Direction', 'Amount'], rows, 'office-cash-flow-' + year + '.xlsx');
+    } else if (activeTab === 'bills') {
+      downloadXlsxRows(['Bill', 'Amount', 'How often', 'Note'], NSH_BILLS.map(function(b) { return { Bill: b.name, Amount: b.amountText, 'How often': b.often, Note: b.note }; }), 'bills.xlsx');
     } else if (activeTab === 'outflow-detail') {
       var rows = outflowDetail.all.map(function(r) {
         return { Date: r.date || '', Area: r.area, Description: r.description, By: r.by || '', Source: r.source, Amount: r.amount, 'Possible Duplicate': r.possibleDuplicate ? 'Yes' : '' };
@@ -13023,6 +13034,28 @@ function FinancialOverviewView({ navigate }) {
 
             <CashInTheBoxCard rentals={rentals} cashLog={cashLog} loading={loading} />
           </div>
+          </div>
+          )}
+
+          {activeTab === 'bills' && (
+          <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 4 }}>Bills</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+              <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '10px 16px' }}><div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Monthly bills</div><div style={{ fontSize: 19, fontWeight: 700, marginTop: 4 }}>{money(NSH_BILLS.reduce(function(t, b) { return t + (b.often === 'Monthly' ? b.amount : 0); }, 0))}</div></div>
+              <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '10px 16px' }}><div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Total per year</div><div style={{ fontSize: 19, fontWeight: 700, marginTop: 4, color: '#886c44' }}>{money(NSH_BILLS.reduce(function(t, b) { return t + b.amount * (b.often === 'Monthly' ? 12 : 1); }, 0))}</div><div style={{ fontSize: 10.5, color: '#999', marginTop: 2 }}>Monthly bills x 12 plus yearly bills, before Microsoft tax</div></div>
+            </div>
+            {NSH_BILLS.map(function(b, i) {
+              return (
+                <div key={b.name} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderTop: i ? '0.5px solid #f0ece6' : 'none' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{b.name}</div>
+                    <div style={{ fontSize: 11.5, color: '#888', marginTop: 2 }}>{b.note}</div>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#886c44', background: '#f6f1e7', borderRadius: 10, padding: '2px 8px', fontWeight: 600, flexShrink: 0 }}>{b.often}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#2a2a2a', minWidth: 100, textAlign: 'right', flexShrink: 0 }}>{b.amountText}{b.often === 'Monthly' && <div style={{ fontSize: 10.5, fontWeight: 500, color: '#999' }}>{money(b.amount * 12)} a year</div>}</div>
+                </div>
+              );
+            })}
           </div>
           )}
 
