@@ -4837,14 +4837,19 @@ function DonorsView({ navigate }) {
     var lifetimeTotal = Math.max(lifeCalc, donorRow.historical_lifetime_giving||0);
     var sorted = dons.slice().sort(function(a,b){return b.date>a.date?1:-1;});
     var lastGift = sorted[0]||null;
+    // A brick purchase does not count toward membership: it is left out of the tier and out of whether the donor is current.
+    var isBrick = function(d){return d.type==='Brick Purchase';};
+    var memberYearTotal = dons.filter(function(d){return !isBrick(d)&&d.date&&new Date(d.date).getFullYear()===THIS_YEAR;}).reduce(function(s,d){return s+d.amount;},0);
+    var lastMemberGift = sorted.filter(function(d){return !isBrick(d);})[0]||null;
     return Object.assign({},donorRow,{
       donations: dons,
       current_year_total: cyTotal,
       lifetime_total: lifetimeTotal,
       last_gift_date: lastGift?lastGift.date:null,
       last_gift_amount: lastGift?lastGift.amount:null,
-      status: nshGetStatus(lastGift?lastGift.date:null),
-      tier: nshGetTier(cyTotal).tier,
+      membership_year_total: memberYearTotal,
+      status: nshGetStatus(lastMemberGift?lastMemberGift.date:null),
+      tier: nshGetTier(memberYearTotal).tier,
     });
   }
 
@@ -5720,7 +5725,7 @@ function DonorsView({ navigate }) {
                   {sortedDonors.length===0 ? (
                     <tr><td colSpan={7} style={{textAlign:'center',padding:40,color:'#aaa',fontSize:12}}>No donors match your filters.</td></tr>
                   ) : sortedDonors.map(function(d){
-                    var tierInfo=nshGetTier(d.current_year_total);
+                    var tierInfo=nshGetTier(d.membership_year_total);
                     var isSelected=selected&&selected.id===d.id;
                     var isChecked=!!selectedIds[d.id];
                     return (
@@ -5783,7 +5788,7 @@ function DonorsView({ navigate }) {
                 style={{background:'rgba(0,0,0,0.06)',border:'none',borderRadius:'50%',width:28,height:28,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:16,color:'#666',flexShrink:0,marginLeft:8}}>×</button>
             </div>
             <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
-              {(function(){var ti=nshGetTier(selected.current_year_total);return ti.tier!=='none'?<span style={{fontSize:11,fontWeight:600,color:ti.color,background:ti.bg,border:'1px solid '+ti.border,borderRadius:20,padding:'2px 10px'}}>✦ {ti.label}</span>:null;})()}
+              {(function(){var ti=nshGetTier(selected.membership_year_total);return ti.tier!=='none'?<span style={{fontSize:11,fontWeight:600,color:ti.color,background:ti.bg,border:'1px solid '+ti.border,borderRadius:20,padding:'2px 10px'}}>✦ {ti.label}</span>:null;})()}
               <span style={{fontSize:11,borderRadius:20,padding:'2px 8px',fontWeight:500,...(NSH_STATUS_PILLS[selected.status]||{background:'#f3f4f6',color:'#6b7280'})}}>
                 {NSH_STATUS_LABELS[selected.status]||selected.status}
               </span>
