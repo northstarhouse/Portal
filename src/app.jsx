@@ -27591,15 +27591,46 @@ function Dashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [viewRuleTick, setViewRuleTick] = useState(0);
+  // "View as": an admin previews the Portal the way a person with a personalized view sees it. Kept for this browser tab only.
+  const [viewAs, setViewAs] = useState(function() { try { return JSON.parse(sessionStorage.getItem('nsh-view-as') || 'null'); } catch (e) { return null; } });
+  const [viewAsChoices, setViewAsChoices] = useState(null);
+  const [viewAsOpen, setViewAsOpen] = useState(false);
+  function startViewAs(p) { try { sessionStorage.setItem('nsh-view-as', JSON.stringify(p)); } catch (e) {} setViewAs(p); setViewAsOpen(false); window.location.hash = 'home'; setActive('home'); }
+  function stopViewAs() { try { sessionStorage.removeItem('nsh-view-as'); } catch (e) {} setViewAs(null); }
+  function openViewAs() {
+    setViewAsOpen(function(o) { return !o; });
+    if (viewAsChoices === null) {
+      var H = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+      Promise.all([
+        fetch(SUPABASE_URL + '/rest/v1/portal_view_rules?select=email,note,hidden', { headers: H }).then(function(r) { return r.json(); }),
+        fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('2026 Volunteers') + '?select=' + encodeURIComponent('First Name,Last Name,Email,Team,Status') + '&Status=eq.Active&limit=500', { headers: H }).then(function(r) { return r.json(); }),
+      ]).then(function(res) {
+        var rules = Array.isArray(res[0]) ? res[0] : [], vols = Array.isArray(res[1]) ? res[1] : [];
+        var byEmail = {}; rules.forEach(function(r) { byEmail[String(r.email).toLowerCase()] = r; });
+        var out = [], seen = {};
+        vols.forEach(function(v) {
+          var team = String(v.Team || ''), email = String(v.Email || '').trim().toLowerCase();
+          var board = /board member/i.test(team), lead = /team lead/i.test(team);
+          if (!email || !(board || lead)) return;
+          seen[email] = true;
+          var rule = byEmail[email];
+          out.push({ email: email, name: (String(v['First Name'] || '').trim() + ' ' + String(v['Last Name'] || '').trim()).trim(), role: board ? 'Board member' : 'Team leader', hidden: rule ? (rule.hidden || []) : [] });
+        });
+        rules.forEach(function(r) { var e = String(r.email).toLowerCase(); if (!seen[e]) out.push({ email: e, name: r.note || e, role: '', hidden: r.hidden || [] }); });
+        out.sort(function(a, b) { return (a.role === 'Board member' ? 0 : a.role ? 1 : 2) - (b.role === 'Board member' ? 0 : b.role ? 1 : 2) || a.name.localeCompare(b.name); });
+        setViewAsChoices(out);
+      }).catch(function() { setViewAsChoices([]); });
+    }
+  }
   React.useEffect(function() {
     var email = '';
-    try { email = (localStorage.getItem('nsh-app-email') || '').trim().toLowerCase(); } catch (e) {}
+    try { email = (viewAs && viewAs.email) || (localStorage.getItem('nsh-app-email') || '').trim().toLowerCase(); } catch (e) {}
     if (!email) return;
     fetch(SUPABASE_URL + '/rest/v1/portal_view_rules?email=eq.' + encodeURIComponent(email) + '&select=hidden', { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } })
       .then(function(r) { return r.json(); })
-      .then(function(rows) { if (Array.isArray(rows) && rows[0]) { nshSetHidden(rows[0].hidden || []); setViewRuleTick(function(t) { return t + 1; }); } })
+      .then(function(rows) { nshSetHidden(Array.isArray(rows) && rows[0] ? (rows[0].hidden || []) : []); setViewRuleTick(function(t) { return t + 1; }); })
       .catch(function() {});
-  }, []);
+  }, [viewAs]);
   const View = nshHides(active) ? views.home : views[active];
   const mod = modules.find(m => m.id === active);
   React.useEffect(function() { if (nshHides(active)) { window.location.hash = 'home'; setActive('home'); } }, [active, viewRuleTick]);
@@ -27624,6 +27655,12 @@ function Dashboard() {
   return (
     <MobileCtx.Provider value={isMobile}>
     <div style={{ display: "flex", minHeight: "100vh", background: cream, fontFamily: 'system-ui, sans-serif' }}>
+      {viewAs && (
+        <div style={{ position: "fixed", top: 0, left: "50%", transform: "translateX(-50%)", zIndex: 5000, background: "#2a2a2e", color: "#f0ebe3", borderRadius: "0 0 12px 12px", padding: "8px 18px", fontSize: 13, display: "flex", alignItems: "center", gap: 14, boxShadow: "0 4px 16px rgba(0,0,0,0.25)" }}>
+          <span>Viewing the Portal as <b>{viewAs.name}</b></span>
+          <button onClick={stopViewAs} style={{ background: "#b5a185", color: "#fff", border: "none", borderRadius: 8, padding: "4px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Exit</button>
+        </div>
+      )}
       <style>{".nsh-sidebar::-webkit-scrollbar { display: none; } .nsh-reviews-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }"}</style>
       <div style={{ display: isMobile ? "none" : "flex", position: "sticky", top: 0, height: "100vh", flexShrink: 0 }}>
         <div className="nsh-sidebar" style={{ width: 220, background: "#2a2a2e", display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", scrollbarWidth: "none" }}>
@@ -27667,6 +27704,29 @@ function Dashboard() {
                 border: "none"
               }} />
             </div>
+            {!viewAs && !nshHides('admin') && (
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, position: "relative" }}>
+                <button onClick={function() { navigate("admin"); setOpOpen(false); }} style={{
+                  width: "100%", padding: "7px 12px", borderRadius: 7, cursor: "pointer", textAlign: "left",
+                  background: active === "admin" ? "rgba(181,161,133,0.15)" : "transparent", border: "0.5px solid rgba(255,255,255,0.1)",
+                  color: active === "admin" ? "#f0ebe3" : "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 500
+                }}>Admin</button>
+                <button onClick={openViewAs} style={{
+                  width: "100%", padding: "7px 12px", borderRadius: 7, cursor: "pointer", textAlign: "left",
+                  background: viewAsOpen ? "rgba(181,161,133,0.15)" : "transparent", border: "0.5px solid rgba(255,255,255,0.1)",
+                  color: viewAsOpen ? "#f0ebe3" : "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 500, display: "flex", alignItems: "center"
+                }}>View as…<span style={{ marginLeft: "auto", fontSize: 9, opacity: 0.6 }}>{viewAsOpen ? "▲" : "▼"}</span></button>
+                {viewAsOpen && (
+                  <div style={{ background: "#222226", border: "0.5px solid rgba(255,255,255,0.12)", borderRadius: 8, overflow: "hidden", maxHeight: 360, overflowY: "auto" }}>
+                    {viewAsChoices === null && <div style={{ padding: "9px 12px", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Loading…</div>}
+                    {viewAsChoices !== null && viewAsChoices.length === 0 && <div style={{ padding: "9px 12px", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>No board members or leaders found.</div>}
+                    {(viewAsChoices || []).map(function(p) {
+                      return <button key={p.email} onClick={function() { startViewAs({ email: p.email, name: p.name }); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "transparent", border: "none", borderBottom: "0.5px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: 12, cursor: "pointer" }}>{p.name}<span style={{ display: "block", fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{[p.role, (p.hidden || []).length ? (p.hidden.length + ' hidden') : 'sees everything'].filter(Boolean).join(' · ')}</span></button>;
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div style={{ padding: "0 20px 20px" }} />
         </div>
