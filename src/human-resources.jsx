@@ -33,7 +33,7 @@ function answerText(f, data, hr) {
 function printPacket(p) {
   const d = p.data || {};
   const sections = PACKET_SECTIONS.map(s => '<h3>' + esc(s.title) + '</h3><table>' + s.fields.map(f =>
-    '<tr><td class="k">' + esc(f.label) + '</td><td' + (f.type === 'sig' || (f.type === 'pending' && (p.hr_received || {}).supervisor_sig) ? ' class="sig"' : '') + '>' + esc(answerText(f, d, p.hr_received || {})) + '</td></tr>').join('') + '</table>').join('');
+    '<tr><td class="k">' + esc(f.label) + '</td><td' + (f.type === 'sig' || (f.type === 'pending' && (p.hr_received || {}).supervisor_sig) ? ' class="sig"' : '') + '>' + (f.type === 'check' ? (d[f.k] ? '&#9745;' : '&#9744;') : esc(answerText(f, d, p.hr_received || {}))) + '</td></tr>').join('') + '</table>').join('');
   const w = window.open('', '_blank');
   if (!w) { alert('Allow pop-ups to print the packet.'); return; }
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet"><title>Onboarding Packet - ' + esc(p.person_name) + '</title><style>' +
@@ -257,7 +257,7 @@ function PacketDetail({ p, onBack, onChanged }) {
       <div style={label}>{s.title}</div>
       {s.fields.map(f => <div key={f.k} style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 13 }}>
         <div style={{ flex: '0 0 46%', color: '#8a7e6b' }}>{f.label}</div>
-        <div style={{ flex: 1, textAlign: 'right', color: '#2c2418', wordBreak: 'break-word', ...(f.type === 'sig' || (f.type === 'pending' && hr.supervisor_sig) ? { fontFamily: "'Great Vibes', 'Brush Script MT', cursive", fontSize: 28, lineHeight: 1.2 } : {}) }}>{f.type === 'form' && d['doc_' + f.k] ? <button disabled={!!fv.busy} onClick={() => fv.open(f)} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '5px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{fv.busy === f.k ? 'Opening\u2026' : 'View'}</button> : answerText(f, d, hr)}</div>
+        <div style={{ flex: 1, textAlign: 'right', color: '#2c2418', wordBreak: 'break-word', ...(f.type === 'sig' || (f.type === 'pending' && hr.supervisor_sig) ? { fontFamily: "'Great Vibes', 'Brush Script MT', cursive", fontSize: 28, lineHeight: 1.2 } : {}) }}>{f.type === 'form' && d['doc_' + f.k] ? <button disabled={!!fv.busy} onClick={() => fv.open(f)} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '5px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{fv.busy === f.k ? 'Opening\u2026' : 'View'}</button> : f.type === 'check' ? <span style={{ display: 'inline-block', width: 17, height: 17, boxSizing: 'border-box', border: '1.5px solid ' + GOLD, borderRadius: 3, textAlign: 'center', lineHeight: '14px', fontSize: 14, fontWeight: 700, color: GOLD, background: d[f.k] ? '#f7f2e8' : '#fff', verticalAlign: 'middle' }}>{d[f.k] ? '✓' : ''}</span> : answerText(f, d, hr)}</div>
       </div>)}
     </div>)}
   </div>;

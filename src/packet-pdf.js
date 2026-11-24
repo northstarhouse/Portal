@@ -94,10 +94,19 @@ export async function buildPacketPdf({ p, letterBytes, formDocs }) {
       const labelLines = wrap(safe(f.label), reg, 9, 250);
       const isSig = f.type === 'sig' || (f.type === 'pending' && hr.supervisor_sig);
       const valFont = isSig ? script : reg, valSize = isSig ? 15 : 10;
-      const valLines = wrap(safe(answerFor(f, data, hr)), valFont, valSize, 232);
+      const isCheck = f.type === 'check';
+      const valLines = isCheck ? [''] : wrap(safe(answerFor(f, data, hr)), valFont, valSize, 232);
       const rowH = Math.max(labelLines.length * 11, valLines.length * (valSize + 2)) + 8;
       need(rowH);
       labelLines.forEach((ln, i) => page.drawText(ln, { x: M, y: y - 9 - i * 11, size: 9, font: reg, color: MUTED }));
+      if (isCheck) {
+        const bx = RIGHT - 11, by = y - 12;
+        page.drawRectangle({ x: bx, y: by, width: 11, height: 11, borderColor: GOLD, borderWidth: 1.2 });
+        if (data[f.k]) {
+          page.drawLine({ start: { x: bx + 2, y: by + 5.5 }, end: { x: bx + 4.6, y: by + 2.5 }, thickness: 1.4, color: INK });
+          page.drawLine({ start: { x: bx + 4.6, y: by + 2.5 }, end: { x: bx + 9, y: by + 9 }, thickness: 1.4, color: INK });
+        }
+      }
       valLines.forEach((ln, i) => {
         const wd = valFont.widthOfTextAtSize(ln, valSize);
         page.drawText(ln, { x: RIGHT - wd, y: y - 9 - i * (valSize + 2), size: valSize, font: valFont, color: INK });
