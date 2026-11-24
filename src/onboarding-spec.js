@@ -12,11 +12,11 @@ export const PACKET_SECTIONS = [
     { k: 'ec2_phone', label: 'Phone', type: 'tel' },
     { k: 'ec_medical', label: 'Allergies or medical conditions we should know about (optional)', type: 'text' },
   ] },
-  { id: 'physician', title: 'Designation of Personal Physician (DWC 9783)', intro: 'If you are injured at work, you may choose to be treated by your personal physician. Name them here, or choose that you have none.', fields: [
+  { id: 'physician', title: 'Designation of Personal Physician (DWC 9783)', intro: 'If you are injured at work, you may choose to be treated by your personal physician. Fill out the form below, or check the box if you have none.', fields: [
     { k: 'phys_none', label: 'I do not have a personal physician to designate', type: 'check' },
     { k: 'phys_form', label: 'Fill out the Designation of Personal Physician form (DWC 9783)', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/physician-designation.pdf', fill: true },
   ] },
-  { id: 'chiro', title: 'Designation of Personal Chiropractor or Acupuncturist (DWC 9783.1)', intro: 'The same choice for a chiropractor or acupuncturist.', fields: [
+  { id: 'chiro', title: 'Designation of Personal Chiropractor or Acupuncturist (DWC 9783.1)', intro: 'The same choice for a chiropractor or acupuncturist. Fill out the form below, or check the box if you have none.', fields: [
     { k: 'chiro_none', label: 'I do not have a personal chiropractor or acupuncturist to designate', type: 'check' },
     { k: 'chiro_form', label: 'Fill out the Designation of Personal Chiropractor or Acupuncturist form (DWC 9783.1)', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/chiropractor-designation.pdf', fill: true },
   ] },

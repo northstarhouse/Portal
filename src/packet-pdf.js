@@ -91,6 +91,21 @@ export async function buildPacketPdf({ p, letterBytes, formDocs }) {
     page.drawLine({ start: { x: M, y }, end: { x: RIGHT, y }, thickness: 1, color: GOLD });
     y -= 14;
     s.fields.forEach(f => {
+      if (f.type === 'check') {
+        const lines = wrap(safe(f.label), reg, 10, W - 2 * M - 22);
+        const h = lines.length * 12 + 8;
+        need(h);
+        const bx = M, by = y - 12;
+        page.drawRectangle({ x: bx, y: by, width: 11, height: 11, borderColor: GOLD, borderWidth: 1.2 });
+        if (data[f.k]) {
+          page.drawLine({ start: { x: bx + 2, y: by + 5.5 }, end: { x: bx + 4.6, y: by + 2.5 }, thickness: 1.4, color: INK });
+          page.drawLine({ start: { x: bx + 4.6, y: by + 2.5 }, end: { x: bx + 9, y: by + 9 }, thickness: 1.4, color: INK });
+        }
+        lines.forEach((ln, i) => page.drawText(ln, { x: M + 20, y: y - 9 - i * 12, size: 10, font: reg, color: INK }));
+        y -= h;
+        page.drawLine({ start: { x: M, y: y + 3 }, end: { x: RIGHT, y: y + 3 }, thickness: 0.4, color: RULE });
+        return;
+      }
       const labelLines = wrap(safe(f.label), reg, 9, 250);
       const isSig = f.type === 'sig' || (f.type === 'pending' && hr.supervisor_sig);
       const valFont = isSig ? script : reg, valSize = isSig ? 15 : 10;

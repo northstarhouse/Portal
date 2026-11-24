@@ -33,7 +33,7 @@ function answerText(f, data, hr) {
 function printPacket(p) {
   const d = p.data || {};
   const sections = PACKET_SECTIONS.map(s => '<h3>' + esc(s.title) + '</h3><table>' + s.fields.map(f =>
-    '<tr><td class="k">' + esc(f.label) + '</td><td' + (f.type === 'sig' || (f.type === 'pending' && (p.hr_received || {}).supervisor_sig) ? ' class="sig"' : '') + '>' + (f.type === 'check' ? (d[f.k] ? 'Yes &#9745;' : 'No &#9744;') : esc(answerText(f, d, p.hr_received || {}))) + '</td></tr>').join('') + '</table>').join('');
+    (f.type === 'check' ? '<tr><td colspan="2">' + (d[f.k] ? '&#9745;' : '&#9744;') + ' ' + esc(f.label) + '</td></tr>' : '<tr><td class="k">' + esc(f.label) + '</td><td' + (f.type === 'sig' || (f.type === 'pending' && (p.hr_received || {}).supervisor_sig) ? ' class="sig"' : '') + '>' + (f.type === 'check' ? (d[f.k] ? 'Yes &#9745;' : 'No &#9744;') : esc(answerText(f, d, p.hr_received || {}))) + '</td></tr>')).join('') + '</table>').join('');
   const w = window.open('', '_blank');
   if (!w) { alert('Allow pop-ups to print the packet.'); return; }
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet"><title>Onboarding Packet - ' + esc(p.person_name) + '</title><style>' +
@@ -55,7 +55,11 @@ function emailHtml(first) {
 
 function PreviewField({ f, value, onChange }) {
   const box = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #e0d8cc', borderRadius: 8, fontSize: 14, background: '#fff' };
-  if (f.type === 'form') return <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '12px 0', flexWrap: 'wrap' }}><div style={{ flex: '1 1 240px', fontSize: 13, color: '#2c2418' }}>{f.label}<div style={{ fontSize: 12, color: '#8a7e6b', marginTop: 2 }}>They fill this official form out on the page, or tick "I already turned this in".</div></div><a href={f.link} target="_blank" rel="noreferrer" style={{ background: GOLD, color: '#fff', textDecoration: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600 }}>Open blank form</a></div>;
+  if (f.type === 'form') return <div style={{ margin: '14px 0 6px' }}>
+    <div style={{ fontSize: 13, fontWeight: 600, color: '#2c2418', marginBottom: 2 }}>{f.label}</div>
+    <div style={{ fontSize: 12, color: '#8a7e6b', marginBottom: 6 }}>This is the form they fill out on the page. They can also tick "I already turned this in". Nothing here is saved.</div>
+    <iframe src={f.link} title={f.label} style={{ width: '100%', height: 420, border: '1px solid #cfc6b4', background: '#fff' }} />
+  </div>;
   if (f.type === 'check') return <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: '#2c2418', margin: '10px 0', cursor: 'pointer' }}><input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked)} style={{ marginTop: 2, width: 17, height: 17 }} /><span>{f.label}</span></label>;
   if (f.type === 'initials') return <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '10px 0', flexWrap: 'wrap' }}>
     <div style={{ flex: '1 1 240px', fontSize: 13, color: '#2c2418' }}>{f.label}{f.link ? <span> {'\u00b7'} <a href={f.link} target="_blank" rel="noreferrer" style={{ color: GOLD }}>{f.linkText || 'Read document'}</a></span> : null}</div>
@@ -255,7 +259,10 @@ function PacketDetail({ p, onBack, onChanged }) {
     {fv.modal}
     {p.status === 'submitted' && PACKET_SECTIONS.map(s => <div key={s.id} style={card}>
       <div style={label}>{s.title}</div>
-      {s.fields.map(f => <div key={f.k} style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 13 }}>
+      {s.fields.map(f => f.type === 'check' ? <div key={f.k} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 13, color: '#2c2418' }}>
+        <span style={{ flex: '0 0 auto', display: 'inline-block', width: 17, height: 17, boxSizing: 'border-box', border: '1.5px solid ' + GOLD, borderRadius: 3, textAlign: 'center', lineHeight: '14px', fontSize: 14, fontWeight: 700, color: GOLD, background: d[f.k] ? '#f7f2e8' : '#fff' }}>{d[f.k] ? '✓' : ''}</span>
+        <span>{f.label}</span>
+      </div> : <div key={f.k} style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 13 }}>
         <div style={{ flex: '0 0 46%', color: '#8a7e6b' }}>{f.label}</div>
         <div style={{ flex: 1, textAlign: 'right', color: '#2c2418', wordBreak: 'break-word', ...(f.type === 'sig' || (f.type === 'pending' && hr.supervisor_sig) ? { fontFamily: "'Great Vibes', 'Brush Script MT', cursive", fontSize: 28, lineHeight: 1.2 } : {}) }}>{f.type === 'form' && d['doc_' + f.k] ? <button disabled={!!fv.busy} onClick={() => fv.open(f)} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '5px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{fv.busy === f.k ? 'Opening\u2026' : 'View'}</button> : f.type === 'check' ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span>{d[f.k] ? 'Yes' : 'No'}</span><span style={{ display: 'inline-block', width: 17, height: 17, boxSizing: 'border-box', border: '1.5px solid ' + GOLD, borderRadius: 3, textAlign: 'center', lineHeight: '14px', fontSize: 14, fontWeight: 700, color: GOLD, background: d[f.k] ? '#f7f2e8' : '#fff', verticalAlign: 'middle' }}>{d[f.k] ? '✓' : ''}</span></span> : answerText(f, d, hr)}</div>
       </div>)}
