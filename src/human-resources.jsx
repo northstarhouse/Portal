@@ -20,7 +20,7 @@ const card = { background: '#fff', border: '0.5px solid #e6dfd3', borderRadius: 
 const label = { fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8 };
 
 function answerText(f, data) {
-  if (f.type === 'form') return data['doc_' + f.k] ? 'Filled out (see Filled forms)' : '\u2014';
+  if (f.type === 'form') return data['doc_' + f.k] ? 'Filled out (see Filled forms)' : data['skip_' + f.k] ? 'Says already turned in. Please confirm.' : '\u2014';
   const v = data[f.k];
   if (f.type === 'check') return v ? 'Yes' : 'No';
   if (f.k === 'dd_account' && v) return v;
@@ -52,7 +52,7 @@ function emailHtml(first) {
 
 function PreviewField({ f, value, onChange }) {
   const box = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #e0d8cc', borderRadius: 8, fontSize: 14, background: '#fff' };
-  if (f.type === 'form') return <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '12px 0', flexWrap: 'wrap' }}><div style={{ flex: '1 1 240px', fontSize: 13, color: '#2c2418' }}>{f.label}<div style={{ fontSize: 12, color: '#8a7e6b', marginTop: 2 }}>They fill this official form out on the page in a pop-out.</div></div><a href={f.link} target="_blank" rel="noreferrer" style={{ background: GOLD, color: '#fff', textDecoration: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600 }}>Open blank form</a></div>;
+  if (f.type === 'form') return <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '12px 0', flexWrap: 'wrap' }}><div style={{ flex: '1 1 240px', fontSize: 13, color: '#2c2418' }}>{f.label}<div style={{ fontSize: 12, color: '#8a7e6b', marginTop: 2 }}>They fill this official form out on the page, or tick "I already turned this in".</div></div><a href={f.link} target="_blank" rel="noreferrer" style={{ background: GOLD, color: '#fff', textDecoration: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600 }}>Open blank form</a></div>;
   if (f.type === 'check') return <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13, color: '#2c2418', margin: '10px 0', cursor: 'pointer' }}><input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked)} style={{ marginTop: 2, width: 17, height: 17 }} /><span>{f.label}</span></label>;
   if (f.type === 'initials') return <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '10px 0', flexWrap: 'wrap' }}>
     <div style={{ flex: '1 1 240px', fontSize: 13, color: '#2c2418' }}>{f.label}{f.link ? <span> {'·'} <a href={f.link} target="_blank" rel="noreferrer" style={{ color: GOLD }}>Read document</a></span> : null}</div>

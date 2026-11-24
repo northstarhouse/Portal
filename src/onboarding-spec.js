@@ -60,11 +60,11 @@ export function missingRequired(data) {
   const out = [];
   PACKET_SECTIONS.forEach(s => s.fields.forEach(f => {
     if (!f.req) return;
-    if (f.type === 'form') { if (!data['doc_' + f.k]) out.push('Fill out and save: ' + f.label); return; }
+    if (f.type === 'form') { if (!data['doc_' + f.k] && !data['skip_' + f.k]) out.push('Fill out and save: ' + f.label + ' (or check that you already turned it in)'); return; }
     const v = data[f.k];
     if (f.type === 'check' ? !v : !String(v || '').trim()) out.push(f.label);
   }));
-  if (!data.phys_none && !data.doc_phys_form) out.push('Physician designation form (or check that you have none)');
-  if (!data.chiro_none && !data.doc_chiro_form) out.push('Chiropractor or acupuncturist designation form (or check that you have none)');
+  if (!data.phys_none && !data.doc_phys_form && !data.skip_phys_form) out.push('Physician designation form (or check that you have none)');
+  if (!data.chiro_none && !data.doc_chiro_form && !data.skip_chiro_form) out.push('Chiropractor or acupuncturist designation form (or check that you have none)');
   return out;
 }
