@@ -19,7 +19,8 @@ const fmt = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'long', da
 const card = { background: '#fff', border: '0.5px solid #e6dfd3', borderRadius: 14, padding: 20, boxShadow: '0 1px 3px rgba(60,45,20,0.04)', marginBottom: 16 };
 const label = { fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8 };
 
-function answerText(f, data) {
+function answerText(f, data, hr) {
+  if (f.type === 'pending') return hr && hr.supervisor_sig ? hr.supervisor_sig + '  \u00b7  ' + fmt(hr.supervisor_date) : 'Awaiting supervisor signature';
   if (f.type === 'form') return data['doc_' + f.k] ? 'Filled out (see Filled forms)' : data['skip_' + f.k] ? 'Says already turned in. Please confirm.' : '\u2014';
   const v = data[f.k];
   if (f.type === 'check') return v ? 'Yes' : 'No';
@@ -30,7 +31,7 @@ function answerText(f, data) {
 function printPacket(p) {
   const d = p.data || {};
   const sections = PACKET_SECTIONS.map(s => '<h3>' + esc(s.title) + '</h3><table>' + s.fields.map(f =>
-    '<tr><td class="k">' + esc(f.label) + '</td><td' + (f.type === 'sig' ? ' class="sig"' : '') + '>' + esc(answerText(f, d)) + '</td></tr>').join('') + '</table>').join('');
+    '<tr><td class="k">' + esc(f.label) + '</td><td' + (f.type === 'sig' || (f.type === 'pending' && (p.hr_received || {}).supervisor_sig) ? ' class="sig"' : '') + '>' + esc(answerText(f, d, p.hr_received || {})) + '</td></tr>').join('') + '</table>').join('');
   const w = window.open('', '_blank');
   if (!w) { alert('Allow pop-ups to print the packet.'); return; }
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet"><title>Onboarding Packet - ' + esc(p.person_name) + '</title><style>' +
@@ -154,6 +155,20 @@ function FilledForms({ p }) {
 function PacketDetail({ p, onBack, onChanged }) {
   const d = p.data || {};
   const [busy, setBusy] = React.useState(false);
+  const [hr, setHr] = React.useState(p.hr_received || {});
+  const [supSig, setSupSig] = React.useState('');
+  const [supDate, setSupDate] = React.useState(new Date().toISOString().slice(0, 10));
+  const [supErr, setSupErr] = React.useState('');
+  const signOff = async () => {
+    if (!supSig.trim()) { setSupErr('Type your full name to sign.'); return; }
+    setBusy(true); setSupErr('');
+    try {
+      const next = { ...hr, supervisor_sig: supSig.trim(), supervisor_date: supDate };
+      await hrReq('onboarding_packets?id=eq.' + p.id, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ hr_received: next }) });
+      setHr(next); onChanged();
+    } catch (e) { setSupErr(e.message); }
+    setBusy(false);
+  };
   const del = async () => {
     if (!window.confirm('Delete this packet? The filled-in answers will be removed.')) return;
     setBusy(true);
@@ -168,18 +183,35 @@ function PacketDetail({ p, onBack, onChanged }) {
           <div style={{ fontSize: 13, color: '#8a7e6b', marginTop: 2 }}>{p.person_email} {'·'} Sent {fmt(p.sent_at)}{p.submitted_at ? ' · Submitted ' + fmt(p.submitted_at) : ''}</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {p.status === 'submitted' && <button onClick={() => printPacket(p)} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Print</button>}
+          {p.status === 'submitted' && <button onClick={() => printPacket({ ...p, hr_received: hr })} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Print</button>}
           <button disabled={busy} onClick={del} style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>Delete</button>
         </div>
       </div>
     </div>
     {p.status !== 'submitted' && <div style={{ ...card, color: '#8a7e6b', fontSize: 14 }}>{p.person_name} has not submitted this packet yet.</div>}
+    {p.status === 'submitted' && !hr.supervisor_sig && <div style={{ ...card, borderLeft: '4px solid ' + GOLD }}>
+      <div style={label}>Supervisor signature</div>
+      <div style={{ fontSize: 13, color: '#5a4d36', marginBottom: 10 }}>{p.person_name} submitted this packet. Review it below, then sign to finish.</div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div style={{ flex: '1 1 260px' }}>
+          <div style={{ fontSize: 11, color: '#8a7e6b', marginBottom: 2 }}>Supervisor signature (type your full name)</div>
+          <input value={supSig} onChange={e => setSupSig(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', border: 'none', borderBottom: '1.5px solid #8a7e6b', background: 'transparent', fontFamily: "'Great Vibes', 'Brush Script MT', cursive", fontSize: 30, outline: 'none', padding: '2px 4px' }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: '#8a7e6b', marginBottom: 2 }}>Date</div>
+          <input type="date" value={supDate} onChange={e => setSupDate(e.target.value)} style={{ border: 'none', borderBottom: '1.5px solid #8a7e6b', background: 'transparent', fontSize: 15, padding: '6px 2px' }} />
+        </div>
+        <button disabled={busy} onClick={signOff} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{busy ? 'Signing\u2026' : 'Sign and complete'}</button>
+      </div>
+      {supErr && <div style={{ fontSize: 12, color: '#c0392b', marginTop: 8 }}>{supErr}</div>}
+    </div>}
+    {p.status === 'submitted' && hr.supervisor_sig && <div style={{ ...card, color: '#15803d', fontSize: 13 }}>Signed by {hr.supervisor_sig} on {fmt(hr.supervisor_date)}. This packet is complete.</div>}
     {p.status === 'submitted' && <FilledForms p={p} />}
     {p.status === 'submitted' && PACKET_SECTIONS.map(s => <div key={s.id} style={card}>
       <div style={label}>{s.title}</div>
       {s.fields.map(f => <div key={f.k} style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 13 }}>
         <div style={{ flex: '0 0 46%', color: '#8a7e6b' }}>{f.label}</div>
-        <div style={{ color: '#2c2418', wordBreak: 'break-word', ...(f.type === 'sig' ? { fontFamily: "'Great Vibes', 'Brush Script MT', cursive", fontSize: 28, lineHeight: 1.2 } : {}) }}>{answerText(f, d)}</div>
+        <div style={{ color: '#2c2418', wordBreak: 'break-word', ...(f.type === 'sig' || (f.type === 'pending' && hr.supervisor_sig) ? { fontFamily: "'Great Vibes', 'Brush Script MT', cursive", fontSize: 28, lineHeight: 1.2 } : {}) }}>{answerText(f, d, hr)}</div>
       </div>)}
     </div>)}
   </div>;
@@ -254,7 +286,7 @@ export function HumanResourcesView({ navigate }) {
             <div style={{ fontSize: 14, fontWeight: 600, color: '#2c2418' }}>{p.person_name}</div>
             <div style={{ fontSize: 12, color: '#8a7e6b' }}>Sent {fmt(p.sent_at)}{p.submitted_at ? ' · Submitted ' + fmt(p.submitted_at) : ''}</div>
           </div>
-          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: p.status === 'submitted' ? '#e3f6ec' : '#fdf3e0', color: p.status === 'submitted' ? '#15803d' : '#92600c' }}>{p.status === 'submitted' ? 'Submitted' : 'Waiting'}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: p.status !== 'submitted' ? '#fdf3e0' : (p.hr_received || {}).supervisor_sig ? '#e3f6ec' : '#e6f0fb', color: p.status !== 'submitted' ? '#92600c' : (p.hr_received || {}).supervisor_sig ? '#15803d' : '#1d4ed8' }}>{p.status !== 'submitted' ? 'Waiting' : (p.hr_received || {}).supervisor_sig ? 'Complete' : 'Needs signature'}</span>
         </div>)}
     </div>
   </div>;

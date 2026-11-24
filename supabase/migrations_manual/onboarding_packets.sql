@@ -37,16 +37,16 @@ declare
 begin
   if not (new.status = 'submitted' and old.status is distinct from 'submitted') then return new; end if;
   select array_agg(distinct lower(trim("Email"))) into recips from public."2026 Volunteers"
-   where (("First Name" = 'Haley' and "Last Name" = 'Wright') or ("First Name" = 'Wyn' and "Last Name" = 'Spiller'))
+   where "First Name" = 'Haley' and "Last Name" = 'Wright'
      and nullif(trim("Email"), '') is not null;
   if recips is null then return new; end if;
   perform net.http_post(
     url := 'https://uvzwhhwzelaelfhfkvdb.supabase.co/functions/v1/send-email',
     headers := jsonb_build_object('Content-Type', 'application/json', 'apikey', 'sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do', 'Authorization', 'Bearer sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do'),
     body := jsonb_build_object('to', recips,
-      'subject', new.person_name || ' completed their onboarding packet',
-      'body', new.person_name || E' submitted their onboarding packet.\n\nReview and print it: ' || v_link,
-      'html', '<div style="font-family:Georgia,serif;background:#f6f1e7;padding:24px"><div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e6dfd3;border-top:4px solid #886c44;border-radius:10px;padding:28px"><div style="font-size:12px;letter-spacing:.12em;color:#886c44;font-weight:700">NORTH STAR HOUSE</div><h2 style="margin:8px 0 14px;font-size:22px;color:#2c2418">Onboarding Packet Submitted</h2><p style="font-family:system-ui,sans-serif;color:#3a3226;line-height:1.5"><b>' || v_name || '</b> completed their onboarding packet.</p><p style="margin:20px 0 0"><a href="' || v_link || '" style="display:inline-block;background:#886c44;color:#fff;text-decoration:none;font-family:system-ui,sans-serif;font-weight:600;padding:11px 22px;border-radius:8px">Review in the Portal</a></p></div></div>'),
+      'subject', 'Please sign: ' || new.person_name || ' completed their onboarding packet',
+      'body', new.person_name || E' submitted their onboarding packet and it is ready for your supervisor signature.\n\nReview and sign it: ' || v_link,
+      'html', '<div style="font-family:Georgia,serif;background:#f6f1e7;padding:24px"><div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e6dfd3;border-top:4px solid #886c44;border-radius:10px;padding:28px"><div style="font-size:12px;letter-spacing:.12em;color:#886c44;font-weight:700">NORTH STAR HOUSE</div><h2 style="margin:8px 0 14px;font-size:22px;color:#2c2418">Onboarding Packet Ready to Sign</h2><p style="font-family:system-ui,sans-serif;color:#3a3226;line-height:1.5"><b>' || v_name || '</b> completed their onboarding packet. Please review it and add your supervisor signature.</p><p style="margin:20px 0 0"><a href="' || v_link || '" style="display:inline-block;background:#886c44;color:#fff;text-decoration:none;font-family:system-ui,sans-serif;font-weight:600;padding:11px 22px;border-radius:8px">Review and Sign</a></p></div></div>'),
     timeout_milliseconds := 20000);
   return new;
 exception when others then

@@ -32,7 +32,9 @@ export const PACKET_SECTIONS = [
         'Regular Payday': '1st & 16th',
       },
       radio: { 'Professional Employer Organization PEO': 'No', 'check box': 'Yes_2', 'undefined_2': 'Yes_3' },
-      lock: ['Legal Name of Hiring Employer', 'Professional Employer Organization PEO', 'Physical Address of Hiring Employers Main Office', 'Hiring Employers Mailing Address if different than above', 'undefined', 'Hiring Employers Telephone Number', 'check box', 'undefined_2', 'If the employee has signed the acknowledgment of receipt below it does not constitute a voluntary written agreement as', 'Regular Payday'],
+      lock: ['Legal Name of Hiring Employer', 'Professional Employer Organization PEO', 'Physical Address of Hiring Employers Main Office', 'Hiring Employers Mailing Address if different than above', 'undefined', 'Hiring Employers Telephone Number', 'check box', 'undefined_2', 'If the employee has signed the acknowledgment of receipt below it does not constitute a voluntary written agreement as', 'Regular Payday', 'Name', 'Physical Address of Main Office', 'Mailing Address', 'Telephone Number'],
+      // North Star is not a staffing agency, so the "other entity" box is locked and grayed out.
+      gray: ['Name', 'Physical Address of Main Office', 'Mailing Address', 'Telephone Number'],
     }, link: 'https://volunteerhub.northstarhouse.org/onboarding/wage-notice.pdf', fill: true, req: true },
     { k: 'ret_w4', label: 'W-4, Federal Withholding', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/w-4.pdf', fill: true, req: true },
     { k: 'ret_de4', label: 'DE 4, California Withholding', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-4.pdf', fill: true, req: true },
@@ -63,10 +65,11 @@ export const PACKET_SECTIONS = [
     { k: 'dd_account', label: 'Account number', type: 'text', req: true },
     { k: 'dd_auth', label: 'I authorize North Star House to deposit my pay into this account and to correct any errors.', type: 'check', req: true },
   ] },
-  { id: 'sign', title: 'Acknowledgment and Signature', intro: 'By typing your full name you sign this packet.', fields: [
-    { k: 'ack', label: 'I have received the North Star House policies and notices listed above, and the information I entered is true and complete.', type: 'check', req: true },
-    { k: 'sig_name', label: 'Signature (type your full name)', type: 'sig', req: true },
+  { id: 'sign', title: 'Acknowledgment', intro: 'Type your full name to sign. After you submit, your supervisor reviews the packet and signs it too.', fields: [
+    { k: 'ack', label: 'I have been informed about the topics I initialed and had the opportunity to ask questions. I understand that additional questions should be directed to my supervisor.', type: 'check', req: true },
+    { k: 'sig_name', label: 'Employee signature (type your full name)', type: 'sig', req: true },
     { k: 'sig_date', label: 'Date', type: 'date', req: true },
+    { k: 'sup_sig', label: 'Supervisor signature and date', type: 'pending' },
   ] },
 ];
 
