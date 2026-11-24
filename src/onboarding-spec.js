@@ -34,14 +34,14 @@ export const PACKET_SECTIONS = [
     { k: 'ret_w4', label: 'W-4, Federal Withholding', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/w-4.pdf', fill: true, req: true },
     { k: 'ret_de4', label: 'DE 4, California Withholding', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-4.pdf', fill: true, req: true },
   ] },
-  { id: 'received', title: 'Notices Received', intro: 'Read each notice, then initial to confirm you received it.', fields: [
+  { id: 'received', group: 'View Documents', title: 'Notices Received', intro: 'Read each notice, then initial to confirm you received it.', fields: [
     { k: 'rec_wchire', label: 'Workers’ Compensation Time of Hire notice', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/workers-comp-time-of-hire.pdf', req: true },
     { k: 'rec_wc', label: 'Workers’ Compensation employee fact sheet', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/workers-comp-fact-sheet.pdf', req: true },
     { k: 'rec_de2320', label: 'DE 2320, For Your Benefit (Disability Insurance, Paid Family Leave and Unemployment)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-2320.pdf', req: true },
     { k: 'rec_de2511', label: 'DE 2511, Paid Family Leave', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-2511.pdf', req: true },
     { k: 'rec_conduct', label: 'Code of Conduct', type: 'initials', req: true },
   ] },
-  { id: 'policies', title: 'Policies Read', intro: 'Initial each policy to confirm you have read it.', fields: [
+  { id: 'policies', group: 'View Documents', title: 'Policies Read', intro: 'Initial each policy to confirm you have read it.', fields: [
     { k: 'pol_harass', label: 'Harassment prevention policy', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/harassment-policy.pdf', req: true },
     { k: 'pol_sexual', label: 'Sexual harassment fact sheet', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/sexual-harassment-fact-sheet.pdf', req: true },
     { k: 'pol_lactation', label: 'Lactation accommodation policy', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/lactation-policy.pdf', req: true },
