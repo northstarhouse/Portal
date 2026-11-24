@@ -2,6 +2,7 @@
 // Send a staff onboarding packet to a person (they fill it in on the Volunteer Hub), then review and print what they submitted.
 import { PACKET_SECTIONS } from './onboarding-spec.js';
 import { PDFDocument } from 'pdf-lib';
+import { buildPacketPdf } from './packet-pdf.js';
 
 const GOLD = '#886c44';
 const HR_URL = 'https://uvzwhhwzelaelfhfkvdb.supabase.co';
@@ -178,6 +179,26 @@ function PacketDetail({ p, onBack, onChanged }) {
   const [busy, setBusy] = React.useState(false);
   const [hr, setHr] = React.useState(p.hr_received || {});
   const fv = useFormViewer(p);
+  const [pkgBusy, setPkgBusy] = React.useState(false);
+  // One PDF: the summary of every answer and signature, then each filled-in official form as a read-only copy.
+  const downloadPacket = async () => {
+    setPkgBusy(true);
+    try {
+      const formDocs = [];
+      for (const sec of PACKET_SECTIONS) for (const fld of sec.fields) {
+        if (fld.type !== 'form' || !d['doc_' + fld.k]) continue;
+        const rows = await hrReq('onboarding_docs?select=pdf_base64&packet_id=eq.' + p.id + '&doc_key=eq.' + encodeURIComponent(fld.k) + '&limit=1');
+        if (rows && rows[0]) formDocs.push({ label: fld.label, bytes: await lockedPdfBytes(rows[0].pdf_base64) });
+      }
+      let letterBytes = null;
+      try { const r = await fetch(LETTERHEAD); if (r.ok) letterBytes = new Uint8Array(await r.arrayBuffer()); } catch (e) { /* the letterhead is optional */ }
+      const bytes = await buildPacketPdf({ p: { ...p, hr_received: hr }, letterBytes, formDocs });
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+      const a = document.createElement('a'); a.href = url; a.download = (p.person_name + ' - Onboarding Packet').replace(/[^A-Za-z0-9 -]/g, '').trim() + '.pdf'; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (e) { alert('Could not build the packet: ' + e.message); }
+    setPkgBusy(false);
+  };
   const [supSig, setSupSig] = React.useState('');
   const [supDate, setSupDate] = React.useState(new Date().toISOString().slice(0, 10));
   const [supErr, setSupErr] = React.useState('');
@@ -206,6 +227,7 @@ function PacketDetail({ p, onBack, onChanged }) {
           <div style={{ fontSize: 13, color: '#8a7e6b', marginTop: 2 }}>{p.person_email} {'·'} Sent {fmt(p.sent_at)}{p.submitted_at ? ' · Submitted ' + fmt(p.submitted_at) : ''}</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {p.status === 'submitted' && <button disabled={pkgBusy} onClick={downloadPacket} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{pkgBusy ? 'Building…' : 'Download entire packet'}</button>}
           {p.status === 'submitted' && <button onClick={() => printPacket({ ...p, hr_received: hr })} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Print</button>}
           <button disabled={busy} onClick={del} style={{ background: '#f0ece6', color: '#666', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>Delete</button>
         </div>
