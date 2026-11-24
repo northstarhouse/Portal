@@ -101,6 +101,8 @@ export async function buildPacketPdf({ p, letterBytes, formDocs }) {
       labelLines.forEach((ln, i) => page.drawText(ln, { x: M, y: y - 9 - i * 11, size: 9, font: reg, color: MUTED }));
       if (isCheck) {
         const bx = RIGHT - 11, by = y - 12;
+        const word = data[f.k] ? 'Yes' : 'No';
+        page.drawText(word, { x: bx - 7 - reg.widthOfTextAtSize(word, 10), y: y - 9, size: 10, font: reg, color: INK });
         page.drawRectangle({ x: bx, y: by, width: 11, height: 11, borderColor: GOLD, borderWidth: 1.2 });
         if (data[f.k]) {
           page.drawLine({ start: { x: bx + 2, y: by + 5.5 }, end: { x: bx + 4.6, y: by + 2.5 }, thickness: 1.4, color: INK });
