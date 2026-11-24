@@ -14,15 +14,15 @@ export const PACKET_SECTIONS = [
   ] },
   { id: 'physician', title: 'Designation of Personal Physician (DWC 9783)', intro: 'If you are injured at work, you may choose to be treated by your personal physician. Name them here, or choose that you have none.', fields: [
     { k: 'phys_none', label: 'I do not have a personal physician to designate', type: 'check' },
-    { k: 'phys_form', label: 'Fill out the Designation of Personal Physician form', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/physician-designation.pdf', fill: true },
+    { k: 'phys_form', label: 'Fill out the Designation of Personal Physician form (DWC 9783)', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/physician-designation.pdf', fill: true },
   ] },
   { id: 'chiro', title: 'Designation of Personal Chiropractor or Acupuncturist (DWC 9783.1)', intro: 'The same choice for a chiropractor or acupuncturist.', fields: [
     { k: 'chiro_none', label: 'I do not have a personal chiropractor or acupuncturist to designate', type: 'check' },
-    { k: 'chiro_form', label: 'Fill out the Designation of Personal Chiropractor or Acupuncturist form', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/chiropractor-designation.pdf', fill: true },
+    { k: 'chiro_form', label: 'Fill out the Designation of Personal Chiropractor or Acupuncturist form (DWC 9783.1)', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/chiropractor-designation.pdf', fill: true },
   ] },
   { id: 'returned', title: 'Forms to Return', intro: 'Fill out each form right here on the page. Your answers are saved to your packet. Only HR can see them.', fields: [
     { k: 'ret_i9', label: 'I-9, Employment Eligibility Verification', type: 'form', link: 'https://volunteerhub.northstarhouse.org/onboarding/i-9.pdf', fill: true, req: true },
-    { k: 'ret_wage', label: 'Wage Theft Prevention Act notice (Labor Code 2810.5)', type: 'form', prefill: {
+    { k: 'ret_wage', label: 'Wage & Employment Notice to Employees (DLSE-NTE, Labor Code 2810.5)', type: 'form', prefill: {
       text: {
         'Legal Name of Hiring Employer': 'North Star Historic Conservancy',
         'Physical Address of Hiring Employers Main Office': 'North Star House',
@@ -40,16 +40,20 @@ export const PACKET_SECTIONS = [
   { id: 'received', group: 'View Documents', title: 'Notices Received', intro: 'Read each notice, then initial to confirm you received it.', fields: [
     { k: 'rec_wchire', label: 'Workers’ Compensation Time of Hire notice', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/workers-comp-time-of-hire.pdf', req: true },
     { k: 'rec_wc', label: 'Workers’ Compensation employee fact sheet', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/workers-comp-fact-sheet.pdf', req: true },
-    { k: 'rec_de2320', label: 'DE 2320, For Your Benefit (Disability Insurance, Paid Family Leave and Unemployment)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-2320.pdf', req: true },
+    { k: 'rec_family', label: 'Family Care, Medical Leave and Pregnancy Disability Leave Fact Sheet (CRD-100)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/family-care-medical-leave-pdl.pdf', req: true },
+    { k: 'rec_family_crd', label: 'Family Care and Medical Leave Fact Sheet, Civil Rights Department (CRD-E03P)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/family-care-medical-leave-fact-sheet.pdf', req: true },
+    { k: 'rec_de2320_pfl', label: 'Paid Family Leave (DE 2320)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-2320.pdf', req: true },
+    { k: 'rec_de2320_sdi', label: 'State Disability Insurance (DE 2320)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-2320.pdf', req: true },
+    { k: 'rec_de2320_sui', label: 'State Unemployment Insurance (DE 2320)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-2320.pdf', req: true },
     { k: 'rec_de2511', label: 'DE 2511, Paid Family Leave', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-2511.pdf', req: true },
-    { k: 'rec_conduct', label: 'Code of Conduct', type: 'initials', req: true },
+    { k: 'rec_conduct', label: 'NSHC Code of Conduct', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/code-of-conduct.pdf', req: true },
+    { k: 'rec_emergency', label: 'Emergency Plan Training (NSH Emergency Information Plan)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/emergency-information-plan.pdf', req: true },
   ] },
   { id: 'policies', group: 'View Documents', title: 'Policies Read', intro: 'Initial each policy to confirm you have read it.', fields: [
     { k: 'pol_harass', label: 'Harassment prevention policy', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/harassment-policy.pdf', req: true },
-    { k: 'pol_sexual', label: 'Sexual harassment fact sheet', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/sexual-harassment-fact-sheet.pdf', req: true },
-    { k: 'pol_lactation', label: 'Lactation accommodation policy', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/lactation-policy.pdf', req: true },
-    { k: 'pol_leave', label: 'Leave policies', type: 'initials', req: true },
-    { k: 'pol_dv', label: 'Domestic violence rights notice', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/domestic-violence-leave-notice.pdf', req: true },
+    { k: 'pol_sexual', label: 'Sexual Harassment Fact Sheet (CRD-185)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/sexual-harassment-fact-sheet.pdf', req: true },
+    { k: 'pol_lactation', label: 'Lactation Accommodation Policy', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/lactation-policy.pdf', req: true },
+    { k: 'pol_dv', label: 'Rights of Victims of Domestic Violence, Sexual Assault and Stalking Notice (Labor Code 230 and 230.1)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/domestic-violence-leave-notice.pdf', req: true },
   ] },
   { id: 'deposit', title: 'Direct Deposit Authorization', intro: 'Your paycheck is deposited into this account. Only HR can see these details.', fields: [
     { k: 'dd_name', label: 'Name on the account', type: 'text', req: true },
