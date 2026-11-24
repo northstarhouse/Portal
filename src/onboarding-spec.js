@@ -49,7 +49,7 @@ export const PACKET_SECTIONS = [
     { k: 'rec_de2320_sui', label: 'State Unemployment Insurance (DE 2320)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-2320.pdf', req: true },
     { k: 'rec_de2511', label: 'DE 2511, Paid Family Leave', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/de-2511.pdf', req: true },
     { k: 'rec_conduct', label: 'NSHC Code of Conduct', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/code-of-conduct.pdf', req: true },
-    { k: 'rec_emergency', label: 'Emergency Plan Training (NSH Emergency Information Plan)', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/emergency-information-plan.pdf', req: true },
+    { k: 'rec_emergency', label: 'Initial Safety Training', linkText: 'Emergency Plan', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/emergency-information-plan.pdf', req: true },
   ] },
   { id: 'policies', group: 'View Documents', title: 'Policies Read', intro: 'Initial each policy to confirm you have read it.', fields: [
     { k: 'pol_harass', label: 'Harassment prevention policy', type: 'initials', link: 'https://volunteerhub.northstarhouse.org/onboarding/harassment-policy.pdf', req: true },
