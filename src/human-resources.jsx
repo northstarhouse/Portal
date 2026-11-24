@@ -30,13 +30,13 @@ function answerText(f, data) {
 function printPacket(p) {
   const d = p.data || {};
   const sections = PACKET_SECTIONS.map(s => '<h3>' + esc(s.title) + '</h3><table>' + s.fields.map(f =>
-    '<tr><td class="k">' + esc(f.label) + '</td><td>' + esc(answerText(f, d)) + '</td></tr>').join('') + '</table>').join('');
+    '<tr><td class="k">' + esc(f.label) + '</td><td' + (f.type === 'sig' ? ' class="sig"' : '') + '>' + esc(answerText(f, d)) + '</td></tr>').join('') + '</table>').join('');
   const w = window.open('', '_blank');
   if (!w) { alert('Allow pop-ups to print the packet.'); return; }
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Onboarding Packet - ' + esc(p.person_name) + '</title><style>' +
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet"><title>Onboarding Packet - ' + esc(p.person_name) + '</title><style>' +
     "body{font-family:Georgia,serif;color:#2c2418;margin:40px;max-width:760px}.brand{font-size:12px;letter-spacing:.14em;color:#886c44;font-weight:700}" +
     "h1{font-size:28px;margin:6px 0 4px;border-bottom:2px solid #886c44;padding-bottom:10px}h3{font-size:16px;color:#886c44;margin:22px 0 6px}" +
-    "table{width:100%;border-collapse:collapse;font-family:system-ui,sans-serif;font-size:13px}td{padding:6px 8px;border-bottom:1px solid #eee6d8;vertical-align:top}td.k{width:48%;color:#6b5f4c}" +
+    "table{width:100%;border-collapse:collapse;font-family:system-ui,sans-serif;font-size:13px}td{padding:6px 8px;border-bottom:1px solid #eee6d8;vertical-align:top}td.k{width:48%;color:#6b5f4c}td.sig{font-family:'Great Vibes','Brush Script MT',cursive;font-size:30px;line-height:1.1}" +
     ".meta{font-family:system-ui,sans-serif;font-size:13px;color:#6b5f4c}@media print{body{margin:18px}}</style></head><body>" +
     '<img src="' + LETTERHEAD + '" style="width:100%;display:block;margin-bottom:14px"><h1>Staff Onboarding Packet</h1><div class="meta"><b>' + esc(p.person_name) + '</b> &middot; ' + esc(p.person_email) +
     (p.blank ? '<br>Blank copy' : '<br>Sent ' + esc(fmt(p.sent_at))) + (p.submitted_at ? ' &middot; Submitted ' + esc(fmt(p.submitted_at)) : '') + '</div>' + sections + '</body></html>');
@@ -62,7 +62,7 @@ function PreviewField({ f, value, onChange }) {
     <div style={{ fontSize: 12, color: '#8a7e6b', marginBottom: 4 }}>{f.label}{f.req ? ' *' : ''}</div>
     {f.type === 'select'
       ? <select value={value || ''} onChange={e => onChange(e.target.value)} style={box}><option value="">Choose</option>{f.options.map(o => <option key={o} value={o}>{o}</option>)}</select>
-      : <input type={f.type === 'date' ? 'date' : 'text'} value={value || ''} onChange={e => onChange(e.target.value)} style={{ ...box, ...(f.type === 'sig' ? { fontFamily: "'Cardo', Georgia, serif", fontStyle: 'italic', fontSize: 17 } : {}) }} />}
+      : <input type={f.type === 'date' ? 'date' : 'text'} value={value || ''} onChange={e => onChange(e.target.value)} style={{ ...box, ...(f.type === 'sig' ? { fontFamily: "'Great Vibes', 'Brush Script MT', cursive", fontSize: 30, padding: '2px 8px' } : {}) }} />}
   </div>;
 }
 
@@ -179,7 +179,7 @@ function PacketDetail({ p, onBack, onChanged }) {
       <div style={label}>{s.title}</div>
       {s.fields.map(f => <div key={f.k} style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 13 }}>
         <div style={{ flex: '0 0 46%', color: '#8a7e6b' }}>{f.label}</div>
-        <div style={{ color: '#2c2418', wordBreak: 'break-word' }}>{answerText(f, d)}</div>
+        <div style={{ color: '#2c2418', wordBreak: 'break-word', ...(f.type === 'sig' ? { fontFamily: "'Great Vibes', 'Brush Script MT', cursive", fontSize: 28, lineHeight: 1.2 } : {}) }}>{answerText(f, d)}</div>
       </div>)}
     </div>)}
   </div>;
