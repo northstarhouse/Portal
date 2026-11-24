@@ -39,7 +39,7 @@ function printPacket(p) {
     "h1{font-size:28px;margin:6px 0 4px;border-bottom:2px solid #886c44;padding-bottom:10px}h3{font-size:16px;color:#886c44;margin:22px 0 6px}" +
     "table{width:100%;border-collapse:collapse;font-family:system-ui,sans-serif;font-size:13px}td{padding:6px 8px;border-bottom:1px solid #eee6d8;vertical-align:top}td.k{width:48%;color:#6b5f4c}td.sig{font-family:'Great Vibes','Brush Script MT',cursive;font-size:30px;line-height:1.1}" +
     ".meta{font-family:system-ui,sans-serif;font-size:13px;color:#6b5f4c}@media print{body{margin:18px}}</style></head><body>" +
-    '<img src="' + LETTERHEAD + '" style="width:100%;display:block;margin-bottom:14px"><h1>Staff Onboarding Packet</h1><div class="meta"><b>' + esc(p.person_name) + '</b> &middot; ' + esc(p.person_email) +
+    '<img src="' + LETTERHEAD + '" style="width:100%;display:block;margin-bottom:14px"><h1>Staff Onboarding Packet</h1><div class="meta"><b>' + esc(p.person_name) + '</b>' + (p.position ? '<br>Position: ' + esc(p.position) : '') + (p.person_email ? '<br>' + esc(p.person_email) : '') +
     (p.blank ? '<br>Blank copy' : '<br>Sent ' + esc(fmt(p.sent_at))) + (p.submitted_at ? ' &middot; Submitted ' + esc(fmt(p.submitted_at)) : '') + '</div>' + sections + '</body></html>');
   w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
 }
@@ -67,7 +67,7 @@ function PreviewField({ f, value, onChange }) {
   </div>;
 }
 
-function PreviewModal({ name, first, onClose, onSend, busy }) {
+function PreviewModal({ name, position, wage, first, onClose, onSend, busy }) {
   const [tab, setTab] = React.useState('packet');
   const [vals, setVals] = React.useState({});
   const tabBtn = (id, t) => <button onClick={() => setTab(id)} style={{ background: tab === id ? GOLD : '#f0ece6', color: tab === id ? '#fff' : '#5a4d36', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{t}</button>;
@@ -76,7 +76,7 @@ function PreviewModal({ name, first, onClose, onSend, busy }) {
     <div onClick={e => e.stopPropagation()} style={{ background: '#faf7f1', borderRadius: 14, width: '100%', maxWidth: 760, maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ padding: '16px 20px', borderBottom: '1px solid #e6dfd3', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 17, fontWeight: 700, fontFamily: "'Cardo', Georgia, serif", color: '#2c2418' }}>Preview: packet for {name}</div>
+          <div style={{ fontSize: 17, fontWeight: 700, fontFamily: "'Cardo', Georgia, serif", color: '#2c2418' }}>Preview: packet for {name}{position ? ', ' + position : ''}</div>
           <div style={{ fontSize: 12, color: '#8a7e6b' }}>This is the form exactly as they will fill it in. Try it out: nothing you type here is saved or sent.</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>{tabBtn('packet', 'Packet')}{tabBtn('email', 'Email')}</div>
@@ -92,7 +92,7 @@ function PreviewModal({ name, first, onClose, onSend, busy }) {
         </>}
       </div>
       <div style={{ padding: '14px 20px', borderTop: '1px solid #e6dfd3', display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <button onClick={() => printPacket({ person_name: name, person_email: '', sent_at: new Date().toISOString(), data: {}, blank: true })} style={plain}>Print blank copy</button>
+        <button onClick={() => printPacket({ person_name: name, position, person_email: '', sent_at: new Date().toISOString(), data: {}, blank: true })} style={plain}>Print blank copy</button>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={onClose} style={plain}>Close</button>
           <button disabled={busy} onClick={onSend} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{busy ? 'Sending\u2026' : 'Send to ' + first}</button>
@@ -180,6 +180,7 @@ function PacketDetail({ p, onBack, onChanged }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'Cardo', Georgia, serif", color: '#2c2418' }}>{p.person_name}</div>
+          {p.position && <div style={{ fontSize: 14, color: '#5a4d36', marginTop: 2 }}>Position: {p.position}{p.wage ? ' \u00b7 ' + p.wage + (p.wage_basis ? ' per ' + p.wage_basis.toLowerCase() : '') : ''}</div>}
           <div style={{ fontSize: 13, color: '#8a7e6b', marginTop: 2 }}>{p.person_email} {'·'} Sent {fmt(p.sent_at)}{p.submitted_at ? ' · Submitted ' + fmt(p.submitted_at) : ''}</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -221,6 +222,9 @@ export function HumanResourcesView({ navigate }) {
   const [packets, setPackets] = React.useState(null);
   const [vols, setVols] = React.useState([]);
   const [pick, setPick] = React.useState('');
+  const [fd, setFd] = React.useState({ name: '', position: '', wage: '', basis: 'Hour' });
+  const setField = (k, v) => setFd(o => ({ ...o, [k]: v }));
+  const volName = v => (String(v['First Name'] || '').trim() + ' ' + String(v['Last Name'] || '').trim()).trim();
   const [msg, setMsg] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [open, setOpen] = React.useState(null);
@@ -241,12 +245,12 @@ export function HumanResourcesView({ navigate }) {
   const send = async () => {
     const v = vols.find(x => String(x.id) === pick);
     if (!v) return;
-    const name = (String(v['First Name'] || '').trim() + ' ' + String(v['Last Name'] || '').trim()).trim();
+    const name = fd.name.trim() || volName(v);
     const email = String(v.Email).trim().toLowerCase();
     setBusy(true); setMsg('');
     try {
-      await hrReq('onboarding_packets', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ person_name: name, person_email: email, }) });
-      const first = esc(String(v['First Name'] || '').trim() || 'there');
+      await hrReq('onboarding_packets', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ person_name: name, person_email: email, position: fd.position.trim() || null, wage: fd.wage.trim() || null, wage_basis: fd.wage.trim() ? fd.basis : null }) });
+      const first = esc(name.split(/\s+/)[0] || 'there');
       const html = emailHtml(first);
       const r = await fetch(HR_URL + '/functions/v1/send-email', { method: 'POST', headers: HR_H, body: JSON.stringify({ to: email, subject: 'Complete your North Star House onboarding packet', body: 'Hi ' + first + ', your onboarding packet is ready. Sign in to the Volunteer Hub to fill it in: ' + HUB_URL, html }) });
       setMsg(r.ok ? 'Packet sent to ' + name + '.' : 'Packet created for ' + name + ', but the email did not send. Ask them to open the Volunteer Hub.');
@@ -264,17 +268,23 @@ export function HumanResourcesView({ navigate }) {
       <div style={{ fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase', letterSpacing: 2 }}>House operations</div>
       <div style={{ fontSize: 26, fontWeight: 700, color: '#2c2418', fontFamily: "'Cardo', Georgia, serif", marginTop: 2 }}>Human Resources</div>
     </div>
-    {preview && pv && <PreviewModal name={(String(pv['First Name'] || '').trim() + ' ' + String(pv['Last Name'] || '').trim()).trim()} first={esc(String(pv['First Name'] || '').trim() || 'there')} onClose={() => setPreview(false)} onSend={send} busy={busy} />}
+    {preview && pv && <PreviewModal name={fd.name.trim() || volName(pv)} position={fd.position.trim()} wage={fd.wage.trim()} first={esc((fd.name.trim() || volName(pv)).split(/\s+/)[0] || 'there')} onClose={() => setPreview(false)} onSend={send} busy={busy} />}
     <div style={card}>
       <div style={label}>Send an onboarding packet</div>
       <div style={{ fontSize: 13, color: '#8a7e6b', marginBottom: 12, lineHeight: 1.5 }}>They get an email and a card on their Volunteer Hub dashboard. You are emailed when they submit it.</div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select value={pick} onChange={e => setPick(e.target.value)} style={sel}>
+        <select value={pick} onChange={e => { setPick(e.target.value); const v = vols.find(x => String(x.id) === e.target.value); setFd({ name: v ? volName(v) : '', position: '', wage: '', basis: 'Hour' }); }} style={sel}>
           <option value="">Choose a person</option>
           {vols.map(v => <option key={v.id} value={String(v.id)}>{(v['First Name'] || '') + ' ' + (v['Last Name'] || '')}</option>)}
         </select>
         <button disabled={!pick} onClick={() => setPreview(true)} style={{ background: '#fff', color: pick ? GOLD : '#b8ad99', border: '1px solid ' + (pick ? GOLD : '#d8cfbf'), borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: pick ? 'pointer' : 'default' }}>Preview and Send</button>
       </div>
+      {pick && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginTop: 14 }}>
+        <div><div style={{ fontSize: 11, color: '#8a7e6b', marginBottom: 2 }}>Employee name</div><input value={fd.name} onChange={e => setField('name', e.target.value)} style={sel} /></div>
+        <div><div style={{ fontSize: 11, color: '#8a7e6b', marginBottom: 2 }}>Position</div><input value={fd.position} onChange={e => setField('position', e.target.value)} placeholder="e.g. Events Coordinator" style={sel} /></div>
+        <div><div style={{ fontSize: 11, color: '#8a7e6b', marginBottom: 2 }}>Rate of pay (goes on the wage notice)</div><input value={fd.wage} onChange={e => setField('wage', e.target.value)} placeholder="e.g. $22.00" style={sel} /></div>
+        <div><div style={{ fontSize: 11, color: '#8a7e6b', marginBottom: 2 }}>Paid by the</div><select value={fd.basis} onChange={e => setField('basis', e.target.value)} style={sel}>{['Hour', 'Day', 'Week', 'Shift', 'Salary', 'Piece rate', 'Commission'].map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+      </div>}
       {msg && <div style={{ fontSize: 13, color: '#5a4d36', marginTop: 10 }}>{msg}</div>}
     </div>
     <div style={card}>

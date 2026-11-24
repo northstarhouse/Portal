@@ -11,6 +11,10 @@ create table if not exists public.onboarding_packets (
   sent_at timestamptz not null default now(),
   submitted_at timestamptz
 );
+-- Entered by HR before sending: the person's position and pay, which go onto the packet and into the wage notice.
+alter table public.onboarding_packets add column if not exists position text;
+alter table public.onboarding_packets add column if not exists wage text;
+alter table public.onboarding_packets add column if not exists wage_basis text;
 alter table public.onboarding_packets enable row level security;
 
 drop policy if exists hr_all on public.onboarding_packets;
