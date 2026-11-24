@@ -235,7 +235,7 @@ function PacketDetail({ p, onBack, onChanged }) {
       <div style={label}>{s.title}</div>
       {s.fields.map(f => <div key={f.k} style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 13 }}>
         <div style={{ flex: '0 0 46%', color: '#8a7e6b' }}>{f.label}</div>
-        <div style={{ color: '#2c2418', wordBreak: 'break-word', ...(f.type === 'sig' || (f.type === 'pending' && hr.supervisor_sig) ? { fontFamily: "'Great Vibes', 'Brush Script MT', cursive", fontSize: 28, lineHeight: 1.2 } : {}) }}>{f.type === 'form' && d['doc_' + f.k] ? <button disabled={!!fv.busy} onClick={() => fv.open(f)} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '5px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{fv.busy === f.k ? 'Opening\u2026' : 'View'}</button> : answerText(f, d, hr)}</div>
+        <div style={{ flex: 1, textAlign: 'right', color: '#2c2418', wordBreak: 'break-word', ...(f.type === 'sig' || (f.type === 'pending' && hr.supervisor_sig) ? { fontFamily: "'Great Vibes', 'Brush Script MT', cursive", fontSize: 28, lineHeight: 1.2 } : {}) }}>{f.type === 'form' && d['doc_' + f.k] ? <button disabled={!!fv.busy} onClick={() => fv.open(f)} style={{ background: GOLD, color: '#fff', border: 'none', borderRadius: 8, padding: '5px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{fv.busy === f.k ? 'Opening\u2026' : 'View'}</button> : answerText(f, d, hr)}</div>
       </div>)}
     </div>)}
   </div>;
