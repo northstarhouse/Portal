@@ -1539,3 +1539,29 @@ export async function sendVoteNotification({ to, title, link }) {
   });
   return r.ok;
 }
+
+// ── Staff onboarding packet (sent from Portal > Human Resources) ─────────────
+export async function fetchMyOnboardingPacket(email) {
+  if (!email) return null;
+  const rows = await get(`onboarding_packets?select=*&person_email=eq.${encodeURIComponent(String(email).trim().toLowerCase())}&order=sent_at.desc&limit=1`);
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
+export async function saveOnboardingPacket(id, data, submit) {
+  const body = submit ? { data, status: 'submitted', submitted_at: new Date().toISOString() } : { data };
+  const rows = await patch(`onboarding_packets?id=eq.${id}&status=eq.sent`, body);
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
+
+// Filled-in official PDFs for the onboarding packet (stored as base64 in onboarding_docs; only HR and the owner can read them)
+export async function fetchOnboardingDoc(packetId, docKey) {
+  const rows = await get(`onboarding_docs?select=pdf_base64&packet_id=eq.${packetId}&doc_key=eq.${encodeURIComponent(docKey)}&limit=1`);
+  return Array.isArray(rows) && rows[0] ? rows[0].pdf_base64 : null;
+}
+export async function saveOnboardingDoc(packetId, docKey, pdfBase64) {
+  const r = await fetch(`${URL}/rest/v1/onboarding_docs?on_conflict=packet_id,doc_key`, {
+    method: 'POST',
+    headers: await hdr({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify({ packet_id: packetId, doc_key: docKey, pdf_base64: pdfBase64, saved_at: new Date().toISOString() }),
+  });
+  return r.ok;
+}

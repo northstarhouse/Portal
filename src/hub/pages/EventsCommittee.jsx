@@ -203,6 +203,7 @@ function EventFlyerCard({ c, onOpen, onMerge }) {
       <div style={{ padding: '10px 12px' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{dateStr}</div>
+        {!c.committee_id && <div style={{ fontSize: 10, marginTop: 4, color: '#b45309', fontWeight: 700 }} title="Money is recorded under this name, but no event has it. If it is a spelling of an existing event, fix the name.">Name does not match an event</div>}
         <div style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 11 }}>
           {!cancelled && (c.rsvp_only ? <span style={{ background: '#f0ebe2', color: 'var(--gold)', fontSize: 10, fontWeight: 700, padding: '1px 8px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: 0.4 }}>RSVP</span> : <span style={{ color: '#4a5d3a', fontWeight: 600 }}>{money(c.earnings)}</span>)}
           <span style={{ color: '#c07040', fontWeight: 600 }}>-{money(c.costs)}</span>
@@ -264,6 +265,10 @@ function MergeEvents({ source, targets, onClose, onDone }) {
     </div>
   );
 }
+
+// Events used to be created quietly whenever a new name showed up (a ticket order, a budget line, a click on a card).
+// A ticket page that renames an event then produced a duplicate. Now nothing is created without an explicit yes.
+const newEventConfirm = (name) => '"' + name + '" is not a tracked event yet.\n\nIf this is just a different spelling of an event you already have, press Cancel and fix the name instead. Creating it now would add a second event.\n\nCreate it as a new event?';
 
 function EventCardsGrid({ onOpen }) {
   const [cards, setCards] = useState(null);
@@ -3105,6 +3110,7 @@ export default function EventsCommittee() {
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [volunteers, setVolunteers] = useState([]);
+  const [unlinked, setUnlinked] = useState([]);
 
   useEffect(() => { fetchAllActiveVolunteers().then(rows => setVolunteers(Array.isArray(rows) ? rows : [])).catch(() => setVolunteers([])); }, []);
 
@@ -3121,14 +3127,8 @@ export default function EventsCommittee() {
       const names = await fetchEventNames().catch(() => []);
       const existing = new Set(mapped.map(e => e.name.trim().toLowerCase()));
       const missing = names.filter(n => !existing.has(n.trim().toLowerCase()));
-      if (missing.length) {
-        const results = await Promise.all(missing.map(n =>
-          insertCommitteeEventIfMissing({ ...toDb(emptyEvent(n)), created_by: session.user.id })
-        ));
-        // A no-op result means another concurrent load already inserted this
-        // name first — nothing to add locally, it'll show up on next load.
-        results.forEach(res => { if (res.row) mapped.push(fromDb(res.row)); });
-      }
+      // Names used in budgets/earnings that no event has: listed on the page for a decision, never created automatically.
+      setUnlinked(missing);
 
       // Deep-link from the dashboard (its Upcoming Events card/openCommitteeEvent)
       // -- open straight into this one event instead of landing on the list.
@@ -3139,8 +3139,10 @@ export default function EventsCommittee() {
         const key = currentCommitteeEvent.trim().toLowerCase();
         let match = mapped.find(e => e.name.trim().toLowerCase() === key);
         if (!match) {
-          const res = await insertCommitteeEventIfMissing({ ...toDb(emptyEvent(currentCommitteeEvent)), created_by: session.user.id });
-          if (res.row) { match = fromDb(res.row); mapped.push(match); }
+          if (window.confirm(newEventConfirm(currentCommitteeEvent))) {
+            const res = await insertCommitteeEventIfMissing({ ...toDb(emptyEvent(currentCommitteeEvent)), created_by: session.user.id });
+            if (res.row) { match = fromDb(res.row); mapped.push(match); }
+          }
         }
         if (match) setSelectedId(match.id);
         setCurrentCommitteeEvent(null);
@@ -3166,11 +3168,25 @@ export default function EventsCommittee() {
     const key = name.trim().toLowerCase();
     const match = events.find(e => e.name.trim().toLowerCase() === key);
     if (match) { setSelectedId(match.id); return; }
+    if (!window.confirm(newEventConfirm(name))) return;
     insertCommitteeEventIfMissing({ ...toDb(emptyEvent(name)), created_by: session.user.id }).then(res => {
       if (res.row) {
         const created = fromDb(res.row);
         setEvents(prev => [...prev, created]);
         setSelectedId(created.id);
+      }
+    });
+  }
+
+  // Creates an event for a name found in budgets/earnings, only when someone chooses to.
+  function createUnlinked(name) {
+    if (!window.confirm(newEventConfirm(name))) return;
+    insertCommitteeEventIfMissing({ ...toDb(emptyEvent(name)), created_by: session.user.id }).then(res => {
+      setUnlinked(prev => prev.filter(n => n !== name));
+      if (res.row) {
+        const created = fromDb(res.row);
+        setEvents(prev => [...prev, created]);
+        syncOverviewCardsFromCommittee([res.row]).catch(() => {});
       }
     });
   }
@@ -3313,6 +3329,19 @@ export default function EventsCommittee() {
           <EventDetail ev={selected} onUpdate={updateSelected} onBack={() => setSelectedId(null)} onEdit={openEditModal} onDelete={() => { if (deleteEvent(selected)) setSelectedId(null); }} volunteers={volunteers} session={session} volunteer={volunteer} />
         ) : (
           <>
+            {unlinked.length > 0 && (
+              <div style={{ background: '#fdf3e0', border: '1px solid #e8c98a', borderRadius: 10, padding: '12px 14px', marginBottom: 14, fontSize: 13, color: '#6b4a10' }}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Names with money recorded that match no event</div>
+                <div style={{ marginBottom: 8, lineHeight: 1.5 }}>These are not created automatically. If one is just a different spelling of an event you already have, fix the name where it was entered. Otherwise create it as a new event.</div>
+                {unlinked.map(n => (
+                  <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', flexWrap: 'wrap' }}>
+                    <span style={{ flex: '1 1 220px', fontWeight: 600 }}>{n}</span>
+                    <button type="button" className="btn-ghost" onClick={() => createUnlinked(n)}>Create as a new event</button>
+                    <button type="button" className="btn-ghost" onClick={() => setUnlinked(prev => prev.filter(x => x !== n))}>Dismiss</button>
+                  </div>
+                ))}
+              </div>
+            )}
             <EventPlan session={session} volunteer={volunteer} onFinalized={() => load()} />
             <SponsorItemsCard />
             <EventCardsGrid onOpen={openEventByName} />

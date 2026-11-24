@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
         if (!email || !/^\S+@\S+\.\S+$/.test(email)) { out.push({ email, status: 'skipped', detail: 'Not a valid email address' }); continue }
         const before = await sb('/rest/v1/cc_sync_log?select=id&order=id.desc&limit=1')
         const lastId = ((await before.json()) as any[])[0]?.id || 0
-        const status = await upsertContact({ email, first: clean(x.first), last: clean(x.last), phone: '', source: 'Pasted list' }, lists, null)
+        const status = await upsertContact({ email, first: clean(x.first), last: clean(x.last), phone: '', source: clean(body.source) || 'Pasted list' }, lists, null)
         const after = await sb('/rest/v1/cc_sync_log?select=detail&id=gt.' + lastId + '&order=id.desc&limit=1')
         const detail = ((await after.json()) as any[])[0]?.detail || ''
         out.push({ email, status, detail })
