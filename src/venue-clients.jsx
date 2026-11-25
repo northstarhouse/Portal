@@ -220,12 +220,13 @@ const CLIENT_PORTAL_URL = 'https://venue.northstarhouse.org/';
 const venueCodeFor = (iso) => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m && VENUE_MONTHS[+m[2] - 1] ? VENUE_MONTHS[+m[2] - 1] + '-' + m[3] + '-' + m[1] : ''; };
 const escMail = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const joinAmp = (list) => list.length <= 1 ? (list[0] || 'there') : list.slice(0, -1).join(', ') + ' & ' + list[list.length - 1];
-function buildPortalEmail(client) {
+function buildPortalEmail(client, onlyEmail) {
   const code = venueCodeFor(client.eventDate);
   if (!code) return { error: 'This client has no event date yet, so there is no venue code to send.' };
   const isEmail = (x) => /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(String(x || '').trim());
   const people = (client.contacts || []).filter((c) => isEmail(c.email));
   if (!people.length && isEmail(client.email)) people.push({ full_name: '', email: client.email });
+  if (onlyEmail) { const keep = people.filter((c) => String(c.email).trim().toLowerCase() === String(onlyEmail).trim().toLowerCase()); people.length = 0; if (keep.length) people.push(...keep); else if (isEmail(onlyEmail)) people.push({ full_name: '', email: onlyEmail }); }
   const to = [...new Set(people.map((c) => String(c.email).trim().toLowerCase()))];
   if (!to.length) return { error: 'There is no email address on file for this client.' };
   // First names: "Julia Yousif" -> Julia. A name written "Last, First" is turned around first.
@@ -673,6 +674,25 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
       alert('Sent to ' + t.to.join(', ') + '.' + (recorded ? '' : ' (It could not be marked as sent on their profile.)'));
     } catch (e) { alert(e.message || 'The email could not be sent.'); } finally { setMailBusy(false); }
   }
+  // Sends the portal link and venue code again to one person who has not signed yet, and files it in the email history.
+  async function resendPortalAccess(name, email) {
+    if (mailBusy) return;
+    const mail = email || ((client.contacts || []).find(c => String(c.full_name || '').trim().toLowerCase() === String(name || '').trim().toLowerCase()) || {}).email;
+    if (!mail) { alert('There is no email address on file for ' + (name || 'this person') + '.'); return; }
+    const t = buildPortalEmail(client, mail);
+    if (t.error) { alert(t.error); return; }
+    if (!window.confirm('Resend portal access to ' + (name || t.who) + ' (' + t.to.join(', ') + ')? Their venue code is ' + t.code + '.')) return;
+    setMailBusy(true);
+    try {
+      const H = { apikey: PB_KEY, Authorization: 'Bearer ' + PB_KEY, 'Content-Type': 'application/json' };
+      const r = await fetch(PB_URL + '/functions/v1/send-email', { method: 'POST', headers: H, body: JSON.stringify({ to: t.to, subject: t.subject, body: t.text, html: t.html, sender: 'North Star House', fromEmail: 'venue@northstarhouse.org' }) });
+      if (!r.ok) throw new Error('The email could not be sent. Please try again.');
+      const stamp = new Date().toISOString();
+      fetch(PB_URL + '/rest/v1/venue_messages', { method: 'POST', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ event_uid: 'client:' + client.id, event_title: client.name, subject: 'Portal access resent to ' + (name || t.to[0]), body: t.text, from_name: 'North Star House', from_email: 'venue@northstarhouse.org', direction: 'outgoing', handled_at: stamp }) }).catch(() => {});
+      fetch(PB_URL + '/rest/v1/activity_log', { method: 'POST', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ description: 'Portal access resent to ' + (name || t.to[0]) + ' (' + t.code + ')', action: 'client_portal_email', tag: 'Venue Rentals' }) }).catch(() => {});
+      alert('Sent to ' + t.to.join(', ') + '.');
+    } catch (e) { alert(e.message || 'The email could not be sent.'); } finally { setMailBusy(false); }
+  }
   const [tl, setTl] = React.useState({ tour: null, sentAt: null, loaded: false });
   // The tour and the "client guide + pre-booking form" email, found by the couple's email addresses.
   React.useEffect(() => {
@@ -738,7 +758,7 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
   const lastSigned = list => list.map(x => x.signed_at).filter(Boolean).sort().pop();
   step(client.legacy || client.nativeAgreement ? 'Agreement sent' : 'Populate agreement', client.legacy || !!client.nativeAgreement, client.legacy ? 'Signed before the new system' : client.nativeAgreement?.issued_at ? dateLabel(client.nativeAgreement.issued_at) : 'Not sent yet', null, false, contractBody);
   const clientsSigned = client.legacy || (clientSigs.length > 0 && clientSigs.every(x => x.signed));
-  step('Clients signed', clientsSigned, client.legacy ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed before the new system') : clientsSigned ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed') : clientSigs.length ? clientSigs.filter(x => x.signed).length + ' of ' + clientSigs.length + ' signed' : 'Waiting on the agreement', null, false, clientSigs.length ? <div><style>{contractPreviewStyle}</style>{clientSigs.map((x, i) => { const r = (client.nativeAgreement?.recipients || []).find(y => y.role !== 'venue' && y.name === x.signee_name) || {}; return <div key={i} style={{marginBottom:10}}><SigBlock s={{ name: x.signee_name, email: r.email, role: 'client', status: x.signed ? 'signed' : 'pending', signed_at: x.signed_at, signed_name: r.signed_name }}/></div>; })}{!clientsSigned && client.nativeAgreement?.expires_at && <p className="vc-muted" style={{margin:0}}>Sign by {new Date(client.nativeAgreement.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. Reminders are sent from the Agreement step.</p>}</div> : null);
+  step('Clients signed', clientsSigned, client.legacy ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed before the new system') : clientsSigned ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed') : clientSigs.length ? clientSigs.filter(x => x.signed).length + ' of ' + clientSigs.length + ' signed' : 'Waiting on the agreement', null, false, clientSigs.length ? <div><style>{contractPreviewStyle}</style>{clientSigs.map((x, i) => { const r = (client.nativeAgreement?.recipients || []).find(y => y.role !== 'venue' && y.name === x.signee_name) || {}; return <div key={i} style={{marginBottom:10}}><SigBlock s={{ name: x.signee_name, email: r.email, role: 'client', status: x.signed ? 'signed' : 'pending', signed_at: x.signed_at, signed_name: r.signed_name }}/>{!x.signed && <button type="button" disabled={mailBusy} onClick={() => resendPortalAccess(x.signee_name, r.email)} style={{marginTop:6,background:'#886c44',color:'#fff',border:0,borderRadius:7,padding:'6px 12px',fontWeight:600,fontSize:12,opacity:mailBusy?.6:1}}>{mailBusy ? 'Sending…' : 'Resend portal access'}</button>}</div>; })}{!clientsSigned && client.nativeAgreement?.expires_at && <p className="vc-muted" style={{margin:0}}>Sign by {new Date(client.nativeAgreement.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. Reminders are sent from the Agreement step.</p>}</div> : null);
   const venueSigned = client.legacy || (venueSigs.length > 0 && venueSigs.every(x => x.signed));
   step('Venue countersigned', venueSigned, client.legacy ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed before the new system') : venueSigned ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed') : 'Waiting on the clients', null, false, contractBody);
   step('Order / estimate' + (client.order?.status === 'final' ? ' (final invoice)' : ''), !!client.order, client.order ? (client.order.status === 'final' ? 'Final invoice' : 'Estimate saved') + (client.order.updated_at ? ' ' + dateLabel(String(client.order.updated_at).slice(0, 10)) : '') + (client.order.updated_by ? ' by ' + client.order.updated_by : '') : 'Suggested from the booking, not saved yet', null, false, <OrderEditor key={client.order?.updated_at || 'new'} client={client} onSaved={onOrderSaved}/>);
