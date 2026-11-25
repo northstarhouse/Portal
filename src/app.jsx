@@ -22047,7 +22047,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
-                      <button onClick={markToured} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: gold, color: '#fff', border: '1px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Toured Venue</button>
+                      <button onClick={markToured} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: '#fff', color: '#2e7d32', border: '1px solid #2e7d32', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Toured Venue</button>
                       <button onClick={startReschedule} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Reschedule</button>
                       <button onClick={cancelTour} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: '#fff', color: '#c0392b', border: '1px solid #e4b8b0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel Tour</button>
                       <button onClick={markNoShow} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: '#fff', color: '#c0392b', border: '1px solid #e4b8b0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Didn't Show Up</button>

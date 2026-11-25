@@ -1051,7 +1051,7 @@ function AvailabilityStats({ clients }) {
   const today = venueDateKey();
   const thisYear = Number(today.slice(0, 4));
   const [onlyWeddings, setOnlyWeddings] = React.useState(false);
-  const [year, setYear] = React.useState(thisYear);
+  const [year, setYear] = React.useState(Math.max(thisYear, 2027)); // opens on 2027
   // Every booked day -> the earliest date it was booked (when the pre-booking came in), or null if unknown.
   const booked = {};
   clients.forEach(c => {
@@ -1131,9 +1131,6 @@ function AvailabilityStats({ clients }) {
       </table>
       </div>;
     })()}
-    <div className="vc-muted" style={{ marginTop: 8, fontSize: 12 }}>
-      Years with venue-team numbers (2025, 2026) use those booked-event counts by event month; other years count booked days in the portal, live (two events on one day count once, a multi-day event counts each day). The venue team's booked-event numbers by event month. The last column shows how far ahead (+) or behind (−) each month is compared with the same month of {year - 1}.
-    </div>
   </div>;
 }
 
