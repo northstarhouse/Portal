@@ -71,6 +71,7 @@ function EmailList({ client, api, messages, guideSentAt, onHandleMessage, extra 
       if (off) return;
       const out = [];
       if (guideSentAt) out.push({ at: guideSentAt, what: 'Client Guide and Pre-Booking Form', who: client.email || '' });
+      if (client.portalEmail && client.portalEmail.sent_at) out.push({ at: client.portalEmail.sent_at, what: 'Client portal access and venue code', who: (client.portalEmail.to || []).join(', ') || client.email || '' });
       (Array.isArray(versions) ? versions : []).forEach(v => {
         const people = {}; (v.recipients || []).forEach(r => { people[r.id] = r; });
         (v.events || []).forEach(e => {
