@@ -5827,14 +5827,16 @@ function DonorsView({ navigate }) {
           <button onClick={function(){setViewMode('donors');}} style={{padding:'7px 12px',fontSize:12,fontWeight:600,border:'none',cursor:'pointer',background:viewMode==='donors'?gold:'#fff',color:viewMode==='donors'?'#fff':'#888'}}>By donor</button>
           <button onClick={function(){setViewMode('gifts');setFilters(function(f){return Object.assign({},f,{status:'all',year:'all'});});}} style={{padding:'7px 12px',fontSize:12,fontWeight:600,border:'none',cursor:'pointer',background:viewMode==='gifts'?gold:'#fff',color:viewMode==='gifts'?'#fff':'#888'}}>Every donation</button>
         </div>
-        <div style={{position:'relative',flex:'1 1 160px',minWidth:160}}>
-          <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'#aaa',pointerEvents:'none',display:'flex'}}>
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          </span>
-          <input type="text" placeholder="Search donors..." value={filters.search}
-            onChange={function(e){setFilters(function(f){return Object.assign({},f,{search:e.target.value});});}}
-            style={{width:'100%',padding:'7px 12px 7px 30px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff',boxSizing:'border-box'}} />
-        </div>
+        <select value={filters.year} onChange={function(e){setFilters(function(f){return Object.assign({},f,{year:e.target.value});});}}
+          style={{padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff'}}>
+          <option value="all">All Years</option>
+          {availableYears.map(function(y){return <option key={y} value={y}>{y}</option>;})}
+        </select>
+        <select value={filters.donationType} onChange={function(e){setFilters(function(f){return Object.assign({},f,{donationType:e.target.value});});}}
+          style={{padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff'}}>
+          <option value="all">All Types</option>
+          {availableTypes.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+        </select>
         <select value={filters.status} onChange={function(e){setFilters(function(f){return Object.assign({},f,{status:e.target.value});});}}
           style={{padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff'}}>
           <option value="all">All Statuses</option>
@@ -5848,16 +5850,15 @@ function DonorsView({ navigate }) {
           <option value="all">All Tiers</option>
           {DONOR_TIERS_NSH.filter(function(t){return t.tier!=='none';}).map(function(t){return <option key={t.tier} value={t.tier}>{t.label}</option>;})}
         </select>
-        <select value={filters.donationType} onChange={function(e){setFilters(function(f){return Object.assign({},f,{donationType:e.target.value});});}}
-          style={{padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff'}}>
-          <option value="all">All Types</option>
-          {availableTypes.map(function(t){return <option key={t} value={t}>{t}</option>;})}
-        </select>
-        <select value={filters.year} onChange={function(e){setFilters(function(f){return Object.assign({},f,{year:e.target.value});});}}
-          style={{padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff'}}>
-          <option value="all">All Years</option>
-          {availableYears.map(function(y){return <option key={y} value={y}>{y}</option>;})}
-        </select>
+        {/* Search sits on its own full-width second line, under the filters. */}
+        <div style={{position:'relative',flex:'1 1 100%',order:99}}>
+          <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'#aaa',pointerEvents:'none',display:'flex'}}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </span>
+          <input type="text" placeholder="Search donors..." value={filters.search}
+            onChange={function(e){setFilters(function(f){return Object.assign({},f,{search:e.target.value});});}}
+            style={{width:'100%',padding:'7px 12px 7px 30px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff',boxSizing:'border-box'}} />
+        </div>
         <select value={filters.hasAddress} onChange={function(e){setFilters(function(f){return Object.assign({},f,{hasAddress:e.target.value});});}}
           style={{padding:'7px 10px',border:'0.5px solid #e0d8cc',borderRadius:8,fontSize:12,background:'#fff'}}>
           <option value="all">All</option>
