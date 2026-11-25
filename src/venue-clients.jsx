@@ -932,10 +932,12 @@ function downloadCsv(filename, header, lines) {
 export function BookingsExport({ clients, onClose, onOpen, inline }) {
   const [toolsOpen, setToolsOpen] = React.useState(false);
   const today = venueDateKey();
+  const [year, setYear] = React.useState(String(Math.max(Number(today.slice(0, 4)), 2027))); // opens on 2027; 'all' = every year
   const [when, setWhen] = React.useState('all'), [pay, setPay] = React.useState('all'), [q, setQ] = React.useState(''), [closedF, setClosedF] = React.useState('all'), [openId, setOpenId] = React.useState(null);
   // Left out until they are real bookings: nobody who has neither signed nor paid anything yet.
   const all = bookingRows(clients.filter(c => c.clientsSigned || (c.paid || 0) > 0), today);
-  const rows = all.filter(r => (when === 'all' || (when === 'upcoming') === !r.c.isPast) && (pay === 'all' || (pay === 'paid' ? r.status === 'Paid in full' : pay === 'unpaid' ? r.status !== 'Paid in full' : r.status.indexOf('past due') !== -1)) && (closedF === 'all' || (closedF === 'closed') === (r.closed === 'Closed out')) && (!q || (r.c.name + ' ' + r.email + ' ' + r.who + ' ' + r.c.eventDate).toLowerCase().includes(q.toLowerCase())));
+  const yearOptions = [...new Set([String(Math.max(Number(today.slice(0, 4)), 2027)), ...all.map(r => String(r.c.eventDate || '').slice(0, 4)).filter(y => /^d{4}$/.test(y))])].sort();
+  const rows = all.filter(r => (year === 'all' || String(r.c.eventDate || '').slice(0, 4) === year) && (when === 'all' || (when === 'upcoming') === !r.c.isPast) && (pay === 'all' || (pay === 'paid' ? r.status === 'Paid in full' : pay === 'unpaid' ? r.status !== 'Paid in full' : r.status.indexOf('past due') !== -1)) && (closedF === 'all' || (closedF === 'closed') === (r.closed === 'Closed out')) && (!q || (r.c.name + ' ' + r.email + ' ' + r.who + ' ' + r.c.eventDate).toLowerCase().includes(q.toLowerCase())));
   const sum = f => rows.reduce((t, r) => t + f(r), 0);
   const money = c => amount(c, 'USD');
   const day = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[2] + '/' + m[3] + '/' + m[1] : ''; };
@@ -987,6 +989,7 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
       </div>
       <div style={{ fontSize: 13, color: '#888', marginBottom: 14 }}>Every signed or paid booking with what was invoiced, what is paid and what is still owed. Download it for QuickBooks, or print it.</div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <select value={year} onChange={e => setYear(e.target.value)} style={sel} aria-label="Year"><option value="all">All years</option>{yearOptions.map(y => <option key={y} value={y}>{y}</option>)}</select>
         <select value={when} onChange={e => setWhen(e.target.value)} style={sel}><option value="all">Upcoming and past</option><option value="upcoming">Upcoming only</option><option value="past">Past only</option></select>
         <select value={pay} onChange={e => setPay(e.target.value)} style={sel}><option value="all">Paid and unpaid</option><option value="paid">Paid in full</option><option value="unpaid">Not fully paid</option><option value="late">Past due</option></select>
         <select value={closedF} onChange={e => setClosedF(e.target.value)} style={sel}><option value="all">Closed and open</option><option value="closed">Closed out</option><option value="open">Not closed out</option></select>
@@ -1012,15 +1015,14 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'auto' }}>
-          <thead><tr><th style={th}>Event date</th><th style={th}>Event</th><th style={th}>Client</th><th style={th}>Status</th><th style={{ ...th, textAlign: 'right' }}>Invoice</th><th style={{ ...th, textAlign: 'right' }}>Paid</th><th style={{ ...th, textAlign: 'right' }}>Balance</th><th style={{ ...th, borderLeft: '2px solid #d8cdb8' }}>Next payment</th></tr></thead>
-          <tbody>{rows.length === 0 ? <tr><td style={td} colSpan={8}>No bookings match.</td></tr> : rows.map(r => <React.Fragment key={r.c.id}><tr onClick={() => setOpenId(openId === r.c.id ? null : r.c.id)} style={{ cursor: 'pointer', background: openId === r.c.id ? '#fbf8f2' : undefined }}>
+          <thead><tr><th style={th}>Event date</th><th style={th}>Event</th><th style={th}>Client</th><th style={th}>Status</th><th style={{ ...th, textAlign: 'right' }}>Invoice</th><th style={{ ...th, textAlign: 'right' }}>Paid</th><th style={{ ...th, textAlign: 'right' }}>Balance</th></tr></thead>
+          <tbody>{rows.length === 0 ? <tr><td style={td} colSpan={7}>No bookings match.</td></tr> : rows.map(r => <React.Fragment key={r.c.id}><tr onClick={() => setOpenId(openId === r.c.id ? null : r.c.id)} style={{ cursor: 'pointer', background: openId === r.c.id ? '#fbf8f2' : undefined, opacity: r.c.isPast && openId !== r.c.id ? 0.5 : 1, filter: r.c.isPast && openId !== r.c.id ? 'grayscale(1)' : undefined }}>
             <td style={{ ...td, whiteSpace: 'nowrap', fontWeight: 600, color: '#886c44' }}>{openId === r.c.id ? '▾ ' : '▸ '}{day(r.c.eventDate) || 'TBD'}</td>
             <td style={{ ...td, minWidth: 150, maxWidth: 240 }}><div style={{ fontWeight: 600 }}>{r.c.name}</div><div style={{ color: '#888', fontSize: 11.5, marginTop: 1 }}>{r.c.type}</div></td>
             <td style={{ ...td, minWidth: 150, maxWidth: 230 }}>{r.people.length ? r.people.map((p, i) => <div key={i} style={{ marginBottom: i < r.people.length - 1 ? 4 : 0 }}>{p.name}{p.email && <div style={{ color: '#999', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.email}>{p.email}</div>}</div>) : <div>{r.who}<div style={{ color: '#999', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.email}>{r.email}</div></div>}</td>
             <td style={{ ...td, whiteSpace: 'nowrap' }}><div><span style={{ ...tone(r.status), display: 'inline-block', padding: '2px 9px', borderRadius: 5, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{r.status}</span></div><div style={{ marginTop: 4 }}><span style={{ ...(r.closed === 'Closed out' ? { background: '#edf4ed', color: '#426b4a' } : r.closed === 'Not yet held' ? { background: '#eee', color: '#555' } : { background: '#faf0e6', color: '#9a5d22' }), display: 'inline-block', padding: '2px 9px', borderRadius: 5, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{r.closed === 'Closed out' ? '✓ Closed out' : r.closed}</span></div></td>
             <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>{money(r.total)}</td><td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>{money(r.paid)}</td><td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 600 }}>{money(r.balance)}</td>
-            <td style={{ ...td, borderLeft: '2px solid #d8cdb8', whiteSpace: 'nowrap' }}>{r.next ? <span><b>{r.next.due ? day(r.next.due) : 'No date'}</b> · {money(r.next.cents)}</span> : ''}</td>
-          </tr>{openId === r.c.id && <tr><td colSpan={8} style={{ padding: '4px 8px 16px 28px', background: '#fbf8f2', borderBottom: '1px solid #e6dfd3' }}>
+          </tr>{openId === r.c.id && <tr><td colSpan={7} style={{ padding: '4px 8px 16px 28px', background: '#fbf8f2', borderBottom: '1px solid #e6dfd3' }}>
             {(() => { const L = invoiceLines(r.c); const sub = L.reduce((t, l) => t + l.amount, 0); return L.length === 0 ? <div className="vc-muted">No invoice on file for this booking yet.</div> : <table style={{ width: '100%', maxWidth: 820, borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead><tr><th style={th}>Item</th><th style={th}>Description</th><th style={{ ...th, textAlign: 'right' }}>Qty</th><th style={{ ...th, textAlign: 'right' }}>Price</th><th style={{ ...th, textAlign: 'right' }}>Amount</th></tr></thead>
               <tbody>{L.map((l, i) => <tr key={i}><td style={{ ...td, paddingLeft: l.child ? 24 : 8, fontWeight: l.child ? 400 : 600 }}>{l.child ? '↳ ' : ''}{l.item}{l.deposit && !/refundable/i.test(l.item + ' ' + (l.desc || '')) ? ' (refundable)' : ''}</td><td style={{ ...td, color: '#666' }}>{l.desc}</td><td style={{ ...td, textAlign: 'right' }}>{l.qty}</td><td style={{ ...td, textAlign: 'right' }}>{money(l.unit)}</td><td style={{ ...td, textAlign: 'right' }}>{money(l.amount)}</td></tr>)}
@@ -1095,9 +1097,10 @@ function AvailabilityStats({ clients, year }) {
     </div>
     {(() => {
       // The two earlier years come from the venue team's yearly numbers when we have them (BOOKED_FIXED), otherwise from the portal's bookings.
-      const prevVal = (y, r) => BOOKED_FIXED[y] ? BOOKED_FIXED[y][r.m] : monthRow(y, r.m).bookedDays;
+      const eventsIn = (y, m) => clients.filter(c => (typeFilter === 'all' || c.type === typeFilter) && String(c.eventDate || '').slice(0, 7) === y + '-' + pad(m + 1)).length;
+      const prevVal = (y, r) => BOOKED_FIXED[y] ? BOOKED_FIXED[y][r.m] : eventsIn(y, r.m);
       const prevTot = y => rows.reduce((t, r) => t + prevVal(y, r), 0);
-      const curVal = r => BOOKED_FIXED[year] ? BOOKED_FIXED[year][r.m] : r.cur.bookedDays;
+      const curVal = r => BOOKED_FIXED[year] ? BOOKED_FIXED[year][r.m] : eventsIn(year, r.m);
       const curTot = rows.reduce((t, r) => t + curVal(r), 0);
       const deltaText = d => d > 0 ? '+' + d : d < 0 ? String(d).replace('-', '−') : '0';
       const deltaColor = d => d > 0 ? '#2e7d32' : d < 0 ? '#b3261e' : '#999';
@@ -1213,7 +1216,7 @@ function ClientStats({ clients, allClients, onClose }) {
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Collected so far</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
       </div>
       <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Bookings vs Availability</div>
-      <AvailabilityStats clients={bookedYear} year={year} />
+      <AvailabilityStats clients={bookedAll} year={year} />
       <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>By Type of Event</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>Bookings</th><th style={th}>Without deposits</th><th style={th}>With deposits</th></tr></thead>
