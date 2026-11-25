@@ -1085,8 +1085,8 @@ function AvailabilityStats({ clients, year, title }) {
   const tot = k => rows.reduce((t, r) => t + r.cur[k], 0);
   const pct = (a, b) => b ? Math.round((a / b) * 100) + '%' : '—';
   const SANS = 'inherit'; // the Portal's own font, same as the rest of Venue Rentals
-  const th = { textAlign: 'right', fontSize: 11, color: '#888', fontWeight: 600, padding: '4px 0 4px 8px', verticalAlign: 'bottom' };
-  const td = { textAlign: 'right', padding: '7px 0 7px 8px', borderTop: '1px solid #f0ebe0', whiteSpace: 'nowrap' };
+  const th = { textAlign: 'center', fontSize: 12, color: '#8a8478', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '6px 8px 10px', verticalAlign: 'bottom' };
+  const td = { textAlign: 'center', padding: '11px 8px', borderTop: '1px solid #ebe5da', whiteSpace: 'nowrap', fontSize: 15, color: '#2a2a2a' };
   const tdTot = { ...td, borderTop: '2px solid #e6d9bd', fontWeight: 700 };
   const bar = (a, b) => { const p = b ? Math.min(100, (a / b) * 100) : 0; return <div style={{ height: 5, background: '#f0ebe0', borderRadius: 3, marginTop: 3 }}><div style={{ width: p + '%', height: 5, borderRadius: 3, background: b && a >= b ? '#2e7d32' : '#b58a3c' }} /></div>; };
   const chip = on => ({ border: '1px solid ' + (on ? '#886c44' : '#e0d8cc'), background: on ? '#886c44' : '#fff', color: on ? '#fff' : '#886c44', borderRadius: 999, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: SANS });
@@ -1108,7 +1108,7 @@ function AvailabilityStats({ clients, year, title }) {
       const deltaText = d => <><span style={{ display: 'inline-block', width: '0.8em', textAlign: 'right' }}>{d > 0 ? '+' : d < 0 ? '−' : ''}</span><span style={{ display: 'inline-block', width: '1.4em', textAlign: 'left' }}>{Math.abs(d)}</span></>;
       const deltaColor = d => d > 0 ? '#2e7d32' : d < 0 ? '#b3261e' : '#999';
       return <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
         <thead><tr>
           <th style={{ ...th, textAlign: 'left', paddingLeft: 0 }}>Month</th>
           <th style={{ ...th, color: '#999', textAlign: 'center', whiteSpace: 'nowrap' }}>{year - 2} booked</th>
@@ -1147,7 +1147,7 @@ const BOOKED_SINCE = '2026-09-01'; // the "Events booked" count starts here: whe
 const bookedOn = c => String((c.hb && c.hb.project && c.hb.project.created_at) || (c.sub && c.sub.created_at) || '').slice(0, 10);
 const BOOKED_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-function ClientStats({ clients, allClients, onClose }) {
+export function ClientStats({ clients, allClients, onClose }) {
   const thisYearNow = Number(venueDateKey().slice(0, 4));
   const [year, setYear] = React.useState(Math.max(thisYearNow, 2027)); // opens on 2027
   const eventYears = (allClients || clients).map(c => Number(String(c.eventDate || '').slice(0, 4))).filter(y => y > 2000);
@@ -1197,10 +1197,10 @@ function ClientStats({ clients, allClients, onClose }) {
   const box = { border: '1px solid #e6d9bd', borderRadius: 12, padding: '14px 16px', background: '#f6efe1', fontFamily: SANS };
   const big = { fontFamily: SANS, fontSize: 26, fontWeight: 700, color: '#4a3b24', letterSpacing: '-0.5px', lineHeight: 1.2 };
   const lab = { fontFamily: SANS, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#886c44', marginBottom: 4 };
-  const th = { textAlign: 'right', fontSize: 11, color: '#888', fontWeight: 600, padding: '4px 0' };
-  const td = { textAlign: 'right', padding: '8px 0', borderTop: '1px solid #f0ebe0' };
+  const th = { textAlign: 'center', fontSize: 12, color: '#8a8478', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '6px 8px 10px' };
+  const td = { textAlign: 'center', padding: '12px 8px', borderTop: '1px solid #ebe5da', fontSize: 15, color: '#2a2a2a' };
   return <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-    <div role="dialog" aria-label="Current stats" style={{ fontFamily: SANS, background: '#fff', borderRadius: 14, maxWidth: 720, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
+    <div role="dialog" aria-label="Current stats" style={{ fontFamily: SANS, background: '#fff', borderRadius: 14, maxWidth: 900, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
         <div style={{ fontSize: 30, fontWeight: 700, color: '#886c44', fontFamily: 'Cardo,serif' }}>Current stats</div>
         <a onClick={onClose} style={{ cursor: 'pointer', color: '#886c44', fontSize: 13, fontWeight: 600 }}>Close ×</a>
@@ -1209,26 +1209,26 @@ function ClientStats({ clients, allClients, onClose }) {
         <select value={year} onChange={e => setYear(Number(e.target.value))} aria-label="Year" style={{ border: '1px solid #886c44', borderRadius: 999, padding: '5px 14px', fontSize: 15, fontWeight: 700, color: '#4a3b24', background: '#fff', fontFamily: 'inherit', cursor: 'pointer' }}>{Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i).map(y => <option key={y} value={y}>{y}</option>)}</select>
         <span style={{ fontSize: 12.5, color: '#8a8478' }}>Paid, confirmed events dated in {year}</span>
       </div>
-      <div style={{ background: '#f7f4ef', margin: '0 -22px', padding: '26px 22px 28px' }}>
+      <div style={{ background: '#f7f4ef', margin: '0 -22px', padding: '30px 22px 32px' }}>
       <AvailabilityStats clients={bookedAll} year={year} title="Booking Overview - Comparison by Year" />
       </div>
-      <div style={{ background: '#ffffff', margin: '0 -22px', padding: '26px 22px 28px' }}>
+      <div style={{ background: '#ffffff', margin: '0 -22px', padding: '30px 22px 32px' }}>
       <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742', display: 'flex', alignItems: 'center', gap: 12, marginTop: 0, marginBottom: 14 }}><StatStar />Bookings &amp; Revenue · {year}</div>
-      <div style={{ padding: '6px 0 2px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '22px 24px' }}>
+      <div style={{ padding: '6px 0 2px', display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: '26px 32px' }}>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Bookings</div><div style={{ fontSize: 34, fontFamily: 'Cardo,serif', fontWeight: 700, color: '#2c2418', lineHeight: 1.1, marginTop: 4 }}>{all.n}</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Total booked</div><div style={{ fontSize: 34, fontFamily: 'Cardo,serif', fontWeight: 700, color: '#2c2418', lineHeight: 1.1, marginTop: 4 }}>{money(all.total)}</div><div className="vc-muted">with deposits</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Earnings without deposits</div><div style={{ fontSize: 34, fontFamily: 'Cardo,serif', fontWeight: 700, color: '#2c2418', lineHeight: 1.1, marginTop: 4 }}>{money(all.noDeposit)}</div><div className="vc-muted">{money(all.deposit)} in refundable deposits removed</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Collected so far</div><div style={{ fontSize: 34, fontFamily: 'Cardo,serif', fontWeight: 700, color: '#2c2418', lineHeight: 1.1, marginTop: 4 }}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
       </div>
       </div>
-      <div style={{ background: '#f7f4ef', margin: '0 -22px', padding: '26px 22px 28px' }}>
+      <div style={{ background: '#f7f4ef', margin: '0 -22px', padding: '30px 22px 32px' }}>
       <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742', display: 'flex', alignItems: 'center', gap: 12, marginTop: 0, marginBottom: 14 }}><StatStar />By Type of Event</div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={{ ...th, textAlign: 'center' }}>Bookings</th><th style={{ ...th, textAlign: 'center' }}>Without deposits</th><th style={{ ...th, textAlign: 'center' }}>With deposits</th></tr></thead>
         <tbody>{types.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={{ ...td, textAlign: 'center' }}>{t.n}</td><td style={{ ...td, textAlign: 'center' }}>{money(t.noDeposit)}</td><td style={{ ...td, textAlign: 'center' }}>{money(t.total)}</td></tr>)}</tbody>
       </table>
       </div>
-      <div style={{ background: '#ffffff', margin: '0 -22px', padding: '26px 22px 28px' }}>
+      <div style={{ background: '#ffffff', margin: '0 -22px', padding: '30px 22px 32px' }}>
       <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742', display: 'flex', alignItems: 'center', gap: 12, marginTop: 0, marginBottom: 14 }}><StatStar />Tour Performance</div>
       {!extra ? <div className="vc-muted">Loading…</div> : (() => {
         const toured = t => !!t.toured_at || t.date < todayKey;
@@ -1248,14 +1248,14 @@ function ClientStats({ clients, allClients, onClose }) {
         </>;
       })()}
       </div>
-      <div style={{ background: '#f7f4ef', margin: '0 -22px -22px', padding: '26px 22px 28px' }}>
+      <div style={{ background: '#f7f4ef', margin: '0 -22px -22px', padding: '30px 22px 32px' }}>
       <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742', display: 'flex', alignItems: 'center', gap: 12, marginTop: 0, marginBottom: 14 }}><StatStar />Inquiries &amp; Lead Generation</div>
       {!extra ? <div className="vc-muted">Loading…</div> : <>
         <div style={{ padding: '6px 0 2px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 12 }}>
           <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>All-time inquiries</div><div style={{ fontSize: 38, fontFamily: 'Cardo,serif', fontWeight: 700, color: '#2c2418', lineHeight: 1.1, marginTop: 4 }}>{extra.inq.length}</div></div>
           <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Last 30 days</div><div style={{ fontSize: 38, fontFamily: 'Cardo,serif', fontWeight: 700, color: '#2c2418', lineHeight: 1.1, marginTop: 4 }}>{extra.inq.filter(r => String(r.created_at).slice(0, 10) >= monthAgo).length}</div></div>
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
           <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>All time</th><th style={th}>Last 30 days</th></tr></thead>
           <tbody>{inqTypes.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={td}>{t.n}</td><td style={td}>{t.recent}</td></tr>)}</tbody>
         </table>
