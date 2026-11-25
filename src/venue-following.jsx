@@ -25,7 +25,7 @@ function stagesOf(p) {
   const isWedding = (p.prebooking && p.prebooking.kind === 'Wedding') || /wedding/i.test((p.inquiry && p.inquiry.event_type) || '') || /wedding/i.test((p.tour && p.tour.category) || '');
   const tourDone = !!(p.tour && p.tour.date && p.tour.date <= today && !/cancel/i.test(p.tour.status || ''));
   return [
-    { key: 'tour', label: 'Toured', done: tourDone, when: p.tour ? (tourDone ? shortDate(p.tour.date) : 'Tour ' + shortDate(p.tour.date)) : '', by: p.tour && p.tour.guide ? 'Guide: ' + p.tour.guide : '' },
+    { key: 'tour', label: 'Toured Venue', done: tourDone, when: p.tour ? (tourDone ? shortDate(p.tour.date) : 'Tour ' + shortDate(p.tour.date)) : '', by: p.tour && p.tour.guide ? 'Guide: ' + p.tour.guide : '' },
     { key: 'pre', label: 'Pre-booking form', done: !!p.prebooking, when: p.prebooking ? shortDate(p.prebooking.at) : '', by: p.prebooking_by || '' },
     { key: 'signed', label: 'Agreement signed', done: !!p.signed, when: p.signed === 'booked' ? 'Booked' : shortDate(p.signed), by: p.signed && p.signed_by ? (p.signed_by === 'HoneyBook' ? 'Via HoneyBook' : 'Countersigned by ' + p.signed_by) : '' },
     { key: 'paid', label: 'First payment', done: !!p.paid, when: p.paid === 'paid' ? 'Paid' : shortDate(p.paid), by: p.paid ? (p.paid_by && p.paid_by !== 'Paid online' && p.paid_by !== 'Logged by staff' ? 'Logged by ' + p.paid_by : (p.paid_by || '')) : '' },
@@ -41,7 +41,7 @@ function currentStage(p) {
 }
 
 // Where a couple is now, for the Stage filter: the furthest step they've completed.
-const STAGE_OPTIONS = [['none', 'Not toured yet'], ['tour', 'Toured'], ['pre', 'Pre-booking form in'], ['signed', 'Agreement signed'], ['paid', 'First payment made'], ['day', 'Event held']];
+const STAGE_OPTIONS = [['none', 'Not toured yet'], ['tour', 'Toured Venue'], ['pre', 'Pre-booking form in'], ['signed', 'Agreement signed'], ['paid', 'First payment made'], ['day', 'Event held']];
 function stageKey(p) { const s = stagesOf(p); const last = s.map(x => x.done).lastIndexOf(true); return last === -1 ? 'none' : s[last].key; }
 
 const btn = { background: GOLD, color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, padding: '6px 13px', cursor: 'pointer' };

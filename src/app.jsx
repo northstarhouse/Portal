@@ -20903,6 +20903,20 @@ function VenueRentalsView({ navigate, initialTab }) {
       .finally(function() { setDetailSaving(false); loadTours(); }); // always refresh, so the lists match what the server did
   }
 
+  // "Toured Venue": the tour really happened. Records it and takes the tour off the upcoming list now. Sends nothing; the tour
+  // stays booked, so the automatic pre-booking form email still goes out as usual.
+  function markToured() {
+    if (detailSaving) return;
+    if (!window.confirm('Mark ' + (detailEntry.raw.visitor_name || 'this visitor') + ' as having toured the venue? They come off the upcoming tours list now. Nothing is sent.')) return;
+    setDetailSaving(true);
+    sbPatchById('estate_tours', detailEntry.raw.id, { toured_at: new Date().toISOString() })
+      .then(function(res) {
+        if (!Array.isArray(res) || !res.length) { alert('Could not mark the tour as toured. Please try again.'); return; }
+        loadTours();
+        setDetailEntry(null);
+      }).finally(function() { setDetailSaving(false); });
+  }
+
   function markNoShow() {
     if (detailSaving) return;
     if (!window.confirm('Mark ' + (detailEntry.raw.visitor_name || 'this visitor') + ' as a no-show? They move off the upcoming list and stay on the All inquiries page, marked Didn\'t show up. No pre-booking form is sent.')) return;
@@ -21266,7 +21280,7 @@ function VenueRentalsView({ navigate, initialTab }) {
   // A booked tour is still an inquiry; only pre-booking submissions are clients.
   var inquirySubmissions = inquiries === null ? null : inquiries.filter(function(q) { return !isVenueClientSubmission(q); });
   var clientSubmissions = inquiries === null ? null : inquiries.filter(function(q) { return isVenueClientSubmission(q) && !isTestVenueBooking(q); });
-  var upcomingCombined = (tours || []).filter(function(t) { return t.status === 'booked' && t.date; }).concat((cancelledTours || []).filter(function(t) { return t.date && t.visitor_name; })).map(function(t) {
+  var upcomingCombined = (tours || []).filter(function(t) { return t.status === 'booked' && t.date && !t.toured_at; }).concat((cancelledTours || []).filter(function(t) { return t.date && t.visitor_name; })).map(function(t) {
     var d = new Date(t.date + 'T' + (t.start_time || '00:00:00'));
     return { key: 't-' + t.id, kind: 'Tour', title: tourTitleFor(t), date: d, raw: t, cancelled: t.status === 'cancelled' };
   }).filter(function(e) { return e.date && e.date.getTime() >= Date.now() - 24 * 60 * 60 * 1000; })
@@ -21328,7 +21342,7 @@ function VenueRentalsView({ navigate, initialTab }) {
             {toolsOpen && (
               <React.Fragment>
                 <div onClick={function() { setToolsOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-                <div role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 41, background: '#fff', border: '1px solid #ded7cb', borderRadius: 10, boxShadow: '0 8px 24px rgba(42,36,32,.14)', minWidth: 270, padding: 6 }}>
+                <div role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 41, background: '#fff', border: '1px solid #ded7cb', borderRadius: 10, boxShadow: '0 8px 24px rgba(42,36,32,.14)', width: 'min(640px, calc(100vw - 32px))', padding: 6, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 2, alignContent: 'start' }}>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); navigate('venue-following'); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
                     <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="venue-following" active size={18} /></span>
@@ -22075,6 +22089,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+                      <button onClick={markToured} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: gold, color: '#fff', border: '1px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Toured Venue</button>
                       <button onClick={startReschedule} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: '#fff', color: gold, border: '1px solid ' + gold, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Reschedule</button>
                       <button onClick={cancelTour} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: '#fff', color: '#c0392b', border: '1px solid #e4b8b0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel Tour</button>
                       <button onClick={markNoShow} disabled={detailSaving} style={{ flex: 1, padding: '9px', background: '#fff', color: '#c0392b', border: '1px solid #e4b8b0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Didn't Show Up</button>
@@ -22766,7 +22781,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
     if (t.status === 'no_show') return 'no_show';
     if (t.status === 'requested') return 'requested';
     var todayKey = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
-    return t.date && t.date < todayKey ? 'completed' : 'booked';
+    return t.toured_at || (t.date && t.date < todayKey) ? 'completed' : 'booked';
   }
   // A visitor who toured (or was booked by staff) without ever filling out an inquiry form has no row here. If they did not show up,
   // they are listed anyway, marked "Didn't show up", so they are not lost once the tour is over.
