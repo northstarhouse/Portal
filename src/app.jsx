@@ -1472,14 +1472,6 @@ function HomeView({ navigate }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                     <div style={{ fontSize: 12, color: '#2a2a2a', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-                      {editingTagId === a.id ? (
-                        <select autoFocus value={a.tag || ''} onChange={function(e) { updateActivityTag(a.id, e.target.value); }} onBlur={function() { setEditingTagId(null); }}
-                          style={{ fontSize: 10, fontWeight: 700, border: '0.5px solid #e0d8cc', borderRadius: 10, padding: '2px 6px', flexShrink: 0 }}>
-                          {Object.keys(ACTIVITY_TAG_COLORS).map(function(t) { return <option key={t} value={t}>{t}</option>; })}
-                        </select>
-                      ) : (
-                        tagStyle && <span onClick={function() { setEditingTagId(a.id); }} title="Click to change tag" style={{ fontSize: 10, fontWeight: 700, background: tagStyle.bg, color: tagStyle.color, borderRadius: 10, padding: '2px 8px', flexShrink: 0, cursor: 'pointer' }}>{a.tag}</span>
-                      )}
                       <span>{boldBeforeColon(a.description)}</span>
                     </div>
                     {isHandled && a.handled_by && <span style={{ fontSize: 10, fontWeight: 700, color: '#2e7d32', flexShrink: 0 }}>{a.handled_by}</span>}
