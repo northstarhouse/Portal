@@ -1050,13 +1050,14 @@ const AV_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July
 function AvailabilityStats({ clients }) {
   const today = venueDateKey();
   const thisYear = Number(today.slice(0, 4));
-  const [onlyWeddings, setOnlyWeddings] = React.useState(false);
+  const [typeFilter, setTypeFilter] = React.useState('all'); // 'all' = every event type
+  const typeNames = [...new Set(clients.map(c => c.type).filter(Boolean))].sort((a, b) => (a === 'Wedding' ? -1 : b === 'Wedding' ? 1 : a.localeCompare(b)));
   const [year, setYear] = React.useState(Math.max(thisYear, 2027)); // opens on 2027
   // Every booked day -> the earliest date it was booked (when the pre-booking came in), or null if unknown.
   const booked = {};
   clients.forEach(c => {
     if (!c.eventDate || c.eventDate < '2000') return;
-    if (onlyWeddings && c.type !== 'Wedding') return;
+    if (typeFilter !== 'all' && c.type !== typeFilter) return;
     const madeOn = String(c.sub?.created_at || '').slice(0, 10) || null;
     let d = c.eventDate, guard = 0;
     const end = c.eventEnd && c.eventEnd >= c.eventDate ? c.eventEnd : c.eventDate;
@@ -1092,8 +1093,10 @@ function AvailabilityStats({ clients }) {
       <span style={{ fontWeight: 700, fontSize: 15, color: '#4a3b24', minWidth: 44, textAlign: 'center' }}>{year}</span>
       <button type="button" aria-label="Next year" onClick={() => setYear(y => Math.min(maxYear, y + 1))} disabled={year >= maxYear} style={chip(false)}>›</button>
       <span style={{ width: 10 }} />
-      <button type="button" onClick={() => setOnlyWeddings(false)} style={chip(!onlyWeddings)}>Weddings &amp; events</button>
-      <button type="button" onClick={() => setOnlyWeddings(true)} style={chip(onlyWeddings)}>Weddings only</button>
+      <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} aria-label="Event type" style={{ border: '1px solid #886c44', borderRadius: 999, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: '#886c44', background: '#fff', fontFamily: 'inherit', cursor: 'pointer' }}>
+        <option value="all">All events</option>
+        {typeNames.map(t => <option key={t} value={t}>{t}</option>)}
+      </select>
     </div>
     {(() => {
       // The two earlier years come from the venue team's yearly numbers when we have them (BOOKED_FIXED), otherwise from the portal's bookings.
@@ -1161,7 +1164,7 @@ function ClientStats({ clients, allClients, onClose }) {
     return () => { off = true; };
   }, []);
   const todayKey = venueDateKey();
-  const monthAgo = shiftDate(todayKey, -90); // the "last 90 days" window
+  const monthAgo = shiftDate(todayKey, -30); // the "last 30 days" window
   const tourCount = f => extra ? extra.tours.filter(f).length : null;
   const inqTypes = [];
   if (extra) extra.inq.forEach(r => { const name = String(extra.byId[r.form_id] || 'Inquiry').replace(/\s*(Inquiry|Inquiries)\s*(Form)?\s*$/i, '').trim() || 'Inquiry'; let t = inqTypes.find(x => x.name === name); if (!t) { t = { name, n: 0, recent: 0 }; inqTypes.push(t); } t.n++; if (String(r.created_at).slice(0, 10) >= monthAgo) t.recent++; });
@@ -1174,7 +1177,11 @@ function ClientStats({ clients, allClients, onClose }) {
     const paid = c.paid || 0;
     return { total, deposit, paid, noDeposit: Math.max(0, total - deposit), paidNoDeposit: Math.max(0, paid - depositPaid), depositPaid };
   };
-  const rows = clients.map(c => ({ c, i: info(c) }));
+  // Booked = at least one payment has come in. A soft hold that has not paid is not counted anywhere on this page.
+  const isBooked = c => (c.paid || 0) > 0;
+  const bookedClients = clients.filter(isBooked);
+  const bookedAll = (allClients || clients).filter(isBooked);
+  const rows = bookedClients.map(c => ({ c, i: info(c) }));
   const all = { n: rows.length, total: sum(rows, r => r.i.total), deposit: sum(rows, r => r.i.deposit), paid: sum(rows, r => r.i.paid), noDeposit: sum(rows, r => r.i.noDeposit), paidNoDeposit: sum(rows, r => r.i.paidNoDeposit), depositPaid: sum(rows, r => r.i.depositPaid) };
   const types = [];
   rows.forEach(r => { let t = types.find(x => x.name === r.c.type); if (!t) { t = { name: r.c.type, n: 0, total: 0, noDeposit: 0 }; types.push(t); } t.n++; t.total += r.i.total; t.noDeposit += r.i.noDeposit; });
@@ -1200,7 +1207,7 @@ function ClientStats({ clients, allClients, onClose }) {
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Collected so far</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
       </div>
       <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>Bookings vs Availability</div>
-      <AvailabilityStats clients={allClients || clients} />
+      <AvailabilityStats clients={bookedAll} />
       <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>By Type of Event</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>Bookings</th><th style={th}>Without deposits</th><th style={th}>With deposits</th></tr></thead>
@@ -1209,7 +1216,7 @@ function ClientStats({ clients, allClients, onClose }) {
       <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>Booked Events by Month: {BOOKED_LIVE_YEAR} vs {BOOKED_GOAL_YEAR}</div>
       {(() => {
         const live = new Array(12).fill(0);
-        (allClients || clients).forEach(c => { if (c.eventDate && c.eventDate.slice(0, 4) === String(BOOKED_LIVE_YEAR)) live[Number(c.eventDate.slice(5, 7)) - 1]++; });
+        bookedAll.forEach(c => { if (c.eventDate && c.eventDate.slice(0, 4) === String(BOOKED_LIVE_YEAR)) live[Number(c.eventDate.slice(5, 7)) - 1]++; });
         const fixedYears = Object.keys(BOOKED_FIXED).map(Number).sort();
         const goal = BOOKED_FIXED[BOOKED_GOAL_YEAR] || new Array(12).fill(0);
         const sumYear = arr => arr.reduce((t, x) => t + x, 0);
@@ -1235,7 +1242,7 @@ function ClientStats({ clients, allClients, onClose }) {
         const toured = t => !!t.toured_at || t.date < todayKey;
         const upcoming = tourCount(t => t.status === 'booked' && t.date >= todayKey && !t.toured_at);
         const completed = tourCount(t => t.status === 'booked' && toured(t));
-        const booked = (allClients || clients).filter(c => bookedOn(c) >= BOOKED_SINCE).length;
+        const booked = bookedAll.filter(c => bookedOn(c) >= BOOKED_SINCE).length;
         const rate = completed ? (booked / completed * 100).toFixed(1) + '%' : '—';
         const waiting = tourCount(t => t.status === 'requested');
         const tile = (icon, label, value, green) => <div key={label}><div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: '#7a7368' }}>{icon}{label}</div><div style={{ fontSize: 32, fontWeight: 600, color: green ? '#2e7d4f' : '#2a2a2a', marginTop: 8, letterSpacing: '-0.5px' }}>{value}</div></div>;
@@ -1248,17 +1255,16 @@ function ClientStats({ clients, allClients, onClose }) {
             {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="m9 15 2.5 2.5L16 13"/></svg>, 'Events Booked', booked, true)}
             {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>, 'Conversion Rate', rate, true)}
           </div>
-          <div className="vc-muted" style={{ fontSize: 11.5, marginTop: 6 }}>Events booked since Sept 2026, divided by completed tours.{waiting > 0 ? ' ' + waiting + (waiting === 1 ? ' tour request is' : ' tour requests are') + ' still waiting.' : ''}</div>
         </>;
       })()}
       <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 24, marginBottom: 10 }}>Inquiries &amp; Lead Generation</div>
       {!extra ? <div className="vc-muted">Loading…</div> : <>
         <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 12 }}>
           <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>All-time inquiries</div><div style={{ fontSize: 34, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{extra.inq.length}</div></div>
-          <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Last 90 days</div><div style={{ fontSize: 34, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{extra.inq.filter(r => String(r.created_at).slice(0, 10) >= monthAgo).length}</div></div>
+          <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Last 30 days</div><div style={{ fontSize: 34, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{extra.inq.filter(r => String(r.created_at).slice(0, 10) >= monthAgo).length}</div></div>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>All time</th><th style={th}>Last 90 days</th></tr></thead>
+          <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>All time</th><th style={th}>Last 30 days</th></tr></thead>
           <tbody>{inqTypes.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={td}>{t.n}</td><td style={td}>{t.recent}</td></tr>)}</tbody>
         </table>
       </>}
