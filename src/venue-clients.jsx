@@ -1090,7 +1090,7 @@ function AvailabilityStats({ clients, year, title }) {
   const chip = on => ({ border: '1px solid ' + (on ? '#886c44' : '#e0d8cc'), background: on ? '#886c44' : '#fff', color: on ? '#fff' : '#886c44', borderRadius: 999, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: SANS });
   return <div>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 6, marginBottom: 10 }}>
-      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#886c44' }}>{title}</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742' }}>{title}</div>
       <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} aria-label="Event type" style={{ border: '1px solid #886c44', borderRadius: 999, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: '#886c44', background: '#fff', fontFamily: 'inherit', cursor: 'pointer' }}>
         <option value="all">All events</option>
         {typeNames.map(t => <option key={t} value={t}>{t}</option>)}
@@ -1103,7 +1103,7 @@ function AvailabilityStats({ clients, year, title }) {
       const prevTot = y => rows.reduce((t, r) => t + prevVal(y, r), 0);
       const curVal = r => BOOKED_FIXED[year] ? BOOKED_FIXED[year][r.m] : eventsIn(year, r.m);
       const curTot = rows.reduce((t, r) => t + curVal(r), 0);
-      const deltaText = d => d > 0 ? '+' + d : d < 0 ? String(d).replace('-', '−') : '0';
+      const deltaText = d => <><span style={{ display: 'inline-block', width: '0.8em', textAlign: 'right' }}>{d > 0 ? '+' : d < 0 ? '−' : ''}</span><span style={{ display: 'inline-block', width: '1.4em', textAlign: 'left' }}>{Math.abs(d)}</span></>;
       const deltaColor = d => d > 0 ? '#2e7d32' : d < 0 ? '#b3261e' : '#999';
       return <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -1208,19 +1208,19 @@ function ClientStats({ clients, allClients, onClose }) {
         <span style={{ fontSize: 12.5, color: '#8a8478' }}>Paid, confirmed events dated in {year}</span>
       </div>
       <AvailabilityStats clients={bookedAll} year={year} title="Booking Overview - Comparison by Year" />
-      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#886c44', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Bookings &amp; Revenue · {year}</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Bookings &amp; Revenue · {year}</div>
       <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '22px 24px' }}>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Bookings</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{all.n}</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Total booked</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.total)}</div><div className="vc-muted">with deposits</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Earnings without deposits</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.noDeposit)}</div><div className="vc-muted">{money(all.deposit)} in refundable deposits removed</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Collected so far</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
       </div>
-      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#886c44', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>By Type of Event</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>By Type of Event</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={{ ...th, textAlign: 'center' }}>Bookings</th><th style={{ ...th, textAlign: 'center' }}>Without deposits</th><th style={{ ...th, textAlign: 'center' }}>With deposits</th></tr></thead>
         <tbody>{types.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={{ ...td, textAlign: 'center' }}>{t.n}</td><td style={{ ...td, textAlign: 'center' }}>{money(t.noDeposit)}</td><td style={{ ...td, textAlign: 'center' }}>{money(t.total)}</td></tr>)}</tbody>
       </table>
-      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#886c44', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Tour Performance</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Tour Performance</div>
       {!extra ? <div className="vc-muted">Loading…</div> : (() => {
         const toured = t => !!t.toured_at || t.date < todayKey;
         const upcoming = tourCount(t => t.status === 'booked' && t.date >= todayKey && !t.toured_at);
@@ -1240,7 +1240,7 @@ function ClientStats({ clients, allClients, onClose }) {
           </div>
         </>;
       })()}
-      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#886c44', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Inquiries &amp; Lead Generation</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Inquiries &amp; Lead Generation</div>
       {!extra ? <div className="vc-muted">Loading…</div> : <>
         <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 12 }}>
           <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>All-time inquiries</div><div style={{ fontSize: 34, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{extra.inq.length}</div></div>
