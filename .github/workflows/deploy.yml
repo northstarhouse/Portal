@@ -14,7 +14,7 @@ jobs:
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment2.outputs.page_url || steps.deployment3.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,5 +22,20 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
+      # GitHub sometimes cannot find the artifact it just received ("No artifacts named github-pages"). Waiting and trying again fixes it.
       - uses: actions/deploy-pages@v4
         id: deployment
+        continue-on-error: true
+      - name: Wait before retrying
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+      - uses: actions/deploy-pages@v4
+        id: deployment2
+        if: steps.deployment.outcome == 'failure'
+        continue-on-error: true
+      - name: Wait before retrying again
+        if: steps.deployment.outcome == 'failure' && steps.deployment2.outcome == 'failure'
+        run: sleep 60
+      - uses: actions/deploy-pages@v4
+        id: deployment3
+        if: steps.deployment.outcome == 'failure' && steps.deployment2.outcome == 'failure'
