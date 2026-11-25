@@ -460,7 +460,9 @@ Deno.serve(async (req) => {
     for (const v of versions || []) {
       try {
         // Never send the same agreement's reminder twice. (The sent flag on the agreement cannot always be saved, so the activity log is the record.)
-        const already = await rest(`activity_log?select=id&action=eq.contract_expiry_reminder_sent&detail->>version_id=eq.${v.id}&limit=1`);
+        // ONE reminder per booking, ever: any earlier version of this agreement that was reminded counts too.
+        const allVersionIds = ((await rest(`venue_agreement_versions?select=id&response_id=eq.${v.response_id}`)) || []).map((x: any) => x.id);
+        const already = await rest(`activity_log?select=id&action=eq.contract_expiry_reminder_sent&detail->>version_id=in.(${allVersionIds.join(',')})&limit=1`);
         if (Array.isArray(already) && already.length) continue;
         // A booking with a payment in is already secured: it never gets the "hold is expiring" warning. If a signature is
         // still missing it gets a gentle note saying the date is confirmed and asking only for the remaining signature.
@@ -475,6 +477,11 @@ Deno.serve(async (req) => {
           const expires = fmtDate(v.expires_at);
           const expiresShort = new Date(v.expires_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: TZ });
           const sentTo: string[] = [];
+          // Record it BEFORE sending, so a failure afterwards can never cause a second send. If it cannot be recorded, nothing is sent.
+          await rest('activity_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+            description: paid ? `Signature reminder sent to ${unsigned.map((x: any) => x.name || x.email).join(' and ')} (date already secured by payment)` : `Signing reminder sent to ${unsigned.map((x: any) => x.name || x.email).join(' and ')} (agreement expires ${expiresShort})`,
+            action: 'contract_expiry_reminder_sent', tag: 'Venue', detail: { version_id: v.id, response_id: v.response_id, title: v.title },
+          }) });
           for (const c of unsigned) {
             const first = String(c.name || '').trim().split(/\s+/)[0] || 'there';
             try {
@@ -488,13 +495,7 @@ Deno.serve(async (req) => {
               } catch (_e) { /* history is a convenience; the email already went out */ }
             } catch (e) { console.error('agreement expiry reminder email failed for', v.id, c.email, e); result.errors++; }
           }
-          if (!sentTo.length) continue; // nothing was delivered: leave it unmarked so the next hourly run retries
-          try {
-            await rest('activity_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-              description: paid ? `Signature reminder sent to ${sentTo.join(' and ')} (date already secured by payment)` : `Signing reminder sent to ${sentTo.join(' and ')} (agreement expires ${expiresShort})`,
-              action: 'contract_expiry_reminder_sent', tag: 'Venue', detail: { version_id: v.id, title: v.title },
-            }) });
-          } catch (_e) { /* the emails already went out */ }
+          if (!sentTo.length) continue; // nothing was delivered; it stays recorded as attempted and is not retried
         }
         await rest(`venue_agreement_versions?id=eq.${v.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ expiry_reminder_sent_at: nowIso }) });
         result.agreementExpiryReminder++;
