@@ -21342,83 +21342,47 @@ function VenueRentalsView({ navigate, initialTab }) {
             {toolsOpen && (
               <React.Fragment>
                 <div onClick={function() { setToolsOpen(false); }} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-                <div role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 41, background: '#fff', border: '1px solid #ded7cb', borderRadius: 10, boxShadow: '0 8px 24px rgba(42,36,32,.14)', width: 'min(640px, calc(100vw - 32px))', padding: 6, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 2, alignContent: 'start' }}>
-                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); navigate('venue-following'); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="venue-following" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Following</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Watch couples go from their tour to their wedding</div>
+                {(function() {
+                  var go = function(fn) { return function() { setToolsOpen(false); fn(); }; };
+                  var groups = [
+                    { title: 'Client & Booking Management', items: [
+                      { icon: 'venue-following', name: 'Following', desc: 'Track couples from tour to wedding', run: go(function() { navigate('venue-following'); }) },
+                      { icon: 'tool-tour', name: 'Add a tour to the calendar', desc: 'Schedule a tour and send confirmation', run: go(function() { setAddTourOpen(true); }) },
+                      { icon: 'tool-send', name: 'Send out a pre-booking form', desc: 'Email the form to a prospective client', run: go(function() { setSendFormOpen(true); }) },
+                      { icon: 'tool-movement', name: 'Pending Movement', desc: 'Track sent and pending communications', run: go(function() { setMovementOpen(true); }) },
+                      { icon: 'person-activity', name: 'Activity Log', desc: 'Review client and booking activity', run: go(function() { navigate('person-activity'); }) }
+                    ] },
+                    { title: 'Operations & Administration', items: [
+                      { icon: 'tool-list', name: 'Upcoming Events List', desc: 'All events in chronological order', run: go(function() { setVenueTab('clients'); setEventsListOpen(true); }) },
+                      { icon: 'tool-list', name: 'Bookings & Payments', desc: 'Payment records and QuickBooks export', run: go(function() { setVenueTab('clients'); setBookingsOpen(true); }) },
+                      { icon: 'tool-stats', name: 'Current Stats', desc: 'Bookings, earnings and event types', run: go(function() { setVenueTab('clients'); setStatsOpen(true); }) },
+                      { icon: 'venue-policies', name: 'Policies & Resources', desc: 'Pricing, templates, FAQs and team resources', run: go(function() { navigate('venue-policies'); }) },
+                      { icon: 'tool-vendor', name: 'Add a vendor recommendation', desc: 'Update the client vendor guides', run: go(function() { setVendorToolOpen(true); }) },
+                      { icon: 'tool-request', name: 'Feature request or report a bug', desc: 'Suggest improvements or report issues', run: go(function() { setFeatureReqOpen(true); }) }
+                    ] }
+                  ];
+                  return (
+                    <div role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 41, background: '#fff', border: '1px solid #ded7cb', borderRadius: 14, boxShadow: '0 8px 24px rgba(42,36,32,.14)', width: 'min(900px, calc(100vw - 32px))', padding: '22px 26px 12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', columnGap: 44, alignContent: 'start' }}>
+                      {groups.map(function(g) {
+                        return (
+                          <div key={g.title}>
+                            <div style={{ fontSize: 12.5, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#6b6358', marginBottom: 14 }}>{g.title}</div>
+                            {g.items.map(function(it) {
+                              return (
+                                <button key={it.name} type="button" role="menuitem" onClick={it.run}
+                                  style={{ display: 'flex', alignItems: 'flex-start', gap: 18, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 8, padding: '9px 6px', marginBottom: 6, cursor: 'pointer', color: '#2a2a2a' }}>
+                                  <span style={{ color: '#886c44', display: 'flex', paddingTop: 3, flexShrink: 0 }}><NavIcon id={it.icon} active size={20} /></span>
+                                  <div><div style={{ fontSize: 16, fontWeight: 500, color: '#1f1c18' }}>{it.name}</div>
+                                  <div style={{ fontSize: 14, color: '#6f6a62', marginTop: 3 }}>{it.desc}</div></div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
                     </div>
-                  </button>
-                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); navigate('venue-policies'); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="venue-policies" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Policies &amp; Resources</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Pricing, templates, FAQs and the team's cheat sheet</div>
-                    </div>
-                  </button>
-                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setAddTourOpen(true); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-tour" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Add a tour to the calendar</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Pick the date and time; they get a confirmation email</div>
-                    </div>
-                  </button>
-                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setSendFormOpen(true); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-send" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Send out a pre-booking form</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Email the form to someone</div>
-                    </div>
-                  </button>
-                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setMovementOpen(true); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-movement" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Pending movement</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>What was sent, and what is waiting to go out</div>
-                    </div>
-                  </button>
-                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVendorToolOpen(true); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-vendor" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Add a vendor recommendation</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Shows up in the client guides right away</div>
-                    </div>
-                  </button>
-                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVenueTab('clients'); setEventsListOpen(true); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-list" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Upcoming Events List</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Every event by name and date, in order</div></div>
-                  </button>
-                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVenueTab('clients'); setBookingsOpen(true); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-list" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Bookings &amp; payments (QuickBooks export)</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>All events, invoiced / paid / unpaid; download or print</div></div>
-                  </button>
-                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setVenueTab('clients'); setStatsOpen(true); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-stats" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Current stats</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Bookings, earnings and events by type</div>
-                    </div>
-                  </button>
-                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); navigate('person-activity'); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="person-activity" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Activity log</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Everything one person has done: Portal changes, messages, tours</div>
-                    </div>
-                  </button>
-                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setFeatureReqOpen(true); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-request" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Feature request or report a bug</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Ask for something new, or flag something broken</div>
-                    </div>
-                  </button>
-                </div>
+                  );
+                })()}
               </React.Fragment>
             )}
           </div>
