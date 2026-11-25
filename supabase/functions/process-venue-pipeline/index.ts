@@ -456,12 +456,17 @@ Deno.serve(async (req) => {
   // The deadline (expires_at) is what keeps the date on a soft hold; after it the hold is released. Sent once per agreement.
   try {
     const in2Days = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString();
-    const versions = await rest(`venue_agreement_versions?select=id,response_id,title,expires_at&status=eq.pending&expires_at=gt.${encodeURIComponent(nowIso)}&expires_at=lte.${encodeURIComponent(in2Days)}&expiry_reminder_sent_at=is.null`);
+    const versions = await rest(`venue_agreement_versions?select=id,response_id,title,expires_at&status=eq.pending&expires_at=lte.${encodeURIComponent(in2Days)}&expiry_reminder_sent_at=is.null`);
     for (const v of versions || []) {
       try {
+        // A booking with a payment in is already secured: it never gets the "hold is expiring" warning. If a signature is
+        // still missing it gets a gentle note saying the date is confirmed and asking only for the remaining signature.
+        const paid = (await rest('rpc/venue_response_paid', { method: 'POST', body: JSON.stringify({ p_rid: v.response_id }) })) === true;
+        if (!paid && new Date(v.expires_at).getTime() <= now.getTime()) continue; // lapsed and unpaid: the expiry step handles it
         const signers = await rest(`venue_agreement_signers?select=name,email,role,status&version_id=eq.${v.id}`);
         const unsigned = (signers || []).filter((x: any) => x.role !== 'venue' && x.status !== 'signed' && x.email);
-        if (unsigned.length && templates.agreement_expiry_reminder) {
+        const tpl = paid ? templates.agreement_signature_reminder : templates.agreement_expiry_reminder;
+        if (unsigned.length && tpl) {
           const inq = (await rest(`venue_inquiries?select=event_date&limit=1&prebooking_form_response_id=eq.${v.response_id}`))?.[0];
           const code = venueCode(inq?.event_date);
           const expires = fmtDate(v.expires_at);
@@ -470,7 +475,7 @@ Deno.serve(async (req) => {
           for (const c of unsigned) {
             const first = String(c.name || '').trim().split(/\s+/)[0] || 'there';
             try {
-              await sendTemplated(templates.agreement_expiry_reminder, c.email,
+              await sendTemplated(tpl, c.email,
                 { name: first, expires, expires_short: expiresShort, venue_code: code, event_page_link: CLIENT_PAGE_URL },
                 { name: escapeHtml(first), expires: escapeHtml(expires), expires_short: escapeHtml(expiresShort), venue_code: escapeHtml(code), event_page_link: CLIENT_PAGE_URL });
               sentTo.push(c.name || c.email);
@@ -479,7 +484,7 @@ Deno.serve(async (req) => {
           if (!sentTo.length) continue; // nothing was delivered: leave it unmarked so the next hourly run retries
           try {
             await rest('activity_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-              description: `Signing reminder sent to ${sentTo.join(' and ')} (agreement expires ${expiresShort})`,
+              description: paid ? `Signature reminder sent to ${sentTo.join(' and ')} (date already secured by payment)` : `Signing reminder sent to ${sentTo.join(' and ')} (agreement expires ${expiresShort})`,
               action: 'contract_expiry_reminder_sent', tag: 'Venue', detail: { version_id: v.id, title: v.title },
             }) });
           } catch (_e) { /* the emails already went out */ }

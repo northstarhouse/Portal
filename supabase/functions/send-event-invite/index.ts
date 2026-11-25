@@ -212,7 +212,7 @@ async function handleLetter(ev: any, body: any, action: string) {
       body: JSON.stringify({
         to: p.email, subject: audience === 'test' ? `[Test] ${subject}` : subject,
         body: `${p.name ? 'Dear ' + p.name : 'Dear Friend'},\n\nYou are invited to ${ev.title}: ${[longDate(ev.date), prettyTime(ev.time)].filter(Boolean).join(', ')}, ${ADDRESS}.\n\nRSVP: ${SITE}${ev.slug}${p.org ? '&g=sponsor&o=' + encodeURIComponent(p.org) : ''}\n\nThe Board of Directors\nNorth Star Historic Conservancy`,
-        html: buildLetterHtml(ev, { name: p.name, text, org: p.org, role, sub }), sender: 'North Star House',
+        html: buildLetterHtml(ev, { name: p.name, text, org: p.org, role, sub }), sender: 'North Star House', replyTo: 'venue@thenorthstarhouse.org',
       }),
     })
     if (!r.ok) return json({ error: `The email could not be sent (sent ${sent} so far). Please try again.`, sent }, 502)
@@ -276,8 +276,8 @@ Deno.serve(async (req) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
         body: JSON.stringify(audience === 'test'
-          ? { to: ADMIN, subject: `[Test] ${subject}`, body: `${ev.title}: ${SITE}${ev.slug}`, html, sender: 'North Star House' }
-          : { to: ADMIN, bcc: batch, subject, body: `${ev.title}\n${[longDate(ev.date), ev.time].filter(Boolean).join(' · ')}\n\nRSVP: ${SITE}${ev.slug}`, html, sender: 'North Star House' }),
+          ? { to: ADMIN, subject: `[Test] ${subject}`, body: `${ev.title}: ${SITE}${ev.slug}`, html, sender: 'North Star House', replyTo: 'venue@thenorthstarhouse.org' }
+          : { to: ADMIN, bcc: batch, subject, body: `${ev.title}\n${[longDate(ev.date), ev.time].filter(Boolean).join(' · ')}\n\nRSVP: ${SITE}${ev.slug}`, html, sender: 'North Star House', replyTo: 'venue@thenorthstarhouse.org' }),
       })
       if (!r.ok) return json({ error: `The email could not be sent (sent ${sent} so far). Please try again.`, sent }, 502)
       sent += batch.length

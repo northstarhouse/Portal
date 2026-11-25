@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     const sendRes = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
-      body: JSON.stringify({ to: recipients, subject, body, html, sender: 'Box Office' }),
+      body: JSON.stringify({ to: recipients, subject, body, html, sender: 'Box Office', replyTo: 'venue@thenorthstarhouse.org' }),
     })
     const sendData = await sendRes.json().catch(() => ({}))
     if (!sendRes.ok) throw new Error(sendData.error || `send-email HTTP ${sendRes.status}`)
