@@ -193,8 +193,18 @@ async function sendEmail(to: string, subject: string, body: string, html?: strin
 // substituted as-is into the text body; `htmlVars` are substituted into the
 // HTML body (caller is responsible for escaping any free-text values, e.g.
 // inquiry name, before passing them here — links/dates built by us are safe raw).
-async function sendTemplated(tpl: { subject: string; body: string; html_body: string }, to: string, textVars: Record<string, string>, htmlVars: Record<string, string>) {
+// Safety net: the same subject is never emailed to the same address twice within 7 days by the automatic jobs, whatever else
+// goes wrong (a flag that cannot be saved, a retry, a second run). Sends started by hand (manual: true) are never blocked.
+async function sendTemplated(tpl: { subject: string; body: string; html_body: string }, to: string, textVars: Record<string, string>, htmlVars: Record<string, string>, opts: { manual?: boolean } = {}) {
   const subject = fillTemplate(tpl.subject, textVars);
+  if (!opts.manual) {
+    const addr = String(to || '').trim().toLowerCase();
+    const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const recent = await rest(`pipeline_email_log?select=id&to_email=eq.${encodeURIComponent(addr)}&subject=eq.${encodeURIComponent(subject)}&sent_at=gte.${encodeURIComponent(since)}&limit=1`);
+    if (Array.isArray(recent) && recent.length) { console.log('skipped duplicate automatic email', addr, subject); return null; }
+    // Recorded before sending: if recording fails nothing is sent.
+    await rest('pipeline_email_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ to_email: addr, subject }) });
+  }
   const body = fillTemplate(tpl.body, textVars);
   const html = tpl.html_body ? renderShell(fillTemplate(tpl.html_body, htmlVars)) : undefined;
   return sendEmail(to, subject, body, html);
@@ -215,7 +225,7 @@ Deno.serve(async (req) => {
 
         await sendTemplated(templates.proposal_sent, inq.email,
           { name: inq.name },
-          { name: escapeHtml(inq.name) });
+          { name: escapeHtml(inq.name) }, { manual: true });
 
         const nowIso = new Date().toISOString();
         await rest(`venue_inquiries?id=eq.${inq.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'Proposal Sent', proposal_sent_at: nowIso }) });
