@@ -1090,7 +1090,7 @@ function AvailabilityStats({ clients, year, title }) {
   const chip = on => ({ border: '1px solid ' + (on ? '#886c44' : '#e0d8cc'), background: on ? '#886c44' : '#fff', color: on ? '#fff' : '#886c44', borderRadius: 999, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: SANS });
   return <div>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 6, marginBottom: 10 }}>
-      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a' }}>{title}</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#886c44' }}>{title}</div>
       <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} aria-label="Event type" style={{ border: '1px solid #886c44', borderRadius: 999, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: '#886c44', background: '#fff', fontFamily: 'inherit', cursor: 'pointer' }}>
         <option value="all">All events</option>
         {typeNames.map(t => <option key={t} value={t}>{t}</option>)}
@@ -1109,25 +1109,25 @@ function AvailabilityStats({ clients, year, title }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr>
           <th style={{ ...th, textAlign: 'left', paddingLeft: 0 }}>Month</th>
-          <th style={{ ...th, color: '#999', textAlign: 'left', whiteSpace: 'nowrap' }}>{year - 2} booked</th>
-          <th style={{ ...th, color: '#999', textAlign: 'left', whiteSpace: 'nowrap' }}>{year - 1} booked</th>
-          <th style={{ ...th, textAlign: 'left', whiteSpace: 'nowrap' }}>{year} booked</th>
-          <th style={{ ...th, textAlign: 'left', whiteSpace: 'nowrap' }}>{year} vs {year - 1}</th>
+          <th style={{ ...th, color: '#999', textAlign: 'center', whiteSpace: 'nowrap' }}>{year - 2} booked</th>
+          <th style={{ ...th, color: '#999', textAlign: 'center', whiteSpace: 'nowrap' }}>{year - 1} booked</th>
+          <th style={{ ...th, textAlign: 'center', whiteSpace: 'nowrap' }}>{year} booked</th>
+          <th style={{ ...th, textAlign: 'center', whiteSpace: 'nowrap' }}>{year} vs {year - 1}</th>
         </tr></thead>
         <tbody>
           {rows.map(r => <tr key={r.m}>
             <td style={{ ...td, textAlign: 'left', paddingLeft: 0, fontWeight: 600 }}>{r.name}</td>
-            <td style={{ ...td, textAlign: 'left', color: '#888' }}>{prevVal(year - 2, r)}</td>
-            <td style={{ ...td, textAlign: 'left', color: '#888' }}>{prevVal(year - 1, r)}</td>
-            <td style={{ ...td, textAlign: 'left', fontWeight: 700, color: '#4a3b24' }}>{curVal(r)}</td>
-            <td style={{ ...td, textAlign: 'left', fontWeight: 600, color: deltaColor(curVal(r) - prevVal(year - 1, r)) }}>{deltaText(curVal(r) - prevVal(year - 1, r))}</td>
+            <td style={{ ...td, textAlign: 'center', color: '#888' }}>{prevVal(year - 2, r)}</td>
+            <td style={{ ...td, textAlign: 'center', color: '#888' }}>{prevVal(year - 1, r)}</td>
+            <td style={{ ...td, textAlign: 'center', fontWeight: 700, color: '#4a3b24' }}>{curVal(r)}</td>
+            <td style={{ ...td, textAlign: 'center', fontWeight: 600, color: deltaColor(curVal(r) - prevVal(year - 1, r)) }}>{deltaText(curVal(r) - prevVal(year - 1, r))}</td>
           </tr>)}
           <tr>
             <td style={{ ...tdTot, textAlign: 'left', paddingLeft: 0 }}>Year</td>
-            <td style={{ ...tdTot, textAlign: 'left', color: '#888' }}>{prevTot(year - 2)}</td>
-            <td style={{ ...tdTot, textAlign: 'left', color: '#888' }}>{prevTot(year - 1)}</td>
-            <td style={{ ...tdTot, textAlign: 'left', color: '#4a3b24' }}>{curTot}</td>
-            <td style={{ ...tdTot, textAlign: 'left', color: deltaColor(curTot - prevTot(year - 1)) }}>{deltaText(curTot - prevTot(year - 1))}</td>
+            <td style={{ ...tdTot, textAlign: 'center', color: '#888' }}>{prevTot(year - 2)}</td>
+            <td style={{ ...tdTot, textAlign: 'center', color: '#888' }}>{prevTot(year - 1)}</td>
+            <td style={{ ...tdTot, textAlign: 'center', color: '#4a3b24' }}>{curTot}</td>
+            <td style={{ ...tdTot, textAlign: 'center', color: deltaColor(curTot - prevTot(year - 1)) }}>{deltaText(curTot - prevTot(year - 1))}</td>
           </tr>
         </tbody>
       </table>
@@ -1208,43 +1208,19 @@ function ClientStats({ clients, allClients, onClose }) {
         <span style={{ fontSize: 12.5, color: '#8a8478' }}>Paid, confirmed events dated in {year}</span>
       </div>
       <AvailabilityStats clients={bookedAll} year={year} title="Booking Overview - Comparison by Year" />
-      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Bookings &amp; Revenue · {year}</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#886c44', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Bookings &amp; Revenue · {year}</div>
       <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '22px 24px' }}>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Bookings</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{all.n}</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Total booked</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.total)}</div><div className="vc-muted">with deposits</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Earnings without deposits</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.noDeposit)}</div><div className="vc-muted">{money(all.deposit)} in refundable deposits removed</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Collected so far</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
       </div>
-      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>By Type of Event</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#886c44', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>By Type of Event</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>Bookings</th><th style={th}>Without deposits</th><th style={th}>With deposits</th></tr></thead>
-        <tbody>{types.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={td}>{t.n}</td><td style={td}>{money(t.noDeposit)}</td><td style={td}>{money(t.total)}</td></tr>)}</tbody>
+        <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={{ ...th, textAlign: 'center' }}>Bookings</th><th style={{ ...th, textAlign: 'center' }}>Without deposits</th><th style={{ ...th, textAlign: 'center' }}>With deposits</th></tr></thead>
+        <tbody>{types.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={{ ...td, textAlign: 'center' }}>{t.n}</td><td style={{ ...td, textAlign: 'center' }}>{money(t.noDeposit)}</td><td style={{ ...td, textAlign: 'center' }}>{money(t.total)}</td></tr>)}</tbody>
       </table>
-      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Booked Events by Month: {BOOKED_LIVE_YEAR} vs {BOOKED_GOAL_YEAR}</div>
-      {(() => {
-        const live = new Array(12).fill(0);
-        bookedAll.forEach(c => { if (c.eventDate && c.eventDate.slice(0, 4) === String(BOOKED_LIVE_YEAR)) live[Number(c.eventDate.slice(5, 7)) - 1]++; });
-        const fixedYears = Object.keys(BOOKED_FIXED).map(Number).sort();
-        const goal = BOOKED_FIXED[BOOKED_GOAL_YEAR] || new Array(12).fill(0);
-        const sumYear = arr => arr.reduce((t, x) => t + x, 0);
-        const liveTotal = sumYear(live), goalTotal = sumYear(goal);
-        const status = (n, g) => n >= g ? (g === 0 && n === 0 ? { t: '—', c: '#999' } : { t: n > g ? '+' + (n - g) + ' over goal' : 'Goal met', c: '#2e7d32' }) : { t: (g - n) + ' to go', c: '#9a5d22' };
-        return <>
-          <div className="vc-muted" style={{ marginBottom: 8 }}>The goal for each month is to meet or beat what we booked that month in {BOOKED_GOAL_YEAR}. {BOOKED_LIVE_YEAR} counts update by themselves from booked events.</div>
-          <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead><tr><th style={{ ...th, textAlign: 'left' }}>Event month</th>{fixedYears.map(y => <th key={y} style={{ ...th, textAlign: 'center' }}>{y}{y === BOOKED_GOAL_YEAR ? ' (goal)' : ''}</th>)}<th style={{ ...th, textAlign: 'center' }}>{BOOKED_LIVE_YEAR} booked</th><th style={{ ...th, textAlign: 'left', paddingLeft: 14 }}>Progress</th></tr></thead>
-            <tbody>{BOOKED_MONTHS.map((m, i) => { const st = status(live[i], goal[i]); const p = goal[i] ? Math.min(100, live[i] / goal[i] * 100) : (live[i] ? 100 : 0); return <tr key={m}>
-              <td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{m}</td>
-              {fixedYears.map(y => <td key={y} style={{ ...td, textAlign: 'center' }}>{(BOOKED_FIXED[y] || [])[i] ?? '—'}</td>)}
-              <td style={{ ...td, textAlign: 'center', fontWeight: 700 }}>{live[i]}</td>
-              <td style={{ ...td, textAlign: 'left', paddingLeft: 14, minWidth: 130 }}><div style={{ fontSize: 11.5, fontWeight: 600, color: st.c }}>{st.t}</div><div style={{ height: 5, background: '#f0ebe0', borderRadius: 3, marginTop: 3 }}><div style={{ width: p + '%', height: 5, borderRadius: 3, background: live[i] >= goal[i] && (live[i] > 0 || goal[i] > 0) ? '#2e7d32' : '#b58a3c' }} /></div></td>
-            </tr>; })}
-              <tr><td style={{ ...td, textAlign: 'left', fontWeight: 700, borderTop: '2px solid #e6d9bd' }}>Total</td>{fixedYears.map(y => <td key={y} style={{ ...td, textAlign: 'center', fontWeight: 700, borderTop: '2px solid #e6d9bd' }}>{sumYear(BOOKED_FIXED[y] || [])}</td>)}<td style={{ ...td, textAlign: 'center', fontWeight: 700, borderTop: '2px solid #e6d9bd' }}>{liveTotal}</td><td style={{ ...td, textAlign: 'left', paddingLeft: 14, fontWeight: 700, borderTop: '2px solid #e6d9bd', color: status(liveTotal, goalTotal).c }}>{status(liveTotal, goalTotal).t}</td></tr>
-            </tbody>
-          </table></div>
-        </>;
-      })()}
-      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Tour Performance</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#886c44', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Tour Performance</div>
       {!extra ? <div className="vc-muted">Loading…</div> : (() => {
         const toured = t => !!t.toured_at || t.date < todayKey;
         const upcoming = tourCount(t => t.status === 'booked' && t.date >= todayKey && !t.toured_at);
@@ -1264,7 +1240,7 @@ function ClientStats({ clients, allClients, onClose }) {
           </div>
         </>;
       })()}
-      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Inquiries &amp; Lead Generation</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#886c44', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Inquiries &amp; Lead Generation</div>
       {!extra ? <div className="vc-muted">Loading…</div> : <>
         <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 12 }}>
           <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>All-time inquiries</div><div style={{ fontSize: 34, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{extra.inq.length}</div></div>
