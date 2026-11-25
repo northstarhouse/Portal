@@ -5850,8 +5850,8 @@ function DonorsView({ navigate }) {
           <option value="all">All Tiers</option>
           {DONOR_TIERS_NSH.filter(function(t){return t.tier!=='none';}).map(function(t){return <option key={t.tier} value={t.tier}>{t.label}</option>;})}
         </select>
-        {/* Search sits on its own full-width second line, under the filters. */}
-        <div style={{position:'relative',flex:'1 1 100%',order:99}}>
+        {/* Search sits on the second line, sharing it with the donor count and buttons. */}
+        <div style={{position:'relative',flex:'1 1 320px',minWidth:200,order:98}}>
           <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'#aaa',pointerEvents:'none',display:'flex'}}>
             <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </span>
@@ -5865,7 +5865,7 @@ function DonorsView({ navigate }) {
           <option value="yes">Has Address</option>
           <option value="no">No Address</option>
         </select>
-        <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto'}}>
+        <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto',order:99}}>
           <span style={{fontSize:11,color:'#aaa'}}>{filteredDonors.length} donor{filteredDonors.length!==1?'s':''}</span>
           {/* Donor tools in one menu. */}
           <PortalToolsMenu items={[
