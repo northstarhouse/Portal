@@ -161,6 +161,8 @@ Deno.serve(async (req) => {
     for (const i of inqs) {
       const rid = i.prebooking_form_response_id;
       if (!live.has(rid) || !i.event_date || /\btest\b/i.test(i.name || "")) continue;
+      // An archived client (removed or lost) keeps no date on the calendar.
+      if (i.status === "Archive") { want.set(rid, null); continue; }
       const v = versions.find((x) => x.response_id === rid) || null;
       const ag = v?.status || null;
       const name = String(i.name || "Venue booking").trim();
