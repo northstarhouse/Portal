@@ -1081,7 +1081,7 @@ function AvailabilityStats({ clients }) {
   const rows = AV_MONTHS.map((name, m) => ({ name, m, cur: monthRow(year, m), }));
   const tot = k => rows.reduce((t, r) => t + r.cur[k], 0);
   const pct = (a, b) => b ? Math.round((a / b) * 100) + '%' : '—';
-  const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  const SANS = 'inherit'; // the Portal's own font, same as the rest of Venue Rentals
   const th = { textAlign: 'right', fontSize: 11, color: '#888', fontWeight: 600, padding: '4px 0 4px 8px', verticalAlign: 'bottom' };
   const td = { textAlign: 'right', padding: '7px 0 7px 8px', borderTop: '1px solid #f0ebe0', whiteSpace: 'nowrap' };
   const tdTot = { ...td, borderTop: '2px solid #e6d9bd', fontWeight: 700 };
@@ -1187,7 +1187,7 @@ function ClientStats({ clients, allClients, onClose }) {
   rows.forEach(r => { let t = types.find(x => x.name === r.c.type); if (!t) { t = { name: r.c.type, n: 0, total: 0, noDeposit: 0 }; types.push(t); } t.n++; t.total += r.i.total; t.noDeposit += r.i.noDeposit; });
   types.sort((a, b) => b.n - a.n);
   const missing = rows.filter(r => !r.i.total).length;
-  const SANS = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  const SANS = 'inherit'; // the Portal's own font, same as the rest of Venue Rentals
   const box = { border: '1px solid #e6d9bd', borderRadius: 12, padding: '14px 16px', background: '#f6efe1', fontFamily: SANS };
   const big = { fontFamily: SANS, fontSize: 26, fontWeight: 700, color: '#4a3b24', letterSpacing: '-0.5px', lineHeight: 1.2 };
   const lab = { fontFamily: SANS, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#886c44', marginBottom: 4 };
@@ -1200,20 +1200,21 @@ function ClientStats({ clients, allClients, onClose }) {
         <a onClick={onClose} style={{ cursor: 'pointer', color: '#886c44', fontSize: 13, fontWeight: 600 }}>Close ×</a>
       </div>
 <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 6, marginBottom: 10 }}>Bookings &amp; Revenue</div>
+      <div style={{ fontFamily: SANS, fontSize: 13, color: '#8a8478', margin: '-4px 0 10px' }}>{(() => { const ds = rows.map(r => r.c.eventDate).filter(Boolean).sort(); const fmt = d => new Date(d.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }); return 'Paid events that have not happened yet' + (ds.length ? ', ' + fmt(ds[0]) + (fmt(ds[0]) === fmt(ds[ds.length - 1]) ? '' : ' to ' + fmt(ds[ds.length - 1])) : '') + '. Not limited to one year.'; })()}</div>
       <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '22px 24px' }}>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Bookings</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{all.n}</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Total booked</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.total)}</div><div className="vc-muted">with deposits</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Earnings without deposits</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.noDeposit)}</div><div className="vc-muted">{money(all.deposit)} in refundable deposits removed</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Collected so far</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
       </div>
-      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>Bookings vs Availability</div>
+      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Bookings vs Availability</div>
       <AvailabilityStats clients={bookedAll} />
-      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>By Type of Event</div>
+      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>By Type of Event</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>Bookings</th><th style={th}>Without deposits</th><th style={th}>With deposits</th></tr></thead>
         <tbody>{types.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={td}>{t.n}</td><td style={td}>{money(t.noDeposit)}</td><td style={td}>{money(t.total)}</td></tr>)}</tbody>
       </table>
-      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>Booked Events by Month: {BOOKED_LIVE_YEAR} vs {BOOKED_GOAL_YEAR}</div>
+      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Booked Events by Month: {BOOKED_LIVE_YEAR} vs {BOOKED_GOAL_YEAR}</div>
       {(() => {
         const live = new Array(12).fill(0);
         bookedAll.forEach(c => { if (c.eventDate && c.eventDate.slice(0, 4) === String(BOOKED_LIVE_YEAR)) live[Number(c.eventDate.slice(5, 7)) - 1]++; });
@@ -1237,7 +1238,7 @@ function ClientStats({ clients, allClients, onClose }) {
           </table></div>
         </>;
       })()}
-      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 24, marginBottom: 10 }}>Tour Performance</div>
+      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Tour Performance</div>
       {!extra ? <div className="vc-muted">Loading…</div> : (() => {
         const toured = t => !!t.toured_at || t.date < todayKey;
         const upcoming = tourCount(t => t.status === 'booked' && t.date >= todayKey && !t.toured_at);
@@ -1257,7 +1258,7 @@ function ClientStats({ clients, allClients, onClose }) {
           </div>
         </>;
       })()}
-      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 24, marginBottom: 10 }}>Inquiries &amp; Lead Generation</div>
+      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Inquiries &amp; Lead Generation</div>
       {!extra ? <div className="vc-muted">Loading…</div> : <>
         <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 12 }}>
           <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>All-time inquiries</div><div style={{ fontSize: 34, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{extra.inq.length}</div></div>
