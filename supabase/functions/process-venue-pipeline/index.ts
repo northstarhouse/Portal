@@ -459,6 +459,9 @@ Deno.serve(async (req) => {
     const versions = await rest(`venue_agreement_versions?select=id,response_id,title,expires_at&status=eq.pending&expires_at=lte.${encodeURIComponent(in2Days)}&expiry_reminder_sent_at=is.null`);
     for (const v of versions || []) {
       try {
+        // Never send the same agreement's reminder twice. (The sent flag on the agreement cannot always be saved, so the activity log is the record.)
+        const already = await rest(`activity_log?select=id&action=eq.contract_expiry_reminder_sent&detail->>version_id=eq.${v.id}&limit=1`);
+        if (Array.isArray(already) && already.length) continue;
         // A booking with a payment in is already secured: it never gets the "hold is expiring" warning. If a signature is
         // still missing it gets a gentle note saying the date is confirmed and asking only for the remaining signature.
         const paid = (await rest('rpc/venue_response_paid', { method: 'POST', body: JSON.stringify({ p_rid: v.response_id }) })) === true;
