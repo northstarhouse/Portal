@@ -1047,12 +1047,11 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
 // (a multi-day event counts each of its days). "Last year by this date" = how many of that month's
 // days last year were already booked on this same calendar date, i.e. are we ahead of pace.
 const AV_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-function AvailabilityStats({ clients }) {
+function AvailabilityStats({ clients, year }) {
   const today = venueDateKey();
   const thisYear = Number(today.slice(0, 4));
   const [typeFilter, setTypeFilter] = React.useState('all'); // 'all' = every event type
   const typeNames = [...new Set(clients.map(c => c.type).filter(Boolean))].sort((a, b) => (a === 'Wedding' ? -1 : b === 'Wedding' ? 1 : a.localeCompare(b)));
-  const [year, setYear] = React.useState(Math.max(thisYear, 2027)); // opens on 2027
   // Every booked day -> the earliest date it was booked (when the pre-booking came in), or null if unknown.
   const booked = {};
   clients.forEach(c => {
@@ -1089,10 +1088,6 @@ function AvailabilityStats({ clients }) {
   const chip = on => ({ border: '1px solid ' + (on ? '#886c44' : '#e0d8cc'), background: on ? '#886c44' : '#fff', color: on ? '#fff' : '#886c44', borderRadius: 999, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: SANS });
   return <div>
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '6px 0 10px' }}>
-      <button type="button" aria-label="Previous year" onClick={() => setYear(y => Math.max(minYear, y - 1))} disabled={year <= minYear} style={chip(false)}>‹</button>
-      <span style={{ fontWeight: 700, fontSize: 15, color: '#4a3b24', minWidth: 44, textAlign: 'center' }}>{year}</span>
-      <button type="button" aria-label="Next year" onClick={() => setYear(y => Math.min(maxYear, y + 1))} disabled={year >= maxYear} style={chip(false)}>›</button>
-      <span style={{ width: 10 }} />
       <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} aria-label="Event type" style={{ border: '1px solid #886c44', borderRadius: 999, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: '#886c44', background: '#fff', fontFamily: 'inherit', cursor: 'pointer' }}>
         <option value="all">All events</option>
         {typeNames.map(t => <option key={t} value={t}>{t}</option>)}
@@ -1147,6 +1142,10 @@ const bookedOn = c => String((c.hb && c.hb.project && c.hb.project.created_at) |
 const BOOKED_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function ClientStats({ clients, allClients, onClose }) {
+  const thisYearNow = Number(venueDateKey().slice(0, 4));
+  const [year, setYear] = React.useState(Math.max(thisYearNow, 2027)); // opens on 2027
+  const eventYears = (allClients || clients).map(c => Number(String(c.eventDate || '').slice(0, 4))).filter(y => y > 2000);
+  const minYear = Math.min(thisYearNow - 1, ...eventYears), maxYear = Math.max(thisYearNow + 1, ...eventYears);
   const sum = (arr, f) => arr.reduce((t, x) => t + (f(x) || 0), 0);
   const money = c => amount(c, 'USD');
   const [extra, setExtra] = React.useState(null);
@@ -1179,9 +1178,10 @@ function ClientStats({ clients, allClients, onClose }) {
   };
   // Booked = at least one payment has come in. A soft hold that has not paid is not counted anywhere on this page.
   const isBooked = c => (c.paid || 0) > 0;
-  const bookedClients = clients.filter(isBooked);
   const bookedAll = (allClients || clients).filter(isBooked);
-  const rows = bookedClients.map(c => ({ c, i: info(c) }));
+  // Everything in the money cards, the by-type table and the availability table is the paid events dated in the chosen year.
+  const bookedYear = bookedAll.filter(c => c.eventDate && c.eventDate.slice(0, 4) === String(year));
+  const rows = bookedYear.map(c => ({ c, i: info(c) }));
   const all = { n: rows.length, total: sum(rows, r => r.i.total), deposit: sum(rows, r => r.i.deposit), paid: sum(rows, r => r.i.paid), noDeposit: sum(rows, r => r.i.noDeposit), paidNoDeposit: sum(rows, r => r.i.paidNoDeposit), depositPaid: sum(rows, r => r.i.depositPaid) };
   const types = [];
   rows.forEach(r => { let t = types.find(x => x.name === r.c.type); if (!t) { t = { name: r.c.type, n: 0, total: 0, noDeposit: 0 }; types.push(t); } t.n++; t.total += r.i.total; t.noDeposit += r.i.noDeposit; });
@@ -1199,8 +1199,13 @@ function ClientStats({ clients, allClients, onClose }) {
         <div style={{ fontSize: 30, fontWeight: 700, color: '#886c44', fontFamily: 'Cardo,serif' }}>Current stats</div>
         <a onClick={onClose} style={{ cursor: 'pointer', color: '#886c44', fontSize: 13, fontWeight: 600 }}>Close ×</a>
       </div>
-<div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 6, marginBottom: 10 }}>Bookings &amp; Revenue</div>
-      <div style={{ fontFamily: SANS, fontSize: 13, color: '#8a8478', margin: '-4px 0 10px' }}>{(() => { const ds = rows.map(r => r.c.eventDate).filter(Boolean).sort(); const fmt = d => new Date(d.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }); return 'Paid events that have not happened yet' + (ds.length ? ', ' + fmt(ds[0]) + (fmt(ds[0]) === fmt(ds[ds.length - 1]) ? '' : ' to ' + fmt(ds[ds.length - 1])) : '') + '. Not limited to one year.'; })()}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 6px' }}>
+        <button type="button" aria-label="Previous year" onClick={() => setYear(y => Math.max(minYear, y - 1))} disabled={year <= minYear} style={{ border: '1px solid #e0d8cc', background: '#fff', color: '#886c44', borderRadius: 999, padding: '3px 11px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>‹</button>
+        <span style={{ fontWeight: 700, fontSize: 18, color: '#4a3b24', minWidth: 54, textAlign: 'center' }}>{year}</span>
+        <button type="button" aria-label="Next year" onClick={() => setYear(y => Math.min(maxYear, y + 1))} disabled={year >= maxYear} style={{ border: '1px solid #e0d8cc', background: '#fff', color: '#886c44', borderRadius: 999, padding: '3px 11px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>›</button>
+        <span style={{ fontSize: 12.5, color: '#8a8478' }}>Paid, confirmed events dated in {year}</span>
+      </div>
+<div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 6, marginBottom: 10 }}>Bookings &amp; Revenue · {year}</div>
       <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '22px 24px' }}>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Bookings</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{all.n}</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Total booked</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.total)}</div><div className="vc-muted">with deposits</div></div>
@@ -1208,7 +1213,7 @@ function ClientStats({ clients, allClients, onClose }) {
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Collected so far</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
       </div>
       <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Bookings vs Availability</div>
-      <AvailabilityStats clients={bookedAll} />
+      <AvailabilityStats clients={bookedYear} year={year} />
       <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>By Type of Event</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>Bookings</th><th style={th}>Without deposits</th><th style={th}>With deposits</th></tr></thead>
@@ -1226,14 +1231,14 @@ function ClientStats({ clients, allClients, onClose }) {
         return <>
           <div className="vc-muted" style={{ marginBottom: 8 }}>The goal for each month is to meet or beat what we booked that month in {BOOKED_GOAL_YEAR}. {BOOKED_LIVE_YEAR} counts update by themselves from booked events.</div>
           <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead><tr><th style={{ ...th, textAlign: 'left' }}>Event month</th>{fixedYears.map(y => <th key={y} style={th}>{y}{y === BOOKED_GOAL_YEAR ? ' (goal)' : ''}</th>)}<th style={th}>{BOOKED_LIVE_YEAR} booked</th><th style={{ ...th, textAlign: 'left', paddingLeft: 14 }}>Progress</th></tr></thead>
+            <thead><tr><th style={{ ...th, textAlign: 'left' }}>Event month</th>{fixedYears.map(y => <th key={y} style={{ ...th, textAlign: 'center' }}>{y}{y === BOOKED_GOAL_YEAR ? ' (goal)' : ''}</th>)}<th style={{ ...th, textAlign: 'center' }}>{BOOKED_LIVE_YEAR} booked</th><th style={{ ...th, textAlign: 'left', paddingLeft: 14 }}>Progress</th></tr></thead>
             <tbody>{BOOKED_MONTHS.map((m, i) => { const st = status(live[i], goal[i]); const p = goal[i] ? Math.min(100, live[i] / goal[i] * 100) : (live[i] ? 100 : 0); return <tr key={m}>
               <td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{m}</td>
-              {fixedYears.map(y => <td key={y} style={td}>{(BOOKED_FIXED[y] || [])[i] ?? '—'}</td>)}
-              <td style={{ ...td, fontWeight: 700 }}>{live[i]}</td>
+              {fixedYears.map(y => <td key={y} style={{ ...td, textAlign: 'center' }}>{(BOOKED_FIXED[y] || [])[i] ?? '—'}</td>)}
+              <td style={{ ...td, textAlign: 'center', fontWeight: 700 }}>{live[i]}</td>
               <td style={{ ...td, textAlign: 'left', paddingLeft: 14, minWidth: 130 }}><div style={{ fontSize: 11.5, fontWeight: 600, color: st.c }}>{st.t}</div><div style={{ height: 5, background: '#f0ebe0', borderRadius: 3, marginTop: 3 }}><div style={{ width: p + '%', height: 5, borderRadius: 3, background: live[i] >= goal[i] && (live[i] > 0 || goal[i] > 0) ? '#2e7d32' : '#b58a3c' }} /></div></td>
             </tr>; })}
-              <tr><td style={{ ...td, textAlign: 'left', fontWeight: 700, borderTop: '2px solid #e6d9bd' }}>Total</td>{fixedYears.map(y => <td key={y} style={{ ...td, fontWeight: 700, borderTop: '2px solid #e6d9bd' }}>{sumYear(BOOKED_FIXED[y] || [])}</td>)}<td style={{ ...td, fontWeight: 700, borderTop: '2px solid #e6d9bd' }}>{liveTotal}</td><td style={{ ...td, textAlign: 'left', paddingLeft: 14, fontWeight: 700, borderTop: '2px solid #e6d9bd', color: status(liveTotal, goalTotal).c }}>{status(liveTotal, goalTotal).t}</td></tr>
+              <tr><td style={{ ...td, textAlign: 'left', fontWeight: 700, borderTop: '2px solid #e6d9bd' }}>Total</td>{fixedYears.map(y => <td key={y} style={{ ...td, textAlign: 'center', fontWeight: 700, borderTop: '2px solid #e6d9bd' }}>{sumYear(BOOKED_FIXED[y] || [])}</td>)}<td style={{ ...td, textAlign: 'center', fontWeight: 700, borderTop: '2px solid #e6d9bd' }}>{liveTotal}</td><td style={{ ...td, textAlign: 'left', paddingLeft: 14, fontWeight: 700, borderTop: '2px solid #e6d9bd', color: status(liveTotal, goalTotal).c }}>{status(liveTotal, goalTotal).t}</td></tr>
             </tbody>
           </table></div>
         </>;
