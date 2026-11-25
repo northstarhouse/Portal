@@ -1189,25 +1189,24 @@ function ClientStats({ clients, allClients, onClose }) {
   return <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
     <div role="dialog" aria-label="Current stats" style={{ fontFamily: SANS, background: '#fff', borderRadius: 14, maxWidth: 720, width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: 22 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#2a2a2a', fontFamily: 'Cardo,serif' }}>Current stats</div>
+        <div style={{ fontSize: 30, fontWeight: 700, color: '#886c44', fontFamily: 'Cardo,serif' }}>Current stats</div>
         <a onClick={onClose} style={{ cursor: 'pointer', color: '#886c44', fontSize: 13, fontWeight: 600 }}>Close ×</a>
       </div>
-      <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Bookings and money: every client whose event has not finished yet. Tours and inquiries: all time.</div>
-<div style={{ fontFamily: 'Cardo,serif', fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 6, marginBottom: 10 }}>Bookings &amp; Revenue</div>
+<div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 6, marginBottom: 10 }}>Bookings &amp; Revenue</div>
       <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '22px 24px' }}>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Bookings</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{all.n}</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Total booked</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.total)}</div><div className="vc-muted">with deposits</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Earnings without deposits</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.noDeposit)}</div><div className="vc-muted">{money(all.deposit)} in refundable deposits removed</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Collected so far</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
       </div>
-      <div style={{ fontFamily: 'Cardo,serif', fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>Bookings vs Availability</div>
+      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>Bookings vs Availability</div>
       <AvailabilityStats clients={allClients || clients} />
-      <div style={{ fontFamily: 'Cardo,serif', fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>By Type of Event</div>
+      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>By Type of Event</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>Bookings</th><th style={th}>Without deposits</th><th style={th}>With deposits</th></tr></thead>
         <tbody>{types.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={td}>{t.n}</td><td style={td}>{money(t.noDeposit)}</td><td style={td}>{money(t.total)}</td></tr>)}</tbody>
       </table>
-      <div style={{ fontFamily: 'Cardo,serif', fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>Booked Events by Month: {BOOKED_LIVE_YEAR} vs {BOOKED_GOAL_YEAR}</div>
+      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>Booked Events by Month: {BOOKED_LIVE_YEAR} vs {BOOKED_GOAL_YEAR}</div>
       {(() => {
         const live = new Array(12).fill(0);
         (allClients || clients).forEach(c => { if (c.eventDate && c.eventDate.slice(0, 4) === String(BOOKED_LIVE_YEAR)) live[Number(c.eventDate.slice(5, 7)) - 1]++; });
@@ -1231,7 +1230,7 @@ function ClientStats({ clients, allClients, onClose }) {
           </table></div>
         </>;
       })()}
-      <div style={{ fontFamily: 'Cardo,serif', fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 24, marginBottom: 10 }}>Tour Performance</div>
+      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 24, marginBottom: 10 }}>Tour Performance</div>
       {!extra ? <div className="vc-muted">Loading…</div> : (() => {
         const toured = t => !!t.toured_at || t.date < todayKey;
         const upcoming = tourCount(t => t.status === 'booked' && t.date >= todayKey && !t.toured_at);
@@ -1252,7 +1251,7 @@ function ClientStats({ clients, allClients, onClose }) {
           <div className="vc-muted" style={{ fontSize: 11.5, marginTop: 6 }}>Events booked since Sept 2026, divided by completed tours.{waiting > 0 ? ' ' + waiting + (waiting === 1 ? ' tour request is' : ' tour requests are') + ' still waiting.' : ''}</div>
         </>;
       })()}
-      <div style={{ fontFamily: 'Cardo,serif', fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 24, marginBottom: 10 }}>Inquiries &amp; Lead Generation</div>
+      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 24, marginBottom: 10 }}>Inquiries &amp; Lead Generation</div>
       {!extra ? <div className="vc-muted">Loading…</div> : <>
         <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 12 }}>
           <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>All-time inquiries</div><div style={{ fontSize: 34, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{extra.inq.length}</div></div>
