@@ -5866,9 +5866,8 @@ function DonorsView({ navigate }) {
           <option value="no">No Address</option>
         </select>
         <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto',order:99}}>
-          <span style={{fontSize:11,color:'#aaa'}}>{filteredDonors.length} donor{filteredDonors.length!==1?'s':''}</span>
-          {/* Donor tools in one menu. */}
-          <PortalToolsMenu items={[
+          {/* Donor tools in one menu, shown as a wrench icon. */}
+          <PortalToolsMenu iconOnly items={[
             navigate && { label: 'Acknowledgments to Process', onClick: function() { navigate('acknowledgments-queue'); } },
             { label: 'Download CSV', onClick: exportCSV },
             { label: 'Members + Sponsors CSV (mail merge)', onClick: exportMembersAndSponsors, title: 'One file for this year: donors who gave $50 or more (not counting brick purchases or in-kind gifts) plus current sponsors' },
@@ -23337,7 +23336,7 @@ function VenueInquiriesView({ navigate, clientsOnly }) {
 // themselves (same reminder emails, same calendar).
 // A small "Tools ▾" button that opens a menu of actions. items: [{ label,
 // onClick, disabled?, title? }]. Closes on pick, outside click or Escape.
-function PortalToolsMenu({ items, label }) {
+function PortalToolsMenu({ items, label, iconOnly }) {
   var [open, setOpen] = useState(false);
   var ref = React.useRef(null);
   React.useEffect(function() {
@@ -23351,8 +23350,13 @@ function PortalToolsMenu({ items, label }) {
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button type="button" onClick={function() { setOpen(!open); }} aria-haspopup="menu" aria-expanded={open}
-        style={{ padding: '5px 10px', background: open ? '#faf8f4' : 'none', border: '0.5px solid #e0d8cc', color: '#666', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-        {label || 'Tools'} <span style={{ fontSize: 9, opacity: 0.7 }}>{open ? '▲' : '▼'}</span>
+        title={iconOnly ? (label || 'Tools') : undefined} aria-label={iconOnly ? (label || 'Tools') : undefined}
+        style={{ padding: iconOnly ? '5px 7px' : '5px 10px', background: open ? '#faf8f4' : 'none', border: '0.5px solid #e0d8cc', color: '#666', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+        {iconOnly ? (
+          <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        ) : (
+          <>{label || 'Tools'} <span style={{ fontSize: 9, opacity: 0.7 }}>{open ? '▲' : '▼'}</span></>
+        )}
       </button>
       {open && (
         <div role="menu" style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 50, minWidth: 190, background: '#fff', border: '0.5px solid #e0d8cc', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,0.12)', padding: 4 }}>
