@@ -467,7 +467,7 @@ Deno.serve(async (req) => {
         const unsigned = (signers || []).filter((x: any) => x.role !== 'venue' && x.status !== 'signed' && x.email);
         const tpl = paid ? templates.agreement_signature_reminder : templates.agreement_expiry_reminder;
         if (unsigned.length && tpl) {
-          const inq = (await rest(`venue_inquiries?select=event_date&limit=1&prebooking_form_response_id=eq.${v.response_id}`))?.[0];
+          const inq = (await rest(`venue_inquiries?select=event_date,name&limit=1&prebooking_form_response_id=eq.${v.response_id}`))?.[0];
           const code = venueCode(inq?.event_date);
           const expires = fmtDate(v.expires_at);
           const expiresShort = new Date(v.expires_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: TZ });
@@ -479,6 +479,10 @@ Deno.serve(async (req) => {
                 { name: first, expires, expires_short: expiresShort, venue_code: code, event_page_link: CLIENT_PAGE_URL },
                 { name: escapeHtml(first), expires: escapeHtml(expires), expires_short: escapeHtml(expiresShort), venue_code: escapeHtml(code), event_page_link: CLIENT_PAGE_URL });
               sentTo.push(c.name || c.email);
+              // File it in the client's email history (their Portal profile) so staff can see the notice went out.
+              try {
+                await rest('venue_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ event_uid: 'client:' + v.response_id, event_title: inq?.name || c.name || '', subject: fillTemplate(tpl.subject, { name: first, expires, expires_short: expiresShort, venue_code: code, event_page_link: CLIENT_PAGE_URL }), body: fillTemplate(tpl.body, { name: first, expires, expires_short: expiresShort, venue_code: code, event_page_link: CLIENT_PAGE_URL }), from_name: 'North Star House', from_email: 'venue@northstarhouse.org', direction: 'outgoing', handled_at: nowIso, handled_by: 'Automatic' }) });
+              } catch (_e) { /* history is a convenience; the email already went out */ }
             } catch (e) { console.error('agreement expiry reminder email failed for', v.id, c.email, e); result.errors++; }
           }
           if (!sentTo.length) continue; // nothing was delivered: leave it unmarked so the next hourly run retries

@@ -3,8 +3,64 @@
 const SB_URL = 'https://uvzwhhwzelaelfhfkvdb.supabase.co', SB_KEY = 'sb_publishable_EbFMfEbyEp3gASl-GZm3tQ_LnPEe5do';
 const when = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }); };
 
+const HDR = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
+const esc = t => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const NL1 = String.fromCharCode(10), NL2 = NL1 + NL1, NLRE = /(?:\r?\n){2,}/;
+const isMail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+
+// A short email to everyone on the client (each contact and the main address), sent from venue@ and filed in their history.
+function ComposeToAll({ client, onSent }) {
+  const [open, setOpen] = React.useState(false);
+  const [subject, setSubject] = React.useState('');
+  const [text, setText] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const to = [...new Set([client.email, ...(client.contacts || []).map(c => c.email)].map(e => String(e || '').trim().toLowerCase().replace(/[,()"]/g, '')).filter(isMail))];
+  const names = [...new Set((client.contacts || []).map(c => String(c.full_name || '').trim().split(/\s+/)[0]).filter(Boolean))];
+  const first = names.length > 1 ? names.slice(0, -1).join(', ') + ' & ' + names[names.length - 1] : (names[0] || 'there');
+  async function send() {
+    if (!to.length) { alert('This client has no email address on file.'); return; }
+    if (!subject.trim() || !text.trim()) { alert('Please add a subject and a message.'); return; }
+    if (!window.confirm('Send this email to ' + to.join(' and ') + '?')) return;
+    setBusy(true);
+    try {
+      const by = await fetch(SB_URL + '/rest/v1/rpc/app_session_name', { method: 'POST', headers: HDR, body: '{}' }).then(r => r.ok ? r.json() : '').catch(() => '');
+      const plain = 'Hi ' + first + ',' + NL2 + text.trim() + NL2 + 'Warmly,' + NL1 + (by || 'The North Star House Team') + NL1 + 'North Star House';
+      const p = t => '<p style="margin:0 0 18px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.6;text-align:left;">' + t + '</p>';
+      const html = '<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:#886c44;"></div><div style="padding:40px;text-align:center;">'
+        + '<h1 style="margin:0 0 24px;font-size:26px;font-weight:400;color:#2a2420;">' + esc(subject.trim()) + '</h1><div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>'
+        + p('Hi ' + esc(first) + ',') + text.trim().split(NLRE).map(x => p(esc(x).split(NL1).join('<br>'))).join('')
+        + '<p style="margin:8px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;text-align:left;">Warmly,<br>' + esc(by || 'The North Star House Team') + '<br>North Star House</p>'
+        + '<p style="margin:26px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Questions? Just reply to this email.</i></p></div></div></div>';
+      const r = await fetch(SB_URL + '/functions/v1/send-email', { method: 'POST', headers: HDR, body: JSON.stringify({ to: to.length === 1 ? to[0] : to, subject: subject.trim(), body: plain, html, sender: by || 'North Star House', fromEmail: 'venue@northstarhouse.org' }) });
+      if (!r.ok) throw new Error('The email could not be sent. Please try again.');
+      const stamp = new Date().toISOString();
+      await fetch(SB_URL + '/rest/v1/venue_messages', { method: 'POST', headers: { ...HDR, Prefer: 'return=minimal' }, body: JSON.stringify({ event_uid: 'client:' + client.id, event_title: client.name, subject: subject.trim(), body: plain, from_name: by || 'North Star House', from_email: 'venue@northstarhouse.org', direction: 'outgoing', handled_at: stamp, handled_by: by || null }) }).catch(() => {});
+      onSent({ at: stamp, what: subject.trim(), who: 'Sent to ' + to.join(', '), body: plain });
+      setSubject(''); setText(''); setOpen(false);
+    } catch (e) { alert(e.message || 'Could not send.'); }
+    setBusy(false);
+  }
+  const box = { width: '100%', boxSizing: 'border-box', border: '1px solid #e0d8cc', borderRadius: 6, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', marginBottom: 8 };
+  return <div style={{ marginBottom: 12 }}>
+    {!open ? <button type="button" onClick={() => setOpen(true)} style={{ background: '#886c44', color: '#fff', border: 0, borderRadius: 7, padding: '7px 14px', fontWeight: 600, fontSize: 12 }}>Send email</button>
+      : <div style={{ background: '#faf6ef', border: '1px solid #e8e0d5', borderRadius: 8, padding: 12 }}>
+        <div className="vc-muted" style={{ marginBottom: 8 }}>To everyone on the list: <b>{to.join(', ') || 'no email on file'}</b>. Sent from venue@northstarhouse.org; replies come back to the venue inbox.</div>
+        <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject" style={box} />
+        <textarea value={text} onChange={e => setText(e.target.value)} rows={6} placeholder={'Write your message. "Hi ' + first + ',"  and a closing are added for you.'} style={{ ...box, resize: 'vertical' }} />
+        <button type="button" disabled={busy} onClick={send} style={{ background: '#886c44', color: '#fff', border: 0, borderRadius: 7, padding: '7px 14px', fontWeight: 600, fontSize: 12, opacity: busy ? .6 : 1 }}>{busy ? 'Sending…' : 'Send to everyone'}</button>
+        <button type="button" disabled={busy} onClick={() => setOpen(false)} style={{ marginLeft: 8, background: 'none', border: '1px solid #e0d8cc', borderRadius: 7, padding: '7px 14px', fontSize: 12, color: '#886c44' }}>Cancel</button>
+      </div>}
+  </div>;
+}
+
 export function EmailHistory({ client, api, messages, guideSentAt, onHandleMessage }) {
-  const [rows, setRows] = React.useState(null);
+  const [extra, setExtra] = React.useState([]);
+  return <div><ComposeToAll client={client} onSent={r => setExtra(x => [r, ...x])} /><EmailList client={client} api={api} messages={messages} guideSentAt={guideSentAt} onHandleMessage={onHandleMessage} extra={extra} /></div>;
+}
+
+function EmailList({ client, api, messages, guideSentAt, onHandleMessage, extra }) {
+  const [rows0, setRows] = React.useState(null);
+  const rows = rows0 === null ? null : [...extra, ...rows0].sort((a, b) => String(b.at).localeCompare(String(a.at)));
   React.useEffect(() => {
     let off = false;
     const H = { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } };
