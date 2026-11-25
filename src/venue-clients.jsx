@@ -1209,10 +1209,10 @@ function ClientStats({ clients, allClients, onClose }) {
         <select value={year} onChange={e => setYear(Number(e.target.value))} aria-label="Year" style={{ border: '1px solid #886c44', borderRadius: 999, padding: '5px 14px', fontSize: 15, fontWeight: 700, color: '#4a3b24', background: '#fff', fontFamily: 'inherit', cursor: 'pointer' }}>{Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i).map(y => <option key={y} value={y}>{y}</option>)}</select>
         <span style={{ fontSize: 12.5, color: '#8a8478' }}>Paid, confirmed events dated in {year}</span>
       </div>
-      <div style={{ border: '1px solid rgba(136,108,68,0.35)', borderRadius: 14, padding: '18px 22px 20px', marginTop: 16 }}>
+      <div style={{ background: '#f7f4ef', margin: '0 -22px', padding: '26px 22px 28px' }}>
       <AvailabilityStats clients={bookedAll} year={year} title="Booking Overview - Comparison by Year" />
       </div>
-      <div style={{ border: '1px solid rgba(136,108,68,0.35)', borderRadius: 14, padding: '18px 22px 20px', marginTop: 16 }}>
+      <div style={{ background: '#ffffff', margin: '0 -22px', padding: '26px 22px 28px' }}>
       <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742', display: 'flex', alignItems: 'center', gap: 12, marginTop: 0, marginBottom: 14 }}><StatStar />Bookings &amp; Revenue · {year}</div>
       <div style={{ padding: '6px 0 2px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '22px 24px' }}>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Bookings</div><div style={{ fontSize: 34, fontFamily: 'Cardo,serif', fontWeight: 700, color: '#2c2418', lineHeight: 1.1, marginTop: 4 }}>{all.n}</div></div>
@@ -1221,14 +1221,14 @@ function ClientStats({ clients, allClients, onClose }) {
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Collected so far</div><div style={{ fontSize: 34, fontFamily: 'Cardo,serif', fontWeight: 700, color: '#2c2418', lineHeight: 1.1, marginTop: 4 }}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
       </div>
       </div>
-      <div style={{ border: '1px solid rgba(136,108,68,0.35)', borderRadius: 14, padding: '18px 22px 20px', marginTop: 16 }}>
+      <div style={{ background: '#f7f4ef', margin: '0 -22px', padding: '26px 22px 28px' }}>
       <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742', display: 'flex', alignItems: 'center', gap: 12, marginTop: 0, marginBottom: 14 }}><StatStar />By Type of Event</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={{ ...th, textAlign: 'center' }}>Bookings</th><th style={{ ...th, textAlign: 'center' }}>Without deposits</th><th style={{ ...th, textAlign: 'center' }}>With deposits</th></tr></thead>
         <tbody>{types.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={{ ...td, textAlign: 'center' }}>{t.n}</td><td style={{ ...td, textAlign: 'center' }}>{money(t.noDeposit)}</td><td style={{ ...td, textAlign: 'center' }}>{money(t.total)}</td></tr>)}</tbody>
       </table>
       </div>
-      <div style={{ border: '1px solid rgba(136,108,68,0.35)', borderRadius: 14, padding: '18px 22px 20px', marginTop: 16 }}>
+      <div style={{ background: '#ffffff', margin: '0 -22px', padding: '26px 22px 28px' }}>
       <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742', display: 'flex', alignItems: 'center', gap: 12, marginTop: 0, marginBottom: 14 }}><StatStar />Tour Performance</div>
       {!extra ? <div className="vc-muted">Loading…</div> : (() => {
         const toured = t => !!t.toured_at || t.date < todayKey;
@@ -1240,17 +1240,15 @@ function ClientStats({ clients, allClients, onClose }) {
         const tile = (icon, label, value, green) => <div key={label}><div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: '#7a7368' }}>{icon}{label}</div><div style={{ fontSize: 36, fontFamily: 'Cardo,serif', fontWeight: 700, color: '#2c2418', lineHeight: 1.1, marginTop: 8 }}>{value}</div></div>;
         return <>
           <div style={{ padding: '6px 0 2px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '24px 20px' }}>
-            {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01"/></svg>, 'Upcoming Tours', upcoming)}
-            {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="m10 13 4 4m0-4-4 4"/></svg>, 'Cancelled', tourCount(t => t.status === 'cancelled'))}
-            {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10" cy="7" r="3.5"/><path d="M3 21v-1a6 6 0 0 1 9-5"/><path d="m16 17 4 4m0-4-4 4"/></svg>, 'No-Shows', tourCount(t => t.status === 'no_show'))}
             {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>, 'Completed Tours', completed)}
+            {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10" cy="7" r="3.5"/><path d="M3 21v-1a6 6 0 0 1 9-5"/><path d="m16 17 4 4m0-4-4 4"/></svg>, 'No-Shows', tourCount(t => t.status === 'no_show'))}
+            {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="m10 13 4 4m0-4-4 4"/></svg>, 'Cancelled', tourCount(t => t.status === 'cancelled'))}
             {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="m9 15 2.5 2.5L16 13"/></svg>, 'Events Booked', booked, true)}
-            {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>, 'Conversion Rate', rate, true)}
           </div>
         </>;
       })()}
       </div>
-      <div style={{ border: '1px solid rgba(136,108,68,0.35)', borderRadius: 14, padding: '18px 22px 20px', marginTop: 16 }}>
+      <div style={{ background: '#f7f4ef', margin: '0 -22px -22px', padding: '26px 22px 28px' }}>
       <div style={{ fontFamily: 'Cardo,serif', fontSize: 25, fontWeight: 700, color: '#4a4742', display: 'flex', alignItems: 'center', gap: 12, marginTop: 0, marginBottom: 14 }}><StatStar />Inquiries &amp; Lead Generation</div>
       {!extra ? <div className="vc-muted">Loading…</div> : <>
         <div style={{ padding: '6px 0 2px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 12 }}>
