@@ -21364,13 +21364,6 @@ function VenueRentalsView({ navigate, initialTab }) {
                     <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Pick the date and time; they get a confirmation email</div>
                     </div>
                   </button>
-                  <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setManualFormOpen(true); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
-                    <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-fill" active size={18} /></span>
-                    <div><div style={{ fontWeight: 700 }}>Fill out a pre-booking form</div>
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>For a client who skipped the form</div>
-                    </div>
-                  </button>
                   <button type="button" role="menuitem" onClick={function() { setToolsOpen(false); setSendFormOpen(true); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: 'none', border: 'none', borderRadius: 7, padding: '10px 12px', cursor: 'pointer', fontSize: 13, color: '#2a2a2a' }}>
                     <span style={{ color: '#886c44', display: 'flex' }}><NavIcon id="tool-send" active size={18} /></span>
