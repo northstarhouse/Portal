@@ -66,7 +66,9 @@ export function prepareAgreementDraft(client,extras={}){
   const normalized=value=>String(value||'').toLowerCase().replace(/\s+/g,' ').trim();
   const originalSigners=client.signatures?.signatures?.filter(s=>s.signee_type==='client'&&s.required) || [];
   const formSigners=client.contacts.filter(c=>String(c.id).startsWith('form-')).map(c=>({name:c.full_name,email:c.email,role:'client'}));
-  const clientSigners=originalSigners.length?originalSigners.map(s=>({name:s.signee_name,email:client.contacts.find(c=>normalized(c.full_name)===normalized(s.signee_name))?.email || '',role:'client'})):formSigners;
+  const everySigner=originalSigners.length?originalSigners.map(s=>({name:s.signee_name,email:client.contacts.find(c=>normalized(c.full_name)===normalized(s.signee_name))?.email || '',role:'client'})):formSigners;
+  // Weddings need both partners. Every other event type (an organization's party, a private event) is signed by the first contact only.
+  const clientSigners=/wedding/i.test(String(client.type||''))?everySigner:everySigner.slice(0,1);
   const people=clientSigners.filter(c=>c.name);
   const guests=extras.guestCount||client.maxGuests||client.hb?.project?.guest_count||'[TO COMPLETE]';
   const schedule=(client.schedule||[]);
