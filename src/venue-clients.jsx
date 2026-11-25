@@ -1049,7 +1049,7 @@ export function BookingsExport({ clients, onClose, onOpen, inline }) {
 // (a multi-day event counts each of its days). "Last year by this date" = how many of that month's
 // days last year were already booked on this same calendar date, i.e. are we ahead of pace.
 const AV_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-function AvailabilityStats({ clients, year }) {
+function AvailabilityStats({ clients, year, title }) {
   const today = venueDateKey();
   const thisYear = Number(today.slice(0, 4));
   const [typeFilter, setTypeFilter] = React.useState('all'); // 'all' = every event type
@@ -1089,7 +1089,8 @@ function AvailabilityStats({ clients, year }) {
   const bar = (a, b) => { const p = b ? Math.min(100, (a / b) * 100) : 0; return <div style={{ height: 5, background: '#f0ebe0', borderRadius: 3, marginTop: 3 }}><div style={{ width: p + '%', height: 5, borderRadius: 3, background: b && a >= b ? '#2e7d32' : '#b58a3c' }} /></div>; };
   const chip = on => ({ border: '1px solid ' + (on ? '#886c44' : '#e0d8cc'), background: on ? '#886c44' : '#fff', color: on ? '#fff' : '#886c44', borderRadius: 999, padding: '3px 9px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: SANS });
   return <div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '6px 0 10px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 6, marginBottom: 10 }}>
+      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a' }}>{title}</div>
       <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} aria-label="Event type" style={{ border: '1px solid #886c44', borderRadius: 999, padding: '4px 12px', fontSize: 12, fontWeight: 600, color: '#886c44', background: '#fff', fontFamily: 'inherit', cursor: 'pointer' }}>
         <option value="all">All events</option>
         {typeNames.map(t => <option key={t} value={t}>{t}</option>)}
@@ -1108,25 +1109,25 @@ function AvailabilityStats({ clients, year }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr>
           <th style={{ ...th, textAlign: 'left', paddingLeft: 0 }}>Month</th>
-          <th style={{ ...th, color: '#999' }}>{year - 2}<br />booked</th>
-          <th style={{ ...th, color: '#999' }}>{year - 1}<br />booked</th>
-          <th style={th}>{year}<br />booked</th>
-          <th style={th}>{year} vs<br />{year - 1}</th>
+          <th style={{ ...th, color: '#999', textAlign: 'left', whiteSpace: 'nowrap' }}>{year - 2} booked</th>
+          <th style={{ ...th, color: '#999', textAlign: 'left', whiteSpace: 'nowrap' }}>{year - 1} booked</th>
+          <th style={{ ...th, textAlign: 'left', whiteSpace: 'nowrap' }}>{year} booked</th>
+          <th style={{ ...th, textAlign: 'left', whiteSpace: 'nowrap' }}>{year} vs {year - 1}</th>
         </tr></thead>
         <tbody>
           {rows.map(r => <tr key={r.m}>
             <td style={{ ...td, textAlign: 'left', paddingLeft: 0, fontWeight: 600 }}>{r.name}</td>
-            <td style={{ ...td, color: '#888' }}>{prevVal(year - 2, r)}</td>
-            <td style={{ ...td, color: '#888' }}>{prevVal(year - 1, r)}</td>
-            <td style={{ ...td, fontWeight: 700, color: '#4a3b24' }}>{curVal(r)}</td>
-            <td style={{ ...td, fontWeight: 600, color: deltaColor(curVal(r) - prevVal(year - 1, r)) }}>{deltaText(curVal(r) - prevVal(year - 1, r))}</td>
+            <td style={{ ...td, textAlign: 'left', color: '#888' }}>{prevVal(year - 2, r)}</td>
+            <td style={{ ...td, textAlign: 'left', color: '#888' }}>{prevVal(year - 1, r)}</td>
+            <td style={{ ...td, textAlign: 'left', fontWeight: 700, color: '#4a3b24' }}>{curVal(r)}</td>
+            <td style={{ ...td, textAlign: 'left', fontWeight: 600, color: deltaColor(curVal(r) - prevVal(year - 1, r)) }}>{deltaText(curVal(r) - prevVal(year - 1, r))}</td>
           </tr>)}
           <tr>
             <td style={{ ...tdTot, textAlign: 'left', paddingLeft: 0 }}>Year</td>
-            <td style={{ ...tdTot, color: '#888' }}>{prevTot(year - 2)}</td>
-            <td style={{ ...tdTot, color: '#888' }}>{prevTot(year - 1)}</td>
-            <td style={{ ...tdTot, color: '#4a3b24' }}>{curTot}</td>
-            <td style={{ ...tdTot, color: deltaColor(curTot - prevTot(year - 1)) }}>{deltaText(curTot - prevTot(year - 1))}</td>
+            <td style={{ ...tdTot, textAlign: 'left', color: '#888' }}>{prevTot(year - 2)}</td>
+            <td style={{ ...tdTot, textAlign: 'left', color: '#888' }}>{prevTot(year - 1)}</td>
+            <td style={{ ...tdTot, textAlign: 'left', color: '#4a3b24' }}>{curTot}</td>
+            <td style={{ ...tdTot, textAlign: 'left', color: deltaColor(curTot - prevTot(year - 1)) }}>{deltaText(curTot - prevTot(year - 1))}</td>
           </tr>
         </tbody>
       </table>
@@ -1203,20 +1204,17 @@ function ClientStats({ clients, allClients, onClose }) {
         <a onClick={onClose} style={{ cursor: 'pointer', color: '#886c44', fontSize: 13, fontWeight: 600 }}>Close ×</a>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 6px' }}>
-        <button type="button" aria-label="Previous year" onClick={() => setYear(y => Math.max(minYear, y - 1))} disabled={year <= minYear} style={{ border: '1px solid #e0d8cc', background: '#fff', color: '#886c44', borderRadius: 999, padding: '3px 11px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>‹</button>
-        <span style={{ fontWeight: 700, fontSize: 18, color: '#4a3b24', minWidth: 54, textAlign: 'center' }}>{year}</span>
-        <button type="button" aria-label="Next year" onClick={() => setYear(y => Math.min(maxYear, y + 1))} disabled={year >= maxYear} style={{ border: '1px solid #e0d8cc', background: '#fff', color: '#886c44', borderRadius: 999, padding: '3px 11px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>›</button>
+        <select value={year} onChange={e => setYear(Number(e.target.value))} aria-label="Year" style={{ border: '1px solid #886c44', borderRadius: 999, padding: '5px 14px', fontSize: 15, fontWeight: 700, color: '#4a3b24', background: '#fff', fontFamily: 'inherit', cursor: 'pointer' }}>{Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i).map(y => <option key={y} value={y}>{y}</option>)}</select>
         <span style={{ fontSize: 12.5, color: '#8a8478' }}>Paid, confirmed events dated in {year}</span>
       </div>
-<div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 6, marginBottom: 10 }}>Bookings &amp; Revenue · {year}</div>
+      <AvailabilityStats clients={bookedAll} year={year} title="Booking Overview - Comparison by Year" />
+      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Bookings &amp; Revenue · {year}</div>
       <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '22px 24px' }}>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Bookings</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{all.n}</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Total booked</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.total)}</div><div className="vc-muted">with deposits</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Earnings without deposits</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.noDeposit)}</div><div className="vc-muted">{money(all.deposit)} in refundable deposits removed</div></div>
         <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Collected so far</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
       </div>
-      <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>Bookings vs Availability</div>
-      <AvailabilityStats clients={bookedAll} year={year} />
       <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: '#2a2a2a', marginTop: 26, paddingTop: 22, borderTop: '1px solid rgba(136,108,68,0.28)', marginBottom: 10 }}>By Type of Event</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>Bookings</th><th style={th}>Without deposits</th><th style={th}>With deposits</th></tr></thead>
