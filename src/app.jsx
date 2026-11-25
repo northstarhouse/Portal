@@ -844,6 +844,7 @@ var NAV_ICONS = {
   'tool-movement': '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
   'tool-vendor': '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
   'tool-list': '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+  'tool-bookings': '<path d="M4 3h16v18l-3-2-2.5 2L12 19l-2.5 2L7 19l-3 2z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h4"/>',
   'tool-stats': '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
   'tool-request': '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z"/>',
   'treasurer': '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
@@ -21354,7 +21355,7 @@ function VenueRentalsView({ navigate, initialTab }) {
                     ] },
                     { title: 'Operations & Administration', items: [
                       { icon: 'tool-list', name: 'Upcoming Events List', desc: 'All events in chronological order', run: go(function() { setVenueTab('clients'); setEventsListOpen(true); }) },
-                      { icon: 'tool-list', name: 'Bookings & Payments', desc: 'Payment records and QuickBooks export', run: go(function() { setVenueTab('clients'); setBookingsOpen(true); }) },
+                      { icon: 'tool-bookings', name: 'Bookings & Payments', desc: 'Payment records and QuickBooks export', run: go(function() { setVenueTab('clients'); setBookingsOpen(true); }) },
                       { icon: 'tool-stats', name: 'Current Stats', desc: 'Bookings, earnings and event types', run: go(function() { setVenueTab('clients'); setStatsOpen(true); }) },
                       { icon: 'venue-policies', name: 'Policies & Resources', desc: 'Pricing, templates, FAQs and team resources', run: go(function() { navigate('venue-policies'); }) },
                       { icon: 'tool-vendor', name: 'Add a vendor recommendation', desc: 'Update the client vendor guides', run: go(function() { setVendorToolOpen(true); }) },
