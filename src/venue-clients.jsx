@@ -1158,13 +1158,13 @@ function ClientStats({ clients, allClients, onClose }) {
       const forms = (await get('nsh_forms?select=id,title')).filter(f => /inquiry/i.test(f.title || ''));
       const byId = {}; forms.forEach(f => { byId[f.id] = f.title; });
       const inq = forms.length ? await get('nsh_form_responses?select=form_id,created_at&order=created_at.desc&limit=5000&form_id=in.(' + forms.map(f => f.id).join(',') + ')') : [];
-      const tours = await get('estate_tours?select=status,date&limit=5000');
+      const tours = await get('estate_tours?select=status,date,toured_at&limit=5000');
       if (!off) setExtra({ byId, inq: Array.isArray(inq) ? inq : [], tours: Array.isArray(tours) ? tours : [] });
     })();
     return () => { off = true; };
   }, []);
   const todayKey = venueDateKey();
-  const monthAgo = shiftDate(todayKey, -30);
+  const monthAgo = shiftDate(todayKey, -90); // the "last 90 days" window
   const tourCount = f => extra ? extra.tours.filter(f).length : null;
   const inqTypes = [];
   if (extra) extra.inq.forEach(r => { const name = String(extra.byId[r.form_id] || 'Inquiry').replace(/\s*(Inquiry|Inquiries)\s*(Form)?\s*$/i, '').trim() || 'Inquiry'; let t = inqTypes.find(x => x.name === name); if (!t) { t = { name, n: 0, recent: 0 }; inqTypes.push(t); } t.n++; if (String(r.created_at).slice(0, 10) >= monthAgo) t.recent++; });
@@ -1196,20 +1196,21 @@ function ClientStats({ clients, allClients, onClose }) {
         <a onClick={onClose} style={{ cursor: 'pointer', color: '#886c44', fontSize: 13, fontWeight: 600 }}>Close ×</a>
       </div>
       <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Bookings and money: every client whose event has not finished yet. Tours and inquiries: all time.</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-        <div style={box}><div style={lab}>Bookings</div><div style={big}>{all.n}</div></div>
-        <div style={box}><div style={lab}>Total booked</div><div style={big}>{money(all.total)}</div><div className="vc-muted">with deposits</div></div>
-        <div style={box}><div style={lab}>Earnings without deposits</div><div style={big}>{money(all.noDeposit)}</div><div className="vc-muted">{money(all.deposit)} in refundable deposits removed</div></div>
-        <div style={box}><div style={lab}>Collected so far</div><div style={big}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
+<div style={{ fontFamily: 'Cardo,serif', fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 6, marginBottom: 10 }}>Bookings &amp; Revenue</div>
+      <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '22px 24px' }}>
+        <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Bookings</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{all.n}</div></div>
+        <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Total booked</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.total)}</div><div className="vc-muted">with deposits</div></div>
+        <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Earnings without deposits</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.noDeposit)}</div><div className="vc-muted">{money(all.deposit)} in refundable deposits removed</div></div>
+        <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Collected so far</div><div style={{ fontSize: 30, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{money(all.paid)}</div><div className="vc-muted">{money(all.paidNoDeposit)} without deposits</div></div>
       </div>
-      <div style={{ ...lab, marginTop: 18 }}>Bookings vs availability</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>Bookings vs Availability</div>
       <AvailabilityStats clients={allClients || clients} />
-      <div style={{ ...lab, marginTop: 22 }}>By type of event</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>By Type of Event</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>Bookings</th><th style={th}>Without deposits</th><th style={th}>With deposits</th></tr></thead>
         <tbody>{types.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={td}>{t.n}</td><td style={td}>{money(t.noDeposit)}</td><td style={td}>{money(t.total)}</td></tr>)}</tbody>
       </table>
-      <div style={{ ...lab, marginTop: 22 }}>Booked events by month: {BOOKED_LIVE_YEAR} vs {BOOKED_GOAL_YEAR}</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 26, marginBottom: 10 }}>Booked Events by Month: {BOOKED_LIVE_YEAR} vs {BOOKED_GOAL_YEAR}</div>
       {(() => {
         const live = new Array(12).fill(0);
         (allClients || clients).forEach(c => { if (c.eventDate && c.eventDate.slice(0, 4) === String(BOOKED_LIVE_YEAR)) live[Number(c.eventDate.slice(5, 7)) - 1]++; });
@@ -1233,23 +1234,35 @@ function ClientStats({ clients, allClients, onClose }) {
           </table></div>
         </>;
       })()}
-      <div style={{ ...lab, marginTop: 22 }}>Tours</div>
-      {!extra ? <div className="vc-muted">Loading…</div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10 }}>
-        <div style={box}><div style={big}>{tourCount(t => t.status === 'booked' && t.date >= todayKey)}</div><div className="vc-muted">Upcoming booked</div></div>
-        <div style={box}><div style={big}>{tourCount(t => t.status === 'booked' && t.date < todayKey)}</div><div className="vc-muted">Completed</div></div>
-        <div style={box}><div style={big}>{tourCount(t => t.status === 'no_show')}</div><div className="vc-muted">Didn't show up</div></div>
-        <div style={box}><div style={big}>{tourCount(t => t.status === 'cancelled')}</div><div className="vc-muted">Cancelled</div></div>
-        <div style={box}><div style={big}>{tourCount(t => t.status === 'requested')}</div><div className="vc-muted">Requests waiting</div></div>
-        <div style={box}><div style={big}>{(allClients || clients).filter(c => bookedOn(c) >= BOOKED_SINCE).length}</div><div className="vc-muted">Events booked</div><div className="vc-muted" style={{ fontSize: 11 }}>since Sept 2026</div></div>
-      </div>}
-      <div style={{ ...lab, marginTop: 22 }}>Inquiries</div>
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 24, marginBottom: 10 }}>Tour Performance</div>
+      {!extra ? <div className="vc-muted">Loading…</div> : (() => {
+        const toured = t => !!t.toured_at || t.date < todayKey;
+        const upcoming = tourCount(t => t.status === 'booked' && t.date >= todayKey && !t.toured_at);
+        const completed = tourCount(t => t.status === 'booked' && toured(t));
+        const booked = (allClients || clients).filter(c => bookedOn(c) >= BOOKED_SINCE).length;
+        const rate = completed ? (booked / completed * 100).toFixed(1) + '%' : '—';
+        const waiting = tourCount(t => t.status === 'requested');
+        const tile = (icon, label, value, green) => <div key={label}><div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: '#7a7368' }}>{icon}{label}</div><div style={{ fontSize: 32, fontWeight: 600, color: green ? '#2e7d4f' : '#2a2a2a', marginTop: 8, letterSpacing: '-0.5px' }}>{value}</div></div>;
+        return <>
+          <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '22px 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '24px 20px' }}>
+            {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01"/></svg>, 'Upcoming Tours', upcoming)}
+            {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="m10 13 4 4m0-4-4 4"/></svg>, 'Cancelled', tourCount(t => t.status === 'cancelled'))}
+            {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10" cy="7" r="3.5"/><path d="M3 21v-1a6 6 0 0 1 9-5"/><path d="m16 17 4 4m0-4-4 4"/></svg>, 'No-Shows', tourCount(t => t.status === 'no_show'))}
+            {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>, 'Completed Tours', completed)}
+            {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="m9 15 2.5 2.5L16 13"/></svg>, 'Events Booked', booked, true)}
+            {tile(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#886c44" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>, 'Conversion Rate', rate, true)}
+          </div>
+          <div className="vc-muted" style={{ fontSize: 11.5, marginTop: 6 }}>Events booked since Sept 2026, divided by completed tours.{waiting > 0 ? ' ' + waiting + (waiting === 1 ? ' tour request is' : ' tour requests are') + ' still waiting.' : ''}</div>
+        </>;
+      })()}
+      <div style={{ fontFamily: 'Cardo,serif', fontSize: 20, fontWeight: 700, color: '#2a2a2a', marginTop: 24, marginBottom: 10 }}>Inquiries &amp; Lead Generation</div>
       {!extra ? <div className="vc-muted">Loading…</div> : <>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 6 }}>
-          <div style={box}><div style={big}>{extra.inq.length}</div><div className="vc-muted">All time</div></div>
-          <div style={box}><div style={big}>{extra.inq.filter(r => String(r.created_at).slice(0, 10) >= monthAgo).length}</div><div className="vc-muted">Last 30 days</div></div>
+        <div style={{ background: '#f9f7f3', border: '1px solid #ece5d8', borderRadius: 16, padding: '20px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 12 }}>
+          <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>All-time inquiries</div><div style={{ fontSize: 34, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{extra.inq.length}</div></div>
+          <div><div style={{ fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#8a8478' }}>Last 90 days</div><div style={{ fontSize: 34, fontWeight: 600, color: '#1f1c18', marginTop: 4, letterSpacing: '-0.5px' }}>{extra.inq.filter(r => String(r.created_at).slice(0, 10) >= monthAgo).length}</div></div>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>All time</th><th style={th}>Last 30 days</th></tr></thead>
+          <thead><tr><th style={{ ...th, textAlign: 'left' }}>Type</th><th style={th}>All time</th><th style={th}>Last 90 days</th></tr></thead>
           <tbody>{inqTypes.map(t => <tr key={t.name}><td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{t.name}</td><td style={td}>{t.n}</td><td style={td}>{t.recent}</td></tr>)}</tbody>
         </table>
       </>}
