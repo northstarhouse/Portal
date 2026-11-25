@@ -17,18 +17,21 @@ function ComposeToAll({ client, onSent }) {
   const to = [...new Set([client.email, ...(client.contacts || []).map(c => c.email)].map(e => String(e || '').trim().toLowerCase().replace(/[,()"]/g, '')).filter(isMail))];
   const names = [...new Set((client.contacts || []).map(c => String(c.full_name || '').trim().split(/\s+/)[0]).filter(Boolean))];
   const first = names.length > 1 ? names.slice(0, -1).join(', ') + ' & ' + names[names.length - 1] : (names[0] || 'there');
+  const BS = String.fromCharCode(92);
+  const GREET = new RegExp('^(hi|hello|hey|dear)' + BS + 'b[^' + String.fromCharCode(10) + ']*' + String.fromCharCode(10) + '+', 'i');
+  const cleanText = () => cleanText().replace(GREET, '').trim();
   async function send() {
     if (!to.length) { alert('This client has no email address on file.'); return; }
-    if (!subject.trim() || !text.trim()) { alert('Please add a subject and a message.'); return; }
+    if (!subject.trim() || !cleanText()) { alert('Please add a subject and a message.'); return; }
     if (!window.confirm('Send this email to ' + to.join(' and ') + '?')) return;
     setBusy(true);
     try {
       const by = await fetch(SB_URL + '/rest/v1/rpc/app_session_name', { method: 'POST', headers: HDR, body: '{}' }).then(r => r.ok ? r.json() : '').catch(() => '');
-      const plain = 'Hi ' + first + ',' + NL2 + text.trim() + NL2 + 'Warmly,' + NL1 + (by || 'The North Star House Team') + NL1 + 'North Star House';
+      const plain = 'Hi ' + first + ',' + NL2 + cleanText() + NL2 + 'Warmly,' + NL1 + (by || 'The North Star House Team') + NL1 + 'North Star House';
       const p = t => '<p style="margin:0 0 18px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;line-height:1.6;text-align:left;">' + t + '</p>';
       const html = '<div style="background:#e6ded0;padding:32px 16px;font-family:Georgia,serif;"><div style="max-width:560px;margin:0 auto;background:#fdfbf7;overflow:hidden;"><div style="height:14px;background:#886c44;"></div><div style="padding:40px;text-align:center;">'
         + '<h1 style="margin:0 0 24px;font-size:26px;font-weight:400;color:#2a2420;">' + esc(subject.trim()) + '</h1><div style="border-top:1px solid #e5ddcf;width:60%;margin:0 auto 24px;"></div>'
-        + p('Hi ' + esc(first) + ',') + text.trim().split(NLRE).map(x => p(esc(x).split(NL1).join('<br>'))).join('')
+        + p('Hi ' + esc(first) + ',') + cleanText().split(NLRE).map(x => p(esc(x).split(NL1).join('<br>'))).join('')
         + '<p style="margin:8px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#555;text-align:left;">Warmly,<br>' + esc(by || 'The North Star House Team') + '<br>North Star House</p>'
         + '<p style="margin:26px 0 0;font-family:Georgia,serif;font-size:14px;color:#444;"><i>Questions? Just reply to this email.</i></p></div></div></div>';
       const r = await fetch(SB_URL + '/functions/v1/send-email', { method: 'POST', headers: HDR, body: JSON.stringify({ to: to.length === 1 ? to[0] : to, subject: subject.trim(), body: plain, html, sender: by || 'North Star House', fromEmail: 'venue@northstarhouse.org' }) });
@@ -46,7 +49,9 @@ function ComposeToAll({ client, onSent }) {
       : <div style={{ background: '#faf6ef', border: '1px solid #e8e0d5', borderRadius: 8, padding: 12 }}>
         <div className="vc-muted" style={{ marginBottom: 8 }}>To everyone on the list: <b>{to.join(', ') || 'no email on file'}</b>. Sent from venue@northstarhouse.org; replies come back to the venue inbox.</div>
         <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject" style={box} />
-        <textarea value={text} onChange={e => setText(e.target.value)} rows={6} placeholder={'Write your message. "Hi ' + first + ',"  and a closing are added for you.'} style={{ ...box, resize: 'vertical' }} />
+        <div style={{ fontSize: 13, color: '#555', background: '#efe8da', borderRadius: 6, padding: '6px 10px', marginBottom: 6 }}>Added automatically: <b>Hi {first},</b> at the top. Do not type the greeting yourself.</div>
+        <textarea value={text} onChange={e => setText(e.target.value)} rows={6} placeholder="Write only the message itself." style={{ ...box, resize: 'vertical' }} />
+        <div style={{ fontSize: 13, color: '#555', background: '#efe8da', borderRadius: 6, padding: '6px 10px', marginBottom: 8 }}>Added automatically: <b>Warmly,</b> your name, North Star House. Do not type a sign-off yourself.</div>
         <button type="button" disabled={busy} onClick={send} style={{ background: '#886c44', color: '#fff', border: 0, borderRadius: 7, padding: '7px 14px', fontWeight: 600, fontSize: 12, opacity: busy ? .6 : 1 }}>{busy ? 'Sending…' : 'Send to everyone'}</button>
         <button type="button" disabled={busy} onClick={() => setOpen(false)} style={{ marginLeft: 8, background: 'none', border: '1px solid #e0d8cc', borderRadius: 7, padding: '7px 14px', fontSize: 12, color: '#886c44' }}>Cancel</button>
       </div>}
