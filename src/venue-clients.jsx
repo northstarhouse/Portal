@@ -86,7 +86,7 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
     total: { amount: nativeScheduleRows.reduce((s, r) => s + (r.amount_cents || 0), 0), currency: 'USD' },
     amount_paid: { amount: nativeScheduleRows.reduce((s, r) => s + (r.amount_paid_cents || 0), 0) },
     balance_due: { amount: nativeScheduleRows.reduce((s, r) => s + ((r.amount_cents || 0) - (r.amount_paid_cents || 0)), 0) },
-    schedule: nativeScheduleRows.map(r => ({ amount: { amount: r.amount_cents, currency: 'USD' }, due_date: r.due_date, paid: r.status === 'paid', __nativeLabel: r.label })),
+    schedule: nativeScheduleRows.map(r => ({ amount: { amount: r.amount_cents, currency: 'USD' }, due_date: r.due_date, paid: r.status === 'paid', paid_at: r.paid_at || null, __nativeLabel: r.label })),
   } : null);
   const nativeAgreement = nativeVersions.filter(v=>v.response_id===sub.id&&!['draft','void'].includes(v.status)).sort((a,b)=>b.version-a.version)[0] || null;
   const signatures = nativeAgreement ? {all_required_signed:nativeAgreement.status==='completed',signatures:(nativeAgreement.recipients||[]).map(s=>({signee_name:s.name,signee_type:s.role==='venue'?'vendor':'client',required:true,signed:s.status==='signed',signed_at:s.signed_at}))} : contract?.responses?.signatures || null;
@@ -109,7 +109,10 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
   const manualPayments = Array.isArray(a.__venue_checklist?.manual_payments) ? a.__venue_checklist.manual_payments.filter(p => p && p.cents > 0) : [];
   const manualTotal = manualPayments.reduce((sum, p) => sum + p.cents, 0);
   let manualLeft = manualTotal;
-  const schedule = baseSchedule.map(s => { if (s.paid || !(s.cents > 0) || manualLeft < s.cents) return s; manualLeft -= s.cents; return { ...s, paid: true, manual: true }; });
+  const manualByDate = manualPayments.slice().sort((x, y) => String(x.date || '').localeCompare(String(y.date || '')));
+  let manualUsed = 0;
+  const manualDateAt = (upTo) => { let run = 0; for (const p of manualByDate) { run += p.cents; if (run >= upTo) return p.date || null; } return null; };
+  const schedule = baseSchedule.map(s => { if (s.paid || !(s.cents > 0) || manualLeft < s.cents) return s; manualLeft -= s.cents; manualUsed += s.cents; return { ...s, paid: true, manual: true, paid_at: manualDateAt(manualUsed) }; });
   const duePayments = schedule.filter(s => !s.paid);
   const legacy = !nativeAgreement && !!sub.created_at && String(sub.created_at).slice(0, 10) < LEGACY_BEFORE;
   const unsigned = legacy ? [] : (signatures?.signatures?.filter(s => s.required && !s.signed) || []);
@@ -761,18 +764,19 @@ function ClientDetail({ client, onClose, onDelete, onRename, onRetype, onAssignS
   step('Clients signed', clientsSigned, client.legacy ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed before the new system') : clientsSigned ? (lastSigned(clientSigs) ? dateLabel(lastSigned(clientSigs)) : 'Signed') : clientSigs.length ? clientSigs.filter(x => x.signed).length + ' of ' + clientSigs.length + ' signed' : 'Waiting on the agreement', null, false, clientSigs.length ? <div><style>{contractPreviewStyle}</style>{clientSigs.map((x, i) => { const r = (client.nativeAgreement?.recipients || []).find(y => y.role !== 'venue' && y.name === x.signee_name) || {}; return <div key={i} style={{marginBottom:10,position:'relative'}}><SigBlock s={{ name: x.signee_name, email: r.email, role: 'client', status: x.signed ? 'signed' : 'pending', signed_at: x.signed_at, signed_name: r.signed_name }}/>{!x.signed && <button type="button" disabled={mailBusy} onClick={() => resendPortalAccess(x.signee_name, r.email)} style={{position:'absolute',right:18,bottom:14,background:'none',border:0,padding:0,color:'#886c44',fontStyle:'italic',fontSize:13,cursor:'pointer',opacity:mailBusy?.6:1}}>{mailBusy ? 'Sending…' : 'Resend portal access'}</button>}</div>; })}{!clientsSigned && client.nativeAgreement?.expires_at && <p className="vc-muted" style={{margin:0}}>Sign by {new Date(client.nativeAgreement.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. Reminders are sent from the Agreement step.</p>}</div> : null);
   const venueSigned = client.legacy || (venueSigs.length > 0 && venueSigs.every(x => x.signed));
   step('Venue countersigned', venueSigned, client.legacy ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed before the new system') : venueSigned ? (lastSigned(venueSigs) ? dateLabel(lastSigned(venueSigs)) : 'Signed') : 'Waiting on the clients', null, false, contractBody);
+  const paidLabel = (p) => p.paid_at ? 'Paid: ' + dateLabel(String(p.paid_at)) : 'Paid';
   (client.schedule || []).forEach((p, i) => {
     // The first payment is due the moment both clients have signed, not on a calendar date.
     if (i === 0 && !client.legacy) {
-      step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : clientsSigned ? 'Due now' : 'Due when both clients sign', null, !p.paid && clientsSigned, paymentBody(p));
+      step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? paidLabel(p) : clientsSigned ? 'Due now' : 'Due when both clients sign', null, !p.paid && clientsSigned, paymentBody(p));
       return;
     }
     const late = !p.paid && p.due && p.due < today && client.clientsSigned;
-    step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? 'Paid' : !client.clientsSigned && p.due && p.due < today ? 'Due once the clients sign' : p.due ? (late ? 'Past due · ' : 'Due ') + dateLabel(p.due) : 'Awaiting payment', null, late, late ? <><LatePaymentReminderButton client={client} payment={p}/>{paymentBody(p)}</> : paymentBody(p));
+    step(p.label + ' · ' + amount(p.cents, p.currency), p.paid, p.paid ? paidLabel(p) : !client.clientsSigned && p.due && p.due < today ? 'Due once the clients sign' : p.due ? (late ? 'Past due · ' : 'Due ') + dateLabel(p.due) : 'Awaiting payment', null, late, late ? <><LatePaymentReminderButton client={client} payment={p}/>{paymentBody(p)}</> : paymentBody(p));
   });
   step('Insurance verified', client.insuranceVerified, client.insuranceVerified ? 'Verified' : client.insuranceUploadedAt ? 'Uploaded ' + dateLabel(client.insuranceUploadedAt) + ', needs checking' : 'Not uploaded yet', null, false, <InsuranceVerification client={client} onVerify={onVerify}/>);
   const qSend = client.eventDate ? shiftDate(client.eventDate, -60) : null;
-  const qWhen = client.surveyComplete ? 'Completed' : client.surveySent ? (client.questionnaireSentAt ? 'Sent ' + dateLabel(String(client.questionnaireSentAt).slice(0, 10)) + ', awaiting answers' : 'Sent, awaiting answers') : !qSend ? 'Not sent yet' : !client.clientsSigned ? 'Sends ' + dateLabel(qSend > today ? qSend : today) + ' or once signed, whichever is later' : qSend <= today ? 'Sends with the next daily run' : 'Sends ' + dateLabel(qSend);
+  const qWhen = client.surveyComplete ? 'Completed' : client.surveySent ? (client.questionnaireSentAt ? 'Sent ' + dateLabel(String(client.questionnaireSentAt).slice(0, 10)) + ', awaiting answers' : 'Sent, awaiting answers') : !qSend ? 'Not sent yet' : !client.clientsSigned ? 'Reminder send out: ' + dateLabel(qSend > today ? qSend : today) : qSend <= today ? 'Reminder send out: ' + dateLabel(today) : 'Reminder send out: ' + dateLabel(qSend);
   step('Event questionnaire', client.surveyComplete, qWhen, null, !client.surveyComplete && client.requirementsDue && client.requirementsDue < today,
     client.questionnaire ? <FormAnswers formId={QUESTIONNAIRE_FORM} answers={client.questionnaire}/>
       : hbAnswered.length ? <div>{hbAnswered.map((x, i) => <div key={i} style={{display:'flex',gap:12,padding:'6px 0',borderTop:'1px solid #f0ebe2'}}><div style={{flex:'0 0 38%',color:'#888'}}>{x.label}</div><div style={{flex:1,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{String(x.answer)}</div></div>)}</div>
