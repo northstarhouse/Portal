@@ -57,6 +57,7 @@ export function InquiryFlagNotes({ who, inline, preloaded }) {
           {flag}{notes.length > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: "#b3261e" }}>{notes.length}</span>}
         </button>
         {notes.map(function(n) { return <button key={n.id} type="button" title={n.body} onClick={function() { setOpen(true); }} style={pill}>{n.body}</button>; })}
+        {!inline && notes.length === 0 && !open && <button type="button" onClick={function() { setOpen(true); }} style={{ background: 'none', border: 'none', padding: 0, color: '#8a6a5f', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' }}>Add anything the client flagged during their tour as a venue red flag</button>}
       </div>
       {open && <div style={{ marginTop: 8, background: "#fdf3f2", border: "1px solid #f1c9c5", borderRadius: 8, padding: "8px 12px" }}>
       <div style={{ fontSize: 11, color: "#a77" }}>What the couple flagged as a red flag while touring the venue.</div>
