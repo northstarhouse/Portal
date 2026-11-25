@@ -9,7 +9,8 @@ const NL1 = String.fromCharCode(10), NL2 = NL1 + NL1, NLRE = /(?:\r?\n){2,}/;
 const isMail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 // A short email to everyone on the client (each contact and the main address), sent from venue@ and filed in their history.
-function ComposeToAll({ client, onSent }) {
+export function ComposeToAll({ client }) {
+  const onSent = row => { try { window.dispatchEvent(new CustomEvent('nsh-client-email-sent', { detail: { clientId: client.id, row } })); } catch (_e) { /* history refreshes next time it opens */ } };
   const [open, setOpen] = React.useState(false);
   const [subject, setSubject] = React.useState('');
   const [text, setText] = React.useState('');
@@ -44,9 +45,11 @@ function ComposeToAll({ client, onSent }) {
     setBusy(false);
   }
   const box = { width: '100%', boxSizing: 'border-box', border: '1px solid #e0d8cc', borderRadius: 6, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', marginBottom: 8 };
-  return <div style={{ marginBottom: 12 }}>
-    {!open ? <button type="button" onClick={() => setOpen(true)} style={{ background: '#886c44', color: '#fff', border: 0, borderRadius: 7, padding: '7px 14px', fontWeight: 600, fontSize: 12 }}>Send email</button>
-      : <div style={{ background: '#faf6ef', border: '1px solid #e8e0d5', borderRadius: 8, padding: 12 }}>
+  return <>
+    <button type="button" onClick={() => setOpen(true)} title="Email everyone on this client" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: '#886c44', border: '0.5px solid #886c44', borderRadius: 8, padding: '7px 14px', fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer' }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Send email</button>
+    {open && <div onClick={() => { if (!busy) setOpen(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,15,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, maxHeight: '92vh', overflow: 'auto', textAlign: 'left' }}>
+        <div style={{ background: '#faf6ef', border: '1px solid #e8e0d5', borderRadius: 8, padding: 12 }}>
         <div className="vc-muted" style={{ marginBottom: 8 }}>To everyone on the list: <b>{to.join(', ') || 'no email on file'}</b>. Sent from venue@northstarhouse.org; replies come back to the venue inbox.</div>
         <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject" style={box} />
         <div style={{ fontSize: 13, color: '#555', background: '#efe8da', borderRadius: 6, padding: '6px 10px', marginBottom: 6 }}>Added automatically: <b>Hi {first},</b> at the top. Do not type the greeting yourself.</div>
@@ -54,13 +57,20 @@ function ComposeToAll({ client, onSent }) {
         <div style={{ fontSize: 13, color: '#555', background: '#efe8da', borderRadius: 6, padding: '6px 10px', marginBottom: 8 }}>Added automatically: <b>Warmly,</b> your name, North Star House. Do not type a sign-off yourself.</div>
         <button type="button" disabled={busy} onClick={send} style={{ background: '#886c44', color: '#fff', border: 0, borderRadius: 7, padding: '7px 14px', fontWeight: 600, fontSize: 12, opacity: busy ? .6 : 1 }}>{busy ? 'Sending…' : 'Send to everyone'}</button>
         <button type="button" disabled={busy} onClick={() => setOpen(false)} style={{ marginLeft: 8, background: 'none', border: '1px solid #e0d8cc', borderRadius: 7, padding: '7px 14px', fontSize: 12, color: '#886c44' }}>Cancel</button>
-      </div>}
-  </div>;
+      </div>
+      </div>
+    </div>}
+  </>;
 }
 
 export function EmailHistory({ client, api, messages, guideSentAt, onHandleMessage }) {
   const [extra, setExtra] = React.useState([]);
-  return <div><ComposeToAll client={client} onSent={r => setExtra(x => [r, ...x])} /><EmailList client={client} api={api} messages={messages} guideSentAt={guideSentAt} onHandleMessage={onHandleMessage} extra={extra} /></div>;
+  React.useEffect(() => {
+    const on = e => { if (e.detail && e.detail.clientId === client.id) setExtra(x => [e.detail.row, ...x]); };
+    window.addEventListener('nsh-client-email-sent', on);
+    return () => window.removeEventListener('nsh-client-email-sent', on);
+  }, [client.id]);
+  return <div><EmailList client={client} api={api} messages={messages} guideSentAt={guideSentAt} onHandleMessage={onHandleMessage} extra={extra} /></div>;
 }
 
 function EmailList({ client, api, messages, guideSentAt, onHandleMessage, extra }) {
