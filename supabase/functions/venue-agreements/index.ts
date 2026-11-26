@@ -88,11 +88,13 @@ async function sendSignedUpdate(versionId:string,auto:boolean):Promise<any>{
  return {delivered:true,to:clients.map((x:any)=>x.email)};
 }
 // The "ready to sign" email the clients get (used by the real send and by the staff preview, so they never differ).
-function readyToSign(signerName:string,first:string,venueCode:string,url:string,expires:string,note:string){
+// "Britnee and Mark": every client on the agreement, so the greeting names both even though each gets their own email and link.
+const greetFor=(rec:any,fallback:string)=>{const n=(rec?.signers||[]).filter((x:any)=>x.role!=='venue').map((x:any)=>String(x.name||'').trim().split(' ')[0]).filter(Boolean);return n.length?joinNames(n):fallback;};
+function readyToSign(signerName:string,first:string,venueCode:string,url:string,expires:string,note:string,greet=''){
  let subject:string,text:string,html:string;
   subject='Your North Star House rental agreement is ready to sign';
-  text='Hello '+signerName+',\n\n'+(note?note+'\n\n':'')+'We are so happy you have chosen to book with us, and we feel honored to be part of your day. Thank you for sending in your pre-booking form.\n\nThe next step is your rental agreement, and it is ready. Open your event page and enter your venue code'+(venueCode?': '+venueCode:' (your wedding date, like DEC-28-2026)')+'. Your agreement will open for you to review, initial and sign:\n'+url+'\n\nYou will receive a verification code at this email address when you are ready to sign.'+(expires?' Please sign by '+expires+'. Your date is on a soft hold until then. If the agreement is not signed by that date, the hold is released and the date becomes available to others.':'')+'\n\nNorth Star House';
-  html=brandedHtml('Your Rental Agreement Is Ready',['Hello '+esc(first)+',',...(note?[esc(note).replace(/\n/g,'<br>')]:[]),'We are so happy you have chosen to book with us, and we feel honored to be part of your day. Thank you for sending in your pre-booking form.','The next step is your rental agreement, and it is ready for you to review and sign.',(venueCode?'Your venue code is <strong style="font-size:20px;letter-spacing:2px;">'+venueCode+'</strong>':'Your venue code is your wedding date, written like <strong>DEC-28-2026</strong>')+'. Open your event page and enter it. Your agreement opens first: you will read and initial each numbered term, confirm with a code we email you, and sign.'+(expires?' Please sign by '+esc(expires)+'. Your date is on a soft hold until then. If the agreement is not signed by that date, the hold is released and the date becomes available to others.':'')],'Open My Event Page',url);
+  text='Hello '+(greet||signerName)+',\n\n'+(note?note+'\n\n':'')+'We are so happy you have chosen to book with us, and we feel honored to be part of your day. Thank you for sending in your pre-booking form.\n\nThe next step is your rental agreement, and it is ready. Open your event page and enter your venue code'+(venueCode?': '+venueCode:' (your wedding date, like DEC-28-2026)')+'. Your agreement will open for you to review, initial and sign:\n'+url+'\n\nYou will receive a verification code at this email address when you are ready to sign.'+(expires?' Please sign by '+expires+'. Your date is on a soft hold until then. If the agreement is not signed by that date, the hold is released and the date becomes available to others.':'')+'\n\nNorth Star House';
+  html=brandedHtml('Your Rental Agreement Is Ready',['Hello '+esc(greet||first)+',',...(note?[esc(note).replace(/\n/g,'<br>')]:[]),'We are so happy you have chosen to book with us, and we feel honored to be part of your day. Thank you for sending in your pre-booking form.','The next step is your rental agreement, and it is ready for you to review and sign.',(venueCode?'Your venue code is <strong style="font-size:20px;letter-spacing:2px;">'+venueCode+'</strong>':'Your venue code is your wedding date, written like <strong>DEC-28-2026</strong>')+'. Open your event page and enter it. Your agreement opens first: you will read and initial each numbered term, confirm with a code we email you, and sign.'+(expires?' Please sign by '+esc(expires)+'. Your date is on a soft hold until then. If the agreement is not signed by that date, the hold is released and the date becomes available to others.':'')],'Open My Event Page',url);
  return {subject,text,html};
 }
 async function mailLink(version:any,signer:any,value:string,copyTo='',note=''){try{
@@ -112,7 +114,7 @@ async function mailLink(version:any,signer:any,value:string,copyTo='',note=''){t
   text='Hello '+signer.name+',\n\nThe clients have signed. Please countersign version '+version.version+' here:\n'+url+'\n\nYou will receive a verification code at this email address when you are ready to sign.\n\nNorth Star House';
   html=brandedHtml('Countersignature Requested',['Hello '+esc(first)+', the clients have signed version '+version.version+' of the rental agreement. Please countersign. You will receive a verification code at this email address when you are ready.'],'Countersign Agreement',url);
  }else{
-  {const u=readyToSign(signer.name,first,venueCode,url,expires,note);subject=u.subject;text=u.text;html=u.html;}
+  {const u=readyToSign(signer.name,first,venueCode,url,expires,note,greetFor(version,first));subject=u.subject;text=u.text;html=u.html;}
  }
  if(copyTo){await email(copyTo,'[Copy of what '+signer.name+' receives] '+subject,'(This is a copy for the venue. It was NOT sent to '+signer.email+'.)\n\n'+text,false,html);return {delivered:true,copy:true};}
  await email(signer.email,subject,text,true,html);
@@ -168,7 +170,7 @@ Deno.serve(async req=>{
    const exp=rec.expires_at?new Date(rec.expires_at):new Date(Date.now()+7*24*3600*1000);
    const expires=exp.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
    const first=String(clients[0].name||'').split(' ')[0]||'there';
-   const u=readyToSign(clients[0].name||'there',first,venueCode,link('preview','client',venueCode),expires,String(body.note||'').trim().slice(0,1500));
+   const u=readyToSign(clients[0].name||'there',first,venueCode,link('preview','client',venueCode),expires,String(body.note||'').trim().slice(0,1500),greetFor(rec,first));
    return json({subject:u.subject,html:u.html,to:clients.map((x:any)=>x.email)});
   }
   if(action==='issue'){
