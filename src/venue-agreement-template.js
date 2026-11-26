@@ -93,3 +93,13 @@ Food Vendor Permits. For public events that include food vendors and/or food ser
 The North Star Historic Conservancy is a 501c3 non-profit organization that exists to restore, maintain and share this special Julia Morgan designed home. Activities at The North Star House and grounds breathe life into this Gold Rush treasure. Thank you so much for joining us.
 
 By signing, you acknowledge that you have read the above Terms and Conditions and agree to abide by them in their entirety.`;
+
+// Weddings only: couples may bring their dogs. Every other event type keeps clause 17 (no pets) as written above.
+const NO_PETS_CLAUSE = '17. Pets. No pets are allowed in the House or on the grounds, except certified trained service animals. Please advise your guests of the “no pets rule.”';
+const WEDDING_PETS_CLAUSE = '17. Pets. Couples are welcome to bring their dogs to their wedding. Dogs are allowed outside only, must be kept on a leash at all times, and are not allowed inside the House. The couple is responsible for cleaning up after their dogs. No other pets are allowed, except certified trained service animals. Please advise your guests of these pet rules.';
+// Weddings only: the day-of coordinator does not have to be a professional, but someone must be designated, and not from the wedding party.
+const OLD_COORDINATOR_CLAUSE = '11. Day-of- Event Coordinator. For weddings, a professional day-of-event Coordinator is required.';
+const WEDDING_COORDINATOR_CLAUSE = '11. Day-of-Event Coordinator. For weddings, the couple must designate a day-of-wedding coordinator. The coordinator may not be a member of the wedding party.';
+export const weddingAgreementTerms = agreementTerms
+  .replace(NO_PETS_CLAUSE, WEDDING_PETS_CLAUSE)
+  .replace(OLD_COORDINATOR_CLAUSE, WEDDING_COORDINATOR_CLAUSE);

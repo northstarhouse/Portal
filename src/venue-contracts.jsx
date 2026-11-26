@@ -1,6 +1,6 @@
 import { contractTerms } from './venue-contract-terms.js';
 import { formatVenueCode } from './venue-code.js';
-import { agreementTerms } from './venue-agreement-template.js';
+import { agreementTerms, weddingAgreementTerms } from './venue-agreement-template.js';
 export function createAgreementApi({baseUrl,apiKey,staffToken}) {
   return async function(action,data={},pdf=false){
     const token=staffToken?.();
@@ -92,7 +92,7 @@ export function prepareAgreementDraft(client,extras={}){
     ...(client.total!==null&&client.total!==undefined?['Venue rental invoice total, including any security deposit: '+money(client.total,client.currency)]:[]),
     ...(schedule.length?['Payment schedule:',...schedule.map((p,i)=>'- '+p.label+': '+money(p.cents,p.currency)+' due '+(i===0?'when both clients have signed this agreement':p.due?writtenDate(p.due):'[TO COMPLETE]')+(p.paid?' (already paid)':''))]:[]),
     '',
-    agreementTerms,
+    /wedding/i.test(String(client.type||''))?weddingAgreementTerms:agreementTerms,
     '',
     'Signatures',
     ...(people.length?people.map(c=>'Client: '+c.name):['Client: '+client.name]),

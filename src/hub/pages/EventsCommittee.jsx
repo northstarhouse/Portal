@@ -162,6 +162,9 @@ function migrateLegacyChecklist(rows) {
 }
 
 const money = (n) => `$${Number(n || 0).toLocaleString()}`;
+// Our cut of the earnings = earnings minus what goes to performers/vendors as a share of ticket sales (their "split" costs log
+// themselves as expenses tagged auto-vendor and worded "... % of ticket sales"). Flat fees are costs, not a share, so they are not taken out here.
+const revenueShare = (expenses) => (expenses || []).filter(r => String(r.notes || '').startsWith('auto-vendor:') && /% of ticket sales/.test(String(r.description || ''))).reduce((n, r) => n + (parseFloat(r.amount) || 0), 0);
 
 // Shared section-header treatment across every tab in the event workspace —
 // uppercase + letter-spaced + a thin rule, so headers read as clear
@@ -471,7 +474,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
   const costSig = JSON.stringify(ev.vendors.map(v => [v.id, v.name, v.who || '', v.costType || '', v.cost || 0, v.splitPct || 0]));
   useEffect(() => {
     let live = true;
-    fetchEventTicketStats(ev.name).catch(() => ({ revenue: 0 })).then(t => syncVendorExpenses(ev.name, ev.vendors, rsvpOnly ? 0 : t.revenue, session && session.user && session.user.id))
+    fetchEventTicketStats(ev.name).catch(() => ({ revenue: 0 })).then(t => syncVendorExpenses(ev.name, ev.vendors, rsvpOnly ? 0 : (t.net != null ? t.net : t.revenue), session && session.user && session.user.id))
       .then(changed => { if (live && changed) fetchEventFinancials(ev.name).then(setFinancials).catch(() => {}); }).catch(() => {});
     return () => { live = false; };
   }, [ev.name, costSig, rsvpOnly]);
@@ -563,6 +566,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
             <StatBox label="Other Earnings" value={money(otherEarnings)} />
             <StatBox label="Expenses" value={money(expenses)} />
             <StatBox label="Net" value={money(netProfit)} color={netProfit >= 0 ? '#4a5d3a' : '#8a4a2e'} />
+            {(() => { const share = financials ? revenueShare(financials.expenses) : 0; const earned = ticketSales + otherEarnings; return <div style={{ gridColumn: '1 / -1' }}><StatBox label="Our Cut of Earnings" value={money(earned - share)} color="#886c44" sub={share > 0 ? `after ${money(share)} paid out as a share of ticket sales` : 'no revenue share on this event'} /></div>; })()}
           </div>
         </div>
 
@@ -2187,6 +2191,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
       const exp = fin.expenses.length ? fin.expenses.map(r => line(r.description || r.type || 'Expense', parseFloat(r.amount) || 0, '#8a4a2e')) : ['<tr><td colspan="2" style="padding:6px 0;font-size:13px;color:#888888;">No expenses logged yet.</td></tr>'];
       return '<tr><td bgcolor="#ffffff" style="padding:0 16px 12px 46px;background:#ffffff;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
         + head('Earnings') + ern.join('') + line('Total earnings', fin.totalEarnings, '#4a5d3a', true)
+        + (revenueShare(fin.expenses) > 0 ? line('Our cut of earnings (after ' + money(revenueShare(fin.expenses)) + ' paid out as a share of ticket sales)', fin.totalEarnings - revenueShare(fin.expenses), '#886c44', true) : '')
         + head('Expenses') + exp.join('') + line('Total expenses', fin.totalExpenses, '#8a4a2e', true)
         + line('Net', fin.totalEarnings - fin.totalExpenses, fin.totalEarnings - fin.totalExpenses >= 0 ? '#4a5d3a' : '#8a4a2e', true)
         + '</table></td></tr>';
@@ -2767,6 +2772,10 @@ function FinancialsTab({ ev }) {
         <div>
           <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif", color: '#4a5d3a' }}>{money(totalEarnings)}</div>
           <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 }}>Earnings</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif", color: '#886c44' }}>{money(totalEarnings - revenueShare(expenses))}</div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 }}>Our cut{revenueShare(expenses) > 0 ? ' (after ' + money(revenueShare(expenses)) + ' revenue share)' : ''}</div>
         </div>
         <div>
           <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Cardo','Georgia',serif", color: '#8a4a2e' }}>{money(totalExpenses)}</div>

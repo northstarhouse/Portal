@@ -613,11 +613,13 @@ export async function fetchEventFinancials(eventName) {
 // are free (mirrors the same fix in Portal's Website Payments view).
 const TICKET_ORDER_MONEY_KINDS = new Set(['paid', 'donation', 'membership', 'brick']);
 export async function fetchEventTicketStats(eventName) {
-  const rows = await get(`ticket_orders?event_title=eq.${encodeURIComponent(eventName)}&select=kind,quantity,amount`);
+  const rows = await get(`ticket_orders?event_title=eq.${encodeURIComponent(eventName)}&select=kind,quantity,amount,paypal_fee,net_amount`);
   const paid = (Array.isArray(rows) ? rows : []).filter(o => TICKET_ORDER_MONEY_KINDS.has(o.kind));
   return {
     ticketsSold: paid.reduce((s, o) => s + Number(o.quantity || 0), 0),
     revenue: paid.reduce((s, o) => s + Number(o.amount || 0), 0),
+    // after PayPal's fee: the amount a revenue share (a performer's % of ticket sales) is worked out on
+    net: paid.reduce((s, o) => s + Number(o.net_amount != null ? o.net_amount : (Number(o.amount || 0) - Number(o.paypal_fee || 0))), 0),
   };
 }
 
@@ -1262,7 +1264,7 @@ async function doVendorSync(eventName, vendors, revenue, authUserId) {
   (vendors || []).forEach(v => {
     let amount = 0; let how = '';
     if (v.costType === 'flat' && Number(v.cost) > 0) { amount = Number(v.cost); how = 'flat fee'; }
-    else if (v.costType === 'split' && Number(v.splitPct) > 0) { amount = Math.round((Number(revenue) || 0) * Number(v.splitPct)) / 100; how = Number(v.splitPct) + '% of ticket sales'; }
+    else if (v.costType === 'split' && Number(v.splitPct) > 0) { amount = Math.round((Number(revenue) || 0) * Number(v.splitPct)) / 100; how = Number(v.splitPct) + '% of ticket sales after fees'; }
     else return;
     wanted[v.id] = { amount, description: 'Vendor fee — ' + ((v.role && !v.who ? v.role : v.name) || 'Vendor') + (v.who ? ' (' + v.who + ')' : (v.role ? ' (' + v.name + ')' : '')) + ' (' + how + ')' };
   });
