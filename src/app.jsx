@@ -1986,7 +1986,7 @@ function EventsView({ navigate, initialTab }) {
           <div style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 11 }}>
             {c.rsvpOnly
               ? <span style={{ background: '#f0ebe2', color: gold, fontSize: 10, fontWeight: 700, padding: '1px 8px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: 0.4 }}>RSVP</span>
-              : <span style={{ color: '#5a8a5a', fontWeight: 600 }}>{fmt(c.earnings + c.ticketRevenue)}</span>}
+              : <span style={{ color: '#5a8a5a', fontWeight: 600 }}>{fmt(c.earnings)}</span>}
             <span style={{ color: '#c07040', fontWeight: 600 }}>-{fmt(c.costs)}</span>
           </div>
           {(function() {
@@ -2646,7 +2646,7 @@ function EventsView({ navigate, initialTab }) {
                       : <StatCard label="Ticket Sales" value={fmt(c.ticketRevenue)} sub={c.ticketQty + ' sold' + (c.rsvpQty > 0 ? ', ' + c.rsvpQty + ' RSVP' : '')} />}
                     <StatCard label="Other Earnings" value={fmt(c.earnings)} />
                     <StatCard label="Expenses" value={fmt(c.costs)} />
-                    <StatCard label="Net" value={fmt((c.rsvpOnly ? 0 : c.ticketNet) + c.net)} />
+                    <StatCard label="Net" value={fmt(c.net)} />
                   </div>
                 </div>
                 <div style={{ width: 260, flexShrink: 0, background: '#faf8f4', borderLeft: '0.5px solid #e8e0d5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16, gap: 10 }}>

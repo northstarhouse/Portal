@@ -486,8 +486,9 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
   // earnings logged by hand in Portal's Op Earnings (sponsorships, door
   // cash, etc.) -- shown as their own boxes rather than combined, since
   // that's how the committee actually tracks where the money came from.
-  const ticketSales = !rsvpOnly && ticketStats ? ticketStats.revenue : 0;
-  const otherEarnings = financials ? financials.earnings.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) : 0;
+  // Website ticket sales now land in Op Earnings by themselves as one "Website tickets" line (after PayPal fees).
+  const ticketSales = !rsvpOnly && financials ? financials.earnings.filter(r => r.earning_source === 'Website tickets').reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) : 0;
+  const otherEarnings = financials ? financials.earnings.filter(r => r.earning_source !== 'Website tickets').reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) : 0;
   const expenses = financials ? financials.expenses.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) : 0;
   const netProfit = ticketSales + otherEarnings - expenses;
 
@@ -558,7 +559,7 @@ function OverviewTab({ ev, onUpdate, onEdit, onDelete, volunteers, session, volu
           </div>
           {emailPanelOpen && <div style={{ margin: '0 0 16px' }}><ChecklistTab ev={ev} onUpdate={onUpdate} volunteers={volunteers} showMarketing={!marketingNA} emailOnly onCloseEmail={() => setEmailPanelOpen(false)} /></div>}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <StatBox label="Ticket Sales" value={rsvpOnly ? 'N/A' : money(ticketSales)} sub={rsvpOnly ? 'RSVP event, no tickets' : (ticketStats ? `${ticketStats.ticketsSold} sold` : null)} color={rsvpOnly ? 'var(--muted)' : undefined} />
+            <StatBox label="Ticket Sales" value={rsvpOnly ? 'N/A' : money(ticketSales)} sub={rsvpOnly ? 'RSVP event, no tickets' : (ticketStats ? `${ticketStats.ticketsSold} sold, after PayPal fees` : null)} color={rsvpOnly ? 'var(--muted)' : undefined} />
             <StatBox label="Other Earnings" value={money(otherEarnings)} />
             <StatBox label="Expenses" value={money(expenses)} />
             <StatBox label="Net" value={money(netProfit)} color={netProfit >= 0 ? '#4a5d3a' : '#8a4a2e'} />
@@ -1960,7 +1961,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
       const rsvpOnly = !!(meta && meta.rsvp_only);
       const earnings = (f && f.earnings) || []; const expenses = (f && f.expenses) || [];
       const ticketRevenue = rsvpOnly ? 0 : t.revenue;
-      const totalEarnings = ticketRevenue + earnings.reduce((n, r) => n + (parseFloat(r.amount) || 0), 0);
+      const totalEarnings = earnings.reduce((n, r) => n + (parseFloat(r.amount) || 0), 0); // includes the automatic Website tickets line
       const totalExpenses = expenses.reduce((n, r) => n + (parseFloat(r.amount) || 0), 0);
       setFin({ earnings, expenses, rsvpOnly, ticketRevenue, ticketsSold: t.ticketsSold, totalEarnings, totalExpenses });
       setBudgetDone(!!((((rows || []).find(r => r.area_key === 'finance') || {}).pre_data || {}).budgetDone));
@@ -2182,8 +2183,7 @@ function ChecklistTab({ ev, onUpdate, volunteers, showMarketing, emailOnly, onCl
       if (!fin) return '';
       const line = (label, amount, color, strong) => '<tr><td style="padding:6px 8px 6px 0;border-bottom:1px solid #f3ecdf;font-size:13px;color:#2a2a2a;' + (strong ? 'font-weight:bold;' : '') + '">' + esc(label) + '</td><td align="right" style="padding:6px 0;border-bottom:1px solid #f3ecdf;font-size:13px;font-weight:bold;color:' + color + ';white-space:nowrap;">' + esc(money(amount)) + '</td></tr>';
       const head = (t) => '<tr><td colspan="2" style="padding:12px 0 2px;font-size:11px;font-weight:bold;letter-spacing:1px;color:' + GOLD + ';text-transform:uppercase;">' + t + '</td></tr>';
-      const ern = [line('Website ticket sales' + (!fin.rsvpOnly && fin.ticketsSold > 0 ? ' (' + fin.ticketsSold + ' sold)' : ''), fin.rsvpOnly ? 0 : fin.ticketRevenue, '#4a5d3a')]
-        .concat(fin.earnings.map(r => line(r.earning_source || 'Earning', parseFloat(r.amount) || 0, '#4a5d3a')));
+      const ern = fin.earnings.map(r => line(r.earning_source === 'Website tickets' ? 'Website ticket sales' + (fin.ticketsSold > 0 ? ' (' + fin.ticketsSold + ' sold, after PayPal fees)' : '') : (r.earning_source || 'Earning'), parseFloat(r.amount) || 0, '#4a5d3a'));
       const exp = fin.expenses.length ? fin.expenses.map(r => line(r.description || r.type || 'Expense', parseFloat(r.amount) || 0, '#8a4a2e')) : ['<tr><td colspan="2" style="padding:6px 0;font-size:13px;color:#888888;">No expenses logged yet.</td></tr>'];
       return '<tr><td bgcolor="#ffffff" style="padding:0 16px 12px 46px;background:#ffffff;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
         + head('Earnings') + ern.join('') + line('Total earnings', fin.totalEarnings, '#4a5d3a', true)
@@ -2747,7 +2747,7 @@ function FinancialsTab({ ev }) {
   const expenses = data?.expenses || [];
   // Website ticket sales are their own income source (separate from earnings logged by hand), so they are added in here.
   const ticketRevenue = rsvpOnly ? 0 : tickets.revenue;
-  const totalEarnings = ticketRevenue + earnings.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+  const totalEarnings = earnings.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0); // includes the automatic Website tickets line
   const totalExpenses = expenses.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
 
   return (
@@ -2780,15 +2780,11 @@ function FinancialsTab({ ev }) {
 
       <div style={{ marginBottom: 24 }}>
         <div style={SECTION_HEAD}>Earnings</div>
-        <ItemRow>
-          <span style={{ flex: 1, fontSize: 13 }}>Website ticket sales{!rsvpOnly && tickets.ticketsSold > 0 ? ' (' + tickets.ticketsSold + ' sold)' : ''}</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: rsvpOnly ? 'var(--muted)' : '#4a5d3a' }}>{rsvpOnly ? 'N/A (RSVP event)' : money(tickets.revenue)}</span>
-        </ItemRow>
         {earnings.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>No other earnings logged for this event yet.</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>No earnings logged for this event yet.</div>
         ) : earnings.map(r => (
           <ItemRow key={r.id}>
-            <span style={{ flex: 1, fontSize: 13 }}>{r.earning_source || 'Earning'}</span>
+            <span style={{ flex: 1, fontSize: 13 }}>{r.earning_source === 'Website tickets' ? 'Website ticket sales' + (tickets.ticketsSold > 0 ? ' (' + tickets.ticketsSold + ' sold, after PayPal fees)' : '') : (r.earning_source || 'Earning')}</span>
             <span style={{ fontSize: 11, color: 'var(--muted)' }}>{r.date ? fmtDateShort(r.date) : ''}</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: '#4a5d3a' }}>{money(r.amount)}</span>
           </ItemRow>

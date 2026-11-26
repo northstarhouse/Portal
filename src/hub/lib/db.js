@@ -695,7 +695,7 @@ export async function fetchMergedEventCards() {
   (Array.isArray(earnings) ? earnings : []).forEach(r => { const b = ensure(r.event); if (b) b.earnings += Number(r.amount || 0); });
   (Array.isArray(tickets) ? tickets : [])
     .filter(o => TICKET_ORDER_MONEY_KINDS.has(o.kind))
-    .forEach(o => { const b = ensure(o.event_title, o.event_date); if (b) b.earnings += Number(o.amount || 0); });
+    .forEach(o => { ensure(o.event_title, o.event_date); }); // the money itself is already in Op Earnings (the automatic "Website tickets" line)
   // events_committee is the source of truth for status (e.g. 'cancelled') and also holds events someone
   // just added on the planning page, which have no flyer/budget/tickets yet -- those show as cards too, so a
   // new event appears right away. (ensure() skips website products like commemorative bricks.)
