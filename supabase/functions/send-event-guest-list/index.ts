@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     if (recipients.some((e) => !ALLOWED_RECIPIENTS.has(e))) return new Response(JSON.stringify({ error: 'recipient not allowed' }), { status: 400 })
 
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/ticket_orders?select=buyer_name,buyer_email,paypal_payer_name,quantity,event_title,event_date&event_slug=eq.${encodeURIComponent(eventSlug)}&status=eq.completed`,
+      `${SUPABASE_URL}/rest/v1/ticket_orders?status=eq.completed&select=buyer_name,buyer_email,paypal_payer_name,quantity,event_title,event_date&event_slug=eq.${encodeURIComponent(eventSlug)}&status=eq.completed`,
       { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } }
     )
     if (!res.ok) throw new Error(`ticket_orders fetch failed: HTTP ${res.status}`)

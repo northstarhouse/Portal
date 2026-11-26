@@ -1679,7 +1679,7 @@ function EventsView({ navigate, initialTab }) {
     // Real website ticket sales -- may not exist yet on installs that haven't
     // run the ticketing migration, so a failure here just means "no ticket
     // data to show" rather than a broken page (same handling as WebsitePaymentsView).
-    fetch(SUPABASE_URL + '/rest/v1/ticket_orders?select=event_title,event_slug,event_date,kind,quantity,amount,paypal_fee,net_amount&limit=5000', {
+    fetch(SUPABASE_URL + '/rest/v1/ticket_orders?status=eq.completed&select=event_title,event_slug,event_date,kind,quantity,amount,paypal_fee,net_amount&limit=5000', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); }).then(function(rows) {
       setTicketOrders(Array.isArray(rows) ? rows : []);
@@ -9852,9 +9852,9 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
             <div onClick={function() { setShowEarnings(true); }} style={cardHover}
               onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'; }}
               onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}>
-              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 8 }}>Earnings</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{fmt(earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0))}</div>
-              <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>{earnings.length} {earnings.length === 1 ? 'entry' : 'entries'}</div>
+              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 8 }}>Net Earnings</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: (earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0) - totalPurchases) >= 0 ? gold : '#b3402a' }}>{(function(n) { return (n < 0 ? '-' : '') + fmt(Math.abs(n)); })((earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0) - totalPurchases))}</div>
+              <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>{fmt(earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0))} earned, {fmt(totalPurchases)} spent</div>
               <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add entries →</div>
             </div>
           )}
@@ -10355,9 +10355,10 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
               <div style={{ fontSize: 17, fontWeight: 600, color: '#2a2a2a' }}>Events — Earnings</div>
               <button onClick={function() { setShowEarnings(false); }} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#bbb' }}>×</button>
             </div>
-            <div style={{ background: '#faf8f5', borderRadius: 8, padding: '10px 14px', textAlign: 'center', marginBottom: 22 }}>
-              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Total Earnings</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: gold, marginTop: 4 }}>{fmt(earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0))}</div>
+            <div style={{ background: '#faf8f5', borderRadius: 8, padding: '12px 14px', textAlign: 'center', marginBottom: 22 }}>
+              <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Net Earnings</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: (earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0) - totalPurchases) >= 0 ? gold : '#b3402a', marginTop: 4 }}>{(function(n) { return (n < 0 ? '-' : '') + fmt(Math.abs(n)); })((earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0) - totalPurchases))}</div>
+              <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>{fmt(earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0))} earned, less {fmt(totalPurchases)} spent on events</div>
             </div>
             <div style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 18 }}>
               <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 12 }}>Add Entry</div>
@@ -18606,7 +18607,7 @@ function EmailNoticesView({ navigate }) {
     setSent(false);
     setSendError(null);
     if (!slug) return;
-    fetch(SUPABASE_URL + '/rest/v1/ticket_orders?event_slug=eq.' + encodeURIComponent(slug) + '&select=*&order=buyer_name.asc', {
+    fetch(SUPABASE_URL + '/rest/v1/ticket_orders?status=eq.completed&event_slug=eq.' + encodeURIComponent(slug) + '&select=*&order=buyer_name.asc', {
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
     }).then(function(r) { return r.json(); }).then(function(rows) {
       rows = Array.isArray(rows) ? rows : [];

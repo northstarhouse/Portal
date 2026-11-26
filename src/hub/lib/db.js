@@ -613,7 +613,7 @@ export async function fetchEventFinancials(eventName) {
 // are free (mirrors the same fix in Portal's Website Payments view).
 const TICKET_ORDER_MONEY_KINDS = new Set(['paid', 'donation', 'membership', 'brick']);
 export async function fetchEventTicketStats(eventName) {
-  const rows = await get(`ticket_orders?event_title=eq.${encodeURIComponent(eventName)}&select=kind,quantity,amount,paypal_fee,net_amount`);
+  const rows = await get(`ticket_orders?status=eq.completed&event_title=eq.${encodeURIComponent(eventName)}&select=kind,quantity,amount,paypal_fee,net_amount`);
   const paid = (Array.isArray(rows) ? rows : []).filter(o => TICKET_ORDER_MONEY_KINDS.has(o.kind));
   return {
     ticketsSold: paid.reduce((s, o) => s + Number(o.quantity || 0), 0),
@@ -666,7 +666,7 @@ export async function fetchMergedEventCards() {
     get('event_overview_cards?select=*'),
     get(`Op%20Budget?area=eq.Events&select=event_name,amount`),
     get(`Op%20Earnings?area=eq.Events&select=event,amount`),
-    get('ticket_orders?select=event_title,event_date,kind,amount'),
+    get('ticket_orders?status=eq.completed&select=event_title,event_date,kind,amount'),
     get('events_committee?select=*'),
   ]);
   const byKey = {};
