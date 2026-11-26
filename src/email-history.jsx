@@ -76,6 +76,40 @@ export function EmailHistory({ client, api, messages, guideSentAt, onHandleMessa
 function EmailList({ client, api, messages, guideSentAt, onHandleMessage, extra }) {
   const [rows0, setRows] = React.useState(null);
   const rows = rows0 === null ? null : [...extra, ...rows0].sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  // Replying to a client's message from right here: sent from venue@ (replies come back to the venue inbox), filed in their history,
+  // and the original message is marked handled by the person who replied. Same as the Messages tab.
+  const [replyFor, setReplyFor] = React.useState(null), [replyText, setReplyText] = React.useState(''), [replySending, setReplySending] = React.useState(false);
+  const detailsRefs = React.useRef({}), boxRefs = React.useRef({});
+  const startReply = r => { setReplyFor(r.id); };
+  // Opening the reply area (from the Reply button or the NEEDS REPLY badge) opens the message, scrolls to the box and puts the cursor in it.
+  React.useEffect(() => {
+    if (replyFor == null) return;
+    const d = detailsRefs.current[replyFor]; if (d) d.open = true;
+    const b = boxRefs.current[replyFor];
+    if (b) { b.scrollIntoView({ behavior: 'smooth', block: 'center' }); const ta = b.querySelector('textarea'); if (ta) ta.focus({ preventScroll: true }); }
+  }, [replyFor]);
+  async function sendReply(r) {
+    const text = replyText.trim();
+    if (!text) { alert('Write a reply first.'); return; }
+    setReplySending(true);
+    try {
+      let by = await fetch(SB_URL + '/rest/v1/rpc/app_session_name', { method: 'POST', headers: HDR, body: '{}' }).then(x => x.ok ? x.json() : '').catch(() => '');
+      by = String(by || '').trim();
+      if (!by) { by = String(window.prompt('Your name, for the signature on the reply?') || '').trim(); if (!by) { setReplySending(false); return; } }
+      const subject = /^re:/i.test(r.msgSubject || '') ? r.msgSubject : 'Re: ' + (r.msgSubject || 'Your message to North Star House');
+      const plain = text + '\n\n' + by + '\nNorth Star House';
+      const p = t => '<p style="margin:0 0 14px;font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#333;line-height:1.6;">' + t + '</p>';
+      const html = text.split(new RegExp('(?:\\r?\\n){2,}')).map(x => p(esc(x).split(String.fromCharCode(10)).join('<br>'))).join('') + p(esc(by) + '<br>North Star House');
+      const res = await fetch(SB_URL + '/functions/v1/send-email', { method: 'POST', headers: HDR, body: JSON.stringify({ to: r.fromEmail, subject, body: plain, html, sender: by, fromEmail: 'venue@northstarhouse.org' }) });
+      if (!res.ok) throw new Error('The email could not be sent. Please try again.');
+      const stamp = new Date().toISOString();
+      await fetch(SB_URL + '/rest/v1/venue_messages', { method: 'POST', headers: { ...HDR, Prefer: 'return=minimal' }, body: JSON.stringify({ event_uid: r.eventUid || ('client:' + client.id), event_title: r.eventTitle || client.name, subject: 'Reply from ' + by, body: text, from_name: by, from_email: 'venue@northstarhouse.org', direction: 'outgoing', handled_at: stamp, handled_by: by }) }).catch(() => {});
+      if (onHandleMessage && r.unhandled) { try { await onHandleMessage(r.id, by); } catch (_e) { /* the reply is sent and filed either way */ } }
+      try { window.dispatchEvent(new CustomEvent('nsh-client-email-sent', { detail: { clientId: client.id, row: { at: stamp, what: 'Reply from ' + by, who: 'Sent to ' + r.fromEmail, body: text } } })); } catch (_e) { /* shows up when the history reloads */ }
+      setReplyFor(null); setReplyText('');
+    } catch (e) { alert(e.message || 'Could not send the reply.'); }
+    setReplySending(false);
+  }
   React.useEffect(() => {
     let off = false;
     const H = { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } };
@@ -100,7 +134,7 @@ function EmailList({ client, api, messages, guideSentAt, onHandleMessage, extra 
       if (q.questionnaire_sent_at) out.push({ at: q.questionnaire_sent_at, what: 'Event questionnaire', who: client.email || '' });
       if (q.questionnaire_reminder_2_sent_at) out.push({ at: q.questionnaire_reminder_2_sent_at, what: 'Event questionnaire reminder', who: client.email || '' });
       if (q.feedback_sent_at) out.push({ at: q.feedback_sent_at, what: 'Post-event feedback request', who: client.email || '' });
-      (messages || []).forEach(m => out.push({ at: m.created_at, what: m.direction === 'outgoing' ? (m.subject && !/^Reply from/i.test(m.subject) ? m.subject : 'Reply from ' + (m.from_name || 'the team')) : 'Message from ' + (m.from_name || 'the client'), who: m.direction === 'outgoing' ? 'Sent to the client' : (m.from_email || ''), incoming: m.direction !== 'outgoing', body: m.body, id: m.id, unhandled: m.direction !== 'outgoing' && !m.handled_at, handledBy: m.handled_by, note: m.handled_note }));
+      (messages || []).forEach(m => out.push({ at: m.created_at, what: m.direction === 'outgoing' ? (m.subject && !/^Reply from/i.test(m.subject) ? m.subject : 'Reply from ' + (m.from_name || 'the team')) : 'Message from ' + (m.from_name || 'the client'), who: m.direction === 'outgoing' ? 'Sent to the client' : (m.from_email || ''), incoming: m.direction !== 'outgoing', fromName: m.from_name, fromEmail: m.from_email, msgSubject: m.subject, eventUid: m.event_uid, eventTitle: m.event_title, body: m.body, id: m.id, unhandled: m.direction !== 'outgoing' && !m.handled_at, handledBy: m.handled_by, note: m.handled_note }));
       out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
       setRows(out);
     });
@@ -108,11 +142,11 @@ function EmailList({ client, api, messages, guideSentAt, onHandleMessage, extra 
   }, [client.id, (messages || []).map(m => m.id + (m.handled_at || '')).join(), guideSentAt]);
   if (rows === null) return <p className="vc-muted" style={{ margin: 0 }}>Loading…</p>;
   if (!rows.length) return <p className="vc-muted" style={{ margin: 0 }}>No emails recorded yet.</p>;
-  return <div><div style={{ display: 'flex', gap: 14, fontSize: 11, color: '#777', marginBottom: 8 }}><span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#c9ad7a', marginRight: 5, verticalAlign: 'middle' }}/>From North Star House</span><span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#8fae8f', marginRight: 5, verticalAlign: 'middle' }}/>From the client</span></div>{rows.map((r, i) => <details key={i} style={{ borderLeft: '3px solid ' + (r.incoming ? '#8fae8f' : '#c9ad7a'), background: r.incoming ? '#f3f7f2' : '#faf6ef', borderRadius: 6, padding: '8px 12px', marginTop: i ? 6 : 0 }} open={!!r.unhandled}>
+  return <div><div style={{ display: 'flex', gap: 14, fontSize: 11, color: '#777', marginBottom: 8 }}><span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#c9ad7a', marginRight: 5, verticalAlign: 'middle' }}/>From North Star House</span><span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#8fae8f', marginRight: 5, verticalAlign: 'middle' }}/>From the client</span></div>{rows.map((r, i) => <details key={i} ref={el => { if (el && r.id != null) detailsRefs.current[r.id] = el; }} style={{ borderLeft: '3px solid ' + (r.incoming ? '#8fae8f' : '#c9ad7a'), background: r.incoming ? '#f3f7f2' : '#faf6ef', borderRadius: 6, padding: '8px 12px', marginTop: i ? 6 : 0 }} open={!!r.unhandled}>
     <summary style={{ display: 'flex', gap: 10, alignItems: 'baseline', cursor: r.body ? 'pointer' : 'default', listStyle: 'none', padding: 0, color: 'inherit', fontStyle: 'normal' }}>
-      <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontWeight: 700, color: r.failed ? '#a64f3c' : r.incoming ? '#4f6b52' : '#886c44' }}>{r.what}{r.failed ? ' (not delivered)' : ''}</b>{r.who ? <span className="vc-muted"> · {r.who}</span> : null}{r.unhandled ? <span style={{ marginLeft: 8, background: '#c0392b', color: '#fff', borderRadius: 10, padding: '1px 8px', fontSize: 10.5, fontWeight: 700 }}>NEEDS REPLY</span> : r.incoming && r.handledBy ? <span className="vc-muted"> · handled by {r.handledBy}</span> : null}</span>
+      <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontWeight: 700, color: r.failed ? '#a64f3c' : r.incoming ? '#4f6b52' : '#886c44' }}>{r.what}{r.failed ? ' (not delivered)' : ''}</b>{r.who ? <span className="vc-muted"> · {r.who}</span> : null}{r.unhandled ? <span role="button" title="Click to reply" onClick={e => { if (!r.fromEmail) return; e.preventDefault(); e.stopPropagation(); startReply(r); }} style={{ marginLeft: 8, background: '#c0392b', color: '#fff', borderRadius: 10, padding: '1px 8px', fontSize: 10.5, fontWeight: 700, cursor: r.fromEmail ? 'pointer' : 'default' }}>NEEDS REPLY</span> : r.incoming && r.handledBy ? <span className="vc-muted"> · handled by {r.handledBy}</span> : null}</span>
       <span className="vc-muted" style={{ whiteSpace: 'nowrap', fontSize: 12 }}>{when(r.at)}</span>
     </summary>
-    {r.body && <div className="vc-note-box" style={{ background: '#fff' }}>{r.body}</div>}{r.note && <div className="vc-muted" style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}><strong>Notes:</strong> {r.note}</div>}{r.unhandled && onHandleMessage && <button type="button" onClick={() => { const who = window.prompt('Handled by (Jen, Derek or Haley)?'); if (who && /^(jen|derek|haley)$/i.test(who.trim())) onHandleMessage(r.id, who.trim().charAt(0).toUpperCase() + who.trim().slice(1).toLowerCase()); else if (who) alert('Please enter Jen, Derek or Haley.'); }} style={{ marginTop: 8, border: '1px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', background: '#fff', color: '#886c44', fontSize: 11, fontWeight: 600 }}>Mark handled</button>}
+    {r.body && <div className="vc-note-box" style={{ background: '#fff' }}>{r.body}</div>}{r.note && <div className="vc-muted" style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}><strong>Notes:</strong> {r.note}</div>}{r.incoming && <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>{r.fromEmail && <button type="button" onClick={() => startReply(r)} style={{ border: '1px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', background: '#fff', color: '#886c44', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Reply</button>}{r.unhandled && onHandleMessage && <button type="button" onClick={() => { const who = window.prompt('Handled by (Jen, Derek or Haley)?'); if (who && /^(jen|derek|haley)$/i.test(who.trim())) onHandleMessage(r.id, who.trim().charAt(0).toUpperCase() + who.trim().slice(1).toLowerCase()); else if (who) alert('Please enter Jen, Derek or Haley.'); }} style={{ border: '1px solid #e0d8cc', borderRadius: 6, padding: '5px 10px', background: '#fff', color: '#886c44', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Mark handled</button>}</div>}{replyFor === r.id && <div ref={el => { if (el) boxRefs.current[r.id] = el; }} style={{ marginTop: 10, background: '#fff', border: '1px solid #e0d8cc', borderRadius: 8, padding: 12 }}><div className="vc-muted" style={{ marginBottom: 6 }}>Reply to <b>{r.fromName || r.fromEmail}</b> ({r.fromEmail}). Sent from venue@northstarhouse.org; their answer comes back to the venue inbox. Write your own greeting, none is added.</div><textarea rows={5} value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Write your reply…" style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #e0d8cc', borderRadius: 6, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', marginBottom: 8, resize: 'vertical' }} /><button type="button" disabled={replySending} onClick={() => sendReply(r)} style={{ background: '#886c44', color: '#fff', border: 0, borderRadius: 7, padding: '7px 14px', fontWeight: 600, fontSize: 12, opacity: replySending ? .6 : 1, cursor: 'pointer' }}>{replySending ? 'Sending…' : 'Send reply'}</button><button type="button" disabled={replySending} onClick={() => { setReplyFor(null); setReplyText(''); }} style={{ marginLeft: 8, background: 'none', border: '1px solid #e0d8cc', borderRadius: 7, padding: '7px 14px', fontSize: 12, color: '#886c44', cursor: 'pointer' }}>Cancel</button></div>}
   </details>)}</div>;
 }
