@@ -10360,6 +10360,33 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
               <div style={{ fontSize: 24, fontWeight: 700, color: (earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0) - totalPurchases) >= 0 ? gold : '#b3402a', marginTop: 4 }}>{(function(n) { return (n < 0 ? '-' : '') + fmt(Math.abs(n)); })((earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0) - totalPurchases))}</div>
               <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>{fmt(earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0))} earned, less {fmt(totalPurchases)} spent on events</div>
             </div>
+            {(function() {
+              var by = {};
+              function slot(name) { var k = String(name || '').trim().toLowerCase() || '(none)'; if (!by[k]) by[k] = { name: String(name || '').trim() || 'Not tied to an event', earned: 0, spent: 0, date: '' }; return by[k]; }
+              earnings.forEach(function(e) { var b = slot(e.event); b.earned += parseFloat(e.amount) || 0; if (e.date && String(e.date) > b.date) b.date = String(e.date); });
+              budget.filter(function(b) { return b.type === 'Purchase'; }).forEach(function(p) { var b = slot(p.event_name); b.spent += parseFloat(p.amount) || 0; if (p.date && !b.date) b.date = String(p.date); });
+              var rows = Object.keys(by).map(function(k) { return by[k]; }).sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+              if (!rows.length) return null;
+              var netStr = function(n) { return (n < 0 ? '-' : '') + fmt(Math.abs(n)); };
+              return (
+                <div style={{ marginBottom: 22 }}>
+                  <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 6 }}>Net by event</div>
+                  {rows.map(function(r) {
+                    var net = r.earned - r.spent;
+                    return (
+                      <div key={r.name} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: '0.5px solid #f0ece6' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{r.name}</div>
+                          <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{fmt(r.earned)} earned, {fmt(r.spent)} spent</div>
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: net >= 0 ? '#2e7d32' : '#b3402a', whiteSpace: 'nowrap' }}>{netStr(net)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 6 }}>Earning entries</div>
             <div style={{ background: '#faf8f5', borderRadius: 10, padding: '14px 16px', marginBottom: 18 }}>
               <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 12 }}>Add Entry</div>
               <form onSubmit={addEarningItem}>
