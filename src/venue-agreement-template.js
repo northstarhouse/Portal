@@ -103,3 +103,8 @@ const WEDDING_COORDINATOR_CLAUSE = '11. Day-of-Event Coordinator. For weddings, 
 export const weddingAgreementTerms = agreementTerms
   .replace(NO_PETS_CLAUSE, WEDDING_PETS_CLAUSE)
   .replace(OLD_COORDINATOR_CLAUSE, WEDDING_COORDINATOR_CLAUSE);
+
+// A draft that was copied from an older version still carries the old pets and coordinator clauses. These bring a wedding
+// draft's text up to the current wording (exact clause match, so anything staff rewrote by hand is left alone).
+export const hasOldWeddingTerms = (body) => String(body || '').includes(NO_PETS_CLAUSE) || String(body || '').includes(OLD_COORDINATOR_CLAUSE);
+export const upgradeWeddingTerms = (body) => String(body || '').replace(NO_PETS_CLAUSE, WEDDING_PETS_CLAUSE).replace(OLD_COORDINATOR_CLAUSE, WEDDING_COORDINATOR_CLAUSE);
