@@ -87,6 +87,14 @@ async function sendSignedUpdate(versionId:string,auto:boolean):Promise<any>{
  try{await rest('activity_log',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({description:'Signed agreement update sent to '+joinNames(clients.map((x:any)=>x.name||x.email))+(auto?' (automatically)':''),action:'contract_signed_update_sent',tag:'Venue',detail:{version_id:rec.id,emails:clients.map((x:any)=>x.email),title:rec.title,auto}})});}catch(_e){/* the email already went out */}
  return {delivered:true,to:clients.map((x:any)=>x.email)};
 }
+// The "ready to sign" email the clients get (used by the real send and by the staff preview, so they never differ).
+function readyToSign(signerName:string,first:string,venueCode:string,url:string,expires:string,note:string){
+ let subject:string,text:string,html:string;
+  subject='Your North Star House rental agreement is ready to sign';
+  text='Hello '+signerName+',\n\n'+(note?note+'\n\n':'')+'We are so happy you have chosen to book with us, and we feel honored to be part of your day. Thank you for sending in your pre-booking form.\n\nThe next step is your rental agreement, and it is ready. Open your event page and enter your venue code'+(venueCode?': '+venueCode:' (your wedding date, like DEC-28-2026)')+'. Your agreement will open for you to review, initial and sign:\n'+url+'\n\nYou will receive a verification code at this email address when you are ready to sign.'+(expires?' Please sign by '+expires+'. Your date is on a soft hold until then. If the agreement is not signed by that date, the hold is released and the date becomes available to others.':'')+'\n\nNorth Star House';
+  html=brandedHtml('Your Rental Agreement Is Ready',['Hello '+esc(first)+',',...(note?[esc(note).replace(/\n/g,'<br>')]:[]),'We are so happy you have chosen to book with us, and we feel honored to be part of your day. Thank you for sending in your pre-booking form.','The next step is your rental agreement, and it is ready for you to review and sign.',(venueCode?'Your venue code is <strong style="font-size:20px;letter-spacing:2px;">'+venueCode+'</strong>':'Your venue code is your wedding date, written like <strong>DEC-28-2026</strong>')+'. Open your event page and enter it. Your agreement opens first: you will read and initial each numbered term, confirm with a code we email you, and sign.'+(expires?' Please sign by '+esc(expires)+'. Your date is on a soft hold until then. If the agreement is not signed by that date, the hold is released and the date becomes available to others.':'')],'Open My Event Page',url);
+ return {subject,text,html};
+}
 async function mailLink(version:any,signer:any,value:string,copyTo='',note=''){try{
  note=String(note||'').trim().slice(0,1500);
  let venueCode='';try{const d=await eventDateFor(version.response_id);if(d){const [y,m,dd]=d.split('-');venueCode=MONTHS[+m-1]+'-'+dd+'-'+y;}}catch(_e){/* the email still goes out without the code */}
@@ -104,9 +112,7 @@ async function mailLink(version:any,signer:any,value:string,copyTo='',note=''){t
   text='Hello '+signer.name+',\n\nThe clients have signed. Please countersign version '+version.version+' here:\n'+url+'\n\nYou will receive a verification code at this email address when you are ready to sign.\n\nNorth Star House';
   html=brandedHtml('Countersignature Requested',['Hello '+esc(first)+', the clients have signed version '+version.version+' of the rental agreement. Please countersign. You will receive a verification code at this email address when you are ready.'],'Countersign Agreement',url);
  }else{
-  subject='Your North Star House rental agreement is ready to sign';
-  text='Hello '+signer.name+',\n\n'+(note?note+'\n\n':'')+'We are so happy you have chosen to book with us, and we feel honored to be part of your day. Thank you for sending in your pre-booking form.\n\nThe next step is your rental agreement, and it is ready. Open your event page and enter your venue code'+(venueCode?': '+venueCode:' (your wedding date, like DEC-28-2026)')+'. Your agreement will open for you to review, initial and sign:\n'+url+'\n\nYou will receive a verification code at this email address when you are ready to sign.'+(expires?' Please sign by '+expires+'. Your date is on a soft hold until then. If the agreement is not signed by that date, the hold is released and the date becomes available to others.':'')+'\n\nNorth Star House';
-  html=brandedHtml('Your Rental Agreement Is Ready',['Hello '+esc(first)+',',...(note?[esc(note).replace(/\n/g,'<br>')]:[]),'We are so happy you have chosen to book with us, and we feel honored to be part of your day. Thank you for sending in your pre-booking form.','The next step is your rental agreement, and it is ready for you to review and sign.',(venueCode?'Your venue code is <strong style="font-size:20px;letter-spacing:2px;">'+venueCode+'</strong>':'Your venue code is your wedding date, written like <strong>DEC-28-2026</strong>')+'. Open your event page and enter it. Your agreement opens first: you will read and initial each numbered term, confirm with a code we email you, and sign.'+(expires?' Please sign by '+esc(expires)+'. Your date is on a soft hold until then. If the agreement is not signed by that date, the hold is released and the date becomes available to others.':'')],'Open My Event Page',url);
+  {const u=readyToSign(signer.name,first,venueCode,url,expires,note);subject=u.subject;text=u.text;html=u.html;}
  }
  if(copyTo){await email(copyTo,'[Copy of what '+signer.name+' receives] '+subject,'(This is a copy for the venue. It was NOT sent to '+signer.email+'.)\n\n'+text,false,html);return {delivered:true,copy:true};}
  await email(signer.email,subject,text,true,html);
@@ -154,6 +160,16 @@ Deno.serve(async req=>{
   if(action==='staff_pdf'){
    const version=await rest('rpc/venue_agreement_record',{method:'POST',body:JSON.stringify({p_id:body.version_id})});if(!version)return json({error:'Agreement not found.'},404);
    return new Response(await agreementPdf({...version,body:tidyBody(version.body)}),{headers:{...CORS,'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="North-Star-House-agreement-v'+version.version+'.pdf"'}});
+  }
+  if(action==='preview_email'){
+   const rec=await rest('rpc/venue_agreement_record',{method:'POST',body:JSON.stringify({p_id:body.version_id})});if(!rec)return json({error:'Agreement not found.'},404);
+   const clients=(rec.signers||[]).filter((x:any)=>x.role!=='venue');if(!clients.length)return json({error:'There are no client signers on this agreement.'},400);
+   let venueCode='';try{const d=await eventDateFor(rec.response_id);if(d){const [y,m,dd]=d.split('-');venueCode=MONTHS[+m-1]+'-'+dd+'-'+y;}}catch(_e){/* previewed without the code */}
+   const exp=rec.expires_at?new Date(rec.expires_at):new Date(Date.now()+7*24*3600*1000);
+   const expires=exp.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+   const first=String(clients[0].name||'').split(' ')[0]||'there';
+   const u=readyToSign(clients[0].name||'there',first,venueCode,link('preview','client',venueCode),expires,String(body.note||'').trim().slice(0,1500));
+   return json({subject:u.subject,html:u.html,to:clients.map((x:any)=>x.email)});
   }
   if(action==='issue'){
    const draft=await rest('rpc/venue_agreement_record',{method:'POST',body:JSON.stringify({p_id:body.version_id})});if(!draft)return json({error:'Draft not found.'},404);
