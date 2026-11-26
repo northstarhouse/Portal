@@ -130,6 +130,12 @@ function tiers(list: any[]) {
   })
 }
 
+// A save rewrites the ticket types, so re-apply the ticket cap (sold out / most per order) right after it.
+async function applyCapacity(slug: string | null | undefined) {
+  if (!slug) return
+  try { await rest('rpc/sync_ticket_capacity', { method: 'POST', body: JSON.stringify({ p_slug: slug }) }) } catch (_e) { /* the next order re-applies it */ }
+}
+
 // The live site keeps copies of its content; ask it to re-read events. Best effort: without the secret it picks changes up on its own.
 async function refreshSite() {
   const secret = Deno.env.get('CONTENT_REFRESH_SECRET')
@@ -213,6 +219,7 @@ Deno.serve(async (req) => {
         // deno-lint-ignore no-explicit-any
         ticket_tiers: (Array.isArray(r.ticket_tiers) && r.ticket_tiers.length ? r.ticket_tiers : [{ name: 'General Admission', price: '', limit: '' }]).map((t: any) => ({ name: t.name || '', price: t.price != null ? String(t.price) : '', limit: t.limitPerCheckout != null ? String(t.limitPerCheckout) : '' })),
         ticket_limit_per_order: String(r.ticket_limit_per_order || 20),
+        ticket_capacity: r.ticket_capacity != null ? String(r.ticket_capacity) : '',
         featured_frame: r.featured_frame || null,
       } })
     }
@@ -260,6 +267,12 @@ Deno.serve(async (req) => {
         seo_description: String(e.short_description || '').trim().slice(0, 300),
         updated_at: new Date().toISOString(),
       }
+      // Total tickets available. Only touched when the form sends it (the Events Committee push leaves the cap alone).
+      if ('ticket_capacity' in e) {
+        const cap = Math.round(Number(e.ticket_capacity))
+        row.ticket_capacity = cap > 0 ? Math.min(cap, 100000) : null
+        if (row.ticket_capacity === null) row.sold_out = false
+      }
       // Homepage "Featured event" box: how much of a too-long flyer shows ({keep, focusY, ratio}; null = whole flyer).
       // Only touched when the form sends it, so other callers (Events Committee push) leave it alone.
       if ('featured_frame' in e) {
@@ -286,6 +299,7 @@ Deno.serve(async (req) => {
         }
         const saved = await rest(`site_events?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(row) })
         if (!saved?.[0]) return json({ error: 'Event not found.' }, 404)
+        await applyCapacity(saved[0].slug)
         return json({ event: saved[0], refreshed: await refreshSite() })
       }
 
@@ -304,6 +318,7 @@ Deno.serve(async (req) => {
       }
       const top = await rest('site_events?select=sort_index&order=sort_index.desc&limit=1')
       const saved = await rest('site_events', { method: 'POST', body: JSON.stringify({ ...row, slug, sort_index: (top?.[0]?.sort_index ?? 0) + 1 }) })
+      await applyCapacity(saved[0]?.slug)
       return json({ event: saved[0], refreshed: await refreshSite() })
     }
 

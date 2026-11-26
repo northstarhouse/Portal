@@ -12,7 +12,7 @@ const blank = () => ({
   id: '', slug: '', title: '', short_description: '', description: '', image_url: '', image_alt: '',
   date: '', start_time: '18:00', end_time: '', date_tbd: false,
   location_name: 'North Star House', location_address: '12075 Auburn Rd, Grass Valley, CA 95949, USA',
-  registration_type: 'NONE', ticket_tiers: [{ name: 'General Admission', price: '', limit: '' }], ticket_limit_per_order: '20',
+  registration_type: 'NONE', ticket_tiers: [{ name: 'General Admission', price: '', limit: '' }], ticket_limit_per_order: '20', ticket_capacity: '',
   featured_frame: null,
 });
 
@@ -254,6 +254,8 @@ export function NewSiteEventPage({ navigate, supabaseUrl, supabaseKey }) {
               </div>
             ))}
             <button type="button" onClick={() => set('ticket_tiers', [...f.ticket_tiers, { name: '', price: '', limit: '' }])} style={{ background: 'none', border: 'none', color: GOLD, fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, marginTop: 4 }}>+ Add another ticket type</button>
+            <label style={{ ...label, marginTop: 14, maxWidth: 260 }}>Tickets available (total)<input style={input} inputMode="numeric" value={f.ticket_capacity || ''} onChange={(e) => set('ticket_capacity', e.target.value.replace(/[^0-9]/g, ''))} placeholder="No limit" /></label>
+            <div style={{ fontSize: 12, color: '#8a8478', marginTop: 4 }}>The most tickets sold for this event, across every ticket type. When they are gone the event shows sold out, and nobody can buy more than what is left in one order. Leave empty for no limit.</div>
           </div>
         )}
       </div>
