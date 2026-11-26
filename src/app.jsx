@@ -9311,6 +9311,15 @@ function AllReimbursementsModal({ onClose }) {
   );
 }
 
+// Events area earnings: for each event, what it earned minus what was spent on it, never below zero. A loss is not negative earnings;
+// it is already visible under expenses. Spending not tied to an event is also expenses, so it is not netted against any event here.
+function eventNetRows(earnings, budget) {
+  var by = {};
+  function slot(name) { var k = String(name || '').trim().toLowerCase(); if (!k) return null; if (!by[k]) by[k] = { name: String(name).trim(), earned: 0, spent: 0, date: '' }; return by[k]; }
+  (earnings || []).forEach(function(e) { var b = slot(e.event); if (!b) return; b.earned += parseFloat(e.amount) || 0; if (e.date && String(e.date) > b.date) b.date = String(e.date); });
+  (budget || []).filter(function(b) { return b.type === 'Purchase'; }).forEach(function(p) { var b = slot(p.event_name); if (!b) return; b.spent += parseFloat(p.amount) || 0; if (p.date && !b.date) b.date = String(p.date); });
+  return Object.keys(by).map(function(k) { var r = by[k]; r.net = Math.max(0, r.earned - r.spent); return r; }).sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+}
 function OperationalView({ opArea, navigateToQuarterly, navigate }) {
   var { useState, useEffect } = React;
   var isMobile = React.useContext(MobileCtx);
@@ -9853,7 +9862,7 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
               onMouseEnter={function(e) { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.08)'; }}
               onMouseLeave={function(e) { e.currentTarget.style.boxShadow = 'none'; }}>
               <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 8 }}>Net Earnings</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: (earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0) - totalPurchases) >= 0 ? gold : '#b3402a' }}>{(function(n) { return (n < 0 ? '-' : '') + fmt(Math.abs(n)); })((earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0) - totalPurchases))}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: gold }}>{fmt(eventNetRows(earnings, budget).reduce(function(s, r) { return s + r.net; }, 0))}</div>
               <div style={{ fontSize: 12, color: '#aaa', marginTop: 3 }}>{fmt(earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0))} earned, {fmt(totalPurchases)} spent</div>
               <div style={{ fontSize: 11, color: gold, marginTop: 10, fontWeight: 500 }}>View / Add entries →</div>
             </div>
@@ -10357,29 +10366,23 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
             </div>
             <div style={{ background: '#faf8f5', borderRadius: 8, padding: '12px 14px', textAlign: 'center', marginBottom: 22 }}>
               <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Net Earnings</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: (earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0) - totalPurchases) >= 0 ? gold : '#b3402a', marginTop: 4 }}>{(function(n) { return (n < 0 ? '-' : '') + fmt(Math.abs(n)); })((earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0) - totalPurchases))}</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: gold, marginTop: 4 }}>{fmt(eventNetRows(earnings, budget).reduce(function(s, r) { return s + r.net; }, 0))}</div>
               <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>{fmt(earnings.reduce(function(s, e) { return s + (parseFloat(e.amount) || 0); }, 0))} earned, less {fmt(totalPurchases)} spent on events</div>
             </div>
             {(function() {
-              var by = {};
-              function slot(name) { var k = String(name || '').trim().toLowerCase() || '(none)'; if (!by[k]) by[k] = { name: String(name || '').trim() || 'Not tied to an event', earned: 0, spent: 0, date: '' }; return by[k]; }
-              earnings.forEach(function(e) { var b = slot(e.event); b.earned += parseFloat(e.amount) || 0; if (e.date && String(e.date) > b.date) b.date = String(e.date); });
-              budget.filter(function(b) { return b.type === 'Purchase'; }).forEach(function(p) { var b = slot(p.event_name); b.spent += parseFloat(p.amount) || 0; if (p.date && !b.date) b.date = String(p.date); });
-              var rows = Object.keys(by).map(function(k) { return by[k]; }).sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+              var rows = eventNetRows(earnings, budget);
               if (!rows.length) return null;
-              var netStr = function(n) { return (n < 0 ? '-' : '') + fmt(Math.abs(n)); };
               return (
                 <div style={{ marginBottom: 22 }}>
-                  <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 6 }}>Net by event</div>
+                  <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600, marginBottom: 6 }}>Earnings by event</div>
                   {rows.map(function(r) {
-                    var net = r.earned - r.spent;
                     return (
                       <div key={r.name} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: '0.5px solid #f0ece6' }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: '#2a2a2a' }}>{r.name}</div>
                           <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{fmt(r.earned)} earned, {fmt(r.spent)} spent</div>
                         </div>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: net >= 0 ? '#2e7d32' : '#b3402a', whiteSpace: 'nowrap' }}>{netStr(net)}</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: r.net > 0 ? '#2e7d32' : '#999', whiteSpace: 'nowrap' }}>{fmt(r.net)}</div>
                       </div>
                     );
                   })}
