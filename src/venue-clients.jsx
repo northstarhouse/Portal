@@ -86,7 +86,7 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
     total: { amount: nativeScheduleRows.reduce((s, r) => s + (r.amount_cents || 0), 0), currency: 'USD' },
     amount_paid: { amount: nativeScheduleRows.reduce((s, r) => s + (r.amount_paid_cents || 0), 0) },
     balance_due: { amount: nativeScheduleRows.reduce((s, r) => s + ((r.amount_cents || 0) - (r.amount_paid_cents || 0)), 0) },
-    schedule: nativeScheduleRows.map(r => ({ amount: { amount: r.amount_cents, currency: 'USD' }, due_date: r.due_date, paid: r.status === 'paid', paid_at: r.paid_at || null, __nativeLabel: r.label })),
+    schedule: nativeScheduleRows.map(r => ({ amount: { amount: r.amount_cents, currency: 'USD' }, due_date: r.due_date, paid: r.status === 'paid', paid_at: r.paid_at || null, seq: r.sequence, __nativeLabel: r.label })),
   } : null);
   const nativeAgreement = nativeVersions.filter(v=>v.response_id===sub.id&&!['draft','void'].includes(v.status)).sort((a,b)=>b.version-a.version)[0] || null;
   const signatures = nativeAgreement ? {all_required_signed:nativeAgreement.status==='completed',signatures:(nativeAgreement.recipients||[]).map(s=>({signee_name:s.name,signee_type:s.role==='venue'?'vendor':'client',required:true,signed:s.status==='signed',signed_at:s.signed_at}))} : contract?.responses?.signatures || null;
@@ -98,7 +98,7 @@ export function buildVenueClient(sub, live = null, today = venueDateKey(), nativ
     const cents = payment.amount?.amount || 0;
     const deposit = /security deposit/i.test(payment.__nativeLabel || '') || (!payment.__nativeLabel && rawSchedule.length > 1 && index === rawSchedule.length - 1 && cents === 80000);
     return { ...payment, cents, currency: payment.amount?.currency || currency, deposit, label: payment.__nativeLabel || (deposit ? 'Refundable Security Deposit' : ''), due: payment.due_date?.slice(0, 10) || null };
-  }).sort((x, y) => (x.deposit ? 1 : 0) - (y.deposit ? 1 : 0) || (x.due || '9999').localeCompare(y.due || '9999'));
+  }).sort((x, y) => (x.deposit ? 1 : 0) - (y.deposit ? 1 : 0) || (typeof x.seq === 'number' && typeof y.seq === 'number' ? x.seq - y.seq : 0) || (x.due || '9999').localeCompare(y.due || '9999'));
   baseSchedule.filter(p => !p.label).forEach((p, i) => { p.label = i === 0 ? 'Booking payment' : 'Scheduled payment ' + (i + 1); });
   // Charges added after a HoneyBook invoice (e.g. a wedding rehearsal added from the client page) are extra payments.
   // (Clients on the Portal's own schedule get these as schedule rows instead.)
