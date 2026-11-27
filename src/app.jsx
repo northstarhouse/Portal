@@ -4764,12 +4764,16 @@ function nshGetStatus(lastGiftDate) {
 }
 var NSH_STATUS_PILLS={current:{background:'#d1fae5',color:'#065f46'},recently_lapsed:{background:'#fef9c3',color:'#713f12'},long_lapsed:{background:'#ffedd5',color:'#7c2d12'},non_donor:{background:'#f3f4f6',color:'#6b7280'}};
 var NSH_STATUS_LABELS={current:'Current',recently_lapsed:'Lapsed',long_lapsed:'Long Lapsed',non_donor:'Non-donor'};
-var NSH_TYPE_COLORS={'Donation':{bg:'#dbeafe',color:'#1d4ed8'},'Membership':{bg:'#d1fae5',color:'#065f46'},'Restricted':{bg:'#fce7f3',color:'#831843'},'Membership, Donation':{bg:'#ede9fe',color:'#5b21b6'},'Brick Purchase':{bg:'#fee2e2',color:'#7f1d1d'},'Tribute':{bg:'#fef9c3',color:'#713f12'},'In-Kind Gift':{bg:'#e0f2e9',color:'#166534'}};
+var NSH_TYPE_COLORS={'Donation':{bg:'#dbeafe',color:'#1d4ed8'},'Membership':{bg:'#d1fae5',color:'#065f46'},'Restricted':{bg:'#fce7f3',color:'#831843'},'Membership, Donation':{bg:'#ede9fe',color:'#5b21b6'},'Brick Purchase':{bg:'#fee2e2',color:'#7f1d1d'},'Tribute':{bg:'#fef9c3',color:'#713f12'},'In-Kind Gift':{bg:'#e0f2e9',color:'#166534'},'Sponsorship':{bg:'#f6ecd4',color:'#7a5a1e'}};
+// What people see for each donation type. Stored values do not change, so every existing donation keeps working.
+var DONATION_TYPE_LABELS={'Donation':'General Donation','Sponsorship':'Business Sponsorship','Tribute':'In Memory / Tribute'};
+var donTypeLabel=function(t){return DONATION_TYPE_LABELS[t]||t;};
 
 var ACK_TYPES=['Membership','General Donation','Event Donation','Sponsorship','Brick Purchase','In-Kind Donation','Memorial Donation','Honorary Donation','Other'];
 var DONATION_TYPE_TO_ACK_TYPES={
   'Donation':['General Donation','Event Donation','Sponsorship','In-Kind Donation','Other'],
   'Membership':['Membership'],
+  'Sponsorship':['Sponsorship'],
   'Restricted':['General Donation','Event Donation','Other'],
   'Membership, Donation':['Membership','General Donation'],
   'Brick Purchase':['Brick Purchase'],
@@ -4805,7 +4809,7 @@ function ackRequiredFields(type){
 
 function DonorsView({ navigate }) {
   var THIS_YEAR = new Date().getFullYear();
-  var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute','In-Kind Gift'];
+  var DONATION_TYPES = ['Donation','Membership','Sponsorship','Tribute','Restricted','Membership, Donation','Brick Purchase','In-Kind Gift'];
   var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
   var ACCOUNT_TYPES = ['Individual','Family','Household','Foundation','Corporate','Organization'];
   var emptyAddForm = {formal_name:'',informal_first_name:'',account_type:'Individual',email:'',phone:'',address:'',amount:'',date:'',type:'Donation',payment_type:'Website',acknowledged:false,donation_notes:''};
@@ -4901,7 +4905,7 @@ function DonorsView({ navigate }) {
     }).catch(function(){setLinkingVol(false);});
   }
 
-  var DONATION_TYPES = ['Donation','Membership','Restricted','Membership, Donation','Brick Purchase','Tribute','In-Kind Gift'];
+  var DONATION_TYPES = ['Donation','Membership','Sponsorship','Tribute','Restricted','Membership, Donation','Brick Purchase','In-Kind Gift'];
   var PAYMENT_TYPES = ['Website','Check','Cash','Credit Card','ACH','Other'];
   var ACCOUNT_TYPES = ['Individual','Family','Household','Foundation','Corporate','Organization'];
 
@@ -6191,7 +6195,7 @@ function DonorsView({ navigate }) {
                               </div>
                               <div style={{marginBottom:8}}><label style={lStyle}>Type</label>
                                 <select value={editForm.type||''} onChange={function(e){var newType=e.target.value;setEditForm(function(f){var mapped=DONATION_TYPE_TO_ACK_TYPES[newType];var nextAck=(!f.acknowledgment_type&&mapped&&newType!=='Restricted')?mapped[0]:f.acknowledgment_type;return Object.assign({},f,{type:newType,acknowledgment_type:nextAck});});}} style={iStyle}>
-                                  {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                                  {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{donTypeLabel(t)}</option>;})}
                                 </select>
                               </div>
                               <div style={{marginBottom:8}}><label style={lStyle}>Payment Type</label>
@@ -6257,7 +6261,7 @@ function DonorsView({ navigate }) {
                             <div style={{padding:'9px 12px'}}>
                               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                                 <div style={{display:'flex',gap:6,alignItems:'center',flex:1,flexWrap:'wrap'}}>
-                                  <span style={{background:tc.bg,color:tc.color,fontSize:11,fontWeight:500,padding:'2px 7px',borderRadius:20,whiteSpace:'nowrap'}}>{don.type}</span>
+                                  <span style={{background:tc.bg,color:tc.color,fontSize:11,fontWeight:500,padding:'2px 7px',borderRadius:20,whiteSpace:'nowrap'}}>{donTypeLabel(don.type)}</span>
                                   <span style={{fontSize:12,color:'#888'}}>{fmtDate(don.date)}</span>
                                   <span style={{fontSize:12,fontWeight:600,color:'#2a2a2a'}}>{fmtAmtFull(don.amount)}</span>
                                   <span style={{fontSize:11,padding:'2px 7px',borderRadius:20,background:acked?'#e8f5e9':'#fff8e1',color:acked?'#2e7d32':'#8a6200',fontWeight:500}}>{acked?'Thanked':'Pending'}</span>
@@ -6398,7 +6402,7 @@ function DonorsView({ navigate }) {
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
                   <div><label style={lStyle}>Donation Type</label>
                     <select value={addGiftForm.type} onChange={function(e){setAddGiftForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
-                      {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                      {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{donTypeLabel(t)}</option>;})}
                     </select>
                   </div>
                   <div><label style={lStyle}>Payment Type</label>
@@ -6437,7 +6441,7 @@ function DonorsView({ navigate }) {
                 </div>
                 <div style={{marginBottom:14}}><label style={lStyle}>Donation Type</label>
                   <select value={addForm.type} onChange={function(e){setAddForm(function(f){return Object.assign({},f,{type:e.target.value});});}} style={iStyle}>
-                    {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                    {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{donTypeLabel(t)}</option>;})}
                   </select>
                 </div>
                 <div style={{marginBottom:14}}><label style={lStyle}>Payment Type</label>
@@ -6506,7 +6510,7 @@ function DonorsView({ navigate }) {
                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:8}}>
                           <div><label style={lStyle}>Type</label>
                             <select value={row.type} onChange={function(e){updateImportRow(row.key,{type:e.target.value});}} style={iStyle}>
-                              {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{t}</option>;})}
+                              {DONATION_TYPES.map(function(t){return <option key={t} value={t}>{donTypeLabel(t)}</option>;})}
                             </select>
                           </div>
                           <div><label style={lStyle}>Payment Type</label>
@@ -12706,6 +12710,7 @@ function FinancialOverviewView({ navigate }) {
   var [donations, setDonations] = useState([]);
   var [donorsList, setDonorsList] = useState([]);
   var [expandedDonationType, setExpandedDonationType] = useState(null);
+  var [donTypeFilter, setDonTypeFilter] = useState('all');
   var [sponsors, setSponsors] = useState([]);
   var [budget, setBudget] = useState([]);
   var [earnings, setEarnings] = useState([]);
@@ -13046,9 +13051,17 @@ function FinancialOverviewView({ navigate }) {
           <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '16px 18px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#2a2a2a', marginBottom: 12 }}>Donations — {year}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#2e7d32', marginBottom: 12 }}>{money(stats.donationTotal)}</div>
+            {Object.keys(stats.donationsByType).length > 1 && (
+              <div style={{ marginBottom: 10 }}>
+                <select value={donTypeFilter} onChange={function(e) { setDonTypeFilter(e.target.value); setExpandedDonationType(e.target.value === 'all' ? null : e.target.value); }} aria-label="Filter by type of donation" style={{ border: '0.5px solid #d8cfbf', borderRadius: 8, padding: '6px 10px', fontSize: 12, color: '#4a3b24', background: '#fff' }}>
+                  <option value="all">All types</option>
+                  {Object.keys(stats.donationsByType).sort().map(function(t) { return <option key={t} value={t}>{donTypeLabel(t)}</option>; })}
+                </select>
+              </div>
+            )}
             {Object.keys(stats.donationsByType).length === 0 ? (
               <div style={{ fontSize: 12, color: '#bbb' }}>No donations recorded for {year}.</div>
-            ) : Object.keys(stats.donationsByType).sort(function(a, b) { return stats.donationsByType[b] - stats.donationsByType[a]; }).map(function(t) {
+            ) : Object.keys(stats.donationsByType).filter(function(t) { return donTypeFilter === 'all' || donTypeFilter === t; }).sort(function(a, b) { return stats.donationsByType[b] - stats.donationsByType[a]; }).map(function(t) {
               var isOpen = expandedDonationType === t;
               var typeDonations = donations.filter(function(d) { return inYear(d.date) && (d.type || 'Other') === t; })
                 .sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
@@ -13057,9 +13070,9 @@ function FinancialOverviewView({ navigate }) {
                   <div onClick={function() { setExpandedDonationType(isOpen ? null : t); }} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '0.5px solid #f0ece6', fontSize: 12, cursor: 'pointer', background: isOpen ? '#faf8f4' : 'transparent' }}>
                     <span style={{ color: '#555', display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 10, color: '#bbb', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s', display: 'inline-block' }}>▶</span>
-                      {t}
+                      <span style={t === 'Sponsorship' ? { color: '#7a5a1e', fontWeight: 600 } : undefined}>{donTypeLabel(t)}</span>
                     </span>
-                    <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(stats.donationsByType[t])}</span>
+                    <span style={{ fontWeight: 600, color: t === 'Sponsorship' ? '#7a5a1e' : '#2a2a2a' }}>{money(stats.donationsByType[t])}</span>
                   </div>
                   {isOpen && (
                     <div style={{ background: '#faf8f4', padding: '4px 0 8px 20px' }}>
@@ -13068,6 +13081,7 @@ function FinancialOverviewView({ navigate }) {
                           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: i < typeDonations.length - 1 ? '0.5px solid #f0ece6' : 'none', fontSize: 12 }}>
                             <span style={{ width: 90, color: '#aaa', fontSize: 11 }}>{d.date || '—'}</span>
                             <span style={{ width: 150, color: '#2a2a2a' }}>{donorNameById[d.donor_id] || 'Unknown donor'}</span>
+                            {t === 'Sponsorship' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#f6ecd4', color: '#7a5a1e', flexShrink: 0 }}>Sponsor</span>}
                             {d.payment_type && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: '#eef2f7', color: '#3a5068', flexShrink: 0 }}>{d.payment_type}</span>}
                             <span style={{ flex: 1, color: '#888', fontSize: 11 }}>{d.donation_notes || ''}</span>
                             <span style={{ fontWeight: 600, color: '#2a2a2a' }}>{money(d.amount)}</span>
