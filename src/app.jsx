@@ -12737,7 +12737,7 @@ function FinancialOverviewView({ navigate }) {
     var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
     setLoading(true);
     Promise.all([
-      fetchAllPages(SUPABASE_URL + '/rest/v1/donations?select=amount,date,type,donor_id,payment_type,acknowledged,donation_notes', hdrs),
+      fetchAllPages(SUPABASE_URL + '/rest/v1/donations?select=amount,date,type,donor_id,payment_type,acknowledged,donation_notes,sponsor_inkind_id', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/donors?select=id,formal_name', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsors') + '?select=*', hdrs),
       fetchAllPages(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Op Budget') + '?select=area,type,amount,date,needs_reimbursement,description,purchased_by,volunteer_name,event_name', hdrs),
@@ -12793,6 +12793,10 @@ function FinancialOverviewView({ navigate }) {
     var currentSponsorIds = new Set(currentSponsors.map(function(s) { return s.id; }));
     var currentEntries = sponsorInKindEntries.filter(function(e) { return currentSponsorIds.has(e.sponsor_id) && inYear(e.date); });
     var sponsorCash = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'Monetary Value' ? (parseFloat(e.value) || 0) : 0); }, 0);
+    // A sponsor's cash contribution that already has a donation (Business Sponsorship) is counted once, as that donation.
+    var donationLinkedLines = {};
+    donations.forEach(function(d) { if (d.sponsor_inkind_id != null) donationLinkedLines[d.sponsor_inkind_id] = true; });
+    var sponsorCashNotInDonations = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'Monetary Value' && !donationLinkedLines[e.id] ? (parseFloat(e.value) || 0) : 0); }, 0);
     var sponsorInKind = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'In-Kind (Work)' ? (parseFloat(e.value) || 0) : 0); }, 0);
     var sponsorDiscount = currentEntries.reduce(function(s, e) { return s + (e.contribution_type === 'Discount' ? (parseFloat(e.value) || 0) : 0); }, 0);
     var sponsorUntagged = currentEntries.reduce(function(s, e) { return s + (e.contribution_type ? 0 : (parseFloat(e.value) || 0)); }, 0);
@@ -12842,7 +12846,7 @@ function FinancialOverviewView({ navigate }) {
     // "Office Cash Flow" = Creative Rentals (earnings) + Cash Log, matching the Financials page's own grouping.
     var cashIn = cashLogIn + rentalTotal;
 
-    var totalIncome = donationTotal + totalEarnings + cashIn + sponsorCash;
+    var totalIncome = donationTotal + totalEarnings + cashIn + sponsorCashNotInDonations;
     var totalOutflow = totalPurchases + cashOut;
 
     return {
