@@ -5052,16 +5052,16 @@ function DonorsView({ navigate }) {
     var hdrs = { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } };
     Promise.all([
       fetch(SUPABASE_URL + '/rest/v1/Sponsors?select=*', hdrs).then(function(r) { return r.json(); }),
-      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?select=sponsor_id,value,date', hdrs).then(function(r) { return r.json(); }).catch(function() { return []; })
+      fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind') + '?select=sponsor_id,value,date,sponsor_year', hdrs).then(function(r) { return r.json(); }).catch(function() { return []; })
     ])
       .then(function(res) {
         var rows = res[0], inkindRows = Array.isArray(res[1]) ? res[1] : [];
         // same levels the Sponsors page uses, from each sponsor's contributions this year
         var TIER_MINS = [['Presenting Sponsor', 10000], ['Keystone Sponsor', 5000], ['Preservation Leader', 2500], ['Heritage Partner', 1000], ['Friend of the North Star House', 300], ['Community Supporter', 0]];
         var tierOf = function(total) { var t = TIER_MINS.find(function(x) { return total >= x[1]; }); return t ? t[0] : ''; };
-        var totalFor = function(id) { return inkindRows.filter(function(e) { return e.sponsor_id === id && e.date && String(e.date).slice(0, 4) === YEAR; }).reduce(function(t, e) { return t + (parseFloat(e.value) || 0); }, 0); };
+        var totalFor = function(id) { return inkindRows.filter(function(e) { return e.sponsor_id === id && sponsorYearOf(e) === YEAR; }).reduce(function(t, e) { return t + (parseFloat(e.value) || 0); }, 0); };
         // same rule as the Sponsors page: no status set counts as current
-        var gaveThisYear = function(id) { return inkindRows.some(function(e) { return e.sponsor_id === id && e.date && String(e.date).slice(0, 4) === YEAR; }); };
+        var gaveThisYear = function(id) { return inkindRows.some(function(e) { return e.sponsor_id === id && sponsorYearOf(e) >= YEAR; }); };
         var sponsors = (Array.isArray(rows) ? rows : []).filter(function(r) { return gaveThisYear(r.id) || (r['sponsor_status'] || 'current') === 'current'; }).map(function(r) {
           var p = splitAddr(r['Mailing Address']);
           var first = String(r['Main Contact'] || '').trim().split(/\s+/)[0];
@@ -10695,8 +10695,27 @@ function OperationalView({ opArea, navigateToQuarterly, navigate }) {
   );
 }
 
+// Sponsor year: the recognition cycle a contribution counts toward (set by the database from the
+// sponsorship party date, or typed by hand). Falls back to the calendar year of the date received.
+function sponsorYearOf(e) {
+  if (!e) return '';
+  if (e.sponsor_year) return String(e.sponsor_year);
+  return e.date ? String(e.date).slice(0, 4) : '';
+}
+// The same rule the database uses, for showing what "Automatic" will pick before saving.
+function autoSponsorYear(dateStr, partyDates) {
+  if (!dateStr) return '';
+  var y = parseInt(String(dateStr).slice(0, 4), 10);
+  var p = (partyDates || []).find(function(r) { return r.year === y; });
+  return String(p && dateStr >= p.party_date ? y + 1 : y);
+}
+
 function SponsorsView() {
   var { useState, useEffect, useRef } = React;
+  var [partyDates, setPartyDates] = useState([]);
+  var [partyEditing, setPartyEditing] = useState(false);
+  var [partyInput, setPartyInput] = useState('');
+  var [partySaving, setPartySaving] = useState(false);
   var isMobile = React.useContext(MobileCtx);
   var [sponsors, setSponsors] = useState(null);
   var [selected, setSelected] = useState(null);
@@ -10733,6 +10752,7 @@ function SponsorsView() {
     cachedFetchAll('Sponsor In-Kind').then(function(rows) {
       if (Array.isArray(rows)) setAllInKind(rows);
     });
+    loadPartyDates();
     // Reuses the same return-address settings the donation acknowledgment
     // letters/envelopes are built from, so sponsor envelopes match.
     fetch(SUPABASE_URL + '/rest/v1/acknowledgment_settings?select=*&limit=1', {
@@ -10741,6 +10761,33 @@ function SponsorsView() {
       setOrgSettings((Array.isArray(rows) && rows[0]) || {});
     }).catch(function() { setOrgSettings({}); });
   }, []);
+
+  function loadPartyDates() {
+    fetch(SUPABASE_URL + '/rest/v1/sponsor_party_dates?select=year,party_date&order=year.desc', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    }).then(function(r) { return r.json(); }).then(function(rows) {
+      if (Array.isArray(rows)) setPartyDates(rows);
+    }).catch(function() {});
+  }
+
+  // Saving a party date re-sorts every automatic contribution in the database, so reload them after.
+  function savePartyDate() {
+    if (!partyInput) return;
+    var yr = parseInt(partyInput.slice(0, 4), 10);
+    setPartySaving(true);
+    fetch(SUPABASE_URL + '/rest/v1/sponsor_party_dates?on_conflict=year', {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify({ year: yr, party_date: partyInput, updated_at: new Date().toISOString() })
+    }).then(function(r) { if (!r.ok) throw new Error('Could not save'); return r.json(); }).then(function() {
+      setPartySaving(false); setPartyEditing(false);
+      loadPartyDates();
+      clearCache('Sponsor In-Kind');
+      cachedFetchAll('Sponsor In-Kind').then(function(rows) { if (Array.isArray(rows)) setAllInKind(rows); });
+      if (selected) setSelected(Object.assign({}, selected));
+      try { if (typeof logActivity === 'function') logActivity('Set sponsorship party date for ' + yr + ': ' + partyInput, 'sponsor_party_date'); } catch (e) {}
+    }).catch(function(err) { setPartySaving(false); alert(err.message); });
+  }
 
   useEffect(function() {
     if (!selected) { setAcks([]); setInkind([]); return; }
@@ -10803,6 +10850,23 @@ function SponsorsView() {
     });
   }
 
+  // Sponsor year picker: "Automatic" lets the party date decide; any other choice is kept as typed.
+  function sponsorYearSelect(value, dateStr, onChange) {
+    var auto = autoSponsorYear(dateStr, partyDates);
+    var base = parseInt(dateStr ? String(dateStr).slice(0, 4) : LEVEL_YEAR, 10);
+    var opts = [base - 1, base, base + 1];
+    return (
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Sponsor Year</div>
+        <select value={value || ''} onChange={function(ev) { onChange(ev.target.value); }} style={inpStyle}>
+          <option value="">{'Automatic' + (auto ? ' (' + auto + ')' : '')}</option>
+          {opts.map(function(y) { return <option key={y} value={String(y)}>{y}</option>; })}
+        </select>
+        {auto && dateStr && auto !== String(dateStr).slice(0, 4) && !value && <div style={{ fontSize: 10.5, color: '#886c44', marginTop: 4 }}>Received after the {String(dateStr).slice(0, 4)} sponsorship party, so it counts toward {auto}. The receipt keeps the date received.</div>}
+      </div>
+    );
+  }
+
   function selectSponsor(s) {
     setSelected(s);
     setAckForm({ date: new Date().toISOString().slice(0,10), method: '', notes: '' });
@@ -10817,13 +10881,13 @@ function SponsorsView() {
   // items regardless of which tier a sponsor is in.
   var TIERS = [
     { name: 'Presenting Sponsor', min: 10000, color: '#7c3aed', bg: '#f3f0ff', border: '#c4b5fd', range: '$10,000+', tickets: 6,
-      ownBenefits: ['"Presented by" naming & press release inclusion', 'Welcome remarks & materials table at event', '"2026 Presenting Sponsor" personalized brick placed on grounds'] },
+      ownBenefits: ['"Presented by" naming & press release inclusion', 'Welcome remarks & materials table at event', '"{year} Presenting Sponsor" personalized brick placed on grounds'] },
     { name: 'Keystone Sponsor', min: 5000, color: '#1565c0', bg: '#e3f2fd', border: '#90caf9', range: '$5,000–$9,999', tickets: 6,
-      ownBenefits: ['6 complimentary North Star House event tickets', '"2026 Keystone Sponsor" personalized brick placed on grounds'] },
+      ownBenefits: ['6 complimentary North Star House event tickets', '"{year} Keystone Sponsor" personalized brick placed on grounds'] },
     { name: 'Preservation Leader', min: 2500, color: '#2e7d32', bg: '#e8f5e9', border: '#a5d6a7', range: '$2,500–$4,999', tickets: 2,
-      ownBenefits: ['Large logo placement on banner', '"2026 Preservation Leader" personalized brick placed on grounds'] },
+      ownBenefits: ['Large logo placement on banner', '"{year} Preservation Leader" personalized brick placed on grounds'] },
     { name: 'Heritage Partner', min: 1000, color: '#b45309', bg: '#fffbeb', border: '#fcd34d', range: '$1,000–$2,499', tickets: 2,
-      ownBenefits: ['Website & newsletter feature', '"2026 Heritage Partner" personalized brick placed on grounds'] },
+      ownBenefits: ['Website & newsletter feature', '"{year} Heritage Partner" personalized brick placed on grounds'] },
     { name: 'Friend of the North Star House', min: 300, color: '#0f766e', bg: '#f0fdfa', border: '#5eead4', range: '$300–$999', tickets: 2,
       ownBenefits: ['Sponsorship recognition & logo on website', 'Logo placement on banner', '2 complimentary North Star House event tickets'] },
     { name: 'Community Supporter', min: 0, color: '#6b7280', bg: '#f3f4f6', border: '#d1d5db', range: 'Under $300', tickets: 0,
@@ -10840,17 +10904,27 @@ function SponsorsView() {
     TIERS[tierIdx].benefits.unshift('Thank you note sent');
   }
 
-  function getTier(total) {
-    return TIERS.find(function(t) { return total >= t.min; }) || null;
+  // The tier's brick names the sponsor year it was earned in ("2027 Heritage Partner").
+  function getTier(total, year) {
+    var t = TIERS.find(function(x) { return total >= x.min; });
+    if (!t) return null;
+    var y = String(year || LEVEL_YEAR);
+    return Object.assign({}, t, { benefits: t.benefits.map(function(b) { return b.replace('{year}', y); }) });
   }
 
-  // Level is based on contributions made in the current year only (not all-time totals).
+  // Level is based on one sponsor year's running total (not all-time totals). A gift received on or
+  // after the sponsorship party counts toward the next sponsor year. A sponsor is shown at their newest
+  // active sponsor year: this calendar year, or next year once they've given after the party.
   var LEVEL_YEAR = String(new Date().getFullYear());
-  function inLevelYear(e) { return e && e.date && String(e.date).slice(0, 4) === LEVEL_YEAR; }
-  function sponsorInKindTotal(sponsorId) {
-    return allInKind.filter(function(e) { return e.sponsor_id === sponsorId && inLevelYear(e); })
+  function levelYearOf(entries) {
+    var ys = (entries || []).map(sponsorYearOf).filter(function(y) { return y && y >= LEVEL_YEAR; }).sort();
+    return ys.length ? ys[ys.length - 1] : LEVEL_YEAR;
+  }
+  function yearTotal(entries, year) {
+    return (entries || []).filter(function(e) { return sponsorYearOf(e) === year; })
       .reduce(function(sum, e) { return sum + (parseFloat(e.value) || 0); }, 0);
   }
+  function sponsorEntries(sponsorId) { return allInKind.filter(function(e) { return e.sponsor_id === sponsorId; }); }
 
   // Tracks which of the sponsor's tier benefits have actually been fulfilled
   // (logo placed, brick ordered, tickets sent, etc.) -- keyed by the benefit's
@@ -10875,6 +10949,8 @@ function SponsorsView() {
     if (!inkindForm.description || !inkindForm.date || !inkindForm.value) return;
     setInkindSaving(true);
     var payload = { sponsor_id: selected.id, description: inkindForm.description, date: inkindForm.date, value: parseFloat(inkindForm.value), contribution_type: inkindForm.contribution_type || null };
+    // blank = automatic (the database sorts it by the party date); a picked year is kept as typed
+    if (inkindForm.sponsor_year) payload.sponsor_year = parseInt(inkindForm.sponsor_year, 10);
     fetch(SUPABASE_URL + '/rest/v1/' + encodeURIComponent('Sponsor In-Kind'), {
       method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -11297,9 +11373,9 @@ function SponsorsView() {
   }
 
   function resolvedTab(s) {
-    // gave this year (any contribution dated this year) = Current
+    // has a contribution counting toward this sponsor year or next (given after the party) = Current
     var thisYear = String(new Date().getFullYear());
-    var gaveThisYear = allInKind.some(function(e) { return e.sponsor_id === s.id && e.date && String(e.date).slice(0, 4) === thisYear; });
+    var gaveThisYear = allInKind.some(function(e) { return e.sponsor_id === s.id && sponsorYearOf(e) >= thisYear; });
     if (gaveThisYear) return 'current';
     if (s.sponsor_status) return s.sponsor_status;
     return 'current';
@@ -11324,6 +11400,30 @@ function SponsorsView() {
 
   return (
     <div>
+      {(function() {
+        // This year's sponsorship party date. Gifts on or after it count toward next year's sponsor recognition.
+        var p = partyDates.find(function(r) { return String(r.year) === LEVEL_YEAR; });
+        var nice = p ? new Date(p.party_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+        var next = String(parseInt(LEVEL_YEAR, 10) + 1);
+        return (
+          <div style={{ background: '#faf8f4', border: '0.5px solid #e8e0d5', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: gold, fontWeight: 700, marginBottom: 3 }}>{LEVEL_YEAR} Sponsorship Party</div>
+              <div style={{ fontSize: 12.5, color: '#555', lineHeight: 1.5 }}>
+                {p ? <>{nice}. Sponsorships received on or after this date count toward {next} recognition. Receipts keep the date received.</>
+                   : <>No party date set yet. Until one is set, every gift counts toward the year it was received.</>}
+              </div>
+            </div>
+            {partyEditing
+              ? <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input type="date" value={partyInput} onChange={function(e) { setPartyInput(e.target.value); }} style={Object.assign({}, inpStyle, { width: 160 })} />
+                  <button onClick={savePartyDate} disabled={partySaving || !partyInput} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, cursor: 'pointer', opacity: partySaving || !partyInput ? 0.6 : 1 }}>{partySaving ? 'Saving…' : 'Save'}</button>
+                  <button onClick={function() { setPartyEditing(false); }} style={{ background: '#f5f0ea', border: 'none', borderRadius: 6, padding: '7px 12px', fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              : <button onClick={function() { setPartyInput(p ? p.party_date : ''); setPartyEditing(true); }} style={{ background: 'none', border: '0.5px solid #d8cdb9', borderRadius: 6, padding: '5px 12px', fontSize: 11.5, color: gold, cursor: 'pointer' }}>{p ? 'Change date' : 'Set party date'}</button>}
+          </div>
+        );
+      })()}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
         <StatCard label="Current" value={sponsors === null ? '...' : currentSponsors.length} />
         <StatCard label="Past" value={sponsors === null ? '...' : pastSponsors.length} />
@@ -11370,12 +11470,14 @@ function SponsorsView() {
                     {s['Main Contact'] && <span style={{ fontSize: 12, color: '#666' }}>{s['Main Contact']}</span>}
                     {s['Area Supported'] && <span style={{ fontSize: 12, color: '#aaa' }}>{s['Area Supported']}</span>}
                     {(function() {
-                      var total = sponsorInKindTotal(s.id);
-                      var tier = getTier(total);
+                      var ents = sponsorEntries(s.id);
+                      var ly = levelYearOf(ents);
+                      var total = yearTotal(ents, ly);
+                      var tier = getTier(total, ly);
                       return (
                         <>
                           {total > 0 && <span style={{ fontSize: 12, fontWeight: 600, color: gold }}>${total.toLocaleString()}</span>}
-                          {tier && <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '1px 8px', whiteSpace: 'nowrap' }}>{tier.name}</span>}
+                          {tier && <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '1px 8px', whiteSpace: 'nowrap' }}>{ly !== LEVEL_YEAR ? ly + ' ' : ''}{tier.name}</span>}
                         </>
                       );
                     })()}
@@ -11489,15 +11591,20 @@ function SponsorsView() {
             {/* In-Kind Contributions */}
             <div style={{ borderTop: '0.5px solid #f0ece6', paddingTop: 16, marginTop: 8, marginBottom: 8 }}>
               {(function() {
-                var total = inkind.filter(inLevelYear).reduce(function(s,e){return s+(parseFloat(e.value)||0);},0);
-                var tier = getTier(total);
+                var ly = levelYearOf(inkind);
+                var total = yearTotal(inkind, ly);
+                var tier = getTier(total, ly);
+                // still finishing this year's recognition while next year's has started
+                var prevTotal = ly !== LEVEL_YEAR ? yearTotal(inkind, LEVEL_YEAR) : 0;
+                var prevTier = prevTotal > 0 ? getTier(prevTotal, LEVEL_YEAR) : null;
                 return (
                   <div style={{ marginBottom: 14 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: tier ? 10 : 0 }}>
-                      <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>{LEVEL_YEAR} Total Contributions:</span>
+                      <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#aaa', fontWeight: 600 }}>{ly} Sponsor Year Total:</span>
                       <span style={{ fontSize: 15, fontWeight: 700, color: '#2a2a2a' }}>${total.toLocaleString()}</span>
                       {tier && <span style={{ fontSize: 11, fontWeight: 600, color: tier.color, background: tier.bg, border: '1px solid ' + tier.border, borderRadius: 20, padding: '2px 10px' }}>{tier.name}</span>}
                     </div>
+                    {prevTier && <div style={{ fontSize: 11.5, color: '#888', margin: '-4px 0 10px' }}>{LEVEL_YEAR} sponsor year: ${prevTotal.toLocaleString()} · {prevTier.name}</div>}
                     {tier && (function() {
                       var checklist = selected.benefits_checklist || {};
                       var doneCount = tier.benefits.filter(function(b) { return checklist[b]; }).length;
@@ -11550,8 +11657,9 @@ function SponsorsView() {
                               <option value="Discount">Discount</option>
                             </select>
                           </div>
+                          {sponsorYearSelect(editInKindForm.sponsor_year, editInKindForm.date, function(v) { setEditInKindForm(function(f) { return Object.assign({}, f, { sponsor_year: v }); }); })}
                           <div style={{ display: 'flex', gap: 8 }}>
-                            <button onClick={function() { updateInKind(e.id, { description: editInKindForm.description, date: editInKindForm.date, value: parseFloat(editInKindForm.value) || 0, contribution_type: editInKindForm.contribution_type || null }); }}
+                            <button onClick={function() { updateInKind(e.id, { description: editInKindForm.description, date: editInKindForm.date, value: parseFloat(editInKindForm.value) || 0, contribution_type: editInKindForm.contribution_type || null, sponsor_year: editInKindForm.sponsor_year ? parseInt(editInKindForm.sponsor_year, 10) : null }); }}
                               disabled={isSaving} style={{ flex: 1, background: gold, color: '#fff', border: 'none', borderRadius: 6, padding: '7px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: isSaving ? 0.7 : 1 }}>{isSaving ? 'Saving…' : 'Save'}</button>
                             <button onClick={function() { setEditingInKindId(null); }} style={{ padding: '7px 12px', background: '#f5f0ea', border: 'none', borderRadius: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}>Cancel</button>
                           </div>
@@ -11564,6 +11672,7 @@ function SponsorsView() {
                         <div style={{ minWidth: 78, flexShrink: 0 }}>
                           <div style={{ fontFamily: "'Cardo', Georgia, serif", fontSize: 19, fontWeight: 700, color: '#2a2a2a', lineHeight: 1.1 }}>${(parseFloat(e.value)||0).toLocaleString()}</div>
                           <div style={{ fontSize: 11, color: '#999', marginTop: 4, letterSpacing: 0.2 }}>{when}</div>
+                          {e.date && sponsorYearOf(e) !== String(e.date).slice(0, 4) && <div style={{ fontSize: 10, fontWeight: 600, color: '#886c44', marginTop: 4 }}>Counts toward {sponsorYearOf(e)}</div>}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {e.contribution_type && <div style={{ display: 'inline-block', fontSize: 9.5, fontWeight: 700, color: '#886c44', letterSpacing: 0.9, textTransform: 'uppercase', border: '0.5px solid #d8c9aa', background: '#faf6ee', padding: '2px 8px', borderRadius: 3, marginBottom: 5 }}>{e.contribution_type === 'Monetary Value' ? 'Monetary Donation' : e.contribution_type}</div>}
@@ -11574,7 +11683,7 @@ function SponsorsView() {
                           style={{ width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #c9b896', borderRadius: 6, color: gold, cursor: 'pointer', padding: 0, flexShrink: 0 }}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></button>
                         <button type="button" onClick={function() { printEnvelope(selected); }} title="Print an envelope" aria-label="Print an envelope"
                           style={{ width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #c9b896', borderRadius: 6, color: gold, cursor: 'pointer', padding: 0, flexShrink: 0 }}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg></button>
-                        <button type="button" onClick={function() { setEditingInKindId(e.id); setEditInKindForm({ description: e.description || '', date: e.date || '', value: e.value != null ? String(e.value) : '', contribution_type: e.contribution_type || '' }); }} title="Edit" aria-label="Edit"
+                        <button type="button" onClick={function() { setEditingInKindId(e.id); setEditInKindForm({ description: e.description || '', date: e.date || '', value: e.value != null ? String(e.value) : '', contribution_type: e.contribution_type || '', sponsor_year: e.sponsor_year_manual && e.sponsor_year ? String(e.sponsor_year) : '' }); }} title="Edit" aria-label="Edit"
                           style={{ width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #c9b896', borderRadius: 6, color: gold, cursor: 'pointer', padding: 0, flexShrink: 0 }}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
                         <button type="button" onClick={function() { deleteInKind(e.id); }} title="Delete" aria-label="Delete"
                           style={{ width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#fff', border: '0.5px solid #e6dcd0', borderRadius: 6, color: '#b9b2a6', cursor: 'pointer', padding: 0, flexShrink: 0 }}><svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
@@ -11608,6 +11717,7 @@ function SponsorsView() {
                     <option value="Discount">Discount</option>
                   </select>
                 </div>
+                {sponsorYearSelect(inkindForm.sponsor_year, inkindForm.date, function(v) { setInkindForm(function(f) { return Object.assign({}, f, { sponsor_year: v }); }); })}
                 <button type="submit" disabled={inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value} style={{ background: gold, color: '#fff', border: 'none', borderRadius: 7, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: (inkindSaving || !inkindForm.description || !inkindForm.date || !inkindForm.value) ? 0.6 : 1, width: '100%' }}>{inkindSaving ? 'Saving…' : 'Add Contribution'}</button>
               </form>
               ))}
