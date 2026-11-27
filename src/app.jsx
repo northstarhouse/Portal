@@ -4917,7 +4917,7 @@ function DonorsView({ navigate }) {
     var lastGift = sorted[0]||null;
     // A brick purchase does not count toward membership: it is left out of the tier and out of whether the donor is current.
     var isBrick = function(d){return d.type==='Brick Purchase';};
-    var memberYearTotal = dons.filter(function(d){return !isBrick(d)&&d.date&&new Date(d.date).getFullYear()===THIS_YEAR;}).reduce(function(s,d){return s+d.amount;},0);
+    var memberYearTotal = dons.filter(function(d){return !isBrick(d)&&d.type!=='Sponsorship'&&d.date&&new Date(d.date).getFullYear()===THIS_YEAR;}).reduce(function(s,d){return s+d.amount;},0);
     var lastMemberGift = sorted.filter(function(d){return !isBrick(d);})[0]||null;
     return Object.assign({},donorRow,{
       donations: dons,
@@ -4928,6 +4928,7 @@ function DonorsView({ navigate }) {
       membership_year_total: memberYearTotal,
       status: nshGetStatus(lastMemberGift?lastMemberGift.date:null),
       tier: nshGetTier(memberYearTotal).tier,
+      donorKind: dons.some(function(d){return d.type==='Sponsorship';}) ? 'sponsor' : (dons.length>0&&dons.every(function(d){return d.type==='Brick Purchase';}) ? 'brick' : ''),
     });
   }
 
@@ -5987,7 +5988,11 @@ function DonorsView({ navigate }) {
                           </div>
                         </td>
                         <td style={{padding:'14px 18px'}}>
-                          {d.tier==='none'
+                          {d.donorKind==='sponsor'
+                            ? <span style={{display:'inline-flex',justifyContent:'flex-start',boxSizing:'border-box',width:168,whiteSpace:'nowrap',padding:'3px 14px',borderRadius:20,fontSize:12.5,fontWeight:600,background:'#f6ecd4',color:'#7a5a1e',border:'1px solid #e5d3a3'}}>Sponsor</span>
+                            : d.donorKind==='brick'
+                            ? <span style={{display:'inline-flex',justifyContent:'flex-start',boxSizing:'border-box',width:168,whiteSpace:'nowrap',padding:'3px 14px',borderRadius:20,fontSize:12.5,fontWeight:600,background:'#fee2e2',color:'#7f1d1d',border:'1px solid #fca5a5'}}>Brick Purchase</span>
+                            : d.tier==='none'
                             ? <span style={{color:'#ccc',fontSize:13}}>—</span>
                             : <span style={{display:'inline-flex',justifyContent:'flex-start',boxSizing:'border-box',width:168,whiteSpace:'nowrap',padding:'3px 14px',borderRadius:20,fontSize:12.5,fontWeight:600,background:tierInfo.bg,color:tierInfo.color,border:'1px solid '+tierInfo.border}}>{tierInfo.label}</span>}
                         </td>
