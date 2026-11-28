@@ -7,6 +7,14 @@
 -- ticket orders), website ticket earnings come from ticket_orders (not the automatic "Website tickets" earnings line), and sponsor
 -- cash that already has a donation is not listed again from the sponsor's contribution lines.
 -- security_invoker makes the view obey the same access rules as the tables underneath it. Safe to re-run.
+-- venue_payments is not readable by the app's own role, so the view reads it through this staff-only function.
+create or replace function public.ledger_venue_payments()
+returns table (id uuid, created_at timestamptz, amount_cents numeric, payer_name text)
+language sql stable security definer set search_path = public as $$
+  select p.id, p.created_at, p.amount_cents::numeric, p.payer_name from public.venue_payments p where public.has_valid_app_session();
+$$;
+revoke all on function public.ledger_venue_payments() from public;
+grant execute on function public.ledger_venue_payments() to anon, authenticated;
 create or replace view public.money_ledger with (security_invoker = true) as
   -- spending (Operational budget: Portal and Volunteer Hub both write here)
   select 'op_budget'::text as src, b.id::text as src_id, b.date::date as date, 'out'::text as direction, coalesce(b.amount, 0)::numeric as amount,
@@ -49,7 +57,7 @@ create or replace view public.money_ledger with (security_invoker = true) as
   -- venue rental payments made online
   select 'venue_payments', p.id::text, (p.created_at at time zone 'America/Los_Angeles')::date, 'in', (coalesce(p.amount_cents, 0) / 100.0)::numeric, null, 'venue', null, 'paypal',
          p.payer_name, 'Venue rental payment', null
-  from public.venue_payments p
+  from public.ledger_venue_payments() p
   union all
   -- venue rental payments logged by hand on a client
   select 'venue_manual', (f.id::text || ':' || coalesce(m.value ->> 'id', m.ordinality::text)), (m.value ->> 'date')::date, 'in', ((m.value ->> 'cents')::numeric / 100.0), null, 'venue', null, 'other',
