@@ -12889,13 +12889,13 @@ function FinanceLedgerPanel() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: '#2a2a2a', fontWeight: 600 }}>{r.who || r.description || '—'}</div>
                 {r.who && r.description && <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{r.description}</div>}
+                {r.event && <div style={{ fontSize: 12, color: '#8a8478', marginTop: 1 }}>{r.event}</div>}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
                   {out ? pill('Money out', '#fbeae1', '#a8532b') : pill('Money in', '#e4f2e4', '#2e6b3a')}
                   {r.area && out && pill(r.area, '#eef2f7', '#3a5068', function() { set('area', r.area); })}
                   {r.type && pill(LEDGER_TYPE_LABELS[r.type] || r.type, r.type === 'sponsorship' ? '#f6ecd4' : '#eef2f7', r.type === 'sponsorship' ? '#7a5a1e' : '#3a5068', function() { set('type', r.type); })}
                   {r.paid_from && pill('Paid from: ' + (LEDGER_PAID_FROM_LABELS[r.paid_from] || r.paid_from), '#f3efe7', '#6b5a3a', function() { set('paid', r.paid_from); })}
                   {r.received_into && pill('Into: ' + (LEDGER_RECEIVED_LABELS[r.received_into] || r.received_into), '#f3efe7', '#6b5a3a', function() { set('recv', r.received_into); })}
-                  {r.event && pill(r.event, '#fff', '#8a8478')}
                 </div>
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, color: out ? (r.paid_from === 'in_kind' ? '#886c44' : '#c07040') : '#2e7d32', whiteSpace: 'nowrap' }}>{out ? '-' : ''}{money(amt(r))}</div>
