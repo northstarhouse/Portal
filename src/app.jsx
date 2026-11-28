@@ -12808,11 +12808,111 @@ var NSH_BILLS = [
   { name: 'Microsoft 365 Personal', amount: 99.99, amountText: '$99.99 + tax', often: 'Yearly', note: 'Annual renewal on December 3, 2026. This is the upcoming renewal price, not a verified historical amount.' },
 ];
 
+// Finance > All Money: every money entry from the combined list (money_ledger), filterable by direction, area, type, paid from and
+// received into. Money out leaves out in-kind (shown on its own), like the rest of Finance.
+var LEDGER_TYPE_LABELS = { venue: 'Venue rental', events: 'Event tickets', donation: 'Donation', membership: 'Membership', brick: 'Brick purchase', sponsorship: 'Sponsorship', grant: 'Grant', class_fees: 'Class fees', other: 'Other' };
+var LEDGER_PAID_FROM_LABELS = { nsh_direct: 'North Star House', cash_box: 'Cash box', reimbursement: 'Reimbursement', in_kind: 'In-kind' };
+var LEDGER_RECEIVED_LABELS = { paypal: 'PayPal', cash_box: 'Cash box', check: 'Check (to deposit)', bank: 'Bank', other: 'Other' };
+function FinanceLedgerPanel() {
+  var hdrs = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+  var [rows, setRows] = useState(null);
+  var [failed, setFailed] = useState(false);
+  var [f, setF] = useState({ year: String(new Date().getFullYear()), dir: 'all', area: 'all', type: 'all', paid: 'all', recv: 'all', cashbox: false, q: '' });
+  var [limit, setLimit] = useState(150);
+  useEffect(function() {
+    fetchAllPages(SUPABASE_URL + '/rest/v1/money_ledger?select=*&order=date.desc.nullslast', hdrs)
+      .then(function(r) { setRows(Array.isArray(r) ? r : []); setFailed(!Array.isArray(r)); })
+      .catch(function() { setFailed(true); setRows([]); });
+  }, []);
+  function set(k, v) { setF(function(o) { var n = Object.assign({}, o); n[k] = v; return n; }); setLimit(150); }
+  function money(n) { return '$' + (parseFloat(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  if (rows === null) return <div style={{ textAlign: 'center', padding: 30, color: '#aaa', fontSize: 13 }}>Loading every money entry…</div>;
+  var yearOf = function(r) { return r.date ? String(r.date).slice(0, 4) : ''; };
+  var years = Array.from(new Set(rows.map(yearOf).filter(Boolean))).sort().reverse();
+  var areas = Array.from(new Set(rows.filter(function(r) { return r.direction === 'out' && r.area; }).map(function(r) { return r.area; }))).sort();
+  var types = Array.from(new Set(rows.filter(function(r) { return r.type; }).map(function(r) { return r.type; }))).sort();
+  var q = f.q.trim().toLowerCase();
+  var shown = rows.filter(function(r) {
+    if (f.year !== 'all' && yearOf(r) !== f.year) return false;
+    if (f.dir !== 'all' && r.direction !== f.dir) return false;
+    if (f.area !== 'all' && r.area !== f.area) return false;
+    if (f.type !== 'all' && r.type !== f.type) return false;
+    if (f.paid !== 'all' && r.paid_from !== f.paid) return false;
+    if (f.recv !== 'all' && r.received_into !== f.recv) return false;
+    if (f.cashbox && !(r.paid_from === 'cash_box' || r.received_into === 'cash_box')) return false;
+    if (q && ((r.who || '') + ' ' + (r.description || '') + ' ' + (r.event || '') + ' ' + (r.area || '')).toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  });
+  var amt = function(r) { return parseFloat(r.amount) || 0; };
+  var moneyIn = shown.filter(function(r) { return r.direction === 'in'; }).reduce(function(t, r) { return t + amt(r); }, 0);
+  var moneyOut = shown.filter(function(r) { return r.direction === 'out' && r.paid_from !== 'in_kind'; }).reduce(function(t, r) { return t + amt(r); }, 0);
+  var inKind = shown.filter(function(r) { return r.paid_from === 'in_kind'; }).reduce(function(t, r) { return t + amt(r); }, 0);
+  var sel = { border: '0.5px solid #d8cfbf', borderRadius: 8, padding: '7px 10px', fontSize: 12, color: '#4a3b24', background: '#fff', minWidth: 0 };
+  var quick = function(label, on, fn) { return <button type="button" onClick={fn} style={{ border: '1px solid ' + (on ? '#886c44' : '#e0d8cc'), background: on ? '#886c44' : '#fff', color: on ? '#fff' : '#886c44', borderRadius: 999, padding: '5px 13px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{label}</button>; };
+  var pill = function(text, bg, color, onClick) { return <span onClick={onClick} title={onClick ? 'Filter by this' : undefined} style={{ fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: bg, color: color, whiteSpace: 'nowrap', cursor: onClick ? 'pointer' : 'default' }}>{text}</span>; };
+  function exportRows() {
+    var out = shown.map(function(r) { return { Date: r.date || '', Direction: r.direction === 'in' ? 'Money in' : 'Money out', Area: r.area || '', Type: LEDGER_TYPE_LABELS[r.type] || '', 'Paid from': LEDGER_PAID_FROM_LABELS[r.paid_from] || '', 'Received into': LEDGER_RECEIVED_LABELS[r.received_into] || '', Who: r.who || '', Description: r.description || '', Event: r.event || '', Amount: amt(r) }; });
+    downloadXlsxRows(['Date', 'Direction', 'Area', 'Type', 'Paid from', 'Received into', 'Who', 'Description', 'Event', 'Amount'], out, 'all-money-' + f.year + '.xlsx');
+  }
+  return (
+    <div>
+      {failed && <div style={{ color: '#b3261e', fontSize: 12, marginBottom: 10 }}>Could not load the money list. Please refresh.</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 14 }}>
+        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '14px 16px' }}><div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Money in</div><div style={{ fontSize: 22, fontWeight: 700, color: '#2e7d32', marginTop: 4 }}>{money(moneyIn)}</div></div>
+        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '14px 16px' }}><div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Money out</div><div style={{ fontSize: 22, fontWeight: 700, color: '#c07040', marginTop: 4 }}>{money(moneyOut)}</div></div>
+        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '14px 16px' }}><div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>Net</div><div style={{ fontSize: 22, fontWeight: 700, color: moneyIn - moneyOut >= 0 ? '#2e7d32' : '#c62828', marginTop: 4 }}>{(moneyIn - moneyOut < 0 ? '-' : '') + money(Math.abs(moneyIn - moneyOut))}</div></div>
+        <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '14px 16px' }}><div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888', fontWeight: 600 }}>In-kind (not counted)</div><div style={{ fontSize: 22, fontWeight: 700, color: '#886c44', marginTop: 4 }}>{money(inKind)}</div></div>
+      </div>
+      <div style={{ background: '#fff', borderRadius: 12, border: '0.5px solid #e8e0d5', padding: '14px 16px' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          {quick('Everything', f.dir === 'all' && !f.cashbox && f.type === 'all' && f.area === 'all' && f.paid === 'all' && f.recv === 'all', function() { setF(function(o) { return Object.assign({}, o, { dir: 'all', cashbox: false, type: 'all', area: 'all', paid: 'all', recv: 'all' }); }); setLimit(150); })}
+          {quick('Money in', f.dir === 'in' && !f.cashbox, function() { setF(function(o) { return Object.assign({}, o, { dir: 'in', cashbox: false, area: 'all', paid: 'all' }); }); setLimit(150); })}
+          {quick('Money out', f.dir === 'out' && !f.cashbox, function() { setF(function(o) { return Object.assign({}, o, { dir: 'out', cashbox: false, type: 'all', recv: 'all' }); }); setLimit(150); })}
+          {quick('Cash box', f.cashbox, function() { setF(function(o) { return Object.assign({}, o, { cashbox: !o.cashbox, dir: 'all', area: 'all', type: 'all', paid: 'all', recv: 'all' }); }); setLimit(150); })}
+          {quick('Sponsorships', f.type === 'sponsorship', function() { setF(function(o) { return Object.assign({}, o, { type: o.type === 'sponsorship' ? 'all' : 'sponsorship', dir: 'in', cashbox: false }); }); setLimit(150); })}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
+          <select value={f.year} onChange={function(e) { set('year', e.target.value); }} style={sel} aria-label="Year"><option value="all">All years</option>{years.map(function(y) { return <option key={y} value={y}>{y}</option>; })}</select>
+          <select value={f.area} onChange={function(e) { set('area', e.target.value); }} style={sel} aria-label="Area"><option value="all">All areas</option>{areas.map(function(a) { return <option key={a} value={a}>{a}</option>; })}</select>
+          <select value={f.type} onChange={function(e) { set('type', e.target.value); }} style={sel} aria-label="Type"><option value="all">All types</option>{types.map(function(t) { return <option key={t} value={t}>{LEDGER_TYPE_LABELS[t] || t}</option>; })}</select>
+          <select value={f.paid} onChange={function(e) { set('paid', e.target.value); }} style={sel} aria-label="Paid from"><option value="all">Paid from: any</option>{Object.keys(LEDGER_PAID_FROM_LABELS).map(function(k) { return <option key={k} value={k}>{LEDGER_PAID_FROM_LABELS[k]}</option>; })}</select>
+          <select value={f.recv} onChange={function(e) { set('recv', e.target.value); }} style={sel} aria-label="Received into"><option value="all">Received into: any</option>{Object.keys(LEDGER_RECEIVED_LABELS).map(function(k) { return <option key={k} value={k}>{LEDGER_RECEIVED_LABELS[k]}</option>; })}</select>
+          <input value={f.q} onChange={function(e) { set('q', e.target.value); }} placeholder="Search name, description, event…" style={Object.assign({}, sel, { flex: 1, minWidth: 160 })} />
+          <button type="button" onClick={exportRows} style={{ padding: '7px 12px', fontSize: 12, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>Export</button>
+        </div>
+        <div style={{ fontSize: 12, color: '#999', marginBottom: 6 }}>{shown.length.toLocaleString()} {shown.length === 1 ? 'entry' : 'entries'}</div>
+        {shown.length === 0 ? <div style={{ color: '#bbb', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>Nothing matches these filters.</div> : shown.slice(0, limit).map(function(r, i) {
+          var out = r.direction === 'out';
+          return (
+            <div key={r.src + ':' + r.src_id + ':' + i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderTop: '0.5px solid #f0ece6' }}>
+              <div style={{ width: 84, fontSize: 11.5, color: '#999', paddingTop: 2, flexShrink: 0 }}>{r.date || 'No date'}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: '#2a2a2a', fontWeight: 600 }}>{r.who || r.description || '—'}</div>
+                {r.who && r.description && <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{r.description}</div>}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
+                  {out ? pill('Money out', '#fbeae1', '#a8532b') : pill('Money in', '#e4f2e4', '#2e6b3a')}
+                  {r.area && out && pill(r.area, '#eef2f7', '#3a5068', function() { set('area', r.area); })}
+                  {r.type && pill(LEDGER_TYPE_LABELS[r.type] || r.type, r.type === 'sponsorship' ? '#f6ecd4' : '#eef2f7', r.type === 'sponsorship' ? '#7a5a1e' : '#3a5068', function() { set('type', r.type); })}
+                  {r.paid_from && pill('Paid from: ' + (LEDGER_PAID_FROM_LABELS[r.paid_from] || r.paid_from), '#f3efe7', '#6b5a3a', function() { set('paid', r.paid_from); })}
+                  {r.received_into && pill('Into: ' + (LEDGER_RECEIVED_LABELS[r.received_into] || r.received_into), '#f3efe7', '#6b5a3a', function() { set('recv', r.received_into); })}
+                  {r.event && pill(r.event, '#fff', '#8a8478')}
+                </div>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: out ? (r.paid_from === 'in_kind' ? '#886c44' : '#c07040') : '#2e7d32', whiteSpace: 'nowrap' }}>{out ? '-' : ''}{money(amt(r))}</div>
+            </div>
+          );
+        })}
+        {shown.length > limit && <div style={{ textAlign: 'center', marginTop: 12 }}><button type="button" onClick={function() { setLimit(limit + 200); }} style={{ padding: '7px 16px', fontSize: 12, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>Show more ({(shown.length - limit).toLocaleString()} left)</button></div>}
+      </div>
+    </div>
+  );
+}
+
 function FinancialOverviewView({ navigate }) {
   var { useState, useEffect, useMemo } = React;
   var thisYear = new Date().getFullYear();
   var [year, setYear] = useState(thisYear);
-  var [activeTab, setActiveTab] = useState('donations');
+  var [activeTab, setActiveTab] = useState('all');
   var [cashDir, setCashDir] = useState('all'); // Office Cash Flow list: 'all' | 'In' | 'Out'
   var [expandedArea, setExpandedArea] = useState(null);
   var [expandedEvent, setExpandedEvent] = useState(null);
@@ -13043,6 +13143,7 @@ function FinancialOverviewView({ navigate }) {
   var yearOptions = [thisYear];
 
   var TABS = [
+    { id: 'all', label: 'All Money' },
     { id: 'donations', label: 'Donations' },
     { id: 'sponsorships', label: 'Sponsorships' },
     { id: 'operational', label: 'Operational Areas' },
@@ -13149,7 +13250,7 @@ function FinancialOverviewView({ navigate }) {
           <select value={year} onChange={function(e) { setYear(parseInt(e.target.value)); }} style={{ padding: '7px 12px', borderRadius: 8, border: '0.5px solid #e0d8cc', fontSize: 13, background: '#fff' }}>
             {yearOptions.map(function(y) { return <option key={y} value={y}>{y}</option>; })}
           </select>
-          <button onClick={exportActiveTab} style={{ padding: '7px 12px', fontSize: 12, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>↓ Export Excel</button>
+          {activeTab !== 'all' && <button onClick={exportActiveTab} style={{ padding: '7px 12px', fontSize: 12, fontWeight: 600, border: '0.5px solid #e0d8cc', borderRadius: 8, background: '#fff', color: '#886c44', cursor: 'pointer' }}>↓ Export Excel</button>}
         </div>
       </div>
 
@@ -13158,12 +13259,13 @@ function FinancialOverviewView({ navigate }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+          {activeTab === 'all' && <FinanceLedgerPanel />}
+          {activeTab !== 'all' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
             <div style={card}><div style={cardLabel}>Total Income</div><div style={{ ...cardValue, color: '#2e7d32' }}>{money(stats.totalIncome)}</div></div>
             <div style={card}><div style={cardLabel}>Total Outflow</div><div style={{ ...cardValue, color: '#c07040' }}>{money(stats.totalOutflow)}</div></div>
             <div style={card}><div style={cardLabel}>Net</div><div style={{ ...cardValue, color: stats.net >= 0 ? '#2e7d32' : '#c62828' }}>{stats.net >= 0 ? '' : '-'}{money(Math.abs(stats.net))}</div></div>
             <div style={card}><div style={cardLabel}>In-Kind Total</div><div style={{ ...cardValue, color: '#886c44' }}>{money(stats.totalInKind + stats.sponsorInKind)}</div></div>
-          </div>
+          </div>}
 
 
           {activeTab === 'donations' && (
